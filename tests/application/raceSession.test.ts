@@ -39,6 +39,86 @@ function createScoreStore() {
 
 describe('RaceSession', () => {
 
+  it('simulates equal wall time consistently across frame rates, including countdown overflow', () => {
+    const snapshots = [10, 20, 30, 60, 120].map((hz) => {
+      const { store } = createScoreStore()
+      const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+      session.start(track, setup)
+      for (let frame = 0; frame < hz * 5; frame++) session.advance(1 / hz, noInput)
+      const state = session.snapshot().state
+      if (!state) throw new Error('Missing race state')
+      return state
+    })
+    const reference = snapshots[0]?.vehicles[0]
+    if (!reference) throw new Error('Missing player')
+    for (const state of snapshots) {
+      expect(state.elapsed).toBeCloseTo(1.3, 8)
+      expect(state.vehicles[0]?.x).toBeCloseTo(reference.x, 8)
+      expect(state.vehicles[0]?.y).toBeCloseTo(reference.y, 8)
+    }
+  })
+
+  it('ignores invalid deltas and clears fractional running time on pause and restart', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start(track, setup)
+    for (const delta of [-1, NaN, Infinity]) session.advance(delta, noInput)
+    expect(session.snapshot().telemetry.countdown).toBe(3.7)
+    session.advance(3.7, noInput)
+    session.advance(0.01, noInput)
+    session.setPaused(true)
+    session.setPaused(false)
+    session.advance(0.01, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBe(0)
+    session.restart()
+    session.advance(3.7, noInput)
+    session.advance(0.01, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBe(0)
+    for (const delta of [-1, NaN, Infinity]) session.advance(delta, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBe(0)
+  })
+
+  it('consumes countdown overflow and limits running catch-up after a long stall', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start(track, setup)
+    session.advance(3.8, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(0.1, 8)
+    session.advance(10, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(0.35, 8)
+  })
+
+  it('publishes and updates continuous feedback once for a multi-step frame', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback })
+    const listener = vi.fn()
+    session.subscribe(listener)
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    listener.mockClear()
+    vi.mocked(feedback.handle).mockClear()
+    session.advance(0.1, noInput)
+    expect(listener).toHaveBeenCalledOnce()
+    expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'engine')).toHaveLength(1)
+    expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'surface')).toHaveLength(1)
+  })
+
+  it('stops substeps at a terminal result and records it once', () => {
+    const { store } = createScoreStore()
+    const step = vi.fn<RaceStep>((state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 1 } : vehicle) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    }))
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.1, noInput)
+    session.advance(0.1, noInput)
+    expect(step).toHaveBeenCalledOnce()
+    expect(store.record).toHaveBeenCalledOnce()
+  })
+
   it('resets a reverse-race player facing reverse travel', () => {
     const { store } = createScoreStore()
     const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })

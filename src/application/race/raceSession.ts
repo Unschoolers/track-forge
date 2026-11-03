@@ -109,6 +109,10 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
   damageLimit: 0,
 }
 
+// Limit running catch-up to 250 ms per frame after background stalls.
+const FIXED_STEP = 1 / 60
+const MAX_CATCH_UP = 0.25
+
 export class RaceSession implements RaceSessionPort {
   private readonly events = new EventBus<RaceSessionSnapshot>()
   private readonly now: () => number
@@ -121,6 +125,7 @@ export class RaceSession implements RaceSessionPort {
     standings: [],
     result: null,
   }
+  private remainder = 0
   private destroyed = false
   private readonly geometry: TrackGeometryService
 
@@ -133,6 +138,7 @@ export class RaceSession implements RaceSessionPort {
   start(track: Track, setup: RaceSetup): void {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
+    this.remainder = 0
     const state = createRace({
       path: this.geometry.get(track).path,
       playerCar: setup.car,
@@ -175,6 +181,7 @@ export class RaceSession implements RaceSessionPort {
     if (paused) this.dependencies.feedback.silenceContinuous()
     const state = this.current.state
     if (!state || state.paused === paused) return
+    this.remainder = 0
     this.publish(
       this.buildSnapshot(
         this.current.track,
@@ -186,45 +193,37 @@ export class RaceSession implements RaceSessionPort {
   }
 
   advance(deltaSeconds: number, input: DriverInput): void {
-    const state = this.current.state
-    if (!state || state.paused || state.phase === 'finished' || this.destroyed) {
-      return
-    }
+    let state = this.current.state
+    if (!state || state.paused || state.phase === 'finished' || this.destroyed ||
+        !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return
+
+    let runningTime = deltaSeconds
+    let countdownChanged = false
     if (state.phase === 'countdown') {
       const countdown = Math.max(0, state.countdown - deltaSeconds)
-      this.publish(
-        this.buildSnapshot(
-          this.current.track,
-          this.current.setup,
-          {
-            ...state,
-            countdown,
-            phase: countdown <= Number.EPSILON ? 'running' : 'countdown',
-          },
-          null,
-        ),
-      )
-      return
+      runningTime = Math.max(0, deltaSeconds - state.countdown)
+      state = { ...state, countdown, phase: countdown <= Number.EPSILON ? 'running' : 'countdown' }
+      countdownChanged = true
     }
-    const stepped = this.step(
-      state,
-      input,
-      Math.max(0, deltaSeconds),
-      this.dependencies.random,
-    )
-    const terminalEvent = stepped.events.find(
-      (event) => event.type === 'race-finished',
-    )
-    const resultState =
-      terminalEvent?.reason === 'water'
-        ? this.withoutPlayerFinish(stepped.state)
-        : stepped.state
-    const result =
-      resultState.phase === 'finished'
-        ? (this.current.result ??
-          this.createResult(resultState, terminalEvent?.reason))
-        : null
-    this.routeFeedback(resultState, stepped.events, input)
+
+    this.remainder += Math.min(runningTime, MAX_CATCH_UP)
+    const events: ReturnType<RaceStep>['events'][number][] = []
+    let stepped = false
+    while (state.phase === 'running' && this.remainder + 1e-10 >= FIXED_STEP) {
+      const next = this.step(state, input, FIXED_STEP, this.dependencies.random)
+      state = next.state
+      events.push(...next.events)
+      this.remainder = Math.max(0, this.remainder - FIXED_STEP)
+      stepped = true
+    }
+    if (!stepped && !countdownChanged) return
+    if (state.phase === 'finished') this.remainder = 0
+    const terminalEvent = events.find((event) => event.type === 'race-finished')
+    const resultState = terminalEvent?.reason === 'water' ? this.withoutPlayerFinish(state) : state
+    const result = resultState.phase === 'finished'
+      ? (this.current.result ?? this.createResult(resultState, terminalEvent?.reason))
+      : null
+    if (stepped) this.routeFeedback(resultState, events, input)
     if (result && !this.current.result) {
       this.dependencies.feedback.silenceContinuous()
       this.dependencies.feedback.handle({
@@ -233,14 +232,7 @@ export class RaceSession implements RaceSessionPort {
         newRecord: result.newRecord,
       })
     }
-    this.publish(
-      this.buildSnapshot(
-        this.current.track,
-        this.current.setup,
-        resultState,
-        result,
-      ),
-    )
+    this.publish(this.buildSnapshot(this.current.track, this.current.setup, resultState, result))
   }
 
   snapshot(): RaceSessionSnapshot {
