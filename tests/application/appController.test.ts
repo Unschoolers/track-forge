@@ -170,6 +170,95 @@ describe('AppController', () => {
     expect(trackStore.save.mock.calls[0]?.[0].trees).toHaveLength(9)
   })
 
+  it('preserves pending edits when renaming a track', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'rename-track', name: 'Renamed' })
+    flush()
+    expect(trackStore.find(asTrackId('starter'))).toMatchObject({ name: 'Renamed', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
+  })
+
+  it.each(['select-track', 'select-track-for-edit', 'select-track-for-race'] as const)(
+    'preserves pending edits before %s', (type) => {
+      const { controller, trackStore } = setup()
+      const other = createStarterTrack(asTrackId('other'), 2)
+      trackStore.tracks.set(other.id, other)
+      controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+      controller.dispatch({ type, id: other.id })
+      expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    },
+  )
+
+  it('preserves pending edits before creating a track', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'create-track', name: 'New Track' })
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('flushes pending edits on destroy', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.destroy()
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('retains a failed pending save for retry and blocks replacing the draft', () => {
+    const { controller, trackStore } = setup()
+    const other = createStarterTrack(asTrackId('other'), 2)
+    trackStore.tracks.set(other.id, other)
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    trackStore.save.mockReturnValueOnce(false)
+    controller.dispatch({ type: 'select-track', id: other.id })
+    expect(controller.snapshot().currentTrack?.id).toBe('starter')
+    expect(controller.snapshot().notice).toBe('Save unavailable.')
+    controller.dispatch({ type: 'save-current-track' })
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(controller.snapshot().notice).toBe('Track saved.')
+  })
+
+  it('clears a failure notice after a later successful flush', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    trackStore.save.mockReturnValueOnce(false)
+    flush()
+    expect(controller.snapshot().notice).toBe('Save unavailable.')
+    expect(controller.flushPendingEditorSave()).toBe(true)
+    expect(controller.snapshot().notice).toBeNull()
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('clears a failed draft save notice when a lighting save succeeds', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    trackStore.save.mockReturnValueOnce(false)
+    flush()
+    expect(controller.snapshot().notice).toBe('Save unavailable.')
+
+    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, lighting: 'night' } })
+
+    expect(trackStore.find(asTrackId('starter'))).toMatchObject({
+      lighting: 'night', trees: expect.arrayContaining([{ x: 4, y: 5 }]),
+    })
+    expect(controller.snapshot().notice).toBeNull()
+  })
+
+  it('does not resurrect a deleted track when a canceled callback runs', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'delete-track', id: asTrackId('starter') })
+    flush()
+    expect(trackStore.find(asTrackId('starter'))).toBeUndefined()
+  })
+
+  it('does not overwrite newer lighting with a pending editor save', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, lighting: 'night' } })
+    flush()
+    expect(trackStore.find(asTrackId('starter'))).toMatchObject({ lighting: 'night', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
+  })
+
   it('persists preference changes through the injected repository', () => {
     const { controller, preferencesStore, trackStore } = setup()
 

@@ -108,10 +108,14 @@ document.addEventListener('pointerdown', unlockFeedback, { once: true })
 document.addEventListener('keydown', unlockFeedback, { once: true })
 
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) controller.flushPendingEditorSave()
   if (document.hidden && controller.snapshot().mode === 'race') {
     controller.dispatch({ type: 'pause-race' })
   }
 })
+
+window.addEventListener('pagehide', () => controller.flushPendingEditorSave())
+window.addEventListener('trackforge:pause', () => controller.flushPendingEditorSave())
 
 window.addEventListener(
   'beforeunload',
