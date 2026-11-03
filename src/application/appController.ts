@@ -135,7 +135,10 @@ export class AppController {
         })
         break
       case 'open-editor':
-        this.update({ ...this.state, mode: 'editor', paused: false, notice: null })
+        if (this.state.mode === 'race') {
+          this.dependencies.raceSession.setPaused(true)
+        }
+        this.update({ ...this.state, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
         break
       case 'start-race':
         this.startRace()

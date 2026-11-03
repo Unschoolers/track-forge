@@ -11,7 +11,7 @@ import {
 } from '@/application/appController'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import type { RaceSessionPort } from '@/application/race/raceSession'
+import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
@@ -36,7 +36,7 @@ const preferences: Preferences = {
   dynamicZoomEnabled: true,
 }
 
-function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
+function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false) {
   const trackStore = new TrackMemory()
   trackStore.tracks.set(track.id, track)
   const preferencesStore: PreferencesStore = {
@@ -66,12 +66,21 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
     subscribe: vi.fn(() => () => undefined),
     destroy: vi.fn(),
   }
+  const session = realRace ? new RaceSession({
+    scoreStore,
+    random: { next: () => 0.5 },
+    feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() },
+    step: (state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 12.5 } : vehicle) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    }),
+  }) : raceSession
   const controller = new AppController({
     trackStore,
     preferencesStore,
     scoreStore,
     scheduler,
-    raceSession,
+    raceSession: session,
     geometry: new TrackGeometryService(),
     createTrackId: () => asTrackId('created'),
     now: () => 500,
@@ -83,7 +92,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
     preferencesStore,
     scheduler,
     cancel,
-    raceSession,
+    raceSession: session,
     flush: () => pending?.(),
   }
 }
@@ -133,6 +142,44 @@ describe('AppController', () => {
     expect(raceSession.setPaused).toHaveBeenLastCalledWith(true)
     expect(raceSession.setPaused).toHaveBeenCalledTimes(2)
     expect(controller.snapshot().mode).toBe('home')
+  })
+
+  it('returns from finished results to the existing editor and silences the race', () => {
+    const { controller, raceSession, trackStore } = setup(undefined, true)
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'start-race' })
+    const input = { steering: 0, throttle: 1, braking: false }
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(controller.snapshot()).toMatchObject({ mode: 'race', paused: true, overlay: { type: 'results' } })
+
+    controller.dispatch({ type: 'open-editor' })
+
+    expect(controller.snapshot()).toMatchObject({ mode: 'editor', paused: false, overlay: { type: 'none' }, currentTrack: { id: 'starter' } })
+    expect(raceSession.snapshot().state?.paused).toBe(true)
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(controller.snapshot().editor.trees).toContainEqual({ x: 4, y: 5 })
+    controller.dispatch({ type: 'editor', command: { type: 'undo' } })
+    expect(controller.snapshot().editor.trees).not.toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('retries a finished race and returns home from its results', () => {
+    const { controller, raceSession } = setup(undefined, true)
+    const input = { steering: 0, throttle: 1, braking: false }
+    controller.dispatch({ type: 'start-race' })
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(controller.snapshot().overlay.type).toBe('results')
+    controller.dispatch({ type: 'restart-race' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'race', paused: false, overlay: { type: 'none' } })
+    expect(raceSession.snapshot().result).toBeNull()
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(controller.snapshot().overlay.type).toBe('results')
+    controller.dispatch({ type: 'go-home' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', paused: false, overlay: { type: 'none' } })
+    expect(raceSession.snapshot().state?.paused).toBe(true)
   })
 
   it('keeps an incomplete track in the editor instead of starting a race', () => {
