@@ -1,0 +1,17 @@
+:root {
+  color-scheme: dark;
+  --color-bg: #080b10;
+  --color-panel: #141a24;
+  --color-panel-raised: #1d2532;
+  --color-line: #303b4d;
+  --color-text: #f4f7fb;
+  --color-muted: #9aa8ba;
+  --color-accent: #ff6b35;
+  --color-good: #35d07f;
+  --color-danger: #ff5068;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.8rem;
+  --radius-lg: 1.2rem;
+  --shadow-deep: 0 1.4rem 4rem rgb(0 0 0 / 45%);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}

@@ -1,0 +1,102 @@
+import type { AppSnapshot } from '@/application/appState'
+import type { Track, TrackId } from '@/domain/model'
+import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { validateTrack } from '@/domain/track/trackValidation'
+import { button, element } from '@/ui/dom'
+import { formatRaceTime } from '@/ui/format'
+import { createModalFrame } from '@/ui/modals/modalFrame'
+
+export interface TrackLibraryActions {
+  readonly close: () => void
+  readonly create: () => void
+  readonly selectForEdit: (id: TrackId) => void
+  readonly selectForRace: (id: TrackId) => void
+  readonly delete: (track: Track) => void
+}
+
+export function createTrackLibraryModal(
+  state: AppSnapshot,
+  actions: TrackLibraryActions,
+  geometry: TrackGeometryService,
+): HTMLElement {
+  if (state.overlay.type !== 'track-library') {
+    throw new Error('Track library requires a track-library overlay')
+  }
+  const race = state.overlay.purpose === 'race'
+  const frame = createModalFrame(
+    race ? 'Choose a track' : 'Choose a track to edit',
+    race
+      ? 'Select a race-ready circuit. Car and difficulty come next.'
+      : 'Select an existing named track or create a new one.',
+    actions.close,
+  )
+  const list = element('div', 'track-list')
+  for (const track of state.tracks) {
+    const validation = validateTrack(
+      track,
+      geometry.get(track).path.totalLength,
+    )
+    const scores = state.scoresByTrack[track.id] ?? []
+    const best = scores[0]
+    const card = element(
+      'article',
+      `track-card${track.id === state.currentTrack?.id ? ' selected' : ''}`,
+    )
+    const copy = element('div', 'track-card-copy')
+    copy.append(
+      element('strong', 'track-card-name', track.name),
+      element(
+        'span',
+        'track-card-meta',
+        `${validation.ready ? 'RACE READY' : 'NEEDS EDITING'} · BEST ${best ? formatRaceTime(best.time) : 'NO TIME'}`,
+      ),
+    )
+    const controls = element('div', 'track-card-actions')
+    const select = button(
+      race ? (validation.ready ? 'SELECT' : 'LOCKED') : 'EDIT',
+      race ? `select-race-${track.id}` : `select-edit-${track.id}`,
+      () =>
+        race
+          ? actions.selectForRace(track.id)
+          : actions.selectForEdit(track.id),
+      `track-mini-button${race && validation.ready ? ' primary' : ''}`,
+    )
+    if (race && !validation.ready) {
+      select.disabled = true
+      select.setAttribute('aria-disabled', 'true')
+    }
+    controls.append(select)
+    if (!race) {
+      controls.append(
+        button(
+          'DELETE',
+          `delete-${track.id}`,
+          () => actions.delete(track),
+          'track-mini-button danger',
+        ),
+      )
+    }
+    card.append(copy, controls)
+    list.append(card)
+  }
+  if (state.tracks.length === 0) {
+    list.append(
+      element('p', 'empty-state', 'No tracks saved yet.'),
+    )
+  }
+  frame.body.append(list)
+  if (!race) {
+    frame.footer.append(
+      button(
+        'NEW TRACK',
+        'new-track',
+        actions.create,
+        'button',
+      ),
+    )
+  }
+  frame.footer.append(
+    button('BACK', 'library-back', actions.close, 'button button-primary'),
+  )
+  return frame.overlay
+}

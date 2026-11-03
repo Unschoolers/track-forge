@@ -1,0 +1,404 @@
+import { describe, expect, it, vi } from 'vitest'
+import type {
+  Preferences,
+  PreferencesStore,
+  ScoreStore,
+  TrackStore,
+} from '@/application/ports/storage'
+import {
+  AppController,
+  type Scheduler,
+} from '@/application/appController'
+import { asTrackId, type Track, type TrackId } from '@/domain/model'
+import { createStarterTrack } from '@/domain/track/starterTrack'
+import type { RaceSessionPort } from '@/application/race/raceSession'
+import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { normalizeTerrain } from '@/domain/terrain/terrainField'
+import { TERRAIN_LIMITS } from '@/domain/config'
+
+class TrackMemory implements TrackStore {
+  readonly tracks = new Map<TrackId, Track>()
+  save = vi.fn((track: Track) => {
+    this.tracks.set(track.id, track)
+    return true
+  })
+  list = () => [...this.tracks.values()]
+  find = (id: TrackId) => this.tracks.get(id)
+  remove = (id: TrackId) => this.tracks.delete(id)
+}
+
+const preferences: Preferences = {
+  car: 'blue',
+  difficulty: 'normal',
+  lighting: 'day',
+  audioEnabled: true,
+  hapticsEnabled: true,
+  dynamicZoomEnabled: true,
+}
+
+function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
+  const trackStore = new TrackMemory()
+  trackStore.tracks.set(track.id, track)
+  const preferencesStore: PreferencesStore = {
+    load: () => preferences,
+    save: vi.fn(() => true),
+  }
+  const scoreStore: ScoreStore = {
+    forTrack: () => [],
+    record: vi.fn(() => true),
+    removeTrack: vi.fn(() => true),
+  }
+  let pending: (() => void) | undefined
+  const cancel = vi.fn()
+  const scheduler: Scheduler = {
+    schedule: vi.fn((_delay, task) => {
+      pending = task
+      return cancel
+    }),
+  }
+  const raceSession: RaceSessionPort = {
+    start: vi.fn(),
+    restart: vi.fn(),
+    resetPlayer: vi.fn(),
+    setPaused: vi.fn(),
+    advance: vi.fn(),
+    snapshot: vi.fn(),
+    subscribe: vi.fn(() => () => undefined),
+    destroy: vi.fn(),
+  }
+  const controller = new AppController({
+    trackStore,
+    preferencesStore,
+    scoreStore,
+    scheduler,
+    raceSession,
+    geometry: new TrackGeometryService(),
+    createTrackId: () => asTrackId('created'),
+    now: () => 500,
+  })
+  return {
+    controller,
+    trackStore,
+    scoreStore,
+    preferencesStore,
+    scheduler,
+    cancel,
+    raceSession,
+    flush: () => pending?.(),
+  }
+}
+
+describe('AppController', () => {
+  it('publishes immutable snapshots and coordinates mode transitions', () => {
+    const { controller, raceSession } = setup()
+    const listener = vi.fn()
+    const unsubscribe = controller.subscribe(listener)
+
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'start-race' })
+    controller.dispatch({ type: 'pause-race' })
+
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'race',
+      paused: true,
+      currentTrack: { name: 'Starter Circuit' },
+    })
+    expect(listener).toHaveBeenCalledTimes(3)
+    expect(raceSession.start).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Starter Circuit' }),
+      { car: 'blue', difficulty: 'normal', laps: 3 },
+    )
+    expect(raceSession.setPaused).toHaveBeenCalledWith(true)
+    unsubscribe()
+  })
+
+  it('resumes and restarts the same authoritative race session', () => {
+    const { controller, raceSession } = setup()
+    controller.dispatch({ type: 'start-race' })
+    controller.dispatch({ type: 'pause-race' })
+    controller.dispatch({ type: 'resume-race' })
+    controller.dispatch({ type: 'restart-race' })
+
+    expect(raceSession.setPaused).toHaveBeenLastCalledWith(false)
+    expect(raceSession.restart).toHaveBeenCalledOnce()
+  })
+
+  it('stops the active race when quitting to home', () => {
+    const { controller, raceSession } = setup()
+    controller.dispatch({ type: 'start-race' })
+    controller.dispatch({ type: 'pause-race' })
+
+    controller.dispatch({ type: 'go-home' })
+
+    expect(raceSession.setPaused).toHaveBeenLastCalledWith(true)
+    expect(raceSession.setPaused).toHaveBeenCalledTimes(2)
+    expect(controller.snapshot().mode).toBe('home')
+  })
+
+  it('keeps an incomplete track in the editor instead of starting a race', () => {
+    const incomplete = {
+      ...createStarterTrack(asTrackId('short'), 1),
+      points: createStarterTrack(asTrackId('source'), 1).points.slice(0, 3),
+    }
+    const { controller } = setup(incomplete)
+
+    controller.dispatch({ type: 'start-race' })
+
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'editor',
+      notice: 'Add more road to complete the circuit',
+    })
+  })
+
+  it('debounces editor persistence through the injected scheduler', () => {
+    const { controller, trackStore, scheduler, cancel, flush } = setup()
+    controller.dispatch({
+      type: 'editor',
+      command: { type: 'add-tree', tree: { x: 4, y: 5 } },
+    })
+    controller.dispatch({
+      type: 'editor',
+      command: { type: 'add-tree', tree: { x: 7, y: 8 } },
+    })
+
+    expect(scheduler.schedule).toHaveBeenCalledTimes(2)
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(trackStore.save).not.toHaveBeenCalled()
+
+    flush()
+    expect(trackStore.save).toHaveBeenCalledOnce()
+    expect(trackStore.save.mock.calls[0]?.[0].trees).toHaveLength(9)
+  })
+
+  it('persists preference changes through the injected repository', () => {
+    const { controller, preferencesStore, trackStore } = setup()
+
+    controller.dispatch({
+      type: 'set-preferences',
+      preferences: { ...preferences, car: 'green', audioEnabled: false },
+    })
+
+    expect(preferencesStore.save).toHaveBeenCalledWith({
+      ...preferences,
+      car: 'green',
+      audioEnabled: false,
+    })
+    expect(controller.snapshot().preferences.car).toBe('green')
+
+    controller.dispatch({
+      type: 'set-preferences',
+      preferences: { ...preferences, lighting: 'night' },
+    })
+    expect(controller.snapshot().currentTrack?.lighting).toBe('night')
+    expect(trackStore.save).toHaveBeenCalledWith(
+      expect.objectContaining({ lighting: 'night', updatedAt: 500 }),
+    )
+  })
+
+  it('creates and renames tracks through typed library commands', () => {
+    const { controller, trackStore } = setup()
+
+    controller.dispatch({ type: 'open-track-library', purpose: 'edit' })
+    expect(controller.snapshot().overlay).toEqual({
+      type: 'track-library',
+      purpose: 'edit',
+    })
+
+    controller.dispatch({ type: 'create-track', name: '  Alpine   Loop ' })
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'editor',
+      overlay: { type: 'none' },
+      currentTrack: { id: 'created', name: 'Alpine Loop' },
+    })
+    expect(trackStore.find(asTrackId('created'))?.points).toEqual([])
+
+    controller.dispatch({ type: 'rename-track', name: 'Summit Ring' })
+    expect(controller.snapshot().currentTrack?.name).toBe('Summit Ring')
+  })
+
+  it('rejects incomplete race selections and opens setup for ready tracks', () => {
+    const incomplete = {
+      ...createStarterTrack(asTrackId('short'), 1),
+      points: createStarterTrack(asTrackId('source'), 1).points.slice(0, 3),
+      lighting: 'night' as const,
+    }
+    const { controller, trackStore, preferencesStore } = setup(incomplete)
+    const ready = {
+      ...createStarterTrack(asTrackId('ready'), 2),
+      lighting: 'night' as const,
+    }
+    trackStore.tracks.set(ready.id, ready)
+
+    controller.dispatch({
+      type: 'open-track-library',
+      purpose: 'race',
+    })
+    controller.dispatch({
+      type: 'select-track-for-race',
+      id: incomplete.id,
+    })
+    expect(controller.snapshot()).toMatchObject({
+      overlay: { type: 'track-library', purpose: 'race' },
+      notice: 'Add more road to complete the circuit',
+    })
+
+    controller.dispatch({ type: 'select-track-for-race', id: ready.id })
+    expect(controller.snapshot()).toMatchObject({
+      overlay: { type: 'race-setup' },
+      currentTrack: { id: 'ready' },
+      preferences: { lighting: 'night' },
+    })
+    expect(preferencesStore.save).toHaveBeenCalledWith({
+      ...preferences,
+      lighting: 'night',
+    })
+  })
+
+  it('deletes scores and selects the newest remaining track', () => {
+    const first = createStarterTrack(asTrackId('first'), 1)
+    const { controller, trackStore, scoreStore } = setup(first)
+    const newest = createStarterTrack(asTrackId('newest'), 10)
+    trackStore.tracks.set(newest.id, newest)
+
+    controller.dispatch({ type: 'delete-track', id: first.id })
+
+    expect(scoreStore.removeTrack).toHaveBeenCalledWith(first.id)
+    expect(controller.snapshot().currentTrack?.id).toBe('newest')
+    expect(controller.snapshot().editor.points).toEqual(newest.points)
+  })
+
+  it('tracks editor tool, surface, grid, and camera requests', () => {
+    const { controller } = setup()
+
+    controller.dispatch({ type: 'set-editor-tool', tool: 'paint' })
+    controller.dispatch({ type: 'set-editor-surface', surface: 'mixed' })
+    controller.dispatch({ type: 'set-editor-terrain-mode', mode: 'water' })
+    controller.dispatch({ type: 'set-editor-terrain-radius', radius: 96 })
+    controller.dispatch({ type: 'toggle-editor-grid' })
+    controller.dispatch({
+      type: 'request-editor-camera',
+      action: 'fit',
+    })
+
+    expect(controller.snapshot().editorUi).toEqual({
+      tool: 'paint',
+      surface: 'mixed',
+      structure: 'overpass',
+      terrainBrush: { mode: 'water', radius: 96 },
+      grid: true,
+      cameraRequest: { sequence: 1, action: 'fit' },
+      selectedCrossing: null,
+      selectedPoint: null,
+    })
+  })
+
+  it('persists terrain changes through the editor command boundary', () => {
+    const { controller, flush, trackStore } = setup()
+
+    controller.dispatch({
+      type: 'editor',
+      command: {
+        type: 'paint-terrain',
+        cells: [{ column: 2, row: 3 }],
+        kind: 'hill',
+      },
+    })
+
+    expect(controller.snapshot().editor.terrain.cells).toEqual([
+      { column: 2, row: 3, kind: 'hill' },
+    ])
+    expect(controller.snapshot().currentTrack?.terrain.cells).toEqual([
+      { column: 2, row: 3, kind: 'hill' },
+    ])
+    flush()
+    expect(trackStore.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        terrain: {
+          cellSize: 32,
+          cells: [{ column: 2, row: 3, kind: 'hill' }],
+        },
+      }),
+    )
+  })
+
+  it('applies undo and redo through the application command boundary', () => {
+    const { controller } = setup()
+    const original = controller.snapshot().editor.points[0]
+
+    controller.dispatch({
+      type: 'editor',
+      command: {
+        type: 'move-point',
+        index: 0,
+        point: { x: 999, y: 888 },
+      },
+    })
+    expect(controller.snapshot().editor.points[0]).toMatchObject({
+      x: 999,
+      y: 888,
+    })
+
+    controller.dispatch({ type: 'editor', command: { type: 'undo' } })
+    expect(controller.snapshot().editor.points[0]).toEqual(original)
+
+    controller.dispatch({ type: 'editor', command: { type: 'redo' } })
+    expect(controller.snapshot().editor.points[0]).toMatchObject({
+      x: 999,
+      y: 888,
+    })
+  })
+
+  it('reports rejected expansion without mutating or scheduling persistence', () => {
+    const base = createStarterTrack(asTrackId('bounded'), 1)
+    const track = {
+      ...base,
+      terrain: normalizeTerrain({
+        cells: [
+          {
+            column: TERRAIN_LIMITS.maximumCoordinate,
+            row: 0,
+            kind: 'hill',
+          },
+        ],
+      }),
+    }
+    const { controller, scheduler, trackStore } = setup(track)
+    const before = controller.snapshot()
+
+    controller.dispatch({
+      type: 'editor',
+      command: { type: 'expand', factor: 2 },
+    })
+
+    expect(controller.snapshot().editor).toBe(before.editor)
+    expect(controller.snapshot().currentTrack).toBe(before.currentTrack)
+    expect(controller.snapshot().notice).toBe(
+      'Expand cancelled: transformed terrain would exceed the map boundary.',
+    )
+    expect(scheduler.schedule).not.toHaveBeenCalled()
+    expect(trackStore.save).not.toHaveBeenCalled()
+  })
+
+  it('reports domain tree rejection without creating history', () => {
+    const base = createStarterTrack(asTrackId('water-tree'), 1)
+    const track = {
+      ...base,
+      terrain: normalizeTerrain({
+        cells: [{ column: 0, row: 0, kind: 'water' }],
+      }),
+    }
+    const { controller, scheduler } = setup(track)
+    const before = controller.snapshot().editor
+
+    controller.dispatch({
+      type: 'editor',
+      command: { type: 'add-tree', tree: { x: 16, y: 16 } },
+    })
+
+    expect(controller.snapshot().editor).toBe(before)
+    expect(controller.snapshot().notice).toBe(
+      'Trees cannot be placed in water.',
+    )
+    expect(scheduler.schedule).not.toHaveBeenCalled()
+  })
+})

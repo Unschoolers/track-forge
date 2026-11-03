@@ -1,0 +1,31 @@
+{
+  "name": "trackforge",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TrackForge racing game and track editor",
+  "scripts": {
+    "dev": "vite",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome lint .",
+    "build": "npm run typecheck && vite build",
+    "verify": "npm test && npm run typecheck && npm run lint && npm run build"
+  },
+  "dependencies": {
+    "phaser": "^4.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
+    "@types/node": "^24.1.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.0.6",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

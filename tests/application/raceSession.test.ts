@@ -1,0 +1,255 @@
+import { describe, expect, it, vi } from 'vitest'
+import type { ScoreEntry, ScoreStore } from '@/application/ports/storage'
+import { RaceSession } from '@/application/race/raceSession'
+import { asTrackId } from '@/domain/model'
+import { createStarterTrack } from '@/domain/track/starterTrack'
+import type { RaceStep } from '@/domain/race/raceEngine'
+import type { FeedbackPort } from '@/application/ports/feedback'
+
+const track = createStarterTrack(asTrackId('session-track'), 1)
+const setup = {
+  car: 'blue' as const,
+  difficulty: 'normal' as const,
+  laps: 3,
+}
+const noInput = { steering: 0, throttle: 1, braking: false }
+
+function createFeedback(): FeedbackPort {
+  return {
+    unlock: vi.fn(),
+    setEnabled: vi.fn(),
+    handle: vi.fn(),
+    silenceContinuous: vi.fn(),
+    destroy: vi.fn(),
+  }
+}
+
+function createScoreStore() {
+  const scores: ScoreEntry[] = []
+  const store: ScoreStore = {
+    forTrack: () => [...scores].sort((left, right) => left.time - right.time),
+    record: vi.fn((_trackId, score) => {
+      scores.push(score)
+      return true
+    }),
+    removeTrack: vi.fn(() => true),
+  }
+  return { store, scores }
+}
+
+describe('RaceSession', () => {
+  it('owns countdown, pause, restart, and observable snapshots', () => {
+    const { store } = createScoreStore()
+    const step = vi.fn<RaceStep>((state) => ({ state, events: [] }))
+    const feedback = createFeedback()
+    const session = new RaceSession({
+      scoreStore: store,
+      random: { next: () => 0.5 },
+      feedback,
+      now: () => 100,
+      step,
+    })
+    const listener = vi.fn()
+    session.subscribe(listener)
+    session.start(track, setup)
+    const initial = session.snapshot()
+
+    session.advance(3.6, noInput)
+    expect(session.snapshot().telemetry).toMatchObject({
+      phase: 'countdown',
+      countdown: expect.closeTo(0.1),
+      elapsed: 0,
+    })
+    expect(step).not.toHaveBeenCalled()
+
+    session.advance(0.1, noInput)
+    expect(session.snapshot().telemetry.phase).toBe('running')
+    session.setPaused(true)
+    expect(feedback.silenceContinuous).toHaveBeenCalledTimes(2)
+    session.advance(1, noInput)
+    expect(step).not.toHaveBeenCalled()
+
+    session.setPaused(false)
+    session.advance(0.02, noInput)
+    expect(step).toHaveBeenCalledOnce()
+    session.restart()
+    expect(feedback.silenceContinuous).toHaveBeenCalledTimes(3)
+    expect(session.snapshot()).toMatchObject({
+      telemetry: { phase: 'countdown', countdown: 3.7, elapsed: 0 },
+      result: null,
+    })
+    expect(session.snapshot().state).toEqual(initial.state)
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it('publishes terminal results and records a player finish exactly once', () => {
+    const { store } = createScoreStore()
+    const step: RaceStep = (state) => ({
+      state: {
+        ...state,
+        phase: 'finished',
+        elapsed: 12.5,
+        vehicles: state.vehicles.map((vehicle, index) => ({
+          ...vehicle,
+          lap: index === 0 ? state.totalLaps : vehicle.lap,
+          finishedAt: index === 0 ? 12.5 : vehicle.finishedAt,
+        })),
+      },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    })
+    const feedback = createFeedback()
+    const session = new RaceSession({
+      scoreStore: store,
+      random: { next: () => 0.5 },
+      feedback,
+      now: () => 250,
+      step,
+    })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+    session.advance(0.02, noInput)
+
+    expect(store.record).toHaveBeenCalledOnce()
+    expect(store.record).toHaveBeenCalledWith(track.id, {
+      time: 12.5,
+      car: 'blue',
+      difficulty: 'normal',
+      recordedAt: 250,
+    })
+    expect(session.snapshot().result).toMatchObject({
+      outcome: 'finished',
+      trackId: track.id,
+      playerPlace: 1,
+      playerTime: 12.5,
+      playerWrecked: false,
+      newRecord: true,
+      highScores: [{ time: 12.5 }],
+    })
+    expect(feedback.handle).toHaveBeenCalledWith({
+      type: 'finish',
+      place: 1,
+      newRecord: true,
+    })
+    expect(feedback.silenceContinuous).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports wrecks without writing a score and destroys idempotently', () => {
+    const { store } = createScoreStore()
+    const step: RaceStep = (state) => ({
+      state: {
+        ...state,
+        phase: 'finished',
+        vehicles: state.vehicles.map((vehicle) =>
+          vehicle.player ? { ...vehicle, wrecked: true } : vehicle,
+        ),
+      },
+      events: [{ type: 'race-finished', reason: 'wrecked' }],
+    })
+    const feedback = createFeedback()
+    const session = new RaceSession({
+      scoreStore: store,
+      random: { next: () => 0.5 },
+      feedback,
+      step,
+    })
+    const listener = vi.fn()
+    session.subscribe(listener)
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+
+    expect(session.snapshot().result).toMatchObject({
+      outcome: 'wrecked',
+      playerTime: null,
+      playerWrecked: true,
+    })
+    expect(store.record).not.toHaveBeenCalled()
+    session.destroy()
+    session.destroy()
+    session.setPaused(true)
+    expect(feedback.silenceContinuous).toHaveBeenCalledTimes(3)
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it('publishes water once, silences feedback, and never writes a score', () => {
+    const { store } = createScoreStore()
+    const step: RaceStep = (state) => ({
+      state: {
+        ...state,
+        phase: 'finished',
+        elapsed: 12.5,
+        vehicles: state.vehicles.map((vehicle) =>
+          vehicle.player ? { ...vehicle, finishedAt: 12.5 } : vehicle,
+        ),
+      },
+      events: [{ type: 'race-finished', reason: 'water' }],
+    })
+    const feedback = createFeedback()
+    const session = new RaceSession({
+      scoreStore: store,
+      random: { next: () => 0.5 },
+      feedback,
+      now: () => 250,
+      step,
+    })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+    session.advance(0.02, noInput)
+
+    expect(session.snapshot().result).toMatchObject({
+      outcome: 'water',
+      playerTime: null,
+      newRecord: false,
+      highScores: [],
+    })
+    expect(
+      session.snapshot().result?.standings.find(({ player }) => player),
+    ).toMatchObject({
+      id: 'player',
+      finishTime: null,
+    })
+    expect(
+      session.snapshot().state?.vehicles.find(({ player }) => player)
+        ?.finishedAt,
+    ).toBeNull()
+    expect(
+      session.snapshot().standings.find(({ player }) => player)?.finishTime,
+    ).toBeNull()
+    expect(store.record).not.toHaveBeenCalled()
+    expect(feedback.silenceContinuous).toHaveBeenCalledTimes(2)
+    expect(
+      vi.mocked(feedback.handle).mock.calls.filter(
+        ([event]) => event.type === 'finish',
+      ),
+    ).toEqual([
+      [{ type: 'finish', place: 1, newRecord: false }],
+    ])
+  })
+
+  it('includes the player car and cornering load in engine feedback', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    const session = new RaceSession({
+      scoreStore: store,
+      random: { next: () => 0.5 },
+      feedback,
+      step: (state) => ({ state, events: [] }),
+    })
+    session.start(track, { ...setup, car: 'red' })
+    session.advance(3.7, noInput)
+    session.advance(0.02, {
+      ...noInput,
+      steering: -0.75,
+    })
+
+    expect(feedback.handle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'engine',
+        car: 'red',
+        cornering: 0.75,
+      }),
+    )
+  })
+})
