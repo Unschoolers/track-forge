@@ -257,7 +257,7 @@ export class RaceSession implements RaceSessionPort {
     state: RaceState,
     result: RaceResult | null,
   ): RaceSessionSnapshot {
-    const ranked = rankVehicles(state.vehicles, state.path.points.length)
+    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed)
     const standings = ranked.map((vehicle, index) =>
       this.toStanding(vehicle, index),
     )
@@ -289,7 +289,7 @@ export class RaceSession implements RaceSessionPort {
     const track = this.current.track
     const setup = this.current.setup
     if (!track || !setup) return null
-    const ranked = rankVehicles(state.vehicles, state.path.points.length)
+    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed)
     const player = ranked.find((vehicle) => vehicle.player)
     if (!player) return null
     const outcome =

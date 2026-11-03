@@ -285,6 +285,44 @@ describe('race simulation', () => {
       .toEqual(['ai-2', 'player', 'ai-1', 'ai-3'])
   })
 
+  it('preserves the physical starting grid in both directions', () => {
+    for (const [startRatio, reversed] of [[0, false], [0.35, false], [0.35, true]] as const) {
+      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3, startRatio, reversed })
+      expect(rankVehicles(race.vehicles, path.points.length, race.startPathIndex, reversed).map(({ id }) => id))
+        .toEqual(race.vehicles.map(({ id }) => id))
+    }
+  })
+
+  it('orders grid cars around the first crossing and the relocated seam in both directions', () => {
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const [first, second] = race.vehicles.map(required)
+    const length = path.points.length
+    if (!first || !second) throw new Error('Missing grid cars')
+    for (const [start, reversed] of [[0, false], [1, false], [length - 2, true]] as const) {
+      const indexAt = (offset: number) => (start + (reversed ? -offset : offset) + length) % length
+      const behind = { ...first, pathIndex: indexAt(-2) }
+      const crossed = updateProgress({ ...second, pathIndex: indexAt(-1) }, indexAt(1), length, 1, 3, start, reversed)
+      expect(crossed.lap).toBe(0)
+      expect(rankVehicles([behind, crossed], length, start, reversed).map(({ id }) => id)).toEqual([second.id, first.id])
+      const earlier = { ...first, pathIndex: indexAt(2) }
+      const later = { ...second, pathIndex: indexAt(4) }
+      expect(rankVehicles([earlier, later], length, start, reversed).map(({ id }) => id)).toEqual([second.id, first.id])
+    }
+  })
+
+  it('orders finish times before progress and resolves equal finishes by grid order', () => {
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const [first, second, third, fourth] = race.vehicles.map(required)
+    if (!first || !second || !third || !fourth) throw new Error('Missing grid cars')
+    const vehicles = [
+      { ...first, finishedAt: 10, pathIndex: 0 },
+      { ...second, finishedAt: 10, pathIndex: 5 },
+      { ...third, finishedAt: 9 },
+      { ...fourth, lap: 99 },
+    ]
+    expect(rankVehicles(vehicles, path.points.length).map(({ id }) => id)).toEqual([third.id, first.id, second.id, fourth.id])
+  })
+
   it('separates overlapping cars and applies bounded damage', () => {
     const race = createRace({
       path,

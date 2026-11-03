@@ -39,6 +39,34 @@ function createScoreStore() {
 
 describe('RaceSession', () => {
 
+  it('uses the moved reverse start for telemetry, standings, and results', () => {
+    for (const terminal of [false, true]) {
+      const { store } = createScoreStore()
+      const step: RaceStep = (state) => ({
+        state: {
+          ...state,
+          phase: terminal ? 'finished' : 'running',
+          vehicles: state.vehicles.map((vehicle, index) => ({
+            ...vehicle,
+            pathIndex: (state.startPathIndex - (index === 0 ? 4 : 1) + state.path.points.length) % state.path.points.length,
+          })),
+        },
+        events: terminal ? [{ type: 'race-finished', reason: 'water' }] : [],
+      })
+      const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+      session.start({ ...track, start: { ratio: 0.35, reversed: true } }, setup)
+      session.advance(3.7, noInput)
+      session.advance(1 / 60, noInput)
+      const snapshot = session.snapshot()
+      expect(snapshot.telemetry.position).toBe(1)
+      expect(snapshot.standings[0]?.id).toBe('player')
+      if (terminal) {
+        expect(snapshot.result?.playerPlace).toBe(1)
+        expect(snapshot.result?.standings[0]?.id).toBe('player')
+      }
+    }
+  })
+
   it('simulates equal wall time consistently across frame rates, including countdown overflow', () => {
     const snapshots = [10, 20, 30, 60, 120].map((hz) => {
       const { store } = createScoreStore()
