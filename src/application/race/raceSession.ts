@@ -161,7 +161,7 @@ export class RaceSession implements RaceSessionPort {
           ...state,
           vehicles: state.vehicles.map((vehicle) =>
             vehicle.player
-              ? resetVehicleToTrack(vehicle, state.path)
+              ? resetVehicleToTrack(vehicle, state.path, { reversed: state.reversed })
               : vehicle,
           ),
         },

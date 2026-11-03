@@ -38,6 +38,24 @@ function createScoreStore() {
 }
 
 describe('RaceSession', () => {
+
+  it('resets a reverse-race player facing reverse travel', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start({ ...track, start: { ratio: 0.35, reversed: true } }, setup)
+    session.advance(4, noInput)
+    session.resetPlayer()
+    const state = session.snapshot().state
+    if (!state) throw new Error('Missing race state')
+    const car = state.vehicles[0]
+    if (!car) throw new Error('Missing player')
+    const point = state.path.points[car.pathIndex]
+    const ahead = state.path.points[(car.pathIndex - 4 + state.path.points.length) % state.path.points.length]
+    if (!point || !ahead) throw new Error('Missing path points')
+    const expected = Math.atan2(ahead.y - point.y, ahead.x - point.x)
+    expect(Math.abs(Math.atan2(Math.sin(car.angle - expected), Math.cos(car.angle - expected)))).toBeLessThan(0.01)
+  })
+
   it('owns countdown, pause, restart, and observable snapshots', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({ state, events: [] }))

@@ -57,17 +57,18 @@ export function samplePathBehindStart(
       current = previous
       continue
     }
-    const direction = reversed ? -1 : 1
     const tangent = {
-      x: (dx / segmentLength) * direction,
-      y: (dy / segmentLength) * direction,
+      x: dx / segmentLength,
+      y: dy / segmentLength,
     }
     if (remaining <= segmentLength || step === path.points.length) {
       const ratio = Math.min(1, remaining / segmentLength)
       return {
         x: current.x + (previous.x - current.x) * ratio,
         y: current.y + (previous.y - current.y) * ratio,
-        pathIndex: reversed ? normalizedStart : index,
+        pathIndex: reversed && ratio < 0.5
+          ? (index - 1 + path.points.length) % path.points.length
+          : index,
         tangent,
         normal: { x: -tangent.y, y: tangent.x },
       }
@@ -135,7 +136,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
       speed: 0,
       slip: 0,
       braking: false,
-      lane: grid.lane,
+      lane: options.reversed ? -grid.lane : grid.lane,
       ai:
         index === 0
           ? null

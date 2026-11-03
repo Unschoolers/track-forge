@@ -274,11 +274,13 @@ export function resetVehicleToTrack(
 export function buildRaceCameraHints(
   path: RoadPath,
   player: RaceVehicle,
+  reversed = false,
 ): RaceCameraHints {
   const context = getVehicleStepContext(path, player)
   const sample = Math.max(5, Math.min(10, Math.round(5 + player.speed / 65)))
-  const behind = wrapped(path, context.nearest.index - sample) ?? player
-  const ahead = wrapped(path, context.nearest.index + sample) ?? player
+  const direction = reversed ? -1 : 1
+  const behind = wrapped(path, context.nearest.index - direction * sample) ?? player
+  const ahead = wrapped(path, context.nearest.index + direction * sample) ?? player
   const roadAngle = Math.atan2(ahead.y - behind.y, ahead.x - behind.x)
   const curveDistances = [8, 14, 20, 28] as const
   let weightedCurve = 0
@@ -286,7 +288,7 @@ export function buildRaceCameraHints(
   for (const [index, distance] of curveDistances.entries()) {
     const weight = 1 - index * 0.18
     weightedCurve +=
-      Math.abs(turnAmountAt(path, context.nearest.index + distance, 5)) *
+      Math.abs(turnAmountAt(path, context.nearest.index + direction * distance, 5)) *
       weight
     weightTotal += weight
   }
