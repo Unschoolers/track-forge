@@ -1,0 +1,9 @@
+{
+  "appId": "io.trackforge.app",
+  "appName": "TrackForge",
+  "webDir": "dist",
+  "server": {
+    "hostname": "trackforge.local",
+    "androidScheme": "https"
+  }
+}
