@@ -14,6 +14,8 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
+import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
+import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 import { TERRAIN_LIMITS } from '@/domain/config'
 
 class TrackMemory implements TrackStore {
@@ -248,6 +250,44 @@ describe('AppController', () => {
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
     controller.destroy()
     expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it.each([false, true])('recovers quota by deleting another track (still insufficient: %s)', (stillInsufficient) => {
+    const current = createStarterTrack(asTrackId('current'), 2)
+    const other = createStarterTrack(asTrackId('other'), 1)
+    const values = new Map<string, string>([[STORAGE_KEYS.trackMigration, '1']])
+    let limit = Infinity
+    const store = new BrowserTrackRepository({
+      get: (key) => values.get(key) ?? null,
+      set: (key, value) => { if (key === STORAGE_KEYS.tracks && value.length > limit) return false; values.set(key, value); return true },
+      remove: (key) => values.delete(key),
+    })
+    expect(store.save(current)).toBe(true)
+    expect(store.save(other)).toBe(true)
+    limit = stillInsufficient ? JSON.stringify([store.find(current.id)]).length : (values.get(STORAGE_KEYS.tracks) ?? '').length
+    const { controller, scoreStore, scheduler, raceSession } = setup()
+    controller.destroy()
+    const app = new AppController({ trackStore: store, scoreStore, scheduler, raceSession, preferencesStore: { load: () => preferences, save: () => true }, geometry: new TrackGeometryService(), createTrackId: () => asTrackId('new'), now: () => 500 })
+    app.dispatch({ type: 'open-editor' })
+    app.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    expect(app.flushPendingEditorSave()).toBe(false)
+    app.dispatch({ type: 'open-track-library', purpose: 'edit' })
+    expect(app.snapshot()).toMatchObject({ overlay: { type: 'track-library' }, notice: 'Save unavailable.' })
+    app.dispatch({ type: 'select-track-for-edit', id: other.id })
+    expect(app.snapshot().currentTrack?.id).toBe(current.id)
+    app.dispatch({ type: 'delete-track', id: other.id })
+    expect(store.find(other.id)).toBeUndefined()
+    expect(app.snapshot().currentTrack?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(app.snapshot().notice).toBe(stillInsufficient ? 'Save unavailable.' : null)
+    if (stillInsufficient) {
+      app.dispatch({ type: 'close-overlay' })
+      expect(app.snapshot().notice).toBe('Save unavailable.')
+      limit = Infinity
+      expect(app.flushPendingEditorSave()).toBe(true)
+    }
+    expect(store.find(current.id)?.trees).toContainEqual({ x: 4, y: 5 })
+    app.dispatch({ type: 'editor', command: { type: 'undo' } })
+    expect(app.snapshot().currentTrack?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
   it('retains a failed pending save for retry and blocks replacing the draft', () => {

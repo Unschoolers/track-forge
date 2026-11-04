@@ -209,14 +209,17 @@ export class RaceSession implements RaceSessionPort {
     this.remainder += Math.min(runningTime, MAX_CATCH_UP)
     const events: ReturnType<RaceStep>['events'][number][] = []
     let stepped = false
+    let peakShake = 0
     while (state.phase === 'running' && this.remainder + 1e-10 >= FIXED_STEP) {
       const next = this.step(state, input, FIXED_STEP, this.dependencies.random)
       state = next.state
+      peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
       this.remainder = Math.max(0, this.remainder - FIXED_STEP)
       stepped = true
     }
     if (!stepped && !countdownChanged) return
+    if (stepped) state = { ...state, cameraHints: { ...state.cameraHints, shake: peakShake } }
     if (state.phase === 'finished') this.remainder = 0
     const terminalEvent = events.find((event) => event.type === 'race-finished')
     const resultState = terminalEvent?.reason === 'water' ? this.withoutPlayerFinish(state) : state

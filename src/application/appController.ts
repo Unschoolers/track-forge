@@ -178,7 +178,7 @@ export class AppController {
         this.selectTrack(command.id)
         break
       case 'open-track-library': {
-        if (!this.flushPendingEditorSave()) break
+        this.flushPendingEditorSave()
         const library = this.librarySnapshot()
         this.update({
           ...this.state,
@@ -187,7 +187,6 @@ export class AppController {
             purpose: command.purpose,
           },
           ...library,
-          notice: null,
         })
         break
       }
@@ -525,7 +524,7 @@ export class AppController {
   }
 
   private deleteTrack(id: TrackId): void {
-    if (this.state.currentTrack?.id !== id && !this.flushPendingEditorSave()) return
+    const deletingCurrent = this.state.currentTrack?.id === id
     if (!this.library.delete(id)) {
       this.update({ ...this.state, notice: 'Track could not be deleted.' })
       return
@@ -552,8 +551,9 @@ export class AppController {
               currentTrack?.terrain,
             )
           : this.state.editor,
-      notice: null,
+      notice: deletingCurrent ? null : this.state.notice,
     })
+    if (!deletingCurrent) this.flushPendingEditorSave()
   }
 
   private closeOverlay(): void {
@@ -590,7 +590,9 @@ export class AppController {
     this.update({
       ...this.state,
       overlay: { type: 'none' },
-      notice: null,
+      notice: this.pendingEditorSave && this.state.notice === 'Save unavailable.'
+        ? this.state.notice
+        : null,
     })
   }
 

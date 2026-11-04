@@ -174,7 +174,7 @@ export class RaceScene extends Phaser.Scene {
     ) return
     this.snapshot = this.controller.snapshot()
     this.raceSession.advance(
-      Math.max(0, deltaMilliseconds / 1000),
+      Math.max(0, this.game.loop.rawDelta / 1000),
       this.controls.snapshot(),
     )
     const race = this.raceSession.snapshot().state

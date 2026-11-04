@@ -69,7 +69,7 @@ points to a keystore with alias `androiddebugkey` and store/key passwords
 `android`. Use the original signing key to update an existing installation.
 Never commit or share private keys.
 
-The Android workflow runs on main pushes, pull requests, and manual dispatch.
+The Android workflow runs on pushes to any branch, pull requests, and manual dispatch.
 After verification it publishes a signed debug APK for 30 days, linked from the
 workflow run summary. CI uses a version code of the run number plus 2. Configure
 the optional repository secret `TRACKFORGE_DEBUG_KEYSTORE_BASE64` with the

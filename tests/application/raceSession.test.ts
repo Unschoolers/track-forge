@@ -132,6 +132,17 @@ describe('RaceSession', () => {
     expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'surface')).toHaveLength(1)
   })
 
+  it('keeps peak shake from earlier substeps with the final camera pose', () => {
+    const { store } = createScoreStore()
+    let n = 0
+    const step: RaceStep = (state) => ({ state: { ...state, cameraHints: { ...state.cameraHints, shake: n++ === 0 ? 0.8 : 0, speed: n } }, events: [] })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.05, noInput)
+    expect(session.snapshot().state?.cameraHints).toMatchObject({ shake: 0.8, speed: 3 })
+  })
+
   it('stops substeps at a terminal result and records it once', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({
