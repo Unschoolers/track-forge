@@ -18,19 +18,19 @@ function forwardDistance(
   vehicle: RaceVehicle,
   other: RaceVehicle,
   path: RoadPath | number,
+  reversed: boolean,
 ): number {
   if (typeof path === 'number') {
     return path > 0
-      ? (other.pathIndex - vehicle.pathIndex + path) % path
+      ? ((reversed ? vehicle.pathIndex - other.pathIndex : other.pathIndex - vehicle.pathIndex) + path) % path
       : Number.POSITIVE_INFINITY
   }
   const length = path.totalLength
   if (length <= 0) return Number.POSITIVE_INFINITY
-  const vehicleDistance =
-    vehicle.lap * length + (path.points[vehicle.pathIndex]?.distance ?? 0)
-  const otherDistance =
-    other.lap * length + (path.points[other.pathIndex]?.distance ?? 0)
-  const direct = otherDistance - vehicleDistance
+  const vehicleDistance = path.points[vehicle.pathIndex]?.distance ?? 0
+  const otherDistance = path.points[other.pathIndex]?.distance ?? 0
+  // Traffic measures the physical gap, independent of the relocated lap line.
+  const direct = (otherDistance - vehicleDistance) * (reversed ? -1 : 1)
   return direct > 0 ? direct : direct + length
 }
 
@@ -38,11 +38,12 @@ export function getTrafficState(
   vehicle: RaceVehicle,
   others: readonly RaceVehicle[],
   path: RoadPath | number,
+  reversed = false,
 ): TrafficState {
   const nearby = others
     .filter((other) => other.id !== vehicle.id && !other.wrecked)
     .map((other) => {
-      const distance = forwardDistance(vehicle, other, path)
+      const distance = forwardDistance(vehicle, other, path, reversed)
       const relativeSpeed = Math.max(0, vehicle.speed - other.speed)
       return {
         vehicle: other,

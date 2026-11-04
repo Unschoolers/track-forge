@@ -48,6 +48,8 @@ export class AppController {
   private readonly library: TrackLibraryService
   private state: AppSnapshot
   private cancelPendingSave: (() => void) | undefined
+  private pendingEditorSave = false
+  private saveGeneration = 0
   private unsubscribeRace: (() => void) | undefined
 
   constructor(private readonly dependencies: AppControllerDependencies) {
@@ -120,6 +122,7 @@ export class AppController {
   dispatch(command: AppCommand): void {
     switch (command.type) {
       case 'go-home':
+        if (!this.flushPendingEditorSave()) break
         if (this.state.mode === 'race') {
           this.dependencies.raceSession.setPaused(true)
         }
@@ -132,7 +135,10 @@ export class AppController {
         })
         break
       case 'open-editor':
-        this.update({ ...this.state, mode: 'editor', paused: false, notice: null })
+        if (this.state.mode === 'race') {
+          this.dependencies.raceSession.setPaused(true)
+        }
+        this.update({ ...this.state, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
         break
       case 'start-race':
         this.startRace()
@@ -172,6 +178,7 @@ export class AppController {
         this.selectTrack(command.id)
         break
       case 'open-track-library': {
+        this.flushPendingEditorSave()
         const library = this.librarySnapshot()
         this.update({
           ...this.state,
@@ -180,7 +187,6 @@ export class AppController {
             purpose: command.purpose,
           },
           ...library,
-          notice: null,
         })
         break
       }
@@ -327,9 +333,11 @@ export class AppController {
         })
         break
       case 'create-track':
+        if (!this.flushPendingEditorSave()) break
         this.applyTrackMutation(this.library.create(command.name), true)
         break
       case 'rename-track':
+        if (!this.flushPendingEditorSave()) break
         if (this.state.currentTrack) {
           this.applyTrackMutation(
             this.library.rename(
@@ -365,8 +373,7 @@ export class AppController {
   }
 
   destroy(): void {
-    this.cancelPendingSave?.()
-    this.cancelPendingSave = undefined
+    this.flushPendingEditorSave()
     this.events.clear()
     this.unsubscribeRace?.()
     this.unsubscribeRace = undefined
@@ -374,6 +381,7 @@ export class AppController {
   }
 
   private startRace(): void {
+    if (!this.flushPendingEditorSave()) return
     const track = this.state.currentTrack
     if (!track) {
       this.update({
@@ -413,6 +421,7 @@ export class AppController {
   }
 
   private selectTrack(id: TrackId): void {
+    if (!this.flushPendingEditorSave()) return
     const track = this.library.select(id)
     if (!track) return
     this.cancelPendingEditorSave()
@@ -430,6 +439,7 @@ export class AppController {
   }
 
   private selectTrackForEdit(id: TrackId): void {
+    if (!this.flushPendingEditorSave()) return
     const track = this.library.select(id)
     if (!track) return
     this.cancelPendingEditorSave()
@@ -452,6 +462,7 @@ export class AppController {
   }
 
   private selectTrackForRace(id: TrackId): void {
+    if (!this.flushPendingEditorSave()) return
     const track = this.library.select(id)
     if (!track) return
     const validation = validateTrack(
@@ -513,6 +524,7 @@ export class AppController {
   }
 
   private deleteTrack(id: TrackId): void {
+    const deletingCurrent = this.state.currentTrack?.id === id
     if (!this.library.delete(id)) {
       this.update({ ...this.state, notice: 'Track could not be deleted.' })
       return
@@ -539,8 +551,9 @@ export class AppController {
               currentTrack?.terrain,
             )
           : this.state.editor,
-      notice: null,
+      notice: deletingCurrent ? null : this.state.notice,
     })
+    if (!deletingCurrent) this.flushPendingEditorSave()
   }
 
   private closeOverlay(): void {
@@ -577,7 +590,9 @@ export class AppController {
     this.update({
       ...this.state,
       overlay: { type: 'none' },
-      notice: null,
+      notice: this.pendingEditorSave && this.state.notice === 'Save unavailable.'
+        ? this.state.notice
+        : null,
     })
   }
 
@@ -602,7 +617,9 @@ export class AppController {
         lighting: preferences.lighting,
         updatedAt: this.now(),
       }
-      this.dependencies.trackStore.save(updatedTrack)
+      const saved = this.dependencies.trackStore.save(updatedTrack)
+      if (saved) this.cancelPendingEditorSave()
+      else this.pendingEditorSave = true
       this.update({
         ...this.state,
         currentTrack: updatedTrack,
@@ -610,6 +627,9 @@ export class AppController {
           track.id === updatedTrack.id ? updatedTrack : track,
         ),
         preferences,
+        notice: saved
+          ? this.state.notice === 'Save unavailable.' ? null : this.state.notice
+          : 'Save unavailable.',
       })
       return
     }
@@ -619,8 +639,11 @@ export class AppController {
   private saveCurrentTrack(): void {
     const track = this.state.currentTrack
     if (!track) return
-    this.cancelPendingEditorSave()
+    this.cancelPendingSave?.()
+    this.cancelPendingSave = undefined
+    this.saveGeneration++
     const saved = this.dependencies.trackStore.save(track)
+    this.pendingEditorSave = !saved
     this.update({
       ...this.state,
       overlay: { type: 'none' },
@@ -688,15 +711,36 @@ export class AppController {
       notice: null,
     })
     this.cancelPendingSave?.()
+    this.pendingEditorSave = true
+    const generation = ++this.saveGeneration
     this.cancelPendingSave = this.dependencies.scheduler.schedule(120, () => {
-      this.dependencies.trackStore.save(updatedTrack)
-      this.cancelPendingSave = undefined
+      if (generation !== this.saveGeneration) return
+      this.flushPendingEditorSave()
     })
+  }
+
+  flushPendingEditorSave(): boolean {
+    if (!this.pendingEditorSave) return true
+    this.cancelPendingSave?.()
+    this.cancelPendingSave = undefined
+    this.saveGeneration++
+    const track = this.state.currentTrack
+    if (!track || !this.dependencies.trackStore.save(track)) {
+      this.update({ ...this.state, notice: 'Save unavailable.' })
+      return false
+    }
+    this.pendingEditorSave = false
+    if (this.state.notice === 'Save unavailable.') {
+      this.update({ ...this.state, notice: null })
+    }
+    return true
   }
 
   private cancelPendingEditorSave(): void {
     this.cancelPendingSave?.()
     this.cancelPendingSave = undefined
+    this.pendingEditorSave = false
+    this.saveGeneration++
   }
 
   private update(state: AppSnapshot): void {

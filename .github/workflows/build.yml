@@ -1,0 +1,87 @@
+name: Verify and build Android
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: npm ci
+      - run: npm test -- --maxWorkers=2
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Check for supplied signing key
+        id: signing
+        env:
+          DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEY_BASE64" ]; then
+            echo 'supplied=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'supplied=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Restore debug signing key
+        if: steps.signing.outputs.supplied == 'false'
+        id: debug-key-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: trackforge-debug-keystore-v1
+      - name: Configure signing key
+        env:
+          DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ -n "$DEBUG_KEY_BASE64" ]; then
+            printf '%s' "$DEBUG_KEY_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          elif [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
+          fi
+      - name: Assemble debug APK
+        run: |
+          export TRACKFORGE_VERSION_CODE=$((GITHUB_RUN_NUMBER + 2))
+          cd android && ./gradlew assembleDebug
+      - name: Verify APK signature and metadata
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Name APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "trackforge-debug-${{ github.run_number }}-${{ github.run_attempt }}-${GITHUB_SHA::7}.apk"
+      - name: Upload APK
+        id: apk
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: trackforge-debug-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: trackforge-debug-*.apk
+          retention-days: 30
+          if-no-files-found: error
+      - name: Add download link
+        env:
+          ARTIFACT_URL: ${{ steps.apk.outputs.artifact-url }}
+        run: printf '## Android APK\n\n[Download the signed debug APK](%s) (available for 30 days).\n' "$ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"

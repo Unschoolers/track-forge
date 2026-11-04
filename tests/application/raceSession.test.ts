@@ -38,6 +38,143 @@ function createScoreStore() {
 }
 
 describe('RaceSession', () => {
+
+  it('uses the moved reverse start for telemetry, standings, and results', () => {
+    for (const terminal of [false, true]) {
+      const { store } = createScoreStore()
+      const step: RaceStep = (state) => ({
+        state: {
+          ...state,
+          phase: terminal ? 'finished' : 'running',
+          vehicles: state.vehicles.map((vehicle, index) => ({
+            ...vehicle,
+            pathIndex: (state.startPathIndex - (index === 0 ? 4 : 1) + state.path.points.length) % state.path.points.length,
+          })),
+        },
+        events: terminal ? [{ type: 'race-finished', reason: 'water' }] : [],
+      })
+      const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+      session.start({ ...track, start: { ratio: 0.35, reversed: true } }, setup)
+      session.advance(3.7, noInput)
+      session.advance(1 / 60, noInput)
+      const snapshot = session.snapshot()
+      expect(snapshot.telemetry.position).toBe(1)
+      expect(snapshot.standings[0]?.id).toBe('player')
+      if (terminal) {
+        expect(snapshot.result?.playerPlace).toBe(1)
+        expect(snapshot.result?.standings[0]?.id).toBe('player')
+      }
+    }
+  })
+
+  it('simulates equal wall time consistently across frame rates, including countdown overflow', () => {
+    const snapshots = [10, 20, 30, 60, 120].map((hz) => {
+      const { store } = createScoreStore()
+      const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+      session.start(track, setup)
+      for (let frame = 0; frame < hz * 5; frame++) session.advance(1 / hz, noInput)
+      const state = session.snapshot().state
+      if (!state) throw new Error('Missing race state')
+      return state
+    })
+    const reference = snapshots[0]?.vehicles[0]
+    if (!reference) throw new Error('Missing player')
+    for (const state of snapshots) {
+      expect(state.elapsed).toBeCloseTo(1.3, 8)
+      expect(state.vehicles[0]?.x).toBeCloseTo(reference.x, 8)
+      expect(state.vehicles[0]?.y).toBeCloseTo(reference.y, 8)
+    }
+  })
+
+  it('ignores invalid deltas and clears fractional running time on pause and restart', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start(track, setup)
+    for (const delta of [-1, NaN, Infinity]) session.advance(delta, noInput)
+    expect(session.snapshot().telemetry.countdown).toBe(3.7)
+    session.advance(3.7, noInput)
+    session.advance(0.01, noInput)
+    session.setPaused(true)
+    session.setPaused(false)
+    session.advance(0.01, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBe(0)
+    session.restart()
+    session.advance(3.7, noInput)
+    session.advance(0.01, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBe(0)
+    for (const delta of [-1, NaN, Infinity]) session.advance(delta, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBe(0)
+  })
+
+  it('consumes countdown overflow and limits running catch-up after a long stall', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start(track, setup)
+    session.advance(3.8, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(0.1, 8)
+    session.advance(10, noInput)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(0.35, 8)
+  })
+
+  it('publishes and updates continuous feedback once for a multi-step frame', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback })
+    const listener = vi.fn()
+    session.subscribe(listener)
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    listener.mockClear()
+    vi.mocked(feedback.handle).mockClear()
+    session.advance(0.1, noInput)
+    expect(listener).toHaveBeenCalledOnce()
+    expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'engine')).toHaveLength(1)
+    expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'surface')).toHaveLength(1)
+  })
+
+  it('keeps peak shake from earlier substeps with the final camera pose', () => {
+    const { store } = createScoreStore()
+    let n = 0
+    const step: RaceStep = (state) => ({ state: { ...state, cameraHints: { ...state.cameraHints, shake: n++ === 0 ? 0.8 : 0, speed: n } }, events: [] })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.05, noInput)
+    expect(session.snapshot().state?.cameraHints).toMatchObject({ shake: 0.8, speed: 3 })
+  })
+
+  it('stops substeps at a terminal result and records it once', () => {
+    const { store } = createScoreStore()
+    const step = vi.fn<RaceStep>((state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 1 } : vehicle) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    }))
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.1, noInput)
+    session.advance(0.1, noInput)
+    expect(step).toHaveBeenCalledOnce()
+    expect(store.record).toHaveBeenCalledOnce()
+  })
+
+  it('resets a reverse-race player facing reverse travel', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start({ ...track, start: { ratio: 0.35, reversed: true } }, setup)
+    session.advance(4, noInput)
+    session.resetPlayer()
+    const state = session.snapshot().state
+    if (!state) throw new Error('Missing race state')
+    const car = state.vehicles[0]
+    if (!car) throw new Error('Missing player')
+    const point = state.path.points[car.pathIndex]
+    const ahead = state.path.points[(car.pathIndex - 4 + state.path.points.length) % state.path.points.length]
+    if (!point || !ahead) throw new Error('Missing path points')
+    const expected = Math.atan2(ahead.y - point.y, ahead.x - point.x)
+    expect(Math.abs(Math.atan2(Math.sin(car.angle - expected), Math.cos(car.angle - expected)))).toBeLessThan(0.01)
+  })
+
   it('owns countdown, pause, restart, and observable snapshots', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({ state, events: [] }))

@@ -89,10 +89,11 @@ function advanceVehicle(
     moved = stepAiVehicle(
       vehicle,
       race.path,
-      getTrafficState(vehicle, race.vehicles, race.path),
+      getTrafficState(vehicle, race.vehicles, race.path, race.reversed),
       race.difficulty,
       deltaSeconds,
       random,
+      race.reversed,
     )
   }
   const nextContext = getVehicleStepContext(race.path, moved)
@@ -175,7 +176,7 @@ export const stepRace: RaceStep = (
       state.reversed,
     )
     if (updated.player && updated.stuckDuration > 0.65) {
-      updated = resetVehicleToTrack(updated, state.path)
+      updated = resetVehicleToTrack(updated, state.path, { reversed: state.reversed })
     }
     if (
       !updated.player &&
@@ -185,7 +186,7 @@ export const stepRace: RaceStep = (
       // arc. Rejoin it at the nearest road sample instead of letting a lost AI
       // circle forever outside the camera.
       if (updated.grounded) {
-        updated = resetVehicleToTrack(updated, state.path)
+        updated = resetVehicleToTrack(updated, state.path, { reversed: state.reversed })
       }
     }
     if (previous && previous.currentSurface !== updated.currentSurface) {
@@ -298,7 +299,7 @@ export const stepRace: RaceStep = (
       ],
       cameraHints: player
         ? {
-            ...buildRaceCameraHints(state.path, player),
+            ...buildRaceCameraHints(state.path, player, state.reversed),
             shake: impactShake,
           }
         : state.cameraHints,

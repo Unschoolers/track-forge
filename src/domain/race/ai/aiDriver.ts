@@ -107,6 +107,7 @@ export function stepAiVehicle(
   difficulty: DifficultyId,
   deltaSeconds: number,
   random: RandomSource = { next: () => 0.5 },
+  reversed = false,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   const tuning = DIFFICULTY_SPECS[difficulty]
@@ -124,7 +125,7 @@ export function stepAiVehicle(
       : 3,
   )
   const targetIndex =
-    (context.nearest.index + lookAheadSamples) % path.points.length
+    (context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples) + path.points.length) % path.points.length
   const target = path.points[targetIndex]
   if (!target) return { ...vehicle, ai }
   const targetX =

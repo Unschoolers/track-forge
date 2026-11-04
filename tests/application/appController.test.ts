@@ -11,9 +11,11 @@ import {
 } from '@/application/appController'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import type { RaceSessionPort } from '@/application/race/raceSession'
+import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
+import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
+import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 import { TERRAIN_LIMITS } from '@/domain/config'
 
 class TrackMemory implements TrackStore {
@@ -36,7 +38,7 @@ const preferences: Preferences = {
   dynamicZoomEnabled: true,
 }
 
-function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
+function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false) {
   const trackStore = new TrackMemory()
   trackStore.tracks.set(track.id, track)
   const preferencesStore: PreferencesStore = {
@@ -66,12 +68,21 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
     subscribe: vi.fn(() => () => undefined),
     destroy: vi.fn(),
   }
+  const session = realRace ? new RaceSession({
+    scoreStore,
+    random: { next: () => 0.5 },
+    feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() },
+    step: (state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 12.5 } : vehicle) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    }),
+  }) : raceSession
   const controller = new AppController({
     trackStore,
     preferencesStore,
     scoreStore,
     scheduler,
-    raceSession,
+    raceSession: session,
     geometry: new TrackGeometryService(),
     createTrackId: () => asTrackId('created'),
     now: () => 500,
@@ -83,7 +94,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1)) {
     preferencesStore,
     scheduler,
     cancel,
-    raceSession,
+    raceSession: session,
     flush: () => pending?.(),
   }
 }
@@ -135,6 +146,44 @@ describe('AppController', () => {
     expect(controller.snapshot().mode).toBe('home')
   })
 
+  it('returns from finished results to the existing editor and silences the race', () => {
+    const { controller, raceSession, trackStore } = setup(undefined, true)
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'start-race' })
+    const input = { steering: 0, throttle: 1, braking: false }
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(controller.snapshot()).toMatchObject({ mode: 'race', paused: true, overlay: { type: 'results' } })
+
+    controller.dispatch({ type: 'open-editor' })
+
+    expect(controller.snapshot()).toMatchObject({ mode: 'editor', paused: false, overlay: { type: 'none' }, currentTrack: { id: 'starter' } })
+    expect(raceSession.snapshot().state?.paused).toBe(true)
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(controller.snapshot().editor.trees).toContainEqual({ x: 4, y: 5 })
+    controller.dispatch({ type: 'editor', command: { type: 'undo' } })
+    expect(controller.snapshot().editor.trees).not.toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('retries a finished race and returns home from its results', () => {
+    const { controller, raceSession } = setup(undefined, true)
+    const input = { steering: 0, throttle: 1, braking: false }
+    controller.dispatch({ type: 'start-race' })
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(controller.snapshot().overlay.type).toBe('results')
+    controller.dispatch({ type: 'restart-race' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'race', paused: false, overlay: { type: 'none' } })
+    expect(raceSession.snapshot().result).toBeNull()
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(controller.snapshot().overlay.type).toBe('results')
+    controller.dispatch({ type: 'go-home' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', paused: false, overlay: { type: 'none' } })
+    expect(raceSession.snapshot().state?.paused).toBe(true)
+  })
+
   it('keeps an incomplete track in the editor instead of starting a race', () => {
     const incomplete = {
       ...createStarterTrack(asTrackId('short'), 1),
@@ -168,6 +217,133 @@ describe('AppController', () => {
     flush()
     expect(trackStore.save).toHaveBeenCalledOnce()
     expect(trackStore.save.mock.calls[0]?.[0].trees).toHaveLength(9)
+  })
+
+  it('preserves pending edits when renaming a track', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'rename-track', name: 'Renamed' })
+    flush()
+    expect(trackStore.find(asTrackId('starter'))).toMatchObject({ name: 'Renamed', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
+  })
+
+  it.each(['select-track', 'select-track-for-edit', 'select-track-for-race'] as const)(
+    'preserves pending edits before %s', (type) => {
+      const { controller, trackStore } = setup()
+      const other = createStarterTrack(asTrackId('other'), 2)
+      trackStore.tracks.set(other.id, other)
+      controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+      controller.dispatch({ type, id: other.id })
+      expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    },
+  )
+
+  it('preserves pending edits before creating a track', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'create-track', name: 'New Track' })
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('flushes pending edits on destroy', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.destroy()
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it.each([false, true])('recovers quota by deleting another track (still insufficient: %s)', (stillInsufficient) => {
+    const current = createStarterTrack(asTrackId('current'), 2)
+    const other = createStarterTrack(asTrackId('other'), 1)
+    const values = new Map<string, string>([[STORAGE_KEYS.trackMigration, '1']])
+    let limit = Infinity
+    const store = new BrowserTrackRepository({
+      get: (key) => values.get(key) ?? null,
+      set: (key, value) => { if (key === STORAGE_KEYS.tracks && value.length > limit) return false; values.set(key, value); return true },
+      remove: (key) => values.delete(key),
+    })
+    expect(store.save(current)).toBe(true)
+    expect(store.save(other)).toBe(true)
+    limit = stillInsufficient ? JSON.stringify([store.find(current.id)]).length : (values.get(STORAGE_KEYS.tracks) ?? '').length
+    const { controller, scoreStore, scheduler, raceSession } = setup()
+    controller.destroy()
+    const app = new AppController({ trackStore: store, scoreStore, scheduler, raceSession, preferencesStore: { load: () => preferences, save: () => true }, geometry: new TrackGeometryService(), createTrackId: () => asTrackId('new'), now: () => 500 })
+    app.dispatch({ type: 'open-editor' })
+    app.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    expect(app.flushPendingEditorSave()).toBe(false)
+    app.dispatch({ type: 'open-track-library', purpose: 'edit' })
+    expect(app.snapshot()).toMatchObject({ overlay: { type: 'track-library' }, notice: 'Save unavailable.' })
+    app.dispatch({ type: 'select-track-for-edit', id: other.id })
+    expect(app.snapshot().currentTrack?.id).toBe(current.id)
+    app.dispatch({ type: 'delete-track', id: other.id })
+    expect(store.find(other.id)).toBeUndefined()
+    expect(app.snapshot().currentTrack?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(app.snapshot().notice).toBe(stillInsufficient ? 'Save unavailable.' : null)
+    if (stillInsufficient) {
+      app.dispatch({ type: 'close-overlay' })
+      expect(app.snapshot().notice).toBe('Save unavailable.')
+      limit = Infinity
+      expect(app.flushPendingEditorSave()).toBe(true)
+    }
+    expect(store.find(current.id)?.trees).toContainEqual({ x: 4, y: 5 })
+    app.dispatch({ type: 'editor', command: { type: 'undo' } })
+    expect(app.snapshot().currentTrack?.trees).not.toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('retains a failed pending save for retry and blocks replacing the draft', () => {
+    const { controller, trackStore } = setup()
+    const other = createStarterTrack(asTrackId('other'), 2)
+    trackStore.tracks.set(other.id, other)
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    trackStore.save.mockReturnValueOnce(false)
+    controller.dispatch({ type: 'select-track', id: other.id })
+    expect(controller.snapshot().currentTrack?.id).toBe('starter')
+    expect(controller.snapshot().notice).toBe('Save unavailable.')
+    controller.dispatch({ type: 'save-current-track' })
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(controller.snapshot().notice).toBe('Track saved.')
+  })
+
+  it('clears a failure notice after a later successful flush', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    trackStore.save.mockReturnValueOnce(false)
+    flush()
+    expect(controller.snapshot().notice).toBe('Save unavailable.')
+    expect(controller.flushPendingEditorSave()).toBe(true)
+    expect(controller.snapshot().notice).toBeNull()
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('clears a failed draft save notice when a lighting save succeeds', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    trackStore.save.mockReturnValueOnce(false)
+    flush()
+    expect(controller.snapshot().notice).toBe('Save unavailable.')
+
+    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, lighting: 'night' } })
+
+    expect(trackStore.find(asTrackId('starter'))).toMatchObject({
+      lighting: 'night', trees: expect.arrayContaining([{ x: 4, y: 5 }]),
+    })
+    expect(controller.snapshot().notice).toBeNull()
+  })
+
+  it('does not resurrect a deleted track when a canceled callback runs', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'delete-track', id: asTrackId('starter') })
+    flush()
+    expect(trackStore.find(asTrackId('starter'))).toBeUndefined()
+  })
+
+  it('does not overwrite newer lighting with a pending editor save', () => {
+    const { controller, trackStore, flush } = setup()
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, lighting: 'night' } })
+    flush()
+    expect(trackStore.find(asTrackId('starter'))).toMatchObject({ lighting: 'night', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
   })
 
   it('persists preference changes through the injected repository', () => {
