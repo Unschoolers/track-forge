@@ -71,10 +71,18 @@ Never commit or share private keys.
 
 The Android workflow runs on pushes to any branch, pull requests, and manual dispatch.
 After verification it publishes a signed debug APK for 30 days, linked from the
-workflow run summary. CI uses a version code of the run number plus 2. Configure
+workflow run summary. Successful main-branch pushes and manual main builds also
+publish the APK itself as a versioned [GitHub Release](https://github.com/Unschoolers/track-forge/releases)
+asset. [Download the latest APK directly](https://github.com/Unschoolers/track-forge/releases/latest/download/trackforge-debug.apk).
+Release downloads require no Actions ZIP and have no 30-day artifact expiry.
+Re-running a build creates a separate release attempt; older builds cannot replace
+a newer build as the latest download. PR and other branch builds retain their
+Actions artifacts without publishing a release.
+
+CI uses a version code of the run number plus 2. Configure
 the optional repository secret `TRACKFORGE_DEBUG_KEYSTORE_BASE64` with the
 base64-encoded original debug keystore to preserve its signing identity. Without
 that secret, CI caches a generated debug keystore: its first certificate will
 normally differ from existing installations, and cache loss or separate cache
 scopes can change it again. Such builds cannot update an app signed with another
-key. Debug APKs are for testing, not release distribution.
+key. The downloadable file remains a signed debug APK for testing.
