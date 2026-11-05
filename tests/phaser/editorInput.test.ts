@@ -133,6 +133,28 @@ describe('EditorInputController', () => {
     },
   )
 
+  it('preserves prior redo entries if a drawing touch turns into a pinch', () => {
+    let editor = reduceEditor(createEditorState(), {
+      type: 'add-point',
+      point: { x: 10, y: 10, surface: 'street' },
+    })
+    editor = reduceEditor(editor, { type: 'undo' })
+    expect(editor.future).toHaveLength(1)
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 },
+      tool: () => 'draw',
+      surface: () => 'street',
+      editor: () => editor,
+      dispatch: (command) => { editor = reduceEditor(editor, command) },
+    })
+    input.pointerDown({ id: 1, x: 50, y: 50 })
+    input.pointerDown({ id: 2, x: 90, y: 50 })
+    expect(editor.points).toHaveLength(0)
+    expect(editor.history).toHaveLength(0)
+    expect(editor.future).toHaveLength(1)
+    expect(reduceEditor(editor, { type: 'redo' }).points).toHaveLength(1)
+  })
+
   it('moves, paints, and erases the nearest editor content', () => {
     const dispatch = vi.fn()
     const camera: EditorCamera = { x: 0, y: 0, zoom: 1 }
