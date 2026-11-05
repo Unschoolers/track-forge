@@ -55,14 +55,16 @@ export function solveCollisionFrame(
         Math.abs(left.speed - right.speed),
       )
       const strength = Math.max(relative, (COLLISION_DISTANCE - distance) * 8)
-      const impulse = (rightNormal - leftNormal) * 0.38
+      // A softer, springier impact preserves momentum instead of making every
+      // contact feel like hitting a wall. Separate the cars before applying it.
+      const impulse = (rightNormal - leftNormal) * 0.55
       let updatedLeft = {
         ...left,
         x: left.x - normalX * correction,
         y: left.y - normalY * correction,
         vx: left.vx + normalX * impulse,
         vy: left.vy + normalY * impulse,
-        speed: left.speed * 0.82,
+        speed: left.speed * 0.94,
       }
       let updatedRight = {
         ...right,
@@ -70,10 +72,14 @@ export function solveCollisionFrame(
         y: right.y + normalY * correction,
         vx: right.vx - normalX * impulse,
         vy: right.vy - normalY * impulse,
-        speed: right.speed * 0.82,
+        speed: right.speed * 0.94,
       }
       const newContact = !previous.has(contact)
-      if (newContact && strength > 9) {
+      // Overlap alone is not a damaging impact: parked cars or gentle nudges
+      // should push apart without burning through the player's damage meter.
+      const closingImpact = Math.max(0, leftNormal - rightNormal)
+      const significantImpact = closingImpact > 22 || relative > 40
+      if (newContact && strength > 9 && significantImpact) {
         updatedLeft = applyImpactDamage(updatedLeft)
         updatedRight = applyImpactDamage(updatedRight)
         events.push({ leftId: left.id, rightId: right.id, strength })
