@@ -319,7 +319,7 @@ describe('EditorInputController', () => {
     expect(reduceEditor(editor, { type: 'undo' })).toBe(editor)
     expect(dispatch.mock.calls.map(([command]) => command.type)).toEqual([
       'begin-gesture',
-      'end-gesture',
+      'cancel-gesture',
     ])
   })
 
