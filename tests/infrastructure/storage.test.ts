@@ -283,6 +283,17 @@ describe('score and preference repositories', () => {
     ])
   })
 
+  it('defaults upgraded installations to Arcade and persists Simulation explicitly', () => {
+    const storage = new MemoryStore()
+    const preferences = new BrowserPreferencesRepository(storage)
+    expect(preferences.load().handling).toBe('arcade')
+    expect(preferences.save({ ...preferences.load(), handling: 'simulation' })).toBe(true)
+    expect(preferences.load().handling).toBe('simulation')
+    expect(storage.values.get('trackforge-handling-mode')).toBe('simulation')
+    storage.values.set('trackforge-handling-mode', 'invalid')
+    expect(preferences.load().handling).toBe('arcade')
+  })
+
   it('falls back for invalid preferences and persists valid changes', () => {
     const storage = new MemoryStore()
     storage.values.set('trackforge-last-car', 'purple')

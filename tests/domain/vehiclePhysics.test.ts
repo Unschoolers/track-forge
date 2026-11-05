@@ -106,6 +106,18 @@ describe('vehicle physics', () => {
     expect(curb).toBe(true)
   })
 
+  it('offers an arcade handling profile without replacing simulation physics', () => {
+    const fixture = vehicle()
+    const initial = { ...fixture, vx: Math.cos(fixture.angle) * 130, vy: Math.sin(fixture.angle) * 130, speed: 130 }
+    const context = getVehicleStepContext(path, initial)
+    const input = { steering: 0.85, throttle: 1, braking: false }
+    const simulation = stepVehicle(initial, input, context, 1 / 60, 'simulation')
+    const arcade = stepVehicle(initial, input, context, 1 / 60, 'arcade')
+    expect(arcade).not.toEqual(simulation)
+    expect(Number.isFinite(arcade.angle)).toBe(true)
+    expect(arcade.speed).toBeGreaterThan(0)
+  })
+
   it('resets a stuck player to the nearest road heading', () => {
     const base = {
       ...vehicle(),
