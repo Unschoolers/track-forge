@@ -80,6 +80,7 @@ export interface EditorInputDependencies {
   readonly dispatch: (command: EditorCommand) => void
   readonly worldPoint?: (pointer: PointerSample) => Vector2
   readonly onCameraChanged?: () => void
+  readonly viewport?: () => { readonly width: number; readonly height: number }
   readonly onCrossingSelected?: (key: string | null) => void
   readonly onPointSelected?: (index: number | null) => void
   readonly onRejected?: (rejection: EditorCommandRejection) => void
@@ -112,6 +113,9 @@ function pointInPolygon(
 
 export class EditorInputController {
   private activePointer: number | undefined
+  private readonly pointers = new Map<number, PointerSample>()
+  private navigating = false
+  private navAnchor: { center: Vector2; distance: number } | undefined
   private lastScreen: Vector2 | undefined
   private selectedPoint = -1
   private drawStartIndex = 0
@@ -139,10 +143,16 @@ export class EditorInputController {
   constructor(private readonly dependencies: EditorInputDependencies) {}
 
   pointerDown(pointer: PointerSample): void {
-    if (this.activePointer !== undefined) {
-      if (this.terrainStroke) this.finishPointer(this.activePointer, false)
+    this.pointers.set(pointer.id, pointer)
+    if (this.pointers.size >= 2) {
+      if (!this.navigating && this.activePointer !== undefined) {
+        this.finishPointer(this.activePointer, false)
+      }
+      this.navigating = true
+      this.navAnchor = this.pinchSample()
       return
     }
+    if (this.navigating || this.activePointer !== undefined) return
     this.activePointer = pointer.id
     this.lastScreen = pointer
     this.drawStartIndex = this.dependencies.editor().points.length
@@ -153,6 +163,26 @@ export class EditorInputController {
   }
 
   pointerMove(pointer: PointerSample): void {
+    if (!this.pointers.has(pointer.id)) return
+    this.pointers.set(pointer.id, pointer)
+    if (this.navigating) {
+      const next = this.pinchSample()
+      const previous = this.navAnchor
+      if (next && previous) {
+        const camera = this.dependencies.camera
+        const viewport = this.dependencies.viewport?.() ?? { width: 0, height: 0 }
+        const oldZoom = camera.zoom
+        const zoom = clamp(oldZoom * next.distance / previous.distance, 0.16, 2.7)
+        const worldX = camera.x + (previous.center.x - viewport.width / 2) / oldZoom
+        const worldY = camera.y + (previous.center.y - viewport.height / 2) / oldZoom
+        camera.zoom = zoom
+        camera.x = worldX - (next.center.x - viewport.width / 2) / zoom
+        camera.y = worldY - (next.center.y - viewport.height / 2) / zoom
+        this.dependencies.onCameraChanged?.()
+      }
+      this.navAnchor = next
+      return
+    }
     if (pointer.id !== this.activePointer) return
     const previous = this.lastScreen
     if (this.dependencies.tool() === 'pan' && previous) {
@@ -168,19 +198,38 @@ export class EditorInputController {
   }
 
   pointerUp(pointer: PointerSample): void {
-    this.finishPointer(pointer.id, true)
+    this.releasePointer(pointer.id, true)
   }
 
   pointerCancel(id: number): void {
-    this.finishPointer(id, false)
+    this.releasePointer(id, false)
   }
 
   cancelActiveGesture(): void {
-    if (this.activePointer === undefined) {
-      this.terrainStroke = undefined
+    if (this.activePointer !== undefined) this.finishPointer(this.activePointer, false)
+    this.pointers.clear()
+    this.navigating = false
+    this.navAnchor = undefined
+    this.terrainStroke = undefined
+  }
+
+  private releasePointer(id: number, commit: boolean): void {
+    if (!this.pointers.delete(id)) return
+    if (this.navigating) {
+      this.navAnchor = this.pinchSample()
+      if (this.pointers.size === 0) this.navigating = false
       return
     }
-    this.finishPointer(this.activePointer, false)
+    this.finishPointer(id, commit)
+  }
+
+  private pinchSample(): { center: Vector2; distance: number } | undefined {
+    const [a, b] = [...this.pointers.values()]
+    if (!a || !b) return undefined
+    return {
+      center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+    }
   }
 
   private finishPointer(id: number, commitTerrain: boolean): void {
