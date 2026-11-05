@@ -75,7 +75,25 @@ export function createRaceSetupModal(
     lightingRow.append(choice)
   }
   lighting.append(lightingRow)
-  frame.body.append(difficulty, lighting)
+  const handling = element('section', 'setup-section')
+  handling.append(element('h3', 'setup-label', 'DRIVING STYLE'))
+  const handlingRow = element('div', 'choice-row')
+  for (const mode of ['arcade', 'simulation'] as const) {
+    const selected = (state.preferences.handling ?? 'arcade') === mode
+    const choice = button(
+      mode.toUpperCase(),
+      `handling-${mode}`,
+      () => actions.preferences({ ...state.preferences, handling: mode }),
+      `setup-choice${selected ? ' active' : ''}`,
+    )
+    choice.setAttribute('aria-pressed', String(selected))
+    handlingRow.append(choice)
+  }
+  handling.append(
+    handlingRow,
+    element('p', 'modal-subtitle', 'Arcade responds faster to touch steering. Simulation preserves the original tire behavior.'),
+  )
+  frame.body.append(difficulty, lighting, handling)
   frame.footer.append(
     button('BACK', 'setup-back', actions.close, 'button'),
     button(
