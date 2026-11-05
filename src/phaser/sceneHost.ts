@@ -53,6 +53,13 @@ export class PhaserSceneHost implements SceneHost {
     if (modeChanged) this.syncScene()
   }
 
+  /** Read-only camera position for the browser gameplay harness. */
+  editorCameraSnapshot(): { x: number; y: number; zoom: number } | null {
+    if (!this.game?.scene.isActive('EditorScene')) return null
+    const scene = this.game.scene.getScene('EditorScene')
+    return scene instanceof EditorScene ? scene.cameraSnapshot() : null
+  }
+
   destroy(): void {
     this.game?.destroy(true)
     this.game = undefined

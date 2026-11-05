@@ -104,6 +104,52 @@ const stopSceneSync = controller.subscribe((snapshot) =>
 
 application.start()
 
+// QA telemetry is read-only and exists only in development builds explicitly
+// opened with ?qa. Production APKs never expose this inspection surface.
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
+  const qaWindow = window as Window & {
+    __trackForgeQa?: { snapshot: () => unknown }
+  }
+  qaWindow.__trackForgeQa = {
+    snapshot: () => {
+      const app = controller.snapshot()
+      const race = raceSession.snapshot().state
+      const player = race?.vehicles.find((vehicle) => vehicle.player)
+      return {
+        mode: app.mode,
+        editor: {
+          points: app.editor.points.length,
+          trees: app.editor.trees.length,
+          history: app.editor.history.length,
+          gestureActive: app.editor.gestureStart !== null,
+        },
+        camera: sceneHost.editorCameraSnapshot(),
+        controls: { ...raceControls.snapshot() },
+        race: race
+          ? {
+              phase: race.phase,
+              handling: race.handling,
+              elapsed: race.elapsed,
+              paused: race.paused,
+              player: player
+                ? {
+                    speed: player.speed,
+                    slip: player.slip,
+                    x: player.x,
+                    y: player.y,
+                    lap: player.lap,
+                    damage: player.damage,
+                    wrecked: player.wrecked,
+                    surface: player.currentSurface,
+                  }
+                : null,
+            }
+          : null,
+      }
+    },
+  }
+}
+
 const unlockFeedback = (): void => feedback.unlock()
 document.addEventListener('pointerdown', unlockFeedback, { once: true })
 document.addEventListener('keydown', unlockFeedback, { once: true })
