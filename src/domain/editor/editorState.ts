@@ -175,7 +175,9 @@ export function patchEditorState(
     return {
       ...content,
       history: state.history,
-      future: [],
+      // Keep the redo stack until the gesture is committed. A pinch/cancel
+      // restores its starting snapshot without discarding redo history.
+      future: state.future,
       gestureStart: state.gestureStart,
       gestureChanged: true,
     }
