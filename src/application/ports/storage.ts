@@ -32,6 +32,8 @@ export interface ScoreStore {
   removeTrack(trackId: TrackId): boolean
 }
 
+export type HandlingMode = 'arcade' | 'simulation'
+
 export interface Preferences {
   readonly car: CarId
   readonly difficulty: DifficultyId
@@ -39,6 +41,7 @@ export interface Preferences {
   readonly audioEnabled: boolean
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean
+  readonly handling?: HandlingMode
 }
 
 export interface PreferencesStore {
