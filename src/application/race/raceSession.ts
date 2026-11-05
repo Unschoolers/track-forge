@@ -158,7 +158,7 @@ export class RaceSession implements RaceSessionPort {
 
   resetPlayer(): void {
     const state = this.current.state
-    if (state?.phase !== 'running' || this.destroyed) return
+    if (state?.phase !== 'running' || state.paused || this.destroyed) return
     this.publish(
       this.buildSnapshot(
         this.current.track,

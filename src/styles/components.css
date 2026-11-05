@@ -45,10 +45,15 @@
 .hud-card { display: grid; width: fit-content; padding: .6rem .8rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: rgb(20 26 36 / 82%); }
 .align-right { justify-self: end; text-align: right; }
 .hud-value { font-size: 1.35rem; }
-.steering-pad { position: relative; width: min(50vw, 15rem); height: 4.2rem; border: 1px solid var(--color-line); border-radius: 999px; background: rgb(20 26 36 / 72%); }
+.steering-pad { position: relative; width: min(50vw, 15rem); min-width: 0; height: 4.2rem; overflow: hidden; border: 1px solid var(--color-line); border-radius: 999px; background: rgb(20 26 36 / 72%); touch-action: none; }
 .steering-thumb { position: absolute; top: 50%; left: 50%; width: 3.2rem; height: 3.2rem; translate: -50% -50%; border-radius: 50%; background: var(--color-text); box-shadow: 0 .3rem 1rem #0008; }
-.brake-button { width: 5.5rem; height: 5.5rem; border-radius: 50%; background: #39242a; color: #ff9aac; }
+.brake-button { width: 5.5rem; height: 5.5rem; border-radius: 50%; background: #39242a; color: #ff9aac; touch-action: none; }
 .brake-button.pressed { scale: .94; background: var(--color-danger); color: white; }
+.recover-button { min-width: 5.5rem; min-height: 44px; padding: .45rem .5rem; color: var(--color-text); font-size: .72rem; touch-action: manipulation; }
+@media (max-height: 320px) {
+  .brake-button { width: 4rem; height: 4rem; }
+  .recover-button { min-width: 4rem; }
+}
 .damage-meter { position: absolute; top: 5rem; left: 50%; display: grid; grid-template-columns: minmax(5rem, 10rem) auto; align-items: center; gap: .55rem; translate: -50%; }
 .damage-meter::before { content: ''; grid-area: 1 / 1; height: .45rem; border-radius: 999px; background: rgb(8 11 16 / 72%); }
 .damage-meter-fill { grid-area: 1 / 1; z-index: 1; width: 0; height: .45rem; border-radius: 999px; background: linear-gradient(90deg, var(--color-accent), var(--color-danger)); transition: width 120ms linear; }

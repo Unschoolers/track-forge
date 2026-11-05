@@ -16,11 +16,11 @@ describe('RaceInputController', () => {
     expect(input.snapshot()).toMatchObject({ steering: 0, braking: false })
   })
 
-  it('supports steering, explicit brake, and two-touch braking', () => {
+  it('brakes only for an explicit brake pointer, even with two steering touches', () => {
     const input = new RaceInputController()
     input.beginSteering(1, 0.75)
     input.beginSteering(2, -0.25)
-    expect(input.snapshot()).toMatchObject({ steering: 0.75, braking: true })
+    expect(input.snapshot()).toMatchObject({ steering: 0.75, braking: false })
     input.endPointer(2)
     input.beginBrake(3)
     expect(input.snapshot().braking).toBe(true)
@@ -30,6 +30,32 @@ describe('RaceInputController', () => {
       throttle: 1,
       braking: false,
     })
+  })
+
+  it('hands steering to the oldest remaining finger at its latest position', () => {
+    const input = new RaceInputController()
+    input.beginSteering(4, 0)
+    input.updateSteering(4, -0.4)
+    input.beginSteering(5, 0)
+    input.beginSteering(6, 0)
+    input.updateSteering(5, 0.6)
+    input.updateSteering(6, -0.8)
+    expect(input.snapshot().steering).toBe(-0.4)
+    input.endPointer(4)
+    expect(input.snapshot().steering).toBe(0.6)
+    input.endPointer(5)
+    expect(input.snapshot().steering).toBe(-0.8)
+    input.endPointer(6)
+    expect(input.snapshot().steering).toBe(0)
+  })
+
+  it('keeps a new steering touch neutral while a keyboard direction is held', () => {
+    const input = new RaceInputController()
+    input.setKeyboard('ArrowRight', true)
+    input.beginSteering(1, 0)
+    expect(input.snapshot().steering).toBe(0)
+    input.endPointer(1)
+    expect(input.snapshot().steering).toBe(1)
   })
 
   it('updates only the active steering pointer and releases controls safely', () => {

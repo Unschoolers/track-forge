@@ -32,6 +32,12 @@ export function solveCollisionFrame(
       const left = next[leftIndex]
       const right = next[rightIndex]
       if (!left || !right || (!left.player && !right.player)) continue
+      // The player can finish during this frame, before collision resolution.
+      // Preserve that final-frame behavior while removing completed opponents.
+      if (
+        (!left.player && left.finishedAt !== null) ||
+        (!right.player && right.finishedAt !== null)
+      ) continue
       if (Math.abs(left.z - right.z) >= COLLISION_HEIGHT) continue
       const dx = right.x - left.x
       const dy = right.y - left.y

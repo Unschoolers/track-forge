@@ -24,8 +24,14 @@ Open the URL printed by Vite, normally <http://localhost:5173>.
 - Home: choose **Track Editor** or **Race**.
 - Editor: use the tool rail, mouse/touch canvas, undo/redo, and surface buttons.
 - Race: steer with `A`/`D` or the arrow keys and brake with `S`, `ArrowDown`,
-  or `Space`. Touching the canvas steers toward the touched side.
+  or `Space`. On touchscreens, place a finger on the steering pad or canvas,
+  then slide left or right from that starting point to steer. Hold the separate
+  **Brake** button with another finger to brake while steering.
+- During an active race, tap **Recover** or press `R` to return your car to the
+  road. Recovery keeps your lap progress, damage, and elapsed race time.
 - Use the race menu to pause, resume, or return home.
+- Android runs in immersive fullscreen. Swipe from a screen edge to temporarily
+  reveal the system navigation bars.
 
 ## Verification
 

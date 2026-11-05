@@ -342,6 +342,89 @@ describe('race simulation', () => {
     expect(collidedFirst.damage + collidedSecond.damage).toBeGreaterThan(0)
   })
 
+  it.each([false, true])(
+    'removes a finished opponent from contact without removing its standing (opponent first: %s)',
+    (opponentFirst) => {
+      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+      const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
+      const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0, finishedAt: 0, lap: 3 }
+      const pair = opponentFirst ? [rival, player] : [player, rival]
+      const previousContact = opponentFirst ? `${rival.id}:${player.id}` : `${player.id}:${rival.id}`
+
+      const frame = solveCollisionFrame(pair, [], 0)
+      const held = solveCollisionFrame(pair, [previousContact], 0)
+
+      expect(frame.vehicles).toEqual(pair)
+      expect(frame.activeContacts).toEqual([])
+      expect(frame.events).toEqual([])
+      expect(held.vehicles).toEqual(pair)
+      expect(held.activeContacts).toEqual([])
+      expect(rankVehicles(frame.vehicles, path.points.length)[0]).toEqual(rival)
+    },
+  )
+
+  it('continues to collide with an unfinished opponent', () => {
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
+    const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0 }
+
+    const frame = solveCollisionFrame([player, rival], [], 0)
+
+    expect(frame.vehicles[0]).toMatchObject({ damage: 1 })
+    expect(frame.vehicles[0]?.x).toBeLessThan(player.x)
+    expect(frame.vehicles[0]?.vx).toBeLessThan(player.vx)
+    expect(frame.vehicles[1]?.x).toBeGreaterThan(rival.x)
+    expect(frame.activeContacts).toEqual([`${player.id}:${rival.id}`])
+    expect(frame.events).toHaveLength(1)
+  })
+
+  it('keeps an earlier finisher in the running race and standings without affecting the player', () => {
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const player = required(race.vehicles[0])
+    const rival = { ...required(race.vehicles[1]), x: player.x + 1, y: player.y, z: player.z, finishedAt: 12, lap: 3 }
+    const running = { ...race, phase: 'running' as const, vehicles: [player, rival], activeContacts: [`${player.id}:${rival.id}`] }
+    const withoutRival = { ...running, vehicles: [player], activeContacts: [] }
+    const input = { steering: 0, throttle: 1, braking: false }
+
+    const observed = stepRace(running, input, 0.05, { next: () => 0.5 })
+    const clear = stepRace(withoutRival, input, 0.05, { next: () => 0.5 })
+
+    expect(observed.state.phase).toBe('running')
+    expect(observed.state.vehicles[0]).toEqual(clear.state.vehicles[0])
+    expect(observed.state.vehicles[1]).toMatchObject({ id: rival.id, finishedAt: 12, lap: 3 })
+    expect(observed.state.activeContacts).toEqual([])
+    expect(observed.events.filter(({ type }) => type === 'collision' || type === 'vehicle-finished')).toEqual([])
+    expect(rankVehicles(observed.state.vehicles, path.points.length)[0]).toMatchObject({ id: rival.id, finishedAt: 12 })
+  })
+
+  it('removes an opponent from contact on the frame it finishes', () => {
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
+    const point = required(path.points[0])
+    const player = { ...required(race.vehicles[0]), x: point.x, y: point.y, z: 0, pathIndex: 0 }
+    const rival = {
+      ...required(race.vehicles[1]),
+      x: point.x - 1,
+      y: point.y,
+      z: 0,
+      pathIndex: path.points.length - 2,
+      nextSector: 4 as const,
+      vx: 0,
+      vy: 0,
+      speed: 0,
+    }
+    const running = { ...race, phase: 'running' as const, elapsed: 12, vehicles: [player, rival] }
+    const input = { steering: 0, throttle: 0, braking: false }
+
+    const observed = stepRace(running, input, 0.001, { next: () => 0.5 })
+    const clear = stepRace({ ...running, vehicles: [player] }, input, 0.001, { next: () => 0.5 })
+
+    expect(observed.state.vehicles[0]).toEqual(clear.state.vehicles[0])
+    expect(observed.state.vehicles[1]).toMatchObject({ id: rival.id, lap: 1, finishedAt: 12.001 })
+    expect(observed.events).toContainEqual({ type: 'vehicle-finished', vehicleId: rival.id, time: 12.001 })
+    expect(observed.events.some(({ type }) => type === 'collision')).toBe(false)
+    expect(observed.state.phase).toBe('running')
+  })
+
   it('does not collide cars travelling on different crossing levels', () => {
     const race = createRace({
       path,

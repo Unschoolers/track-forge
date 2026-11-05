@@ -10,6 +10,10 @@ import {
 } from '@/domain/race/ai/lanePlanner'
 import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
+import type { RaceVehicle } from '@/domain/race/raceState'
+import { getVehicleStepContext } from '@/domain/race/trackContext'
+import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import type { RoadPath } from '@/domain/track/pathBuilder'
 
 const track = createStarterTrack(asTrackId('starter'), 1)
 const path = buildRoadPath(track.points, track.terrain)
@@ -23,13 +27,320 @@ function cars() {
   }).vehicles
 }
 
+function onPath(
+  vehicle: RaceVehicle,
+  road: RoadPath,
+  index: number,
+  lane: number,
+  speed: number,
+  reversed = false,
+): RaceVehicle {
+  const point = road.points[index]
+  const before =
+    road.points[(index - 1 + road.points.length) % road.points.length]
+  const after = road.points[(index + 1) % road.points.length]
+  if (!point || !before || !after) throw new Error('Missing path fixture')
+  const length = Math.hypot(after.x - before.x, after.y - before.y)
+  const tx = (after.x - before.x) / length
+  const ty = (after.y - before.y) / length
+  const position = { x: point.x - ty * lane, y: point.y + tx * lane }
+  const direction = reversed ? -1 : 1
+  return {
+    ...vehicle,
+    ...position,
+    pathIndex: index,
+    pathDistance: point.distance,
+    lane,
+    z: road.roadSurface.at(index, position).height,
+    angle: Math.atan2(direction * ty, direction * tx),
+    vx: direction * tx * speed,
+    vy: direction * ty * speed,
+    speed,
+    ai: createAiDriverState(lane),
+  }
+}
+
+function driveWithTraffic(
+  vehicle: RaceVehicle,
+  traffic: ReturnType<typeof getTrafficState>,
+) {
+  return stepAiVehicle(vehicle, path, traffic, 'normal', 0.05, {
+    next: () => 0.5,
+  })
+}
+
 describe('overtaking AI', () => {
+  it.each(['road path', 'sample count'] as const)(
+    'ignores finished opponents when finding traffic using %s',
+    (pathKind) => {
+      const [, first, second, third] = cars()
+      if (!first || !second || !third) throw new Error('Missing race fixtures')
+      const ego = onPath(first, path, 30, 0, 120)
+      const finisher = { ...onPath(second, path, 33, 0, 0), finishedAt: 0 }
+      const rival = onPath(third, path, 34, 0, 10)
+      const trafficPath = pathKind === 'road path' ? path : path.points.length
+
+      const clear = getTrafficState(ego, [finisher], trafficPath)
+      const blocked = getTrafficState(ego, [finisher, rival], trafficPath)
+
+      expect(clear.ahead).toBeNull()
+      expect(clear.nearby).toEqual([])
+      expect(driveWithTraffic(ego, clear).braking).toBe(false)
+      expect(blocked.ahead?.vehicle.id).toBe(rival.id)
+      expect(blocked.nearby.map(({ vehicle }) => vehicle.id)).toEqual([rival.id])
+      expect(driveWithTraffic(ego, blocked).braking).toBe(true)
+    },
+  )
+
+  it('does not brake for a safe adjacent car but keeps it for lane planning', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const ego = onPath(first, path, 30, -20, 120)
+    const rival = onPath(second, path, 33, 20, 10)
+    const traffic = getTrafficState(ego, [rival], path)
+    const clear = driveWithTraffic(ego, getTrafficState(ego, [], path))
+    const observed = driveWithTraffic(ego, traffic)
+
+    expect(getVehicleStepContext(path, ego).onRoad).toBe(true)
+    expect(getVehicleStepContext(path, rival).onRoad).toBe(true)
+    expect(traffic.nearby[0]?.distance).toBeCloseTo(18, 0)
+    expect(Math.hypot(rival.x - ego.x, rival.y - ego.y)).toBeCloseTo(44, 0)
+    expect(clear.braking).toBe(false)
+    expect(observed.braking).toBe(false)
+    expect(observed.speed).toBeCloseTo(clear.speed)
+    expect(traffic.ahead).toBeNull()
+    expect(traffic.nearby.map(({ vehicle }) => vehicle.id)).toContain(rival.id)
+    expect(scorePassingLane(20, traffic, 'normal')).toBeLessThan(
+      scorePassingLane(-20, traffic, 'normal'),
+    )
+  })
+
+  it('brakes for the nearest blocking car even if an adjacent car is closer', () => {
+    const [blockingCar, first, second] = cars()
+    if (!blockingCar || !first || !second)
+      throw new Error('Missing race fixtures')
+    const ego = onPath(first, path, 30, -20, 120)
+    const adjacent = onPath(second, path, 33, 20, 10)
+    const blocker = onPath(blockingCar, path, 34, -20, 10)
+    const traffic = getTrafficState(ego, [adjacent, blocker], path)
+    const stepped = driveWithTraffic(ego, traffic)
+
+    expect(traffic.ahead?.vehicle.id).toBe(blocker.id)
+    expect(traffic.nearby.map(({ vehicle }) => vehicle.id)).toEqual([
+      adjacent.id,
+      blocker.id,
+    ])
+    expect(stepped.braking).toBe(true)
+    expect(stepped.speed).toBeLessThan(
+      driveWithTraffic(ego, getTrafficState(ego, [], path)).speed,
+    )
+  })
+
+  it('brakes when the car ahead overlaps the vehicle clearance corridor', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const ego = onPath(first, path, 30, -8, 120)
+    const rival = onPath(second, path, 33, 8, 10)
+    const traffic = getTrafficState(ego, [rival], path)
+
+    expect(traffic.ahead?.vehicle.id).toBe(rival.id)
+    expect(driveWithTraffic(ego, traffic).braking).toBe(true)
+  })
+
+  it.each([
+    { egoLane: -20, rivalLane: 20 },
+    { egoLane: 20, rivalLane: -20 },
+  ])(
+    'keeps a side-by-side car in the same path sample for lane planning',
+    ({ egoLane, rivalLane }) => {
+      const [, first, second] = cars()
+      if (!first || !second) throw new Error('Missing race fixtures')
+      const ego = onPath(first, path, 30, egoLane, 120)
+      const rival = onPath(second, path, 30, rivalLane, 10)
+      const traffic = getTrafficState(ego, [rival], path)
+
+      expect(traffic.nearby[0]?.distance).toBeCloseTo(0, 3)
+      expect(traffic.ahead).toBeNull()
+      expect(driveWithTraffic(ego, traffic).braking).toBe(false)
+      expect(scorePassingLane(rivalLane, traffic, 'normal')).toBeLessThan(
+        scorePassingLane(egoLane, traffic, 'normal'),
+      )
+    },
+  )
+
+  it('treats an overlapping car in the same path sample as an obstruction', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const ego = onPath(first, path, 30, 0, 120)
+    const rival = onPath(second, path, 30, 0, 10)
+    const traffic = getTrafficState(ego, [rival], path)
+
+    expect(traffic.ahead?.vehicle.id).toBe(rival.id)
+    expect(traffic.ahead?.distance).toBe(0)
+    expect(driveWithTraffic(ego, traffic).braking).toBe(true)
+  })
+
+  it.each(['height', 'off road'] as const)(
+    'does not react to a phantom obstruction separated by %s',
+    (separation) => {
+      const [, first, second] = cars()
+      if (!first || !second) throw new Error('Missing race fixtures')
+      const ego = onPath(first, path, 30, 0, 120)
+      const placed = onPath(second, path, 33, 0, 10)
+      const rival =
+        separation === 'height'
+          ? { ...placed, z: placed.z + 24, grounded: false }
+          : { ...placed, x: placed.x + 1_000 }
+      const traffic = getTrafficState(ego, [rival], path)
+      const clear = driveWithTraffic(ego, getTrafficState(ego, [], path))
+      const observed = driveWithTraffic(ego, traffic)
+
+      expect(clear.braking).toBe(false)
+      expect(observed.braking).toBe(false)
+      expect(observed.speed).toBeCloseTo(clear.speed)
+      expect(traffic.ahead).toBeNull()
+      expect(traffic.nearby).toHaveLength(0)
+    },
+  )
+
+  it('does not classify the other branch of a crossing as traffic ahead', () => {
+    const crossingPath = buildRoadPath(
+      [
+        { x: -84, y: -70, surface: 'street' },
+        { x: 84, y: 70, surface: 'street' },
+        { x: -84, y: 70, surface: 'street' },
+        { x: 84, y: -70, surface: 'street' },
+        { x: 300, y: -70, surface: 'street' },
+        { x: 300, y: -300, surface: 'street' },
+        { x: -300, y: -300, surface: 'street' },
+        { x: -300, y: -70, surface: 'street' },
+        { x: -84, y: -70, surface: 'street' },
+      ],
+      EMPTY_TERRAIN,
+    )
+    const crossing = crossingPath.crossings.find(({ key }) => key === '0:2')
+    const [, first, second] = cars()
+    if (!crossing || !first || !second)
+      throw new Error('Missing crossing fixtures')
+    const ego = onPath(first, crossingPath, crossing.firstPathIndex, 0, 120)
+    const rival = onPath(second, crossingPath, crossing.secondPathIndex, 0, 10)
+
+    expect(Math.hypot(rival.x - ego.x, rival.y - ego.y)).toBeLessThan(12)
+    const traffic = getTrafficState(ego, [rival], crossingPath)
+    expect(traffic.ahead).toBeNull()
+    expect(traffic.nearby).toHaveLength(0)
+  })
+
+  it('keeps traffic on the same rising ramp despite its different absolute height', () => {
+    const ramp = buildRoadPath(
+      [
+        { x: 0, y: 0, surface: 'street' },
+        { x: 500, y: 0, surface: 'street', structure: 'overpass' },
+        { x: 1000, y: 0, surface: 'street' },
+        { x: 1000, y: 500, surface: 'street' },
+        { x: 0, y: 500, surface: 'street' },
+        { x: 0, y: 0, surface: 'street' },
+      ],
+      EMPTY_TERRAIN,
+    )
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const ego = onPath(first, ramp, 85, 0, 120)
+    const rival = onPath(second, ramp, 95, 0, 10)
+    const traffic = getTrafficState(ego, [rival], ramp)
+
+    expect(rival.z - ego.z).toBeGreaterThan(12)
+    expect(traffic.ahead?.vehicle.id).toBe(rival.id)
+    expect(traffic.ahead?.distance).toBeCloseTo(60, 0)
+  })
+
+  it.each([false, true])(
+    'finds a car just ahead in the same path sample (reversed: %s)',
+    (reversed) => {
+      const [, first, second] = cars()
+      if (!first || !second) throw new Error('Missing race fixtures')
+      const ego = onPath(first, path, 30, 0, 120, reversed)
+      const rival = {
+        ...onPath(second, path, 30, 0, 10, reversed),
+        x: ego.x + Math.cos(ego.angle) * 2,
+        y: ego.y + Math.sin(ego.angle) * 2,
+      }
+      const traffic = getTrafficState(ego, [rival], path, reversed)
+      const stepped = stepAiVehicle(
+        ego,
+        path,
+        traffic,
+        'normal',
+        0.05,
+        { next: () => 0.5 },
+        reversed,
+      )
+
+      expect(traffic.ahead?.distance).toBeCloseTo(2)
+      expect(stepped.braking).toBe(true)
+    },
+  )
+
+  it.each([false, true])(
+    'does not brake for a car just behind in the same path sample (reversed: %s)',
+    (reversed) => {
+      const [, first, second] = cars()
+      if (!first || !second) throw new Error('Missing race fixtures')
+      const ego = onPath(first, path, 30, 0, 120, reversed)
+      const rival = {
+        ...onPath(second, path, 30, 0, 10, reversed),
+        x: ego.x - Math.cos(ego.angle) * 2,
+        y: ego.y - Math.sin(ego.angle) * 2,
+      }
+      const traffic = getTrafficState(ego, [rival], path, reversed)
+      const stepped = stepAiVehicle(
+        ego,
+        path,
+        traffic,
+        'normal',
+        0.05,
+        { next: () => 0.5 },
+        reversed,
+      )
+
+      expect(traffic.ahead?.distance).toBeGreaterThan(100)
+      expect(stepped.braking).toBe(false)
+    },
+  )
+
+  it.each([false, true])(
+    'brakes for a closing car across the physical path wrap (reversed: %s)',
+    (reversed) => {
+      const [, first, second] = cars()
+      if (!first || !second) throw new Error('Missing race fixtures')
+      const egoIndex = reversed ? 1 : path.points.length - 2
+      const rivalIndex = reversed ? path.points.length - 2 : 1
+      const ego = onPath(first, path, egoIndex, 0, 120, reversed)
+      const rival = onPath(second, path, rivalIndex, 0, 10, reversed)
+      const traffic = getTrafficState(ego, [rival], path, reversed)
+      const stepped = stepAiVehicle(
+        ego,
+        path,
+        traffic,
+        'normal',
+        0.05,
+        { next: () => 0.5 },
+        reversed,
+      )
+
+      expect(traffic.ahead?.vehicle.id).toBe(rival.id)
+      expect(traffic.ahead?.distance).toBeCloseTo(18, 0)
+      expect(traffic.ahead?.timeToCollision).toBeCloseTo(18 / 110, 2)
+      expect(stepped.braking).toBe(true)
+    },
+  )
+
   it('finds traffic ahead across the path wrap boundary', () => {
     const [ego, rival] = cars()
     if (!ego || !rival) throw new Error('Missing race fixtures')
     const traffic = getTrafficState(
-      { ...ego, pathIndex: path.points.length - 4 },
-      [{ ...rival, pathIndex: 3 }],
+      { ...ego, pathIndex: path.points.length - 4, lane: 0 },
+      [{ ...rival, pathIndex: 3, lane: 0 }],
       path.points.length,
     )
 

@@ -33,6 +33,7 @@ import {
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { renderTerrain } from '@/phaser/rendering/terrainRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { bindRacePointer, type RacePointerBinding } from '@/phaser/input/racePointer'
 
 export class RaceScene extends Phaser.Scene {
   private terrainGraphics?: Phaser.GameObjects.Graphics
@@ -48,6 +49,7 @@ export class RaceScene extends Phaser.Scene {
   private lamps: readonly LampPost[] = []
   private snapshot: AppSnapshot | undefined
   private raceCamera: RaceCameraState | undefined
+  private pointerBinding: RacePointerBinding | undefined
 
   constructor(
     private readonly controller: SceneControllerPort,
@@ -157,10 +159,9 @@ export class RaceScene extends Phaser.Scene {
     )
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
-    this.input.on('pointerdown', this.onPointerDown, this)
-    this.input.on('pointermove', this.onPointerMove, this)
-    this.input.on('pointerup', this.onPointerUp, this)
-    this.input.on('pointercancel', this.onPointerUp, this)
+    this.pointerBinding = bindRacePointer(this.game.canvas, 'steering', this.controls)
+    window.addEventListener('blur', this.onBlur)
+    document.addEventListener('visibilitychange', this.onVisibility)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this)
   }
 
@@ -202,14 +203,17 @@ export class RaceScene extends Phaser.Scene {
     this.upperVehicleGraphics.clear()
     this.effectGraphics.clear()
     renderRaceEffects(this.effectGraphics, race.effects)
+    const visibleVehicles = race.vehicles.filter(
+      (vehicle) => vehicle.player || vehicle.finishedAt === null,
+    )
     renderVehicleShadows(
       this.shadowGraphics,
-      race.vehicles,
+      visibleVehicles,
       race.path.terrainSurface,
       this.snapshot.preferences.lighting === 'night',
     )
     const upperVehicles = new Set(
-      race.vehicles
+      visibleVehicles
         .filter(
           (vehicle) =>
             vehicle.z - race.path.terrainSurface.heightAt(vehicle) >=
@@ -219,11 +223,11 @@ export class RaceScene extends Phaser.Scene {
     )
     renderVehicles(
       this.vehicleGraphics,
-      race.vehicles.filter(({ id }) => !upperVehicles.has(id)),
+      visibleVehicles.filter(({ id }) => !upperVehicles.has(id)),
     )
     renderVehicles(
       this.upperVehicleGraphics,
-      race.vehicles.filter(({ id }) => upperVehicles.has(id)),
+      visibleVehicles.filter(({ id }) => upperVehicles.has(id)),
     )
     this.nightShadeGraphics?.clear()
     this.nightLightGraphics?.clear()
@@ -244,7 +248,7 @@ export class RaceScene extends Phaser.Scene {
       })
       renderNightLights(
         this.nightLightGraphics,
-        race.vehicles.map((vehicle) =>
+        visibleVehicles.map((vehicle) =>
           transformVehicleLights(
             vehicle.car,
             vehicle,
@@ -262,8 +266,10 @@ export class RaceScene extends Phaser.Scene {
       return
     }
     if (event.key.toLowerCase() === 'r' && !event.repeat) {
-      this.raceSession.resetPlayer()
+      const state = this.raceSession.snapshot().state
+      if (state?.phase !== 'running' || state.paused) return
       this.controls.reset()
+      this.raceSession.resetPlayer()
       return
     }
     this.controls.setKeyboard(event.key, true)
@@ -271,27 +277,19 @@ export class RaceScene extends Phaser.Scene {
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.controls.setKeyboard(event.key, false)
   }
-  private readonly onPointerDown = (pointer: Phaser.Input.Pointer): void => {
-    const steering = (pointer.x / Math.max(1, this.scale.width) - 0.5) * 2
-    this.controls.beginSteering(pointer.id, steering)
-  }
-  private readonly onPointerMove = (pointer: Phaser.Input.Pointer): void => {
-    if (!pointer.isDown) return
-    const steering = (pointer.x / Math.max(1, this.scale.width) - 0.5) * 2
-    this.controls.updateSteering(pointer.id, steering)
-  }
-  private readonly onPointerUp = (pointer: Phaser.Input.Pointer): void => {
-    this.controls.endPointer(pointer.id)
+  private readonly onBlur = (): void => this.controls.reset()
+  private readonly onVisibility = (): void => {
+    if (document.hidden) this.onBlur()
   }
 
   private dispose(): void {
     this.controls.reset()
+    this.pointerBinding?.destroy()
+    this.pointerBinding = undefined
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
-    this.input.off('pointerdown', this.onPointerDown, this)
-    this.input.off('pointermove', this.onPointerMove, this)
-    this.input.off('pointerup', this.onPointerUp, this)
-    this.input.off('pointercancel', this.onPointerUp, this)
+    window.removeEventListener('blur', this.onBlur)
+    document.removeEventListener('visibilitychange', this.onVisibility)
     this.lamps = []
   }
 }

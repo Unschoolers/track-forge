@@ -43,6 +43,7 @@ export function createUiRuntime(): UiRuntime {
       updateSteering: vi.fn(),
       beginBrake: vi.fn(),
       endPointer: vi.fn(),
+      onReset: vi.fn(() => () => undefined),
       reset: vi.fn(),
     },
     feedback: {

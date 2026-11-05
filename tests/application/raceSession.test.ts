@@ -3,7 +3,7 @@ import type { ScoreEntry, ScoreStore } from '@/application/ports/storage'
 import { RaceSession } from '@/application/race/raceSession'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import type { RaceStep } from '@/domain/race/raceEngine'
+import { stepRace, type RaceStep } from '@/domain/race/raceEngine'
 import type { FeedbackPort } from '@/application/ports/feedback'
 
 const track = createStarterTrack(asTrackId('session-track'), 1)
@@ -175,6 +175,57 @@ describe('RaceSession', () => {
     expect(Math.abs(Math.atan2(Math.sin(car.angle - expected), Math.cos(car.angle - expected)))).toBeLessThan(0.01)
   })
 
+  it('only recovers during unpaused racing and preserves progress, damage, and time', () => {
+    const { store } = createScoreStore()
+    let finish = false
+    const step: RaceStep = (state) => ({
+      state: {
+        ...state,
+        phase: finish ? 'finished' : 'running',
+        elapsed: 42,
+        vehicles: state.vehicles.map((vehicle) => vehicle.player
+          ? { ...vehicle, x: vehicle.x + 1000, y: vehicle.y + 1000, speed: 30, lap: 1, nextSector: 3, damage: 2 }
+          : vehicle),
+      },
+      events: finish ? [{ type: 'race-finished', reason: 'water' }] : [],
+    })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+
+    const countdown = session.snapshot()
+    session.resetPlayer()
+    expect(session.snapshot()).toBe(countdown)
+
+    session.advance(3.7, noInput)
+    session.advance(1 / 60, noInput)
+    session.setPaused(true)
+    const paused = session.snapshot()
+    session.resetPlayer()
+    expect(session.snapshot()).toBe(paused)
+
+    session.setPaused(false)
+    const before = session.snapshot()
+    const beforePlayer = before.state?.vehicles.find((vehicle) => vehicle.player)
+    if (!beforePlayer) throw new Error('Missing player')
+    session.resetPlayer()
+    const recovered = session.snapshot()
+    const player = recovered.state?.vehicles.find((vehicle) => vehicle.player)
+    expect(player?.x).not.toBe(beforePlayer.x)
+    expect(player?.y).not.toBe(beforePlayer.y)
+    expect(player).toMatchObject({ speed: 0, vx: 0, vy: 0, lap: 1, nextSector: 3, damage: 2 })
+    expect(recovered.telemetry).toMatchObject({ elapsed: 42, lap: 1, damage: 2 })
+    expect(recovered.state?.vehicles.filter((vehicle) => !vehicle.player)).toEqual(
+      before.state?.vehicles.filter((vehicle) => !vehicle.player),
+    )
+
+    finish = true
+    session.advance(1 / 60, noInput)
+    const finished = session.snapshot()
+    expect(finished.state?.phase).toBe('finished')
+    session.resetPlayer()
+    expect(session.snapshot()).toBe(finished)
+  })
+
   it('owns countdown, pause, restart, and observable snapshots', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({ state, events: [] }))
@@ -269,6 +320,55 @@ describe('RaceSession', () => {
       newRecord: true,
     })
     expect(feedback.silenceContinuous).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps an opponent finish in standings and results as the player continues and finishes', () => {
+    const { store } = createScoreStore()
+    let frames = 0
+    const step: RaceStep = (state, input, deltaSeconds, random) => {
+      const point = state.path.points[0]
+      const player = state.vehicles[0]
+      const rival = state.vehicles[1]
+      if (!point || !player || !rival) throw new Error('Missing race fixtures')
+      const atLine = { x: point.x, y: point.y, z: 0, vx: 0, vy: 0, speed: 0 }
+      const prepared = frames++ === 0
+        ? {
+            ...state,
+            elapsed: 10,
+            vehicles: [
+              { ...player, ...atLine, pathIndex: 0 },
+              { ...rival, ...atLine, x: point.x - 1, pathIndex: state.path.points.length - 2, nextSector: 4 as const },
+            ],
+          }
+        : {
+            ...state,
+            vehicles: [
+              { ...player, ...atLine, pathIndex: state.path.points.length - 2, nextSector: 4 as const },
+              rival,
+            ],
+          }
+      return stepRace(prepared, input, deltaSeconds, random)
+    }
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, { ...setup, laps: 1 })
+    session.advance(3.7, noInput)
+    session.advance(1 / 60, noInput)
+
+    const running = session.snapshot()
+    expect(running.state?.phase).toBe('running')
+    expect(running.state?.vehicles[0]?.damage).toBe(0)
+    expect(running.state?.activeContacts).toEqual([])
+    expect(running.standings[0]).toMatchObject({ id: 'ai-1', place: 1, finishTime: 10 + 1 / 60 })
+    expect(running.result).toBeNull()
+
+    session.advance(1 / 60, noInput)
+    const finished = session.snapshot()
+    expect(finished.result).toMatchObject({ outcome: 'finished', playerPlace: 2, playerTime: expect.closeTo(10 + 2 / 60) })
+    expect(finished.result?.standings).toMatchObject([
+      { id: 'ai-1', place: 1, finishTime: 10 + 1 / 60 },
+      { id: 'player', place: 2, finishTime: expect.closeTo(10 + 2 / 60) },
+    ])
+    expect(store.record).toHaveBeenCalledOnce()
   })
 
   it('reports wrecks without writing a score and destroys idempotently', () => {

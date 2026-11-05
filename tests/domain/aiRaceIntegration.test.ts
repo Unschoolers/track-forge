@@ -49,6 +49,7 @@ describe('AI race integration', () => {
               x: point.x,
               y: point.y,
               pathIndex: 30,
+              lane: 0,
               speed: 100,
               vx: Math.cos(vehicle.angle) * 100,
               vy: Math.sin(vehicle.angle) * 100,
@@ -59,6 +60,7 @@ describe('AI race integration', () => {
                 x: ahead.x,
                 y: ahead.y,
                 pathIndex: 36,
+                lane: 0,
                 speed: 20,
               }
             : vehicle,

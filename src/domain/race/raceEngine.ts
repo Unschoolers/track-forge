@@ -153,6 +153,7 @@ export const stepRace: RaceStep = (
       elapsed > 1.1 &&
       vehicle.speed < 13 &&
       input.throttle > 0 &&
+      !input.braking &&
       !vehicle.wrecked
         ? vehicle.stuckDuration + dt
         : Math.max(0, vehicle.stuckDuration - dt * 2.5)

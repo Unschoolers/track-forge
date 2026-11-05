@@ -1,4 +1,4 @@
-import { ROAD_GEOMETRY } from '@/domain/config'
+import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type {
   RaceCameraHints,
@@ -10,6 +10,7 @@ import {
   type RoadPath,
 } from '@/domain/track/pathBuilder'
 import type { TerrainMaterial } from '@/domain/terrain/terrainSurface'
+import type { RoadSurfaceSample } from '@/domain/track/roadSurface'
 import {
   hasSafeOverpassSupport,
   isSafeRoadRecoverySample,
@@ -64,15 +65,185 @@ export function turnAmountAt(
   )
 }
 
+/**
+ * Search a bounded route window so the nearest sample can move across a
+ * hairpin even when distance to the previous straight has a local minimum.
+ * If that search proposes the other arm of a nearby detected crossing,
+ * repeat it without crossing arms unrelated to the current route segment.
+ */
+function nearestContinuousPathPoint(
+  path: RoadPath,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
+): NearestPathPoint | undefined {
+  const count = path.points.length
+  if (count === 0) return undefined
+  const start = path.closed
+    ? ((Math.round(vehicle.pathIndex) % count) + count) % count
+    : Math.max(0, Math.min(count - 1, Math.round(vehicle.pathIndex)))
+  const nearest = nearestPathPoint(path, vehicle, start, 80)
+  const current = path.points[start]
+  if (!nearest || !current || nearest.point.segment === current.segment) {
+    return nearest
+  }
+
+  const crossingArms = new Set<number>()
+  for (const crossing of path.crossings) {
+    if (
+      Math.hypot(
+        vehicle.x - crossing.position.x,
+        vehicle.y - crossing.position.y,
+      ) > crossing.bridgeHalfLength + ROAD_GEOMETRY.onRoadRadius
+    ) continue
+    if (current.segment === crossing.firstSegment) {
+      crossingArms.add(crossing.secondSegment)
+    } else if (current.segment === crossing.secondSegment) {
+      crossingArms.add(crossing.firstSegment)
+    }
+  }
+  if (!crossingArms.has(nearest.point.segment)) return nearest
+
+  let closest: NearestPathPoint | undefined
+  const radius = Math.min(80, count - 1)
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    const rawIndex = start + offset
+    if (!path.closed && (rawIndex < 0 || rawIndex >= count)) continue
+    const index = ((rawIndex % count) + count) % count
+    const point = path.points[index]
+    if (!point || crossingArms.has(point.segment)) continue
+    const distance = Math.hypot(point.x - vehicle.x, point.y - vehicle.y)
+    if (!closest || distance < closest.distance) {
+      closest = { index, point, distance }
+    }
+  }
+  return closest
+}
+
+// Half a level leaves room for the height change across a normal ramp step,
+// while distinguishing a full deck from the ground beneath it.
+const LEVEL_COMPATIBILITY = WORLD_ELEVATION.levelHeight / 2
+
+function heightCompatible(
+  path: RoadPath,
+  index: number,
+  terrainHeight: number,
+  z: number,
+): boolean {
+  return (
+    !Number.isFinite(z) ||
+    Math.abs(terrainHeight + path.roadSurface.at(index).structureHeight - z) <=
+      LEVEL_COMPATIBILITY
+  )
+}
+
+function roadAboveVehicle(
+  surface: RoadSurfaceSample,
+  vehicle: Pick<RaceVehicle, 'z'> & Partial<Pick<RaceVehicle, 'grounded'>>,
+): boolean {
+  // A grounded car can follow a ramp between frames. An airborne car must
+  // approach the deck from above; a deck above its underside cannot catch it.
+  const clearance = vehicle.grounded === false
+    ? SUPPORT_HEIGHT_EPSILON
+    : LEVEL_COMPATIBILITY
+  return (
+    surface.structureHeight > clearance &&
+    surface.height > vehicle.z + clearance
+  )
+}
+
+/** Search globally only after the previously followed road is left. */
+function reacquireRoad(
+  path: RoadPath,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'z'>,
+  terrainHeight: number,
+): NearestPathPoint | undefined {
+  let nearest: NearestPathPoint | undefined
+  let compatible: NearestPathPoint | undefined
+  for (const [index, point] of path.points.entries()) {
+    const distance = Math.hypot(point.x - vehicle.x, point.y - vehicle.y)
+    if (!nearest || distance < nearest.distance) {
+      nearest = { index, point, distance }
+    }
+    if (
+      distance <= ROAD_GEOMETRY.onRoadRadius &&
+      (!compatible || distance < compatible.distance) &&
+      heightCompatible(path, index, terrainHeight, vehicle.z)
+    ) {
+      compatible = { index, point, distance }
+    }
+  }
+  return compatible ?? nearest
+}
+
+/** Check other crossing arms only when the followed deck is above the car. */
+function lowerCrossingRoad(
+  path: RoadPath,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'z'>,
+  current: NearestPathPoint,
+  terrainHeight: number,
+): NearestPathPoint | undefined {
+  let nearest: NearestPathPoint | undefined
+  for (const crossing of path.crossings) {
+    if (
+      Math.hypot(
+        vehicle.x - crossing.position.x,
+        vehicle.y - crossing.position.y,
+      ) > crossing.bridgeHalfLength + ROAD_GEOMETRY.onRoadRadius
+    ) continue
+    const otherIndex =
+      current.point.segment === crossing.firstSegment
+        ? crossing.secondPathIndex
+        : current.point.segment === crossing.secondSegment
+          ? crossing.firstPathIndex
+          : undefined
+    if (otherIndex === undefined) continue
+    const candidate = nearestContinuousPathPoint(path, {
+      ...vehicle,
+      pathIndex: otherIndex,
+    })
+    if (
+      candidate &&
+      candidate.distance <= ROAD_GEOMETRY.onRoadRadius &&
+      (!nearest || candidate.distance < nearest.distance) &&
+      heightCompatible(path, candidate.index, terrainHeight, vehicle.z)
+    ) {
+      nearest = candidate
+    }
+  }
+  return nearest
+}
+
 export function getVehicleStepContext(
   path: RoadPath,
-  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex' | 'z'>,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex' | 'z'> &
+    Partial<Pick<RaceVehicle, 'grounded'>>,
 ): VehicleStepContext {
-  const local = nearestPathPoint(path, vehicle, vehicle.pathIndex, 80)
-  const nearest =
-    local && local.distance <= 72
-      ? local
-      : nearestPathPoint(path, vehicle)
+  const local = nearestContinuousPathPoint(path, vehicle)
+  let nearest = local
+  let roadSurface = local && path.roadSurface.at(local.index, vehicle)
+  if (local && roadSurface && local.distance > ROAD_GEOMETRY.onRoadRadius) {
+    const reacquired = reacquireRoad(path, vehicle, roadSurface.terrainHeight)
+    if (
+      reacquired &&
+      (reacquired.distance <= ROAD_GEOMETRY.onRoadRadius || local.distance > 72)
+    ) {
+      nearest = reacquired
+      roadSurface = path.roadSurface.at(nearest.index, vehicle)
+    }
+  }
+  if (
+    nearest && roadSurface && roadAboveVehicle(roadSurface, vehicle)
+  ) {
+    const lower = lowerCrossingRoad(
+      path,
+      vehicle,
+      nearest,
+      roadSurface.terrainHeight,
+    )
+    if (lower) {
+      nearest = lower
+      roadSurface = path.roadSurface.at(lower.index, vehicle)
+    }
+  }
   if (!nearest) {
     const terrainMaterial = path.terrainSurface.materialAt(vehicle)
     const fallback = {
@@ -109,14 +280,18 @@ export function getVehicleStepContext(
     x: (next.x - previous.x) / length,
     y: (next.y - previous.y) / length,
   }
-  const onRoad = nearest.distance <= ROAD_GEOMETRY.onRoadRadius
+  roadSurface ??= path.roadSurface.at(nearest.index, vehicle)
+  // A vehicle below a raised deck is supported by terrain (or by a lower
+  // crossing arm found above), never by the overhead road.
+  const onRoad =
+    nearest.distance <= ROAD_GEOMETRY.onRoadRadius &&
+    !roadAboveVehicle(roadSurface, vehicle)
   const onCurb =
     onRoad &&
     nearest.point.surface === 'street' &&
     nearest.distance > ROAD_GEOMETRY.curbDetectInner &&
     nearest.distance < ROAD_GEOMETRY.curbDetectOuter &&
     Math.abs(turnAmountAt(path, nearest.index)) > 0.12
-  const roadSurface = path.roadSurface.at(nearest.index, vehicle)
   const safeAboveWater =
     onRoad &&
     hasSafeOverpassSupport(nearest.point, roadSurface, vehicle.z)
@@ -235,10 +410,11 @@ export function resetVehicleToTrack(
           ),
         }
       : context.nearest
-  const roadSurface =
-    requestedIndex !== undefined && requestedPoint
-      ? path.roadSurface.at(requestedIndex, requestedPoint)
-      : undefined
+  // Resetting changes position to the selected road center, so sample support
+  // there instead of retaining terrain height from a position under the deck.
+  const roadSurface = path.points[nearest.index]
+    ? path.roadSurface.at(nearest.index, nearest.point)
+    : undefined
   const direction = target.reversed ? -1 : 1
   const ahead =
     wrapped(path, nearest.index + direction * 4) ?? nearest.point

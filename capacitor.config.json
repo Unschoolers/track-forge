@@ -5,5 +5,12 @@
   "server": {
     "hostname": "trackforge.local",
     "androidScheme": "https"
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true,
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
   }
 }

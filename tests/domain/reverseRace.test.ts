@@ -60,8 +60,23 @@ describe('reverse races', () => {
   })
   it('detects reverse traffic across the wrap boundary in samples and world distance', () => {
     const [ego, rival] = race().vehicles
-    const a = { ...required(ego), pathIndex: 3 }
-    const b = { ...required(rival), pathIndex: path.points.length - 4 }
+    const egoPoint = required(path.points[3])
+    const rivalIndex = path.points.length - 4
+    const rivalPoint = required(path.points[rivalIndex])
+    const a = {
+      ...required(ego),
+      x: egoPoint.x,
+      y: egoPoint.y,
+      pathIndex: 3,
+      lane: 0,
+    }
+    const b = {
+      ...required(rival),
+      x: rivalPoint.x,
+      y: rivalPoint.y,
+      pathIndex: rivalIndex,
+      lane: 0,
+    }
     expect(
       getTrafficState(a, [b], path.points.length, true).ahead?.distance,
     ).toBe(7)
@@ -80,10 +95,23 @@ describe('reverse races', () => {
     'detects physical traffic across a relocated lap boundary (reversed: $reversed)',
     ({ reversed, egoIndex, rivalIndex }) => {
       const [ego, rival] = race().vehicles
-      const car = { ...required(ego), pathIndex: egoIndex, lap: 0, speed: 100 }
+      const egoPoint = required(path.points[egoIndex])
+      const rivalPoint = required(path.points[rivalIndex])
+      const car = {
+        ...required(ego),
+        x: egoPoint.x,
+        y: egoPoint.y,
+        pathIndex: egoIndex,
+        lane: 0,
+        lap: 0,
+        speed: 100,
+      }
       const ahead = {
         ...required(rival),
+        x: rivalPoint.x,
+        y: rivalPoint.y,
         pathIndex: rivalIndex,
+        lane: 0,
         lap: 1,
         speed: 20,
       }

@@ -7,5 +7,7 @@ export interface RaceControlsPort {
   updateSteering(pointerId: number, normalizedSteering: number): void
   beginBrake(pointerId: number): void
   endPointer(pointerId: number): void
+  /** Release any captured pointers when the shared input is reset. */
+  onReset(listener: () => void): () => void
   reset(): void
 }

@@ -7,6 +7,7 @@ import type {
 import type { Unsubscribe } from '@/application/eventBus'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
+import { bindRacePointer, STEERING_RANGE_PX } from '@/phaser/input/racePointer'
 
 export interface RaceHudMount {
   readonly element: HTMLElement
@@ -59,61 +60,39 @@ export function createRaceHud(
   steering.append(steeringThumb)
   const brake = button('BRAKE', 'brake', () => undefined, 'brake-button')
   brake.setAttribute('aria-label', 'Brake')
-  controlsBar.append(steering, brake)
+  const recover = button('RECOVER', 'recover', () => {
+    const state = raceSession.snapshot().state
+    if (state?.phase !== 'running' || state.paused) return
+    controls.reset()
+    updateControls()
+    raceSession.resetPlayer()
+  }, 'button recover-button')
+  const pedals = element('div', 'race-pedals')
+  pedals.append(recover, brake)
+  controlsBar.append(steering, pedals)
   screen.append(hud, damage, countdown, controlsBar)
 
-  const normalizedSteering = (event: PointerEvent): number => {
-    const bounds = steering.getBoundingClientRect()
-    return Math.max(
-      -1,
-      Math.min(1, ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * 2 - 1),
-    )
+  const updateControls = (): void => {
+    const input = controls.snapshot()
+    steering.setAttribute('aria-valuenow', input.steering.toFixed(2))
+    steeringThumb.style.transform = `translateX(${input.steering * STEERING_RANGE_PX}px)`
+    brake.classList.toggle('pressed', input.braking)
   }
-  const steeringPointers = new Set<number>()
-  const brakePointers = new Set<number>()
-  const beginSteering = (event: PointerEvent): void => {
-    event.preventDefault()
-    steeringPointers.add(event.pointerId)
-    steering.setPointerCapture?.(event.pointerId)
-    const steeringValue = normalizedSteering(event)
-    controls.beginSteering(event.pointerId, steeringValue)
-    steering.setAttribute('aria-valuenow', steeringValue.toFixed(2))
+  const steeringBinding = bindRacePointer(steering, 'steering', controls, updateControls)
+  const brakeBinding = bindRacePointer(brake, 'brake', controls, updateControls)
+  const onBlur = (): void => {
+    controls.reset()
+    updateControls()
   }
-  const updateSteering = (event: PointerEvent): void => {
-    if (!steeringPointers.has(event.pointerId)) return
-    event.preventDefault()
-    const steeringValue = normalizedSteering(event)
-    controls.updateSteering(event.pointerId, steeringValue)
-    steering.setAttribute('aria-valuenow', steeringValue.toFixed(2))
+  const onVisibility = (): void => {
+    if (document.hidden) onBlur()
   }
-  const endSteering = (event: PointerEvent): void => {
-    if (!steeringPointers.delete(event.pointerId)) return
-    event.preventDefault()
-    controls.endPointer(event.pointerId)
-    steering.setAttribute('aria-valuenow', '0')
-  }
-  const beginBrake = (event: PointerEvent): void => {
-    event.preventDefault()
-    brakePointers.add(event.pointerId)
-    brake.setPointerCapture?.(event.pointerId)
-    controls.beginBrake(event.pointerId)
-    brake.classList.add('pressed')
-  }
-  const endBrake = (event: PointerEvent): void => {
-    if (!brakePointers.delete(event.pointerId)) return
-    event.preventDefault()
-    controls.endPointer(event.pointerId)
-    brake.classList.remove('pressed')
-  }
-  steering.addEventListener('pointerdown', beginSteering)
-  steering.addEventListener('pointermove', updateSteering)
-  steering.addEventListener('pointerup', endSteering)
-  steering.addEventListener('pointercancel', endSteering)
-  brake.addEventListener('pointerdown', beginBrake)
-  brake.addEventListener('pointerup', endBrake)
-  brake.addEventListener('pointercancel', endBrake)
+  window.addEventListener('blur', onBlur)
+  document.addEventListener('visibilitychange', onVisibility)
 
   const update = (snapshot: RaceSessionSnapshot): void => {
+    updateControls()
+    recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused
     const telemetry = snapshot.telemetry
     positionValue.textContent = `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
     lapValue.textContent = `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
@@ -143,8 +122,10 @@ export function createRaceHud(
     destroy(): void {
       unsubscribe?.()
       unsubscribe = undefined
-      steeringPointers.clear()
-      brakePointers.clear()
+      steeringBinding.destroy()
+      brakeBinding.destroy()
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', onVisibility)
       controls.reset()
     },
   }
