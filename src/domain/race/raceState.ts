@@ -66,6 +66,8 @@ export interface RaceState {
   readonly countdown: number
   readonly paused: boolean
   readonly activeContacts: readonly string[]
+  readonly boostCharge?: number
+  readonly boostRemaining?: number
   readonly cameraHints: RaceCameraHints
   readonly effects: RaceEffectsState
 }
