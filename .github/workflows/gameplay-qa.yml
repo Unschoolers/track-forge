@@ -1,0 +1,48 @@
+name: Mobile gameplay QA
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'qa/**'
+      - 'package.json'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'playwright.mobile.config.mjs'
+      - '.github/workflows/gameplay-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gameplay-qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Locked, isolated QA runner; avoids changing the existing APK lockfile.
+      - name: Install browser test runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.64.1
+      - name: Install Chromium and OS dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Simulate mobile gameplay
+        run: npm run qa:mobile
+      - uses: actions/upload-artifact@v7.0.2
+        if: ${{ always() }}
+        with:
+          name: mobile-gameplay-qa-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
