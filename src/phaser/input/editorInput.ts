@@ -146,7 +146,7 @@ export class EditorInputController {
     this.pointers.set(pointer.id, pointer)
     if (this.pointers.size >= 2) {
       if (!this.navigating && this.activePointer !== undefined) {
-        this.finishPointer(this.activePointer, false)
+        this.abortGesture()
       }
       this.navigating = true
       this.navAnchor = this.pinchSample()
@@ -206,7 +206,7 @@ export class EditorInputController {
   }
 
   cancelActiveGesture(): void {
-    if (this.activePointer !== undefined) this.finishPointer(this.activePointer, false)
+    this.abortGesture()
     this.pointers.clear()
     this.navigating = false
     this.navAnchor = undefined
@@ -220,7 +220,20 @@ export class EditorInputController {
       if (this.pointers.size === 0) this.navigating = false
       return
     }
-    this.finishPointer(id, commit)
+    if (commit) this.finishPointer(id, true)
+    else this.abortGesture()
+  }
+
+  private abortGesture(): void {
+    if (this.activePointer === undefined) return
+    this.terrainStroke = undefined
+    if (this.dependencies.tool() !== 'pan') {
+      this.dependencies.dispatch({ type: 'cancel-gesture' })
+    }
+    this.activePointer = undefined
+    this.lastScreen = undefined
+    this.selectedPoint = -1
+    this.drawStartIndex = 0
   }
 
   private pinchSample(): { center: Vector2; distance: number } | undefined {
