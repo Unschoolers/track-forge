@@ -71,6 +71,68 @@ describe('EditorInputController', () => {
     expect(dispatch).not.toHaveBeenCalled()
   })
 
+  it('pinches around the gesture midpoint without painting, then requires a fresh touch', () => {
+    const dispatch = vi.fn()
+    const camera: EditorCamera = { x: 0, y: 0, zoom: 1 }
+    const input = new EditorInputController({
+      camera,
+      viewport: () => ({ width: 200, height: 200 }),
+      tool: () => 'draw',
+      surface: () => 'street',
+      editor: () => createEditorState(),
+      dispatch,
+    })
+    input.pointerDown({ id: 1, x: 60, y: 100 })
+    input.pointerDown({ id: 2, x: 140, y: 100 })
+    dispatch.mockClear()
+    input.pointerMove({ id: 1, x: 40, y: 100 })
+    input.pointerMove({ id: 2, x: 180, y: 100 })
+    expect(camera.zoom).toBeGreaterThan(1)
+    expect(dispatch).not.toHaveBeenCalled()
+    const zoom = camera.zoom
+    input.pointerUp({ id: 1, x: 40, y: 100 })
+    input.pointerMove({ id: 2, x: 190, y: 100 })
+    expect(camera.zoom).toBe(zoom)
+    input.pointerUp({ id: 2, x: 180, y: 100 })
+    expect(dispatch).not.toHaveBeenCalled()
+    input.pointerDown({ id: 3, x: 50, y: 50 })
+    input.pointerUp({ id: 3, x: 50, y: 50 })
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'add-point' }))
+  })
+
+  it.each(['draw', 'tree'] as const)(
+    'rolls back a one-finger %s edit when a second finger starts navigation',
+    (tool) => {
+      let editor = createEditorState()
+      const dispatch = vi.fn((command: Parameters<typeof reduceEditor>[1]) => {
+        editor = reduceEditor(editor, command)
+      })
+      const input = new EditorInputController({
+        camera: { x: 0, y: 0, zoom: 1 },
+        viewport: () => ({ width: 300, height: 300 }),
+        tool: () => tool,
+        surface: () => 'street',
+        editor: () => editor,
+        dispatch,
+      })
+      const original = editor
+      input.pointerDown({ id: 1, x: 50, y: 50 })
+      if (tool === 'draw') {
+        input.pointerMove({ id: 1, x: 110, y: 50 })
+      }
+      expect(editor.points.length + editor.trees.length).toBeGreaterThan(0)
+      input.pointerDown({ id: 2, x: 180, y: 50 })
+      input.pointerMove({ id: 1, x: 30, y: 50 })
+      input.pointerUp({ id: 1, x: 30, y: 50 })
+      input.pointerUp({ id: 2, x: 180, y: 50 })
+      expect(editor.points).toEqual(original.points)
+      expect(editor.trees).toEqual(original.trees)
+      expect(editor.history).toEqual(original.history)
+      expect(editor.gestureStart).toBeNull()
+      expect(dispatch).toHaveBeenCalledWith({ type: 'cancel-gesture' })
+    },
+  )
+
   it('moves, paints, and erases the nearest editor content', () => {
     const dispatch = vi.fn()
     const camera: EditorCamera = { x: 0, y: 0, zoom: 1 }
@@ -257,7 +319,7 @@ describe('EditorInputController', () => {
     expect(reduceEditor(editor, { type: 'undo' })).toBe(editor)
     expect(dispatch.mock.calls.map(([command]) => command.type)).toEqual([
       'begin-gesture',
-      'end-gesture',
+      'cancel-gesture',
     ])
   })
 
@@ -284,7 +346,7 @@ describe('EditorInputController', () => {
     expect(reduceEditor(editor, { type: 'undo' })).toBe(editor)
     expect(dispatch.mock.calls.map(([command]) => command.type)).toEqual([
       'begin-gesture',
-      'end-gesture',
+      'cancel-gesture',
     ])
   })
 
