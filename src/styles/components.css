@@ -128,3 +128,45 @@
     text-shadow: 0 2px 6px #000;
   }
 }
+
+/* In-race events and hands-free drift boost: no extra touch button required. */
+.boost-meter {
+  position: absolute;
+  top: 6.15rem;
+  left: 50%;
+  translate: -50%;
+  width: min(36vw, 11rem);
+  height: .45rem;
+  border-radius: 999px;
+  background: rgb(8 11 16 / 75%);
+  border: 1px solid rgb(255 255 255 / 20%);
+  overflow: hidden;
+  pointer-events: none;
+}
+.boost-meter-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #f7b44a;
+  transition: width 100ms linear;
+}
+.boost-meter.boosting .boost-meter-fill {
+  background: #45e9ff;
+}
+.race-event-banner {
+  position: absolute;
+  top: 7.25rem;
+  left: 50%;
+  translate: -50%;
+  z-index: 5;
+  pointer-events: none;
+  color: #ffe18d;
+  font-size: clamp(.8rem, 3vw, 1.1rem);
+  font-weight: 1000;
+  letter-spacing: .09em;
+  text-shadow: 0 2px 8px #000d;
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+.race-event-banner.visible { opacity: 1; }

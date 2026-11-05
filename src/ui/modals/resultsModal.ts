@@ -34,7 +34,7 @@ export function createResultsModal(
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),
     button(
-      'RACE AGAIN',
+      'RETRY',
       'retry-race',
       actions.retry,
       'button button-primary',

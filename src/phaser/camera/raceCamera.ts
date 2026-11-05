@@ -52,13 +52,15 @@ export function advanceRaceCamera(
   deltaSeconds: number,
 ): RaceCameraState {
   const dt = clamp(deltaSeconds, 0, 1)
-  const positionFollow = 1 - Math.exp(-dt * 7.2)
+  const positionFollow = 1 - Math.exp(-dt * 9.2)
   const headingError = wrapAngle(hints.roadAngle - camera.angle)
   const rotationActive =
     Math.abs(options.steering) > 0.08 ||
     Math.abs(headingError) > 0.14 ||
     hints.upcomingCurve > 0.2
-  const rotationFollow = rotationActive ? 1 - Math.exp(-dt * 4) : 0
+  const rotationFollow = rotationActive
+    ? 1 - Math.exp(-dt * (Math.abs(options.steering) > 0.08 ? 6.4 : 5.2))
+    : 0
   const curveAmount = clamp((hints.upcomingCurve - 0.055) / 0.34, 0, 1)
   const speedAmount = clamp((hints.speed - 80) / 220, 0, 1)
   // Preserve useful look-ahead without making the car feel miniature. Faster
