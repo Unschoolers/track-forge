@@ -22,6 +22,7 @@ import type { RaceStep } from '@/domain/race/raceEngine'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { createRaceHud } from '@/ui/screens/raceHud'
+import { bindRacePointer } from '@/phaser/input/racePointer'
 
 function pointer(type: string, id: number, clientX = 0): Event {
   const event = new Event(type, { bubbles: true, cancelable: true })
@@ -76,6 +77,61 @@ function recoverySession() {
 }
 
 describe('race canvas steering', () => {
+  it.each(['pointercancel', 'lostpointercapture'])(
+    'cancels only the affected finger on %s', (eventType) => {
+      const controls = new RaceInputController()
+      const { canvas, shutdown } = createScene(controls, { snapshot: () => ({ state: { vehicles: [] } }) } as never)
+      const brake = document.createElement('button')
+      document.body.append(brake)
+      const binding = bindRacePointer(brake, 'brake', controls)
+      try {
+        canvas.dispatchEvent(pointer('pointerdown', 201, 100))
+        canvas.dispatchEvent(pointer('pointermove', 201, 148))
+        brake.dispatchEvent(pointer('pointerdown', 202, 480))
+        brake.dispatchEvent(pointer(eventType, 202, 480))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: false })
+        brake.dispatchEvent(pointer('pointerdown', 203, 480))
+        canvas.dispatchEvent(pointer(eventType, 201, 148))
+        expect(controls.snapshot()).toMatchObject({ steering: 0, braking: true })
+      } finally { binding.destroy(); shutdown() }
+    },
+  )
+  it.each(['steer-first', 'brake-first'])(
+    'keeps steering responsive across the open playfield while braking (%s)', (order) => {
+      const controls = new RaceInputController()
+      const { canvas, shutdown } = createScene(controls, { snapshot: () => ({ state: { vehicles: [] } }) } as never)
+      Object.defineProperty(canvas, 'getBoundingClientRect', {
+        value: () => ({ left: 0, width: 500, top: 0, height: 700 }),
+      })
+      const brake = document.createElement('button')
+      document.body.append(brake)
+      const binding = bindRacePointer(brake, 'brake', controls)
+      const touch = (type: string, id: number, x: number): Event => {
+        const event = pointer(type, id, x)
+        Object.defineProperty(event, 'pointerType', { value: 'touch' })
+        return event
+      }
+      try {
+        if (order === 'brake-first') brake.dispatchEvent(touch('pointerdown', 102, 480))
+        canvas.dispatchEvent(touch('pointerdown', 101, 350))
+        canvas.dispatchEvent(touch('pointermove', 101, 398))
+        if (order === 'steer-first') brake.dispatchEvent(touch('pointerdown', 102, 480))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: true })
+        // Releasing/reapplying Brake must not cancel the steering finger.
+        brake.dispatchEvent(touch('pointerup', 102, 480))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: false })
+        brake.dispatchEvent(touch('pointerdown', 103, 480))
+        canvas.dispatchEvent(touch('pointermove', 101, 302))
+        expect(controls.snapshot()).toMatchObject({ steering: -1, braking: true })
+        canvas.dispatchEvent(touch('pointerup', 101, 302))
+        expect(controls.snapshot()).toMatchObject({ steering: 0, braking: true })
+        // Regrab at the current thumb position while Brake remains held.
+        canvas.dispatchEvent(touch('pointerdown', 104, 370))
+        canvas.dispatchEvent(touch('pointermove', 104, 418))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: true })
+      } finally { binding.destroy(); shutdown() }
+    },
+  )
   it('uses CSS-pixel movement and releases on capture loss and scene shutdown', () => {
     const controls = new RaceInputController()
     const session = { snapshot: () => ({ state: { vehicles: [] } }) } as never
@@ -97,10 +153,13 @@ describe('race canvas steering', () => {
     expect(controls.snapshot().steering).toBe(0)
   })
 
-  it('reserves the right side of the playfield for touch actions', () => {
+  it('keeps brake-button touches separate from canvas steering', () => {
     const controls = new RaceInputController()
     const session = { snapshot: () => ({ state: { vehicles: [] } }) } as never
     const { canvas, shutdown } = createScene(controls, session)
+    const brake = document.createElement('button')
+    document.body.append(brake)
+    const brakeBinding = bindRacePointer(brake, 'brake', controls)
     Object.defineProperty(canvas, 'getBoundingClientRect', {
       value: () => ({ left: 0, width: 500, top: 0, height: 700 }),
     })
@@ -110,15 +169,16 @@ describe('race canvas steering', () => {
       return event
     }
     try {
-      canvas.dispatchEvent(touch('pointerdown', 90, 450))
-      canvas.dispatchEvent(touch('pointermove', 90, 400))
-      expect(controls.snapshot().steering).toBe(0)
+      brake.dispatchEvent(touch('pointerdown', 90, 450))
+      brake.dispatchEvent(touch('pointermove', 90, 400))
+      expect(controls.snapshot()).toMatchObject({ steering: 0, braking: true })
       canvas.dispatchEvent(touch('pointerdown', 91, 100))
       canvas.dispatchEvent(touch('pointermove', 91, 148))
       expect(controls.snapshot().steering).toBe(1)
       canvas.dispatchEvent(touch('pointerup', 91, 148))
       expect(controls.snapshot().steering).toBe(0)
     } finally {
+      brakeBinding.destroy()
       shutdown()
     }
   })
