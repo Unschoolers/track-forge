@@ -170,6 +170,28 @@ export const VEHICLE_DYNAMICS_TUNING = {
   },
 } as const satisfies VehicleDynamicsTuning
 
+// Arcade uses the same deterministic bicycle integrator with a forgiving
+// grip and steering profile; the existing profile remains Simulation mode.
+export const ARCADE_DYNAMICS_TUNING: VehicleDynamicsTuning = {
+  ...VEHICLE_DYNAMICS_TUNING,
+  forces: {
+    ...VEHICLE_DYNAMICS_TUNING.forces,
+    lateralGripScale: 3.1,
+  },
+  steering: {
+    ...VEHICLE_DYNAMICS_TUNING.steering,
+    maximumAngleScale: 0.235,
+    highSpeedReduction: 0.31,
+  },
+  stability: {
+    ...VEHICLE_DYNAMICS_TUNING.stability,
+    lateralDamping: 9.6,
+    steeringRetention: 0.76,
+    brakingRetention: 0.28,
+    yawNeutralInfluence: 0.56,
+  },
+}
+
 export const CAR_PHYSICS_SPECS = {
   blue: {
     max: 306,

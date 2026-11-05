@@ -32,6 +32,7 @@ export interface RaceSetup {
   readonly car: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
+  readonly handling?: 'arcade' | 'simulation'
 }
 
 export interface RaceTelemetry {
@@ -144,6 +145,7 @@ export class RaceSession implements RaceSessionPort {
       playerCar: setup.car,
       difficulty: setup.difficulty,
       laps: setup.laps,
+      handling: setup.handling,
       startRatio: track.start?.ratio,
       reversed: track.start?.reversed,
     })

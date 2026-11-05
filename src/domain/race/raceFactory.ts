@@ -11,6 +11,7 @@ export interface CreateRaceOptions {
   readonly playerCar: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
+  readonly handling?: 'arcade' | 'simulation' | undefined
   readonly startRatio?: number | undefined
   readonly reversed?: boolean | undefined
 }
@@ -174,6 +175,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
     path: options.path,
     vehicles,
     difficulty: options.difficulty,
+    handling: options.handling ?? 'simulation',
     totalLaps: Math.max(1, Math.floor(options.laps)),
     startPathIndex: resolvedStartIndex,
     reversed: options.reversed ?? false,

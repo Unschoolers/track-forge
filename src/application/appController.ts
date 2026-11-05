@@ -400,6 +400,7 @@ export class AppController {
         car: this.state.preferences.car,
         difficulty: this.state.preferences.difficulty,
         laps: 3,
+        handling: this.state.preferences.handling ?? 'arcade',
       })
     }
     this.update(
