@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "qa:mobile": "playwright test --config=playwright.mobile.config.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome lint .",
     "build": "npm run typecheck && vite build",

@@ -185,6 +185,11 @@ export class EditorScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this)
   }
 
+  /** Read-only editor camera telemetry used by development-only gameplay QA. */
+  cameraSnapshot(): EditorCamera {
+    return { ...this.editorCamera }
+  }
+
   override update(): void {
     if (!this.previewRenderPending) return
     this.previewRenderPending = false
