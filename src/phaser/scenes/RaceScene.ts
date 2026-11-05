@@ -12,6 +12,7 @@ import {
 import {
   renderVehicleShadows,
   renderVehicles,
+  isVehicleAboveStructures,
   transformVehicleLights,
 } from '@/phaser/rendering/vehicleRenderer'
 import type { SceneControllerPort } from '@/phaser/scenes/EditorScene'
@@ -24,7 +25,6 @@ import {
 } from '@/phaser/camera/raceCamera'
 import { renderRaceEffects } from '@/phaser/rendering/raceEffectsRenderer'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import { WORLD_ELEVATION } from '@/domain/config'
 import {
   buildLampPosts,
   renderLampPosts,
@@ -215,9 +215,7 @@ export class RaceScene extends Phaser.Scene {
     const upperVehicles = new Set(
       visibleVehicles
         .filter(
-          (vehicle) =>
-            vehicle.z - race.path.terrainSurface.heightAt(vehicle) >=
-            WORLD_ELEVATION.levelHeight * 0.45,
+          (vehicle) => isVehicleAboveStructures(vehicle, race.path),
         )
         .map(({ id }) => id),
     )

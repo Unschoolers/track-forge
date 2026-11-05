@@ -73,33 +73,63 @@ test('two-finger editing pinch pans and zooms without leaving road edits', async
   }
 })
 
-test('left-thumb steering remains active while right thumb brakes', async ({ page, context }) => {
-  await launch(page)
-  await enterRace(page)
-  const canvas = await page.locator('#game-container canvas').boundingBox()
-  const brake = await page.getByRole('button', { name: 'Brake', exact: true }).boundingBox()
-  expect(canvas).not.toBeNull()
-  expect(brake).not.toBeNull()
-  const y = canvas.y + canvas.height * 0.64
-  const first = contact(1, canvas.x + canvas.width * 0.22, y)
-  const moved = contact(1, first.x + 40, y)
-  const brakeTouch = contact(2, brake.x + brake.width / 2, brake.y + brake.height / 2)
-  const cdp = await context.newCDPSession(page)
-  try {
-    await touch(cdp, 'touchStart', [first])
-    await touch(cdp, 'touchMove', [moved])
-    await expect.poll(async () => (await telemetry(page)).controls.steering).toBeGreaterThan(0.5)
-    await touch(cdp, 'touchStart', [moved, brakeTouch])
-    await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(true)
-    expect((await telemetry(page)).controls.steering).toBeGreaterThan(0.5)
-    await releaseTouches(cdp)
-    await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(false)
-    await expect.poll(async () => (await telemetry(page)).controls.steering).toBe(0)
-  } finally {
-    await releaseTouches(cdp).catch(() => {})
-    await cdp.detach()
+for (const side of ['left', 'right']) {
+  for (const order of ['steer-first', 'brake-first']) {
+    test(`steering survives braking, releases and regrabs (${side}, ${order})`, async ({ page, context }) => {
+      await launch(page)
+      await enterRace(page)
+      const canvas = await page.locator('#game-container canvas').boundingBox()
+      const brake = await page.getByRole('button', { name: 'Brake', exact: true }).boundingBox()
+      expect(canvas).not.toBeNull()
+      expect(brake).not.toBeNull()
+      const y = canvas.y + canvas.height * 0.52
+      const first = contact(1, canvas.x + canvas.width * (side === 'left' ? 0.22 : 0.68), y)
+      let steering = contact(1, first.x + 40, y)
+      const pedal = contact(2, brake.x + brake.width / 2, brake.y + brake.height / 2)
+      const cdp = await context.newCDPSession(page)
+      try {
+        if (order === 'brake-first') {
+          await touch(cdp, 'touchStart', [pedal])
+          await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(true)
+          await touch(cdp, 'touchStart', [first])
+          await touch(cdp, 'touchMove', [steering])
+        } else {
+          await touch(cdp, 'touchStart', [first])
+          await touch(cdp, 'touchMove', [steering])
+          await touch(cdp, 'touchStart', [pedal])
+        }
+        await expect.poll(async () => (await telemetry(page)).controls).toMatchObject({ braking: true })
+        await expect.poll(async () => (await telemetry(page)).controls.steering).toBeGreaterThan(0.5)
+        steering = contact(1, first.x - 40, y)
+        await touch(cdp, 'touchMove', [steering])
+        await expect.poll(async () => (await telemetry(page)).controls.steering).toBeLessThan(-0.5)
+        expect((await telemetry(page)).controls.braking).toBe(true)
+
+        // Lift and reapply only Brake; steering must remain held.
+        await touch(cdp, 'touchEnd', [pedal])
+        await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(false)
+        expect((await telemetry(page)).controls.steering).toBeLessThan(-0.5)
+        await touch(cdp, 'touchStart', [pedal])
+        await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(true)
+
+        // Lift steering, then regrab while Brake remains down.
+        await touch(cdp, 'touchEnd', [steering])
+        await expect.poll(async () => (await telemetry(page)).controls.steering).toBe(0)
+        expect((await telemetry(page)).controls.braking).toBe(true)
+        const regrab = contact(3, first.x + 10, y)
+        await touch(cdp, 'touchStart', [regrab])
+        await touch(cdp, 'touchMove', [contact(3, regrab.x + 40, y)])
+        await expect.poll(async () => (await telemetry(page)).controls.steering).toBeGreaterThan(0.5)
+        expect((await telemetry(page)).controls.braking).toBe(true)
+        await releaseTouches(cdp)
+        await expect.poll(async () => (await telemetry(page)).controls).toMatchObject({ steering: 0, braking: false })
+      } finally {
+        await releaseTouches(cdp).catch(() => {})
+        await cdp.detach()
+      }
+    })
   }
-})
+}
 
 test('arcade race advances and produces machine-readable driving metrics', async ({ page }, testInfo) => {
   const browserErrors = []
