@@ -4,3 +4,4 @@ coverage/
 .superpowers/
 *.log
 .DS_Store
+qa/results/

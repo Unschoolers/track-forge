@@ -53,6 +53,15 @@ export type RaceEvent =
       readonly time: number
     }
   | { readonly type: 'vehicle-wrecked'; readonly vehicleId: string }
+  | {
+      readonly type: 'vehicle-recovered'
+      readonly vehicleId: string
+      readonly reason: 'off-road' | 'water'
+      /** Position and followed road sample before automatic recovery. */
+      readonly x: number
+      readonly y: number
+      readonly pathIndex: number
+    }
   | { readonly type: 'boost-activated' }
   | {
       readonly type: 'race-finished'
@@ -198,6 +207,10 @@ export const stepRace: RaceStep = (
       // arc. Rejoin it at the nearest road sample instead of letting a lost AI
       // circle forever outside the camera.
       if (updated.grounded) {
+        events.push({
+          type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',
+          x: updated.x, y: updated.y, pathIndex: updated.pathIndex,
+        })
         updated = resetVehicleToTrack(updated, state.path, { reversed: state.reversed })
       }
     }
@@ -238,6 +251,10 @@ export const stepRace: RaceStep = (
       vehicle,
       state.reversed,
     )
+    events.push({
+      type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
+      x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
+    })
     return resetVehicleToTrack(vehicle, state.path, {
       ...(pathIndex === undefined ? {} : { pathIndex }),
       reversed: state.reversed,
