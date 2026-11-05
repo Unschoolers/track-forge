@@ -354,8 +354,8 @@ describe('race simulation', () => {
     })
     const [first, second] = race.vehicles
     const collided = solveCollisions([
-      { ...required(first), x: 0, y: 0, speed: 100 },
-      { ...required(second), x: 1, y: 0, speed: 20 },
+      { ...required(first), x: 0, y: 0, vx: 100, vy: 0, speed: 100 },
+      { ...required(second), x: 1, y: 0, vx: 20, vy: 0, speed: 20 },
     ])
     const collidedFirst = required(collided[0])
     const collidedSecond = required(collided[1])
