@@ -135,7 +135,8 @@ export const stepRace: RaceStep = (
   const boosting = arcade && (state.boostRemaining ?? 0) > 0
   const moved = state.vehicles.map((vehicle) => {
     const advanced = advanceVehicle(vehicle, state, input, dt, random)
-    if (!vehicle.player || !boosting || advanced.wrecked) return advanced
+    // Braking must retain full authority, even during an earned boost.
+    if (!vehicle.player || !boosting || input.braking || !advanced.grounded || advanced.wrecked) return advanced
     const push = 180 * dt
     const vx = advanced.vx + Math.cos(advanced.angle) * push
     const vy = advanced.vy + Math.sin(advanced.angle) * push
