@@ -521,6 +521,8 @@ function reduceEditorUnchecked(
         : state
     }
     case 'redo': {
+      // A retained redo stack is only actionable after the gesture ends.
+      if (state.gestureStart) return state
       const next = state.future[0]
       return next
         ? {
