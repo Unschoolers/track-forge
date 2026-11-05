@@ -117,7 +117,7 @@ describe('AppController', () => {
     expect(listener).toHaveBeenCalledTimes(3)
     expect(raceSession.start).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Starter Circuit' }),
-      { car: 'blue', difficulty: 'normal', laps: 3 },
+      expect.objectContaining({ car: 'blue', difficulty: 'normal', laps: 3, handling: 'arcade' }),
     )
     expect(raceSession.setPaused).toHaveBeenCalledWith(true)
     unsubscribe()
