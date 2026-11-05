@@ -69,7 +69,9 @@ export function createRaceHud(
   }, 'button recover-button')
   const pedals = element('div', 'race-pedals')
   pedals.append(recover, brake)
-  controlsBar.append(steering, pedals)
+  const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
+  steeringHint.setAttribute('aria-hidden', 'true')
+  controlsBar.append(steering, steeringHint, pedals)
   screen.append(hud, damage, countdown, controlsBar)
 
   const updateControls = (): void => {
