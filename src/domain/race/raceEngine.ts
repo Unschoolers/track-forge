@@ -86,6 +86,7 @@ function advanceVehicle(
       input,
       previousContext,
       deltaSeconds,
+      race.handling ?? 'simulation',
     )
   } else {
     moved = stepAiVehicle(

@@ -58,6 +58,7 @@ export interface RaceState {
   readonly path: RoadPath
   readonly vehicles: readonly RaceVehicle[]
   readonly difficulty: DifficultyId
+  readonly handling?: 'arcade' | 'simulation'
   readonly totalLaps: number
   readonly startPathIndex: number
   readonly reversed: boolean

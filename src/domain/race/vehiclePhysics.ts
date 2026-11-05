@@ -9,13 +9,14 @@ import type { SurfaceId } from '@/domain/model'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
-import { VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
+import { ARCADE_DYNAMICS_TUNING, VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
 
 export function stepVehicle(
   vehicle: RaceVehicle,
   input: DriverInput,
   context: VehicleStepContext,
   deltaSeconds: number,
+  handling: 'arcade' | 'simulation' = 'simulation',
 ): RaceVehicle {
   if (vehicle.wrecked || vehicle.finishedAt !== null) {
     return {
@@ -110,6 +111,7 @@ export function stepVehicle(
       contactLoad: vehicle.contactLoad,
     },
     dt,
+    handling === 'arcade' ? ARCADE_DYNAMICS_TUNING : VEHICLE_DYNAMICS_TUNING,
   )
   return {
     ...vehicle,
