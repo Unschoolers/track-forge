@@ -211,7 +211,6 @@ export class EditorScene extends Phaser.Scene {
   }
 
   private readonly onGameOut = (): void => {
-    const pointer = this.input.activePointer
     const changes = this.pointerRenderChanges()
     this.editorInput?.cancelActiveGesture()
     this.renderChanges(changes)
