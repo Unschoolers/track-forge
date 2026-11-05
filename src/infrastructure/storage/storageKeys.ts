@@ -15,4 +15,5 @@ export const STORAGE_KEYS = {
   audio: 'trackforge-audio-enabled',
   haptics: 'trackforge-haptics-enabled',
   dynamicZoom: 'trackforge-dynamic-zoom',
+  handling: 'trackforge-handling-mode',
 } as const
