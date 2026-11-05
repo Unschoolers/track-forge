@@ -323,6 +323,16 @@ describe('race simulation', () => {
     expect(rankVehicles(vehicles, path.points.length).map(({ id }) => id)).toEqual([third.id, first.id, second.id, fourth.id])
   })
 
+  it('lets parked cars gently separate without damage', () => {
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 0, speed: 0 }
+    const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
+    const frame = solveCollisionFrame([player, rival], [], 1 / 60)
+    expect(frame.vehicles[0]?.damage).toBe(0)
+    expect(frame.events).toEqual([])
+    expect(frame.vehicles[0]?.x).toBeLessThan(player.x)
+  })
+
   it('separates overlapping cars and applies bounded damage', () => {
     const race = createRace({
       path,
