@@ -108,6 +108,7 @@ export type EditorCommand =
   | { readonly type: 'normalize-loop' }
   | { readonly type: 'expand'; readonly factor: 2 }
   | { readonly type: 'end-gesture' }
+  | { readonly type: 'cancel-gesture' }
   | { readonly type: 'undo' }
   | { readonly type: 'redo' }
 
@@ -469,6 +470,18 @@ function reduceEditorUnchecked(
         },
       )
       }
+    case 'cancel-gesture':
+      // A second finger turns the active edit into a navigation gesture.
+      // Restore the pre-touch snapshot without creating an undo/redo entry.
+      return state.gestureStart
+        ? {
+            ...state.gestureStart,
+            history: state.history,
+            future: state.future,
+            gestureStart: null,
+            gestureChanged: false,
+          }
+        : state
     case 'end-gesture': {
       if (!state.gestureStart) return state
       return {
