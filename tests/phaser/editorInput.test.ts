@@ -148,6 +148,7 @@ describe('EditorInputController', () => {
       dispatch: (command) => { editor = reduceEditor(editor, command) },
     })
     input.pointerDown({ id: 1, x: 50, y: 50 })
+    expect(reduceEditor(editor, { type: 'redo' })).toBe(editor)
     input.pointerDown({ id: 2, x: 90, y: 50 })
     expect(editor.points).toHaveLength(0)
     expect(editor.history).toHaveLength(0)
