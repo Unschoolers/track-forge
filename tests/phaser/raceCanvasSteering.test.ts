@@ -97,6 +97,32 @@ describe('race canvas steering', () => {
     expect(controls.snapshot().steering).toBe(0)
   })
 
+  it('reserves the right side of the playfield for touch actions', () => {
+    const controls = new RaceInputController()
+    const session = { snapshot: () => ({ state: { vehicles: [] } }) } as never
+    const { canvas, shutdown } = createScene(controls, session)
+    Object.defineProperty(canvas, 'getBoundingClientRect', {
+      value: () => ({ left: 0, width: 500, top: 0, height: 700 }),
+    })
+    const touch = (type: string, id: number, x: number): Event => {
+      const event = pointer(type, id, x)
+      Object.defineProperty(event, 'pointerType', { value: 'touch' })
+      return event
+    }
+    try {
+      canvas.dispatchEvent(touch('pointerdown', 90, 450))
+      canvas.dispatchEvent(touch('pointermove', 90, 400))
+      expect(controls.snapshot().steering).toBe(0)
+      canvas.dispatchEvent(touch('pointerdown', 91, 100))
+      canvas.dispatchEvent(touch('pointermove', 91, 148))
+      expect(controls.snapshot().steering).toBe(1)
+      canvas.dispatchEvent(touch('pointerup', 91, 148))
+      expect(controls.snapshot().steering).toBe(0)
+    } finally {
+      shutdown()
+    }
+  })
+
   it('ignores keyboard recovery during countdown, pause, and after finish', () => {
     const controls = new RaceInputController()
     const { session, finish } = recoverySession()
