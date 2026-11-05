@@ -44,6 +44,15 @@ export function createRaceHud(
   damageText.dataset.raceDamage = ''
   damage.append(damageFill, damageText)
 
+  const boostMeter = element('div', 'boost-meter')
+  boostMeter.setAttribute('aria-label', 'Drift boost charge')
+  boostMeter.setAttribute('role', 'progressbar')
+  boostMeter.setAttribute('aria-valuemin', '0')
+  boostMeter.setAttribute('aria-valuemax', '100')
+  const boostFill = element('i', 'boost-meter-fill')
+  boostMeter.append(boostFill)
+  const raceBanner = element('div', 'race-event-banner')
+  raceBanner.setAttribute('aria-live', 'polite')
   const countdown = element('div', 'race-countdown')
   countdown.dataset.raceCountdown = ''
   countdown.setAttribute('aria-live', 'polite')
@@ -69,8 +78,10 @@ export function createRaceHud(
   }, 'button recover-button')
   const pedals = element('div', 'race-pedals')
   pedals.append(recover, brake)
-  controlsBar.append(steering, pedals)
-  screen.append(hud, damage, countdown, controlsBar)
+  const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
+  steeringHint.setAttribute('aria-hidden', 'true')
+  controlsBar.append(steering, steeringHint, pedals)
+  screen.append(hud, damage, boostMeter, raceBanner, countdown, controlsBar)
 
   const updateControls = (): void => {
     const input = controls.snapshot()
@@ -90,10 +101,37 @@ export function createRaceHud(
   window.addEventListener('blur', onBlur)
   document.addEventListener('visibilitychange', onVisibility)
 
+  let lastPosition: number | null = null
+  let lastLap: number | null = null
+  let lastBoosting = false
+  let bannerUntil = 0
   const update = (snapshot: RaceSessionSnapshot): void => {
     updateControls()
     recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused
     const telemetry = snapshot.telemetry
+    const boostCharge = Math.max(0, Math.min(1, snapshot.state?.boostCharge ?? 0))
+    const boosting = (snapshot.state?.boostRemaining ?? 0) > 0
+    boostFill.style.width = `${Math.round((boosting ? 1 : boostCharge) * 100)}%`
+    boostMeter.setAttribute('aria-valuenow', String(Math.round(boostCharge * 100)))
+    boostMeter.classList.toggle('boosting', boosting)
+    if (telemetry.phase === 'running') {
+      if (boosting && !lastBoosting) {
+        raceBanner.textContent = 'BOOST!'
+        bannerUntil = performance.now() + 1200
+      } else if (lastPosition !== null && telemetry.position < lastPosition) {
+        raceBanner.textContent = 'OVERTAKE!'
+        bannerUntil = performance.now() + 1100
+      } else if (lastLap !== null && telemetry.lap > lastLap) {
+        raceBanner.textContent = telemetry.lap + 1 >= telemetry.totalLaps
+          ? 'FINAL LAP!'
+          : `LAP ${telemetry.lap + 1}!`
+        bannerUntil = performance.now() + 1300
+      }
+    }
+    raceBanner.classList.toggle('visible', performance.now() < bannerUntil)
+    lastPosition = telemetry.position
+    lastLap = telemetry.lap
+    lastBoosting = boosting
     positionValue.textContent = `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
     lapValue.textContent = `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
     timeValue.textContent = formatRaceTime(telemetry.elapsed)

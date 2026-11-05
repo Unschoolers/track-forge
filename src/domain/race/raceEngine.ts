@@ -23,6 +23,7 @@ import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
+import { advanceArcadeBoost } from '@/domain/race/arcadeBoost'
 
 export type RaceEvent =
   | {
@@ -52,6 +53,7 @@ export type RaceEvent =
       readonly time: number
     }
   | { readonly type: 'vehicle-wrecked'; readonly vehicleId: string }
+  | { readonly type: 'boost-activated' }
   | {
       readonly type: 'race-finished'
       readonly reason: RaceOutcome
@@ -130,9 +132,17 @@ export const stepRace: RaceStep = (
   const dt = Math.min(0.05, deltaSeconds)
   const elapsed = state.elapsed + dt
   const events: RaceEvent[] = []
-  const moved = state.vehicles.map((vehicle) =>
-    advanceVehicle(vehicle, state, input, dt, random),
-  )
+  const arcade = !('handling' in state) || state.handling !== 'simulation'
+  const boosting = arcade && (state.boostRemaining ?? 0) > 0
+  const moved = state.vehicles.map((vehicle) => {
+    const advanced = advanceVehicle(vehicle, state, input, dt, random)
+    // Braking must retain full authority, even during an earned boost.
+    if (!vehicle.player || !boosting || input.braking || !advanced.grounded || advanced.wrecked) return advanced
+    const push = 180 * dt
+    const vx = advanced.vx + Math.cos(advanced.angle) * push
+    const vy = advanced.vy + Math.sin(advanced.angle) * push
+    return { ...advanced, vx, vy, speed: Math.hypot(vx, vy) }
+  })
   const barrierFrame = solveBridgeBarrierFrame(
     state.vehicles,
     moved,
@@ -278,6 +288,18 @@ export const stepRace: RaceStep = (
       (player?.landingIntensity ?? 0) * 4.5,
     ),
   )
+  const boost = advanceArcadeBoost(
+    { charge: state.boostCharge ?? 0, remaining: state.boostRemaining ?? 0 },
+    {
+      speed: player?.speed ?? 0,
+      slip: player?.slip ?? 0,
+      steering: input.steering,
+      grounded: player?.grounded ?? false,
+    },
+    dt,
+    arcade && !player?.wrecked && !playerWaterContact,
+  )
+  if (boost.activated) events.push({ type: 'boost-activated' })
   const terminalReason =
     playerWaterContact
       ? 'water'
@@ -294,6 +316,8 @@ export const stepRace: RaceStep = (
       ...state,
       vehicles,
       elapsed,
+      boostCharge: boost.charge,
+      boostRemaining: boost.remaining,
       phase: terminalReason ? 'finished' : 'running',
       activeContacts: [
         ...collisionFrame.activeContacts,

@@ -108,6 +108,7 @@ export type EditorCommand =
   | { readonly type: 'normalize-loop' }
   | { readonly type: 'expand'; readonly factor: 2 }
   | { readonly type: 'end-gesture' }
+  | { readonly type: 'cancel-gesture' }
   | { readonly type: 'undo' }
   | { readonly type: 'redo' }
 
@@ -174,7 +175,9 @@ export function patchEditorState(
     return {
       ...content,
       history: state.history,
-      future: [],
+      // Keep the redo stack until the gesture is committed. A pinch/cancel
+      // restores its starting snapshot without discarding redo history.
+      future: state.future,
       gestureStart: state.gestureStart,
       gestureChanged: true,
     }
@@ -469,6 +472,18 @@ function reduceEditorUnchecked(
         },
       )
       }
+    case 'cancel-gesture':
+      // A second finger turns the active edit into a navigation gesture.
+      // Restore the pre-touch snapshot without creating an undo/redo entry.
+      return state.gestureStart
+        ? {
+            ...state.gestureStart,
+            history: state.history,
+            future: state.future,
+            gestureStart: null,
+            gestureChanged: false,
+          }
+        : state
     case 'end-gesture': {
       if (!state.gestureStart) return state
       return {
@@ -506,6 +521,8 @@ function reduceEditorUnchecked(
         : state
     }
     case 'redo': {
+      // A retained redo stack is only actionable after the gesture ends.
+      if (state.gestureStart) return state
       const next = state.future[0]
       return next
         ? {

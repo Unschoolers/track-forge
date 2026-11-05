@@ -33,6 +33,7 @@ export function createEditorToolPalette(
       `tool-button${state.editorUi.tool === definition.id ? ' active' : ''}`,
     )
     tool.dataset.tool = definition.id
+    if (definition.id === 'pan') tool.classList.add('desktop-pan-tool')
     tool.title = definition.label
     tool.setAttribute('aria-label', definition.label)
     palette.append(tool)
