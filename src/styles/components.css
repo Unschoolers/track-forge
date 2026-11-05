@@ -147,3 +147,8 @@
   transition: opacity 90ms ease;
 }
 .race-event-banner.visible { opacity: 1; }
+
+/* Two-finger gestures replace the manual pan tool on touch screens. */
+@media (pointer: coarse) {
+  .desktop-pan-tool { display: none; }
+}

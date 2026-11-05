@@ -150,6 +150,7 @@ export class EditorScene extends Phaser.Scene {
       },
       dispatch: (command) =>
         this.controller.dispatch({ type: 'editor', command }),
+      viewport: () => this.viewport(),
       onCameraChanged: () => {
         this.applyCamera()
         this.renderGridPresentation()
@@ -210,9 +211,8 @@ export class EditorScene extends Phaser.Scene {
   }
 
   private readonly onGameOut = (): void => {
-    const pointer = this.input.activePointer
     const changes = this.pointerRenderChanges()
-    this.editorInput?.pointerCancel(pointer.id)
+    this.editorInput?.cancelActiveGesture()
     this.renderChanges(changes)
   }
 

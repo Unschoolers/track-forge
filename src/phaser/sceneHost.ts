@@ -42,6 +42,7 @@ export class PhaserSceneHost implements SceneHost {
             this.geometry,
           ),
         ],
+        input: { activePointers: 3 },
         scale: {
           mode: Phaser.Scale.RESIZE,
           autoCenter: Phaser.Scale.CENTER_BOTH,
