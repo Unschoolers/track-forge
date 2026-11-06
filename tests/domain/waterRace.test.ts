@@ -139,6 +139,79 @@ function hillBoundaryCollisionState(pushedIndex: 0 | 1) {
 }
 
 describe('water race contact', () => {
+  it.each([false, true])('recovers Arcade players onto safe road and continues racing (reverse: %s)', (reversed) => {
+    const initial = roadBoundaryRace()
+    const player = atWater(requireFixture(initial.vehicles[0]))
+    const state: RaceState = {
+      ...initial, handling: 'arcade', reversed, elapsed: 12,
+      vehicles: [{ ...player, lap: 1, nextSector: 3 }],
+    }
+    const result = stepRace(state, noInput, 1 / 60, random)
+    const recovered = requireFixture(result.state.vehicles[0])
+    expect(result.state.phase).toBe('running')
+    expect(result.state.elapsed).toBeCloseTo(12 + 1 / 60)
+    expect(recovered).toMatchObject({
+      speed: 0, vx: 0, vy: 0, lap: 1, nextSector: 3,
+      finishedAt: null, grounded: true,
+    })
+    expect(getVehicleStepContext(state.path, recovered).onRoad).toBe(true)
+    expect(state.path.terrainSurface.materialAt(recovered)).not.toBe('water')
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered', vehicleId: player.id, reason: 'water',
+    }))
+    expect(result.events.some((event) => event.type === 'race-finished')).toBe(false)
+    const direction = reversed ? -1 : 1
+    const ahead = requireFixture(state.path.points[
+      (recovered.pathIndex + direction * 4 + state.path.points.length) % state.path.points.length
+    ])
+    const expectedAngle = Math.atan2(ahead.y - recovered.y, ahead.x - recovered.x)
+    expect(recovered.angle).toBeCloseTo(expectedAngle)
+    const resumed = stepRace(result.state,
+      { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
+    expect(resumed.state.phase).toBe('running')
+    expect(resumed.state.vehicles[0]?.speed).toBeGreaterThan(0)
+    expect(resumed.events.some((event) => event.type === 'vehicle-recovered')).toBe(false)
+  })
+
+  it('does not award an Arcade finish when landing in water on the finish line', () => {
+    const initial = roadBoundaryRace()
+    const pathIndex = requireFixture(nearestPathPoint(initial.path, { x: 16, y: 16 })).index
+    const state: RaceState = {
+      ...initial, handling: 'arcade', totalLaps: 1, startPathIndex: pathIndex,
+      vehicles: [{
+        ...atWater(requireFixture(initial.vehicles[0])),
+        pathIndex: pathIndex - 2, nextSector: 4,
+      }],
+    }
+    const result = stepRace(state, noInput, 1 / 60, random)
+    expect(result.state.phase).toBe('running')
+    expect(result.state.vehicles[0]).toMatchObject({ lap: 0, nextSector: 4, finishedAt: null })
+    expect(result.events.some((event) =>
+      event.type === 'race-finished' || event.type === 'vehicle-finished')).toBe(false)
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered', reason: 'water',
+    }))
+  })
+
+  it('recovers an airborne Arcade player only after landing in water', () => {
+    const initial = runningRace()
+    const state: RaceState = {
+      ...initial, handling: 'arcade', vehicles: [{
+        ...atWater(requireFixture(initial.vehicles[0])),
+        z: 0.1, grounded: false, verticalVelocity: -18, contactLoad: 0,
+      }],
+    }
+    const flying = stepRace({ ...state, vehicles: state.vehicles.map((vehicle) => ({
+      ...vehicle, z: 12, verticalVelocity: 0,
+    })) }, noInput, 1 / 60, random)
+    expect(flying.events.some((event) => event.type === 'vehicle-recovered')).toBe(false)
+    const landed = stepRace(state, noInput, 1 / 30, random)
+    expect(landed.state.phase).toBe('running')
+    expect(landed.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered', reason: 'water',
+    }))
+  })
+
   it('ends the player race immediately and emits the terminal reason once', () => {
     const initial = runningRace()
     const state = {

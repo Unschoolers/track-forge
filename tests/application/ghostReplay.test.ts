@@ -36,7 +36,7 @@ describe('personal-best ghost replay', () => {
     expect(store.load(track, setup)).toBeNull()
   })
 
-  it('does not store a finish after a short automatic player recovery', () => {
+  it.each(['off-road', 'water'] as const)('does not store a finish after a short automatic player %s recovery', (reason) => {
     const store = new BrowserGhostRepository(memory())
     const step: RaceStep = (state) => {
       const player = state.vehicles.find((vehicle) => vehicle.player)!
@@ -44,7 +44,7 @@ describe('personal-best ghost replay', () => {
         state: { ...state, phase: 'finished', elapsed: 1,
           vehicles: [{ ...player, x: player.x + 20, finishedAt: 1 }] },
         events: [
-          { type: 'vehicle-recovered', vehicleId: player.id, reason: 'off-road',
+          { type: 'vehicle-recovered', vehicleId: player.id, reason,
             x: player.x, y: player.y, pathIndex: player.pathIndex },
           { type: 'race-finished', reason: 'finished' },
         ],

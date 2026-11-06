@@ -255,10 +255,10 @@ export const stepRace: RaceStep = (
     state.activeContacts,
     dt,
   )
-  let vehicles = collisionFrame.vehicles.map((collided) => {
+  let vehicles = collisionFrame.vehicles.map((collided, index) => {
     const context = getVehicleStepContext(state.path, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
-    if (vehicle.player) return vehicle
+    if (vehicle.player && !arcade) return vehicle
     if (!hasVehicleWaterContact({
       grounded: vehicle.grounded,
       terrainMaterial: context.terrainMaterial,
@@ -275,7 +275,13 @@ export const stepRace: RaceStep = (
       type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
       x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
     })
-    return resetVehicleToTrack(vehicle, state.path, {
+    // Water recovery must not award a lap, sector or finish from the fall.
+    const previous = state.vehicles[index]
+    const recovering = vehicle.player && previous
+      ? { ...vehicle, lap: previous.lap, nextSector: previous.nextSector,
+          finishedAt: previous.finishedAt }
+      : vehicle
+    return resetVehicleToTrack(recovering, state.path, {
       ...(pathIndex === undefined ? {} : { pathIndex }),
       reversed: state.reversed,
     })
