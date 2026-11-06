@@ -42,6 +42,8 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npx cap sync android
+      - name: Test native Android behavior
+        run: cd android && ./gradlew testDebugUnitTest
       - name: Set unique Android build version
         id: version
         run: |
