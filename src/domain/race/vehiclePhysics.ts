@@ -59,6 +59,9 @@ export function stepVehicle(
   }
   const maxSpeed = Math.min(speedLimit, car.max * surface.max * terrain.max * condition.max)
   const braking = input.braking || vehicle.speed > speedLimit
+  const tuning = handling === 'arcade'
+    ? ARCADE_DYNAMICS_TUNING
+    : VEHICLE_DYNAMICS_TUNING
   const dynamics = stepVehicleDynamics(
     {
       angle: vehicle.angle,
@@ -90,7 +93,7 @@ export function stepVehicle(
         terrain.accel *
         condition.accel,
       maxSteerAngle:
-        car.steer * VEHICLE_DYNAMICS_TUNING.steering.maximumAngleScale,
+        car.steer * tuning.steering.maximumAngleScale,
       grip:
         car.grip *
         surface.grip *
@@ -114,7 +117,7 @@ export function stepVehicle(
       contactLoad: vehicle.contactLoad,
     },
     dt,
-    handling === 'arcade' ? ARCADE_DYNAMICS_TUNING : VEHICLE_DYNAMICS_TUNING,
+    tuning,
   )
   return {
     ...vehicle,
