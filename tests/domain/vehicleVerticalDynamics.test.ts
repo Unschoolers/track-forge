@@ -107,6 +107,20 @@ describe('vehicle vertical dynamics', () => {
     expect(result.contactLoad).toBeGreaterThan(1)
   })
 
+  it('catches an ascending car when its continuing ramp rises into its flight', () => {
+    const result = stepVehicleVerticalDynamics(
+      { ...groundedAt(14), grounded: false, verticalVelocity: 10 },
+      environment({
+        previousSurfaceHeight: 14, surfaceHeight: 16,
+        previousGrade: 0.38, grade: 0.35, longitudinalSpeed: 200,
+      }),
+      1 / 60,
+    )
+    expect(result.z).toBe(16)
+    expect(result.grounded).toBe(true)
+    expect(result.contactLoad).toBeGreaterThan(0)
+  })
+
   it('preserves deck height and becomes airborne after losing lateral support', () => {
     const departed = stepVehicleVerticalDynamics(
       groundedAt(24),
