@@ -480,7 +480,9 @@ export function buildRaceCameraHints(
       weight
     weightTotal += weight
   }
-  const lookAhead = Math.max(10, Math.min(26, 10 + player.speed * 0.055))
+  // Give the camera an earlier view of the apex without pulling the car
+  // out of frame. The preview grows with speed but saturates before 50 units.
+  const lookAhead = Math.max(14, Math.min(46, 14 + player.speed * 0.095))
   return {
     target: {
       x: player.x + Math.cos(roadAngle) * lookAhead,
