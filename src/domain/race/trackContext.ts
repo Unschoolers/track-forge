@@ -138,7 +138,18 @@ function heightCompatible(
 function roadAboveVehicle(
   surface: RoadSurfaceSample,
   vehicle: Pick<RaceVehicle, 'z'> & Partial<Pick<RaceVehicle, 'grounded'>>,
+  previousSupport?: VehicleStepContext,
 ): boolean {
+  // Horizontal motion is integrated before height. A ramp can rise above the
+  // old chassis height during that step without becoming an overhead deck.
+  // Carry only support approached from above on the same continuous run;
+  // actual underpass traffic never satisfies this condition.
+  if (
+    previousSupport?.onRoad &&
+    previousSupport.structureRunId !== null &&
+    previousSupport.structureRunId === surface.structureRunId &&
+    vehicle.z >= previousSupport.surfaceHeight - SUPPORT_HEIGHT_EPSILON
+  ) return false
   // A grounded car can follow a ramp between frames. An airborne car must
   // approach the deck from above; a deck above its underside cannot catch it.
   const clearance = vehicle.grounded === false
@@ -216,6 +227,7 @@ export function getVehicleStepContext(
   path: RoadPath,
   vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex' | 'z'> &
     Partial<Pick<RaceVehicle, 'grounded'>>,
+  previousSupport?: VehicleStepContext,
 ): VehicleStepContext {
   const local = nearestContinuousPathPoint(path, vehicle)
   let nearest = local
@@ -231,7 +243,7 @@ export function getVehicleStepContext(
     }
   }
   if (
-    nearest && roadSurface && roadAboveVehicle(roadSurface, vehicle)
+    nearest && roadSurface && roadAboveVehicle(roadSurface, vehicle, previousSupport)
   ) {
     const lower = lowerCrossingRoad(
       path,
@@ -285,7 +297,7 @@ export function getVehicleStepContext(
   // crossing arm found above), never by the overhead road.
   const onRoad =
     nearest.distance <= ROAD_GEOMETRY.onRoadRadius &&
-    !roadAboveVehicle(roadSurface, vehicle)
+    !roadAboveVehicle(roadSurface, vehicle, previousSupport)
   const onCurb =
     onRoad &&
     nearest.point.surface === 'street' &&

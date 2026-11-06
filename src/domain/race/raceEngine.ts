@@ -99,7 +99,7 @@ function advanceVehicle(
       race.reversed,
     )
   }
-  const nextContext = getVehicleStepContext(race.path, moved)
+  const nextContext = getVehicleStepContext(race.path, moved, previousContext)
   const longitudinalSpeed = Math.abs(
     moved.vx * nextContext.tangent.x +
       moved.vy * nextContext.tangent.y,
