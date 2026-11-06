@@ -60,7 +60,7 @@ function observeFor(
 }
 
 describe('AI lane monitor', () => {
-	it('inspects the actual finishing frame for an implausible path jump', () => {
+	it('inspects a finishing frame for an implausible path jump', () => {
 		const race = fixture()
 		const point = requireFixture(path.points[2])
 		const before: RaceState = {
@@ -76,13 +76,14 @@ describe('AI lane monitor', () => {
 				},
 			],
 		}
-		const result = stepRace(
-			before,
-			{ steering: 0, throttle: 0, braking: false },
-			1 / 60,
-			{ next: () => 0.5 },
-		)
-		expect(requireFixture(result.state.vehicles[0]).finishedAt).not.toBeNull()
+		// Feed the faulty finishing frame directly: the engine must now prevent
+		// this route jump, while the monitor must still detect it if it occurs.
+		const result = {
+			state: { ...before, elapsed: 1 + 1 / 60, vehicles: [{
+				...requireFixture(before.vehicles[0]), pathIndex: 2, finishedAt: 1 + 1 / 60,
+			}] },
+			events: [],
+		}
 		const monitor = new LaneMonitor(before)
 		monitor.observe(before, result, 1 / 60)
 		expect(monitor.issues.some((issue) => issue.code === 'path-jump')).toBe(

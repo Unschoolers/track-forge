@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { requireFixture } from '../fixtures/requireFixture'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import { buildRoadPath } from '@/domain/track/pathBuilder'
+import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
 
@@ -24,7 +24,10 @@ describe('AI recovery telemetry', () => {
 			difficulty: 'normal',
 			laps: 1,
 		})
-		const ai = { ...requireFixture(race.vehicles[1]), x: 16, y: 16, z: 0 }
+		const ai = {
+			...requireFixture(race.vehicles[1]), x: 16, y: 16, z: 0,
+			pathIndex: requireFixture(nearestPathPoint(path, { x: 16, y: 16 })).index,
+		}
 		const result = stepRace(
 			{ ...race, phase: 'running', vehicles: [ai] },
 			{ steering: 0, throttle: 0, braking: false },

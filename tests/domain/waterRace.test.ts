@@ -7,7 +7,8 @@ import {
   getVehicleStepContext,
   reconcileSupportAfterCollision,
 } from '@/domain/race/trackContext'
-import { buildRoadPath } from '@/domain/track/pathBuilder'
+import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
+import { requireFixture } from '../fixtures/requireFixture'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
 
@@ -122,6 +123,7 @@ function hillBoundaryCollisionState(pushedIndex: 0 | 1) {
               ...vehicle,
               x: index === pushedIndex ? -1 : -2,
               y: 16,
+              pathIndex: requireFixture(nearestPathPoint(initial.path, { x: -1, y: 16 })).index,
               z: supportHeight,
               vx: 0,
               vy: 0,
@@ -423,6 +425,7 @@ describe('water race contact', () => {
               ...vehicle,
               x: -1,
               y: 16,
+              pathIndex: requireFixture(nearestPathPoint(initial.path, { x: -1, y: 16 })).index,
               z: 0,
               vx: 0,
               vy: 0,
@@ -434,6 +437,7 @@ describe('water race contact', () => {
                 ...vehicle,
                 x: -2,
                 y: 16,
+                pathIndex: requireFixture(nearestPathPoint(initial.path, { x: -2, y: 16 })).index,
                 z: 0,
                 vx: 0,
                 vy: 0,
