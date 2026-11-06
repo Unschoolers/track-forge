@@ -405,6 +405,7 @@ export class AppController {
         difficulty: this.state.preferences.difficulty,
         laps: this.state.preferences.raceLaps ?? 2,
         handling: this.state.preferences.handling ?? 'arcade',
+        mode: this.state.preferences.raceMode ?? 'normal',
       })
     }
     this.update(

@@ -4,6 +4,7 @@ import { DIFFICULTY_SPECS } from '@/domain/config'
 import { createCarPicker } from '@/ui/components/carPicker'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
+import { formatRaceTime } from '@/ui/format'
 
 export function createRaceSetupModal(
   state: AppSnapshot,
@@ -12,7 +13,10 @@ export function createRaceSetupModal(
     readonly preferences: (preferences: AppSnapshot['preferences']) => void
     readonly start: () => void
   },
+  ghostTime: number | null = null,
 ): HTMLElement {
+  const ghostAvailable = ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0
+  const raceMode = state.preferences.raceMode === 'ghost' && ghostAvailable ? 'ghost' : 'normal'
   const frame = createModalFrame(
     'Race setup',
     state.currentTrack?.name ?? 'Selected track',
@@ -25,6 +29,7 @@ export function createRaceSetupModal(
     ),
   )
   const difficulty = element('section', 'setup-section')
+  difficulty.hidden = raceMode === 'ghost'
   difficulty.append(element('h3', 'setup-label', 'AI DIFFICULTY'))
   const difficultyRow = element('div', 'choice-row')
   for (const id of DIFFICULTY_IDS) {
@@ -109,11 +114,29 @@ export function createRaceSetupModal(
     raceLengthRow.append(choice)
   }
   raceLength.append(raceLengthRow)
-  frame.body.append(difficulty, raceLength, lighting, handling)
+  const mode = element('section', 'setup-section')
+  mode.append(element('h3', 'setup-label', 'RACE MODE'))
+  const modeRow = element('div', 'choice-row')
+  for (const [id, label] of [['normal', 'NORMAL RACE'], ['ghost', 'GHOST RACE']] as const) {
+    const choice = button(label, `mode-${id}`,
+      () => actions.preferences({ ...state.preferences, raceMode: id }),
+      `setup-choice${id === raceMode ? ' active' : ''}`)
+    choice.disabled = id === 'ghost' && !ghostAvailable
+    choice.setAttribute('aria-disabled', String(choice.disabled))
+    choice.setAttribute('aria-pressed', String(id === raceMode))
+    choice.setAttribute('aria-describedby', 'ghost-availability')
+    modeRow.append(choice)
+  }
+  const description = element('p', 'modal-subtitle', ghostAvailable
+    ? `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; Normal Race has AI opponents.`
+    : 'Finish a race with this setup to save a ghost.')
+  description.id = 'ghost-availability'
+  mode.append(modeRow, description)
+  frame.body.append(mode, difficulty, raceLength, lighting, handling)
   frame.footer.append(
     button('BACK', 'setup-back', actions.close, 'button'),
     button(
-      'START RACE',
+      raceMode === 'ghost' ? 'START GHOST RACE' : 'START RACE',
       'setup-start',
       actions.start,
       'button button-primary',

@@ -57,10 +57,11 @@ describe('personal-best ghost replay', () => {
       feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
       step,
     })
-    session.start(track, setup)
+    const simulation = { ...setup, handling: 'simulation' as const }
+    session.start(track, simulation)
     session.advance(4, { steering: 0, throttle: 1, braking: false })
     expect(session.snapshot().result?.outcome).toBe('finished')
-    expect(store.load(track, setup)).toBeNull()
+    expect(store.load(track, simulation)).toBeNull()
     session.destroy()
   })
 
@@ -105,7 +106,7 @@ describe('personal-best ghost replay', () => {
     session.advance(3.7, input)
     session.advance(1 / 60, input)
     expect(store.load(track, setup)?.frames.length).toBeGreaterThan(1)
-    session.restart()
+    session.start(track, { ...setup, mode: 'ghost' })
     expect(session.snapshot().ghost).not.toBeNull()
     expect(session.snapshot().ghost?.car).toBe('blue')
     session.destroy()

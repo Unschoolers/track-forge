@@ -25,6 +25,7 @@ function validRun(value: unknown): value is GhostRun {
       frame && [frame.t, frame.x, frame.y, frame.angle, frame.z].every(Number.isFinite) &&
       frame.t >= 0 && frame.t <= run.time! &&
       (index === 0 || frame.t > frames[index - 1].t) &&
+      (frame.cut === undefined || typeof frame.cut === 'boolean') &&
       (frame.structureRunId === null || typeof frame.structureRunId === 'string'))
   )
 }
@@ -54,7 +55,13 @@ export class BrowserGhostRepository implements GhostStore {
     delete all[key]
     all[key] = run
     const recent = Object.entries(all).slice(-MAX_RUNS)
-    try { return this.storage.set(STORAGE_KEY, JSON.stringify(Object.fromEntries(recent))) }
-    catch { return false }
+    // Keep the new best, evicting older combinations if this device is full.
+    while (recent.length > 0) {
+      try {
+        if (this.storage.set(STORAGE_KEY, JSON.stringify(Object.fromEntries(recent)))) return true
+      } catch { /* Retry a smaller replay bank. */ }
+      recent.shift()
+    }
+    return false
   }
 }

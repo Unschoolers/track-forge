@@ -43,6 +43,7 @@ export interface Preferences {
   readonly dynamicZoomEnabled: boolean
   readonly handling?: HandlingMode
   readonly raceLaps?: 1 | 2 | 3
+  readonly raceMode?: 'normal' | 'ghost'
 }
 
 export interface PreferencesStore {

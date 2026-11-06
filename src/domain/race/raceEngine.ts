@@ -80,13 +80,16 @@ export type RaceStep = (
 ) => RaceStepResult
 
 function rampSpeedLimit(race: RaceState, vehicle: RaceVehicle): number {
-  // Look ahead far enough to brake before either end of a ramp, in either direction.
+  // Anticipate climbs in the travel direction; descents keep their speed.
   const lookAhead = Math.min(40, Math.max(12, Math.ceil(vehicle.speed / 6)))
   const startIndex = getVehicleStepContext(race.path, vehicle).nearest.index
+  if (gradeForTravel(race.path.roadSurface.gradeAt(startIndex), race.reversed) < -0.025) {
+    return Number.POSITIVE_INFINITY
+  }
   for (let offset = 0; offset <= lookAhead; offset++) {
     const index = startIndex + offset * (race.reversed ? -1 : 1)
     if (!race.path.closed && (index < 0 || index >= race.path.points.length)) continue
-    if (Math.abs(race.path.roadSurface.gradeAt(index)) > 0.025) {
+    if (gradeForTravel(race.path.roadSurface.gradeAt(index), race.reversed) > 0.025) {
       return 110
     }
   }
