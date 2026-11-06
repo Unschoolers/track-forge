@@ -3,6 +3,7 @@ import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { createHighScores, createStandings } from '@/ui/components/scoreboard'
 import { createModalFrame } from '@/ui/modals/modalFrame'
+import { medalForFinish } from '@/ui/components/finishMedal'
 
 export function createResultsModal(
   result: RaceResult,
@@ -25,6 +26,10 @@ export function createResultsModal(
       : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
+  const medal = medalForFinish(result.outcome, result.playerPlace)
+  if (medal) {
+    frame.body.append(element('p', 'race-finish-medal', `${medal} MEDAL`))
+  }
   frame.body.append(
     element('h3', 'results-heading', 'STANDINGS'),
     createStandings(result.standings),
