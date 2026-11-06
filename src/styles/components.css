@@ -149,3 +149,6 @@
     text-shadow: 0 2px 6px #000;
   }
 }
+
+/* Placement reward: clear and lightweight for short repeat races. */
+.race-finish-medal { margin: .3rem auto .7rem; text-align: center; color: #ffce65; font-weight: 1000; font-size: 1.1rem; letter-spacing: .12em; }
