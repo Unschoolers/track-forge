@@ -189,7 +189,10 @@ function fillPolygon(
   if (!first) return
   graphics.beginPath()
   graphics.moveTo(first.x, first.y)
-  for (const point of points.slice(1)) graphics.lineTo(point.x, point.y)
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index]
+    if (point) graphics.lineTo(point.x, point.y)
+  }
   graphics.closePath()
   graphics.fillPath()
 }
