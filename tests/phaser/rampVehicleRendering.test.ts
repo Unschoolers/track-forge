@@ -5,6 +5,7 @@ import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
+import { isVehicleAboveStructures } from '@/phaser/rendering/vehicleRenderer'
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
 
@@ -54,6 +55,29 @@ function required<T>(value: T | undefined): T {
 }
 
 describe('ramp vehicle rendering', () => {
+  it('retains a known ramp deck layer during a crossing lookup and slight suspension drop', () => {
+    const path = buildRoadPath(track.points, track.terrain)
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
+    const index = path.points.findIndex((point, i) =>
+      path.roadSurface.at(i, point).structureHeight > 16 &&
+      path.roadSurface.at(i, point).structureHeight < 24)
+    expect(index).toBeGreaterThan(0)
+    const point = required(path.points[index])
+    const surface = path.roadSurface.at(index, point)
+    const car = {
+      ...required(race.vehicles[0]),
+      x: point.x,
+      y: point.y,
+      z: surface.height - 1,
+      pathIndex: index,
+      structureRunId: surface.structureRunId,
+    }
+    expect(isVehicleAboveStructures(car, path)).toBe(true)
+    expect(isVehicleAboveStructures({
+      ...car, z: 0, structureRunId: null,
+    }, path)).toBe(false)
+  })
+
 	it.each([false, true])(
 		'draws all cars above every supported ramp sample (reverse=%s)',
 		(reversed) => {
