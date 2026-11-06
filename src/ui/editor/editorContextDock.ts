@@ -62,7 +62,7 @@ export function createEditorContextDock(
 ): HTMLElement {
   const dock = element('footer', 'editor-context-dock')
   dock.dataset.editorContextDock = ''
-  dock.dataset.layout = 'two-row'
+  dock.dataset.layout = state.editorUi.tool === 'terrain' ? 'two-row' : 'one-row'
 
   if (state.editorUi.tool === 'structure') {
     dock.append(
