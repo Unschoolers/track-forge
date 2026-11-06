@@ -139,6 +139,47 @@ function hillBoundaryCollisionState(pushedIndex: 0 | 1) {
 }
 
 describe('water race contact', () => {
+  it('lets an Arcade player drive away when no safe road sample exists', () => {
+    const points = Array.from({ length: 9 }, (_, index) => ({
+      x: 200 * Math.cos(index * Math.PI / 4),
+      y: 200 * Math.sin(index * Math.PI / 4),
+      surface: 'street' as const,
+    }))
+    const path = buildRoadPath(points, {
+      cellSize: 32,
+      cells: Array.from({ length: 289 }, (_, index) => ({
+        column: index % 17 - 8, row: Math.floor(index / 17) - 8, kind: 'water' as const,
+      })),
+    })
+    const initial = createRace({ path, playerCar: 'blue', difficulty: 'normal',
+      laps: 10, handling: 'arcade' })
+    const player = requireFixture(initial.vehicles[0])
+    expect(findNearestSafeTrackIndex(path, player)).toBeUndefined()
+    const first = stepRace({ ...initial, phase: 'running', vehicles: [player] }, noInput, 1 / 60, random)
+    expect(first.state.phase).toBe('running')
+    expect(first.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'water' }))
+    const recovered = requireFixture(first.state.vehicles[0])
+    let state = first.state
+    for (let frame = 0; frame < 60; frame += 1) {
+      const result = stepRace(state, { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
+      expect(result.events.some((event) => event.type === 'vehicle-recovered')).toBe(false)
+      state = result.state
+    }
+    expect(state.phase).toBe('running')
+    expect(state.vehicles[0]?.speed).toBeGreaterThan(0)
+    expect(Math.hypot(requireFixture(state.vehicles[0]).x - recovered.x,
+      requireFixture(state.vehicles[0]).y - recovered.y)).toBeGreaterThan(10)
+    // Reaching dry ground arms water recovery again for a later fall.
+    const dry = stepRace({ ...state, vehicles: [{ ...requireFixture(state.vehicles[0]),
+      x: 400, y: 400, z: 0, grounded: true, vx: 0, vy: 0, speed: 0,
+    }] }, noInput, 1 / 60, random)
+    const wetAgain = stepRace({ ...dry.state, vehicles: [{ ...requireFixture(dry.state.vehicles[0]),
+      x: recovered.x, y: recovered.y, z: 0, grounded: true, vx: 0, vy: 0, speed: 0,
+    }] }, noInput, 1 / 60, random)
+    expect(wetAgain.state.phase).toBe('running')
+    expect(wetAgain.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'water' }))
+  })
+
   it.each([false, true])('recovers Arcade players onto safe road and continues racing (reverse: %s)', (reversed) => {
     const initial = roadBoundaryRace()
     const player = atWater(requireFixture(initial.vehicles[0]))

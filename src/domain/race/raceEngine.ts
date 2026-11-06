@@ -259,11 +259,17 @@ export const stepRace: RaceStep = (
     const context = getVehicleStepContext(state.path, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     if (vehicle.player && !arcade) return vehicle
-    if (!hasVehicleWaterContact({
+    const waterContact = hasVehicleWaterContact({
       grounded: vehicle.grounded,
       terrainMaterial: context.terrainMaterial,
       safeAboveWater: context.safeAboveWater,
-    })) {
+    })
+    if (arcade && vehicle.player && vehicle.waterRecoveryProtected) {
+      return vehicle.grounded && !waterContact
+        ? { ...vehicle, waterRecoveryProtected: false }
+        : vehicle
+    }
+    if (!waterContact) {
       return vehicle
     }
     const pathIndex = findNearestSafeTrackIndex(
@@ -279,7 +285,7 @@ export const stepRace: RaceStep = (
     const previous = state.vehicles[index]
     const recovering = vehicle.player && previous
       ? { ...vehicle, lap: previous.lap, nextSector: previous.nextSector,
-          finishedAt: previous.finishedAt }
+          finishedAt: previous.finishedAt, waterRecoveryProtected: pathIndex === undefined }
       : vehicle
     return resetVehicleToTrack(recovering, state.path, {
       ...(pathIndex === undefined ? {} : { pathIndex }),
@@ -296,6 +302,7 @@ export const stepRace: RaceStep = (
   const playerWaterContact =
     player !== undefined &&
     playerContext !== undefined &&
+    !(arcade && player.waterRecoveryProtected) &&
     hasVehicleWaterContact({
       grounded: player.grounded,
       terrainMaterial: playerContext.terrainMaterial,
