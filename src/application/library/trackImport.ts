@@ -1,5 +1,8 @@
 import { isSurfaceId, isLightingMode, asTrackId, type Track, type TrackPoint } from '@/domain/model'
-import { normalizeTerrain } from '@/domain/terrain/terrainField'
+import { EMPTY_TERRAIN, normalizeTerrain } from '@/domain/terrain/terrainField'
+import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
+import { buildRoadPath } from '@/domain/track/pathBuilder'
+import { CrossingWorkLimitError } from '@/domain/track/crossings'
 
 export type TrackImportResult =
   | { readonly ok: true; readonly track: Track }
@@ -9,6 +12,11 @@ const MAX_FILE_CHARS = 2_000_000
 const MAX_POINTS = 2_000
 const MAX_TREES = 5_000
 const MAX_TERRAIN_CELLS = 20_000
+// Road compilation allocates samples by length (roughly every 6 world units),
+// not just authored point count. Check this before persisting untrusted data.
+// Bounded Bezier tangents keep compiled length below 2.5x this polygon length.
+const MAX_ROAD_POLYGON_LENGTH = 60_000
+const MAX_CROSSING_PAIR_CHECKS = 100_000
 
 function finite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 10_000_000
@@ -65,6 +73,27 @@ export function parseTrackImport(content: string): TrackImportResult {
       structure: p.structure === 'overpass' ? 'overpass' : 'surface',
     }
   })
+  let polygonLength = 0
+  for (let index = 0; index < normalizedPoints.length; index += 1) {
+    const point = normalizedPoints[index]!
+    const next = normalizedPoints[(index + 1) % normalizedPoints.length]!
+    // Match the compiler: open drafts do not include a last-to-first edge.
+    if (index === normalizedPoints.length - 1 &&
+        (normalizedPoints.length < 3 ||
+          Math.hypot(next.x - point.x, next.y - point.y) >= TRACK_CLOSE_DISTANCE)) break
+    polygonLength += Math.hypot(next.x - point.x, next.y - point.y)
+    if (polygonLength > MAX_ROAD_POLYGON_LENGTH) {
+      return { ok: false, message: 'The shared track is too long to import safely.' }
+    }
+  }
+  try {
+    // Crossing candidates depend on road coordinates, never terrain height.
+    // Preflight with a work limit before any untrusted circuit reaches storage.
+    buildRoadPath(normalizedPoints, EMPTY_TERRAIN, MAX_CROSSING_PAIR_CHECKS)
+  } catch (error) {
+    if (!(error instanceof CrossingWorkLimitError)) throw error
+    return { ok: false, message: 'The shared track has too many overlapping road segments.' }
+  }
   const start = object(source.start)
   const now = Date.now()
   return {

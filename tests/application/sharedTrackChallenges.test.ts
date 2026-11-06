@@ -28,6 +28,40 @@ describe('shareable track challenges', () => {
       ...track, points: Array.from({ length: 2001 }, () => track.points[0]!),
     })).ok).toBe(false)
   })
+  it('rejects tiny files that would expand into millions of road samples', () => {
+    expect(parseTrackImport(exported({ ...track, points: [
+      { x: -10_000_000, y: 0, surface: 'street' },
+      { x: 10_000_000, y: 0, surface: 'street' },
+    ] })).ok).toBe(false)
+  })
+  it('bounds the total road length even when every individual segment is small', () => {
+    expect(parseTrackImport(exported({ ...track,
+      points: Array.from({ length: 1000 }, (_, index) => ({
+        x: index % 2 * 200, y: index, surface: 'street' as const,
+      })),
+    })).ok).toBe(false)
+  })
+  it('allows a normal-sized circuit far from the origin', () => {
+    const translated = { ...track, points: track.points.map((point) => ({
+      ...point, x: point.x + 1_000_000, y: point.y - 1_000_000,
+    })) }
+    const imported = parseTrackImport(exported(translated))
+    expect(imported.ok).toBe(true)
+    if (imported.ok) expect(imported.track.points[0]?.x).toBe(translated.points[0]?.x)
+  })
+  it('rejects dense repeated road segments before crossing pairs can exhaust memory', () => {
+    expect(parseTrackImport(exported({ ...track,
+      points: Array.from({ length: 1000 }, (_, index) => ({
+        x: index % 2 * 60, y: 0, surface: 'street' as const, curve: 'corner' as const,
+      })),
+    })).ok).toBe(false)
+  })
+  it('does not count an artificial closing edge for an exported open draft', () => {
+    expect(parseTrackImport(exported({ ...track, points: [
+      { x: 0, y: 0, surface: 'street' },
+      { x: 40_000, y: 0, surface: 'street' },
+    ] })).ok).toBe(true)
+  })
   it('imports copies rather than replacing the existing circuit or scores', () => {
     const tracks: Track[] = [track]
     let next = 0
