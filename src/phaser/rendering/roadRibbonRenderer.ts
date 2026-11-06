@@ -38,18 +38,19 @@ export function buildRoadRibbonQuads(
   return quads
 }
 
-function fillPolygon(
+/**
+ * Draw two fixed triangles instead of running Phaser's polygon tessellator
+ * for every six-unit road segment. These are simple ruled ribbon quads.
+ */
+function fillQuad(
   graphics: Phaser.GameObjects.Graphics,
   points: readonly [Vector2, Vector2, Vector2, Vector2],
-  color: number,
 ): void {
-  graphics.fillStyle(color, 1)
-  graphics.beginPath()
-  graphics.moveTo(points[0].x, points[0].y)
-  for (const point of points.slice(1)) graphics.lineTo(point.x, point.y)
-  graphics.closePath()
-  graphics.fillPath()
+  const [a, b, c, d] = points
+  graphics.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
+  graphics.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y)
 }
+
 
 export function renderRoadRibbon(
   graphics: Phaser.GameObjects.Graphics,
@@ -58,13 +59,25 @@ export function renderRoadRibbon(
   night: boolean,
 ): void {
   const quads = buildRoadRibbonQuads(path, ribbon)
+  // Preserve the edge-under-road draw order but avoid thousands of redundant
+  // fill-state changes on long tracks with uninterrupted surface types.
+  let previousEdge: SurfaceId | undefined
   for (const quad of quads) {
-    const spec = SURFACE_SPECS[quad.surface]
-    fillPolygon(graphics, quad.edge, hex(night ? spec.nightEdge : spec.edge))
+    if (quad.surface !== previousEdge) {
+      const spec = SURFACE_SPECS[quad.surface]
+      graphics.fillStyle(hex(night ? spec.nightEdge : spec.edge), 1)
+      previousEdge = quad.surface
+    }
+    fillQuad(graphics, quad.edge)
   }
+  let previousRoad: SurfaceId | undefined
   for (const quad of quads) {
-    const spec = SURFACE_SPECS[quad.surface]
-    fillPolygon(graphics, quad.road, hex(night ? spec.nightRoad : spec.road))
+    if (quad.surface !== previousRoad) {
+      const spec = SURFACE_SPECS[quad.surface]
+      graphics.fillStyle(hex(night ? spec.nightRoad : spec.road), 1)
+      previousRoad = quad.surface
+    }
+    fillQuad(graphics, quad.road)
   }
 }
 
