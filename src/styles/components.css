@@ -16,6 +16,10 @@
 .danger { color: var(--color-danger); }
 .primary, .active { border-color: var(--color-accent); }
 .icon-button, .tool-button { min-inline-size: 44px; min-block-size: 44px; width: 2.8rem; height: 2.8rem; font-size: 1.1rem; }
+.icon-button, .tool-button { display: grid; place-items: center; flex: none; padding: 0; line-height: 1; touch-action: manipulation; }
+.editor-icon { display: block; width: 1.45rem; height: 1.45rem; flex: none; pointer-events: none; }
+.editor-segmented-button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 .2rem; }
+
 .surface-button { min-block-size: 44px; padding: .7rem 1rem; font-size: .72rem; }
 .editor-segmented-buttons { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: .35rem; }
 .editor-segmented-button { min-block-size: 44px; min-width: 0; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-panel-raised); color: var(--color-text); font: inherit; font-size: .72rem; font-weight: 850; letter-spacing: .04em; }
