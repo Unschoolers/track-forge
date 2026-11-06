@@ -52,6 +52,10 @@ npm run preview
 The original `trackforge.html` remains as a migration reference and is not loaded
 by the Vite application.
 
+Run `npm run qa:lanes` for fast, deterministic AI path checks without graphics.
+Open `qa/results/lanes/report.html` for dot trails and failure locations. See
+[AI lane checker](docs/ai-lane-checker.md) for custom tracks and larger batches.
+
 ## Android APK
 
 Android builds bundle the production web assets for offline use at
