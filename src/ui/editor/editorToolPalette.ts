@@ -1,21 +1,22 @@
 import type { AppSnapshot } from '@/application/appState'
 import type { EditorTool } from '@/domain/editor/editorGeometry'
-import { button, element } from '@/ui/dom'
+import { element } from '@/ui/dom'
+import { editorIconButton, type EditorIcon } from '@/ui/editor/editorIcons'
 
 const tools: readonly {
   readonly id: EditorTool
-  readonly icon: string
+  readonly icon: EditorIcon
   readonly label: string
 }[] = [
-  { id: 'draw', icon: '✎', label: 'Draw road' },
-  { id: 'select', icon: '↖', label: 'Move points' },
-  { id: 'start', icon: '⚑', label: 'Place start line' },
-  { id: 'paint', icon: '▧', label: 'Paint surface' },
-  { id: 'structure', icon: '↥', label: 'Paint structure' },
-  { id: 'terrain', icon: '◒', label: 'Paint terrain' },
-  { id: 'pan', icon: '✥', label: 'Pan map' },
-  { id: 'tree', icon: '♣', label: 'Add trees' },
-  { id: 'erase', icon: '⌫', label: 'Erase' },
+  { id: 'draw', icon: 'draw', label: 'Draw road' },
+  { id: 'select', icon: 'select', label: 'Move points' },
+  { id: 'start', icon: 'start', label: 'Place start line' },
+  { id: 'paint', icon: 'paint', label: 'Paint surface' },
+  { id: 'structure', icon: 'structure', label: 'Paint structure' },
+  { id: 'terrain', icon: 'terrain', label: 'Paint terrain' },
+  { id: 'pan', icon: 'pan', label: 'Pan map' },
+  { id: 'tree', icon: 'tree', label: 'Add trees' },
+  { id: 'erase', icon: 'erase', label: 'Erase' },
 ]
 
 export function createEditorToolPalette(
@@ -26,9 +27,10 @@ export function createEditorToolPalette(
   palette.setAttribute('aria-label', 'Editor tools')
 
   for (const definition of tools) {
-    const tool = button(
+    const tool = editorIconButton(
       definition.icon,
       definition.id,
+      definition.label,
       () => actions.tool(definition.id),
       `tool-button${state.editorUi.tool === definition.id ? ' active' : ''}`,
     )
