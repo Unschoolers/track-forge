@@ -17,6 +17,7 @@ export function stepVehicle(
   context: VehicleStepContext,
   deltaSeconds: number,
   handling: 'arcade' | 'simulation' = 'simulation',
+  speedLimit = Number.POSITIVE_INFINITY,
 ): RaceVehicle {
   if (vehicle.wrecked || vehicle.finishedAt !== null) {
     return {
@@ -56,7 +57,8 @@ export function stepVehicle(
       damageRatio *
         VEHICLE_DYNAMICS_TUNING.damage.maximumGripLoss,
   }
-  const maxSpeed = car.max * surface.max * terrain.max * condition.max
+  const maxSpeed = Math.min(speedLimit, car.max * surface.max * terrain.max * condition.max)
+  const braking = input.braking || vehicle.speed > speedLimit
   const dynamics = stepVehicleDynamics(
     {
       angle: vehicle.angle,
@@ -69,7 +71,8 @@ export function stepVehicle(
       // The shared input controller models an automatic accelerator. Holding
       // the service brake must cut drive torque instead of asking the finite
       // brakes to fight a permanently wide-open engine.
-      throttle: input.braking ? 0 : input.throttle,
+      throttle: braking ? 0 : input.throttle,
+      braking,
     },
     {
       mass: car.mass,
@@ -123,7 +126,7 @@ export function stepVehicle(
     yawRate: dynamics.yawRate,
     speed: dynamics.speed,
     slip: Math.abs(dynamics.lateralSpeed),
-    braking: input.braking,
+    braking,
     currentSurface: context.surface,
     onCurb: context.onCurb,
   }

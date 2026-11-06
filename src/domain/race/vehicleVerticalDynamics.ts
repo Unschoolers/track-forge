@@ -7,6 +7,7 @@ export interface VehicleVerticalState {
 }
 
 export interface VehicleVerticalEnvironment {
+  readonly allowTakeoff?: boolean
   readonly previousSurfaceHeight: number
   readonly surfaceHeight: number
   readonly previousGrade: number
@@ -136,6 +137,7 @@ export function stepVehicleVerticalDynamics(
     carriedVelocity * crestStrength,
   )
   if (
+    environment.allowTakeoff !== false &&
     environment.overRoad &&
     launchVelocity >= VERTICAL_DYNAMICS.takeoffVelocityThreshold
   ) {

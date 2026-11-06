@@ -1,3 +1,5 @@
+import { exportTrack } from '@/infrastructure/export/trackExport'
+import type { Track } from '@/domain/model'
 import type {
   AppCommand,
   AppSnapshot,
@@ -79,6 +81,20 @@ export class DomUiHost implements UiHost {
       this.root.removeEventListener('pointerdown', this.onIntent)
       this.root.removeEventListener('click', this.onClickFeedback)
       this.mounted = false
+    }
+  }
+
+  private async exportTrackFile(track: Track): Promise<void> {
+    try {
+      if (await exportTrack(track)) {
+        const toast = createToast('Track exported. Attach the JSON file in chat for debugging.')
+        this.root.append(toast)
+        setTimeout(() => toast.remove(), 5000)
+      }
+    } catch {
+      const toast = createToast('Export failed. Please try another save location.')
+      this.root.append(toast)
+      setTimeout(() => toast.remove(), 5000)
     }
   }
 
@@ -237,6 +253,7 @@ export class DomUiHost implements UiHost {
               type: 'select-track-for-race',
               id,
             }),
+          export: (track) => { void this.exportTrackFile(track) },
           delete: (track) => {
             if (this.environment.confirm(`Delete "${track.name}"?`)) {
               this.controller.dispatch({
@@ -295,6 +312,10 @@ export class DomUiHost implements UiHost {
       case 'editor-menu':
         return createEditorMenuModal({
           close,
+          export: () => {
+            const track = this.controller.snapshot().currentTrack
+            if (track) void this.exportTrackFile(track)
+          },
           save: () =>
             this.controller.dispatch({ type: 'save-current-track' }),
           rename: () =>
