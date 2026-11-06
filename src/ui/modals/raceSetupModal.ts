@@ -93,7 +93,23 @@ export function createRaceSetupModal(
     handlingRow,
     element('p', 'modal-subtitle', 'Arcade responds faster to touch steering. Simulation preserves the original tire behavior.'),
   )
-  frame.body.append(difficulty, lighting, handling)
+  const raceLength = element('section', 'setup-section')
+  raceLength.append(element('h3', 'setup-label', 'RACE LENGTH'))
+  const raceLengthRow = element('div', 'choice-row')
+  for (const [laps, label] of [[1, 'SPRINT · 1 LAP'], [2, 'CLASSIC · 2'], [3, 'ENDURANCE · 3']] as const) {
+    const selected = (state.preferences.raceLaps ?? 2) === laps
+    const choice = button(
+      label,
+      `laps-${laps}`,
+      () => actions.preferences({ ...state.preferences, raceLaps: laps }),
+      `setup-choice${selected ? ' active' : ''}`,
+    )
+    choice.dataset.raceLaps = String(laps)
+    choice.setAttribute('aria-pressed', String(selected))
+    raceLengthRow.append(choice)
+  }
+  raceLength.append(raceLengthRow)
+  frame.body.append(difficulty, raceLength, lighting, handling)
   frame.footer.append(
     button('BACK', 'setup-back', actions.close, 'button'),
     button(
