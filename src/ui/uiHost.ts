@@ -1,4 +1,5 @@
-import { exportTrack } from '@/infrastructure/export/trackExport'
+import { exportTrack, serializeTrack } from '@/infrastructure/export/trackExport'
+import { formatRaceTime } from '@/ui/format'
 import type { Track } from '@/domain/model'
 import type {
   AppCommand,
@@ -96,6 +97,23 @@ export class DomUiHost implements UiHost {
       this.root.append(toast)
       setTimeout(() => toast.remove(), 5000)
     }
+  }
+
+  private async shareTrackChallenge(track: Track): Promise<void> {
+    const file = serializeTrack(track)
+    const best = this.controller.snapshot().scoresByTrack[track.id]?.[0]
+    const challenge = `I built "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win on my track?'} Import the attached track file and race it.`
+    const attachment = new File([file.content], file.filename, { type: 'application/json' })
+    if (navigator.share && navigator.canShare?.({ files: [attachment] })) {
+      try {
+        await navigator.share({ title: 'Track Forge challenge', text: challenge, files: [attachment] })
+        return
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+      }
+    }
+    // Offline/no native sharing: export a genuine file the player can send.
+    await this.exportTrackFile(track)
   }
 
   private readonly onIntent = (): void => {
@@ -254,6 +272,8 @@ export class DomUiHost implements UiHost {
               id,
             }),
           export: (track) => { void this.exportTrackFile(track) },
+          share: (track) => { void this.shareTrackChallenge(track) },
+          importFile: (content) => this.controller.dispatch({ type: 'import-track', content }),
           delete: (track) => {
             if (this.environment.confirm(`Delete "${track.name}"?`)) {
               this.controller.dispatch({
