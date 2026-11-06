@@ -12,6 +12,16 @@ import { runLaneCheck } from '../../qa/lanes/simulation'
 import { parseLaneOptions } from '../../qa/lanes/options'
 
 describe('AI lane simulations', () => {
+	it('finishes the reverse hairpin without jumping to another arm of the route', () => {
+		const track = requireFixture(createLaneScenarios().find((track) => track.id === 'hairpin'))
+		const run = runLaneCheck({
+			path: prepareLanePath(track), trackName: track.name, seed: 1,
+			difficulty: 'normal', reversed: true, seconds: 60,
+			laps: 1, mode: 'solo', car: 'blue',
+		})
+		expect(run.stoppedReason).toBe('finished')
+		expect(run.issues.filter((issue) => issue.code === 'path-jump')).toEqual([])
+	})
 	it('rejects malformed or excessive geometry before the path compiler expands it', () => {
 		const track = requireFixture(createLaneScenarios()[0])
 		const malformed = {

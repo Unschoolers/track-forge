@@ -73,14 +73,17 @@ export function turnAmountAt(
  */
 function nearestContinuousPathPoint(
   path: RoadPath,
-  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'player'>>,
 ): NearestPathPoint | undefined {
   const count = path.points.length
   if (count === 0) return undefined
   const start = path.closed
     ? ((Math.round(vehicle.pathIndex) % count) + count) % count
     : Math.max(0, Math.min(count - 1, Math.round(vehicle.pathIndex)))
-  const nearest = nearestPathPoint(path, vehicle, start, 80)
+  // AI advances only a few samples per physics step. A broad spatial search
+  // can pick a distant hairpin arm and make its pursuit target jump backwards.
+  const searchRadius = vehicle.player === false ? 12 : 80
+  const nearest = nearestPathPoint(path, vehicle, start, searchRadius)
   const current = path.points[start]
   if (!nearest || !current || nearest.point.segment === current.segment) {
     return nearest
@@ -103,7 +106,7 @@ function nearestContinuousPathPoint(
   if (!crossingArms.has(nearest.point.segment)) return nearest
 
   let closest: NearestPathPoint | undefined
-  const radius = Math.min(80, count - 1)
+  const radius = Math.min(searchRadius, count - 1)
   for (let offset = -radius; offset <= radius; offset += 1) {
     const rawIndex = start + offset
     if (!path.closed && (rawIndex < 0 || rawIndex >= count)) continue
@@ -226,13 +229,14 @@ function lowerCrossingRoad(
 export function getVehicleStepContext(
   path: RoadPath,
   vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex' | 'z'> &
-    Partial<Pick<RaceVehicle, 'grounded'>>,
+    Partial<Pick<RaceVehicle, 'grounded' | 'player'>>,
   previousSupport?: VehicleStepContext,
 ): VehicleStepContext {
   const local = nearestContinuousPathPoint(path, vehicle)
   let nearest = local
   let roadSurface = local && path.roadSurface.at(local.index, vehicle)
-  if (local && roadSurface && local.distance > ROAD_GEOMETRY.onRoadRadius) {
+  if (local && roadSurface && local.distance > ROAD_GEOMETRY.onRoadRadius &&
+      vehicle.player !== false) {
     const reacquired = reacquireRoad(path, vehicle, roadSurface.terrainHeight)
     if (
       reacquired &&
