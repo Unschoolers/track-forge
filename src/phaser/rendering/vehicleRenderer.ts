@@ -6,6 +6,7 @@ import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import { projectSunShadow } from '@/phaser/rendering/lighting'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
+import type { GhostPose } from '@/application/race/ghostReplay'
 
 export interface VehicleGeometry {
   readonly id: CarId
@@ -224,6 +225,22 @@ export function renderVehicles(
     }
     graphics.restore()
   }
+}
+
+/** Transparent reference lap. A ghost never enters physics or collisions. */
+export function renderGhostVehicle(
+  graphics: Phaser.GameObjects.Graphics,
+  ghost: GhostPose,
+): void {
+  const geometry = getVehicleGeometry(ghost.car)
+  graphics.save()
+  graphics.translateCanvas(ghost.x, ghost.y)
+  graphics.rotateCanvas(ghost.angle)
+  graphics.fillStyle(0x99ecff, 0.28)
+  fillPolygon(graphics, geometry.body)
+  graphics.fillStyle(0xe8fbff, 0.16)
+  fillPolygon(graphics, geometry.cabin)
+  graphics.restore()
 }
 
 export function renderVehicleShadows(
