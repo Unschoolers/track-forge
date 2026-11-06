@@ -44,6 +44,8 @@ export interface RaceVehicle {
   readonly onCurb: boolean
   readonly stuckDuration: number
   readonly finishedAt: number | null
+  /** Arcade fallback: suppress repeat water resets until safe grounded support. */
+  readonly waterRecoveryProtected?: boolean
 }
 
 export interface RaceCameraHints {

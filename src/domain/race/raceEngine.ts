@@ -255,15 +255,21 @@ export const stepRace: RaceStep = (
     state.activeContacts,
     dt,
   )
-  let vehicles = collisionFrame.vehicles.map((collided) => {
+  let vehicles = collisionFrame.vehicles.map((collided, index) => {
     const context = getVehicleStepContext(state.path, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
-    if (vehicle.player) return vehicle
-    if (!hasVehicleWaterContact({
+    if (vehicle.player && !arcade) return vehicle
+    const waterContact = hasVehicleWaterContact({
       grounded: vehicle.grounded,
       terrainMaterial: context.terrainMaterial,
       safeAboveWater: context.safeAboveWater,
-    })) {
+    })
+    if (arcade && vehicle.player && vehicle.waterRecoveryProtected) {
+      return vehicle.grounded && !waterContact
+        ? { ...vehicle, waterRecoveryProtected: false }
+        : vehicle
+    }
+    if (!waterContact) {
       return vehicle
     }
     const pathIndex = findNearestSafeTrackIndex(
@@ -275,7 +281,13 @@ export const stepRace: RaceStep = (
       type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
       x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
     })
-    return resetVehicleToTrack(vehicle, state.path, {
+    // Water recovery must not award a lap, sector or finish from the fall.
+    const previous = state.vehicles[index]
+    const recovering = vehicle.player && previous
+      ? { ...vehicle, lap: previous.lap, nextSector: previous.nextSector,
+          finishedAt: previous.finishedAt, waterRecoveryProtected: pathIndex === undefined }
+      : vehicle
+    return resetVehicleToTrack(recovering, state.path, {
       ...(pathIndex === undefined ? {} : { pathIndex }),
       reversed: state.reversed,
     })
@@ -290,6 +302,7 @@ export const stepRace: RaceStep = (
   const playerWaterContact =
     player !== undefined &&
     playerContext !== undefined &&
+    !(arcade && player.waterRecoveryProtected) &&
     hasVehicleWaterContact({
       grounded: player.grounded,
       terrainMaterial: playerContext.terrainMaterial,
