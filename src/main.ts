@@ -6,6 +6,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
 import { BrowserPreferencesRepository } from '@/infrastructure/storage/preferencesRepository'
 import { BrowserScoreRepository } from '@/infrastructure/storage/scoreRepository'
+import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository'
 import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
 import { PhaserSceneHost } from '@/phaser/sceneHost'
 import { DomUiHost } from '@/ui/uiHost'
@@ -65,6 +66,7 @@ feedback.setChannels({
 })
 const raceSession = new RaceSession({
   scoreStore,
+  ghostStore: new BrowserGhostRepository(storage),
   random: mathRandom,
   feedback,
   geometry,
