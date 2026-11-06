@@ -8,6 +8,8 @@ import { createModalFrame } from '@/ui/modals/modalFrame'
 
 export interface TrackLibraryActions {
   readonly export: (track: Track) => void
+  readonly share: (track: Track) => void
+  readonly importFile: (content: string) => void
   readonly close: () => void
   readonly create: () => void
   readonly selectForEdit: (id: TrackId) => void
@@ -66,7 +68,11 @@ export function createTrackLibraryModal(
       select.disabled = true
       select.setAttribute('aria-disabled', 'true')
     }
-    controls.append(select, button('EXPORT', `export-${track.id}`, () => actions.export(track), 'track-mini-button'))
+    controls.append(
+      select,
+      button('SHARE', `share-${track.id}`, () => actions.share(track), 'track-mini-button'),
+      button('EXPORT', `export-${track.id}`, () => actions.export(track), 'track-mini-button'),
+    )
     if (!race) {
       controls.append(
         button(
@@ -85,7 +91,21 @@ export function createTrackLibraryModal(
       element('p', 'empty-state', 'No tracks saved yet.'),
     )
   }
-  frame.body.append(list)
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = '.json,.trackforge.json,application/json'
+  fileInput.hidden = true
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.item(0)
+    if (!file) return
+    if (file.size > 2_000_000) { actions.importFile(''); return }
+    void file.text().then(actions.importFile).catch(() => actions.importFile(''))
+    fileInput.value = ''
+  })
+  frame.body.append(list, fileInput)
+  frame.footer.append(
+    button('IMPORT TRACK', 'import-track-file', () => fileInput.click(), 'button'),
+  )
   if (!race) {
     frame.footer.append(
       button(
