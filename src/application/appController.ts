@@ -15,6 +15,7 @@ import {
   TrackLibraryService,
   type TrackMutationResult,
 } from '@/application/library/trackLibraryService'
+import { parseTrackImport } from '@/application/library/trackImport'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
@@ -351,6 +352,9 @@ export class AppController {
       case 'delete-track':
         this.deleteTrack(command.id)
         break
+      case 'import-track':
+        this.importTrack(command.content)
+        break
       case 'select-track-for-edit':
         this.selectTrackForEdit(command.id)
         break
@@ -522,6 +526,16 @@ export class AppController {
       ),
       notice: null,
     })
+  }
+
+  private importTrack(content: string): void {
+    if (!this.flushPendingEditorSave()) return
+    const parsed = parseTrackImport(content)
+    if (!parsed.ok) {
+      this.update({ ...this.state, notice: parsed.message })
+      return
+    }
+    this.applyTrackMutation(this.library.importShared(parsed.track), true)
   }
 
   private deleteTrack(id: TrackId): void {

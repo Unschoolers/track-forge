@@ -197,6 +197,7 @@ function cubicBezier(
 export function buildRoadPath(
   points: readonly TrackPoint[],
   terrain: TerrainMap,
+  maximumCrossingPairChecks = Infinity,
 ): RoadPath {
   if (points.length < 2) {
     const centerPath: readonly RoadPathPoint[] = []
@@ -337,7 +338,7 @@ export function buildRoadPath(
   }
   return {
     ...path,
-    crossings: detectTrackCrossings(path),
+    crossings: detectTrackCrossings(path, maximumCrossingPairChecks),
   }
 }
 

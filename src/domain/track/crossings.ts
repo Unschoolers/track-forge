@@ -39,6 +39,13 @@ interface SegmentCandidate {
   readonly end: RoadPathPoint
 }
 
+export class CrossingWorkLimitError extends Error {
+  constructor() {
+    super('Track crossing analysis exceeds the permitted work budget.')
+    this.name = 'CrossingWorkLimitError'
+  }
+}
+
 export function crossingKey(firstSegment: number, secondSegment: number): string {
   return firstSegment < secondSegment
     ? `${firstSegment}:${secondSegment}`
@@ -159,6 +166,7 @@ function sourceSegmentsAdjacent(
 
 function crossingCandidates(
   path: Pick<RoadPath, 'points' | 'closed'>,
+  maximumPairChecks: number,
 ): readonly [SegmentCandidate, SegmentCandidate][] {
   const segmentCount = path.closed ? path.points.length : path.points.length - 1
   const cellSize = ROAD_GEOMETRY.edgeWidth * 2
@@ -184,9 +192,11 @@ function crossingCandidates(
     }
   }
   const pairs = new Map<string, [SegmentCandidate, SegmentCandidate]>()
+  let pairChecks = 0
   for (const contents of cells.values()) {
     for (let left = 0; left < contents.length; left += 1) {
       for (let right = left + 1; right < contents.length; right += 1) {
+        if (++pairChecks > maximumPairChecks) throw new CrossingWorkLimitError()
         const first = contents[left]
         const second = contents[right]
         if (!first || !second) continue
@@ -208,12 +218,13 @@ export function detectTrackCrossings(
     RoadPath,
     'points' | 'closed' | 'totalLength' | 'roadSurface'
   >,
+  maximumPairChecks = Infinity,
 ): readonly TrackCrossing[] {
   if (path.points.length < 4) return []
   const sourceSegmentCount =
     Math.max(...path.points.map((point) => point.segment)) + 1
   const byKey = new Map<string, TrackCrossing>()
-  for (const [left, right] of crossingCandidates(path)) {
+  for (const [left, right] of crossingCandidates(path, maximumPairChecks)) {
       const leftIndex = left.index
       const rightIndex = right.index
       const leftStart = left.start
