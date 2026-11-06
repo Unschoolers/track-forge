@@ -133,6 +133,7 @@ export type AppCommand =
   | { readonly type: 'create-track'; readonly name: string }
   | { readonly type: 'rename-track'; readonly name: string }
   | { readonly type: 'delete-track'; readonly id: TrackId }
+  | { readonly type: 'import-track'; readonly content: string }
   | { readonly type: 'select-track-for-edit'; readonly id: TrackId }
   | { readonly type: 'select-track-for-race'; readonly id: TrackId }
   | { readonly type: 'editor'; readonly command: EditorCommand }
