@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       apk_artifact_id: ${{ steps.apk.outputs.artifact-id }}
+      version_code: ${{ steps.version.outputs.TRACKFORGE_VERSION_CODE }}
+      version_name: ${{ steps.version.outputs.TRACKFORGE_VERSION_NAME }}
+      build_run: ${{ steps.version.outputs.TRACKFORGE_BUILD_RUN }}
+      build_attempt: ${{ steps.version.outputs.TRACKFORGE_BUILD_ATTEMPT }}
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -38,92 +42,119 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npx cap sync android
-      - name: Check for supplied signing key
-        id: signing
-        env:
-          DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
+      - name: Set unique Android build version
+        id: version
         run: |
-          if [ -n "$DEBUG_KEY_BASE64" ]; then
-            echo 'supplied=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'supplied=false' >> "$GITHUB_OUTPUT"
+          node scripts/android-build-policy.mjs version "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/trackforge-version.env"
+          cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_OUTPUT"
+      - name: Assemble debug APK without the signing key
+        run: cd android && ./gradlew assembleDebug
+      - name: Verify unsigned APK metadata
+        run: |
+          shopt -s nullglob
+          apks=(android/app/build/outputs/apk/debug/*.apk)
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo 'Expected exactly one unsigned APK.' >&2
+            exit 1
           fi
-      - name: Restore debug signing key
-        if: steps.signing.outputs.supplied == 'false'
-        id: debug-key-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: trackforge-debug-keystore-v1
-      - name: Configure signing key
-        env:
-          DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          mkdir -p "$HOME/.android"
-          if [ -n "$DEBUG_KEY_BASE64" ]; then
-            printf '%s' "$DEBUG_KEY_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-          elif [ ! -f "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
-          fi
-      - name: Assemble debug APK
-        run: |
-          export TRACKFORGE_VERSION_CODE=$((GITHUB_RUN_NUMBER + 2))
-          cd android && ./gradlew assembleDebug
-      - name: Verify APK signature and metadata
-        run: |
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Name APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk "trackforge-debug-${{ github.run_number }}-${{ github.run_attempt }}-${GITHUB_SHA::7}.apk"
-      - name: Upload APK
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "${apks[0]}" > "$RUNNER_TEMP/trackforge-badging.txt"
+          node scripts/android-build-policy.mjs metadata "$RUNNER_TEMP/trackforge-badging.txt" "$TRACKFORGE_VERSION_CODE" "$TRACKFORGE_VERSION_NAME"
+          cp "${apks[0]}" trackforge-unsigned.apk
+      - name: Upload unsigned build for isolated signing
         id: apk
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: trackforge-debug-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}
-          path: trackforge-debug-*.apk
-          retention-days: 30
+          name: trackforge-unsigned-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: trackforge-unsigned.apk
+          retention-days: 7
           if-no-files-found: error
-      - name: Add download link
-        env:
-          ARTIFACT_URL: ${{ steps.apk.outputs.artifact-url }}
-        run: printf '## Android APK\n\n[Download the signed debug APK](%s) (available for 30 days).\n' "$ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
+      - name: Explain build artifact
+        run: printf '## Android build\n\nUnsigned QA artifact verified. Installable APKs are signed and published from main in the protected android-signing environment.\n' >> "$GITHUB_STEP_SUMMARY"
 
-  release:
+  sign-and-release:
     needs: android
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment: android-signing
     runs-on: ubuntu-latest
     permissions:
       contents: write
       actions: read
     steps:
-      - name: Download verified APK
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install signing tools
+        run: sdkmanager 'build-tools;36.0.0'
+      - name: Download verified unsigned APK
         uses: actions/download-artifact@v8.0.2
         with:
           artifact-ids: ${{ needs.android.outputs.apk_artifact_id }}
-          path: release-apk
+          path: unsigned-apk
           merge-multiple: true
+      - name: Sign with permanent identity and verify install metadata
+        env:
+          DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
+          VERSION_CODE: ${{ needs.android.outputs.version_code }}
+          VERSION_NAME: ${{ needs.android.outputs.version_name }}
+        run: |
+          if [ -z "$DEBUG_KEY_BASE64" ]; then
+            echo '::error::Configure the original TrackForge key as TRACKFORGE_DEBUG_KEYSTORE_BASE64 in the main-only android-signing environment. Refusing to create another incompatible APK.'
+            exit 1
+          fi
+          umask 077
+          key_file="$RUNNER_TEMP/trackforge-signing.keystore"
+          printf '%s' "$DEBUG_KEY_BASE64" | base64 --decode > "$key_file"
+          actual_signer=$(keytool -exportcert -keystore "$key_file" -storepass android -alias androiddebugkey | sha256sum | cut -d' ' -f1)
+          expected_signer=$(tr -d '\r\n' < android/signing-certificate.sha256)
+          if [ "$actual_signer" != "$expected_signer" ]; then
+            echo '::error::The configured key does not match the pinned TrackForge certificate.'
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$key_file" --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey --out trackforge-debug.apk unsigned-apk/trackforge-unsigned.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs trackforge-debug.apk > "$RUNNER_TEMP/trackforge-certificates.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging trackforge-debug.apk > "$RUNNER_TEMP/trackforge-badging.txt"
+          node scripts/android-build-policy.mjs verify "$RUNNER_TEMP/trackforge-badging.txt" "$RUNNER_TEMP/trackforge-certificates.txt" "$VERSION_CODE" "$VERSION_NAME"
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/trackforge-signing.keystore"
       - name: Publish APK release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          VERSION_CODE: ${{ needs.android.outputs.version_code }}
+          VERSION_NAME: ${{ needs.android.outputs.version_name }}
+          BUILD_RUN: ${{ needs.android.outputs.build_run }}
+          BUILD_ATTEMPT: ${{ needs.android.outputs.build_attempt }}
         run: |
-          shopt -s nullglob
-          apks=(release-apk/*.apk)
-          if [ "${#apks[@]}" -ne 1 ]; then
-            echo 'Expected exactly one verified APK.' >&2
-            exit 1
-          fi
-          cp "${apks[0]}" trackforge-debug.apk
-
-          tag="android-build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          tag="android-build-${BUILD_RUN}-${BUILD_ATTEMPT}"
           gh api "repos/$GH_REPO/releases?per_page=100" --paginate --slurp > releases.json
           highest_build=$(jq -r '[.[][] | select(.draft == false) | .tag_name | capture("^android-build-(?<run>[0-9]+)-[0-9]+$")? | .run | tonumber] | max // 0' releases.json)
           main_sha=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
           latest=(--latest=false)
-          if (( GITHUB_RUN_NUMBER >= highest_build )) && [ "$GITHUB_SHA" = "$main_sha" ]; then
+          if (( BUILD_RUN >= highest_build )) && [ "$GITHUB_SHA" = "$main_sha" ]; then
             latest=(--latest)
           fi
-
-          printf 'Signed debug APK from commit `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
-          gh release create "$tag" trackforge-debug.apk --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge Android build ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" --notes-file release-notes.md "${latest[@]}"
-          printf '## APK release\n\n[Download this APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n\n[Latest APK](%s/%s/releases/latest/download/trackforge-debug.apk)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" >> "$GITHUB_STEP_SUMMARY"
+          if gh release view "$tag" --repo "$GH_REPO" --json targetCommitish,assets > existing-release.json 2>/dev/null; then
+            if [ "$(jq -r '.targetCommitish' existing-release.json)" != "$GITHUB_SHA" ]; then
+              echo 'Existing release has a different source commit; refusing replacement.' >&2
+              exit 1
+            fi
+            if ! jq -e '.assets[] | select(.name == "trackforge-debug.apk")' existing-release.json > /dev/null; then
+              gh release upload "$tag" trackforge-debug.apk --repo "$GH_REPO"
+            fi
+          else
+            printf 'TrackForge %s (Android version code %s).\n\nSigned with the fixed original TrackForge certificate.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
+            gh release create "$tag" trackforge-debug.apk --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge Android ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"
+          fi
+          printf '## APK release\n\nVersion %s (code %s).\n\n[Download this APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
