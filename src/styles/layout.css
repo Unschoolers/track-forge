@@ -62,8 +62,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   .tool-rail, .history-actions { grid-template-columns: repeat(2, var(--editor-control-size)); }
 }
 @media (max-height: 700px) {
-  .tool-rail, .history-actions { top: calc(4.25rem + env(safe-area-inset-top)); grid-template-columns: repeat(3, var(--editor-control-size)); }
   .diagnostic-panel { max-block-size: calc(100svh - var(--editor-diagnostic-top) - var(--editor-track-actions-clearance)); overflow: auto; }
+  .tool-rail, .history-actions { top: calc(4.25rem + env(safe-area-inset-top)); grid-template-columns: repeat(3, var(--editor-control-size)); }
 }
 @media (max-width: 520px) {
   .editor-screen { --editor-context-dock-inset: max(.5rem, env(safe-area-inset-bottom)); }
