@@ -11,9 +11,9 @@ import type { TrafficState } from '@/domain/race/ai/traffic'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import {
   getVehicleStepContext,
-  turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
+import { safeEntrySpeedAhead } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
 function wrapAngle(angle: number): number {
@@ -155,10 +155,11 @@ export function stepAiVehicle(
     ahead !== null &&
     ahead.distance < tuning.followDistance &&
     ahead.vehicle.speed < vehicle.speed
-  const curve =
-    Math.abs(turnAmountAt(path, targetIndex, 6)) * tuning.cornerSafety
-  const curveSpeed = clamp(225 - curve * 230, 92, 225)
-  const curveBraking = vehicle.speed > curveSpeed
+  // Brake for the tightest upcoming bend, not just one moving pursuit point.
+  const curveSpeed = safeEntrySpeedAhead(
+    path, context.nearest.index, reversed, tuning.cornerSafety,
+  )
+  const curveBraking = vehicle.speed > curveSpeed + 3
   const recovering = !context.onRoad
   const stepped = stepVehicle(
     vehicle,
