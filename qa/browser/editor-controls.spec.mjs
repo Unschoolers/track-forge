@@ -18,6 +18,7 @@ async function assertClearEditorControls(page, tool) {
       actions: bounds('.editor-actions'),
       leftRail: bounds('.tool-rail'),
       rightRail: bounds('.history-actions'),
+      status: bounds('.status-pill'),
       buttons: [...document.querySelectorAll('.editor-actions button')].map(el => {
         const r = el.getBoundingClientRect()
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
@@ -29,6 +30,8 @@ async function assertClearEditorControls(page, tool) {
     expect(intersects(region, geometry.actions), `${tool}: ${name} overlaps editor actions`).toBe(name === 'actions')
   }
   expect(geometry.actions.bottom).toBeLessThanOrEqual(geometry.dock.top + 1)
+  expect(intersects(geometry.status, geometry.leftRail), `${tool}: status overlaps tool rail`).toBe(false)
+  expect(intersects(geometry.status, geometry.rightRail), `${tool}: status overlaps history rail`).toBe(false)
   expect(geometry.buttons).toHaveLength(4)
   for (const button of geometry.buttons) {
     expect(button.right - button.left).toBeGreaterThanOrEqual(43)
