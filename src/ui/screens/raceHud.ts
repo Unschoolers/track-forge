@@ -8,6 +8,7 @@ import type { Unsubscribe } from '@/application/eventBus'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { bindRacePointer, STEERING_RANGE_PX } from '@/phaser/input/racePointer'
+import { driftCue } from '@/ui/screens/driftCue'
 
 export interface RaceHudMount {
   readonly element: HTMLElement
@@ -46,6 +47,9 @@ export function createRaceHud(
 
   const raceBanner = element('div', 'race-event-banner')
   raceBanner.setAttribute('aria-live', 'polite')
+  const slide = element('div', 'race-slide-cue')
+  slide.dataset.raceDrift = ''
+  slide.setAttribute('aria-hidden', 'true')
   const countdown = element('div', 'race-countdown')
   countdown.dataset.raceCountdown = ''
   countdown.setAttribute('aria-live', 'polite')
@@ -74,7 +78,7 @@ export function createRaceHud(
   const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
   steeringHint.setAttribute('aria-hidden', 'true')
   controlsBar.append(steering, steeringHint, pedals)
-  screen.append(hud, damage, raceBanner, countdown, controlsBar)
+  screen.append(hud, damage, raceBanner, slide, countdown, controlsBar)
 
   const updateControls = (): void => {
     const input = controls.snapshot()
@@ -101,6 +105,10 @@ export function createRaceHud(
     updateControls()
     recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused
     const telemetry = snapshot.telemetry
+    const player = snapshot.state?.vehicles.find((car) => car.player)
+    const cue = driftCue(player, telemetry.phase, snapshot.state?.paused ?? false)
+    slide.textContent = cue ?? ''
+    slide.classList.toggle('visible', cue !== null)
     if (telemetry.phase === 'running') {
       if (lastPosition !== null && telemetry.position < lastPosition) {
         raceBanner.textContent = 'OVERTAKE!'

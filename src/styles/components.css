@@ -127,6 +127,24 @@
 }
 .race-event-banner.visible { opacity: 1; }
 
+/* Separate from race milestone announcements so a slide never hides a pass. */
+.race-slide-cue {
+  position: absolute;
+  top: 9.2rem;
+  left: 50%;
+  translate: -50%;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  color: #ffb85e;
+  font-size: .83rem;
+  letter-spacing: .14em;
+  font-weight: 950;
+  text-shadow: 0 2px 10px #000d;
+  transition: opacity 120ms ease;
+}
+.race-slide-cue.visible { opacity: 1; }
+
 /* Two-finger gestures replace the manual pan tool on touch screens. */
 @media (pointer: coarse) {
   .desktop-pan-tool { display: none; }
