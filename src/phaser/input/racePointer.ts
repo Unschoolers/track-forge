@@ -33,16 +33,8 @@ export function bindRacePointer(
   const unsubscribeReset = controls.onReset(cancel)
   const onDown = (event: PointerEvent): void => {
     if (anchors.has(event.pointerId)) return
-    // Touch steering begins anywhere on the left side of the playfield.
-    // Leave the right side available for braking and other actions.
-    if (
-      role === 'steering' &&
-      target.tagName === 'CANVAS' &&
-      event.pointerType === 'touch'
-    ) {
-      const bounds = target.getBoundingClientRect()
-      if (event.clientX > bounds.left + bounds.width * 0.58) return
-    }
+    // HUD buttons are separate DOM targets. Accept the whole exposed canvas:
+    // a thumb can regrab on either side while another finger holds Brake.
     event.preventDefault()
     anchors.set(event.pointerId, event.clientX)
     // Capture can fail when a pointer has already gone away. Window listeners

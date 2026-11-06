@@ -60,6 +60,13 @@ describe('vehicle vertical dynamics', () => {
     expect(result.contactLoad).toBe(0)
   })
 
+  it('keeps curved ramp crests grounded when takeoff is disallowed', () => {
+    const result = stepVehicleVerticalDynamics(groundedAt(9.8),
+      { ...environment({ longitudinalSpeed: 250 }), allowTakeoff: false }, 1 / 60)
+    expect(result.grounded).toBe(true)
+    expect(result.z).toBe(10)
+  })
+
   it('applies gravity throughout an airborne arc', () => {
     const result = stepVehicleVerticalDynamics(
       {
@@ -105,6 +112,20 @@ describe('vehicle vertical dynamics', () => {
     expect(result.verticalVelocity).toBe(0)
     expect(result.landingIntensity).toBeGreaterThan(0)
     expect(result.contactLoad).toBeGreaterThan(1)
+  })
+
+  it('catches an ascending car when its continuing ramp rises into its flight', () => {
+    const result = stepVehicleVerticalDynamics(
+      { ...groundedAt(14), grounded: false, verticalVelocity: 10 },
+      environment({
+        previousSurfaceHeight: 14, surfaceHeight: 16,
+        previousGrade: 0.38, grade: 0.35, longitudinalSpeed: 200,
+      }),
+      1 / 60,
+    )
+    expect(result.z).toBe(16)
+    expect(result.grounded).toBe(true)
+    expect(result.contactLoad).toBeGreaterThan(0)
   })
 
   it('preserves deck height and becomes airborne after losing lateral support', () => {

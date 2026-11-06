@@ -15,18 +15,32 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 #ui-root { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 #ui-root button, #ui-root [role='button'], #ui-root .steering-pad { pointer-events: auto; }
 .screen { position: absolute; inset: 0; }
-.editor-screen { --editor-control-size: 44px; --editor-context-dock-gap: .4rem; --editor-context-dock-reserved-height: calc(88px + var(--editor-context-dock-gap) + 2px); --editor-context-dock-inset: max(.75rem, env(safe-area-inset-bottom)); --editor-context-dock-clearance: calc(var(--editor-context-dock-reserved-height) + var(--editor-context-dock-inset)); --editor-track-actions-bottom: calc(var(--editor-context-dock-clearance) + var(--editor-context-dock-gap)); --editor-track-actions-clearance: calc(var(--editor-track-actions-bottom) + var(--editor-control-size) + var(--editor-context-dock-gap)); --editor-selection-panels-bottom: calc(var(--editor-track-actions-clearance) + var(--editor-context-dock-gap)); --editor-diagnostic-top: 7.2rem; }
+.editor-screen {
+  --editor-control-size: 44px;
+  --editor-context-dock-gap: .4rem;
+  /* The ordinary dock has one row. Reserve two rows only for terrain brushes. */
+  --editor-context-dock-reserved-height: calc(var(--editor-control-size) + .7rem + 2px);
+  --editor-context-dock-inset: max(.75rem, env(safe-area-inset-bottom));
+  --editor-context-dock-clearance: calc(var(--editor-context-dock-reserved-height) + var(--editor-context-dock-inset));
+  --editor-track-actions-bottom: calc(var(--editor-context-dock-clearance) + var(--editor-context-dock-gap));
+  --editor-track-actions-clearance: calc(var(--editor-track-actions-bottom) + var(--editor-control-size) + var(--editor-context-dock-gap));
+  --editor-selection-panels-bottom: calc(var(--editor-track-actions-clearance) + var(--editor-context-dock-gap));
+  --editor-diagnostic-top: calc(7.2rem + env(safe-area-inset-top));
+}
+.editor-screen[data-editor-tool='terrain'] {
+  --editor-context-dock-reserved-height: calc(var(--editor-control-size) + var(--editor-control-size) + var(--editor-context-dock-gap) + .7rem + 2px);
+}
 .home-screen { display: grid; place-items: center; padding: 1rem; }
 .home-card { width: min(30rem, 100%); padding: clamp(1.4rem, 5vw, 2.5rem); border: 1px solid var(--color-line); border-radius: var(--radius-lg); background: rgb(20 26 36 / 92%); box-shadow: var(--shadow-deep); backdrop-filter: blur(1rem); }
 .topbar, .race-hud { position: absolute; inset: env(safe-area-inset-top) 0 auto; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem; padding: .75rem; }
 .topbar-title { text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tool-rail { position: absolute; top: 5rem; left: .75rem; display: grid; gap: .4rem; }
-.history-actions { position: absolute; top: 5rem; right: .75rem; display: grid; gap: .4rem; }
-.status-pill { position: absolute; top: 4.7rem; left: 50%; translate: -50%; padding: .5rem .8rem; border-radius: 999px; background: rgb(8 11 16 / 72%); color: var(--color-muted); }
-.editor-context-dock { position: absolute; z-index: 7; right: .75rem; bottom: var(--editor-context-dock-inset); left: .75rem; display: grid; grid-template-rows: repeat(2, minmax(var(--editor-control-size), auto)); block-size: var(--editor-context-dock-reserved-height); gap: var(--editor-context-dock-gap); padding-block: 0; padding-inline: .35rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-panel); box-shadow: var(--shadow-deep); }
+.tool-rail { position: absolute; top: calc(5rem + env(safe-area-inset-top)); left: max(.75rem, env(safe-area-inset-left)); display: grid; gap: .4rem; }
+.history-actions { position: absolute; top: calc(5rem + env(safe-area-inset-top)); right: max(.75rem, env(safe-area-inset-right)); display: grid; gap: .4rem; }
+.status-pill { position: absolute; top: calc(4.7rem + env(safe-area-inset-top)); left: 50%; translate: -50%; padding: .5rem .8rem; border-radius: 999px; background: rgb(8 11 16 / 72%); color: var(--color-muted); }
+.editor-context-dock { position: absolute; z-index: 7; right: max(.75rem, env(safe-area-inset-right)); bottom: var(--editor-context-dock-inset); left: max(.75rem, env(safe-area-inset-left)); display: grid; grid-auto-rows: minmax(var(--editor-control-size), auto); min-block-size: var(--editor-context-dock-reserved-height); gap: var(--editor-context-dock-gap); padding: .35rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-panel); box-shadow: var(--shadow-deep); }
 .editor-context-row { display: grid; min-width: 0; }
 .editor-context-row .editor-segmented-buttons { width: min(34rem, 100%); justify-self: center; }
-.editor-actions { position: absolute; right: .75rem; bottom: var(--editor-track-actions-bottom); display: flex; gap: .4rem; }
+.editor-actions { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: var(--editor-track-actions-bottom); display: flex; gap: .4rem; }
 .race-controls { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: max(.75rem, env(safe-area-inset-bottom)); left: max(.75rem, env(safe-area-inset-left)); display: flex; gap: .5rem; }
 .race-hud { grid-template-columns: 1fr auto 1fr; }
 .race-controls { justify-content: space-between; align-items: end; }
@@ -45,15 +59,23 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   .race-setup-modal .setup-section:first-child { grid-row: span 2; }
 }
 @media (max-width: 759px), (max-height: 700px) {
-  .tool-rail { grid-template-columns: repeat(2, auto); }
+  .tool-rail, .history-actions { grid-template-columns: repeat(2, var(--editor-control-size)); }
 }
 @media (max-height: 700px) {
   .diagnostic-panel { max-block-size: calc(100svh - var(--editor-diagnostic-top) - var(--editor-track-actions-clearance)); overflow: auto; }
+  .tool-rail, .history-actions { top: calc(4.25rem + env(safe-area-inset-top)); grid-template-columns: repeat(3, var(--editor-control-size)); }
 }
 @media (max-width: 520px) {
   .editor-screen { --editor-context-dock-inset: max(.5rem, env(safe-area-inset-bottom)); }
-  .editor-context-dock { right: .5rem; left: .5rem; }
+  .editor-context-dock { right: max(.5rem, env(safe-area-inset-right)); left: max(.5rem, env(safe-area-inset-left)); }
+  .tool-rail { left: max(.5rem, env(safe-area-inset-left)); }
+  .history-actions { right: max(.5rem, env(safe-area-inset-right)); }
+  .status-pill { top: calc(5rem + env(safe-area-inset-top) + 220px + 2.1rem); max-width: calc(100% - 2rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .68rem; padding: .35rem .55rem; }
   .editor-actions { right: auto; left: 50%; translate: -50% 0; }
   .crossing-control, .point-control, .start-control { min-width: min(20rem, calc(100vw - 2rem)); }
   .diagnostic-panel { right: 4.2rem; left: 7rem; width: auto; max-block-size: calc(100svh - var(--editor-diagnostic-top) - var(--editor-track-actions-clearance)); overflow: auto; translate: none; }
+}
+
+@media (max-width: 520px) and (max-height: 700px) {
+  .status-pill { top: calc(4.25rem + env(safe-area-inset-top) + 132px + 1.3rem); }
 }

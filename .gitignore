@@ -4,4 +4,8 @@ coverage/
 .superpowers/
 *.log
 .DS_Store
+*.keystore
+*.jks
+*.p12
+*.pfx
 qa/results/

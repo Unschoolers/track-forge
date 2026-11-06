@@ -38,6 +38,7 @@ export function createEditorChrome(
 ): HTMLElement {
   const screen = element('section', 'screen editor-screen')
   screen.dataset.screen = 'editor'
+  screen.dataset.editorTool = state.editorUi.tool
   screen.append(
     createEditorTopbar(state, actions),
     createEditorToolPalette(state, actions),

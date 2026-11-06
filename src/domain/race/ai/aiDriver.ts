@@ -108,6 +108,7 @@ export function stepAiVehicle(
   deltaSeconds: number,
   random: RandomSource = { next: () => 0.5 },
   reversed = false,
+  speedLimit = Number.POSITIVE_INFINITY,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   const tuning = DIFFICULTY_SPECS[difficulty]
@@ -180,6 +181,8 @@ export function stepAiVehicle(
     },
     context,
     deltaSeconds,
+    'simulation',
+    speedLimit,
   )
   return { ...stepped, ai }
 }

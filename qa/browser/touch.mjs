@@ -1,4 +1,6 @@
 /** Inject genuine Chromium touch contacts, including concurrent fingers. */
+// In Chromium's default CDP path, nonempty touchEnd lists contacts to release.
+// [] ends the full sequence. Subsequent starts/moves need only changed contacts.
 export async function touch(session, type, points = []) {
   await session.send('Input.dispatchTouchEvent', {
     type,

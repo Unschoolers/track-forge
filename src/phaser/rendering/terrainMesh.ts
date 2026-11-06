@@ -109,6 +109,12 @@ export interface TerrainPresentationStats {
   readonly weight: number
 }
 
+/**
+ * Rendering-only LOD. Terrain physics and authored cells never change.
+ * The overview mesh tiles each 32-unit cell once instead of four times.
+ */
+export type TerrainPresentationDetail = 'full' | 'overview'
+
 export interface TerrainPresentation {
   readonly primitives: readonly TerrainPrimitive[]
   readonly stats: TerrainPresentationStats
@@ -125,10 +131,14 @@ export class TerrainPresentationBudgetError extends Error {
   }
 }
 
-const terrainPresentationCache = new WeightedIdentityCache<
-  TerrainSurface,
-  TerrainPresentation
->(TERRAIN_PRESENTATION_LIMITS.maximumWeight * 2)
+const terrainPresentationCaches = {
+  full: new WeightedIdentityCache<TerrainSurface, TerrainPresentation>(
+    TERRAIN_PRESENTATION_LIMITS.maximumWeight * 2,
+  ),
+  overview: new WeightedIdentityCache<TerrainSurface, TerrainPresentation>(
+    TERRAIN_PRESENTATION_LIMITS.maximumWeight,
+  ),
+} as const
 
 function componentBounds(component: TerrainComponent): {
   readonly left: number
@@ -181,13 +191,16 @@ function waterTexture(
 function terrainHeightMesh(
   component: TerrainComponent,
   surface: TerrainSurface,
+  detail: TerrainPresentationDetail,
 ): {
   readonly slopes: readonly HillSlopeFacet[]
   readonly plateau: readonly TerrainTriangle[]
 } {
   const triangles = tileTerrainComponent(
     component,
-    WORLD_ELEVATION.cellSize / 2,
+    detail === 'overview'
+      ? WORLD_ELEVATION.cellSize
+      : WORLD_ELEVATION.cellSize / 2,
   )
   const slopes: HillSlopeFacet[] = []
   const plateau: TerrainTriangle[] = []
@@ -258,6 +271,7 @@ function weightedChunks<T>(
 
 function buildUncachedPresentation(
   surface: TerrainSurface,
+  detail: TerrainPresentationDetail,
 ): TerrainPresentation {
   const waterTriangles: TerrainTriangle[] = []
   const waterTextureLines: TerrainTextureLine[] = []
@@ -282,7 +296,7 @@ function buildUncachedPresentation(
     for (const triangle of triangulateTerrainComponent(projected)) {
       shadowTriangles.push(triangle)
     }
-    const mesh = terrainHeightMesh(component, surface)
+    const mesh = terrainHeightMesh(component, surface, detail)
     for (const facet of mesh.slopes) slopeFacets.push(facet)
     for (const triangle of mesh.plateau) {
       plateauTriangles.push(triangle)
@@ -420,11 +434,13 @@ function buildUncachedPresentation(
 
 export function compileTerrainPresentation(
   surface: TerrainSurface,
+  detail: TerrainPresentationDetail = 'full',
 ): TerrainPresentation {
-  const cached = terrainPresentationCache.get(surface)
+  const cache = terrainPresentationCaches[detail]
+  const cached = cache.get(surface)
   if (cached) return cached
-  const presentation = buildUncachedPresentation(surface)
-  terrainPresentationCache.set(
+  const presentation = buildUncachedPresentation(surface, detail)
+  cache.set(
     surface,
     presentation,
     Math.max(1, presentation.stats.weight),
@@ -434,6 +450,7 @@ export function compileTerrainPresentation(
 
 export function buildTerrainPresentation(
   surface: TerrainSurface,
+  detail: TerrainPresentationDetail = 'full',
 ): readonly TerrainPrimitive[] {
-  return compileTerrainPresentation(surface).primitives
+  return compileTerrainPresentation(surface, detail).primitives
 }

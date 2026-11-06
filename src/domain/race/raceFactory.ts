@@ -184,8 +184,6 @@ export function createRace(options: CreateRaceOptions): RaceState {
     countdown: 3.7,
     paused: false,
     activeContacts: [],
-    boostCharge: 0,
-    boostRemaining: 0,
     cameraHints: {
       target: {
         x: vehicles[0]?.x ?? 0,

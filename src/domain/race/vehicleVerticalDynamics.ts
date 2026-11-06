@@ -7,6 +7,7 @@ export interface VehicleVerticalState {
 }
 
 export interface VehicleVerticalEnvironment {
+  readonly allowTakeoff?: boolean
   readonly previousSurfaceHeight: number
   readonly surfaceHeight: number
   readonly previousGrade: number
@@ -67,7 +68,14 @@ export function stepVehicleVerticalDynamics(
       z +
       verticalVelocity * dt -
       0.5 * VERTICAL_DYNAMICS.gravity * dt * dt
-    if (nextVerticalVelocity <= 0 && nextZ <= surfaceHeight) {
+    // A car may still be ascending when a rising ramp intercepts its flight.
+    // Resolve that swept contact instead of letting it pass through the deck.
+    const risingRoadContact =
+      environment.previousOverRoad &&
+      environment.overRoad &&
+      surfaceHeight > previousSurfaceHeight + SUPPORT_HEIGHT_EPSILON &&
+      z >= previousSurfaceHeight - SUPPORT_HEIGHT_EPSILON
+    if ((nextVerticalVelocity <= 0 || risingRoadContact) && nextZ <= surfaceHeight) {
       const impact = clamp(
         -nextVerticalVelocity * VERTICAL_DYNAMICS.landingVelocityScale,
         0,
@@ -129,6 +137,7 @@ export function stepVehicleVerticalDynamics(
     carriedVelocity * crestStrength,
   )
   if (
+    environment.allowTakeoff !== false &&
     environment.overRoad &&
     launchVelocity >= VERTICAL_DYNAMICS.takeoffVelocityThreshold
   ) {

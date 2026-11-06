@@ -4,6 +4,8 @@ import type { CarId, Vector2 } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import { projectSunShadow } from '@/phaser/rendering/lighting'
+import type { RoadPath } from '@/domain/track/pathBuilder'
+import { getVehicleStepContext } from '@/domain/race/trackContext'
 
 export interface VehicleGeometry {
   readonly id: CarId
@@ -115,6 +117,16 @@ const GEOMETRIES: Record<CarId, VehicleGeometry> = {
 
 export function getVehicleGeometry(car: CarId): VehicleGeometry {
   return GEOMETRIES[car]
+}
+
+/** Supported ramps share the deck's draw layer even near ground level. */
+export function isVehicleAboveStructures(vehicle: RaceVehicle, path: RoadPath): boolean {
+  const context = getVehicleStepContext(path, vehicle)
+  if (context.onRoad && context.structureRunId !== null) return true
+  // Preserve elevated/airborne rendering without lifting underpass traffic
+  // just because an overhead road has been authored at the same position.
+  return vehicle.z - path.terrainSurface.heightAt(vehicle) >=
+    WORLD_ELEVATION.levelHeight * 0.45
 }
 
 function transform(point: Vector2, pose: Vector2 & { readonly angle: number }): Vector2 {

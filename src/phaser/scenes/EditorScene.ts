@@ -30,6 +30,8 @@ import {
   renderTerrainImpactPreview,
   renderTerrainPreview,
 } from '@/phaser/rendering/terrainRenderer'
+import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
+import type { TerrainPresentationDetail } from '@/phaser/rendering/terrainMesh'
 import {
   buildLampPosts,
   renderLampPosts,
@@ -82,6 +84,7 @@ export class EditorScene extends Phaser.Scene {
   private previewRenderPending = false
   private compiledTerrainPreviewRevision: number | undefined
   private terrainPreviewImpacts: readonly TerrainPreviewImpact[] = []
+  private renderedTerrainDetail: TerrainPresentationDetail | undefined
   private unsubscribe: Unsubscribe | undefined
 
   constructor(
@@ -153,6 +156,7 @@ export class EditorScene extends Phaser.Scene {
       viewport: () => this.viewport(),
       onCameraChanged: () => {
         this.applyCamera()
+        this.refreshTerrainForCamera()
         this.renderGridPresentation()
       },
       onCrossingSelected: (key) =>
@@ -263,13 +267,13 @@ export class EditorScene extends Phaser.Scene {
     }
     const renderState = this.editorRenderState(snapshot)
     this.currentRenderState = renderState
-    this.renderChanges(
-      editorSnapshotRenderChanges(
-        previousRenderState,
-        renderState,
-        cameraChanged,
-      ),
+    const changes = editorSnapshotRenderChanges(
+      previousRenderState,
+      renderState,
+      cameraChanged,
     )
+    this.renderChanges(changes)
+    if (cameraChanged && !changes.world) this.refreshTerrainForCamera()
   }
 
   private renderChanges(changes: EditorRenderChanges): void {
@@ -313,11 +317,14 @@ export class EditorScene extends Phaser.Scene {
     this.structureDeckGraphics.clear()
     this.structureWallGraphics.clear()
     this.lampGraphics.clear()
+    const detail = this.terrainDetail(geometry)
     renderTerrain(
       this.terrainGraphics,
       geometry.path.terrainSurface,
       night,
+      detail,
     )
+    this.renderedTerrainDetail = detail
     renderTrees(
       this.sceneryGraphics,
       snapshot.editor.trees,
@@ -351,6 +358,30 @@ export class EditorScene extends Phaser.Scene {
       buildLampPosts(geometry),
       night,
     )
+  }
+
+  private terrainDetail(geometry: TrackGeometry): TerrainPresentationDetail {
+    return terrainDetailForView(
+      geometry.path.terrainSurface.authoredCellCount,
+      this.editorCamera.zoom,
+    )
+  }
+
+  /** Zooming only rebuilds terrain when crossing a detail threshold.
+   * Road, bridges, and authored geometry stay exactly as they were. */
+  private refreshTerrainForCamera(): void {
+    if (!this.terrainGraphics || !this.currentSnapshot) return
+    const geometry = this.trackGeometry()
+    const detail = this.terrainDetail(geometry)
+    if (detail === this.renderedTerrainDetail) return
+    this.terrainGraphics.clear()
+    renderTerrain(
+      this.terrainGraphics,
+      geometry.path.terrainSurface,
+      this.currentSnapshot.preferences.lighting === 'night',
+      detail,
+    )
+    this.renderedTerrainDetail = detail
   }
 
   private renderGridPresentation(): void {
@@ -507,5 +538,6 @@ export class EditorScene extends Phaser.Scene {
     this.previewRenderPending = false
     this.compiledTerrainPreviewRevision = undefined
     this.terrainPreviewImpacts = []
+    this.renderedTerrainDetail = undefined
   }
 }

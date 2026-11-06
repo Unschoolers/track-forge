@@ -73,26 +73,47 @@ npm run android:apk
 ```
 
 The APK is `android/app/build/outputs/apk/debug/app-debug.apk`. The local default
-version code is 3; set `TRACKFORGE_VERSION_CODE` to a higher integer when needed.
+version code is 3 and its version name is `2.0.0-local`. To update an installed
+CI build locally, supply its same signing key and set `TRACKFORGE_VERSION_CODE`
+above the installed version. `TRACKFORGE_VERSION_NAME` sets the visible version.
 The build uses Android's default debug keystore unless `TRACKFORGE_DEBUG_KEYSTORE`
 points to a keystore with alias `androiddebugkey` and store/key passwords
 `android`. Use the original signing key to update an existing installation.
 Never commit or share private keys.
 
-The Android workflow runs on pushes to any branch, pull requests, and manual dispatch.
-After verification it publishes a signed debug APK for 30 days, linked from the
-workflow run summary. Successful main-branch pushes and manual main builds also
-publish the APK itself as a versioned [GitHub Release](https://github.com/Unschoolers/track-forge/releases)
+The Android workflow compiles and verifies unsigned APKs on pushes to any branch,
+pull requests, and manual dispatch. These artifacts are for QA, not installation.
+Successful main-branch pushes and manual main builds sign and publish the APK
+itself as a versioned [GitHub Release](https://github.com/Unschoolers/track-forge/releases)
 asset. [Download the latest APK directly](https://github.com/Unschoolers/track-forge/releases/latest/download/trackforge-debug.apk).
 Release downloads require no Actions ZIP and have no 30-day artifact expiry.
-Re-running a build creates a separate release attempt; older builds cannot replace
-a newer build as the latest download. PR and other branch builds retain their
-Actions artifacts without publishing a release.
+Re-running compilation creates a new version. Re-running only signing/publication
+reuses the original verified build identity and is idempotent; it does not label
+an old APK as a newer attempt. Older builds cannot replace a newer build as the
+latest download. PR builds never receive the permanent signing key.
 
-CI uses a version code of the run number plus 2. Configure
-the optional repository secret `TRACKFORGE_DEBUG_KEYSTORE_BASE64` with the
-base64-encoded original debug keystore to preserve its signing identity. Without
-that secret, CI caches a generated debug keystore: its first certificate will
-normally differ from existing installations, and cache loss or separate cache
-scopes can change it again. Such builds cannot update an app signed with another
-key. The downloadable file remains a signed debug APK for testing.
+Create the GitHub environment `android-signing`, restrict its deployment branches
+to **main only**, and then add environment secret `TRACKFORGE_DEBUG_KEYSTORE_BASE64`,
+containing the base64-encoded **original** `trackforge_debug_signing.keystore`.
+Use Settings → Environments → android-signing; do not store this as a repository
+secret, where branch workflows could access it. Do not generate a replacement
+key or put a keystore in git. The certificate fingerprint in
+`android/signing-certificate.sha256` is public and identifies the original key.
+
+The main-only signing job uses an explicit private temporary keystore, verifies
+its certificate, signs the verified unsigned artifact without executing Gradle,
+and checks the final APK's signer, application id, version code and version name
+before publication. Missing or incorrect signing configuration stops publication
+rather than distributing another incompatible APK. The compilation job receives
+no signing key and disables Gradle's automatic debug signer in CI.
+
+Published builds have version name `2.0.RUN.ATTEMPT` and version code
+`1000000 + RUN * 100 + ATTEMPT`. Both new builds and reruns increase the code;
+attempts outside 1–99 and codes over Android's limit fail explicitly. For example,
+build 117.1 is version `2.0.117.1` with code `1011701`.
+
+Earlier cached-key builds were signed with different certificates. A version bump
+cannot make those mutually updateable. Installs signed with the original key can
+update directly; other signing identities may require a one-time reinstall.
+Preserve locally saved tracks before any reinstall. All future published builds
+must retain the pinned original signing identity.
