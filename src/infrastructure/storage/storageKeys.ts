@@ -16,4 +16,5 @@ export const STORAGE_KEYS = {
   haptics: 'trackforge-haptics-enabled',
   dynamicZoom: 'trackforge-dynamic-zoom',
   handling: 'trackforge-handling-mode',
+  raceLaps: 'trackforge-race-laps',
 } as const
