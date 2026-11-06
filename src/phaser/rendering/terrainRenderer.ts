@@ -5,6 +5,7 @@ import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import type { TerrainPreview } from '@/phaser/input/editorInput'
 import {
   buildTerrainPresentation,
+  type TerrainPresentationDetail,
 } from '@/phaser/rendering/terrainMesh'
 import type {
   TerrainPreviewBounds,
@@ -24,6 +25,7 @@ export {
   TerrainPresentationBudgetError,
   type TerrainPresentation,
   type TerrainPresentationStats,
+  type TerrainPresentationDetail,
   type TerrainPrimitive,
 } from '@/phaser/rendering/terrainMesh'
 
@@ -58,8 +60,9 @@ export function renderTerrain(
   graphics: Phaser.GameObjects.Graphics,
   surface: TerrainSurface,
   night: boolean,
+  detail: TerrainPresentationDetail = 'full',
 ): void {
-  for (const primitive of buildTerrainPresentation(surface)) {
+  for (const primitive of buildTerrainPresentation(surface, detail)) {
     switch (primitive.kind) {
       case 'water':
         graphics.fillStyle(night ? 0x183f52 : 0x287c9c, 1)
@@ -89,14 +92,27 @@ export function renderTerrain(
         }
         break
       case 'hill-slope': {
+        // Adjacent facets do not overlap. Bucket their subtle light gradients
+        // so the renderer emits at most nine fill-state changes per chunk
+        // instead of one state change for every hill triangle.
         const base = night ? 0x1b452a : 0x398858
+        const shadeBuckets: TerrainTriangle[][] = Array.from(
+          { length: 9 },
+          () => [],
+        )
         for (const facet of primitive.facets) {
-          const alpha = 0.82 + facet.shade * 0.1
-          graphics.fillStyle(
-            base,
-            Math.max(0.65, Math.min(0.95, alpha)),
+          const bucket = Math.max(
+            0,
+            Math.min(8, Math.round((facet.shade + 1) * 4)),
           )
-          fillTriangle(graphics, facet.triangle)
+          shadeBuckets[bucket]?.push(facet.triangle)
+        }
+        for (let bucket = 0; bucket < shadeBuckets.length; bucket += 1) {
+          const triangles = shadeBuckets[bucket]
+          if (!triangles || triangles.length === 0) continue
+          const alpha = 0.82 + (bucket / 4 - 1) * 0.1
+          graphics.fillStyle(base, Math.max(0.65, Math.min(0.95, alpha)))
+          for (const triangle of triangles) fillTriangle(graphics, triangle)
         }
         break
       }
@@ -169,7 +185,8 @@ export function renderTerrainImpactPreview(
     fillTriangle(graphics, triangle)
   }
 
-  for (const primitive of buildTerrainPresentation(surface)) {
+  // Impact overlays only need one quad per terrain cell, not four.
+  for (const primitive of buildTerrainPresentation(surface, 'overview')) {
     switch (primitive.kind) {
       case 'water':
         graphics.fillStyle(night ? 0x5ca7c2 : 0x2f9fc6, 0.28)
