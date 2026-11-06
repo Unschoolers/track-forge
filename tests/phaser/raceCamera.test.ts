@@ -5,6 +5,17 @@ import {
 } from '@/phaser/camera/raceCamera'
 
 describe('race camera', () => {
+  it('caps camera rotation on abrupt route-heading discontinuities', () => {
+    const camera = createRaceCamera({ x: 0, y: 0, angle: 0 })
+    const next = advanceRaceCamera(
+      camera,
+      { target: { x: 100, y: 0 }, roadAngle: Math.PI, upcomingCurve: 1, speed: 250, shake: 0 },
+      { dynamicZoom: true, steering: 1 },
+      1 / 60,
+    )
+    expect(Math.abs(next.angle)).toBeLessThanOrEqual(2.3 / 60 + 0.00001)
+  })
+
   it('starts close enough for the player car to remain readable', () => {
     expect(createRaceCamera({ x: 0, y: 0, angle: 0 }).zoom).toBe(1.2)
   })
