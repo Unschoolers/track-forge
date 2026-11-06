@@ -70,8 +70,12 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   .editor-context-dock { right: max(.5rem, env(safe-area-inset-right)); left: max(.5rem, env(safe-area-inset-left)); }
   .tool-rail { left: max(.5rem, env(safe-area-inset-left)); }
   .history-actions { right: max(.5rem, env(safe-area-inset-right)); }
-  .status-pill { max-width: max(4.5rem, calc(100% - 14rem)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .65rem; padding: .35rem .3rem; }
+  .status-pill { top: calc(5rem + env(safe-area-inset-top) + 5 * var(--editor-control-size) + 4 * .4rem + .5rem); max-width: calc(100% - 2rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .68rem; padding: .35rem .55rem; }
   .editor-actions { right: auto; left: 50%; translate: -50% 0; }
   .crossing-control, .point-control, .start-control { min-width: min(20rem, calc(100vw - 2rem)); }
   .diagnostic-panel { right: 4.2rem; left: 7rem; width: auto; max-block-size: calc(100svh - var(--editor-diagnostic-top) - var(--editor-track-actions-clearance)); overflow: auto; translate: none; }
+}
+
+@media (max-width: 520px) and (max-height: 700px) {
+  .status-pill { top: calc(4.25rem + env(safe-area-inset-top) + 3 * var(--editor-control-size) + 2 * .4rem + .5rem); }
 }
