@@ -42,6 +42,7 @@ export interface Preferences {
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean
   readonly handling?: HandlingMode
+  readonly raceLaps?: 1 | 2 | 3
 }
 
 export interface PreferencesStore {
