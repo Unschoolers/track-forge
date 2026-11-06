@@ -29,6 +29,8 @@ export interface LampLight {
 }
 
 const lampCache = new WeakMap<TrackGeometry, readonly LampPost[]>()
+// Lamp geometry does not change during a race; avoid remapping it at 60 FPS.
+const lightCache = new WeakMap<readonly LampPost[], readonly LampLight[]>()
 
 function pointDistance(left: Vector2, right: Vector2): number {
   return Math.hypot(right.x - left.x, right.y - left.y)
@@ -124,13 +126,17 @@ export function buildLampPosts(
 export function buildLampLights(
   posts: readonly LampPost[],
 ): readonly LampLight[] {
-  return posts.map((post) => ({
+  const cached = lightCache.get(posts)
+  if (cached) return cached
+  const lights = posts.map((post) => ({
     center: post.roadAnchor,
     fixture: post.position,
     radius: post.bridge ? 54 : 46,
     intensity: post.bridge ? 0.1 : 0.082,
     bridge: post.bridge,
   }))
+  lightCache.set(posts, lights)
+  return lights
 }
 
 export function renderLampPosts(
