@@ -1,7 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { RaceInputController } from '@/phaser/input/raceInput'
+import { steeringFromDrag } from '@/phaser/input/racePointer'
 
 describe('RaceInputController', () => {
+  it('provides fine center steering while retaining full lock after a 48px drag', () => {
+    expect(steeringFromDrag(0)).toBe(0)
+    expect(steeringFromDrag(3)).toBe(0)
+    expect(steeringFromDrag(24)).toBeGreaterThan(0.25)
+    expect(steeringFromDrag(24)).toBeLessThan(0.4)
+    expect(steeringFromDrag(-24)).toBeCloseTo(-steeringFromDrag(24))
+    expect(steeringFromDrag(48)).toBe(1)
+    expect(steeringFromDrag(-200)).toBe(-1)
+    expect(steeringFromDrag(Number.NaN)).toBe(0)
+  })
+
+  it('restores a still-held direction after releasing the opposite key', () => {
+    const input = new RaceInputController()
+    input.setKeyboard('a', true)
+    input.setKeyboard('d', true)
+    expect(input.snapshot().steering).toBe(1)
+    input.setKeyboard('d', false)
+    expect(input.snapshot().steering).toBe(-1)
+    input.setKeyboard('a', false)
+    expect(input.snapshot().steering).toBe(0)
+  })
+
   it('maps keyboard controls to the same normalized driver input', () => {
     const input = new RaceInputController()
     input.setKeyboard('ArrowLeft', true)
