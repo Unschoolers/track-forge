@@ -16,6 +16,7 @@ import {
   getVehicleStepContext,
   reconcileSupportAfterCollision,
   resetVehicleToTrack,
+  turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { advanceRaceEffects } from '@/domain/race/effects'
@@ -23,7 +24,6 @@ import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
-import { advanceArcadeBoost } from '@/domain/race/arcadeBoost'
 
 export type RaceEvent =
   | {
@@ -53,7 +53,6 @@ export type RaceEvent =
       readonly time: number
     }
   | { readonly type: 'vehicle-wrecked'; readonly vehicleId: string }
-  | { readonly type: 'boost-activated' }
   | {
       readonly type: 'race-finished'
       readonly reason: RaceOutcome
@@ -71,6 +70,20 @@ export type RaceStep = (
   random: RandomSource,
 ) => RaceStepResult
 
+function rampSpeedLimit(race: RaceState, vehicle: RaceVehicle): number {
+  // Look ahead far enough to brake before either end of a ramp, in either direction.
+  const lookAhead = Math.min(40, Math.max(12, Math.ceil(vehicle.speed / 6)))
+  const startIndex = getVehicleStepContext(race.path, vehicle).nearest.index
+  for (let offset = 0; offset <= lookAhead; offset++) {
+    const index = startIndex + offset * (race.reversed ? -1 : 1)
+    if (!race.path.closed && (index < 0 || index >= race.path.points.length)) continue
+    if (Math.abs(race.path.roadSurface.gradeAt(index)) > 0.025) {
+      return 110
+    }
+  }
+  return Number.POSITIVE_INFINITY
+}
+
 function advanceVehicle(
   vehicle: RaceVehicle,
   race: RaceState,
@@ -79,6 +92,7 @@ function advanceVehicle(
   random: RandomSource,
 ): RaceVehicle {
   const previousContext = getVehicleStepContext(race.path, vehicle)
+  const speedLimit = rampSpeedLimit(race, vehicle)
   let moved: RaceVehicle
   if (vehicle.player) {
     moved = stepVehicle(
@@ -87,6 +101,7 @@ function advanceVehicle(
       previousContext,
       deltaSeconds,
       race.handling ?? 'simulation',
+      speedLimit,
     )
   } else {
     moved = stepAiVehicle(
@@ -97,6 +112,7 @@ function advanceVehicle(
       deltaSeconds,
       random,
       race.reversed,
+      speedLimit,
     )
   }
   const nextContext = getVehicleStepContext(race.path, moved, previousContext)
@@ -112,6 +128,9 @@ function advanceVehicle(
       previousGrade: gradeForTravel(previousContext.grade, race.reversed),
       grade: gradeForTravel(nextContext.grade, race.reversed),
       longitudinalSpeed,
+      allowTakeoff: [0, 6, 12, 18].every((offset) =>
+        Math.abs(turnAmountAt(race.path, nextContext.nearest.index + offset * (race.reversed ? -1 : 1), 6)) < 0.08,
+      ),
       previousOverRoad: previousContext.onRoad,
       overRoad: nextContext.onRoad,
     },
@@ -133,17 +152,12 @@ export const stepRace: RaceStep = (
   const elapsed = state.elapsed + dt
   const events: RaceEvent[] = []
   const arcade = !('handling' in state) || state.handling !== 'simulation'
-  const boosting = arcade && (state.boostRemaining ?? 0) > 0
-  const moved = state.vehicles.map((vehicle) => {
-    const advanced = advanceVehicle(vehicle, state, input, dt, random)
-    // Braking must retain full authority, even during an earned boost.
-    if (!vehicle.player || !boosting || input.braking || !advanced.grounded || advanced.wrecked) return advanced
-    const push = 180 * dt
-    const vx = advanced.vx + Math.cos(advanced.angle) * push
-    const vy = advanced.vy + Math.sin(advanced.angle) * push
-    return { ...advanced, vx, vy, speed: Math.hypot(vx, vy) }
-  })
-  const barrierFrame = solveBridgeBarrierFrame(
+  const moved = state.vehicles.map((vehicle) =>
+    advanceVehicle(vehicle, state, input, dt, random),
+  )
+  const barrierFrame = arcade
+    ? { vehicles: moved, activeContacts: [], events: [] }
+    : solveBridgeBarrierFrame(
     state.vehicles,
     moved,
     state.path,
@@ -217,7 +231,9 @@ export const stepRace: RaceStep = (
     }
     return updated
   })
-  const collisionFrame = solveCollisionFrame(
+  const collisionFrame = arcade
+    ? { vehicles: progressed, activeContacts: [], events: [] }
+    : solveCollisionFrame(
     progressed,
     state.activeContacts,
     dt,
@@ -288,18 +304,6 @@ export const stepRace: RaceStep = (
       (player?.landingIntensity ?? 0) * 4.5,
     ),
   )
-  const boost = advanceArcadeBoost(
-    { charge: state.boostCharge ?? 0, remaining: state.boostRemaining ?? 0 },
-    {
-      speed: player?.speed ?? 0,
-      slip: player?.slip ?? 0,
-      steering: input.steering,
-      grounded: player?.grounded ?? false,
-    },
-    dt,
-    arcade && !player?.wrecked && !playerWaterContact,
-  )
-  if (boost.activated) events.push({ type: 'boost-activated' })
   const terminalReason =
     playerWaterContact
       ? 'water'
@@ -316,8 +320,6 @@ export const stepRace: RaceStep = (
       ...state,
       vehicles,
       elapsed,
-      boostCharge: boost.charge,
-      boostRemaining: boost.remaining,
       phase: terminalReason ? 'finished' : 'running',
       activeContacts: [
         ...collisionFrame.activeContacts,

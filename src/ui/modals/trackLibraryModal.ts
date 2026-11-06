@@ -7,6 +7,7 @@ import { formatRaceTime } from '@/ui/format'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
 export interface TrackLibraryActions {
+  readonly export: (track: Track) => void
   readonly close: () => void
   readonly create: () => void
   readonly selectForEdit: (id: TrackId) => void
@@ -65,7 +66,7 @@ export function createTrackLibraryModal(
       select.disabled = true
       select.setAttribute('aria-disabled', 'true')
     }
-    controls.append(select)
+    controls.append(select, button('EXPORT', `export-${track.id}`, () => actions.export(track), 'track-mini-button'))
     if (!race) {
       controls.append(
         button(

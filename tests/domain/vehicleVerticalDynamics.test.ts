@@ -60,6 +60,13 @@ describe('vehicle vertical dynamics', () => {
     expect(result.contactLoad).toBe(0)
   })
 
+  it('keeps curved ramp crests grounded when takeoff is disallowed', () => {
+    const result = stepVehicleVerticalDynamics(groundedAt(9.8),
+      { ...environment({ longitudinalSpeed: 250 }), allowTakeoff: false }, 1 / 60)
+    expect(result.grounded).toBe(true)
+    expect(result.z).toBe(10)
+  })
+
   it('applies gravity throughout an airborne arc', () => {
     const result = stepVehicleVerticalDynamics(
       {

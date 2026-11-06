@@ -3,6 +3,7 @@ import { createModalFrame } from '@/ui/modals/modalFrame'
 
 export function createEditorMenuModal(actions: {
   readonly close: () => void
+  readonly export: () => void
   readonly save: () => void
   readonly rename: () => void
   readonly choose: () => void
@@ -22,6 +23,7 @@ export function createEditorMenuModal(actions: {
       actions.save,
       'button button-primary',
     ),
+    button('EXPORT TRACK', 'menu-export', actions.export, 'button'),
     button('RENAME TRACK', 'menu-rename', actions.rename, 'button'),
     button('CHOOSE ANOTHER TRACK', 'menu-choose', actions.choose, 'button'),
     button('OPTIONS', 'editor-options', actions.options, 'button'),
