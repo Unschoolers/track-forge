@@ -283,6 +283,18 @@ describe('score and preference repositories', () => {
     ])
   })
 
+  it('supports quick one-lap sprints without changing classic-race defaults', () => {
+    const storage = new MemoryStore()
+    const preferences = new BrowserPreferencesRepository(storage)
+    expect(preferences.load().raceLaps).toBe(2)
+    expect(preferences.save({ ...preferences.load(), raceLaps: 1 })).toBe(true)
+    expect(preferences.load().raceLaps).toBe(1)
+    storage.values.set('trackforge-race-laps', '999')
+    expect(preferences.load().raceLaps).toBe(2)
+    expect(preferences.save({ ...preferences.load(), raceLaps: 3 })).toBe(true)
+    expect(preferences.load().raceLaps).toBe(3)
+  })
+
   it('defaults upgraded installations to Arcade and persists Simulation explicitly', () => {
     const storage = new MemoryStore()
     const preferences = new BrowserPreferencesRepository(storage)

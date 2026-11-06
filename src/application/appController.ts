@@ -399,7 +399,7 @@ export class AppController {
       this.dependencies.raceSession.start(track, {
         car: this.state.preferences.car,
         difficulty: this.state.preferences.difficulty,
-        laps: 2,
+        laps: this.state.preferences.raceLaps ?? 2,
         handling: this.state.preferences.handling ?? 'arcade',
       })
     }
