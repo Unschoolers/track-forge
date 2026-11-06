@@ -13,6 +13,53 @@ const path = buildRoadPath([
 const input={steering:0,throttle:1,braking:false}
 const random={next:()=>0.5}
 function required<T>(value: T | undefined): T { if(value===undefined) throw new Error('Missing fixture'); return value }
+it('does not brake downhill even when another climb is inside the lookahead', () => {
+ const road = buildRoadPath([
+  { x: -300, y: 0, surface: 'street' },
+  { x: 0, y: 0, surface: 'street', structure: 'overpass' },
+  { x: 240, y: 0, surface: 'street' },
+  { x: 360, y: 0, surface: 'street', structure: 'overpass' },
+  { x: 600, y: 0, surface: 'street' },
+  { x: 900, y: 0, surface: 'street' },
+ ], EMPTY_TERRAIN)
+ for (const reversed of [false, true]) {
+  const direction = reversed ? -1 : 1
+  const index = road.points.findIndex((_point, index) =>
+   road.roadSurface.gradeAt(index) * direction < -0.025 &&
+   Array.from({ length: 30 }, (_, offset) => road.roadSurface.gradeAt(index + direction * offset) * direction)
+    .some((grade) => grade > 0.025))
+  expect(index).toBeGreaterThan(0)
+  const point = required(road.points[index])
+  const base = createRace({ path: road, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade', reversed })
+  const vehicle = required(base.vehicles[0])
+  const result = stepRace({ ...base, phase: 'running', vehicles: [{
+   ...vehicle, ...point, pathIndex: index, angle: reversed ? Math.PI : 0,
+   vx: direction * 180, vy: 0, speed: 180, z: road.roadSurface.at(index, point).height,
+   grounded: true, structureRunId: road.roadSurface.at(index, point).structureRunId,
+  }] }, input, 1 / 60, random)
+  expect(result.state.vehicles[0]?.braking).toBe(false)
+ }
+})
+it.each(['arcade', 'simulation'] as const)('does not apply uphill ramp braking while descending in %s', (handling) => {
+ for (const reversed of [false, true]) {
+  const direction = reversed ? -1 : 1
+  const index = path.points.findIndex((_point, index) =>
+   path.roadSurface.gradeAt(index) * direction < -0.025)
+  expect(index).toBeGreaterThan(0)
+  const point = required(path.points[index])
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling, reversed })
+  for (const vehicle of base.vehicles) {
+   const state: RaceState = { ...base, phase: 'running', vehicles: [{
+    ...vehicle, ...point, pathIndex: index, angle: reversed ? Math.PI : 0,
+    vx: direction * 180, vy: 0, speed: 180, z: path.roadSurface.at(index, point).height,
+    grounded: true, structureRunId: path.roadSurface.at(index, point).structureRunId,
+   }] }
+   const next = required(stepRace(state, input, 1 / 60, random).state.vehicles[0])
+   expect(next.braking, `${vehicle.id}, reverse=${reversed}`).toBe(false)
+   expect(next.speed).toBeGreaterThan(175)
+  }
+ }
+})
 it('Arcade overlap has no collision impulse, damage, or contacts',()=>{
  const base=createRace({path,playerCar:'blue',difficulty:'normal',laps:2,handling:'arcade'})
  const a={...required(base.vehicles[0]),x:-400,y:0,vx:120,vy:0,speed:120,angle:0,pathIndex:50}

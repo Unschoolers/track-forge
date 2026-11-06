@@ -306,7 +306,10 @@ export class DomUiHost implements UiHost {
             }),
           start: () =>
             this.controller.dispatch({ type: 'start-race' }),
-        })
+        }, state.currentTrack ? this.runtime.raceSession.ghostTime?.(state.currentTrack, {
+          car: state.preferences.car, difficulty: state.preferences.difficulty,
+          laps: state.preferences.raceLaps ?? 2, handling: state.preferences.handling ?? 'arcade',
+        }) ?? null : null)
       case 'options':
         return createOptionsModal(state, {
           close,

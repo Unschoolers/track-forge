@@ -133,6 +133,8 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
               handling: race.handling,
               elapsed: race.elapsed,
               paused: race.paused,
+              vehicleCount: race.vehicles.length,
+              ghostVisible: Boolean(raceSession.snapshot().ghost),
               player: player
                 ? {
                     speed: player.speed,

@@ -33,6 +33,16 @@ class MemoryStore implements KeyValueStore {
   }
 }
 
+it('persists the explicit race mode and rejects unknown stored modes', () => {
+  const memory = new MemoryStore()
+  const preferences = new BrowserPreferencesRepository(memory)
+  expect(preferences.load().raceMode).toBe('normal')
+  preferences.save({ ...preferences.load(), raceMode: 'ghost' })
+  expect(preferences.load().raceMode).toBe('ghost')
+  memory.values.set('trackforge-race-mode', 'invalid')
+  expect(preferences.load().raceMode).toBe('normal')
+})
+
 describe('BrowserTrackRepository', () => {
   it('round-trips normalized tracks and ignores malformed records', () => {
     const storage = new MemoryStore()

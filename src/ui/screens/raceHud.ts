@@ -27,7 +27,8 @@ export function createRaceHud(
   const position = element('div', 'hud-card')
   const positionValue = element('strong', 'hud-value', '1/4')
   positionValue.dataset.racePosition = ''
-  position.append(positionValue, element('span', 'label', 'POSITION'))
+  const positionLabel = element('span', 'label', 'POSITION')
+  position.append(positionValue, positionLabel)
 
   const lap = element('div', 'hud-card align-right')
   const lapValue = element('strong', 'hud-value', '1/3')
@@ -123,7 +124,11 @@ export function createRaceHud(
     raceBanner.classList.toggle('visible', performance.now() < bannerUntil)
     lastPosition = telemetry.position
     lastLap = telemetry.lap
-    positionValue.textContent = `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
+    const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
+    positionValue.textContent = ghostRace
+      ? formatRaceTime(snapshot.ghostTime ?? 0)
+      : `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
+    positionLabel.textContent = ghostRace ? 'GHOST TARGET' : 'POSITION'
     lapValue.textContent = `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
     timeValue.textContent = formatRaceTime(telemetry.elapsed)
     damageText.textContent = `${telemetry.damage}/${telemetry.damageLimit}`

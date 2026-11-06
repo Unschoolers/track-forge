@@ -17,4 +17,5 @@ export const STORAGE_KEYS = {
   dynamicZoom: 'trackforge-dynamic-zoom',
   handling: 'trackforge-handling-mode',
   raceLaps: 'trackforge-race-laps',
+  raceMode: 'trackforge-race-mode',
 } as const

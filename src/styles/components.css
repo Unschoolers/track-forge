@@ -8,7 +8,7 @@
 .home-actions { display: grid; gap: .7rem; }
 .button, .icon-button, .tool-button, .surface-button, .brake-button, .track-mini-button, .car-choice, .setup-choice, .toggle-button, .modal-close { border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-panel-raised); cursor: pointer; font-weight: 850; transition: 120ms ease; }
 .button:hover, .icon-button:hover, .tool-button:hover { filter: brightness(1.16); translate: 0 -1px; }
-.button:disabled, .track-mini-button:disabled { cursor: not-allowed; opacity: .45; translate: none; }
+.button:disabled, .track-mini-button:disabled, .setup-choice:disabled { cursor: not-allowed; opacity: .45; translate: none; filter: grayscale(1); }
 .button { min-height: 3rem; padding: .6rem 1rem; }
 .button-large { min-height: 3.8rem; }
 .button-primary, .accent { background: var(--color-accent); border-color: #ff8e66; color: white; }

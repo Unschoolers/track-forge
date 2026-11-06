@@ -19,6 +19,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   dynamicZoomEnabled: true,
   handling: 'arcade',
   raceLaps: 2,
+  raceMode: 'normal',
 }
 
 function boolean(value: string | null, fallback: boolean): boolean {
@@ -41,6 +42,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
         : DEFAULT_PREFERENCES.difficulty,
       handling: handling === 'simulation' ? 'simulation' : 'arcade',
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
+      raceMode: this.storage.get(STORAGE_KEYS.raceMode) === 'ghost' ? 'ghost' : 'normal',
       lighting: isLightingMode(lighting)
         ? lighting
         : DEFAULT_PREFERENCES.lighting,
@@ -66,6 +68,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       this.storage.set(STORAGE_KEYS.lighting, preferences.lighting),
       this.storage.set(STORAGE_KEYS.handling, preferences.handling === 'simulation' ? 'simulation' : 'arcade'),
       this.storage.set(STORAGE_KEYS.raceLaps, String(preferences.raceLaps === 1 || preferences.raceLaps === 3 ? preferences.raceLaps : 2)),
+      this.storage.set(STORAGE_KEYS.raceMode, preferences.raceMode === 'ghost' ? 'ghost' : 'normal'),
       this.storage.set(
         STORAGE_KEYS.audio,
         preferences.audioEnabled ? '1' : '0',

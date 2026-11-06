@@ -17,6 +17,9 @@ export function createResultsModal(
     ? 'SUNK'
     : result.outcome === 'wrecked'
       ? 'WRECKED'
+      : result.ghostTime !== undefined && result.playerTime !== null
+        ? Math.abs(result.playerTime - result.ghostTime) < 0.0005 ? 'GHOST TIED'
+          : result.playerTime < result.ghostTime ? 'GHOST BEATEN' : 'GHOST WINS'
       : result.newRecord
       ? 'NEW RECORD'
       : `FINISHED ${result.playerPlace}${ordinalSuffix(result.playerPlace)}`
@@ -26,15 +29,26 @@ export function createResultsModal(
       : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
-  const medal = medalForFinish(result.outcome, result.playerPlace)
+  const medal = result.ghostTime === undefined ? medalForFinish(result.outcome, result.playerPlace) : null
   if (medal) {
     frame.body.append(element('p', 'race-finish-medal', `${medal} MEDAL`))
   }
-  frame.body.append(
-    element('h3', 'results-heading', 'STANDINGS'),
-    createStandings(result.standings),
-    createHighScores(result.highScores),
-  )
+  if (result.ghostTime !== undefined) {
+    frame.body.append(element('p', 'modal-subtitle', `Ghost target: ${formatRaceTime(result.ghostTime)}`))
+  } else {
+    frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings))
+  }
+  if (result.ghostSaveFailed) {
+    frame.body.append(element('p', 'modal-subtitle', 'Replay could not be saved on this device.'))
+  }
+  if (result.ghostSaved) {
+    frame.body.append(element('p', 'modal-subtitle ghost-save-status', 'BEST GHOST SAVED'))
+  } else if (result.savedGhostTime !== undefined) {
+    frame.body.append(element('p', 'modal-subtitle', `Best ghost ready: ${formatRaceTime(result.savedGhostTime)}`))
+  } else if (result.ghostSaved === false && !result.ghostSaveFailed) {
+    frame.body.append(element('p', 'modal-subtitle', 'Replay could not be saved on this device.'))
+  }
+  frame.body.append(createHighScores(result.highScores))
   frame.footer.append(
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),

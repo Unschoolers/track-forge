@@ -13,6 +13,8 @@ export interface GhostFrame {
   readonly angle: number
   readonly z: number
   readonly structureRunId: string | null
+  /** This pose starts after a recovery; never interpolate into it. */
+  readonly cut?: boolean
 }
 export interface GhostRun {
   readonly car: CarId
@@ -27,7 +29,7 @@ export interface GhostStore {
   record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[]): boolean
 }
 
-export const MAX_GHOST_FRAMES = 3000 // 5 minutes at 10 Hz
+export const MAX_GHOST_FRAMES = 3000 // Long Arcade runs compact older samples.
 
 /** Track edits and a changed race setup must never reuse a stale ghost. */
 export function ghostRaceKey(track: Track, setup: GhostSetup): string {
@@ -61,6 +63,7 @@ export function ghostPoseAt(run: GhostRun, time: number): GhostPose | null {
   const next = frames[low]
   const previous = frames[Math.max(0, low - 1)]
   if (!next || !previous) return { ...first, car: run.car }
+  if (next.cut && time < next.t) return { ...previous, t: time, car: run.car }
   const fraction = Math.max(0, Math.min(1,
     (time - previous.t) / Math.max(0.000001, next.t - previous.t)))
   const lerp = (a: number, b: number): number => a + (b - a) * fraction
