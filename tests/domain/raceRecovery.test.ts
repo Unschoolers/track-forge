@@ -41,6 +41,16 @@ function stoppedPlayerRace(stuckDuration = 0) {
 }
 
 describe('automatic player recovery', () => {
+  it('reports a short stuck-player reset so replay recording can reject it', () => {
+    const race = stoppedPlayerRace(0.65)
+    const result = stepRace(race,
+      { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
+    expect(result.state.vehicles[0]?.stuckDuration).toBe(0)
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered', vehicleId: race.vehicles[0]?.id,
+    }))
+  })
+
   it('does not move or recover a stopped player holding the brake', () => {
     let race: RaceState = stoppedPlayerRace()
     const initial = required(race.vehicles[0])

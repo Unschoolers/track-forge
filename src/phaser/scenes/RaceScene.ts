@@ -12,6 +12,7 @@ import {
 import {
   renderVehicleShadows,
   renderVehicles,
+  renderGhostVehicle,
   isVehicleAboveStructures,
   transformVehicleLights,
 } from '@/phaser/rendering/vehicleRenderer'
@@ -229,6 +230,15 @@ export class RaceScene extends Phaser.Scene {
       this.upperVehicleGraphics,
       visibleVehicles.filter(({ id }) => upperVehicles.has(id)),
     )
+    const ghost = this.raceSession.snapshot().ghost
+    if (ghost) {
+      const raised = ghost.structureRunId !== null ||
+        ghost.z - race.path.terrainSurface.heightAt(ghost) > 10
+      renderGhostVehicle(
+        raised ? this.upperVehicleGraphics : this.vehicleGraphics,
+        ghost,
+      )
+    }
     this.nightShadeGraphics?.clear()
     this.nightLightGraphics?.clear()
     if (

@@ -27,6 +27,15 @@ import { resetVehicleToTrack } from '@/domain/race/trackContext'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import { CAR_SPECS } from '@/domain/config'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import {
+  captureGhost,
+  ghostPoseAt,
+  MAX_GHOST_FRAMES,
+  type GhostFrame,
+  type GhostPose,
+  type GhostRun,
+  type GhostStore,
+} from '@/application/race/ghostReplay'
 
 export interface RaceSetup {
   readonly car: CarId
@@ -76,6 +85,7 @@ export interface RaceSessionSnapshot {
   readonly telemetry: RaceTelemetry
   readonly standings: readonly RaceStanding[]
   readonly result: RaceResult | null
+  readonly ghost?: GhostPose | null
 }
 
 export interface RaceSessionPort {
@@ -96,6 +106,7 @@ export interface RaceSessionDependencies {
   readonly now?: () => number
   readonly step?: RaceStep
   readonly geometry?: TrackGeometryService
+  readonly ghostStore?: GhostStore
 }
 
 const EMPTY_TELEMETRY: RaceTelemetry = {
@@ -129,6 +140,9 @@ export class RaceSession implements RaceSessionPort {
   private remainder = 0
   private destroyed = false
   private readonly geometry: TrackGeometryService
+  private bestGhost: GhostRun | null = null
+  private recording: GhostFrame[] = []
+  private recordingValid = true
 
   constructor(private readonly dependencies: RaceSessionDependencies) {
     this.now = dependencies.now ?? (() => Date.now())
@@ -149,6 +163,10 @@ export class RaceSession implements RaceSessionPort {
       startRatio: track.start?.ratio,
       reversed: track.start?.reversed,
     })
+    this.bestGhost = this.dependencies.ghostStore?.load(track, setup) ?? null
+    const player = state.vehicles.find((vehicle) => vehicle.player)
+    this.recording = player && this.dependencies.ghostStore ? [captureGhost(player, 0)] : []
+    this.recordingValid = true
     this.publish(this.buildSnapshot(track, setup, state, null))
   }
 
@@ -161,6 +179,8 @@ export class RaceSession implements RaceSessionPort {
   resetPlayer(): void {
     const state = this.current.state
     if (state?.phase !== 'running' || state.paused || this.destroyed) return
+    // A teleported recovery should never become an impossible best-time ghost.
+    this.recordingValid = false
     this.publish(
       this.buildSnapshot(
         this.current.track,
@@ -217,6 +237,11 @@ export class RaceSession implements RaceSessionPort {
       state = next.state
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
+      if (next.events.some((event) => event.type === 'vehicle-recovered' &&
+          next.state.vehicles.some((vehicle) => vehicle.player && vehicle.id === event.vehicleId))) {
+        this.recordingValid = false
+      }
+      this.captureStep(state)
       this.remainder = Math.max(0, this.remainder - FIXED_STEP)
       stepped = true
     }
@@ -230,6 +255,16 @@ export class RaceSession implements RaceSessionPort {
       : null
     if (stepped) this.routeFeedback(resultState, events, input)
     if (result && !this.current.result) {
+      const track = this.current.track
+      const setup = this.current.setup
+      const player = resultState.vehicles.find((vehicle) => vehicle.player)
+      if (track && setup && player && this.dependencies.ghostStore &&
+          result.outcome === 'finished' && result.playerTime !== null && this.recordingValid) {
+        const finishedFrames = [...this.recording, captureGhost(player, result.playerTime)]
+        if (this.dependencies.ghostStore.record(track, setup, result.playerTime, finishedFrames)) {
+          this.bestGhost = this.dependencies.ghostStore.load(track, setup)
+        }
+      }
       this.dependencies.feedback.silenceContinuous()
       this.dependencies.feedback.handle({
         type: 'finish',
@@ -238,6 +273,26 @@ export class RaceSession implements RaceSessionPort {
       })
     }
     this.publish(this.buildSnapshot(this.current.track, this.current.setup, resultState, result))
+  }
+
+  private captureStep(state: RaceState): void {
+    if (!this.dependencies.ghostStore || !this.recordingValid) return
+    const player = state.vehicles.find((vehicle) => vehicle.player)
+    if (!player || player.wrecked) { this.recordingValid = false; return }
+    const last = this.recording.at(-1)
+    if (last && state.elapsed < last.t + 0.1 && state.phase !== 'finished') return
+    if (this.recording.length >= MAX_GHOST_FRAMES - 1) {
+      this.recordingValid = false
+      return
+    }
+    // Reject unreported automatic resets and jumps caused by invalid geometry.
+    if (last && Math.hypot(player.x - last.x, player.y - last.y) >
+        Math.max(85, player.speed * 0.25 + 25)) {
+      this.recordingValid = false
+      return
+    }
+    // The finish handler appends the exact terminal frame once.
+    if (state.phase !== 'finished') this.recording.push(captureGhost(player, state.elapsed))
   }
 
   snapshot(): RaceSessionSnapshot {
@@ -273,6 +328,7 @@ export class RaceSession implements RaceSessionPort {
       state,
       standings,
       result,
+      ...(this.bestGhost ? { ghost: ghostPoseAt(this.bestGhost, state.elapsed) } : {}),
       telemetry: {
         phase: state.phase,
         countdown: state.countdown,
