@@ -1,7 +1,10 @@
 package io.trackforge.app;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -9,50 +12,153 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @CapacitorPlugin(name = "TrackExport")
 public class TrackExportPlugin extends Plugin {
+    private static final String EXPORT_DIRECTORY = "trackforge-exports";
+    private static final long STALE_AFTER_MS = 24L * 60 * 60 * 1000;
+    private static final ExecutorService IO = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "trackforge-export-io");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
     @PluginMethod
     public void save(PluginCall call) {
-        String content = call.getString("content");
-        String filename = call.getString("filename");
-        if (content == null || filename == null) {
+        // Do not open ACTION_CREATE_DOCUMENT with the full JSON still inside a
+        // PluginCall. Capacitor persists call.getData() into Activity saved state.
+        // Large tracks otherwise cause TransactionTooLargeException on Android.
+        final String content = call.getString("content");
+        final String filename = call.getString("filename");
+        if (content == null || filename == null || filename.isEmpty()) {
             call.reject("Track export is missing its content or filename.");
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, filename);
-        startActivityForResult(call, intent, "fileSelected");
+        IO.execute(() -> {
+            String id = UUID.randomUUID().toString();
+            File staged = stagedFile(getContext(), id);
+            try {
+                cleanupStale(getContext());
+                File directory = staged.getParentFile();
+                if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) {
+                    throw new IOException("Cannot create temporary export directory.");
+                }
+                // Streaming UTF-8 encoding avoids an additional multi-megabyte
+                // byte[] allocation on top of Capacitor's incoming JSON string.
+                try (BufferedWriter writer = new BufferedWriter(
+                        new OutputStreamWriter(new FileOutputStream(staged), StandardCharsets.UTF_8))) {
+                    writer.write(content);
+                }
+                // Only the small UUID survives the document picker / process
+                // recreation. The private file survives Activity reconstruction.
+                call.getData().remove("content");
+                call.getData().put("exportId", id);
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                intent.putExtra(Intent.EXTRA_TITLE, filename);
+                mainHandler.post(() -> {
+                    try {
+                        startActivityForResult(call, intent, "fileSelected");
+                    } catch (Exception error) {
+                        deleteStaged(getContext(), id);
+                        call.reject("Could not open the file picker.", error);
+                    }
+                });
+            } catch (Exception error) {
+                staged.delete();
+                call.reject("Track could not be prepared for export.", error);
+            }
+        });
     }
 
     @ActivityCallback
     private void fileSelected(PluginCall call, ActivityResult result) {
         if (call == null) return;
+        String id = call.getString("exportId");
+        if (!validId(id)) {
+            call.reject("The pending export is missing or invalid.");
+            return;
+        }
         if (result.getResultCode() != Activity.RESULT_OK) {
+            deleteStaged(getContext(), id);
             JSObject response = new JSObject();
             response.put("saved", false);
             call.resolve(response);
             return;
         }
-        Intent data = result.getData();
-        if (data == null || data.getData() == null) {
+        Intent resultData = result.getData();
+        if (resultData == null || resultData.getData() == null) {
+            deleteStaged(getContext(), id);
             call.reject("No export destination selected.");
             return;
         }
-        try (OutputStream stream = getContext().getContentResolver().openOutputStream(data.getData(), "wt")) {
-            if (stream == null) throw new java.io.IOException("Cannot open destination.");
-            stream.write(call.getString("content", "").getBytes(StandardCharsets.UTF_8));
-            stream.flush();
-        } catch (Exception error) {
-            call.reject("Track could not be exported.", error);
-            return;
+
+        // A large write must never block Android's activity-result/UI thread.
+        final android.net.Uri destination = resultData.getData();
+        IO.execute(() -> {
+            try (OutputStream stream = getContext().getContentResolver().openOutputStream(destination, "wt")) {
+                if (stream == null) throw new IOException("Cannot open destination.");
+                copyStaged(getContext(), id, stream);
+                stream.flush();
+                JSObject response = new JSObject();
+                response.put("saved", true);
+                call.resolve(response);
+            } catch (Exception error) {
+                call.reject("Track could not be exported.", error);
+            } finally {
+                deleteStaged(getContext(), id);
+            }
+        });
+    }
+
+    private static boolean validId(String id) {
+        if (id == null) return false;
+        try {
+            return UUID.fromString(id).toString().equals(id);
+        } catch (IllegalArgumentException ignored) {
+            return false;
         }
-        JSObject response = new JSObject();
-        response.put("saved", true);
-        call.resolve(response);
+    }
+
+    static File stagedFile(Context context, String id) {
+        if (!validId(id)) throw new IllegalArgumentException("Invalid export identifier.");
+        return new File(new File(context.getCacheDir(), EXPORT_DIRECTORY), id + ".json");
+    }
+
+    static void copyStaged(Context context, String id, OutputStream target) throws IOException {
+        try (FileInputStream input = new FileInputStream(stagedFile(context, id))) {
+            byte[] buffer = new byte[16 * 1024];
+            int length;
+            while ((length = input.read(buffer)) != -1) target.write(buffer, 0, length);
+        }
+    }
+
+    static void deleteStaged(Context context, String id) {
+        if (validId(id)) stagedFile(context, id).delete();
+    }
+
+    private static void cleanupStale(Context context) {
+        File directory = new File(context.getCacheDir(), EXPORT_DIRECTORY);
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        long threshold = System.currentTimeMillis() - STALE_AFTER_MS;
+        for (File file : files) {
+            if (file.isFile() && file.getName().endsWith(".json") && file.lastModified() < threshold) {
+                file.delete();
+            }
+        }
     }
 }
