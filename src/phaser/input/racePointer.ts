@@ -2,6 +2,14 @@ import type { RaceControlsPort } from '@/application/ports/input'
 
 export const STEERING_RANGE_PX = 48
 const STEERING_DEAD_ZONE = 0.08
+/** More travel near center gives thumbs precise small corrections without losing full lock. */
+export function steeringFromDrag(deltaPx: number): number {
+  if (!Number.isFinite(deltaPx)) return 0
+  const magnitude = Math.min(1, Math.abs(deltaPx) / STEERING_RANGE_PX)
+  if (magnitude <= STEERING_DEAD_ZONE) return 0
+  const normalized = (magnitude - STEERING_DEAD_ZONE) / (1 - STEERING_DEAD_ZONE)
+  return Math.sign(deltaPx) * normalized ** 1.35
+}
 
 export interface RacePointerBinding {
   cancel(): void
@@ -52,12 +60,7 @@ export function bindRacePointer(
     const anchor = anchors.get(event.pointerId)
     if (anchor === undefined || role !== 'steering') return
     event.preventDefault()
-    const delta = Math.max(-1, Math.min(1, (event.clientX - anchor) / STEERING_RANGE_PX))
-    const magnitude = Math.abs(delta)
-    const steering = magnitude <= STEERING_DEAD_ZONE
-      ? 0
-      : Math.sign(delta) * (magnitude - STEERING_DEAD_ZONE) / (1 - STEERING_DEAD_ZONE)
-    controls.updateSteering(event.pointerId, steering)
+    controls.updateSteering(event.pointerId, steeringFromDrag(event.clientX - anchor))
     onChange()
   }
   const onUp = (event: PointerEvent): void => end(event.pointerId)

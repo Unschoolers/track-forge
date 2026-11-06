@@ -8,7 +8,7 @@ type PointerState =
 
 export class RaceInputController implements RaceControlsPort {
   private readonly pointers = new Map<number, PointerState>()
-  private keyboardSteering = 0
+  private readonly steeringKeys = new Set<string>()
   private keyboardBrake = false
   private activeSteeringPointer: number | undefined
   private readonly resetListeners = new Set<() => void>()
@@ -20,7 +20,7 @@ export class RaceInputController implements RaceControlsPort {
     return {
       steering: activePointer?.role === 'steering'
         ? activePointer.steering
-        : this.keyboardSteering,
+        : this.keyboardDirection(),
       throttle: 1,
       braking:
         this.keyboardBrake ||
@@ -28,15 +28,18 @@ export class RaceInputController implements RaceControlsPort {
     }
   }
 
+  private keyboardDirection(): number {
+    // Most recently pressed direction wins; releasing it restores the held key.
+    const latest = [...this.steeringKeys].at(-1)
+    if (latest === undefined) return 0
+    return latest === 'arrowleft' || latest === 'a' ? -1 : 1
+  }
+
   setKeyboard(key: string, pressed: boolean): void {
-    if (
-      key === 'ArrowLeft' ||
-      key.toLowerCase() === 'a'
-    ) {
-      this.keyboardSteering = pressed ? -1 : 0
-    }
-    if (key === 'ArrowRight' || key.toLowerCase() === 'd') {
-      this.keyboardSteering = pressed ? 1 : 0
+    const normalized = key.toLowerCase()
+    if (['arrowleft', 'arrowright', 'a', 'd'].includes(normalized)) {
+      this.steeringKeys.delete(normalized)
+      if (pressed) this.steeringKeys.add(normalized)
     }
     if (
       key === ' ' ||
@@ -81,7 +84,7 @@ export class RaceInputController implements RaceControlsPort {
   reset(): void {
     this.pointers.clear()
     this.activeSteeringPointer = undefined
-    this.keyboardSteering = 0
+    this.steeringKeys.clear()
     this.keyboardBrake = false
     for (const listener of this.resetListeners) listener()
   }
