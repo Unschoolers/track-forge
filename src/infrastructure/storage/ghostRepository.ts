@@ -20,8 +20,11 @@ function validRun(value: unknown): value is GhostRun {
     Number.isFinite(run.time) && (run.time ?? 0) > 0 &&
     Array.isArray(run.frames) && run.frames.length >= 2 &&
     run.frames.length <= MAX_GHOST_FRAMES &&
-    run.frames.every((frame) =>
+    run.frames[0]?.t === 0 && run.frames.at(-1)?.t === run.time &&
+    run.frames.every((frame, index, frames) =>
       frame && [frame.t, frame.x, frame.y, frame.angle, frame.z].every(Number.isFinite) &&
+      frame.t >= 0 && frame.t <= run.time! &&
+      (index === 0 || frame.t > frames[index - 1].t) &&
       (frame.structureRunId === null || typeof frame.structureRunId === 'string'))
   )
 }

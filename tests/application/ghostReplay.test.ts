@@ -23,6 +23,47 @@ function memory(): KeyValueStore {
 }
 
 describe('personal-best ghost replay', () => {
+  it.each([
+    [-0.1, 1], [0.1, 1], [0, 0.5], [0, 2], [0, 0], [0, 0.8, 0.4, 1],
+  ])('rejects an invalid replay timeline %j on record and load', (...times) => {
+    const storage = memory()
+    const store = new BrowserGhostRepository(storage)
+    const invalid = times.map((t) => ({ ...frames[0]!, t }))
+    expect(store.record(track, setup, 1, invalid)).toBe(false)
+    storage.set('trackforge-ghost-runs-v1', JSON.stringify({
+      [ghostRaceKey(track, setup)]: { car: 'blue', time: 1, frames: invalid },
+    }))
+    expect(store.load(track, setup)).toBeNull()
+  })
+
+  it('does not store a finish after a short automatic player recovery', () => {
+    const store = new BrowserGhostRepository(memory())
+    const step: RaceStep = (state) => {
+      const player = state.vehicles.find((vehicle) => vehicle.player)!
+      return {
+        state: { ...state, phase: 'finished', elapsed: 1,
+          vehicles: [{ ...player, x: player.x + 20, finishedAt: 1 }] },
+        events: [
+          { type: 'vehicle-recovered', vehicleId: player.id, reason: 'off-road',
+            x: player.x, y: player.y, pathIndex: player.pathIndex },
+          { type: 'race-finished', reason: 'finished' },
+        ],
+      }
+    }
+    const session = new RaceSession({
+      ghostStore: store,
+      scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
+      random: { next: () => 0.5 },
+      feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
+      step,
+    })
+    session.start(track, setup)
+    session.advance(4, { steering: 0, throttle: 1, braking: false })
+    expect(session.snapshot().result?.outcome).toBe('finished')
+    expect(store.load(track, setup)).toBeNull()
+    session.destroy()
+  })
+
   it('interpolates position and wrapped heading, then disappears after finishing', () => {
     const run = { car: 'blue' as const, time: 1, frames }
     const pose = ghostPoseAt(run, 0.5)

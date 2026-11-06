@@ -211,6 +211,10 @@ export const stepRace: RaceStep = (
       state.reversed,
     )
     if (updated.player && updated.stuckDuration > 0.65) {
+      events.push({
+        type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',
+        x: updated.x, y: updated.y, pathIndex: updated.pathIndex,
+      })
       updated = resetVehicleToTrack(updated, state.path, { reversed: state.reversed })
     }
     if (

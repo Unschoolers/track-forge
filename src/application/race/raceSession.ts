@@ -237,6 +237,10 @@ export class RaceSession implements RaceSessionPort {
       state = next.state
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
+      if (next.events.some((event) => event.type === 'vehicle-recovered' &&
+          next.state.vehicles.some((vehicle) => vehicle.player && vehicle.id === event.vehicleId))) {
+        this.recordingValid = false
+      }
       this.captureStep(state)
       this.remainder = Math.max(0, this.remainder - FIXED_STEP)
       stepped = true
@@ -287,7 +291,8 @@ export class RaceSession implements RaceSessionPort {
       this.recordingValid = false
       return
     }
-    this.recording.push(captureGhost(player, state.elapsed))
+    // The finish handler appends the exact terminal frame once.
+    if (state.phase !== 'finished') this.recording.push(captureGhost(player, state.elapsed))
   }
 
   snapshot(): RaceSessionSnapshot {
