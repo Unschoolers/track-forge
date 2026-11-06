@@ -32,6 +32,7 @@ export function parseTrackImport(content: string): TrackImportResult {
     return { ok: false, message: 'Not a supported Track Forge export.' }
   }
   const source = object(envelope.track)
+  if (!source) return { ok: false, message: 'Track contents are missing.' }
   const name = typeof source?.name === 'string'
     ? source.name.replace(/\s+/g, ' ').trim().slice(0, 32)
     : ''
