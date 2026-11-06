@@ -28,6 +28,7 @@ export const RACE_CAMERA_TUNING = {
   minimumZoom: 1.14,
   maximumZoom: 1.3,
   zoomInResponse: 1.65,
+  maximumRotationRadiansPerSecond: 2.3,
   zoomOutResponse: 0.78,
 } as const
 
@@ -89,7 +90,12 @@ export function advanceRaceCamera(
   return {
     x: camera.x + (hints.target.x - camera.x) * positionFollow,
     y: camera.y + (hints.target.y - camera.y) * positionFollow,
-    angle: camera.angle + headingError * rotationFollow,
+    // Never spin the world instantly when path sampling changes branches.
+    angle: camera.angle + clamp(
+      headingError * rotationFollow,
+      -RACE_CAMERA_TUNING.maximumRotationRadiansPerSecond * dt,
+      RACE_CAMERA_TUNING.maximumRotationRadiansPerSecond * dt,
+    ),
     zoom: clamp(
       camera.zoom + (targetZoom - camera.zoom) * zoomFollow,
       RACE_CAMERA_TUNING.minimumZoom,
