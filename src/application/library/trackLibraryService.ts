@@ -54,6 +54,27 @@ export class TrackLibraryService {
       : { ok: false, message: 'Track could not be saved.' }
   }
 
+  importShared(source: Track): TrackMutationResult {
+    // A shared track is always a copy. Never overwrite the sender's or
+    // receiver's existing circuit, scores or best-time ghosts.
+    const now = this.dependencies.now()
+    let name = source.name.slice(0, 32)
+    let number = 2
+    while (this.dependencies.trackStore.list().some(
+      (item) => item.name.toLowerCase() === name.toLowerCase(),
+    )) {
+      const suffix = ` (${number++})`
+      name = source.name.slice(0, 32 - suffix.length) + suffix
+    }
+    const track: Track = {
+      ...source, id: this.dependencies.createId(), name,
+      createdAt: now, updatedAt: now,
+    }
+    return this.dependencies.trackStore.save(track)
+      ? { ok: true, track }
+      : { ok: false, message: 'Shared track could not be saved.' }
+  }
+
   rename(id: TrackId, value: string): TrackMutationResult {
     const existing = this.dependencies.trackStore.find(id)
     if (!existing) {
