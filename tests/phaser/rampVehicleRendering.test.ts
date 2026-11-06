@@ -59,8 +59,8 @@ describe('ramp vehicle rendering', () => {
     const path = buildRoadPath(track.points, track.terrain)
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
     const index = path.points.findIndex((point, i) =>
-      path.roadSurface.at(i, point).structureHeight > 5 &&
-      path.roadSurface.at(i, point).structureHeight < 19)
+      path.roadSurface.at(i, point).structureHeight > 16 &&
+      path.roadSurface.at(i, point).structureHeight < 24)
     expect(index).toBeGreaterThan(0)
     const point = required(path.points[index])
     const surface = path.roadSurface.at(index, point)
