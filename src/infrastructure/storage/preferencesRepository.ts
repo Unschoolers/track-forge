@@ -18,6 +18,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
   handling: 'arcade',
+  raceLaps: 2,
 }
 
 function boolean(value: string | null, fallback: boolean): boolean {
@@ -32,12 +33,14 @@ export class BrowserPreferencesRepository implements PreferencesStore {
     const difficulty = this.storage.get(STORAGE_KEYS.difficulty)
     const lighting = this.storage.get(STORAGE_KEYS.lighting)
     const handling = this.storage.get(STORAGE_KEYS.handling)
+    const raceLaps = this.storage.get(STORAGE_KEYS.raceLaps)
     return {
       car: isCarId(car) ? car : DEFAULT_PREFERENCES.car,
       difficulty: isDifficultyId(difficulty)
         ? difficulty
         : DEFAULT_PREFERENCES.difficulty,
       handling: handling === 'simulation' ? 'simulation' : 'arcade',
+      raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       lighting: isLightingMode(lighting)
         ? lighting
         : DEFAULT_PREFERENCES.lighting,
@@ -62,6 +65,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       this.storage.set(STORAGE_KEYS.difficulty, preferences.difficulty),
       this.storage.set(STORAGE_KEYS.lighting, preferences.lighting),
       this.storage.set(STORAGE_KEYS.handling, preferences.handling === 'simulation' ? 'simulation' : 'arcade'),
+      this.storage.set(STORAGE_KEYS.raceLaps, String(preferences.raceLaps === 1 || preferences.raceLaps === 3 ? preferences.raceLaps : 2)),
       this.storage.set(
         STORAGE_KEYS.audio,
         preferences.audioEnabled ? '1' : '0',
