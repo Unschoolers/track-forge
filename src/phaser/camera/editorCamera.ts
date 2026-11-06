@@ -3,6 +3,12 @@ import type { Vector2 } from '@/domain/model'
 import type { EditorCamera } from '@/phaser/input/editorInput'
 import type { EditorCameraAction } from '@/domain/editor/editorGeometry'
 
+/** Small tracks stay readable; larger authored layouts still fit on phones. */
+export const EDITOR_ZOOM_LIMITS = {
+  minimum: 0.035,
+  maximum: 2.7,
+} as const
+
 export interface EditorViewport {
   readonly width: number
   readonly height: number
@@ -27,7 +33,7 @@ export function fitEditorCamera(
         viewport.width / Math.max(300, maximumX - minimumX + 180),
         viewport.height / Math.max(420, maximumY - minimumY + 220),
       ),
-      0.18,
+      EDITOR_ZOOM_LIMITS.minimum,
       1,
     ),
   }
@@ -44,8 +50,8 @@ export function applyEditorCameraAction(
     ...camera,
     zoom: clamp(
       camera.zoom * (action === 'zoom-in' ? 1.2 : 1 / 1.2),
-      0.16,
-      2.7,
+      EDITOR_ZOOM_LIMITS.minimum,
+      EDITOR_ZOOM_LIMITS.maximum,
     ),
   }
 }
