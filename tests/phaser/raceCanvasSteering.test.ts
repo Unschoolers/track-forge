@@ -32,12 +32,12 @@ function pointer(type: string, id: number, clientX = 0): Event {
 
 afterEach(() => document.body.replaceChildren())
 
-function createScene(controls: RaceInputController, session: Pick<RaceSessionPort, 'snapshot'>) {
+function createScene(controls: RaceInputController, session: Pick<RaceSessionPort, 'snapshot'>, steeringSensitivity?: 0.75 | 1 | 1.5) {
   const canvas = document.createElement('canvas')
   canvas.width = 2000
   canvas.style.width = '500px'
   document.body.append(canvas)
-  const controller = { snapshot: () => ({ currentTrack: { trees: [] }, preferences: { lighting: 'day' } }), dispatch: vi.fn() }
+  const controller = { snapshot: () => ({ currentTrack: { trees: [] }, preferences: { lighting: 'day', steeringSensitivity } }), dispatch: vi.fn() }
   const geometry = { get: () => ({ path: { terrainSurface: {} } }) }
   const graphics = { setDepth() { return this }, setBlendMode() { return this } }
   let shutdown: (() => void) | undefined
@@ -77,6 +77,41 @@ function recoverySession() {
 }
 
 describe('race canvas steering', () => {
+  it.each(['canvas', 'pad'] as const)('backs off immediately after overtravel on the %s while braking', (surface) => {
+    const controls = new RaceInputController()
+    const { session } = recoverySession()
+    const { canvas, shutdown } = createScene(controls, session, 1.5)
+    const hud = createRaceHud({ preferences: { steeringSensitivity: 1.5 } } as never, session, controls, { pause() {} })
+    document.body.append(hud.element)
+    try {
+      const pad = hud.element.querySelector<HTMLElement>('[data-race-steering]')
+      const brake = hud.element.querySelector<HTMLElement>('[data-action="brake"]')
+      if (!pad || !brake) throw new Error('Missing race controls')
+      const target = surface === 'canvas' ? canvas : pad
+      brake.dispatchEvent(pointer('pointerdown', 2, 480))
+      target.dispatchEvent(pointer('pointerdown', 1, 200))
+      target.dispatchEvent(pointer('pointermove', 1, 350))
+      expect(controls.snapshot()).toMatchObject({ steering: 1, braking: true })
+      target.dispatchEvent(pointer('pointermove', 1, 330))
+      expect(controls.snapshot().steering).toBeGreaterThan(0)
+      expect(controls.snapshot().steering).toBeLessThan(1)
+      expect(controls.snapshot().braking).toBe(true)
+      target.dispatchEvent(pointer('pointermove', 1, 180))
+      expect(controls.snapshot()).toMatchObject({ steering: -1, braking: true })
+      target.dispatchEvent(pointer('pointermove', 1, 200))
+      expect(controls.snapshot().steering).toBeLessThan(0)
+      expect(controls.snapshot().steering).toBeGreaterThan(-1)
+      target.dispatchEvent(pointer('pointerup', 1))
+      target.dispatchEvent(pointer('pointerdown', 3, 200))
+      expect(controls.snapshot()).toMatchObject({ steering: 0, braking: true })
+      target.dispatchEvent(pointer('pointermove', 3, 232))
+      expect(controls.snapshot()).toMatchObject({ steering: 1, braking: true })
+    } finally {
+      hud.destroy()
+      shutdown()
+    }
+  })
+
   it.each(['pointercancel', 'lostpointercapture'])(
     'cancels only the affected finger on %s', (eventType) => {
       const controls = new RaceInputController()
@@ -217,7 +252,7 @@ describe('race canvas steering', () => {
     session.advance(3.7, controls.snapshot())
     session.advance(1 / 60, controls.snapshot())
     const { canvas, shutdown } = createScene(controls, session)
-    const hud = createRaceHud(null as never, session, controls, { pause() {} })
+    const hud = createRaceHud({ preferences: {} } as never, session, controls, { pause() {} })
     document.body.append(hud.element)
     try {
       const pad = hud.element.querySelector<HTMLElement>('[data-race-steering]')

@@ -1,4 +1,6 @@
 import type { RaceControlsPort } from '@/application/ports/input'
+import type { SteeringSensitivity } from '@/application/ports/storage'
+import { clamp } from '@/domain/geometry/math'
 
 export const STEERING_RANGE_PX = 48
 const STEERING_DEAD_ZONE = 0.08
@@ -22,6 +24,7 @@ export function bindRacePointer(
   role: 'steering' | 'brake',
   controls: RaceControlsPort,
   onChange: () => void = () => undefined,
+  getSensitivity: () => SteeringSensitivity | undefined = () => 1,
 ): RacePointerBinding {
   const anchors = new Map<number, number>()
 
@@ -60,7 +63,16 @@ export function bindRacePointer(
     const anchor = anchors.get(event.pointerId)
     if (anchor === undefined || role !== 'steering') return
     event.preventDefault()
-    controls.updateSteering(event.pointerId, steeringFromDrag(event.clientX - anchor))
+    const sensitivity = getSensitivity() ?? 1
+    const range = STEERING_RANGE_PX / sensitivity
+    // Keep the origin one full-lock distance behind the thumb at most,
+    // so a reversal reduces steering even after dragging past full lock.
+    const delta = event.clientX - anchor
+    const travel = Number.isFinite(delta) ? clamp(delta, -range, range) : 0
+    if (Number.isFinite(delta) && delta !== travel) {
+      anchors.set(event.pointerId, event.clientX - travel)
+    }
+    controls.updateSteering(event.pointerId, steeringFromDrag(travel * sensitivity))
     onChange()
   }
   const onUp = (event: PointerEvent): void => end(event.pointerId)

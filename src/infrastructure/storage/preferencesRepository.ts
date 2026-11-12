@@ -17,6 +17,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   audioEnabled: true,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
+  steeringSensitivity: 1,
   handling: 'arcade',
   raceLaps: 2,
   raceMode: 'normal',
@@ -35,7 +36,9 @@ export class BrowserPreferencesRepository implements PreferencesStore {
     const lighting = this.storage.get(STORAGE_KEYS.lighting)
     const handling = this.storage.get(STORAGE_KEYS.handling)
     const raceLaps = this.storage.get(STORAGE_KEYS.raceLaps)
+    const steeringSensitivity = this.storage.get(STORAGE_KEYS.steeringSensitivity)
     return {
+      steeringSensitivity: steeringSensitivity === '0.75' ? 0.75 : steeringSensitivity === '1.5' ? 1.5 : 1,
       car: isCarId(car) ? car : DEFAULT_PREFERENCES.car,
       difficulty: isDifficultyId(difficulty)
         ? difficulty
@@ -63,6 +66,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
 
   save(preferences: Preferences): boolean {
     const writes = [
+      this.storage.set(STORAGE_KEYS.steeringSensitivity, String(preferences.steeringSensitivity ?? 1)),
       this.storage.set(STORAGE_KEYS.car, preferences.car),
       this.storage.set(STORAGE_KEYS.difficulty, preferences.difficulty),
       this.storage.set(STORAGE_KEYS.lighting, preferences.lighting),
