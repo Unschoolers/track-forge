@@ -9,7 +9,11 @@ import type { SurfaceId } from '@/domain/model'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
-import { ARCADE_DYNAMICS_TUNING, VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
+import {
+  ARCADE_BRAKE_TIMING,
+  ARCADE_DYNAMICS_TUNING,
+  VEHICLE_DYNAMICS_TUNING,
+} from '@/domain/race/vehiclePhysicsConfig'
 
 // An exponential response reaches about 95% of the new grip in 0.15 s.
 const SURFACE_GRIP_TIME_CONSTANT = 0.05
@@ -41,6 +45,17 @@ export function stepVehicle(
     0,
     VEHICLE_DYNAMICS_TUNING.integration.maximumDeltaSeconds,
   )
+  const progressiveBrake = handling === 'arcade' && vehicle.player
+  const driverPressure = progressiveBrake
+    ? clamp(
+        (vehicle.brakePressure ?? 0) + (input.braking
+          ? dt / ARCADE_BRAKE_TIMING.pressSeconds
+          : -dt / ARCADE_BRAKE_TIMING.releaseSeconds),
+        0,
+        1,
+      )
+    : Number(input.braking)
+  const brakePressure = vehicle.speed > speedLimit ? 1 : driverPressure
   const car = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
@@ -86,8 +101,9 @@ export function stepVehicle(
       // The shared input controller models an automatic accelerator. Holding
       // the service brake must cut drive torque instead of asking the finite
       // brakes to fight a permanently wide-open engine.
-      throttle: braking ? 0 : input.throttle,
+      throttle: braking ? 0 : input.throttle * (1 - driverPressure),
       braking,
+      brakePressure,
     },
     {
       mass: car.mass,
@@ -141,7 +157,8 @@ export function stepVehicle(
     yawRate: dynamics.yawRate,
     speed: dynamics.speed,
     slip: Math.abs(dynamics.lateralSpeed),
-    braking,
+    braking: braking || brakePressure > 0,
+    ...(progressiveBrake ? { brakePressure: driverPressure } : {}),
     currentSurface: context.surface,
     surfaceGrip,
     onCurb: context.onCurb,
