@@ -63,6 +63,7 @@ export class FeedbackRouter implements FeedbackPort {
 
   private rateLimited(event: FeedbackEvent): boolean {
     if (event.type !== 'curb' && event.type !== 'tire-slip') return false
+    if (event.type === 'tire-slip' && event.strength <= 0) return false
     const now = this.now()
     const previous = this.lastContinuous.get(event.type)
     const interval = event.type === 'curb' ? 95 : 120

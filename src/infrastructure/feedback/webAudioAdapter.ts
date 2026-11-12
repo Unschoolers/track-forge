@@ -22,7 +22,8 @@ export interface ToneSink {
     cornering: number,
   ): void
   setSurface(surface: SurfaceId | 'grass', speedRatio: number): void
-  setSlip(strength: number): void
+  setSlip(strength: number, speedRatio?: number, surface?: SurfaceId | 'grass'): void
+  setRival?(proximity: number, pan: number, speedRatio: number): void
   silenceContinuous(): void
   destroy(): void
 }
@@ -41,6 +42,12 @@ export class BrowserToneSink implements ToneSink {
   private roadFilter: BiquadFilterNode | undefined
   private roadGain: GainNode | undefined
   private engineGear: number | undefined
+  private slip: AudioBufferSourceNode | undefined
+  private slipFilter: BiquadFilterNode | undefined
+  private slipGain: GainNode | undefined
+  private rival: OscillatorNode | undefined
+  private rivalGain: GainNode | undefined
+  private rivalPan: StereoPannerNode | undefined
 
   unlock(): void {
     if (this.context) {
@@ -125,6 +132,29 @@ export class BrowserToneSink implements ToneSink {
       .connect(this.roadGain)
       .connect(context.destination)
     this.road.start()
+
+    this.slip = context.createBufferSource()
+    this.slip.buffer = noiseBuffer
+    this.slip.loop = true
+    this.slipFilter = context.createBiquadFilter()
+    this.slipFilter.type = 'bandpass'
+    this.slipFilter.Q.value = 1.4
+    this.slipGain = context.createGain()
+    this.slipGain.gain.value = 0
+    this.slip.connect(this.slipFilter).connect(this.slipGain).connect(context.destination)
+    this.slip.start()
+
+    this.rival = context.createOscillator()
+    this.rival.type = 'sawtooth'
+    this.rivalGain = context.createGain()
+    this.rivalGain.gain.value = 0
+    if (typeof context.createStereoPanner === 'function') {
+      this.rivalPan = context.createStereoPanner()
+      this.rival.connect(this.rivalGain).connect(this.rivalPan).connect(context.destination)
+    } else {
+      this.rival.connect(this.rivalGain).connect(context.destination)
+    }
+    this.rival.start()
   }
 
   play(
@@ -229,10 +259,25 @@ export class BrowserToneSink implements ToneSink {
     )
   }
 
-  setSlip(strength: number): void {
-    if (strength > 0.05) {
-      this.play(680 + strength * 180, 0.045, strength * 0.025, 'square')
-    }
+  setSlip(strength: number, speedRatio = 1, surface: SurfaceId | 'grass' = 'street'): void {
+    const context = this.context
+    if (!context || !this.slipGain || !this.slipFilter) return
+    const amount = Math.max(0, Math.min(1, strength))
+    const speed = Math.max(0, Math.min(1, speedRatio))
+    const frequency = { street: 1800, dirt: 850, grass: 600, ice: 2400 }[surface]
+    this.slipFilter.frequency.setTargetAtTime(frequency + speed * 500, context.currentTime, 0.08)
+    if (amount * speed > 0) this.slipGain.gain.cancelScheduledValues(context.currentTime)
+    this.slipGain.gain.setTargetAtTime(amount * speed * 0.035, context.currentTime, amount ? 0.06 : 0.09)
+    if (amount * speed === 0) this.slipGain.gain.setValueAtTime(0, context.currentTime + 0.9)
+  }
+
+  setRival(proximity: number, pan: number, speedRatio: number): void {
+    const context = this.context
+    if (!context || !this.rival || !this.rivalGain) return
+    const near = Math.max(0, Math.min(1, proximity))
+    this.rival.frequency.setTargetAtTime(55 + Math.max(0, Math.min(1, speedRatio)) * 100, context.currentTime, 0.1)
+    this.rivalGain.gain.setTargetAtTime(near * near * 0.018, context.currentTime, 0.1)
+    this.rivalPan?.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), context.currentTime, 0.1)
   }
 
   silenceContinuous(): void {
@@ -240,6 +285,8 @@ export class BrowserToneSink implements ToneSink {
     if (!context) return
     this.fadeOut(this.engineGain, context.currentTime)
     this.fadeOut(this.roadGain, context.currentTime)
+    this.fadeOut(this.slipGain, context.currentTime)
+    this.fadeOut(this.rivalGain, context.currentTime)
     this.fadeOut(this.enginePulseGain, context.currentTime)
     this.fadeOut(this.engineNoiseGain, context.currentTime)
     this.engineGear = undefined
@@ -250,6 +297,8 @@ export class BrowserToneSink implements ToneSink {
     this.enginePulse?.stop()
     this.engineNoise?.stop()
     this.road?.stop()
+    this.slip?.stop()
+    this.rival?.stop()
     void this.context?.close()
     this.context = undefined
     this.engine = undefined
@@ -264,12 +313,18 @@ export class BrowserToneSink implements ToneSink {
     this.road = undefined
     this.roadFilter = undefined
     this.roadGain = undefined
+    this.slip = undefined
+    this.slipFilter = undefined
+    this.slipGain = undefined
+    this.rival = undefined
+    this.rivalGain = undefined
+    this.rivalPan = undefined
   }
 
   private fadeOut(gain: GainNode | undefined, now: number): void {
     if (!gain) return
     gain.gain.cancelScheduledValues(now)
-    gain.gain.setTargetAtTime(0.0001, now, 0.025)
+    gain.gain.setTargetAtTime(0, now, 0.025)
   }
 }
 
@@ -306,7 +361,11 @@ export class WebAudioAdapter implements FeedbackPort {
     } else if (event.type === 'surface') {
       this.sink.setSurface(event.surface, event.speedRatio)
     } else if (event.type === 'tire-slip') {
-      this.sink.setSlip(event.strength)
+      this.sink.setSlip(event.strength, event.speedRatio, event.surface)
+    } else if (event.type === 'rival') {
+      this.sink.setRival?.(event.proximity, event.pan, event.speedRatio)
+    } else if (event.type === 'landing') {
+      this.sink.play(75, 0.1, Math.min(0.08, event.strength * 0.05), 'triangle')
     } else if (event.type === 'collision') {
       this.sink.play(
         90,

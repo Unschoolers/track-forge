@@ -81,3 +81,11 @@ describe('FeedbackRouter', () => {
     expect(haptics.destroy).toHaveBeenCalledOnce()
   })
 })
+
+it('forwards grip recovery immediately even after a slip update', () => {
+  const audio = port()
+  const router = new FeedbackRouter({ audio, haptics: port(), now: () => 100 })
+  router.handle({ type: 'tire-slip', strength: 0.8 })
+  router.handle({ type: 'tire-slip', strength: 0 })
+  expect(audio.handle).toHaveBeenLastCalledWith({ type: 'tire-slip', strength: 0 })
+})

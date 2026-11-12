@@ -130,6 +130,28 @@ describe('RaceSession', () => {
     expect(listener).toHaveBeenCalledOnce()
     expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'engine')).toHaveLength(1)
     expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'surface')).toHaveLength(1)
+    expect(feedback.handle).toHaveBeenCalledWith(expect.objectContaining({ type: 'tire-slip', strength: 0 }))
+    expect(feedback.handle).toHaveBeenCalledWith(expect.objectContaining({ type: 'rival' }))
+  })
+
+  it('emits the strongest landing within a catch-up frame once', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    let index = 0
+    const steps = [false, true, false, true, true, true]
+    const strengths = [0, 0.4, 0, 0.8, 0, 0]
+    const step: RaceStep = (state) => ({
+      state: { ...state, vehicles: state.vehicles.map((vehicle) => vehicle.player
+        ? { ...vehicle, grounded: steps[index] ?? true, landingIntensity: strengths[index] ?? 0 } : vehicle) },
+      events: [],
+    })
+    const countingStep: RaceStep = (...args) => { const result = step(...args); index++; return result }
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback, step: countingStep })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.1, noInput)
+    expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'landing'))
+      .toEqual([[{ type: 'landing', strength: 0.8 }]])
   })
 
   it('keeps peak shake from earlier substeps with the final camera pose', () => {

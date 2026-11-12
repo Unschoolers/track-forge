@@ -253,6 +253,7 @@ export class RaceSession implements RaceSessionPort {
     const events: ReturnType<RaceStep>['events'][number][] = []
     let stepped = false
     let peakShake = 0
+    let peakLanding = 0
     while (state.phase === 'running' && this.remainder + 1e-10 >= FIXED_STEP) {
       const before = state.vehicles.find((vehicle) => vehicle.player)
       const next = this.step(state, input, FIXED_STEP, this.dependencies.random)
@@ -269,6 +270,9 @@ export class RaceSession implements RaceSessionPort {
       const player = state.vehicles.find((vehicle) => vehicle.player)
       if (before && player && !recovered) this.timing.cross(before.lap, before.nextSector, player.lap, player.nextSector, state.elapsed)
       if (player && state.phase !== 'finished') this.recording?.sample(player, state.elapsed)
+      if (before && player && !before.grounded && player.grounded) {
+        peakLanding = Math.max(peakLanding, player.landingIntensity)
+      }
       this.remainder = Math.max(0, this.remainder - FIXED_STEP)
       stepped = true
     }
@@ -280,7 +284,7 @@ export class RaceSession implements RaceSessionPort {
     let result = resultState.phase === 'finished'
       ? (this.current.result ?? this.createResult(resultState, terminalEvent?.reason))
       : null
-    if (stepped) this.routeFeedback(resultState, events, input)
+    if (stepped) this.routeFeedback(resultState, events, input, peakLanding)
     if (result && !this.current.result) {
       const track = this.current.track
       const setup = this.current.setup
@@ -427,6 +431,7 @@ export class RaceSession implements RaceSessionPort {
     state: RaceState,
     events: ReturnType<RaceStep>['events'],
     input: DriverInput,
+    peakLanding: number,
   ): void {
     const player = state.vehicles.find((vehicle) => vehicle.player)
     if (player) {
@@ -438,7 +443,7 @@ export class RaceSession implements RaceSessionPort {
         type: 'engine',
         car: player.car,
         speedRatio,
-        throttle: player.braking ? 0 : 1,
+        throttle: player.braking ? 0 : input.throttle,
         cornering: Math.min(1, Math.abs(input.steering)),
       })
       this.dependencies.feedback.handle({
@@ -446,12 +451,27 @@ export class RaceSession implements RaceSessionPort {
         surface: player.currentSurface,
         speedRatio,
       })
-      if (player.slip > 8) {
-        this.dependencies.feedback.handle({
-          type: 'tire-slip',
-          strength: Math.min(1, player.slip / 80),
-        })
+      this.dependencies.feedback.handle({
+        type: 'tire-slip',
+        strength: player.slip > 8 ? Math.min(1, player.slip / 80) : 0,
+        speedRatio,
+        surface: player.currentSurface,
+      })
+      if (peakLanding > 0.1) {
+        this.dependencies.feedback.handle({ type: 'landing', strength: peakLanding })
       }
+      const rival = state.vehicles
+        .filter((vehicle) => !vehicle.player && !vehicle.wrecked && vehicle.finishedAt === null)
+        .map((vehicle) => ({ vehicle, distance: Math.hypot(vehicle.x - player.x, vehicle.y - player.y) }))
+        .sort((a, b) => a.distance - b.distance)[0]
+      const dx = (rival?.vehicle.x ?? player.x) - player.x
+      const dy = (rival?.vehicle.y ?? player.y) - player.y
+      this.dependencies.feedback.handle({
+        type: 'rival',
+        proximity: rival ? Math.max(0, 1 - rival.distance / 250) : 0,
+        pan: rival && rival.distance > 0 ? Math.max(-1, Math.min(1, (-Math.sin(player.angle) * dx + Math.cos(player.angle) * dy) / rival.distance)) : 0,
+        speedRatio: rival ? Math.min(1, rival.vehicle.speed / CAR_SPECS[rival.vehicle.car].max) : 0,
+      })
     }
     for (const event of events) {
       if (event.type === 'curb-hit' && event.vehicleId === 'player') {
