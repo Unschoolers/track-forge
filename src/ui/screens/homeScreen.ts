@@ -1,3 +1,4 @@
+import { courseIdentity, scoreCategoryLabel } from '@/application/race/raceRecords'
 import type { AppSnapshot } from '@/application/appState'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
@@ -27,7 +28,7 @@ export function createHomeScreen(
       'span',
       'track-meta',
       state.currentTrack
-        ? `Best time: ${best ? formatRaceTime(best.time) : 'no time yet'}`
+        ? `Best time: ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(state.currentTrack) ? ' · past layout' : ''})` : 'no time yet'}`
         : 'Create your first circuit',
     ),
   )

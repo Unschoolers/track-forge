@@ -1,4 +1,5 @@
 import type { AppSnapshot } from '@/application/appState'
+import { courseIdentity, scoreCategoryLabel } from '@/application/race/raceRecords'
 import type { Track, TrackId } from '@/domain/model'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { validateTrack } from '@/domain/track/trackValidation'
@@ -51,7 +52,7 @@ export function createTrackLibraryModal(
       element(
         'span',
         'track-card-meta',
-        `${validation.ready ? 'RACE READY' : 'NEEDS EDITING'} · BEST ${best ? formatRaceTime(best.time) : 'NO TIME'}`,
+        `${validation.ready ? 'RACE READY' : 'NEEDS EDITING'} · BEST ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(track) ? ' · past layout' : ''})` : 'NO TIME'}`,
       ),
     )
     const controls = element('div', 'track-card-actions')

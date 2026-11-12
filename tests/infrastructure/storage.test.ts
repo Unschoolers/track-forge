@@ -293,6 +293,23 @@ describe('score and preference repositories', () => {
     ])
   })
 
+  it('retains ranked scores separately for each modern category and legacy', () => {
+    const storage = new MemoryStore()
+    const scores = new BrowserScoreRepository(storage)
+    const trackId = asTrackId('partitioned')
+    for (const laps of [1, 3]) {
+      for (const time of [1, 2, 3, 4, 5, 6]) {
+        scores.record(trackId, { time, car: 'blue', difficulty: 'normal', recordedAt: time,
+          category: { course: 'course', laps, handling: 'arcade', mode: 'normal' } })
+      }
+    }
+    scores.record(trackId, { time: 0.5, car: 'blue', difficulty: 'normal', recordedAt: 1 })
+    expect(scores.forTrack(trackId)).toHaveLength(11)
+    expect(scores.forTrack(trackId).filter((score) => score.category?.laps === 3).map((score) => score.time)).toEqual([1, 2, 3, 4, 5])
+    scores.removeTrack(trackId)
+    expect(scores.forTrack(trackId)).toEqual([])
+  })
+
   it('supports quick one-lap sprints without changing classic-race defaults', () => {
     const storage = new MemoryStore()
     const preferences = new BrowserPreferencesRepository(storage)

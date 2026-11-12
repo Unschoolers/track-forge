@@ -38,6 +38,9 @@ export function createResultsModal(
   } else {
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings))
   }
+  if (result.scoreSaveFailed) {
+    frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))
+  }
   if (result.ghostSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Replay could not be saved on this device.'))
   }
