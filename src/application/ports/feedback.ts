@@ -6,6 +6,8 @@ export const FEEDBACK_EVENT_TYPES = [
   'surface',
   'tire-slip',
   'curb',
+  'landing',
+  'rival',
   'collision',
   'finish',
 ] as const
@@ -24,7 +26,9 @@ export type FeedbackEvent =
       readonly surface: SurfaceId | 'grass'
       readonly speedRatio: number
     }
-  | { readonly type: 'tire-slip'; readonly strength: number }
+  | { readonly type: 'tire-slip'; readonly strength: number; readonly speedRatio?: number; readonly surface?: SurfaceId | 'grass' }
+  | { readonly type: 'landing'; readonly strength: number }
+  | { readonly type: 'rival'; readonly proximity: number; readonly pan: number; readonly speedRatio: number }
   | { readonly type: 'curb'; readonly speed: number }
   | { readonly type: 'collision'; readonly strength: number }
   | {

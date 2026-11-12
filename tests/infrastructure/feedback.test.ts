@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { WebAudioAdapter, type ToneSink } from '@/infrastructure/feedback/webAudioAdapter'
+import { BrowserToneSink, WebAudioAdapter, type ToneSink } from '@/infrastructure/feedback/webAudioAdapter'
 import { HapticsAdapter } from '@/infrastructure/feedback/hapticsAdapter'
 
 describe('feedback adapters', () => {
@@ -35,7 +35,7 @@ describe('feedback adapters', () => {
     audio.handle({ type: 'collision', strength: 0.8 })
     expect(sink.setEngine).toHaveBeenCalledWith('green', 0.7, 1, 0.6)
     expect(sink.setSurface).toHaveBeenCalledWith('dirt', 0.6)
-    expect(sink.setSlip).toHaveBeenCalledWith(0.4)
+    expect(sink.setSlip).toHaveBeenCalledWith(0.4, undefined, undefined)
     expect(sink.play).toHaveBeenCalledWith(
       90,
       0.12,
@@ -69,4 +69,24 @@ describe('feedback adapters', () => {
     ).not.toThrow()
     haptics.destroy()
   })
+})
+
+it('vibrates only on surface transitions and resets after silence', () => {
+  const vibrate = vi.fn(() => true)
+  const haptics = new HapticsAdapter(vibrate, true)
+  haptics.handle({ type: 'surface', surface: 'grass', speedRatio: 0.5 })
+  haptics.handle({ type: 'surface', surface: 'grass', speedRatio: 0.5 })
+  expect(vibrate).toHaveBeenCalledOnce()
+  haptics.silenceContinuous()
+  haptics.handle({ type: 'surface', surface: 'grass', speedRatio: 0.5 })
+  expect(vibrate).toHaveBeenCalledTimes(2)
+})
+
+it('brings the slip voice to exact silence after grip returns', () => {
+  const gain = { setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() }
+  const frequency = { setTargetAtTime: vi.fn() }
+  const sink = new BrowserToneSink()
+  Object.assign(sink, { context: { currentTime: 2 }, slipGain: { gain }, slipFilter: { frequency } })
+  sink.setSlip(0, 1, 'street')
+  expect(gain.setValueAtTime).toHaveBeenCalledWith(0, expect.any(Number))
 })
