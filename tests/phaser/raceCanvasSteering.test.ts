@@ -246,6 +246,24 @@ describe('race canvas steering', () => {
     }
   })
 
+  it('does not reapply a held throttle from key repeat after a reset', () => {
+    const controls = new RaceInputController()
+    const { session } = recoverySession()
+    const { shutdown } = createScene(controls, session)
+    try {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }))
+      expect(controls.snapshot().throttle).toBe(1)
+      controls.reset()
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', repeat: true }))
+      expect(controls.snapshot().throttle).toBe(0)
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }))
+      expect(controls.snapshot().throttle).toBe(1)
+    } finally {
+      shutdown()
+    }
+  })
+
   it('recovers once on R and cancels a held canvas pointer', () => {
     const controls = new RaceInputController()
     const { session } = recoverySession()

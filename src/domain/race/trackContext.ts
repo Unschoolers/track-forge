@@ -74,6 +74,7 @@ export function turnAmountAt(
 function nearestContinuousPathPoint(
   path: RoadPath,
   vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'player'>>,
+  playerSearchRadius = 80,
 ): NearestPathPoint | undefined {
   const count = path.points.length
   if (count === 0) return undefined
@@ -82,7 +83,7 @@ function nearestContinuousPathPoint(
     : Math.max(0, Math.min(count - 1, Math.round(vehicle.pathIndex)))
   // AI advances only a few samples per physics step. A broad spatial search
   // can pick a distant hairpin arm and make its pursuit target jump backwards.
-  const searchRadius = vehicle.player === false ? 12 : 80
+  const searchRadius = vehicle.player === false ? 12 : playerSearchRadius
   const nearest = nearestPathPoint(path, vehicle, start, searchRadius)
   const current = path.points[start]
   if (!nearest || !current || nearest.point.segment === current.segment) {
@@ -231,8 +232,9 @@ export function getVehicleStepContext(
   vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex' | 'z'> &
     Partial<Pick<RaceVehicle, 'grounded' | 'player'>>,
   previousSupport?: VehicleStepContext,
+  playerSearchRadius = 80,
 ): VehicleStepContext {
-  const local = nearestContinuousPathPoint(path, vehicle)
+  const local = nearestContinuousPathPoint(path, vehicle, playerSearchRadius)
   let nearest = local
   let roadSurface = local && path.roadSurface.at(local.index, vehicle)
   if (local && roadSurface && local.distance > ROAD_GEOMETRY.onRoadRadius &&
@@ -449,6 +451,7 @@ export function resetVehicleToTrack(
     slip: 0,
     braking: false,
     ...(vehicle.brakePressure === undefined ? {} : { brakePressure: 0 }),
+    ...(vehicle.arcadeAssistBrake === undefined ? {} : { arcadeAssistBrake: 0 }),
     yawRate: 0,
     pathIndex: nearest.index,
     pathDistance: nearest.point.distance,

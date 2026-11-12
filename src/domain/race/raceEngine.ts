@@ -17,6 +17,7 @@ import {
   reconcileSupportAfterCollision,
   resetVehicleToTrack,
   turnAmountAt,
+  type VehicleStepContext,
 } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { advanceRaceEffects } from '@/domain/race/effects'
@@ -24,6 +25,7 @@ import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
+import { planArcadeSpeed } from '@/domain/race/arcadeSpeedPlanner'
 
 export type RaceEvent =
   | {
@@ -79,10 +81,20 @@ export type RaceStep = (
   random: RandomSource,
 ) => RaceStepResult
 
-function rampSpeedLimit(race: RaceState, vehicle: RaceVehicle): number {
+function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previous?: VehicleStepContext) {
+  // An Arcade car moves only a few samples per step. Restrict local matching
+  // to its route so a nearby return arm cannot redirect the speed plan.
+  const radius = vehicle.player && race.handling !== 'simulation' ? 12 : undefined
+  return getVehicleStepContext(race.path, vehicle, previous, radius)
+}
+
+function aiRampSpeedLimit(
+  race: RaceState,
+  vehicle: RaceVehicle,
+  startIndex: number,
+): number {
   // Anticipate climbs in the travel direction; descents keep their speed.
   const lookAhead = Math.min(40, Math.max(12, Math.ceil(vehicle.speed / 6)))
-  const startIndex = getVehicleStepContext(race.path, vehicle).nearest.index
   if (gradeForTravel(race.path.roadSurface.gradeAt(startIndex), race.reversed) < -0.025) {
     return Number.POSITIVE_INFINITY
   }
@@ -103,17 +115,23 @@ function advanceVehicle(
   deltaSeconds: number,
   random: RandomSource,
 ): RaceVehicle {
-  const previousContext = getVehicleStepContext(race.path, vehicle)
-  const speedLimit = rampSpeedLimit(race, vehicle)
+  const previousContext = raceVehicleContext(race, vehicle)
   let moved: RaceVehicle
   if (vehicle.player) {
+    const handling = race.handling ?? 'arcade'
+    const { tangent, nearest, onRoad } = previousContext
+    const travelSpeed = (vehicle.vx * tangent.x + vehicle.vy * tangent.y) *
+      (race.reversed ? -1 : 1)
+    const cornerSpeed = handling === 'arcade' && onRoad && travelSpeed > 0
+      ? planArcadeSpeed(race.path, nearest.index, race.reversed, vehicle.car)
+      : Infinity
     moved = stepVehicle(
       vehicle,
       input,
       previousContext,
       deltaSeconds,
-      race.handling ?? 'simulation',
-      speedLimit,
+      handling,
+      cornerSpeed,
     )
   } else {
     moved = stepAiVehicle(
@@ -124,10 +142,10 @@ function advanceVehicle(
       deltaSeconds,
       random,
       race.reversed,
-      speedLimit,
+      aiRampSpeedLimit(race, vehicle, previousContext.nearest.index),
     )
   }
-  const nextContext = getVehicleStepContext(race.path, moved, previousContext)
+  const nextContext = raceVehicleContext(race, moved, previousContext)
   const longitudinalSpeed = Math.abs(
     moved.vx * nextContext.tangent.x +
       moved.vy * nextContext.tangent.y,
@@ -183,7 +201,7 @@ export const stepRace: RaceStep = (
     })
   }
   const progressed = barrierFrame.vehicles.map((vehicle, index) => {
-    const context = getVehicleStepContext(state.path, vehicle)
+    const context = raceVehicleContext(state, vehicle)
     const previous = state.vehicles[index]
     const stuckDuration =
       vehicle.player &&
@@ -259,7 +277,7 @@ export const stepRace: RaceStep = (
     dt,
   )
   let vehicles = collisionFrame.vehicles.map((collided, index) => {
-    const context = getVehicleStepContext(state.path, collided)
+    const context = raceVehicleContext(state, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     if (vehicle.player && !arcade) return vehicle
     const waterContact = hasVehicleWaterContact({
@@ -300,7 +318,7 @@ export const stepRace: RaceStep = (
   }
   let player = vehicles.find((vehicle) => vehicle.player)
   const playerContext = player
-    ? getVehicleStepContext(state.path, player)
+    ? raceVehicleContext(state, player)
     : undefined
   const playerWaterContact =
     player !== undefined &&

@@ -96,7 +96,7 @@ export function createRaceSetupModal(
   }
   handling.append(
     handlingRow,
-    element('p', 'modal-subtitle', 'Arcade responds faster to touch steering. Simulation preserves the original tire behavior.'),
+    element('p', 'modal-subtitle', 'Arcade accelerates automatically. Simulation: hold GAS or W / ↑ to accelerate. Focused pedals: hold Space or Enter.'),
   )
   const raceLength = element('section', 'setup-section')
   raceLength.append(element('h3', 'setup-label', 'RACE LENGTH'))

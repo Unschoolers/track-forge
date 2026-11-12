@@ -138,9 +138,11 @@ function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessio
       braking: false,
     })),
     setKeyboard: vi.fn(),
+    setPedalKeyboard: vi.fn(),
     beginSteering: vi.fn(),
     updateSteering: vi.fn(),
     beginBrake: vi.fn(),
+    beginThrottle: vi.fn(),
     endPointer: vi.fn(),
     onReset: vi.fn(() => () => undefined),
     reset: vi.fn(),
@@ -295,6 +297,79 @@ describe('race UI flow', () => {
     )
     expect(root.querySelector('[data-screen="race"]')).toBe(screen)
     expect(root.querySelector('[data-race-countdown]')?.textContent).toBe('3')
+  })
+
+  it('exposes separate simulation pedals and releases each touch independently', () => {
+    const controls = new RaceInputController()
+    const { root, updateRace } = setup(controls)
+    const simulation = raceSnapshot()
+    const simulationSetup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 3, handling: 'simulation' as const }
+    updateRace({ ...simulation, setup: simulationSetup })
+    const throttle = requiredElement(root, '[data-action="throttle"]')
+    const brake = requiredElement(root, '[data-action="brake"]')
+    const pad = requiredElement(root, '[data-race-steering]')
+    expect(throttle.hidden).toBe(false)
+    pad.dispatchEvent(pointer('pointerdown', 1, 100))
+    window.dispatchEvent(pointer('pointermove', 1, 148))
+    throttle.dispatchEvent(pointer('pointerdown', 2))
+    brake.dispatchEvent(pointer('pointerdown', 3))
+    expect(controls.snapshot()).toEqual({ steering: 1, throttle: 1, braking: true })
+    window.dispatchEvent(pointer('pointercancel', 2))
+    expect(controls.snapshot()).toEqual({ steering: 1, throttle: 0, braking: true })
+    expect(throttle.classList.contains('pressed')).toBe(false)
+    throttle.dispatchEvent(pointer('pointerdown', 4))
+    updateRace({ ...simulation, setup: simulationSetup,
+      state: { paused: true, vehicles: [] } as unknown as RaceSessionSnapshot['state'] })
+    expect(controls.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
+    updateRace(raceSnapshot())
+    expect(throttle.hidden).toBe(true)
+    expect(controls.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
+  })
+
+  it('keeps held gas through GO but clears controls on pause and resume', () => {
+    const controls = new RaceInputController()
+    const { root, updateRace } = setup(controls)
+    const raceSetup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 3, handling: 'simulation' as const }
+    const countdown = raceSnapshot({ phase: 'countdown' })
+    updateRace({ ...countdown, setup: raceSetup })
+    requiredElement(root, '[data-action="throttle"]').dispatchEvent(pointer('pointerdown', 51))
+    updateRace({ ...raceSnapshot(), setup: raceSetup })
+    expect(controls.snapshot().throttle).toBe(1)
+    updateRace({ ...raceSnapshot(), setup: raceSetup, state: { paused: true, vehicles: [] } as unknown as RaceSessionSnapshot['state'] })
+    expect(controls.snapshot().throttle).toBe(0)
+    controls.setKeyboard('w', true)
+    updateRace({ ...raceSnapshot(), setup: raceSetup })
+    expect(controls.snapshot().throttle).toBe(0)
+  })
+
+  it('holds focused pedal with Enter or Space without sending Space to global braking', () => {
+    const controls = new RaceInputController()
+    const { root, updateRace } = setup(controls)
+    const snapshot = raceSnapshot()
+    updateRace({ ...snapshot, setup: { car: 'blue', difficulty: 'normal', laps: 3, handling: 'simulation' } })
+    const throttle = requiredElement(root, '[data-action="throttle"]')
+    const brake = requiredElement(root, '[data-action="brake"]')
+    const globalKey = vi.fn()
+    window.addEventListener('keydown', globalKey)
+    try {
+      throttle.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }))
+      expect(controls.snapshot()).toMatchObject({ throttle: 1, braking: false })
+      expect(globalKey).not.toHaveBeenCalled()
+      throttle.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true }))
+      expect(controls.snapshot().throttle).toBe(0)
+      throttle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      expect(controls.snapshot().throttle).toBe(1)
+      throttle.dispatchEvent(new FocusEvent('blur'))
+      expect(controls.snapshot().throttle).toBe(0)
+      throttle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true }))
+      expect(controls.snapshot().throttle).toBe(0)
+      brake.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      expect(controls.snapshot().braking).toBe(true)
+      brake.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true, cancelable: true }))
+      expect(controls.snapshot().braking).toBe(false)
+    } finally {
+      window.removeEventListener('keydown', globalKey)
+    }
   })
 
   it('binds steering, brake, pause, and cancellation to shared controls', () => {

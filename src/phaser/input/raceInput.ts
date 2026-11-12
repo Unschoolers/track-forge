@@ -2,14 +2,21 @@ import { clamp } from '@/domain/geometry/math'
 import type { DriverInput } from '@/domain/race/raceState'
 import type { RaceControlsPort } from '@/application/ports/input'
 
+/** Arcade keeps its automatic throttle; Simulation uses the held input. */
+export function inputForHandling(input: DriverInput, handling: 'arcade' | 'simulation' | undefined): DriverInput {
+  return handling === 'simulation' ? input : { ...input, throttle: 1 }
+}
+
 type PointerState =
   | { readonly role: 'steering'; steering: number }
   | { readonly role: 'brake' }
+  | { readonly role: 'throttle' }
 
 export class RaceInputController implements RaceControlsPort {
   private readonly pointers = new Map<number, PointerState>()
   private readonly steeringKeys = new Set<string>()
-  private keyboardBrake = false
+  private readonly brakeKeys = new Set<string>()
+  private readonly throttleKeys = new Set<string>()
   private activeSteeringPointer: number | undefined
   private readonly resetListeners = new Set<() => void>()
 
@@ -21,9 +28,10 @@ export class RaceInputController implements RaceControlsPort {
       steering: activePointer?.role === 'steering'
         ? activePointer.steering
         : this.keyboardDirection(),
-      throttle: 1,
+      throttle: this.throttleKeys.size > 0 ||
+        [...this.pointers.values()].some((pointer) => pointer.role === 'throttle') ? 1 : 0,
       braking:
-        this.keyboardBrake ||
+        this.brakeKeys.size > 0 ||
         [...this.pointers.values()].some((pointer) => pointer.role === 'brake'),
     }
   }
@@ -41,13 +49,21 @@ export class RaceInputController implements RaceControlsPort {
       this.steeringKeys.delete(normalized)
       if (pressed) this.steeringKeys.add(normalized)
     }
-    if (
-      key === ' ' ||
-      key === 'ArrowDown' ||
-      key.toLowerCase() === 's'
-    ) {
-      this.keyboardBrake = pressed
+    if ([' ', 'arrowdown', 's'].includes(normalized)) {
+      if (pressed) this.brakeKeys.add(normalized)
+      else this.brakeKeys.delete(normalized)
     }
+    if (['arrowup', 'w'].includes(normalized)) {
+      if (pressed) this.throttleKeys.add(normalized)
+      else this.throttleKeys.delete(normalized)
+    }
+  }
+
+  setPedalKeyboard(pedal: 'brake' | 'throttle', key: string, pressed: boolean): void {
+    const keys = pedal === 'brake' ? this.brakeKeys : this.throttleKeys
+    const name = `pedal:${key}`
+    if (pressed) keys.add(name)
+    else keys.delete(name)
   }
 
   beginSteering(id: number, steering: number): void {
@@ -64,6 +80,10 @@ export class RaceInputController implements RaceControlsPort {
 
   beginBrake(id: number): void {
     this.pointers.set(id, { role: 'brake' })
+  }
+
+  beginThrottle(id: number): void {
+    this.pointers.set(id, { role: 'throttle' })
   }
 
   endPointer(id: number): void {
@@ -85,7 +105,8 @@ export class RaceInputController implements RaceControlsPort {
     this.pointers.clear()
     this.activeSteeringPointer = undefined
     this.steeringKeys.clear()
-    this.keyboardBrake = false
+    this.brakeKeys.clear()
+    this.throttleKeys.clear()
     for (const listener of this.resetListeners) listener()
   }
 }

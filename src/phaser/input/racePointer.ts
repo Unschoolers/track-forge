@@ -21,7 +21,7 @@ export interface RacePointerBinding {
 /** Pointer coordinates are viewport CSS pixels, independent of canvas resolution. */
 export function bindRacePointer(
   target: HTMLElement,
-  role: 'steering' | 'brake',
+  role: 'steering' | 'brake' | 'throttle',
   controls: RaceControlsPort,
   onChange: () => void = () => undefined,
   getSensitivity: () => SteeringSensitivity | undefined = () => 1,
@@ -56,7 +56,8 @@ export function bindRacePointer(
       // Keep tracking through the window until release or focus loss.
     }
     if (role === 'steering') controls.beginSteering(event.pointerId, 0)
-    else controls.beginBrake(event.pointerId)
+    else if (role === 'brake') controls.beginBrake(event.pointerId)
+    else controls.beginThrottle(event.pointerId)
     onChange()
   }
   const onMove = (event: PointerEvent): void => {

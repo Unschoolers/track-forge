@@ -1,8 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { RaceInputController } from '@/phaser/input/raceInput'
+import { RaceInputController, inputForHandling } from '@/phaser/input/raceInput'
 import { steeringFromDrag } from '@/phaser/input/racePointer'
 
 describe('RaceInputController', () => {
+  it('keeps automatic throttle in Arcade but uses manual throttle in Simulation', () => {
+    const input = new RaceInputController().snapshot()
+    expect(inputForHandling(input, 'arcade').throttle).toBe(1)
+    expect(inputForHandling(input, undefined).throttle).toBe(1)
+    expect(inputForHandling(input, 'simulation').throttle).toBe(0)
+  })
+
+  it('holds throttle independently across keys and multiple pointers', () => {
+    const input = new RaceInputController()
+    expect(input.snapshot().throttle).toBe(0)
+    input.setKeyboard('w', true)
+    input.setKeyboard('ArrowUp', true)
+    input.setKeyboard('w', false)
+    expect(input.snapshot().throttle).toBe(1)
+    input.beginSteering(1, -0.5)
+    input.beginThrottle(2)
+    input.beginThrottle(3)
+    input.beginBrake(4)
+    input.setKeyboard('ArrowUp', false)
+    input.endPointer(2)
+    expect(input.snapshot()).toEqual({ steering: -0.5, throttle: 1, braking: true })
+    input.endPointer(3)
+    expect(input.snapshot()).toEqual({ steering: -0.5, throttle: 0, braking: true })
+    input.reset()
+    expect(input.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
+  })
+
   it('provides fine center steering while retaining full lock after a 48px drag', () => {
     expect(steeringFromDrag(0)).toBe(0)
     expect(steeringFromDrag(3)).toBe(0)
@@ -31,7 +58,7 @@ describe('RaceInputController', () => {
     input.setKeyboard(' ', true)
     expect(input.snapshot()).toEqual({
       steering: -1,
-      throttle: 1,
+      throttle: 0,
       braking: true,
     })
     input.setKeyboard('ArrowLeft', false)
@@ -50,7 +77,7 @@ describe('RaceInputController', () => {
     input.reset()
     expect(input.snapshot()).toEqual({
       steering: 0,
-      throttle: 1,
+      throttle: 0,
       braking: false,
     })
   })

@@ -1,3 +1,4 @@
+import { inputForHandling } from '@/phaser/input/raceInput'
 import Phaser from 'phaser'
 import type { AppSnapshot } from '@/application/appState'
 import {
@@ -182,7 +183,7 @@ export class RaceScene extends Phaser.Scene {
     this.snapshot = this.controller.snapshot()
     this.raceSession.advance(
       Math.max(0, this.game.loop.rawDelta / 1000),
-      this.controls.snapshot(),
+      inputForHandling(this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
     )
     const race = this.raceSession.snapshot().state
     if (!race) return
@@ -275,6 +276,7 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.repeat) return
     if (event.key === 'Escape') {
       this.controller.dispatch({ type: 'pause-race' })
       return
@@ -286,6 +288,8 @@ export class RaceScene extends Phaser.Scene {
       this.raceSession.resetPlayer()
       return
     }
+    const race = this.raceSession.snapshot().state
+    if (race?.paused || race?.phase === 'finished') return
     this.controls.setKeyboard(event.key, true)
   }
   private readonly onKeyUp = (event: KeyboardEvent): void => {
