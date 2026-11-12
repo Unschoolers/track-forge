@@ -90,6 +90,7 @@ describe('DomUiHost', () => {
     expect(race?.textContent).toContain('RACE')
     editor?.click()
     race?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="arcade-cup"]')?.click()
 
     expect(port.dispatch).toHaveBeenNthCalledWith(1, {
       type: 'open-track-library',
@@ -99,6 +100,7 @@ describe('DomUiHost', () => {
       type: 'open-track-library',
       purpose: 'race',
     })
+    expect(port.dispatch).toHaveBeenNthCalledWith(3, { type: 'start-cup' })
   })
 
   it('updates to editor and race layouts without remounting the host', () => {

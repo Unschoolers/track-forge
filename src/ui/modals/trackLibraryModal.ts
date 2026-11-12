@@ -1,3 +1,4 @@
+import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import type { AppSnapshot } from '@/application/appState'
 import type { Track, TrackId } from '@/domain/model'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
@@ -34,6 +35,7 @@ export function createTrackLibraryModal(
     actions.close,
   )
   const list = element('div', 'track-list')
+  if (race) list.append(element('h3', 'results-heading', 'SAVED TRACKS'))
   for (const track of state.tracks) {
     const validation = validateTrack(
       track,
@@ -90,6 +92,16 @@ export function createTrackLibraryModal(
     list.append(
       element('p', 'empty-state', 'No tracks saved yet.'),
     )
+  }
+  if (race) {
+    list.append(element('h3', 'results-heading', 'OFFICIAL CIRCUITS'))
+    for (const { track, target } of OFFICIAL_CIRCUITS) {
+      const card = element('article', 'track-card')
+      const copy = element('div', 'track-card-copy')
+      copy.append(element('strong', 'track-card-name', track.name), element('span', 'track-card-meta', `ONE LAP TARGET ${formatRaceTime(target)}`))
+      card.append(copy, button('SELECT', `select-race-${track.id}`, () => actions.selectForRace(track.id), 'track-mini-button primary'))
+      list.append(card)
+    }
   }
   const fileInput = document.createElement('input')
   fileInput.type = 'file'

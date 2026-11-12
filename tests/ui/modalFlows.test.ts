@@ -120,6 +120,7 @@ describe('modal application flows', () => {
     )
 
     expect(root.textContent).toContain('Starter Circuit')
+    expect(root.querySelector('[data-action^="select-race-"]')?.getAttribute('data-action')).toBe('select-race-ready')
     expect(root.textContent).toContain('01:02.345')
     expect(root.textContent).toContain('NEEDS EDITING')
     expect(

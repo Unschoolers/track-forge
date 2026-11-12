@@ -1,3 +1,5 @@
+import { cupStandings, type CircuitCup } from '@/application/race/circuitCup'
+import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
@@ -12,6 +14,7 @@ export function createResultsModal(
     readonly edit: () => void
     readonly home: () => void
   },
+  cupAction?: { readonly cup: CircuitCup; readonly next: () => void },
 ): HTMLElement {
   const headline = result.outcome === 'water'
     ? 'SUNK'
@@ -49,6 +52,18 @@ export function createResultsModal(
     frame.body.append(element('p', 'modal-subtitle', 'Replay could not be saved on this device.'))
   }
   frame.body.append(createHighScores(result.highScores))
+  if (cupAction) {
+    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${OFFICIAL_CIRCUITS.length}`))
+    for (const [index, driver] of cupStandings(cupAction.cup).entries()) {
+      frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
+    }
+    frame.footer.append(
+      button('LEAVE CUP', 'results-home', actions.home, 'button'),
+      button('RETRY', 'retry-race', actions.retry, 'button'),
+      button(cupAction.cup.index === OFFICIAL_CIRCUITS.length - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
+    )
+    return frame.overlay
+  }
   frame.footer.append(
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),

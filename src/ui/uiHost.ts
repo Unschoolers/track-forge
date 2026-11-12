@@ -145,6 +145,7 @@ export class DomUiHost implements UiHost {
       screen = createHomeScreen(state, {
             edit: () => openLibrary('edit'),
             race: () => openLibrary('race'),
+            cup: () => this.controller.dispatch({ type: 'start-cup' }),
             options: () =>
               this.controller.dispatch({
                 type: 'open-options',
@@ -250,7 +251,7 @@ export class DomUiHost implements UiHost {
               edit: () =>
                 this.controller.dispatch({ type: 'open-editor' }),
               home: () => this.controller.dispatch({ type: 'go-home' }),
-            })
+            }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined)
           : undefined
       }
       case 'track-library':
