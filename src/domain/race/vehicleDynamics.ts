@@ -26,7 +26,10 @@ export interface VehicleDynamicsParameters {
   readonly cornerStiffness: number
   readonly brakeForce: number
   readonly recovery: number
+  /** Speed target for drive and drag, which can change at terrain boundaries. */
   readonly maxSpeed: number
+  /** Separate numerical limit before the integration headroom is applied. */
+  readonly safetySpeed?: number
   readonly engineAcceleration: number
   readonly maxSteerAngle: number
   readonly grip: number
@@ -264,7 +267,8 @@ export function stepVehicleDynamics(
   if (nextLongitudinal < 0) nextLongitudinal = 0
   nextLongitudinal = Math.min(
     nextLongitudinal,
-    maxSpeed * Math.max(1, tuning.integration.maximumSpeedFactor),
+    Math.max(1, parameters.safetySpeed ?? maxSpeed) *
+      Math.max(1, tuning.integration.maximumSpeedFactor),
   )
 
   // Below tire-operating speed, settle residual motion without affecting

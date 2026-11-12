@@ -11,6 +11,13 @@ import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import { ARCADE_DYNAMICS_TUNING, VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
 
+// An exponential response reaches about 95% of the new grip in 0.15 s.
+const SURFACE_GRIP_TIME_CONSTANT = 0.05
+
+function getSurfaceSpec(surface: SurfaceId | 'grass') {
+  return surface === 'grass' ? OFFROAD_SURFACE : SURFACE_SPECS[surface]
+}
+
 export function stepVehicle(
   vehicle: RaceVehicle,
   input: DriverInput,
@@ -35,10 +42,7 @@ export function stepVehicle(
     VEHICLE_DYNAMICS_TUNING.integration.maximumDeltaSeconds,
   )
   const car = CAR_SPECS[vehicle.car]
-  const surface =
-    context.surface === 'grass'
-      ? OFFROAD_SURFACE
-      : SURFACE_SPECS[context.surface]
+  const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
   const damageRatio = vehicle.player
     ? clamp(vehicle.damage / Math.max(1, vehicle.damageLimit), 0, 1)
@@ -62,6 +66,14 @@ export function stepVehicle(
   const tuning = handling === 'arcade'
     ? ARCADE_DYNAMICS_TUNING
     : VEHICLE_DYNAMICS_TUNING
+  const targetGrip = surface.grip * terrain.grip
+  const previousGrip = vehicle.speed === 0
+    ? targetGrip
+    : vehicle.surfaceGrip ??
+      getSurfaceSpec(vehicle.currentSurface).grip *
+        VEHICLE_TERRAIN_SPECS[vehicle.car][vehicle.currentSurface].grip
+  const surfaceGrip = targetGrip +
+    (previousGrip - targetGrip) * Math.exp(-dt / SURFACE_GRIP_TIME_CONSTANT)
   const dynamics = stepVehicleDynamics(
     {
       angle: vehicle.angle,
@@ -87,6 +99,7 @@ export function stepVehicle(
       brakeForce: car.brakeForce,
       recovery: car.recovery,
       maxSpeed,
+      safetySpeed: Math.min(speedLimit, car.max),
       engineAcceleration:
         car.accel *
         surface.accel *
@@ -96,8 +109,7 @@ export function stepVehicle(
         car.steer * tuning.steering.maximumAngleScale,
       grip:
         car.grip *
-        surface.grip *
-        terrain.grip *
+        surfaceGrip *
         condition.grip,
       brakeGrip: car.brake * surface.brake * terrain.brake,
       rollingResistance:
@@ -131,6 +143,7 @@ export function stepVehicle(
     slip: Math.abs(dynamics.lateralSpeed),
     braking,
     currentSurface: context.surface,
+    surfaceGrip,
     onCurb: context.onCurb,
   }
 }

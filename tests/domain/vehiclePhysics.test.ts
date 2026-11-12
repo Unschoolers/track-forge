@@ -24,6 +24,49 @@ function vehicle(car: 'red' | 'green' | 'yellow' = 'red') {
 }
 
 describe('vehicle physics', () => {
+  it('carries street momentum onto grass before settling at a lower speed', () => {
+    const base = {
+      ...vehicle(),
+      x: 10_000,
+      y: 10_000,
+      angle: 0,
+      vx: 280,
+      speed: 280,
+      currentSurface: 'street' as const,
+    }
+    const grass = getVehicleStepContext(path, base)
+    expect(grass.surface).toBe('grass')
+    const input = { steering: 0, throttle: 1, braking: false }
+    const first = stepVehicle(base, input, grass, 1 / 60)
+    expect(first.speed).toBeGreaterThanOrEqual(252)
+
+    let running = first
+    for (let frame = 1; frame < 120; frame++) {
+      running = stepVehicle(running, input, grass, 1 / 60)
+    }
+    expect(running.speed).toBeLessThan(first.speed * 0.85)
+    for (let frame = 120; frame < 1200; frame++) {
+      running = stepVehicle(running, input, grass, 1 / 60)
+    }
+    expect(running.speed).toBeGreaterThan(25)
+    expect(running.speed).toBeLessThan(140)
+    const next = stepVehicle(running, input, grass, 1 / 60)
+    expect(next.speed).toBeCloseTo(running.speed, 1)
+  })
+
+  it('eases the loss of lateral grip when entering ice', () => {
+    const base = { ...vehicle(), angle: 0, vx: 100, vy: 45, speed: 110 }
+    const street = { ...getVehicleStepContext(path, base), grade: 0, surface: 'street' as const }
+    const ice = { ...street, surface: 'ice' as const }
+    const input = { steering: 0, throttle: 0, braking: false }
+    const roadStep = stepVehicle(base, input, street, 1 / 60)
+    const enteringIce = stepVehicle(base, input, ice, 1 / 60)
+    const settledIce = stepVehicle({ ...base, currentSurface: 'ice' }, input, ice, 1 / 60)
+
+    expect(enteringIce.slip).toBeGreaterThan(roadStep.slip)
+    expect(enteringIce.slip).toBeLessThan(settledIce.slip)
+  })
+
   it('applies car-specific grass performance and surface grip', () => {
     const farFromRoad = { ...vehicle(), x: 10_000, y: 10_000 }
     const grass = getVehicleStepContext(path, farFromRoad)
