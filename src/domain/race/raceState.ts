@@ -21,6 +21,7 @@ export interface RaceVehicle {
   readonly speed: number
   readonly slip: number
   readonly braking: boolean
+  readonly brakePressure?: number
   readonly lane: number
   readonly ai: AiDriverState | null
   readonly aiPace: number

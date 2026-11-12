@@ -15,6 +15,7 @@ export interface VehicleDynamicsControl {
   readonly steering: number
   readonly throttle: number
   readonly braking: boolean
+  readonly brakePressure?: number
 }
 
 export interface VehicleDynamicsParameters {
@@ -119,13 +120,10 @@ export function stepVehicleDynamics(
     throttle *
     contactLoad *
     Math.max(0, 1 - speedRatio * speedRatio)
-  const requestedBrakeAcceleration = control.braking
-    ? (parameters.brakeForce / Math.max(1, parameters.mass)) *
-      parameters.brakeGrip
-      * contactLoad
-    : 0
-  const brakeAcceleration = Math.min(
-    requestedBrakeAcceleration,
+  const pressure = clamp(finiteOr(control.brakePressure ?? Number(control.braking)), 0, 1)
+  const brakeAcceleration = pressure * Math.min(
+    (parameters.brakeForce / Math.max(1, parameters.mass)) *
+      parameters.brakeGrip * contactLoad,
     longitudinalGripAcceleration * tuning.forces.brakeGripUsage,
   )
   const direction =
@@ -273,9 +271,7 @@ export function stepVehicleDynamics(
     1 -
     Math.abs(steeringInput) *
       (1 - clamp(tuning.stability.steeringRetention, 0, 1))
-  const brakingStability = control.braking
-    ? clamp(tuning.stability.brakingRetention, 0, 1)
-    : 1
+  const brakingStability = 1 - pressure * (1 - clamp(tuning.stability.brakingRetention, 0, 1))
   const lateralStability =
     Math.max(0, tuning.stability.lateralDamping) *
     steeringStability *

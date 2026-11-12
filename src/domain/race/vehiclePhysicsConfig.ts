@@ -192,6 +192,8 @@ export const ARCADE_DYNAMICS_TUNING: VehicleDynamicsTuning = {
   },
 }
 
+export const ARCADE_BRAKE_TIMING = { pressSeconds: 0.15, releaseSeconds: 0.1 } as const
+
 export const CAR_PHYSICS_SPECS = {
   blue: {
     max: 306,

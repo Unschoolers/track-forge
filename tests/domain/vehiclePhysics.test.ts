@@ -118,6 +118,38 @@ describe('vehicle physics', () => {
     expect(arcade.speed).toBeGreaterThan(0)
   })
 
+  it('trims speed on the first Arcade brake frame instead of applying full force', () => {
+    const initial = { ...vehicle(), angle: 0, vx: 180, vy: 0, speed: 180 }
+    const context = { ...getVehicleStepContext(path, initial), surface: 'street' as const, grade: 0 }
+    const coast = { steering: 0.7, throttle: 0, braking: false }
+    const brake = { ...coast, throttle: 1, braking: true }
+    const dt = 1 / 60
+    const coasting = stepVehicle(initial, coast, context, dt, 'arcade')
+    const tapping = stepVehicle(initial, brake, context, dt, 'arcade')
+    const full = stepVehicle({ ...initial, brakePressure: 1 }, brake, context, dt, 'arcade')
+
+    expect(tapping.speed).toBeLessThan(coasting.speed)
+    expect(coasting.speed - tapping.speed).toBeLessThan((coasting.speed - full.speed) * 0.4)
+    expect(Math.abs(tapping.yawRate)).toBeGreaterThan(Math.abs(full.yawRate))
+  })
+
+  it('holds full braking to stop and restores acceleration after release', () => {
+    let car = { ...vehicle(), angle: 0, vx: 180, vy: 0, speed: 180 }
+    const context = { ...getVehicleStepContext(path, car), surface: 'street' as const, grade: 0 }
+    const dt = 1 / 60
+    for (let step = 0; step < 240; step += 1) {
+      car = stepVehicle(car, { steering: 0, throttle: 1, braking: true }, context, dt, 'arcade')
+    }
+    expect(car.speed).toBeLessThan(0.5)
+    const released = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
+    expect(released.speed).toBeLessThan(1)
+    car = released
+    for (let step = 0; step < 30; step += 1) {
+      car = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
+    }
+    expect(car.speed).toBeGreaterThan(40)
+  })
+
   it('resets a stuck player to the nearest road heading', () => {
     const base = {
       ...vehicle(),
