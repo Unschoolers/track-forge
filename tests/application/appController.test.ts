@@ -46,7 +46,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
     save: vi.fn(() => true),
   }
   const scoreStore: ScoreStore = {
-    forTrack: () => [],
+    forTrack: vi.fn(() => []),
     record: vi.fn(() => true),
     removeTrack: vi.fn(() => true),
   }
@@ -100,6 +100,47 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('shows an official race record on Home without adding the circuit to saved tracks', () => {
+    const { controller, raceSession, scoreStore } = setup(undefined, true)
+    let scores: ReturnType<ScoreStore['forTrack']> = []
+    vi.mocked(scoreStore.forTrack).mockImplementation((id) => id === 'official-meadow' ? scores : [])
+    vi.mocked(scoreStore.record).mockImplementation((_id, score) => { scores = [score]; return true })
+    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('official-meadow') })
+    controller.dispatch({ type: 'start-race' })
+    const input = { steering: 0, throttle: 1, braking: false }
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    controller.dispatch({ type: 'go-home' })
+    expect(controller.snapshot().scoresByTrack['official-meadow']?.[0]?.time).toBe(12.5)
+    expect(controller.snapshot().tracks.map((track) => track.id)).toEqual(['starter'])
+  })
+
+  it('runs the cup from Home, retries without duplicate points, and restores the saved track', () => {
+    const { controller, raceSession, trackStore } = setup(undefined, true)
+    const input = { steering: 0, throttle: 1, braking: false }
+    const finish = () => { raceSession.advance(3.7, input); raceSession.advance(0.02, input) }
+    controller.dispatch({ type: 'start-cup' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'race', cup: { index: 0 }, currentTrack: { id: 'official-meadow' } })
+    expect(raceSession.snapshot().setup).toMatchObject({ mode: 'normal', handling: 'arcade', laps: 1 })
+    finish()
+    const first = controller.snapshot().cup
+    expect(first?.rounds).toHaveLength(1)
+    controller.dispatch({ type: 'restart-race' })
+    expect(controller.snapshot().cup?.rounds).toHaveLength(0)
+    finish()
+    expect(controller.snapshot().cup?.rounds).toEqual(first?.rounds)
+    for (const id of ['official-hairpin', 'official-frost', 'official-bridge']) {
+      controller.dispatch({ type: 'next-cup-race' })
+      expect(controller.snapshot().currentTrack?.id).toBe(id)
+      finish()
+    }
+    expect(controller.snapshot().cup?.rounds).toHaveLength(4)
+    controller.dispatch({ type: 'next-cup-race' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', currentTrack: { id: 'starter' }, cup: null })
+    expect(trackStore.list().map((track) => track.id)).toEqual(['starter'])
+  })
+
+
   it('publishes immutable snapshots and coordinates mode transitions', () => {
     const { controller, raceSession } = setup()
     const listener = vi.fn()

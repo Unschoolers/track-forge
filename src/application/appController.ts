@@ -1,3 +1,5 @@
+import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { createCup, recordCupResult, retryCupRace, advanceCup } from '@/application/race/circuitCup'
 import type {
   Preferences,
   PreferencesStore,
@@ -48,6 +50,7 @@ export class AppController {
   private readonly now: () => number
   private readonly library: TrackLibraryService
   private state: AppSnapshot
+  private preCupTrack: Track | null = null
   private cancelPendingSave: (() => void) | undefined
   private pendingEditorSave = false
   private saveGeneration = 0
@@ -106,6 +109,8 @@ export class AppController {
         this.update({
           ...this.state,
           paused: true,
+          scoresByTrack: this.scoresForTracks(this.state.tracks),
+          cup: this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null,
           overlay: { type: 'results' },
         })
       }
@@ -130,16 +135,39 @@ export class AppController {
         this.update({
           ...this.state,
           mode: 'home',
+          currentTrack: this.state.cup ? this.preCupTrack : this.state.currentTrack,
+          cup: null,
           paused: false,
           overlay: { type: 'none' },
           notice: null,
         })
         break
       case 'open-editor':
+        if (this.state.currentTrack && OFFICIAL_CIRCUITS.some(({ track }) => track.id === this.state.currentTrack?.id)) {
+          const copy = this.library.importShared(this.state.currentTrack)
+          if (!copy.ok) { this.update({ ...this.state, notice: copy.message }); break }
+          if (this.state.mode === 'race') this.dependencies.raceSession.setPaused(true)
+          this.applyTrackMutation(copy, true)
+          break
+        }
         if (this.state.mode === 'race') {
           this.dependencies.raceSession.setPaused(true)
         }
         this.update({ ...this.state, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
+        break
+      case 'start-cup':
+        if (!this.flushPendingEditorSave()) break
+        this.preCupTrack = this.state.currentTrack
+        this.launchCupRace(createCup())
+        break
+      case 'next-cup-race':
+        if (this.state.cup && this.state.overlay.type === 'results') {
+          if (this.state.cup.index === OFFICIAL_CIRCUITS.length - 1) {
+            this.dispatch({ type: 'go-home' })
+          } else {
+            this.launchCupRace(advanceCup(this.state.cup))
+          }
+        }
         break
       case 'start-race':
         this.startRace()
@@ -170,6 +198,7 @@ export class AppController {
           this.update({
             ...this.state,
             paused: false,
+            cup: this.state.cup ? retryCupRace(this.state.cup) : null,
             overlay: { type: 'none' },
             notice: null,
           })
@@ -384,6 +413,19 @@ export class AppController {
     this.dependencies.raceSession.destroy()
   }
 
+  private launchCupRace(cup: import('@/application/race/circuitCup').CircuitCup): void {
+    const track = OFFICIAL_CIRCUITS[cup.index]?.track
+    if (!track) return
+    this.dependencies.raceSession.start(track, {
+      car: this.state.preferences.car,
+      difficulty: this.state.preferences.difficulty,
+      laps: 1,
+      handling: 'arcade',
+      mode: 'normal',
+    })
+    this.update({ ...this.state, cup, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice: null })
+  }
+
   private startRace(): void {
     if (!this.flushPendingEditorSave()) return
     const track = this.state.currentTrack
@@ -469,7 +511,7 @@ export class AppController {
 
   private selectTrackForRace(id: TrackId): void {
     if (!this.flushPendingEditorSave()) return
-    const track = this.library.select(id)
+    const track = OFFICIAL_CIRCUITS.find((entry) => entry.track.id === id)?.track ?? this.library.select(id)
     if (!track) return
     const validation = validateTrack(
       track,
@@ -626,6 +668,7 @@ export class AppController {
     const currentTrack = this.state.currentTrack
     if (
       currentTrack &&
+      !OFFICIAL_CIRCUITS.some(({ track }) => track.id === currentTrack.id) &&
       currentTrack.lighting !== preferences.lighting
     ) {
       const updatedTrack = {
@@ -671,7 +714,7 @@ export class AppController {
     tracks: readonly Track[],
   ): Readonly<Record<string, readonly ScoreEntry[]>> {
     return Object.fromEntries(
-      tracks.map((track) => [
+      [...tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)].map((track) => [
         track.id,
         this.dependencies.scoreStore.forTrack(track.id),
       ]),

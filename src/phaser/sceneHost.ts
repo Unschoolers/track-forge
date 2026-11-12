@@ -13,6 +13,7 @@ import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 export class PhaserSceneHost implements SceneHost {
   private game: Phaser.Game | undefined
   private mode: AppMode = 'home'
+  private raceTrackId: string | undefined
 
   constructor(
     private readonly parent: HTMLElement,
@@ -50,7 +51,14 @@ export class PhaserSceneHost implements SceneHost {
       })
       return
     }
+    const trackId = mode === 'race' ? this.controller.snapshot().currentTrack?.id : undefined
+    const trackChanged = mode === 'race' && trackId !== this.raceTrackId
+    this.raceTrackId = trackId
     if (modeChanged) this.syncScene()
+    else if (trackChanged) {
+      this.game.scene.stop('RaceScene')
+      this.game.scene.start('RaceScene')
+    }
   }
 
   /** Read-only camera position for the browser gameplay harness. */

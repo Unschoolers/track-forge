@@ -1,3 +1,4 @@
+import type { CircuitCup } from '@/application/race/circuitCup'
 import type { Preferences } from '@/application/ports/storage'
 import type { ScoreEntry } from '@/application/ports/storage'
 import type { TerrainBrushRadius } from '@/domain/config'
@@ -46,6 +47,7 @@ export type AppOverlay =
   | { readonly type: 'results' }
 
 export interface AppSnapshot {
+  readonly cup?: CircuitCup | null
   readonly mode: AppMode
   readonly paused: boolean
   readonly overlay: AppOverlay
@@ -81,6 +83,8 @@ export type AppCommand =
   | { readonly type: 'go-home' }
   | { readonly type: 'open-editor' }
   | { readonly type: 'start-race' }
+  | { readonly type: 'start-cup' }
+  | { readonly type: 'next-cup-race' }
   | { readonly type: 'pause-race' }
   | { readonly type: 'resume-race' }
   | { readonly type: 'restart-race' }
