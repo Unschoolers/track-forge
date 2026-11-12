@@ -1,6 +1,8 @@
 export type AiPhase = 'follow' | 'passing' | 'rejoin'
 
 export interface AiDriverState {
+  readonly passTargetId?: string | null
+  readonly passElapsed?: number
   readonly phase: AiPhase
   readonly baseLane: number
   readonly targetLane: number
@@ -16,6 +18,8 @@ export interface AiDriverState {
 export function createAiDriverState(baseLane: number): AiDriverState {
   return {
     phase: 'follow',
+    passTargetId: null,
+    passElapsed: 0,
     baseLane,
     targetLane: baseLane,
     passLane: baseLane,

@@ -11,6 +11,7 @@ const LEVEL_COMPATIBILITY = WORLD_ELEVATION.levelHeight / 2
 
 export interface TrafficObservation {
   readonly vehicle: RaceVehicle
+  readonly signedDistance: number
   readonly distance: number
   readonly laneGap: number
   readonly relativeSpeed: number
@@ -60,13 +61,12 @@ function forwardDistance(
           (((other.x - vehicle.x) * dx + (other.y - vehicle.y) * dy) /
             tangentLength) *
           (reversed ? -1 : 1)
-        // Round-off must not turn cars exactly side by side into a full-lap
-        // gap. Keep them visible to lane planning, including zero-gap overlap.
-        if (projection >= -0.000_001) return Math.max(0, projection)
+        // Preserve the local signed gap, including side-by-side overlap.
+        return projection
       }
     }
   }
-  return direct > 0 ? direct : direct + length
+  return path.closed && direct < 0 ? direct + length : direct
 }
 
 function sharesRoad(
@@ -134,7 +134,11 @@ export function getTrafficState(
     .map((other) => {
       const distance = forwardDistance(vehicle, other, path, reversed)
       const relativeSpeed = Math.max(0, vehicle.speed - other.speed)
+      const length = typeof path === 'number' ? path : path.totalLength
+      const closed = typeof path === 'number' || path.closed
+      const signedDistance = closed && distance > length / 2 ? distance - length : distance
       return {
+        signedDistance,
         vehicle: other,
         distance,
         laneGap: Math.abs(other.lane - vehicle.lane),
@@ -147,13 +151,12 @@ export function getTrafficState(
     })
     .filter(
       (observation) =>
-        observation.distance > 0 ||
-        (typeof path !== 'number' && observation.distance === 0),
+        typeof path !== 'number' || observation.distance > 0,
     )
     .sort((left, right) => left.distance - right.distance)
   return {
     ahead:
-      nearby.find((observation) => observation.laneGap <= TRAFFIC_CLEARANCE) ??
+      nearby.find((observation) => observation.signedDistance >= 0 && observation.laneGap <= TRAFFIC_CLEARANCE) ??
       null,
     nearby,
   }

@@ -1,5 +1,5 @@
 import type { RandomSource } from '@/application/ports/random'
-import { AI_OVERTAKE, DIFFICULTY_SPECS } from '@/domain/config'
+import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'
 import {
@@ -42,6 +42,8 @@ function advancePassingState(
         return {
           ...ai,
           phase: 'passing',
+          passTargetId: ahead.vehicle.id,
+          passElapsed: 0,
           targetLane: passLane,
           passLane,
           holdRemaining: tuning.laneHold,
@@ -52,10 +54,17 @@ function advancePassingState(
     }
     return { ...ai, targetLane: ai.baseLane, cooldownRemaining }
   }
+  const destinationClear = !traffic.nearby.some((entry) =>
+    Math.abs(entry.vehicle.lane - ai.baseLane) < Math.max(18, tuning.passClearance) &&
+    Math.abs(entry.signedDistance) < Math.max(18, tuning.completionDistance),
+  )
   if (ai.phase === 'passing') {
     const holdRemaining = Math.max(0, ai.holdRemaining - deltaSeconds)
-    const clear =
-      !ahead || ahead.distance > tuning.completionDistance * 2.2
+    const passElapsed = (ai.passElapsed ?? 0) + deltaSeconds
+    const target = traffic.nearby.find((entry) => entry.vehicle.id === ai.passTargetId)
+    const targetClear = !target || target.signedDistance < -tuning.completionDistance
+    // A stuck pass eventually aborts, but never enters an occupied lane.
+    const clear = destinationClear && (targetClear || passElapsed > 8)
     const clearTime = clear ? ai.clearTime + deltaSeconds : 0
     if (holdRemaining <= 0 && clearTime >= 0.25) {
       return {
@@ -66,7 +75,10 @@ function advancePassingState(
         clearTime,
       }
     }
-    return { ...ai, holdRemaining, clearTime, cooldownRemaining }
+    return { ...ai, holdRemaining, clearTime, cooldownRemaining, passElapsed }
+  }
+  if (!destinationClear) {
+    return { ...ai, phase: 'passing', targetLane: ai.passLane, clearTime: 0, cooldownRemaining }
   }
   if (Math.abs(vehicle.lane - ai.baseLane) < 3) {
     return {
@@ -158,6 +170,7 @@ export function stepAiVehicle(
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const curveSpeed = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
+    CAR_SPECS[vehicle.car], tuning.pace * vehicle.aiPace, vehicle.car,
   )
   const curveBraking = vehicle.speed > curveSpeed + 3
   const recovering = !context.onRoad
