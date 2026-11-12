@@ -109,6 +109,7 @@ export class AppController {
         this.update({
           ...this.state,
           paused: true,
+          scoresByTrack: this.scoresForTracks(this.state.tracks),
           cup: this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null,
           overlay: { type: 'results' },
         })
@@ -713,7 +714,7 @@ export class AppController {
     tracks: readonly Track[],
   ): Readonly<Record<string, readonly ScoreEntry[]>> {
     return Object.fromEntries(
-      tracks.map((track) => [
+      [...tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)].map((track) => [
         track.id,
         this.dependencies.scoreStore.forTrack(track.id),
       ]),
