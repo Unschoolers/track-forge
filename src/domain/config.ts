@@ -182,7 +182,7 @@ export const CAR_SPECS = {
     name: 'Yellow',
     role: 'Heavy off-road',
     description:
-      'Slowest on street, but keeps far more momentum and stability through dirt and grass.',
+      'Strong brakes and steady momentum through dirt and grass, with a lower street top speed.',
     uiSpeed: 2,
     uiGrip: 4,
     uiBrake: 5,

@@ -245,7 +245,7 @@ export const CAR_PHYSICS_SPECS = {
     max: 286,
     accel: 202,
     steer: 2.34,
-    grip: 1.06,
+    grip: 1.24,
     brake: 1.2,
     steerLoss: 0.061,
     mass: 1510,
