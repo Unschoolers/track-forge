@@ -248,6 +248,11 @@ export class DomUiHost implements UiHost {
           ? createResultsModal(result, {
               retry: () =>
                 this.controller.dispatch({ type: 'restart-race' }),
+              raceBestGhost: (() => {
+                const { track, setup } = this.runtime.raceSession.snapshot()
+                return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null
+                  ? () => this.controller.dispatch({ type: 'race-best-ghost' }) : undefined
+              })(),
               edit: () =>
                 this.controller.dispatch({ type: 'open-editor' }),
               home: () => this.controller.dispatch({ type: 'go-home' }),

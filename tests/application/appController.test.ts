@@ -225,6 +225,18 @@ describe('AppController', () => {
     expect(raceSession.snapshot().state?.paused).toBe(true)
   })
 
+  it('races the best ghost using the active session setup', () => {
+    const { controller, raceSession } = setup()
+    controller.dispatch({ type: 'start-race' })
+    const activeTrack = createStarterTrack(asTrackId('active'), 2)
+    const activeSetup = { car: 'red' as const, difficulty: 'hard' as const, laps: 3, handling: 'simulation' as const, mode: 'normal' as const }
+    vi.mocked(raceSession.snapshot).mockReturnValue({ track: activeTrack, setup: activeSetup } as ReturnType<RaceSessionPort['snapshot']>)
+    raceSession.ghostTime = vi.fn(() => 100)
+    controller.dispatch({ type: 'race-best-ghost' })
+    expect(raceSession.start).toHaveBeenLastCalledWith(activeTrack, { ...activeSetup, mode: 'ghost' })
+    expect(controller.snapshot().overlay.type).toBe('none')
+  })
+
   it('keeps an incomplete track in the editor instead of starting a race', () => {
     const incomplete = {
       ...createStarterTrack(asTrackId('short'), 1),

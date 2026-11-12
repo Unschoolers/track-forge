@@ -88,6 +88,7 @@ export type AppCommand =
   | { readonly type: 'pause-race' }
   | { readonly type: 'resume-race' }
   | { readonly type: 'restart-race' }
+  | { readonly type: 'race-best-ghost' }
   | { readonly type: 'select-track'; readonly id: TrackId }
   | {
       readonly type: 'open-track-library'

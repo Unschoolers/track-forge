@@ -11,6 +11,7 @@ export function createResultsModal(
   result: RaceResult,
   actions: {
     readonly retry: () => void
+    readonly raceBestGhost?: (() => void) | undefined
     readonly edit: () => void
     readonly home: () => void
   },
@@ -76,6 +77,9 @@ export function createResultsModal(
       actions.retry,
       'button button-primary',
     ),
+  )
+  if (actions.raceBestGhost) frame.footer.append(
+    button('RACE BEST GHOST', 'race-best-ghost', actions.raceBestGhost, 'button'),
   )
   return frame.overlay
 }

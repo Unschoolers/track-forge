@@ -35,7 +35,11 @@ export function createRaceHud(
   lapValue.dataset.raceLap = ''
   const timeValue = element('span', 'label', '00:00.000')
   timeValue.dataset.raceTime = ''
-  lap.append(lapValue, timeValue)
+  const lapTimes = element('span', 'label')
+  lapTimes.dataset.raceLapTimes = ''
+  const gap = element('span', 'label')
+  gap.dataset.raceGhostGap = ''
+  lap.append(lapValue, timeValue, lapTimes, gap)
   hud.append(position, button('☰', 'pause', actions.pause, 'icon-button'), lap)
 
   const damage = element('div', 'damage-meter')
@@ -134,6 +138,12 @@ export function createRaceHud(
     positionLabel.textContent = ghostRace ? 'GHOST TARGET' : 'POSITION'
     lapValue.textContent = `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
     timeValue.textContent = formatRaceTime(telemetry.elapsed)
+    const currentLap = telemetry.currentLapTime
+    const bestLap = telemetry.bestLapTime
+    lapTimes.textContent = `LAP ${currentLap == null ? '—' : formatRaceTime(currentLap)} · BEST ${bestLap == null ? '—' : formatRaceTime(bestLap)}`
+    const delta = telemetry.ghostGap
+    gap.textContent = ghostRace && delta != null
+      ? `GAP ${delta >= 0 ? '+' : '−'}${formatRaceTime(Math.abs(delta))}` : ''
     damageText.textContent = `${telemetry.damage}/${telemetry.damageLimit}`
     const damageRatio =
       telemetry.damageLimit > 0
