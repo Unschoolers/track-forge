@@ -41,6 +41,7 @@ export interface RaceVehicle {
   readonly damageCooldown: number
   readonly wrecked: boolean
   readonly currentSurface: SurfaceId | 'grass'
+  readonly surfaceGrip?: number
   readonly onCurb: boolean
   readonly stuckDuration: number
   readonly finishedAt: number | null
