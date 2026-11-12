@@ -33,6 +33,7 @@ import {
   type GhostRun,
   type GhostStore,
 } from '@/application/race/ghostReplay'
+import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
 
 export interface RaceSetup {
@@ -53,6 +54,9 @@ export interface RaceTelemetry {
   readonly totalLaps: number
   readonly damage: number
   readonly damageLimit: number
+  readonly currentLapTime?: number | null
+  readonly bestLapTime?: number | null
+  readonly ghostGap?: number | null
 }
 
 export interface RaceStanding {
@@ -147,6 +151,7 @@ export class RaceSession implements RaceSessionPort {
   private readonly geometry: TrackGeometryService
   private bestGhost: GhostRun | null = null
   private recording: GhostRecording | null = null
+  private timing = new LapTiming()
 
   constructor(private readonly dependencies: RaceSessionDependencies) {
     this.now = dependencies.now ?? (() => Date.now())
@@ -159,6 +164,8 @@ export class RaceSession implements RaceSessionPort {
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
     this.bestGhost = this.dependencies.ghostStore?.load(track, setup) ?? null
+    this.timing = new LapTiming(setup.mode === 'ghost' && this.bestGhost?.splits?.length === setup.laps * 4
+      ? this.bestGhost.splits : undefined)
     const resolved = { ...setup, mode: setup.mode === 'ghost' && this.bestGhost ? 'ghost' as const : 'normal' as const }
     const created = createRace({
       path: this.geometry.get(track).path,
@@ -196,6 +203,7 @@ export class RaceSession implements RaceSessionPort {
     const before = state.vehicles.find((vehicle) => vehicle.player)
     const after = reset.find((vehicle) => vehicle.player)
     if (before && after) this.recording?.recover(before, after, state.elapsed)
+    this.timing.recover()
     this.publish(
       this.buildSnapshot(
         this.current.track,
@@ -249,12 +257,15 @@ export class RaceSession implements RaceSessionPort {
       state = next.state
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
-      if (next.events.some((event) => event.type === 'vehicle-recovered' &&
-          next.state.vehicles.some((vehicle) => vehicle.player && vehicle.id === event.vehicleId))) {
+      const recovered = next.events.some((event) => event.type === 'vehicle-recovered' &&
+          next.state.vehicles.some((vehicle) => vehicle.player && vehicle.id === event.vehicleId))
+      if (recovered) {
+        this.timing.recover()
         const after = next.state.vehicles.find((vehicle) => vehicle.player)
         if (before && after) this.recording?.recover(before, after, state.elapsed)
       }
       const player = state.vehicles.find((vehicle) => vehicle.player)
+      if (before && player && !recovered) this.timing.cross(before.lap, before.nextSector, player.lap, player.nextSector, state.elapsed)
       if (player && state.phase !== 'finished') this.recording?.sample(player, state.elapsed)
       this.remainder = Math.max(0, this.remainder - FIXED_STEP)
       stepped = true
@@ -277,7 +288,7 @@ export class RaceSession implements RaceSessionPort {
         const frames = this.recording?.finish(player, result.playerTime)
         if (frames) {
           const previous = this.dependencies.ghostStore.load(track, setup)
-          const saved = this.dependencies.ghostStore.record(track, setup, result.playerTime, frames)
+          const saved = this.dependencies.ghostStore.record(track, setup, result.playerTime, frames, this.timing.complete(setup.laps))
           const best = this.dependencies.ghostStore.load(track, setup)
           const failed = !saved && (!previous || result.playerTime < previous.time)
           result = { ...result, ghostSaved: saved, ghostSaveFailed: failed,
@@ -339,6 +350,9 @@ export class RaceSession implements RaceSessionPort {
         totalLaps: state.totalLaps,
         damage: player?.damage ?? 0,
         damageLimit: player?.damageLimit ?? 0,
+        currentLapTime: this.timing.currentLap(state.elapsed),
+        bestLapTime: this.timing.bestLap,
+        ghostGap: this.timing.gap,
       },
     }
   }

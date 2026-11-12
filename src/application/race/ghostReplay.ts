@@ -20,13 +20,14 @@ export interface GhostRun {
   readonly car: CarId
   readonly time: number
   readonly frames: readonly GhostFrame[]
+  readonly splits?: readonly number[]
 }
 export interface GhostPose extends GhostFrame {
   readonly car: CarId
 }
 export interface GhostStore {
   load(track: Track, setup: GhostSetup): GhostRun | null
-  record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[]): boolean
+  record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[], splits?: readonly number[]): boolean
 }
 
 export const MAX_GHOST_FRAMES = 3000 // Long Arcade runs compact older samples.

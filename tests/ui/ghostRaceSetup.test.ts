@@ -47,6 +47,15 @@ describe('Ghost Race setup', () => {
     } }, callbacks, null)
     expect(stale.querySelector('[data-action="mode-normal"]')?.getAttribute('aria-pressed')).toBe('true')
   })
+  it('offers and invokes the best ghost action when available', () => {
+    const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
+      playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false, standings: [], highScores: [] }
+    const raceBestGhost = vi.fn()
+    const modal = createResultsModal(result, { retry() {}, edit() {}, home() {}, raceBestGhost })
+    modal.querySelector<HTMLButtonElement>('[data-action="race-best-ghost"]')?.click()
+    expect(raceBestGhost).toHaveBeenCalledOnce()
+    expect(createResultsModal(result, { retry() {}, edit() {}, home() {} }).querySelector('[data-action="race-best-ghost"]')).toBeNull()
+  })
   it('compares the finish with the original ghost instead of awarding a solo-race medal', () => {
     const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
       playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false,

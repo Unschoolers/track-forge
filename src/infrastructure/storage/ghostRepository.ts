@@ -21,6 +21,10 @@ function validRun(value: unknown): value is GhostRun {
     Array.isArray(run.frames) && run.frames.length >= 2 &&
     run.frames.length <= MAX_GHOST_FRAMES &&
     run.frames[0]?.t === 0 && run.frames.at(-1)?.t === run.time &&
+    (run.splits === undefined || (Array.isArray(run.splits) && run.splits.length > 0 &&
+      run.splits.length % 4 === 0 && run.splits.every((time, index, splits) =>
+        Number.isFinite(time) && time > 0 && time <= (run.time ?? 0) &&
+        (index === 0 || time >= splits[index - 1])))) &&
     run.frames.every((frame, index, frames) =>
       frame && [frame.t, frame.x, frame.y, frame.angle, frame.z].every(Number.isFinite) &&
       frame.t >= 0 && frame.t <= run.time! &&
@@ -46,8 +50,8 @@ export class BrowserGhostRepository implements GhostStore {
     return this.all()[ghostRaceKey(track, setup)] ?? null
   }
 
-  record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[]): boolean {
-    const run = { car: setup.car, time, frames }
+  record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[], splits?: readonly number[]): boolean {
+    const run = { car: setup.car, time, frames, ...(splits ? { splits } : {}) }
     if (!validRun(run)) return false
     const all = this.all()
     const key = ghostRaceKey(track, setup)

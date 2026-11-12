@@ -164,6 +164,15 @@ export class AppController {
           })
         }
         break
+      case 'race-best-ghost': {
+        const { track, setup } = this.dependencies.raceSession.snapshot()
+        if (this.state.mode === 'race' && track && setup &&
+            this.dependencies.raceSession.ghostTime?.(track, setup) != null) {
+          this.dependencies.raceSession.start(track, { ...setup, mode: 'ghost' })
+          this.update({ ...this.state, paused: false, overlay: { type: 'none' }, notice: null })
+        }
+        break
+      }
       case 'restart-race':
         if (this.state.mode === 'race') {
           this.dependencies.raceSession.restart()
