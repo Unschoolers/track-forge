@@ -3,6 +3,10 @@ import {
   advanceRaceCamera,
   createRaceCamera,
 } from '@/phaser/camera/raceCamera'
+import { createRace } from '@/domain/race/raceFactory'
+import { buildRaceCameraHints } from '@/domain/race/trackContext'
+import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 
 describe('race camera', () => {
   it('caps camera rotation on abrupt route-heading discontinuities', () => {
@@ -114,5 +118,33 @@ describe('race camera', () => {
     expect(straight.zoom).toBeGreaterThanOrEqual(1.16)
     expect(corner.zoom).toBeGreaterThan(straight.zoom)
     expect(corner.zoom).toBeGreaterThanOrEqual(1.24)
+  })
+
+  it('frames the side of a fast approach where the road turns on a narrow phone', () => {
+    const path = buildRoadPath([
+      { x: -300, y: 0, surface: 'street', curve: 'corner' },
+      { x: 110, y: 0, surface: 'street', curve: 'corner' },
+      { x: 110, y: 380, surface: 'street', curve: 'corner' },
+    ], EMPTY_TERRAIN)
+    const player = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 }).vehicles[0]
+    const approach = nearestPathPoint(path, { x: 70, y: 0 })
+    if (!player || !approach) throw new Error('Missing corner approach fixture')
+    const car = {
+      ...player, x: 70, y: 0, speed: 300, angle: 0,
+      pathIndex: approach.index, pathDistance: approach.point.distance,
+    }
+    const hints = buildRaceCameraHints(path, car)
+    const options = { dynamicZoom: true, steering: 0 }
+    const camera = createRaceCamera(car)
+    const phone = advanceRaceCamera(camera, hints, {
+      ...options, viewport: { width: 320, height: 640 },
+    }, 1)
+    const wide = advanceRaceCamera(camera, hints, {
+      ...options, viewport: { width: 800, height: 640 },
+    }, 1)
+
+    expect(phone.y).toBeGreaterThan(40)
+    expect(phone.zoom).toBeLessThan(wide.zoom)
+    expect(phone.zoom).toBeGreaterThan(1)
   })
 })

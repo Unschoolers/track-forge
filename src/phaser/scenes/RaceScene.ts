@@ -194,6 +194,7 @@ export class RaceScene extends Phaser.Scene {
         {
           dynamicZoom: this.snapshot.preferences.dynamicZoomEnabled,
           steering: this.controls.snapshot().steering,
+          viewport: this.cameras.main,
         },
         Math.min(0.033, deltaMilliseconds / 1000),
       )

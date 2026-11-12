@@ -484,14 +484,31 @@ export function buildRaceCameraHints(
       weight
     weightTotal += weight
   }
-  // Give the camera an earlier view of the apex without pulling the car
-  // out of frame. The preview grows with speed but saturates before 50 units.
+  // Preview the road over reaction time plus braking distance. Keep the
+  // horizon local on short circuits, where another arm may be very close.
+  const horizon = Math.min(
+    path.totalLength * 0.28,
+    240,
+    30 + player.speed * 0.32 + player.speed ** 2 / (2 * 330),
+  )
+  const preview: Vector2[] = [player]
+  for (let offset = 1; offset < path.points.length; offset += 1) {
+    const index = context.nearest.index + direction * offset
+    if (!path.closed && (index < 0 || index >= path.points.length)) break
+    const point = wrapped(path, index)
+    if (!point) break
+    let distance = (point.distance - context.nearest.point.distance) * direction
+    if (path.closed && distance < 0) distance += path.totalLength
+    if (distance > horizon) break
+    preview.push(point)
+  }
   const lookAhead = Math.max(14, Math.min(46, 14 + player.speed * 0.095))
   return {
     target: {
       x: player.x + Math.cos(roadAngle) * lookAhead,
       y: player.y + Math.sin(roadAngle) * lookAhead,
     },
+    preview,
     roadAngle,
     upcomingCurve: weightTotal > 0 ? weightedCurve / weightTotal : 0,
     speed: player.speed,
