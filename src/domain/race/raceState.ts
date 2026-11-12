@@ -50,6 +50,8 @@ export interface RaceVehicle {
 
 export interface RaceCameraHints {
   readonly target: Vector2
+  /** Player position followed by route points inside the approach preview. */
+  readonly preview?: readonly Vector2[]
   readonly roadAngle: number
   readonly upcomingCurve: number
   readonly speed: number
