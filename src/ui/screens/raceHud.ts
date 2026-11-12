@@ -71,6 +71,8 @@ export function createRaceHud(
   steering.append(steeringThumb)
   const brake = button('BRAKE', 'brake', () => undefined, 'brake-button')
   brake.setAttribute('aria-label', 'Brake')
+  const throttle = button('GAS', 'throttle', () => undefined, 'throttle-button')
+  throttle.setAttribute('aria-label', 'Accelerate')
   const recover = button('RECOVER', 'recover', () => {
     const state = raceSession.snapshot().state
     if (state?.phase !== 'running' || state.paused) return
@@ -79,7 +81,7 @@ export function createRaceHud(
     raceSession.resetPlayer()
   }, 'button recover-button')
   const pedals = element('div', 'race-pedals')
-  pedals.append(recover, brake)
+  pedals.append(recover, brake, throttle)
   const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
   steeringHint.setAttribute('aria-hidden', 'true')
   controlsBar.append(steering, steeringHint, pedals)
@@ -90,12 +92,44 @@ export function createRaceHud(
     steering.setAttribute('aria-valuenow', input.steering.toFixed(2))
     steeringThumb.style.transform = `translateX(${input.steering * STEERING_RANGE_PX}px)`
     brake.classList.toggle('pressed', input.braking)
+    throttle.classList.toggle('pressed', input.throttle > 0)
   }
   const steeringBinding = bindRacePointer(
     steering, 'steering', controls, updateControls,
     () => state.preferences.steeringSensitivity,
   )
   const brakeBinding = bindRacePointer(brake, 'brake', controls, updateControls)
+  const throttleBinding = bindRacePointer(throttle, 'throttle', controls, updateControls)
+  const bindPedalKeyboard = (target: HTMLButtonElement, pedal: 'brake' | 'throttle'): (() => void) => {
+    const keyChange = (event: KeyboardEvent, pressed: boolean): void => {
+      if (event.key !== ' ' && event.key !== 'Enter') return
+      event.preventDefault()
+      // A focused pedal owns its press. Keyup can also clear a global Space
+      // press that began before focus moved to the pedal.
+      if (pressed) event.stopPropagation()
+      if (pressed && (target.disabled || event.repeat)) return
+      controls.setPedalKeyboard(pedal, event.key, pressed)
+      updateControls()
+    }
+    const down = (event: KeyboardEvent): void => keyChange(event, true)
+    const up = (event: KeyboardEvent): void => keyChange(event, false)
+    const blur = (): void => {
+      controls.setPedalKeyboard(pedal, ' ', false)
+      controls.setPedalKeyboard(pedal, 'Enter', false)
+      updateControls()
+    }
+    target.addEventListener('keydown', down)
+    target.addEventListener('keyup', up)
+    target.addEventListener('blur', blur)
+    return () => {
+      blur()
+      target.removeEventListener('keydown', down)
+      target.removeEventListener('keyup', up)
+      target.removeEventListener('blur', blur)
+    }
+  }
+  const unbindBrakeKeyboard = bindPedalKeyboard(brake, 'brake')
+  const unbindThrottleKeyboard = bindPedalKeyboard(throttle, 'throttle')
   const onBlur = (): void => {
     controls.reset()
     updateControls()
@@ -109,7 +143,25 @@ export function createRaceHud(
   let lastPosition: number | null = null
   let lastLap: number | null = null
   let bannerUntil = 0
+  let previousHandling: string | undefined
+  let previousPaused: boolean | undefined
+  let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
   const update = (snapshot: RaceSessionSnapshot): void => {
+    const handling = snapshot.setup?.handling ?? 'arcade'
+    const paused = snapshot.state?.paused ?? false
+    const phase = snapshot.telemetry.phase
+    if ((previousHandling !== undefined && handling !== previousHandling) ||
+      (previousPaused !== undefined && paused !== previousPaused) ||
+      (previousPhase !== undefined && phase !== previousPhase && (phase === 'finished' || previousPhase === 'finished'))) {
+      controls.reset()
+    }
+    previousHandling = handling
+    previousPaused = paused
+    previousPhase = phase
+    throttle.disabled = paused || phase === 'finished'
+    brake.disabled = paused || phase === 'finished'
+    throttle.hidden = handling !== 'simulation'
+    pedals.classList.toggle('simulation', handling === 'simulation')
     updateControls()
     recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused
     const telemetry = snapshot.telemetry
@@ -171,6 +223,9 @@ export function createRaceHud(
       unsubscribe = undefined
       steeringBinding.destroy()
       brakeBinding.destroy()
+      throttleBinding.destroy()
+      unbindBrakeKeyboard()
+      unbindThrottleKeyboard()
       window.removeEventListener('blur', onBlur)
       document.removeEventListener('visibilitychange', onVisibility)
       controls.reset()

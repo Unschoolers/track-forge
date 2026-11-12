@@ -24,6 +24,30 @@ function vehicle(car: 'red' | 'green' | 'yellow' = 'red') {
 }
 
 describe('vehicle physics', () => {
+  it('applies gradual proportional corner assistance and releases it after the corner', () => {
+    const initial = { ...vehicle(), angle: 0, vx: 180, vy: 0, speed: 180 }
+    const context = { ...getVehicleStepContext(path, initial), surface: 'street' as const, grade: 0 }
+    const input = { steering: 0.5, throttle: 1, braking: false }
+    const assisted = stepVehicle(initial, input, context, 1 / 60, 'arcade', 120)
+    const unassisted = stepVehicle(initial, input, context, 1 / 60, 'arcade')
+    expect(assisted.arcadeAssistBrake).toBeGreaterThan(0)
+    expect(assisted.arcadeAssistBrake).toBeLessThan(0.1)
+    expect(assisted.speed).toBeGreaterThan(120)
+    expect(assisted.speed).toBeLessThan(unassisted.speed)
+    const released = stepVehicle(assisted, input, context, 1 / 60, 'arcade')
+    expect(released.arcadeAssistBrake).toBeLessThan(assisted.arcadeAssistBrake ?? 0)
+  })
+
+  it('does not carry Arcade assistance into Simulation', () => {
+    const initial = { ...vehicle(), angle: 0, vx: 120, vy: 0, speed: 120 }
+    const context = { ...getVehicleStepContext(path, initial), grade: 0 }
+    const input = { steering: 0, throttle: 0, braking: false }
+    const switched = stepVehicle({ ...initial, arcadeAssistBrake: 0.5 }, input, context, 1 / 60, 'simulation')
+    const baseline = stepVehicle(initial, input, context, 1 / 60, 'simulation')
+    expect(switched.speed).toBeCloseTo(baseline.speed, 8)
+    expect(switched.braking).toBe(false)
+  })
+
   it('carries street momentum onto grass before settling at a lower speed', () => {
     const base = {
       ...vehicle(),
