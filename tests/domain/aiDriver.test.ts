@@ -303,7 +303,8 @@ describe('overtaking AI', () => {
         reversed,
       )
 
-      expect(traffic.ahead?.distance).toBeGreaterThan(100)
+      expect(traffic.ahead).toBeNull()
+      expect(traffic.nearby[0]?.signedDistance).toBeLessThan(0)
       expect(stepped.braking).toBe(false)
     },
   )
@@ -434,6 +435,98 @@ describe('overtaking AI', () => {
     })
     expect(committedLane).not.toBe(0)
     expect(held.ai?.passLane).toBe(committedLane)
+  })
+
+  it('does not brake a hard rival at 240 on a long flat straight', () => {
+    const [, ego] = cars()
+    if (!ego) throw new Error('Missing race fixture')
+    const straight = buildRoadPath([
+      { x: 0, y: 0, surface: 'street', curve: 'corner' },
+      { x: 3000, y: 0, surface: 'street', curve: 'corner' },
+      { x: 3000, y: 1000, surface: 'street', curve: 'corner' },
+      { x: 0, y: 1000, surface: 'street', curve: 'corner' },
+      { x: 0, y: 0, surface: 'street', curve: 'corner' },
+    ], EMPTY_TERRAIN)
+    const index = straight.points.findIndex((point) => point.distance > 600)
+    const moving = onPath({ ...ego, car: 'red', aiPace: 1 }, straight, index, 0, 240)
+    const result = stepAiVehicle(moving, straight, getTrafficState(moving, [], straight), 'hard', 0.05)
+    expect(result.braking).toBe(false)
+  })
+
+  it('brakes earlier for a street-to-ice bend than a street bend', () => {
+    const [, ego] = cars()
+    if (!ego) throw new Error('Missing race fixture')
+    const street = buildRoadPath([
+      { x: 0, y: 0, surface: 'street', curve: 'corner' },
+      { x: 1000, y: 0, surface: 'street', curve: 'corner' },
+      { x: 1000, y: 600, surface: 'street', curve: 'corner' },
+      { x: 0, y: 600, surface: 'street', curve: 'corner' },
+      { x: 0, y: 0, surface: 'street', curve: 'corner' },
+    ], EMPTY_TERRAIN)
+    const ice = { ...street, points: street.points.map((point) => ({ ...point,
+      surface: point.distance >= 900 && point.distance < 1200 ? 'ice' as const : point.surface })) }
+    const onset = (road: RoadPath) => road.points.findIndex((point, index) => {
+      if (point.distance < 500 || point.distance > 1000) return false
+      const car = onPath({ ...ego, aiPace: 1 }, road, index, 0, 180)
+      return stepAiVehicle(car, road, getTrafficState(car, [], road), 'normal', 0.05).braking
+    })
+    const streetOnset = onset(street)
+    const iceOnset = onset(ice)
+    expect(streetOnset).toBeGreaterThan(0)
+    expect(iceOnset).toBeGreaterThan(0)
+    expect(iceOnset).toBeLessThan(streetOnset)
+  })
+
+  it('does not cut back while the passed target is still ahead in the base lane', () => {
+    const [, ego, rival] = cars()
+    if (!ego || !rival) throw new Error('Missing race fixtures')
+    const passing = { ...ego, lane: 40, pathIndex: 10, ai: {
+      ...createAiDriverState(0), phase: 'passing' as const, targetLane: 40,
+      passLane: 40, holdRemaining: 0, clearTime: 0.3, passTargetId: rival.id,
+    } }
+    const blocker = { ...rival, lane: 0, pathIndex: 16 }
+    const result = driveWithTraffic(passing, getTrafficState(passing, [blocker], path.points.length))
+    expect(result.ai?.phase).toBe('passing')
+  })
+
+  it.each(['passing', 'rejoin'] as const)('keeps clear of near-edge traffic during %s', (phase) => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const ego = onPath(first, path, 30, 35, 100)
+    const passing = { ...ego, ai: { ...createAiDriverState(0), phase, passLane: 35,
+      targetLane: phase === 'rejoin' ? 0 : 35, holdRemaining: 0, clearTime: 0.3 } }
+    const rival = onPath(second, path, 31, 17, 100)
+    const result = stepAiVehicle(passing, path, getTrafficState(passing, [rival], path), 'normal', 0.05)
+    expect(result.ai?.phase).toBe('passing')
+    expect(result.ai?.targetLane).toBe(35)
+  })
+
+  it('does not wrap gaps on an open road', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const open = { ...path, closed: false }
+    const ego = onPath(first, open, 30, 0, 100)
+    const behind = onPath(second, open, 20, 0, 100)
+    const traffic = getTrafficState(ego, [behind], open)
+    expect(traffic.nearby[0]?.signedDistance).toBeLessThan(0)
+    expect(traffic.ahead).toBeNull()
+  })
+
+  it('ignores distant traffic behind on an open road and scores nearby traffic by proximity', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const open = { ...path, closed: false }
+    const ego = onPath(first, open, 80, 0, 100)
+    const near = onPath(second, open, 75, 20, 100)
+    const farther = onPath(second, open, 70, 20, 100)
+    const distant = onPath(second, open, 10, 20, 100)
+    const clear = getTrafficState(ego, [], open)
+    const nearTraffic = getTrafficState(ego, [near], open)
+    const fartherTraffic = getTrafficState(ego, [farther], open)
+    const distantTraffic = getTrafficState(ego, [distant], open)
+    expect(scorePassingLane(20, nearTraffic, 'normal')).toBeLessThan(scorePassingLane(20, fartherTraffic, 'normal'))
+    expect(distantTraffic.nearby).toEqual([])
+    expect(scorePassingLane(20, distantTraffic, 'normal')).toBe(scorePassingLane(20, clear, 'normal'))
   })
 
   it('applies seeded mistakes only through the injected random source', () => {
