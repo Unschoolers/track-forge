@@ -512,6 +512,23 @@ describe('overtaking AI', () => {
     expect(traffic.ahead).toBeNull()
   })
 
+  it('ignores distant traffic behind on an open road and scores nearby traffic by proximity', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const open = { ...path, closed: false }
+    const ego = onPath(first, open, 80, 0, 100)
+    const near = onPath(second, open, 75, 20, 100)
+    const farther = onPath(second, open, 70, 20, 100)
+    const distant = onPath(second, open, 10, 20, 100)
+    const clear = getTrafficState(ego, [], open)
+    const nearTraffic = getTrafficState(ego, [near], open)
+    const fartherTraffic = getTrafficState(ego, [farther], open)
+    const distantTraffic = getTrafficState(ego, [distant], open)
+    expect(scorePassingLane(20, nearTraffic, 'normal')).toBeLessThan(scorePassingLane(20, fartherTraffic, 'normal'))
+    expect(distantTraffic.nearby).toEqual([])
+    expect(scorePassingLane(20, distantTraffic, 'normal')).toBe(scorePassingLane(20, clear, 'normal'))
+  })
+
   it('applies seeded mistakes only through the injected random source', () => {
     const [, ego] = cars()
     if (!ego) throw new Error('Missing AI fixture')

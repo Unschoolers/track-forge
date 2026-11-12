@@ -11,12 +11,13 @@ export function scorePassingLane(
   const tuning = AI_OVERTAKE[difficulty]
   let score = 100 - Math.abs(lane) * 0.05
   for (const observation of traffic.nearby) {
+    const distance = Math.abs(observation.signedDistance)
     const laneGap = Math.abs(observation.vehicle.lane - lane)
     if (
-      observation.distance < tuning.triggerDistance &&
+      distance < tuning.triggerDistance &&
       laneGap < tuning.passClearance
     ) {
-      score -= (tuning.triggerDistance - observation.distance) * 3
+      score -= (tuning.triggerDistance - distance) * 3
     }
   }
   return score

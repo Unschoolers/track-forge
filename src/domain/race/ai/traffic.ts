@@ -1,4 +1,4 @@
-import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
+import { AI_OVERTAKE, ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -123,7 +123,7 @@ export function getTrafficState(
   path: RoadPath | number,
   reversed = false,
 ): TrafficState {
-  const nearby = others
+  const observations = others
     .filter(
       (other) =>
         other.id !== vehicle.id &&
@@ -154,9 +154,12 @@ export function getTrafficState(
         typeof path !== 'number' || observation.distance > 0,
     )
     .sort((left, right) => left.distance - right.distance)
+  const nearby = typeof path !== 'number' && !path.closed
+    ? observations.filter((observation) => Math.abs(observation.signedDistance) <= AI_OVERTAKE.hard.triggerDistance)
+    : observations
   return {
     ahead:
-      nearby.find((observation) => observation.signedDistance >= 0 && observation.laneGap <= TRAFFIC_CLEARANCE) ??
+      observations.find((observation) => observation.signedDistance >= 0 && observation.laneGap <= TRAFFIC_CLEARANCE) ??
       null,
     nearby,
   }
