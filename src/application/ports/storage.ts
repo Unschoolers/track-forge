@@ -34,6 +34,8 @@ export interface ScoreStore {
 
 export type HandlingMode = 'arcade' | 'simulation'
 
+export type SteeringSensitivity = 0.75 | 1 | 1.5
+
 export interface Preferences {
   readonly car: CarId
   readonly difficulty: DifficultyId
@@ -41,6 +43,7 @@ export interface Preferences {
   readonly audioEnabled: boolean
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean
+  readonly steeringSensitivity?: SteeringSensitivity
   readonly handling?: HandlingMode
   readonly raceLaps?: 1 | 2 | 3
   readonly raceMode?: 'normal' | 'ghost'

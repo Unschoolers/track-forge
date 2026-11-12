@@ -16,7 +16,7 @@ export interface RaceHudMount {
 }
 
 export function createRaceHud(
-  _state: AppSnapshot,
+  state: AppSnapshot,
   raceSession: RaceSessionPort,
   controls: RaceControlsPort,
   actions: { readonly pause: () => void },
@@ -87,7 +87,10 @@ export function createRaceHud(
     steeringThumb.style.transform = `translateX(${input.steering * STEERING_RANGE_PX}px)`
     brake.classList.toggle('pressed', input.braking)
   }
-  const steeringBinding = bindRacePointer(steering, 'steering', controls, updateControls)
+  const steeringBinding = bindRacePointer(
+    steering, 'steering', controls, updateControls,
+    () => state.preferences.steeringSensitivity,
+  )
   const brakeBinding = bindRacePointer(brake, 'brake', controls, updateControls)
   const onBlur = (): void => {
     controls.reset()

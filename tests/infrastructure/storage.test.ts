@@ -316,6 +316,18 @@ describe('score and preference repositories', () => {
     expect(preferences.load().handling).toBe('arcade')
   })
 
+  it('defaults legacy and malformed steering sensitivity and persists each option', () => {
+    const storage = new MemoryStore()
+    const preferences = new BrowserPreferencesRepository(storage)
+    expect(preferences.load().steeringSensitivity).toBe(1)
+    for (const steeringSensitivity of [0.75, 1.5, 1] as const) {
+      expect(preferences.save({ ...preferences.load(), steeringSensitivity })).toBe(true)
+      expect(new BrowserPreferencesRepository(storage).load().steeringSensitivity).toBe(steeringSensitivity)
+    }
+    storage.values.set('trackforge-steering-sensitivity', '2')
+    expect(preferences.load().steeringSensitivity).toBe(1)
+  })
+
   it('falls back for invalid preferences and persists valid changes', () => {
     const storage = new MemoryStore()
     storage.values.set('trackforge-last-car', 'purple')

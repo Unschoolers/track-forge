@@ -162,7 +162,10 @@ export class RaceScene extends Phaser.Scene {
     )
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
-    this.pointerBinding = bindRacePointer(this.game.canvas, 'steering', this.controls)
+    this.pointerBinding = bindRacePointer(
+      this.game.canvas, 'steering', this.controls, undefined,
+      () => this.controller.snapshot().preferences.steeringSensitivity,
+    )
     window.addEventListener('blur', this.onBlur)
     document.addEventListener('visibilitychange', this.onVisibility)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this)
