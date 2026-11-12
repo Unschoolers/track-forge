@@ -13,6 +13,12 @@ import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 function decodeScore(value: unknown): ScoreEntry | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const item = value as Record<string, unknown>
+  const rawCategory = item.category
+  const category = rawCategory && typeof rawCategory === 'object' ? rawCategory as Record<string, unknown> : undefined
+  const validCategory = category && typeof category.course === 'string' && category.course.length > 0 &&
+    typeof category.laps === 'number' && Number.isInteger(category.laps) && category.laps > 0 &&
+    (category.handling === 'arcade' || category.handling === 'simulation') &&
+    (category.mode === 'normal' || category.mode === 'ghost')
   return typeof item.time === 'number' &&
     Number.isFinite(item.time) &&
     isCarId(item.car) &&
@@ -22,6 +28,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
       (typeof item.date === 'number' && Number.isFinite(item.date)))
     ? {
         time: item.time,
+        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, handling: category.handling as 'arcade' | 'simulation', mode: category.mode as 'normal' | 'ghost' } } : {}),
         car: item.car,
         difficulty: item.difficulty,
         recordedAt:
@@ -30,6 +37,10 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
             : (item.date as number),
       }
     : undefined
+}
+
+function categoryKey(score: ScoreEntry): string {
+  return score.category ? JSON.stringify([score.category.course, score.category.laps, score.category.handling, score.category.mode, score.car, score.difficulty]) : 'legacy'
 }
 
 export class BrowserScoreRepository implements ScoreStore {
@@ -43,7 +54,7 @@ export class BrowserScoreRepository implements ScoreStore {
           .map(decodeScore)
           .filter((score) => score !== undefined)
           .sort((left, right) => left.time - right.time)
-          .slice(0, 5)
+          .filter((score, index, scores) => scores.slice(0, index).filter((previous) => categoryKey(previous) === categoryKey(score)).length < 5)
       : []
   }
 
@@ -52,7 +63,7 @@ export class BrowserScoreRepository implements ScoreStore {
     const all = this.read()
     all[trackId] = [...this.forTrack(trackId), score]
       .sort((left, right) => left.time - right.time)
-      .slice(0, 5)
+      .filter((entry, index, scores) => scores.slice(0, index).filter((previous) => categoryKey(previous) === categoryKey(entry)).length < 5)
     return this.storage.set(STORAGE_KEYS.scores, JSON.stringify(all))
   }
 
@@ -114,12 +125,13 @@ export class BrowserScoreRepository implements ScoreStore {
           score.car,
           score.difficulty,
           score.recordedAt,
+          categoryKey(score),
         ].join(':')
         unique.set(identity, score)
       }
       const scores = [...unique.values()]
         .sort((left, right) => left.time - right.time)
-        .slice(0, 5)
+        .filter((entry, index, scores) => scores.slice(0, index).filter((previous) => categoryKey(previous) === categoryKey(entry)).length < 5)
       if (scores.length > 0) merged[trackId] = scores
     }
     return merged

@@ -1,3 +1,4 @@
+import { raceCategory, sameCategory } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
 import type {
@@ -73,6 +74,7 @@ export interface RaceResult {
   readonly playerTime: number | null
   readonly playerWrecked: boolean
   readonly newRecord: boolean
+  readonly scoreSaveFailed?: boolean
   readonly standings: readonly RaceStanding[]
   readonly highScores: readonly ScoreEntry[]
   readonly ghostTime?: number
@@ -361,15 +363,19 @@ export class RaceSession implements RaceSessionPort {
           ? 'finished'
           : null)
     if (!outcome) return null
-    const oldScores = this.dependencies.scoreStore.forTrack(track.id)
+    const category = raceCategory(track, setup)
+    const comparable = (score: ScoreEntry) => sameCategory(score, category, setup)
+    const oldScores = this.dependencies.scoreStore.forTrack(track.id).filter(comparable)
     const playerTime =
       outcome === 'finished' ? player.finishedAt : null
-    const newRecord =
+    const recordCandidate =
       playerTime !== null &&
       (oldScores[0] === undefined || playerTime < oldScores[0].time)
+    let scoreSaved = true
     if (playerTime !== null) {
-      this.dependencies.scoreStore.record(track.id, {
+      scoreSaved = this.dependencies.scoreStore.record(track.id, {
         time: playerTime,
+        category,
         car: setup.car,
         difficulty: setup.difficulty,
         recordedAt: this.now(),
@@ -382,11 +388,12 @@ export class RaceSession implements RaceSessionPort {
       playerPlace: ranked.indexOf(player) + 1,
       playerTime,
       playerWrecked: player.wrecked,
-      newRecord,
+      newRecord: recordCandidate && scoreSaved,
+      ...(playerTime !== null && !scoreSaved ? { scoreSaveFailed: true } : {}),
       standings: ranked.map((vehicle, index) =>
         this.toStanding(vehicle, index),
       ),
-      highScores: this.dependencies.scoreStore.forTrack(track.id),
+      highScores: this.dependencies.scoreStore.forTrack(track.id).filter(comparable),
       ...(setup.mode === 'ghost' && this.bestGhost ? { ghostTime: this.bestGhost.time } : {}),
     }
   }

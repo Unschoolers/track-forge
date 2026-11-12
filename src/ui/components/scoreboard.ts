@@ -1,8 +1,9 @@
+import { scoreCategoryLabel } from '@/application/race/raceRecords'
 import type {
   RaceStanding,
 } from '@/application/race/raceSession'
 import type { ScoreEntry } from '@/application/ports/storage'
-import { CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
+import { CAR_SPECS } from '@/domain/config'
 import { element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 
@@ -39,7 +40,7 @@ export function createHighScores(scores: readonly ScoreEntry[]): HTMLElement {
       element(
         'span',
         undefined,
-        `${CAR_SPECS[score.car].name} · ${DIFFICULTY_SPECS[score.difficulty].name}`,
+        scoreCategoryLabel(score),
       ),
     )
     list.append(item)

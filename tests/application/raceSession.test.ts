@@ -270,6 +270,40 @@ describe('RaceSession', () => {
     expect(listener).toHaveBeenCalled()
   })
 
+  it('does not compare a modern result with an unclassified legacy time', () => {
+    const { store, scores } = createScoreStore()
+    scores.push({ time: 1, car: 'blue', difficulty: 'normal', recordedAt: 1 })
+    const step: RaceStep = (state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle, index) => ({
+        ...vehicle, finishedAt: index === 0 ? 12.5 : vehicle.finishedAt,
+      })) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+    expect(session.snapshot().result?.newRecord).toBe(true)
+    expect(session.snapshot().result?.highScores.map((score) => score.time)).toEqual([12.5])
+  })
+
+  it('reports a failed score write without announcing a record', () => {
+    const store: ScoreStore = { forTrack: () => [], record: () => false, removeTrack: () => true }
+    const feedback = createFeedback()
+    const step: RaceStep = (state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle, index) => ({
+        ...vehicle, finishedAt: index === 0 ? 12.5 : vehicle.finishedAt,
+      })) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback, step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+    expect(session.snapshot().result).toMatchObject({ newRecord: false, scoreSaveFailed: true, highScores: [] })
+    expect(feedback.handle).toHaveBeenCalledWith(expect.objectContaining({ type: 'finish', newRecord: false }))
+  })
+
   it('publishes terminal results and records a player finish exactly once', () => {
     const { store } = createScoreStore()
     const step: RaceStep = (state) => ({
@@ -304,6 +338,7 @@ describe('RaceSession', () => {
       car: 'blue',
       difficulty: 'normal',
       recordedAt: 250,
+      category: expect.objectContaining({ laps: 3, handling: 'arcade', mode: 'normal' }),
     })
     expect(session.snapshot().result).toMatchObject({
       outcome: 'finished',

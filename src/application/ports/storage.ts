@@ -19,7 +19,16 @@ export interface TrackStore {
   remove(id: TrackId): boolean
 }
 
+export interface ScoreCategory {
+  readonly course: string
+  readonly laps: number
+  readonly handling: HandlingMode
+  readonly mode: 'normal' | 'ghost'
+}
+
 export interface ScoreEntry {
+  /** Absent for historical scores whose race settings cannot be recovered. */
+  readonly category?: ScoreCategory
   readonly time: number
   readonly car: CarId
   readonly difficulty: DifficultyId
