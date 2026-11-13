@@ -1,6 +1,17 @@
 import type { RaceStanding } from '@/application/race/raceSession'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 
+export const CUP_CIRCUITS = [
+  'official-meadow',
+  'official-hairpin',
+  'official-frost',
+  'official-bridge',
+].map((id) => {
+  const circuit = OFFICIAL_CIRCUITS.find(({ track }) => track.id === id)
+  if (!circuit) throw new Error(`Missing Arcade Cup circuit: ${id}`)
+  return circuit
+})
+
 export interface CupDriver { readonly id: string; readonly label: string; readonly points: number }
 export interface CircuitCup { readonly index: number; readonly rounds: readonly (readonly CupDriver[])[] }
 export function createCup(): CircuitCup { return { index: 0, rounds: [] } }
@@ -21,6 +32,6 @@ export function cupStandings(cup: CircuitCup): CupDriver[] {
   return [...totals.values()].sort((a, b) => b.points - a.points || a.id.localeCompare(b.id))
 }
 export function advanceCup(cup: CircuitCup): CircuitCup {
-  return cup.rounds.length > cup.index && cup.index < OFFICIAL_CIRCUITS.length - 1
+  return cup.rounds.length > cup.index && cup.index < CUP_CIRCUITS.length - 1
     ? { ...cup, index: cup.index + 1 } : cup
 }
