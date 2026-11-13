@@ -69,6 +69,43 @@ function driveWithTraffic(
   })
 }
 
+describe('rival tendencies', () => {
+  it('assigns the same profiles to grid rivals at every difficulty', () => {
+    for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+      const race = createRace({ path, playerCar: 'blue', difficulty, laps: 1 })
+      expect(race.vehicles.slice(1).map((vehicle) => vehicle.ai?.personality))
+        .toEqual(['cautious', 'steady', 'opportunist'])
+    }
+    expect(createAiDriverState(0).personality).toBeUndefined()
+  })
+
+  it('makes three distinct decisions in the same safe passing scene', () => {
+    const [, first, second] = cars()
+    if (!first || !second) throw new Error('Missing race fixtures')
+    const ego = { ...first, lane: 0, pathIndex: 10, speed: 110, vx: 110 }
+    const traffic = getTrafficState(ego, [{ ...second, lane: 0, pathIndex: 16, speed: 100 }], path.points.length)
+    const decisions = (['cautious', 'steady', 'opportunist'] as const).map((profile) =>
+      driveWithTraffic({ ...ego, ai: createAiDriverState(0, profile) }, traffic).ai,
+    )
+    expect(decisions[0]?.phase).toBe('follow')
+    expect(decisions[1]?.phase).toBe('passing')
+    expect(decisions[2]?.phase).toBe('passing')
+    expect(decisions[1]?.passLane).not.toBe(decisions[2]?.passLane)
+  })
+
+  it.each(['cautious', 'steady', 'opportunist'] as const)('%s yields to occupied passing lanes', (profile) => {
+    const [, first, second, third] = cars()
+    if (!first || !second || !third) throw new Error('Missing race fixtures')
+    const ego = { ...first, lane: 0, pathIndex: 10, speed: 110, vx: 110, ai: createAiDriverState(0, profile) }
+    const traffic = getTrafficState(ego, [
+      { ...second, lane: 0, pathIndex: 16, speed: 45 },
+      { ...third, lane: -24, pathIndex: 11, speed: 90 },
+      { ...third, id: 'other', lane: 24, pathIndex: 11, speed: 90 },
+    ], path.points.length)
+    expect(driveWithTraffic(ego, traffic).ai?.phase).toBe('follow')
+  })
+})
+
 describe('overtaking AI', () => {
   it.each(['road path', 'sample count'] as const)(
     'ignores finished opponents when finding traffic using %s',

@@ -1,6 +1,9 @@
+export type AiPersonality = 'cautious' | 'steady' | 'opportunist'
+
 export type AiPhase = 'follow' | 'passing' | 'rejoin'
 
 export interface AiDriverState {
+  readonly personality?: AiPersonality
   readonly passTargetId?: string | null
   readonly passElapsed?: number
   readonly phase: AiPhase
@@ -15,8 +18,9 @@ export interface AiDriverState {
   readonly mistakeRemaining: number
 }
 
-export function createAiDriverState(baseLane: number): AiDriverState {
+export function createAiDriverState(baseLane: number, personality?: AiPersonality): AiDriverState {
   return {
+    ...(personality ? { personality } : {}),
     phase: 'follow',
     passTargetId: null,
     passElapsed: 0,
