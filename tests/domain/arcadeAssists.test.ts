@@ -174,70 +174,17 @@ const climbingBend = buildRoadPath([
   { x: 195, y: 1000, surface: 'street' },
 ], EMPTY_TERRAIN)
 
-function driveBend(handling: 'arcade' | 'simulation') {
-  const base = createRace({ path: climbingBend, playerCar: 'blue', difficulty: 'normal', laps: 2, handling })
-  const start = required(nearestPathPoint(climbingBend, { x: -450, y: 0 })).index
-  let player = placeOnRoad(climbingBend, required(base.vehicles[0]), start, 235, false)
-  let race: RaceState = { ...base, phase: 'running', vehicles: [player] }
-  let distance = player.pathDistance
-  let index = start
-  const frames = []
-  for (let frame = 0; frame < 600; frame += 1) {
-    while ((climbingBend.points[index + 1]?.distance ?? Infinity) <= distance) index += 1
-    const point = required(climbingBend.points[index])
-    if (point.y > 400) break
-    // Follow the authored centerline so the test measures speed planning
-    // independently of a particular driver's steering corrections.
-    player = placeOnRoad(climbingBend, player, index, player.speed, false)
-    race = stepRace({ ...race, vehicles: [player] }, input, 1 / 60, random).state
-    player = required(race.vehicles[0])
-    frames.push({ x: point.x, y: point.y, speed: player.speed, braking: player.braking, pressure: player.arcadeAssistBrake ?? 0 })
-    distance += player.speed / 60
-  }
-  return frames
-}
-
-it('eases into an uphill bend in Arcade and releases the assist on exit', () => {
-  const frames = driveBend('arcade')
-  const firstBrake = required(frames.find(({ braking }) => braking))
-  const apex = required(frames.find(({ y }) => y > 50))
-  expect(firstBrake.x).toBeLessThan(0)
-  expect(firstBrake.pressure).toBeGreaterThan(0)
-  expect(firstBrake.pressure).toBeLessThan(0.1)
-  expect(apex.speed).toBeLessThan(190)
-  expect(frames.every(({ pressure }) => pressure < 1)).toBe(true)
-  for (const [index, frame] of frames.entries()) {
-    expect(Math.abs(frame.pressure - (frames[index - 1]?.pressure ?? 0))).toBeLessThan(0.05)
-  }
-  const exit = required(frames.at(-1))
-  expect(exit.y).toBeGreaterThan(380)
-  expect(exit.braking).toBe(false)
-  expect(exit.speed).toBeGreaterThan(apex.speed)
-})
-
-it('uses manual drive and brake in Simulation through the same corner', () => {
-  const frames = driveBend('simulation')
-  expect(frames.every(({ braking, pressure }) => !braking && pressure === 0)).toBe(true)
-  expect(required(frames.find(({ y }) => y > 50)).speed)
-    .toBeGreaterThan(required(driveBend('arcade').find(({ y }) => y > 50)).speed)
-})
-
-it.each([false, true])('does not assist a player driving away from the planned bend (reversed=%s)', (reversed) => {
+it.each([false, true])('only brakes the Arcade player before a curve when requested (reversed=%s)', (reversed) => {
   const base = createRace({ path: climbingBend, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade', reversed })
   const approach = reversed ? { x: 195, y: 225 } : { x: -50, y: 0 }
   const index = required(nearestPathPoint(climbingBend, approach)).index
-  const source = required(base.vehicles[0])
-  const drive = (wrongWay: boolean) => {
-    const player = placeOnRoad(climbingBend, source, index, 235, reversed !== wrongWay)
-    return required(stepRace(
-      { ...base, phase: 'running', vehicles: [player] },
-      input,
-      1 / 60,
-      random,
-    ).state.vehicles[0])
-  }
-  expect(drive(false).braking).toBe(true)
-  expect(drive(true).braking).toBe(false)
+  const player = placeOnRoad(climbingBend, required(base.vehicles[0]), index, 235, reversed)
+  const state: RaceState = { ...base, phase: 'running', vehicles: [player] }
+  const accelerating = required(stepRace(state, input, 1 / 60, random).state.vehicles[0])
+  const braking = required(stepRace(state, { ...input, braking: true }, 1 / 60, random).state.vehicles[0])
+  expect(accelerating.braking).toBe(false)
+  expect(braking.braking).toBe(true)
+  expect(braking.speed).toBeLessThan(accelerating.speed)
 })
 it('ignores any old boost state instead of adding a speed burst',()=>{
  const base=createRace({path,playerCar:'blue',difficulty:'normal',laps:2,handling:'arcade'})
@@ -245,20 +192,4 @@ it('ignores any old boost state instead of adding a speed burst',()=>{
  const race={...base,phase:'running' as const,vehicles:[v]}
  expect(stepRace({...race,...{boostRemaining:1}},input,1/60,random).state.vehicles)
   .toEqual(stepRace(race,input,1/60,random).state.vehicles)
-})
-
-it.each([false, true])('releases residual corner assist on a straight descent (reversed=%s)', (reversed) => {
-  const direction = reversed ? -1 : 1
-  const index = path.points.findIndex((_, i) => path.roadSurface.gradeAt(i) * direction < -0.025)
-  expect(index).toBeGreaterThan(0)
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade', reversed })
-  const vehicle = placeOnRoad(path, required(base.vehicles[0]), index, 180, reversed)
-  const drive = (pressure: number) => required(stepRace({
-    ...base, phase: 'running', vehicles: [{ ...vehicle, arcadeAssistBrake: pressure }],
-  }, input, 1 / 60, random).state.vehicles[0])
-  const released = drive(0.65)
-  const unassisted = drive(0)
-  expect(released.arcadeAssistBrake).toBe(0)
-  expect(released.speed).toBeCloseTo(unassisted.speed, 8)
-  expect(released.braking).toBe(false)
 })

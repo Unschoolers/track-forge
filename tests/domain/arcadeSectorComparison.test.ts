@@ -41,7 +41,7 @@ const icyHairpin = buildRoadPath(
 )
 
 function run(
-	mode: 'early' | 'assist' | 'late',
+	mode: 'early' | 'unbraked' | 'late',
 	threshold = 145,
 	preview = 5,
 	road: RoadPath = hairpin,
@@ -99,7 +99,7 @@ function run(
 		)
 		const braking =
 			mode === 'early'
-				? car.x > -170 && car.x < 100 && car.y < 40 && car.speed > threshold
+				? car.x > -170 && car.y < 130 && car.speed > threshold
 				: mode === 'late'
 					? car.x > 100 && car.y < 100 && car.speed > 125
 					: false
@@ -122,38 +122,25 @@ function run(
 	}
 	return { entry, exit, seconds: frame / 60, offRoad, recoveries }
 }
-it('a longer preview gains time on the street hairpin even with early braking', () => {
-	const clean = run('early', 145, 10)
-	const assisted = run('assist')
-	const late = run('late')
-	const sameLineAssisted = run('assist', 145, 10)
+it('manual braking lowers entry speed and keeps the car on the street hairpin', () => {
+	const clean = run('early', 100, 10)
+	const unbraked = run('unbraked', 100, 10)
 	expect(clean.exit).toBeGreaterThan(0)
-	expect(clean.seconds).toBeLessThan(assisted.seconds)
-	expect(clean.seconds).toBeLessThan(late.seconds)
-	// Braking alone costs time on this line; the longer preview earns the gain.
-	expect(sameLineAssisted.seconds).toBeLessThan(clean.seconds)
-	expect([clean, assisted, late].map((result) => result.offRoad)).toEqual([
-		0, 0, 0,
-	])
-	expect([clean, assisted, late].map((result) => result.recoveries)).toEqual([
-		0, 0, 0,
-	])
+	expect(unbraked.exit).toBeGreaterThan(0)
+	expect(clean.entry).toBeGreaterThan(0)
+	expect(clean.entry).toBeLessThan(unbraked.entry)
+	expect(clean.offRoad).toBe(0)
+	expect(unbraked.offRoad).toBeGreaterThan(0)
+	expect(clean.recoveries).toBe(0)
 })
 
 it('records the cost of late braking on the same icy hairpin', () => {
-	const early = run('early', 100, 10, icyHairpin)
-	const assisted = run('assist', 145, 5, icyHairpin)
+	const unbraked = run('unbraked', 145, 5, icyHairpin)
 	const late = run('late', 145, 5, icyHairpin)
-	expect(
-		[early.exit, assisted.exit, late.exit].every((speed) => speed > 0),
-	).toBe(true)
-	expect(late.seconds).toBeGreaterThan(assisted.seconds)
-	expect([early, assisted, late].map((result) => result.offRoad)).toEqual([
-		1, 1, 1,
-	])
-	expect([early, assisted, late].map((result) => result.recoveries)).toEqual([
-		0, 0, 0,
-	])
+	expect(late.exit).toBeGreaterThan(0)
+	expect(unbraked.exit).toBeGreaterThan(0)
+	expect(late.seconds).toBeGreaterThan(unbraked.seconds)
+	expect([unbraked.recoveries, late.recoveries]).toEqual([0, 0])
 })
 
 const ramp = buildRoadPath(
@@ -166,7 +153,7 @@ const ramp = buildRoadPath(
 	EMPTY_TERRAIN,
 )
 
-function runDownhill(mode: 'early' | 'assist' | 'late') {
+function runDownhill(mode: 'early' | 'unbraked' | 'late') {
 	const base = createRace({
 		path: ramp,
 		playerCar: 'blue',
@@ -232,15 +219,15 @@ function runDownhill(mode: 'early' | 'assist' | 'late') {
 
 it('carries speed down a straight unless the driver brakes', () => {
 	const early = runDownhill('early'),
-		assist = runDownhill('assist'),
+		unbraked = runDownhill('unbraked'),
 		late = runDownhill('late')
-	expect(assist.exit).toBeGreaterThan(early.exit)
-	expect(assist.seconds).toBeLessThan(early.seconds)
-	expect(assist.seconds).toBeLessThan(late.seconds)
-	expect([early, assist, late].map((result) => result.offRoad)).toEqual([
+	expect(unbraked.exit).toBeGreaterThan(early.exit)
+	expect(unbraked.seconds).toBeLessThan(early.seconds)
+	expect(unbraked.seconds).toBeLessThan(late.seconds)
+	expect([early, unbraked, late].map((result) => result.offRoad)).toEqual([
 		0, 0, 0,
 	])
-	expect([early, assist, late].map((result) => result.recoveries)).toEqual([
+	expect([early, unbraked, late].map((result) => result.recoveries)).toEqual([
 		0, 0, 0,
 	])
 })

@@ -32,8 +32,9 @@ Open the URL printed by Vite, normally <http://localhost:5173>.
   or `Space`. On touchscreens, place a finger on the steering pad or canvas,
   then slide left or right from that starting point to steer. Hold the separate
   **Brake** button with another finger to brake while steering. Arcade accelerates
-  automatically. In Simulation, hold **Gas**, `W`, or `ArrowUp` to accelerate;
-  release it to coast. Gas and Brake can be held independently while steering.
+  automatically. Use **Brake** to slow down for corners. In Simulation, hold
+  **Gas**, `W`, or `ArrowUp` to accelerate and release it to coast. Gas and Brake
+  can be held independently while steering.
   When a pedal has keyboard focus, hold `Space` or `Enter` to use it.
 - During an active race, tap **Recover** or press `R` to return your car to the
   road. Recovery keeps your lap progress, damage, and elapsed race time.
