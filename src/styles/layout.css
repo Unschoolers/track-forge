@@ -42,7 +42,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 .editor-context-row .editor-segmented-buttons { width: min(34rem, 100%); justify-self: center; }
 .editor-actions { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: var(--editor-track-actions-bottom); display: flex; gap: .4rem; }
 .race-controls { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: max(.75rem, env(safe-area-inset-bottom)); left: max(.75rem, env(safe-area-inset-left)); display: flex; gap: .5rem; }
-.race-hud { grid-template-columns: 1fr auto 1fr; }
+.race-hud { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: .35rem; padding: .45rem max(.5rem, env(safe-area-inset-right)) .45rem max(.5rem, env(safe-area-inset-left)); }
 .race-controls { justify-content: space-between; align-items: end; }
 .race-controls[data-hand='right'] { flex-direction: row-reverse; }
 .race-steering { min-width: 0; }

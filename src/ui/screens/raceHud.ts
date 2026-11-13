@@ -24,13 +24,13 @@ export function createRaceHud(
   const screen = element('section', 'screen race-screen')
   screen.dataset.screen = 'race'
   const hud = element('header', 'race-hud')
-  const position = element('div', 'hud-card')
+  const position = element('div', 'hud-card race-position')
   const positionValue = element('strong', 'hud-value', '1/4')
   positionValue.dataset.racePosition = ''
   const positionLabel = element('span', 'label', 'POSITION')
   position.append(positionValue, positionLabel)
 
-  const lap = element('div', 'hud-card align-right')
+  const lap = element('div', 'hud-card race-timing align-right')
   const lapValue = element('strong', 'hud-value', '1/3')
   lapValue.dataset.raceLap = ''
   const timeValue = element('span', 'label', '00:00.000')
@@ -39,8 +39,11 @@ export function createRaceHud(
   lapTimes.dataset.raceLapTimes = ''
   const gap = element('span', 'label')
   gap.dataset.raceGhostGap = ''
-  lap.append(lapValue, timeValue, lapTimes, gap)
-  hud.append(position, button('☰', 'pause', actions.pause, 'icon-button'), lap)
+  const pause = button('☰', 'pause', actions.pause, 'icon-button')
+  pause.setAttribute('aria-label', 'Pause race')
+  position.append(gap)
+  lap.append(lapValue, timeValue, lapTimes)
+  hud.append(position, pause, lap)
 
   const damage = element('div', 'damage-meter')
   damage.setAttribute('role', 'progressbar')
@@ -96,7 +99,8 @@ export function createRaceHud(
   steeringHint.setAttribute('aria-hidden', 'true')
   steeringGroup.append(steering, steeringHint, steeringButtons)
   controlsBar.append(steeringGroup, pedals)
-  screen.append(hud, damage, raceBanner, slide, countdown, controlsBar)
+  position.append(damage)
+  screen.append(hud, raceBanner, slide, countdown, controlsBar)
 
   const updateControls = (): void => {
     const input = controls.snapshot()
@@ -181,6 +185,7 @@ export function createRaceHud(
   let lastPosition: number | null = null
   let lastLap: number | null = null
   let bannerUntil = 0
+  let finalLapNotice = false
   let previousHandling: string | undefined
   let previousPaused: boolean | undefined
   let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
@@ -209,18 +214,25 @@ export function createRaceHud(
     const cue = driftCue(player, telemetry.phase, snapshot.state?.paused ?? false)
     slide.textContent = cue ?? ''
     slide.classList.toggle('visible', cue !== null)
-    if (telemetry.phase === 'running') {
-      if (lastPosition !== null && telemetry.position < lastPosition) {
-        raceBanner.textContent = 'OVERTAKE!'
-        bannerUntil = performance.now() + 1100
-      } else if (lastLap !== null && telemetry.lap > lastLap) {
-        raceBanner.textContent = telemetry.lap + 1 >= telemetry.totalLaps
-          ? 'FINAL LAP!'
-          : `LAP ${telemetry.lap + 1}!`
-        bannerUntil = performance.now() + 1300
-      }
+    const now = performance.now()
+    const racing = phase === 'running' && !paused && telemetry.elapsed >= 0.7
+    if (!racing) {
+      bannerUntil = 0
+      finalLapNotice = false
+    } else if (lastLap !== null && telemetry.lap > lastLap &&
+      telemetry.lap + 1 === telemetry.totalLaps) {
+      finalLapNotice = true
+      raceBanner.textContent = 'FINAL LAP!'
+      bannerUntil = now + 1300
+    } else if (lastPosition !== null && telemetry.position < lastPosition &&
+      (!finalLapNotice || now >= bannerUntil)) {
+      finalLapNotice = false
+      raceBanner.textContent = 'OVERTAKE!'
+      bannerUntil = now + 1100
     }
-    raceBanner.classList.toggle('visible', performance.now() < bannerUntil)
+    const showBanner = racing && now < bannerUntil
+    raceBanner.classList.toggle('visible', showBanner)
+    if (!showBanner) raceBanner.textContent = ''
     lastPosition = telemetry.position
     lastLap = telemetry.lap
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
@@ -230,12 +242,14 @@ export function createRaceHud(
     positionLabel.textContent = ghostRace ? 'GHOST TARGET' : 'POSITION'
     lapValue.textContent = `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
     timeValue.textContent = formatRaceTime(telemetry.elapsed)
-    const currentLap = telemetry.currentLapTime
     const bestLap = telemetry.bestLapTime
-    lapTimes.textContent = `LAP ${currentLap == null ? '—' : formatRaceTime(currentLap)} · BEST ${bestLap == null ? '—' : formatRaceTime(bestLap)}`
+    lapTimes.hidden = bestLap == null || ghostRace
+    lapTimes.textContent = bestLap == null ? '' : `BEST ${formatRaceTime(bestLap)}`
     const delta = telemetry.ghostGap
     gap.textContent = ghostRace && delta != null
       ? `GAP ${delta >= 0 ? '+' : '−'}${formatRaceTime(Math.abs(delta))}` : ''
+    gap.hidden = !gap.textContent
+    damage.hidden = handling !== 'simulation'
     damageText.textContent = `${telemetry.damage}/${telemetry.damageLimit}`
     const damageRatio =
       telemetry.damageLimit > 0
