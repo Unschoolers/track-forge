@@ -1,3 +1,4 @@
+import { raceCategory } from '@/application/race/raceRecords'
 import { describe, expect, it, vi } from 'vitest'
 import type { ScoreEntry, ScoreStore } from '@/application/ports/storage'
 import { RaceSession } from '@/application/race/raceSession'
@@ -316,6 +317,18 @@ describe('RaceSession', () => {
     session.advance(0.02, noInput)
     expect(session.snapshot().result?.newRecord).toBe(true)
     expect(session.snapshot().result?.highScores.map((score) => score.time)).toEqual([12.5])
+  })
+
+  it('reports the previous best from the exact category before recording', () => {
+    const { store, scores } = createScoreStore()
+    scores.push({ time: 20, car: setup.car, difficulty: setup.difficulty, recordedAt: 1, category: raceCategory(track, setup) })
+    scores.push({ time: 2, car: setup.car, difficulty: setup.difficulty, recordedAt: 1, category: { ...raceCategory(track, setup), laps: 99 } })
+    const step: RaceStep = (state) => ({ state: { ...state, phase: 'finished', vehicles: state.vehicles.map((v) => v.player ? { ...v, finishedAt: 12.5 } : v) }, events: [{ type: 'race-finished', reason: 'finished' }] })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+    expect(session.snapshot().result?.previousBestTime).toBe(20)
   })
 
   it('reports a failed score write without announcing a record', () => {

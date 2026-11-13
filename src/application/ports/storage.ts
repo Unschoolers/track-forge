@@ -63,3 +63,14 @@ export interface PreferencesStore {
   load(): Preferences
   save(preferences: Preferences): boolean
 }
+
+export interface LastRace {
+  readonly trackId: TrackId
+  readonly course: string
+  readonly setup: import('@/application/race/raceSession').RaceSetup
+}
+
+export interface LastRaceStore {
+  load(): LastRace | null
+  save(race: LastRace): boolean
+}

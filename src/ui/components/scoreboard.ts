@@ -18,7 +18,7 @@ export function createStandings(
     const outcome = standing.wrecked
       ? 'WRECKED'
       : standing.finishTime === null
-        ? 'DNF'
+        ? 'UNFINISHED'
         : formatRaceTime(standing.finishTime)
     item.append(
       element('strong', undefined, `${standing.place}. ${CAR_SPECS[standing.car].name}`),

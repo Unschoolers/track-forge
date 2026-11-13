@@ -5,6 +5,7 @@ import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
 import { BrowserPreferencesRepository } from '@/infrastructure/storage/preferencesRepository'
+import { BrowserLastRaceRepository } from '@/infrastructure/storage/lastRaceRepository'
 import { BrowserScoreRepository } from '@/infrastructure/storage/scoreRepository'
 import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository'
 import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
@@ -75,6 +76,7 @@ const raceControls = new RaceInputController()
 const controller = new AppController({
   trackStore,
   scoreStore,
+  lastRaceStore: new BrowserLastRaceRepository(storage),
   preferencesStore: initialPreferences,
   scheduler,
   raceSession,
@@ -129,6 +131,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
         controls: { ...raceControls.snapshot() },
         race: race
           ? {
+              setup: raceSession.snapshot().setup,
               phase: race.phase,
               handling: race.handling,
               lighting: raceSession.snapshot().setup?.lighting,

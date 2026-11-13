@@ -80,6 +80,7 @@ export interface RaceResult {
   readonly playerTime: number | null
   readonly playerWrecked: boolean
   readonly newRecord: boolean
+  readonly previousBestTime?: number
   readonly scoreSaveFailed?: boolean
   readonly standings: readonly RaceStanding[]
   readonly highScores: readonly ScoreEntry[]
@@ -386,11 +387,12 @@ export class RaceSession implements RaceSessionPort {
     const category = raceCategory(track, setup)
     const comparable = (score: ScoreEntry) => sameCategory(score, category, setup)
     const oldScores = this.dependencies.scoreStore.forTrack(track.id).filter(comparable)
+    const previousBestTime = oldScores.length ? Math.min(...oldScores.map((score) => score.time)) : undefined
     const playerTime =
       outcome === 'finished' ? player.finishedAt : null
     const recordCandidate =
       playerTime !== null &&
-      (oldScores[0] === undefined || playerTime < oldScores[0].time)
+      (previousBestTime === undefined || playerTime < previousBestTime)
     let scoreSaved = true
     if (playerTime !== null) {
       scoreSaved = this.dependencies.scoreStore.record(track.id, {
@@ -409,6 +411,7 @@ export class RaceSession implements RaceSessionPort {
       playerTime,
       playerWrecked: player.wrecked,
       newRecord: recordCandidate && scoreSaved,
+      ...(previousBestTime !== undefined ? { previousBestTime } : {}),
       ...(playerTime !== null && !scoreSaved ? { scoreSaveFailed: true } : {}),
       standings: ranked.map((vehicle, index) =>
         this.toStanding(vehicle, index),

@@ -155,6 +155,7 @@ export class DomUiHost implements UiHost {
       screen = createHomeScreen(state, {
             edit: () => openLibrary('edit'),
             race: () => openLibrary('race'),
+            raceAgain: () => this.controller.dispatch({ type: 'race-again' }),
             cup: () => this.controller.dispatch({ type: 'start-cup' }),
             options: () =>
               this.controller.dispatch({
@@ -263,6 +264,7 @@ export class DomUiHost implements UiHost {
                 return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null
                   ? () => this.controller.dispatch({ type: 'race-best-ghost' }) : undefined
               })(),
+              changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
               edit: () =>
                 this.controller.dispatch({ type: 'open-editor' }),
               home: () => this.controller.dispatch({ type: 'go-home' }),
