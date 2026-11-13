@@ -286,7 +286,8 @@ describe('race UI flow', () => {
     expect(root.querySelector('[data-race-time]')?.textContent).toBe(
       '01:05.432',
     )
-    expect(root.querySelector('[data-race-damage]')?.textContent).toBe('2/5')
+    expect(requiredElement(root, '[aria-label="Vehicle damage"]').hidden).toBe(true)
+    expect(requiredElement(root, '[data-race-lap-times]').hidden).toBe(true)
 
     updateRace(
       raceSnapshot({
@@ -298,6 +299,36 @@ describe('race UI flow', () => {
     )
     expect(root.querySelector('[data-screen="race"]')).toBe(screen)
     expect(root.querySelector('[data-race-countdown]')?.textContent).toBe('3')
+  })
+
+  it('shows the finished best lap and damage only where they are relevant', () => {
+    const { root, updateRace } = setup()
+    updateRace({
+      ...raceSnapshot({ currentLapTime: 9.5, bestLapTime: 15.25 }),
+      setup: { car: 'blue', difficulty: 'normal', laps: 3, handling: 'simulation' },
+    })
+    expect(requiredElement(root, '[aria-label="Vehicle damage"]').hidden).toBe(false)
+    expect(requiredElement(root, '[data-race-damage]').textContent).toBe('2/5')
+    expect(requiredElement(root, '[data-race-lap-times]').textContent).toBe('BEST 00:15.250')
+
+    updateRace({
+      ...raceSnapshot({ bestLapTime: 15.25, ghostGap: -0.42 }),
+      setup: { car: 'blue', difficulty: 'normal', laps: 3, mode: 'ghost' },
+      ghostTime: 45,
+    })
+    expect(requiredElement(root, '[aria-label="Vehicle damage"]').hidden).toBe(true)
+    expect(requiredElement(root, '[data-race-position]').textContent).toBe('00:45.000')
+    expect(requiredElement(root, '[data-race-ghost-gap]').textContent).toBe('GAP −00:00.420')
+  })
+
+  it('keeps the final lap notice visible when an overtake follows it', () => {
+    const { root, updateRace } = setup()
+    const banner = requiredElement(root, '.race-event-banner')
+    updateRace(raceSnapshot({ lap: 2, position: 1 }))
+    expect(banner.textContent).toBe('FINAL LAP!')
+    updateRace(raceSnapshot({ lap: 2, position: 2 }))
+    updateRace(raceSnapshot({ lap: 2, position: 1 }))
+    expect(banner.textContent).toBe('FINAL LAP!')
   })
 
   it('exposes separate simulation pedals and releases each touch independently', () => {
