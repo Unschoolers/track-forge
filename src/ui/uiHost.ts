@@ -1,6 +1,6 @@
-import { exportTrack, serializeTrack } from '@/infrastructure/export/trackExport'
+import { exportTrack, shareTrack } from '@/infrastructure/export/trackExport'
 import { formatRaceTime } from '@/ui/format'
-import type { Track } from '@/domain/model'
+import type { Track, TrackId } from '@/domain/model'
 import type {
   AppCommand,
   AppSnapshot,
@@ -10,6 +10,7 @@ import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
+import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createNameModal } from '@/ui/modals/nameModal'
@@ -44,6 +45,9 @@ export interface UiRuntime {
 export class DomUiHost implements UiHost {
   private unsubscribe: Unsubscribe | undefined
   private screenCleanup: (() => void) | undefined
+  private overlayCleanup: (() => void) | undefined
+  private flyoverTrackId: TrackId | undefined
+  private flyoverPlayback: RaceFlyoverPlayback = { elapsedSeconds: 0 }
   private mounted = false
   private readonly dialogs = new DialogController()
   private readonly environment: UiEnvironment
@@ -76,6 +80,9 @@ export class DomUiHost implements UiHost {
     this.unsubscribe = undefined
     this.screenCleanup?.()
     this.screenCleanup = undefined
+    this.overlayCleanup?.()
+    this.overlayCleanup = undefined
+    this.flyoverTrackId = undefined
     this.dialogs.destroy()
     this.root.replaceChildren()
     if (this.mounted) {
@@ -88,7 +95,7 @@ export class DomUiHost implements UiHost {
   private async exportTrackFile(track: Track): Promise<void> {
     try {
       if (await exportTrack(track)) {
-        const toast = createToast('Track exported. Attach the JSON file in chat for debugging.')
+        const toast = createToast('Track file saved.')
         this.root.append(toast)
         setTimeout(() => toast.remove(), 5000)
       }
@@ -100,19 +107,13 @@ export class DomUiHost implements UiHost {
   }
 
   private async shareTrackChallenge(track: Track): Promise<void> {
-    const file = serializeTrack(track)
     const best = this.controller.snapshot().scoresByTrack[track.id]?.[0]
-    const challenge = `I built "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win on my track?'} Import the attached track file and race it.`
-    const attachment = new File([file.content], file.filename, { type: 'application/json' })
-    if (navigator.share && navigator.canShare?.({ files: [attachment] })) {
-      try {
-        await navigator.share({ title: 'Track Forge challenge', text: challenge, files: [attachment] })
-        return
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-      }
+    const challenge = `Race "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win?'} Import the attached track file to play.`
+    try {
+      if (await shareTrack(track, challenge)) return
+    } catch {
+      // Saving a copy also works when the system share sheet fails to open.
     }
-    // Offline/no native sharing: export a genuine file the player can send.
     await this.exportTrackFile(track)
   }
 
@@ -136,6 +137,15 @@ export class DomUiHost implements UiHost {
   private render(state: AppSnapshot): void {
     this.screenCleanup?.()
     this.screenCleanup = undefined
+    this.overlayCleanup?.()
+    this.overlayCleanup = undefined
+    const isRaceSetup = state.overlay.type === 'race-setup' ||
+      (state.overlay.type === 'options' && state.overlay.returnTo === 'race-setup')
+    const flyoverTrackId = isRaceSetup ? state.currentTrack?.id : undefined
+    if (flyoverTrackId !== this.flyoverTrackId) {
+      this.flyoverTrackId = flyoverTrackId
+      this.flyoverPlayback = { elapsedSeconds: 0 }
+    }
     const home = () => this.controller.dispatch({ type: 'go-home' })
     this.dialogs.beforeRender(this.root, state.overlay)
     const openLibrary = (purpose: 'edit' | 'race') =>
@@ -277,7 +287,6 @@ export class DomUiHost implements UiHost {
               type: 'select-track-for-race',
               id,
             }),
-          export: (track) => { void this.exportTrackFile(track) },
           share: (track) => { void this.shareTrackChallenge(track) },
           importFile: (content) => this.controller.dispatch({ type: 'import-track', content }),
           delete: (track) => {
@@ -302,9 +311,29 @@ export class DomUiHost implements UiHost {
               name,
             }),
         })
-      case 'race-setup':
+      case 'race-setup': {
+        const { currentTrack, preferences } = state
+        const ghostTime = currentTrack ? this.runtime.raceSession.ghostTime?.(currentTrack, {
+          car: preferences.car,
+          difficulty: preferences.difficulty,
+          laps: preferences.raceLaps ?? 2,
+          handling: preferences.handling ?? 'arcade',
+        }) ?? null : null
+        const geometry = currentTrack && this.runtime.geometry.get(currentTrack)
+        const flyover = currentTrack && geometry && geometry.path.points.length > 1
+          ? createRaceFlyover(
+              currentTrack,
+              geometry,
+              preferences.car,
+              preferences.lighting,
+              preferences.raceMode === 'ghost' && ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0,
+              this.flyoverPlayback,
+            )
+          : undefined
+        this.overlayCleanup = flyover?.destroy
         return createRaceSetupModal(state, {
           close,
+          options: () => this.controller.dispatch({ type: 'open-options', returnTo: 'race-setup' }),
           preferences: (preferences) =>
             this.controller.dispatch({
               type: 'set-preferences',
@@ -312,10 +341,8 @@ export class DomUiHost implements UiHost {
             }),
           start: () =>
             this.controller.dispatch({ type: 'start-race' }),
-        }, state.currentTrack ? this.runtime.raceSession.ghostTime?.(state.currentTrack, {
-          car: state.preferences.car, difficulty: state.preferences.difficulty,
-          laps: state.preferences.raceLaps ?? 2, handling: state.preferences.handling ?? 'arcade',
-        }) ?? null : null)
+        }, ghostTime, flyover?.element)
+      }
       case 'options':
         return createOptionsModal(state, {
           close,

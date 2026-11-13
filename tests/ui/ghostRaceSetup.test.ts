@@ -18,7 +18,7 @@ const state: AppSnapshot = {
     audioEnabled: true, hapticsEnabled: true, dynamicZoomEnabled: true, handling: 'arcade' },
   scoresByTrack: {}, notice: null,
 }
-const actions = () => ({ close: vi.fn(), preferences: vi.fn(), start: vi.fn() })
+const actions = () => ({ close: vi.fn(), preferences: vi.fn(), start: vi.fn(), options: vi.fn() })
 describe('Ghost Race setup', () => {
   it('always shows a disabled Ghost Race button when no replay is available', () => {
     const modal = createRaceSetupModal(state, actions(), null)

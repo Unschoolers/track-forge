@@ -23,6 +23,11 @@ Open the URL printed by Vite, normally <http://localhost:5173>.
 
 - Home: choose **Track Editor** or **Race**.
 - Editor: use the tool rail, mouse/touch canvas, undo/redo, and surface buttons.
+- Tap a circuit preview to open Race Setup, then choose a car and race mode.
+  The flyover uses the selected car and lighting. Open **Options** for race
+  length, lighting, difficulty, and driving style.
+- Use the track's share icon to send its importable file. On browsers without
+  file sharing it downloads a copy.
 - Race: steer with `A`/`D` or `ArrowLeft`/`ArrowRight` and brake with `S`, `ArrowDown`,
   or `Space`. On touchscreens, place a finger on the steering pad or canvas,
   then slide left or right from that starting point to steer. Hold the separate

@@ -120,6 +120,16 @@ describe('modal application flows', () => {
     )
 
     expect(root.textContent).toContain('Starter Circuit')
+    const raceTile = root.querySelector<HTMLButtonElement>('[data-action="select-race-ready"]')
+    expect(raceTile?.getAttribute('aria-label')).toBe('Race Starter Circuit')
+    expect(raceTile?.querySelector('svg path')).not.toBeNull()
+    expect(root.querySelector('[data-action="select-race-incomplete"] svg path')).not.toBeNull()
+    expect(root.querySelectorAll('.track-card svg.track-preview').length).toBeGreaterThan(2)
+    const share = root.querySelector<HTMLButtonElement>('[data-action="share-ready"]')
+    expect(share?.getAttribute('aria-label')).toBe('Share Starter Circuit')
+    expect(share?.textContent).toBe('')
+    expect(raceTile?.contains(share ?? null)).toBe(false)
+    expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')?.getAttribute('data-action')).toBe('select-race-ready')
     expect(root.textContent).toContain('01:02.345')
     expect(root.textContent).toContain('NEEDS EDITING')
@@ -136,6 +146,21 @@ describe('modal application flows', () => {
       type: 'select-track-for-race',
       id: ready.id,
     })
+  })
+
+  it('shows the selected car and lighting in the race setup flyover', () => {
+    const initial = state({ type: 'race-setup' })
+    const { root, host, update } = setup(initial)
+    const preview = root.querySelector<HTMLCanvasElement>('canvas.race-flyover')
+    expect(preview?.getAttribute('aria-label')).toBe('Daytime flyover of Starter Circuit')
+    expect(preview?.dataset.car).toBe('blue')
+    update({ ...initial, preferences: { ...initial.preferences, car: 'red', lighting: 'night' } })
+    const night = root.querySelector<HTMLCanvasElement>('canvas.race-flyover')
+    expect(night?.getAttribute('aria-label')).toBe('Nighttime flyover of Starter Circuit')
+    expect(night?.dataset.car).toBe('red')
+    update({ ...initial, overlay: { type: 'options', returnTo: 'race-setup' } })
+    expect(root.querySelector('canvas.race-flyover')).toBeNull()
+    host.destroy()
   })
 
   it('creates, renames, and confirms deletion through dialogs', () => {
@@ -177,36 +202,50 @@ describe('modal application flows', () => {
     })
   })
 
-  it('updates race setup and option preferences', () => {
-    const { root, port, update } = setup(
-      state({ type: 'race-setup' }),
-    )
+  it('moves race settings to options while keeping car and race mode in setup', () => {
+    const { root, port, update } = setup(state({ type: 'race-setup' }))
 
-    expect(root.textContent).toContain('Balanced')
-    root.querySelector<HTMLButtonElement>('[data-car="green"]')?.click()
-    expect(port.dispatch).toHaveBeenCalledWith({
-      type: 'set-preferences',
-      preferences: { ...preferences, car: 'green' },
-    })
+    expect(root.querySelector('[data-car="green"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="mode-normal"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
+    root.querySelector<HTMLButtonElement>('[data-action="setup-options"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-options', returnTo: 'race-setup' })
 
-    root
-      .querySelector<HTMLButtonElement>('[data-difficulty="hard"]')
-      ?.click()
+    update(state({ type: 'options', returnTo: 'race-setup' }))
+    expect(root.textContent).toContain('Race settings')
+    for (const action of ['difficulty-hard', 'laps-3', 'lighting-night', 'handling-simulation']) {
+      expect(root.querySelector(`[data-action="${action}"]`)).not.toBeNull()
+    }
+    root.querySelector<HTMLButtonElement>('[data-action="difficulty-hard"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
-      type: 'set-preferences',
-      preferences: { ...preferences, difficulty: 'hard' },
+      type: 'set-preferences', preferences: { ...preferences, difficulty: 'hard' },
     })
+  })
 
-    update(
-      state({ type: 'options', returnTo: 'home' }),
-    )
-    root
-      .querySelector<HTMLButtonElement>('[data-action="toggle-audio"]')
-      ?.click()
-    expect(port.dispatch).toHaveBeenCalledWith({
-      type: 'set-preferences',
-      preferences: { ...preferences, audioEnabled: false },
-    })
+  it('shows comfort settings but hides race settings during a paused race', () => {
+    const { root } = setup({ ...state({ type: 'options', returnTo: 'race' }), mode: 'race', paused: true })
+    expect(root.querySelector('[data-action="toggle-audio"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
+    expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
+    expect(root.querySelector('[data-action="handling-simulation"]')).toBeNull()
+    expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
+  })
+
+  it('retains the selected option focus and scroll position through a preferences update', () => {
+    const initial = state({ type: 'options', returnTo: 'race-setup' })
+    const { root, update, host } = setup(initial)
+    root.querySelector<HTMLButtonElement>('[data-action="handling-simulation"]')?.focus()
+    const body = root.querySelector<HTMLElement>('.modal-body')
+    if (!body) throw new Error('Missing options body')
+    body.scrollTop = 150
+
+    update({ ...initial, preferences: { ...initial.preferences, handling: 'simulation' } })
+
+    expect(document.activeElement?.getAttribute('data-action')).toBe('handling-simulation')
+    expect(root.querySelector<HTMLElement>('.modal-body')?.scrollTop).toBe(150)
+    update(state({ type: 'race-setup' }))
+    expect(document.activeElement?.getAttribute('data-action')).toBe('setup-options')
+    host.destroy()
   })
 
   it('restores focus after Escape closes an allowed dialog', () => {

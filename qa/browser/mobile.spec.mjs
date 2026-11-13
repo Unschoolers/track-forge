@@ -24,7 +24,7 @@ async function enterEditor(page) {
 
 async function enterRace(page) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'SELECT', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
   await page.getByRole('button', { name: 'START RACE' }).click()
   await expect(page.locator('[data-screen="race"]')).toBeVisible()
   await expect.poll(async () => (await telemetry(page)).race?.phase, {
