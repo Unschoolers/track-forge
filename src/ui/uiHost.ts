@@ -315,12 +315,17 @@ export class DomUiHost implements UiHost {
         })
       case 'race-setup': {
         const { currentTrack, preferences } = state
-        const ghostTime = currentTrack ? this.runtime.raceSession.ghostTime?.(currentTrack, {
+        const ghostSetup = {
           car: preferences.car,
           difficulty: preferences.difficulty,
           laps: preferences.raceLaps ?? 2,
           handling: preferences.handling ?? 'arcade',
-        }) ?? null : null
+        } as const
+        const availability = currentTrack
+          ? this.runtime.raceSession.ghostAvailability?.(currentTrack, ghostSetup) ??
+            (() => { const time = this.runtime.raceSession.ghostTime?.(currentTrack, ghostSetup); return time == null ? { kind: 'none' as const } : { kind: 'exact' as const, time } })()
+          : { kind: 'none' as const }
+        const ghostTime = availability.kind === 'exact' ? availability.time : null
         const geometry = currentTrack && this.runtime.geometry.get(currentTrack)
         const flyover = currentTrack && geometry && geometry.path.points.length > 1
           ? createRaceFlyover(
@@ -344,7 +349,7 @@ export class DomUiHost implements UiHost {
             }),
           start: () =>
             this.controller.dispatch({ type: 'start-race' }),
-        }, ghostTime, flyover?.element)
+        }, availability, flyover?.element)
       }
       case 'options':
         return createOptionsModal(state, {

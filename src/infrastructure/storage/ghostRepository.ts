@@ -3,6 +3,7 @@ import type { Track } from '@/domain/model'
 import {
   ghostRaceKey,
   MAX_GHOST_FRAMES,
+  type GhostAvailability,
   type GhostFrame,
   type GhostRun,
   type GhostSetup,
@@ -44,6 +45,30 @@ export class BrowserGhostRepository implements GhostStore {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
       return Object.fromEntries(Object.entries(parsed).filter(([, run]) => validRun(run)))
     } catch { return {} }
+  }
+
+  availability(track: Track, setup: GhostSetup): GhostAvailability {
+    const key = ghostRaceKey(track, setup)
+    const suffix = `|${setup.car}|${setup.laps}|${setup.handling ?? 'arcade'}`
+    const prefix = key.slice(0, -suffix.length) + '|'
+    let best: { setup: GhostSetup; differences: number; time: number } | undefined
+    for (const [candidateKey, run] of Object.entries(this.all()).slice(-MAX_RUNS)) {
+      if (!candidateKey.startsWith(prefix)) continue
+      const parts = candidateKey.slice(prefix.length).split('|')
+      const [car, lapsText, handling] = parts
+      const laps = Number(lapsText)
+      if (parts.length !== 3 || !['blue', 'red', 'green', 'yellow'].includes(car ?? '') ||
+          car !== run.car || !Number.isSafeInteger(laps) || laps < 1 || String(laps) !== lapsText ||
+          (handling !== 'arcade' && handling !== 'simulation')) continue
+      const candidate: GhostSetup = { car: run.car, laps, handling }
+      const differences = Number(candidate.car !== setup.car) + Number(laps !== setup.laps) +
+        Number(handling !== (setup.handling ?? 'arcade'))
+      if (differences === 0) return { kind: 'exact', time: run.time }
+      if (!best || differences < best.differences || (differences === best.differences && run.time < best.time)) {
+        best = { setup: candidate, differences, time: run.time }
+      }
+    }
+    return best ? { kind: 'different-setup', setup: best.setup } : { kind: 'none' }
   }
 
   load(track: Track, setup: GhostSetup): GhostRun | null {

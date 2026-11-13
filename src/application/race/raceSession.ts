@@ -31,6 +31,7 @@ import { CAR_SPECS } from '@/domain/config'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import {
   ghostPoseAt,
+  type GhostAvailability,
   type GhostPose,
   type GhostRun,
   type GhostStore,
@@ -102,6 +103,7 @@ export interface RaceSessionSnapshot {
 }
 
 export interface RaceSessionPort {
+  ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
   start(track: Track, setup: RaceSetup): void
   restart(): void
@@ -188,6 +190,13 @@ export class RaceSession implements RaceSessionPort {
     this.recording = player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
     this.publish(this.buildSnapshot(track, resolved, state, null))
+  }
+
+  ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
+    const store = this.dependencies.ghostStore
+    if (store?.availability) return store.availability(track, setup)
+    const time = store?.load(track, setup)?.time
+    return time === undefined ? { kind: 'none' } : { kind: 'exact', time }
   }
 
   ghostTime(track: Track, setup: RaceSetup): number | null {
