@@ -1,4 +1,5 @@
 export const STORAGE_KEYS = {
+  lastRace: 'trackforge-last-race-v1',
   tracks: 'trackforge-library-v2',
   legacyTracks: 'trackforge-library-v1',
   trackMigration: 'trackforge-library-v1-migrated',

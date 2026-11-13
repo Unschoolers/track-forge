@@ -1,3 +1,4 @@
+import { courseIdentity } from '@/application/race/raceRecords'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   Preferences,
@@ -114,6 +115,34 @@ describe('AppController', () => {
     expect(raceSession.snapshot().setup?.lighting).toBe('night')
     controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
     expect(controller.snapshot().raceLighting).toBe('day')
+  })
+
+  it('starts and finishes even when saving the last race fails', () => {
+    const track = createStarterTrack(asTrackId('lost-write'), 1)
+    const trackStore = new TrackMemory()
+    trackStore.tracks.set(track.id, track)
+    const scoreStore: ScoreStore = { forTrack: () => [], record: () => true, removeTrack: () => true }
+    const session = new RaceSession({ scoreStore, random: { next: () => 0.5 }, feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() }, step: (state) => ({ state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 12.5 } : vehicle) }, events: [{ type: 'race-finished', reason: 'finished' }] }) })
+    const controller = new AppController({ trackStore, scoreStore, lastRaceStore: { load: () => null, save: () => false }, preferencesStore: { load: () => preferences, save: () => true }, scheduler: { schedule: () => () => undefined }, raceSession: session, geometry: new TrackGeometryService() })
+    controller.dispatch({ type: 'start-race' })
+    session.advance(3.7, { steering: 0, throttle: 1, braking: false })
+    session.advance(0.02, { steering: 0, throttle: 1, braking: false })
+    expect(controller.snapshot().overlay.type).toBe('results')
+    expect(session.snapshot().result?.playerTime).toBe(12.5)
+  })
+
+  it('rechecks a remembered track when Race Again is tapped', () => {
+    const track = createStarterTrack(asTrackId('remembered'), 1)
+    const trackStore = new TrackMemory()
+    trackStore.tracks.set(track.id, track)
+    const scoreStore: ScoreStore = { forTrack: () => [], record: () => true, removeTrack: () => true }
+    const session = new RaceSession({ scoreStore, random: { next: () => 0.5 }, feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() } })
+    const lastRaceStore = { load: () => ({ trackId: track.id, course: courseIdentity(track), setup: { car: 'blue' as const, difficulty: 'normal' as const, laps: 2, handling: 'arcade' as const, mode: 'normal' as const, lighting: 'night' as const } }), save: () => true }
+    const controller = new AppController({ trackStore, scoreStore, lastRaceStore, preferencesStore: { load: () => preferences, save: () => true }, scheduler: { schedule: () => () => undefined }, raceSession: session, geometry: new TrackGeometryService() })
+    expect(controller.snapshot().raceAgainTrackName).toBe(track.name)
+    trackStore.remove(track.id)
+    controller.dispatch({ type: 'race-again' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'track-library', purpose: 'race' }, notice: expect.stringContaining('no longer available') })
   })
 
   it('shows an official race record on Home without adding the circuit to saved tracks', () => {

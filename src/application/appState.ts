@@ -48,6 +48,7 @@ export type AppOverlay =
 
 export interface AppSnapshot {
   readonly raceLighting?: LightingMode
+  readonly raceAgainTrackName?: string | undefined
   readonly cup?: CircuitCup | null
   readonly mode: AppMode
   readonly paused: boolean
@@ -85,6 +86,7 @@ export type AppCommand =
   | { readonly type: 'open-editor' }
   | { readonly type: 'start-race' }
   | { readonly type: 'set-race-lighting'; readonly lighting: LightingMode }
+  | { readonly type: 'race-again' }
   | { readonly type: 'start-cup' }
   | { readonly type: 'next-cup-race' }
   | { readonly type: 'pause-race' }

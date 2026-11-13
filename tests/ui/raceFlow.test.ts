@@ -654,6 +654,8 @@ describe('race UI flow', () => {
     expect(root.querySelector('[data-results-standings]')?.textContent).toContain(
       '01:02.500',
     )
+    root.querySelector<HTMLButtonElement>('[data-action="change-track"]')?.click()
+    expect(controller.dispatch).toHaveBeenCalledWith({ type: 'open-track-library', purpose: 'race' })
     root.querySelector<HTMLButtonElement>('[data-action="retry-race"]')?.click()
     root.querySelector<HTMLButtonElement>('[data-action="edit-race-track"]')
       ?.click()

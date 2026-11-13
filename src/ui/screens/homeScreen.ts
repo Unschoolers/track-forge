@@ -8,6 +8,7 @@ export function createHomeScreen(
   actions: {
     readonly edit: () => void
     readonly race: () => void
+    readonly raceAgain: () => void
     readonly cup?: () => void
     readonly options: () => void
   },
@@ -35,6 +36,7 @@ export function createHomeScreen(
   )
   const actionsNode = element('div', 'home-actions')
   actionsNode.append(
+    ...(state.raceAgainTrackName ? [button(`RACE AGAIN · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain, 'button button-primary button-large')] : []),
     button('RACE', 'race', actions.race, 'button button-primary button-large'),
     ...(actions.cup ? [button('ARCADE CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
     button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),

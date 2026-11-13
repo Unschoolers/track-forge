@@ -1,6 +1,8 @@
+import { courseIdentity } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { CUP_CIRCUITS, createCup, recordCupResult, retryCupRace, advanceCup } from '@/application/race/circuitCup'
 import type {
+  LastRaceStore,
   Preferences,
   PreferencesStore,
   ScoreEntry,
@@ -35,6 +37,7 @@ export interface Scheduler {
 }
 
 export interface AppControllerDependencies {
+  readonly lastRaceStore?: LastRaceStore
   readonly trackStore: TrackStore
   readonly scoreStore: ScoreStore
   readonly preferencesStore: PreferencesStore
@@ -73,6 +76,7 @@ export class AppController {
     const currentTrack = tracks[0] ?? null
     this.state = {
       mode: 'home',
+      raceAgainTrackName: this.resolveLastRace()?.track.name,
       paused: false,
       overlay: { type: 'none' },
       tracks,
@@ -135,6 +139,7 @@ export class AppController {
         this.update({
           ...this.state,
           mode: 'home',
+          raceAgainTrackName: this.resolveLastRace()?.track.name,
           currentTrack: this.state.cup ? this.preCupTrack : this.state.currentTrack,
           cup: null,
           paused: false,
@@ -172,6 +177,17 @@ export class AppController {
       case 'set-race-lighting':
         if (this.state.overlay.type === 'race-setup') this.update({ ...this.state, raceLighting: command.lighting })
         break
+      case 'race-again': {
+        const saved = this.resolveLastRace()
+        if (!saved) {
+          this.update({ ...this.state, mode: 'home', raceAgainTrackName: undefined, overlay: { type: 'track-library', purpose: 'race' }, ...this.librarySnapshot(), notice: 'Last race is no longer available. Choose a track.' })
+          break
+        }
+        this.dependencies.raceSession.start(saved.track, saved.race.setup)
+        this.rememberRace()
+        this.update({ ...this.state, currentTrack: saved.track, mode: 'race', paused: false, cup: null, overlay: { type: 'none' }, notice: null })
+        break
+      }
       case 'start-race':
         this.startRace()
         break
@@ -200,6 +216,7 @@ export class AppController {
         if (this.state.mode === 'race' && track && setup &&
             this.dependencies.raceSession.ghostTime?.(track, setup) != null) {
           this.dependencies.raceSession.start(track, { ...setup, mode: 'ghost' })
+          if (!this.state.cup) this.rememberRace()
           this.update({ ...this.state, paused: false, overlay: { type: 'none' }, notice: null })
         }
         break
@@ -221,9 +238,11 @@ export class AppController {
         break
       case 'open-track-library': {
         this.flushPendingEditorSave()
+        if (this.state.mode === 'race') this.dependencies.raceSession.setPaused(true)
         const library = this.librarySnapshot()
         this.update({
           ...this.state,
+          ...(this.state.mode === 'race' ? { mode: 'home' as const, paused: false, cup: null } : {}),
           overlay: {
             type: 'track-library',
             purpose: command.purpose,
@@ -438,6 +457,22 @@ export class AppController {
     this.update({ ...this.state, cup, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice: null })
   }
 
+  private rememberRace(): void {
+    if (!this.dependencies.lastRaceStore) return
+    const { track, setup } = this.dependencies.raceSession.snapshot()
+    if (!track || !setup) return
+    this.dependencies.lastRaceStore?.save({ trackId: track.id, course: courseIdentity(track), setup: { ...setup, handling: setup.handling ?? 'arcade', mode: setup.mode ?? 'normal', lighting: setup.lighting ?? track.lighting } })
+  }
+
+  private resolveLastRace(): { race: import('@/application/ports/storage').LastRace; track: Track } | null {
+    const race = this.dependencies.lastRaceStore?.load()
+    if (!race) return null
+    const track = this.dependencies.trackStore.find(race.trackId) ?? OFFICIAL_CIRCUITS.find((entry) => entry.track.id === race.trackId)?.track
+    if (!track || courseIdentity(track) !== race.course || !validateTrack(track, this.dependencies.geometry.get(track).path.totalLength).ready) return null
+    if (race.setup.mode === 'ghost' && this.dependencies.raceSession.ghostTime?.(track, race.setup) == null) return null
+    return { race, track }
+  }
+
   private startRace(): void {
     if (!this.flushPendingEditorSave()) return
     const track = this.state.currentTrack
@@ -462,6 +497,7 @@ export class AppController {
         mode: this.state.preferences.raceMode ?? 'normal',
         lighting: this.state.overlay.type === 'race-setup' ? this.state.raceLighting ?? track.lighting : track.lighting,
       })
+      this.rememberRace()
     }
     this.update(
       validation.ready

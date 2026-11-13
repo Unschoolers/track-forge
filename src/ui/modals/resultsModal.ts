@@ -11,6 +11,7 @@ export function createResultsModal(
   actions: {
     readonly retry: () => void
     readonly raceBestGhost?: (() => void) | undefined
+    readonly changeTrack?: () => void
     readonly edit: () => void
     readonly home: () => void
   },
@@ -41,6 +42,10 @@ export function createResultsModal(
   } else {
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings))
   }
+  if (result.playerTime !== null && result.previousBestTime !== undefined) {
+    const delta = result.playerTime - result.previousBestTime
+    frame.body.append(element('p', 'modal-subtitle', `${delta < 0 ? 'Improved by' : 'Gap to best:'} ${formatRaceTime(Math.abs(delta))}`))
+  }
   if (result.scoreSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))
   }
@@ -67,18 +72,14 @@ export function createResultsModal(
     )
     return frame.overlay
   }
+  frame.footer.append(button('RETRY', 'retry-race', actions.retry, 'button button-primary'))
+  if (actions.raceBestGhost) frame.footer.append(
+    button('RACE GHOST', 'race-best-ghost', actions.raceBestGhost, 'button'),
+  )
   frame.footer.append(
+    button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'),
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),
-    button(
-      'RETRY',
-      'retry-race',
-      actions.retry,
-      'button button-primary',
-    ),
-  )
-  if (actions.raceBestGhost) frame.footer.append(
-    button('RACE BEST GHOST', 'race-best-ghost', actions.raceBestGhost, 'button'),
   )
   return frame.overlay
 }
