@@ -30,6 +30,7 @@ export function stepVehicle(
   deltaSeconds: number,
   handling: 'arcade' | 'simulation' = 'simulation',
   speedLimit = Number.POSITIVE_INFINITY,
+  reversed = false,
 ): RaceVehicle {
   if (vehicle.wrecked || vehicle.finishedAt !== null) {
     return {
@@ -62,7 +63,9 @@ export function stepVehicle(
   const assistTarget = arcadePlayer
     ? clamp((speedError - (previousAssist > 0 ? 0 : 2)) * 0.04, 0, ARCADE_ASSIST_BRAKING.maxPressure)
     : 0
-  const assistBrake = arcadePlayer
+  // Do not carry corner braking onto an uncapped downhill straight.
+  const downhill = (reversed ? -context.grade : context.grade) < 0
+  const assistBrake = arcadePlayer && !(speedLimit === Infinity && downhill)
     ? clamp(
         assistTarget,
         Math.max(0, previousAssist - dt * ARCADE_ASSIST_BRAKING.pressureSlewPerSecond),
