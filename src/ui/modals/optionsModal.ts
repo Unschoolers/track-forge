@@ -125,6 +125,27 @@ export function createOptionsModal(
         }),
     ),
   )
+  frame.body.append(element('h3', 'setup-label', 'Controls'))
+  const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize'>(
+    title: string, key: K, values: readonly NonNullable<AppSnapshot['preferences'][K]>[], fallback: NonNullable<AppSnapshot['preferences'][K]>,
+  ): void => {
+    const section = element('section', 'setup-section')
+    section.append(element('h3', 'setup-label', title))
+    const row = element('div', 'choice-row')
+    row.setAttribute('role', 'group')
+    row.setAttribute('aria-label', title)
+    for (const value of values) {
+      const selected = (state.preferences[key] ?? fallback) === value
+      const choice = button(value.toUpperCase(), `${key}-${value}`, () => actions.preferences({ ...state.preferences, [key]: value }), `setup-choice${selected ? ' active' : ''}`)
+      choice.setAttribute('aria-pressed', String(selected))
+      row.append(choice)
+    }
+    section.append(row)
+    frame.body.append(section)
+  }
+  controlChoices('Steering layout', 'steeringLayout', ['drag', 'buttons'], 'drag')
+  controlChoices('Steering hand', 'steeringHand', ['left', 'right'], 'left')
+  controlChoices('Control size', 'controlSize', ['standard', 'large'], 'standard')
   const steering = element('section', 'setup-section')
   steering.append(element('h3', 'setup-label', 'Steering sensitivity'))
   const choices = element('div', 'choice-row')
@@ -142,7 +163,7 @@ export function createOptionsModal(
     choices.append(choice)
   }
   steering.append(choices)
-  frame.body.append(steering)
+  if ((state.preferences.steeringLayout ?? 'drag') === 'drag') frame.body.append(steering)
   frame.footer.append(
     button('DONE', 'options-done', actions.close, 'button button-primary'),
   )

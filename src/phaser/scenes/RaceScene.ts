@@ -166,6 +166,7 @@ export class RaceScene extends Phaser.Scene {
     this.pointerBinding = bindRacePointer(
       this.game.canvas, 'steering', this.controls, undefined,
       () => this.controller.snapshot().preferences.steeringSensitivity,
+      () => (this.controller.snapshot().preferences.steeringLayout ?? 'drag') === 'drag',
     )
     window.addEventListener('blur', this.onBlur)
     document.addEventListener('visibilitychange', this.onVisibility)

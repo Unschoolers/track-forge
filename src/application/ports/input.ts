@@ -4,6 +4,8 @@ export interface RaceControlsPort {
   snapshot(): DriverInput
   setKeyboard(key: string, pressed: boolean): void
   setPedalKeyboard(pedal: 'brake' | 'throttle', key: string, pressed: boolean): void
+  beginSteeringButton(pointerId: number, direction: -1 | 1): void
+  setSteeringButtonKeyboard(direction: -1 | 1, key: string, pressed: boolean): void
   beginSteering(pointerId: number, normalizedSteering: number): void
   updateSteering(pointerId: number, normalizedSteering: number): void
   beginBrake(pointerId: number): void

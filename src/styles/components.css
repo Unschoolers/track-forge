@@ -50,15 +50,24 @@
 .align-right { justify-self: end; text-align: right; }
 .hud-value { font-size: 1.35rem; }
 .steering-pad { position: relative; width: min(50vw, 15rem); min-width: 0; height: 4.2rem; overflow: hidden; border: 1px solid var(--color-line); border-radius: 999px; background: rgb(20 26 36 / 72%); touch-action: none; }
+.steering-buttons { display: none; }
+.race-controls[data-layout='buttons'] .steering-buttons { display: flex; }
+.steer-button { flex: none; width: 64px; height: 64px; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: rgb(20 26 36 / 82%); color: var(--color-text); font-size: 1.4rem; touch-action: none; }
+.steer-button.pressed { background: var(--color-accent); color: white; }
+.race-controls[data-size='large'] .steer-button { width: 72px; height: 72px; }
+.race-controls[data-size='large'] .brake-button, .race-controls[data-size='large'] .throttle-button { width: 6rem; height: 6rem; }
 .steering-thumb { position: absolute; top: 50%; left: 50%; width: 3.2rem; height: 3.2rem; translate: -50% -50%; border-radius: 50%; background: var(--color-text); box-shadow: 0 .3rem 1rem #0008; }
-.brake-button, .throttle-button { width: 5.5rem; height: 5.5rem; border-radius: 50%; background: #39242a; color: #ff9aac; touch-action: none; }
+.brake-button, .throttle-button { width: 5.5rem; height: 5.5rem; border-radius: 50%; background: #39242a; color: #ff9aac; touch-action: none; transition: background-color 120ms ease, color 120ms ease, scale 120ms ease; }
 .throttle-button { background: #173d31; color: #a0f1c2; }
 .throttle-button[hidden] { display: none; }
 .throttle-button.pressed { scale: .94; background: #238954; color: white; }
 .brake-button.pressed { scale: .94; background: var(--color-danger); color: white; }
 .recover-button { min-width: 5.5rem; min-height: 44px; padding: .45rem .5rem; color: var(--color-text); font-size: .72rem; touch-action: manipulation; }
-@media (max-height: 320px) {
+@media (max-width: 400px), (max-height: 320px) {
   .brake-button, .throttle-button { width: 4rem; height: 4rem; }
+  .race-controls[data-size='large'] .brake-button, .race-controls[data-size='large'] .throttle-button { width: 4.25rem; height: 4.25rem; }
+  .steer-button { width: 52px; height: 52px; }
+  .race-controls[data-size='large'] .steer-button { width: 60px; height: 60px; }
   .recover-button { min-width: 4rem; }
 }
 .damage-meter { position: absolute; top: 5rem; left: 50%; display: grid; grid-template-columns: minmax(5rem, 10rem) auto; align-items: center; gap: .55rem; translate: -50%; }
@@ -190,6 +199,8 @@
     text-shadow: 0 2px 6px #000;
   }
 }
+
+.race-controls[data-layout='buttons'] .steering-pad, .race-controls[data-layout='buttons'] .touch-steer-hint { display: none; }
 
 /* Placement reward: clear and lightweight for short repeat races. */
 .race-finish-medal { margin: .3rem auto .7rem; text-align: center; color: #ffce65; font-weight: 1000; font-size: 1.1rem; letter-spacing: .12em; }

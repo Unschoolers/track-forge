@@ -30,6 +30,22 @@ describe('RaceInputController', () => {
     expect(input.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
   })
 
+  it('restores held button and keyboard directions independently of pedals', () => {
+    const input = new RaceInputController()
+    input.setKeyboard('a', true)
+    input.beginSteeringButton(1, 1)
+    input.beginBrake(2)
+    input.beginThrottle(3)
+    input.beginSteeringButton(4, -1)
+    expect(input.snapshot()).toEqual({ steering: -1, throttle: 1, braking: true })
+    input.endPointer(4)
+    expect(input.snapshot().steering).toBe(1)
+    input.endPointer(1)
+    expect(input.snapshot()).toEqual({ steering: -1, throttle: 1, braking: true })
+    input.reset()
+    expect(input.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
+  })
+
   it('provides fine center steering while retaining full lock after a 48px drag', () => {
     expect(steeringFromDrag(0)).toBe(0)
     expect(steeringFromDrag(3)).toBe(0)

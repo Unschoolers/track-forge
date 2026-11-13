@@ -347,6 +347,9 @@ describe('score and preference repositories', () => {
   it('defaults legacy and malformed steering sensitivity and persists each option', () => {
     const storage = new MemoryStore()
     const preferences = new BrowserPreferencesRepository(storage)
+    expect(preferences.load()).toMatchObject({ steeringLayout: 'drag', steeringHand: 'left', controlSize: 'standard' })
+    expect(preferences.save({ ...preferences.load(), steeringLayout: 'buttons', steeringHand: 'right', controlSize: 'large' })).toBe(true)
+    expect(new BrowserPreferencesRepository(storage).load()).toMatchObject({ steeringLayout: 'buttons', steeringHand: 'right', controlSize: 'large' })
     expect(preferences.load().steeringSensitivity).toBe(1)
     for (const steeringSensitivity of [0.75, 1.5, 1] as const) {
       expect(preferences.save({ ...preferences.load(), steeringSensitivity })).toBe(true)

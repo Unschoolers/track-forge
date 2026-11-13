@@ -15,6 +15,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   audioEnabled: true,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
+  steeringLayout: 'drag',
+  steeringHand: 'left',
+  controlSize: 'standard',
   steeringSensitivity: 1,
   handling: 'arcade',
   raceLaps: 2,
@@ -35,6 +38,9 @@ export class BrowserPreferencesRepository implements PreferencesStore {
     const raceLaps = this.storage.get(STORAGE_KEYS.raceLaps)
     const steeringSensitivity = this.storage.get(STORAGE_KEYS.steeringSensitivity)
     return {
+      steeringLayout: this.storage.get(STORAGE_KEYS.steeringLayout) === 'buttons' ? 'buttons' : 'drag',
+      steeringHand: this.storage.get(STORAGE_KEYS.steeringHand) === 'right' ? 'right' : 'left',
+      controlSize: this.storage.get(STORAGE_KEYS.controlSize) === 'large' ? 'large' : 'standard',
       steeringSensitivity: steeringSensitivity === '0.75' ? 0.75 : steeringSensitivity === '1.5' ? 1.5 : 1,
       car: isCarId(car) ? car : DEFAULT_PREFERENCES.car,
       difficulty: isDifficultyId(difficulty)
@@ -60,6 +66,9 @@ export class BrowserPreferencesRepository implements PreferencesStore {
 
   save(preferences: Preferences): boolean {
     const writes = [
+      this.storage.set(STORAGE_KEYS.steeringLayout, preferences.steeringLayout === 'buttons' ? 'buttons' : 'drag'),
+      this.storage.set(STORAGE_KEYS.steeringHand, preferences.steeringHand === 'right' ? 'right' : 'left'),
+      this.storage.set(STORAGE_KEYS.controlSize, preferences.controlSize === 'large' ? 'large' : 'standard'),
       this.storage.set(STORAGE_KEYS.steeringSensitivity, String(preferences.steeringSensitivity ?? 1)),
       this.storage.set(STORAGE_KEYS.car, preferences.car),
       this.storage.set(STORAGE_KEYS.difficulty, preferences.difficulty),
