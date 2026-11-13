@@ -36,8 +36,10 @@ export function safeEntrySpeedAhead(
     const terrain = VEHICLE_TERRAIN_SPECS[carId][point.surface]
     const grip = Math.sqrt(car.grip * surface.grip * terrain.grip)
     const surfaceMax = straightSpeed * surface.max * terrain.max
+    // Allow the chassis more time to rotate through tight bends, especially
+    // when traffic places it away from the center of the racing line.
     const apexSpeed = Math.min(surfaceMax, clamp(
-      (225 - bend * 230 * cornerSafety) * grip +
+      (225 - bend * 350 * cornerSafety) * grip +
         Math.max(0, straightSpeed - 225) * Math.exp(-bend * 20),
       70, straightSpeed,
     ))

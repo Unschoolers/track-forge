@@ -22,6 +22,17 @@ describe('AI lane simulations', () => {
 		expect(run.stoppedReason).toBe('finished')
 		expect(run.issues.filter((issue) => issue.code === 'path-jump')).toEqual([])
 	})
+	it('reduces reverse hairpin traffic departures without hiding route jumps', () => {
+		const track = requireFixture(createLaneScenarios().find((track) => track.id === 'hairpin'))
+		const run = runLaneCheck({
+			path: prepareLanePath(track), trackName: track.name, seed: 1,
+			difficulty: 'normal', reversed: true, seconds: 60,
+			laps: 1, mode: 'traffic', car: 'blue',
+		})
+		expect(run.stoppedReason).toBe('finished')
+		expect(run.issues.filter((issue) => issue.code === 'path-jump').length).toBeLessThan(3)
+		expect(run.issues.filter((issue) => issue.code === 'recovery').length).toBeLessThan(8)
+	})
 	it('rejects malformed or excessive geometry before the path compiler expands it', () => {
 		const track = requireFixture(createLaneScenarios()[0])
 		const malformed = {
