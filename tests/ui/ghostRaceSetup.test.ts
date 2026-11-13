@@ -14,11 +14,11 @@ const state: AppSnapshot = {
   editorUi: { tool: 'draw', surface: 'street', structure: 'overpass',
     terrainBrush: { mode: 'raise', radius: 48 }, grid: false, cameraRequest: null,
     selectedCrossing: null, selectedPoint: null },
-  preferences: { car: 'blue', difficulty: 'normal', lighting: 'day',
+  preferences: { car: 'blue', difficulty: 'normal',
     audioEnabled: true, hapticsEnabled: true, dynamicZoomEnabled: true, handling: 'arcade' },
   scoresByTrack: {}, notice: null,
 }
-const actions = () => ({ close: vi.fn(), preferences: vi.fn(), start: vi.fn(), options: vi.fn() })
+const actions = () => ({ close: vi.fn(), preferences: vi.fn(), lighting: vi.fn(), start: vi.fn(), options: vi.fn() })
 describe('Ghost Race setup', () => {
   it('always shows a disabled Ghost Race button when no replay is available', () => {
     const modal = createRaceSetupModal(state, actions(), null)

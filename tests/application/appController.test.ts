@@ -32,7 +32,6 @@ class TrackMemory implements TrackStore {
 const preferences: Preferences = {
   car: 'blue',
   difficulty: 'normal',
-  lighting: 'day',
   audioEnabled: true,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
@@ -100,6 +99,23 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('captures setup lighting without changing the track, and retains it on retry', () => {
+    const { controller, raceSession, trackStore } = setup(undefined, true)
+    const before = JSON.stringify(trackStore.find(asTrackId('starter')))
+    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
+    controller.dispatch({ type: 'set-race-lighting', lighting: 'night' })
+    controller.dispatch({ type: 'open-options', returnTo: 'race-setup' })
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot().raceLighting).toBe('night')
+    controller.dispatch({ type: 'start-race' })
+    expect(raceSession.snapshot().setup?.lighting).toBe('night')
+    expect(JSON.stringify(trackStore.find(asTrackId('starter')))).toBe(before)
+    controller.dispatch({ type: 'restart-race' })
+    expect(raceSession.snapshot().setup?.lighting).toBe('night')
+    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
+    expect(controller.snapshot().raceLighting).toBe('day')
+  })
+
   it('shows an official race record on Home without adding the circuit to saved tracks', () => {
     const { controller, raceSession, scoreStore } = setup(undefined, true)
     let scores: ReturnType<ScoreStore['forTrack']> = []
@@ -368,21 +384,6 @@ describe('AppController', () => {
     expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
   })
 
-  it('clears a failed draft save notice when a lighting save succeeds', () => {
-    const { controller, trackStore, flush } = setup()
-    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    trackStore.save.mockReturnValueOnce(false)
-    flush()
-    expect(controller.snapshot().notice).toBe('Save unavailable.')
-
-    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, lighting: 'night' } })
-
-    expect(trackStore.find(asTrackId('starter'))).toMatchObject({
-      lighting: 'night', trees: expect.arrayContaining([{ x: 4, y: 5 }]),
-    })
-    expect(controller.snapshot().notice).toBeNull()
-  })
-
   it('does not resurrect a deleted track when a canceled callback runs', () => {
     const { controller, trackStore, flush } = setup()
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
@@ -391,16 +392,15 @@ describe('AppController', () => {
     expect(trackStore.find(asTrackId('starter'))).toBeUndefined()
   })
 
-  it('does not overwrite newer lighting with a pending editor save', () => {
-    const { controller, trackStore, flush } = setup()
+  it('flushes pending editor changes before opening race setup', () => {
+    const { controller, trackStore } = setup()
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, lighting: 'night' } })
-    flush()
-    expect(trackStore.find(asTrackId('starter'))).toMatchObject({ lighting: 'night', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
+    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
   })
 
   it('persists preference changes through the injected repository', () => {
-    const { controller, preferencesStore, trackStore } = setup()
+    const { controller, preferencesStore } = setup()
 
     controller.dispatch({
       type: 'set-preferences',
@@ -414,14 +414,7 @@ describe('AppController', () => {
     })
     expect(controller.snapshot().preferences.car).toBe('green')
 
-    controller.dispatch({
-      type: 'set-preferences',
-      preferences: { ...preferences, lighting: 'night' },
-    })
-    expect(controller.snapshot().currentTrack?.lighting).toBe('night')
-    expect(trackStore.save).toHaveBeenCalledWith(
-      expect.objectContaining({ lighting: 'night', updatedAt: 500 }),
-    )
+
   })
 
   it('creates and renames tracks through typed library commands', () => {
@@ -451,7 +444,7 @@ describe('AppController', () => {
       points: createStarterTrack(asTrackId('source'), 1).points.slice(0, 3),
       lighting: 'night' as const,
     }
-    const { controller, trackStore, preferencesStore } = setup(incomplete)
+    const { controller, trackStore } = setup(incomplete)
     const ready = {
       ...createStarterTrack(asTrackId('ready'), 2),
       lighting: 'night' as const,
@@ -475,12 +468,9 @@ describe('AppController', () => {
     expect(controller.snapshot()).toMatchObject({
       overlay: { type: 'race-setup' },
       currentTrack: { id: 'ready' },
-      preferences: { lighting: 'night' },
+      raceLighting: 'night',
     })
-    expect(preferencesStore.save).toHaveBeenCalledWith({
-      ...preferences,
-      lighting: 'night',
-    })
+
 
     controller.dispatch({ type: 'open-options', returnTo: 'race-setup' })
     controller.dispatch({ type: 'set-preferences', preferences: {

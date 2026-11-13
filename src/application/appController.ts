@@ -169,6 +169,9 @@ export class AppController {
           }
         }
         break
+      case 'set-race-lighting':
+        if (this.state.overlay.type === 'race-setup') this.update({ ...this.state, raceLighting: command.lighting })
+        break
       case 'start-race':
         this.startRace()
         break
@@ -457,6 +460,7 @@ export class AppController {
         laps: this.state.preferences.raceLaps ?? 2,
         handling: this.state.preferences.handling ?? 'arcade',
         mode: this.state.preferences.raceMode ?? 'normal',
+        lighting: this.state.overlay.type === 'race-setup' ? this.state.raceLighting ?? track.lighting : track.lighting,
       })
     }
     this.update(
@@ -531,11 +535,6 @@ export class AppController {
       return
     }
     this.cancelPendingEditorSave()
-    const preferences = {
-      ...this.state.preferences,
-      lighting: track.lighting,
-    }
-    this.dependencies.preferencesStore.save(preferences)
     const library = this.librarySnapshot()
     this.update({
       ...this.state,
@@ -548,7 +547,7 @@ export class AppController {
         track.start,
         track.terrain,
       ),
-      preferences,
+      raceLighting: track.lighting,
       notice: null,
     })
   }
@@ -676,33 +675,6 @@ export class AppController {
     preferences: Preferences,
   ): void {
     this.dependencies.preferencesStore.save(preferences)
-    const currentTrack = this.state.currentTrack
-    if (
-      currentTrack &&
-      !OFFICIAL_CIRCUITS.some(({ track }) => track.id === currentTrack.id) &&
-      currentTrack.lighting !== preferences.lighting
-    ) {
-      const updatedTrack = {
-        ...currentTrack,
-        lighting: preferences.lighting,
-        updatedAt: this.now(),
-      }
-      const saved = this.dependencies.trackStore.save(updatedTrack)
-      if (saved) this.cancelPendingEditorSave()
-      else this.pendingEditorSave = true
-      this.update({
-        ...this.state,
-        currentTrack: updatedTrack,
-        tracks: this.state.tracks.map((track) =>
-          track.id === updatedTrack.id ? updatedTrack : track,
-        ),
-        preferences,
-        notice: saved
-          ? this.state.notice === 'Save unavailable.' ? null : this.state.notice
-          : 'Save unavailable.',
-      })
-      return
-    }
     this.update({ ...this.state, preferences })
   }
 

@@ -19,7 +19,6 @@ const incomplete = {
 const preferences: Preferences = {
   car: 'blue',
   difficulty: 'normal',
-  lighting: 'day',
   audioEnabled: true,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
@@ -150,11 +149,13 @@ describe('modal application flows', () => {
 
   it('shows the selected car and lighting in the race setup flyover', () => {
     const initial = state({ type: 'race-setup' })
-    const { root, host, update } = setup(initial)
+    const { root, host, update, port } = setup(initial)
     const preview = root.querySelector<HTMLCanvasElement>('canvas.race-flyover')
     expect(preview?.getAttribute('aria-label')).toBe('Daytime flyover of Starter Circuit')
     expect(preview?.dataset.car).toBe('blue')
-    update({ ...initial, preferences: { ...initial.preferences, car: 'red', lighting: 'night' } })
+    root.querySelector<HTMLButtonElement>('[data-action="lighting-night"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-race-lighting', lighting: 'night' })
+    update({ ...initial, raceLighting: 'night', preferences: { ...initial.preferences, car: 'red' } })
     const night = root.querySelector<HTMLCanvasElement>('canvas.race-flyover')
     expect(night?.getAttribute('aria-label')).toBe('Nighttime flyover of Starter Circuit')
     expect(night?.dataset.car).toBe('red')
@@ -213,7 +214,8 @@ describe('modal application flows', () => {
 
     update(state({ type: 'options', returnTo: 'race-setup' }))
     expect(root.textContent).toContain('Race settings')
-    for (const action of ['difficulty-hard', 'laps-3', 'lighting-night', 'handling-simulation']) {
+    expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
+    for (const action of ['difficulty-hard', 'laps-3', 'handling-simulation']) {
       expect(root.querySelector(`[data-action="${action}"]`)).not.toBeNull()
     }
     root.querySelector<HTMLButtonElement>('[data-action="difficulty-hard"]')?.click()

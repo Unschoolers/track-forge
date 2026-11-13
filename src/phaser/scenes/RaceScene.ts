@@ -79,7 +79,7 @@ export class RaceScene extends Phaser.Scene {
       .state?.vehicles.find((vehicle) => vehicle.player)
     if (initialPlayer) this.raceCamera = createRaceCamera(initialPlayer)
     this.cameras.main.setBackgroundColor(
-      this.snapshot.preferences.lighting === 'night' ? '#0e2b1d' : '#2d7344',
+      this.raceSession.snapshot().setup?.lighting === 'night' ? '#0e2b1d' : '#2d7344',
     )
     this.terrainGraphics = this.add
       .graphics()
@@ -125,41 +125,41 @@ export class RaceScene extends Phaser.Scene {
     renderTerrain(
       this.terrainGraphics,
       geometry.path.terrainSurface,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
       terrainDetailForView(geometry.path.terrainSurface.authoredCellCount, 1),
     )
     renderTrees(
       this.sceneryGraphics,
       track.trees,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
       geometry.path.terrainSurface,
     )
     renderTrackGeometryBase(
       this.worldGraphics,
       geometry,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
     )
     renderTrackGeometryStructureUnderlay(
       structureUnderlayGraphics,
       geometry,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
     )
     renderTrackGeometryBridgeOverlay(
       bridgeGraphics,
       geometry,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
     )
     renderTrackGeometryBridgeOverlay(
       wallGraphics,
       geometry,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
       true,
     )
     this.lamps = buildLampPosts(geometry)
     renderLampPosts(
       this.lampGraphics,
       this.lamps,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
     )
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
@@ -218,7 +218,7 @@ export class RaceScene extends Phaser.Scene {
       this.shadowGraphics,
       visibleVehicles,
       race.path.terrainSurface,
-      this.snapshot.preferences.lighting === 'night',
+      this.raceSession.snapshot().setup?.lighting === 'night',
     )
     const upperVehicles = new Set(
       visibleVehicles
@@ -247,7 +247,7 @@ export class RaceScene extends Phaser.Scene {
     this.nightShadeGraphics?.clear()
     this.nightLightGraphics?.clear()
     if (
-      this.snapshot.preferences.lighting === 'night' &&
+      this.raceSession.snapshot().setup?.lighting === 'night' &&
       this.nightShadeGraphics &&
       this.nightLightGraphics
     ) {

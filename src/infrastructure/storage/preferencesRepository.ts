@@ -6,14 +6,12 @@ import type {
 import {
   isCarId,
   isDifficultyId,
-  isLightingMode,
 } from '@/domain/model'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 
 export const DEFAULT_PREFERENCES: Preferences = {
   car: 'blue',
   difficulty: 'normal',
-  lighting: 'day',
   audioEnabled: true,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
@@ -33,7 +31,6 @@ export class BrowserPreferencesRepository implements PreferencesStore {
   load(): Preferences {
     const car = this.storage.get(STORAGE_KEYS.car)
     const difficulty = this.storage.get(STORAGE_KEYS.difficulty)
-    const lighting = this.storage.get(STORAGE_KEYS.lighting)
     const handling = this.storage.get(STORAGE_KEYS.handling)
     const raceLaps = this.storage.get(STORAGE_KEYS.raceLaps)
     const steeringSensitivity = this.storage.get(STORAGE_KEYS.steeringSensitivity)
@@ -46,9 +43,6 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       handling: handling === 'simulation' ? 'simulation' : 'arcade',
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       raceMode: this.storage.get(STORAGE_KEYS.raceMode) === 'ghost' ? 'ghost' : 'normal',
-      lighting: isLightingMode(lighting)
-        ? lighting
-        : DEFAULT_PREFERENCES.lighting,
       audioEnabled: boolean(
         this.storage.get(STORAGE_KEYS.audio),
         DEFAULT_PREFERENCES.audioEnabled,
@@ -69,7 +63,6 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       this.storage.set(STORAGE_KEYS.steeringSensitivity, String(preferences.steeringSensitivity ?? 1)),
       this.storage.set(STORAGE_KEYS.car, preferences.car),
       this.storage.set(STORAGE_KEYS.difficulty, preferences.difficulty),
-      this.storage.set(STORAGE_KEYS.lighting, preferences.lighting),
       this.storage.set(STORAGE_KEYS.handling, preferences.handling === 'simulation' ? 'simulation' : 'arcade'),
       this.storage.set(STORAGE_KEYS.raceLaps, String(preferences.raceLaps === 1 || preferences.raceLaps === 3 ? preferences.raceLaps : 2)),
       this.storage.set(STORAGE_KEYS.raceMode, preferences.raceMode === 'ghost' ? 'ghost' : 'normal'),

@@ -1,3 +1,4 @@
+import type { LightingMode } from '@/domain/model'
 import { raceCategory, sameCategory } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
@@ -38,6 +39,7 @@ import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
 
 export interface RaceSetup {
+  readonly lighting?: LightingMode
   readonly car: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
@@ -168,7 +170,7 @@ export class RaceSession implements RaceSessionPort {
     this.bestGhost = this.dependencies.ghostStore?.load(track, setup) ?? null
     this.timing = new LapTiming(setup.mode === 'ghost' && this.bestGhost?.splits?.length === setup.laps * 4
       ? this.bestGhost.splits : undefined)
-    const resolved = { ...setup, mode: setup.mode === 'ghost' && this.bestGhost ? 'ghost' as const : 'normal' as const }
+    const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && this.bestGhost ? 'ghost' as const : 'normal' as const }
     const created = createRace({
       path: this.geometry.get(track).path,
       playerCar: setup.car,
