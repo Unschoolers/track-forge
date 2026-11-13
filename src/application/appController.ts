@@ -1,5 +1,5 @@
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { createCup, recordCupResult, retryCupRace, advanceCup } from '@/application/race/circuitCup'
+import { CUP_CIRCUITS, createCup, recordCupResult, retryCupRace, advanceCup } from '@/application/race/circuitCup'
 import type {
   Preferences,
   PreferencesStore,
@@ -162,7 +162,7 @@ export class AppController {
         break
       case 'next-cup-race':
         if (this.state.cup && this.state.overlay.type === 'results') {
-          if (this.state.cup.index === OFFICIAL_CIRCUITS.length - 1) {
+          if (this.state.cup.index === CUP_CIRCUITS.length - 1) {
             this.dispatch({ type: 'go-home' })
           } else {
             this.launchCupRace(advanceCup(this.state.cup))
@@ -426,7 +426,7 @@ export class AppController {
   }
 
   private launchCupRace(cup: import('@/application/race/circuitCup').CircuitCup): void {
-    const track = OFFICIAL_CIRCUITS[cup.index]?.track
+    const track = CUP_CIRCUITS[cup.index]?.track
     if (!track) return
     this.dependencies.raceSession.start(track, {
       car: this.state.preferences.car,

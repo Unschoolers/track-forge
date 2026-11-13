@@ -1,5 +1,4 @@
-import { cupStandings, type CircuitCup } from '@/application/race/circuitCup'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { CUP_CIRCUITS, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
 import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
@@ -57,14 +56,14 @@ export function createResultsModal(
   }
   frame.body.append(createHighScores(result.highScores))
   if (cupAction) {
-    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${OFFICIAL_CIRCUITS.length}`))
+    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${CUP_CIRCUITS.length}`))
     for (const [index, driver] of cupStandings(cupAction.cup).entries()) {
       frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
     }
     frame.footer.append(
       button('LEAVE CUP', 'results-home', actions.home, 'button'),
       button('RETRY', 'retry-race', actions.retry, 'button'),
-      button(cupAction.cup.index === OFFICIAL_CIRCUITS.length - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
+      button(cupAction.cup.index === CUP_CIRCUITS.length - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
     )
     return frame.overlay
   }
