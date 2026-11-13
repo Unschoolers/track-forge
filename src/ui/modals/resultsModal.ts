@@ -1,3 +1,4 @@
+import type { TimeMedal } from '@/application/race/raceRecords'
 import { CUP_CIRCUITS, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
 import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
@@ -16,6 +17,7 @@ export function createResultsModal(
     readonly home: () => void
   },
   cupAction?: { readonly cup: CircuitCup; readonly next: () => void },
+  newTimeMedal?: TimeMedal | null,
 ): HTMLElement {
   const headline = result.outcome === 'water'
     ? 'SUNK'
@@ -34,17 +36,21 @@ export function createResultsModal(
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
   const medal = result.ghostTime === undefined ? medalForFinish(result.outcome, result.playerPlace) : null
+  if (result.playerTime !== null && result.previousBestTime !== undefined) {
+    const delta = result.playerTime - result.previousBestTime
+    const copy = delta < 0
+      ? `${result.newRecord ? 'Personal best by' : 'Faster by'} ${formatRaceTime(-delta)}`
+      : delta === 0 ? 'Personal best matched' : `Gap to best: ${formatRaceTime(delta)}`
+    frame.body.append(element('p', 'modal-subtitle', copy))
+  }
   if (medal) {
     frame.body.append(element('p', 'race-finish-medal', `${medal} MEDAL`))
   }
+  if (newTimeMedal) frame.body.append(element('p', 'race-finish-medal', `NEW ${newTimeMedal.toUpperCase()} TIME MEDAL`))
   if (result.ghostTime !== undefined) {
     frame.body.append(element('p', 'modal-subtitle', `Ghost target: ${formatRaceTime(result.ghostTime)}`))
   } else {
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings))
-  }
-  if (result.playerTime !== null && result.previousBestTime !== undefined) {
-    const delta = result.playerTime - result.previousBestTime
-    frame.body.append(element('p', 'modal-subtitle', `${delta < 0 ? 'Improved by' : 'Gap to best:'} ${formatRaceTime(Math.abs(delta))}`))
   }
   if (result.scoreSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))
@@ -76,11 +82,13 @@ export function createResultsModal(
   if (actions.raceBestGhost) frame.footer.append(
     button('RACE GHOST', 'race-best-ghost', actions.raceBestGhost, 'button'),
   )
-  frame.footer.append(
-    button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'),
+  const secondary = element('div', 'results-secondary')
+  secondary.append(
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),
   )
+  frame.body.append(secondary)
+  frame.footer.append(button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'))
   return frame.overlay
 }
 
@@ -90,4 +98,12 @@ function ordinalSuffix(place: number): string {
   if (place % 10 === 2) return 'ND'
   if (place % 10 === 3) return 'RD'
   return 'TH'
+}
+
+export function createCupFinalModal(cup: CircuitCup, finish: () => void): HTMLElement {
+  const frame = createModalFrame('CUP STANDINGS', 'Final results', undefined, 'results-modal')
+  frame.overlay.dataset.modal = 'cup-final'
+  for (const [index, driver] of cupStandings(cup).entries()) frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
+  frame.footer.append(button('FINISH CUP', 'next-cup-race', finish, 'button button-primary'))
+  return frame.overlay
 }

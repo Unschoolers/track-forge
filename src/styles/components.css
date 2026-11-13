@@ -85,6 +85,8 @@
 .scoreboard.compact .scoreboard-row { padding: .5rem .65rem; font-size: .82rem; }
 .results-heading { margin: 1rem 0 .5rem; color: var(--color-muted); font-size: .72rem; letter-spacing: .13em; }
 .results-heading:first-child { margin-top: 0; }
+.results-secondary { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
+.results-secondary .button { min-height: 44px; padding-inline: .7rem; font-size: .78rem; }
 .modal-title { margin: 0; font-size: 1.25rem; }
 .modal-subtitle { margin: .3rem 0 0; color: var(--color-muted); font-size: .85rem; line-height: 1.45; }
 .modal-close { width: 2.5rem; height: 2.5rem; font-size: 1.35rem; }

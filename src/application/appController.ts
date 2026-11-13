@@ -1,7 +1,9 @@
-import { courseIdentity } from '@/application/race/raceRecords'
+import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { CUP_CIRCUITS, createCup, recordCupResult, retryCupRace, advanceCup } from '@/application/race/circuitCup'
+import { CUP_CIRCUITS, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 import type {
+  CupStore,
+  LastRace,
   LastRaceStore,
   Preferences,
   PreferencesStore,
@@ -38,6 +40,7 @@ export interface Scheduler {
 
 export interface AppControllerDependencies {
   readonly lastRaceStore?: LastRaceStore
+  readonly cupStore?: CupStore
   readonly trackStore: TrackStore
   readonly scoreStore: ScoreStore
   readonly preferencesStore: PreferencesStore
@@ -77,6 +80,7 @@ export class AppController {
     this.state = {
       mode: 'home',
       raceAgainTrackName: this.resolveLastRace()?.track.name,
+      cupProgress: dependencies.cupStore?.load() ?? { checkpoint: null, bestPlacement: null },
       paused: false,
       overlay: { type: 'none' },
       tracks,
@@ -110,12 +114,22 @@ export class AppController {
         this.state.mode === 'race' &&
         this.state.overlay.type !== 'results'
       ) {
+        const cup = this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null
+        const scores = this.scoresForTracks(this.state.tracks)
+        const track = this.state.currentTrack
+        const previousMedal = track ? timeMedal(track, this.state.scoresByTrack[track.id] ?? []) : null
+        const earnedMedal = track ? timeMedal(track, scores[track.id] ?? []) : null
+        const rank = (medal: typeof earnedMedal) => medal === 'gold' ? 3 : medal === 'silver' ? 2 : medal === 'bronze' ? 1 : 0
+        const savedCup = cup ? this.persistCup(cup) : null
         this.update({
           ...this.state,
           paused: true,
-          scoresByTrack: this.scoresForTracks(this.state.tracks),
-          cup: this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null,
+          scoresByTrack: scores,
+          newTimeMedal: rank(earnedMedal) > rank(previousMedal) ? earnedMedal : null,
+          cupProgress: savedCup?.progress ?? this.state.cupProgress,
+          cup,
           overlay: { type: 'results' },
+          notice: savedCup?.notice ?? this.state.notice,
         })
       }
     })
@@ -158,17 +172,33 @@ export class AppController {
         if (this.state.mode === 'race') {
           this.dependencies.raceSession.setPaused(true)
         }
-        this.update({ ...this.state, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
+        this.update({ ...this.state, cup: null, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
         break
       case 'start-cup':
         if (!this.flushPendingEditorSave()) break
         this.preCupTrack = this.state.currentTrack
-        this.launchCupRace(createCup())
+        this.launchCupRace(createCup(this.state.preferences.car, this.state.preferences.difficulty))
         break
+      case 'resume-cup': {
+        const cup = this.state.cupProgress?.checkpoint
+        if (!cup) break
+        this.preCupTrack = this.state.currentTrack
+        if (cup.rounds.length > cup.index && cup.index === CUP_CIRCUITS.length - 1) {
+          this.update({ ...this.state, cup, overlay: { type: 'cup-final' } })
+        } else {
+          this.launchCupRace(cup.rounds.length > cup.index ? advanceCup(cup) : cup)
+        }
+        break
+      }
       case 'next-cup-race':
-        if (this.state.cup && this.state.overlay.type === 'results') {
+        if (this.state.cup && (this.state.overlay.type === 'results' || this.state.overlay.type === 'cup-final')) {
           if (this.state.cup.index === CUP_CIRCUITS.length - 1) {
+            const placement = cupStandings(this.state.cup).findIndex((driver) => driver.id === 'player') + 1
+            const previous = this.state.cupProgress?.bestPlacement ?? null
+            const progress = { checkpoint: null, bestPlacement: placement > 0 ? Math.min(previous ?? placement, placement) : previous }
+            const notice = this.saveCupProgress(progress)
             this.dispatch({ type: 'go-home' })
+            this.update({ ...this.state, cupProgress: progress, notice })
           } else {
             this.launchCupRace(advanceCup(this.state.cup))
           }
@@ -178,6 +208,7 @@ export class AppController {
         if (this.state.overlay.type === 'race-setup') this.update({ ...this.state, raceLighting: command.lighting })
         break
       case 'race-again': {
+        if (!this.flushPendingEditorSave()) break
         const saved = this.resolveLastRace()
         if (!saved) {
           this.update({ ...this.state, mode: 'home', raceAgainTrackName: undefined, overlay: { type: 'track-library', purpose: 'race' }, ...this.librarySnapshot(), notice: 'Last race is no longer available. Choose a track.' })
@@ -185,7 +216,16 @@ export class AppController {
         }
         this.dependencies.raceSession.start(saved.track, saved.race.setup)
         this.rememberRace()
-        this.update({ ...this.state, currentTrack: saved.track, mode: 'race', paused: false, cup: null, overlay: { type: 'none' }, notice: null })
+        this.update({
+          ...this.state,
+          currentTrack: saved.track,
+          editor: createEditorState(saved.track.points, saved.track.trees, saved.track.start, saved.track.terrain),
+          mode: 'race',
+          paused: false,
+          cup: null,
+          overlay: { type: 'none' },
+          notice: null,
+        })
         break
       }
       case 'start-race':
@@ -223,13 +263,16 @@ export class AppController {
       }
       case 'restart-race':
         if (this.state.mode === 'race') {
+          const cup = this.state.cup ? retryCupRace(this.state.cup) : null
+          const savedCup = cup ? this.persistCup(cup) : null
           this.dependencies.raceSession.restart()
           this.update({
             ...this.state,
             paused: false,
-            cup: this.state.cup ? retryCupRace(this.state.cup) : null,
+            cup,
+            cupProgress: savedCup?.progress ?? this.state.cupProgress,
             overlay: { type: 'none' },
-            notice: null,
+            notice: savedCup?.notice ?? null,
           })
         }
         break
@@ -444,17 +487,29 @@ export class AppController {
     this.dependencies.raceSession.destroy()
   }
 
-  private launchCupRace(cup: import('@/application/race/circuitCup').CircuitCup): void {
+  private saveCupProgress(progress: CupProgress): string | null {
+    return this.dependencies.cupStore?.save(progress) === false
+      ? 'Cup progress could not be saved on this device.'
+      : null
+  }
+
+  private persistCup(checkpoint: CircuitCup): { progress: CupProgress; notice: string | null } {
+    const progress = { checkpoint, bestPlacement: this.state.cupProgress?.bestPlacement ?? null }
+    return { progress, notice: this.saveCupProgress(progress) }
+  }
+
+  private launchCupRace(cup: CircuitCup): void {
     const track = CUP_CIRCUITS[cup.index]?.track
     if (!track) return
     this.dependencies.raceSession.start(track, {
-      car: this.state.preferences.car,
-      difficulty: this.state.preferences.difficulty,
+      car: cup.car,
+      difficulty: cup.difficulty,
       laps: 1,
       handling: 'arcade',
       mode: 'normal',
     })
-    this.update({ ...this.state, cup, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice: null })
+    const { progress, notice } = this.persistCup(cup)
+    this.update({ ...this.state, cup, cupProgress: progress, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice })
   }
 
   private rememberRace(): void {
@@ -464,7 +519,7 @@ export class AppController {
     this.dependencies.lastRaceStore?.save({ trackId: track.id, course: courseIdentity(track), setup: { ...setup, handling: setup.handling ?? 'arcade', mode: setup.mode ?? 'normal', lighting: setup.lighting ?? track.lighting } })
   }
 
-  private resolveLastRace(): { race: import('@/application/ports/storage').LastRace; track: Track } | null {
+  private resolveLastRace(): { race: LastRace; track: Track } | null {
     const race = this.dependencies.lastRaceStore?.load()
     if (!race) return null
     const track = this.dependencies.trackStore.find(race.trackId) ?? OFFICIAL_CIRCUITS.find((entry) => entry.track.id === race.trackId)?.track
@@ -601,6 +656,7 @@ export class AppController {
     this.update({
       ...this.state,
       mode: enterEditor ? 'editor' : this.state.mode,
+      cup: enterEditor ? null : this.state.cup ?? null,
       paused: false,
       overlay: { type: 'none' },
       currentTrack: result.track,
@@ -660,6 +716,10 @@ export class AppController {
 
   private closeOverlay(): void {
     const overlay = this.state.overlay
+    if (overlay.type === 'cup-final') {
+      this.dispatch({ type: 'go-home' })
+      return
+    }
     if (overlay.type === 'track-name') {
       this.update({
         ...this.state,

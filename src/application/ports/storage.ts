@@ -4,6 +4,8 @@ import type {
   Track,
   TrackId,
 } from '@/domain/model'
+import type { CupProgress } from '@/application/race/circuitCup'
+import type { RaceSetup } from '@/application/race/raceSession'
 
 export interface KeyValueStore {
   get(key: string): string | null
@@ -67,10 +69,15 @@ export interface PreferencesStore {
 export interface LastRace {
   readonly trackId: TrackId
   readonly course: string
-  readonly setup: import('@/application/race/raceSession').RaceSetup
+  readonly setup: RaceSetup
 }
 
 export interface LastRaceStore {
   load(): LastRace | null
   save(race: LastRace): boolean
+}
+
+export interface CupStore {
+  load(): CupProgress
+  save(progress: CupProgress): boolean
 }

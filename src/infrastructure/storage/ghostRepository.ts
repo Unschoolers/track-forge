@@ -50,7 +50,7 @@ export class BrowserGhostRepository implements GhostStore {
   availability(track: Track, setup: GhostSetup): GhostAvailability {
     const key = ghostRaceKey(track, setup)
     const suffix = `|${setup.car}|${setup.laps}|${setup.handling ?? 'arcade'}`
-    const prefix = key.slice(0, -suffix.length) + '|'
+    const prefix = `${key.slice(0, -suffix.length)}|`
     let best: { setup: GhostSetup; differences: number; time: number } | undefined
     for (const [candidateKey, run] of Object.entries(this.all()).slice(-MAX_RUNS)) {
       if (!candidateKey.startsWith(prefix)) continue

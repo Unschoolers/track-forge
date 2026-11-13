@@ -42,3 +42,14 @@ export const OFFICIAL_CIRCUITS = [
     target: 26,
   },
 ] as const
+
+// Targets in seconds, checked against clean 60 Hz Arcade laps with Blue and Red.
+// A practicing driver has room to earn Bronze before chasing the quick lap.
+export const OFFICIAL_TIME_TARGETS = [
+  { gold: 14.6, silver: 17, bronze: 20 },
+  { gold: 37.3, silver: 43, bronze: 50 },
+  { gold: 17.1, silver: 19.5, bronze: 22 },
+  { gold: 15.3, silver: 18, bronze: 21 },
+  { gold: 21.7, silver: 25, bronze: 29 },
+  { gold: 24.6, silver: 28.5, bronze: 33 },
+] as const

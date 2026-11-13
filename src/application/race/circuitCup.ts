@@ -1,3 +1,4 @@
+import type { CarId, DifficultyId } from '@/domain/model'
 import type { RaceStanding } from '@/application/race/raceSession'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 
@@ -13,8 +14,12 @@ export const CUP_CIRCUITS = [
 })
 
 export interface CupDriver { readonly id: string; readonly label: string; readonly points: number }
-export interface CircuitCup { readonly index: number; readonly rounds: readonly (readonly CupDriver[])[] }
-export function createCup(): CircuitCup { return { index: 0, rounds: [] } }
+export interface CircuitCup { readonly car: CarId; readonly difficulty: DifficultyId; readonly index: number; readonly rounds: readonly (readonly CupDriver[])[] }
+export interface CupProgress {
+  readonly checkpoint: CircuitCup | null
+  readonly bestPlacement: number | null
+}
+export function createCup(car: CarId = 'blue', difficulty: DifficultyId = 'normal'): CircuitCup { return { car, difficulty, index: 0, rounds: [] } }
 export function recordCupResult(cup: CircuitCup, standings: readonly RaceStanding[]): CircuitCup {
   if (cup.rounds.length > cup.index) return cup
   const points = [10, 6, 4, 2]

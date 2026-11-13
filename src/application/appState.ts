@@ -1,4 +1,5 @@
-import type { CircuitCup } from '@/application/race/circuitCup'
+import type { TimeMedal } from '@/application/race/raceRecords'
+import type { CircuitCup, CupProgress } from '@/application/race/circuitCup'
 import type { Preferences } from '@/application/ports/storage'
 import type { ScoreEntry } from '@/application/ports/storage'
 import type { TerrainBrushRadius } from '@/domain/config'
@@ -45,11 +46,14 @@ export type AppOverlay =
     }
   | { readonly type: 'pause' }
   | { readonly type: 'results' }
+  | { readonly type: 'cup-final' }
 
 export interface AppSnapshot {
   readonly raceLighting?: LightingMode
   readonly raceAgainTrackName?: string | undefined
   readonly cup?: CircuitCup | null
+  readonly cupProgress?: CupProgress | undefined
+  readonly newTimeMedal?: TimeMedal | null
   readonly mode: AppMode
   readonly paused: boolean
   readonly overlay: AppOverlay
@@ -88,6 +92,7 @@ export type AppCommand =
   | { readonly type: 'set-race-lighting'; readonly lighting: LightingMode }
   | { readonly type: 'race-again' }
   | { readonly type: 'start-cup' }
+  | { readonly type: 'resume-cup' }
   | { readonly type: 'next-cup-race' }
   | { readonly type: 'pause-race' }
   | { readonly type: 'resume-race' }

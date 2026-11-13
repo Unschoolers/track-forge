@@ -1,5 +1,5 @@
 import type { LightingMode } from '@/domain/model'
-import { DIFFICULTY_SPECS } from '@/domain/config'
+import { CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import type { GhostAvailability } from '@/application/race/ghostReplay'
 import type { AppSnapshot } from '@/application/appState'
 import { createCarPicker } from '@/ui/components/carPicker'
@@ -62,7 +62,7 @@ export function createRaceSetupModal(
   const description = element('p', 'modal-subtitle', ghostAvailable
     ? `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; Normal Race has AI opponents.`
     : ghost.kind === 'different-setup'
-      ? `Saved ghost: ${ghost.setup.car[0]!.toUpperCase()}${ghost.setup.car.slice(1)} · ${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'} · ${ghost.setup.handling === 'simulation' ? 'Simulation' : 'Arcade'}.`
+      ? `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'} · ${ghost.setup.handling === 'simulation' ? 'Simulation' : 'Arcade'}.`
       : 'Finish a race on this layout to save a ghost.')
   description.id = 'ghost-availability'
   mode.append(modeRow, description)

@@ -1,6 +1,6 @@
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import type { AppSnapshot } from '@/application/appState'
-import { courseIdentity, scoreCategoryLabel } from '@/application/race/raceRecords'
+import { courseIdentity, scoreCategoryLabel, timeMedal, nextMedalTarget } from '@/application/race/raceRecords'
 import type { Track, TrackId } from '@/domain/model'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { validateTrack } from '@/domain/track/trackValidation'
@@ -86,12 +86,14 @@ export function createTrackLibraryModal(
   }
   if (race) {
     list.append(element('h3', 'results-heading', 'OFFICIAL CIRCUITS'))
-    for (const { track, target } of OFFICIAL_CIRCUITS) {
+    for (const { track } of OFFICIAL_CIRCUITS) {
       const card = element('article', 'track-card')
       const select = button('', `select-race-${track.id}`, () => actions.selectForRace(track.id), 'track-card-select')
       select.setAttribute('aria-label', `Race ${track.name}`)
       const copy = element('span', 'track-card-copy')
-      const meta = element('span', 'track-card-meta', `ONE LAP TARGET ${formatRaceTime(target)}`)
+      const medal = timeMedal(track, state.scoresByTrack[track.id] ?? [])
+      const next = nextMedalTarget(track, medal)
+      const meta = element('span', 'track-card-meta', `${medal ? `${medal.toUpperCase()} MEDAL` : 'NO TIME MEDAL'}${next ? ` · NEXT ${next.tier.toUpperCase()} ${formatRaceTime(next.time)}` : ' · ALL MEDALS EARNED'}`)
       meta.id = `race-track-status-${list.childElementCount}`
       select.setAttribute('aria-describedby', meta.id)
       copy.append(element('strong', 'track-card-name', track.name), meta, createTrackPreview(geometry.get(track).path))

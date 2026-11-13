@@ -21,7 +21,7 @@ import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
 import { createToast } from '@/ui/toast'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
-import { createResultsModal } from '@/ui/modals/resultsModal'
+import { createResultsModal, createCupFinalModal } from '@/ui/modals/resultsModal'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 
@@ -157,6 +157,7 @@ export class DomUiHost implements UiHost {
             race: () => openLibrary('race'),
             raceAgain: () => this.controller.dispatch({ type: 'race-again' }),
             cup: () => this.controller.dispatch({ type: 'start-cup' }),
+            resumeCup: () => this.controller.dispatch({ type: 'resume-cup' }),
             options: () =>
               this.controller.dispatch({
                 type: 'open-options',
@@ -253,6 +254,8 @@ export class DomUiHost implements UiHost {
     switch (state.overlay.type) {
       case 'none':
         return undefined
+      case 'cup-final':
+        return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' })) : undefined
       case 'results': {
         const result = this.runtime.raceSession.snapshot().result
         return result
@@ -268,7 +271,7 @@ export class DomUiHost implements UiHost {
               edit: () =>
                 this.controller.dispatch({ type: 'open-editor' }),
               home: () => this.controller.dispatch({ type: 'go-home' }),
-            }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined)
+            }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined, state.newTimeMedal)
           : undefined
       }
       case 'track-library':

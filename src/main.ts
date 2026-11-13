@@ -1,3 +1,4 @@
+import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
 import { createApplication } from '@/app/createApplication'
 import { AppController, type Scheduler } from '@/application/appController'
@@ -74,6 +75,7 @@ const raceSession = new RaceSession({
 })
 const raceControls = new RaceInputController()
 const controller = new AppController({
+  cupStore: new BrowserCupRepository(storage),
   trackStore,
   scoreStore,
   lastRaceStore: new BrowserLastRaceRepository(storage),

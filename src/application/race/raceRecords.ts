@@ -1,3 +1,4 @@
+import { OFFICIAL_CIRCUITS, OFFICIAL_TIME_TARGETS } from '@/domain/track/officialCircuits'
 import type { ScoreCategory, ScoreEntry } from '@/application/ports/storage'
 import type { Track } from '@/domain/model'
 import type { RaceSetup } from '@/application/race/raceSession'
@@ -35,4 +36,32 @@ export function sameCategory(score: ScoreEntry, category: ScoreCategory, setup: 
 export function scoreCategoryLabel(score: ScoreEntry): string {
   const category = score.category
   return category ? `${score.car} · ${score.difficulty} · ${category.laps} ${category.laps === 1 ? 'lap' : 'laps'} · ${category.handling} · ${category.mode}` : 'Legacy · settings unknown'
+}
+
+export type TimeMedal = 'bronze' | 'silver' | 'gold'
+export function medalTargets(track: Track): Readonly<Record<TimeMedal, number>> | null {
+  const index = OFFICIAL_CIRCUITS.findIndex(({ track: official }) => official.id === track.id)
+  const official = OFFICIAL_CIRCUITS[index]?.track
+  return official && (official === track || courseIdentity(official) === courseIdentity(track))
+    ? OFFICIAL_TIME_TARGETS[index] ?? null
+    : null
+}
+
+export function timeMedal(track: Track, scores: readonly ScoreEntry[]): TimeMedal | null {
+  const targets = medalTargets(track)
+  if (!targets) return null
+  const course = courseIdentity(track)
+  let best = Infinity
+  for (const { time, category } of scores) {
+    if (Number.isFinite(time) && time > 0 && category?.course === course &&
+      category.laps === 1 && category.handling === 'arcade') best = Math.min(best, time)
+  }
+  return best <= targets.gold ? 'gold' : best <= targets.silver ? 'silver' : best <= targets.bronze ? 'bronze' : null
+}
+
+export function nextMedalTarget(track: Track, medal: TimeMedal | null): { tier: TimeMedal; time: number } | null {
+  const targets = medalTargets(track)
+  if (!targets || medal === 'gold') return null
+  const tier = medal === 'silver' ? 'gold' : medal === 'bronze' ? 'silver' : 'bronze'
+  return { tier, time: targets[tier] }
 }

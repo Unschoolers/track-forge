@@ -1,4 +1,6 @@
-import { courseIdentity, scoreCategoryLabel } from '@/application/race/raceRecords'
+import { CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { courseIdentity, nextMedalTarget, scoreCategoryLabel, timeMedal } from '@/application/race/raceRecords'
+import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import type { AppSnapshot } from '@/application/appState'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
@@ -10,6 +12,7 @@ export function createHomeScreen(
     readonly race: () => void
     readonly raceAgain: () => void
     readonly cup?: () => void
+    readonly resumeCup?: () => void
     readonly options: () => void
   },
 ): HTMLElement {
@@ -34,11 +37,21 @@ export function createHomeScreen(
         : 'Create your first circuit',
     ),
   )
+  if (state.cupProgress?.bestPlacement) trackCard.append(element('span', 'track-meta', `Best Cup placement: ${state.cupProgress.bestPlacement}`))
+  const checkpoint = state.cupProgress?.checkpoint
+  if (checkpoint) {
+    const nextIndex = Math.min(checkpoint.index + (checkpoint.rounds.length > checkpoint.index ? 1 : 0), CUP_CIRCUITS.length - 1)
+    trackCard.append(element('span', 'track-meta', checkpoint.rounds.length === CUP_CIRCUITS.length ? 'Cup standings ready' : `Next Cup round: ${CUP_CIRCUITS[nextIndex]?.track.name}`))
+  } else {
+    const circuit = OFFICIAL_CIRCUITS.map(({ track }) => ({ track, next: nextMedalTarget(track, timeMedal(track, state.scoresByTrack[track.id] ?? [])) })).find(({ next }) => next)
+    if (circuit?.next) trackCard.append(element('span', 'track-meta', `Next target: ${circuit.track.name} · ${circuit.next.tier.toUpperCase()} ${formatRaceTime(circuit.next.time)}`))
+  }
   const actionsNode = element('div', 'home-actions')
   actionsNode.append(
     ...(state.raceAgainTrackName ? [button(`RACE AGAIN · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain, 'button button-primary button-large')] : []),
     button('RACE', 'race', actions.race, 'button button-primary button-large'),
-    ...(actions.cup ? [button('ARCADE CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
+    ...(checkpoint && actions.resumeCup ? [button('RESUME CUP', 'resume-cup', actions.resumeCup, 'button button-large')] : []),
+    ...(actions.cup && !checkpoint ? [button('ARCADE CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
     button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),
     button('OPTIONS', 'options', actions.options, 'button button-large'),
   )
