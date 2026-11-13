@@ -60,6 +60,16 @@ export function createRaceHud(
   countdown.setAttribute('aria-live', 'polite')
 
   const controlsBar = element('footer', 'race-controls')
+  controlsBar.dataset.layout = state.preferences.steeringLayout ?? 'drag'
+  controlsBar.dataset.hand = state.preferences.steeringHand ?? 'left'
+  controlsBar.dataset.size = state.preferences.controlSize ?? 'standard'
+  const steeringGroup = element('div', 'race-steering')
+  const steeringButtons = element('div', 'steering-buttons')
+  const left = button('◀', 'steer-left', () => undefined, 'steer-button')
+  const right = button('▶', 'steer-right', () => undefined, 'steer-button')
+  left.setAttribute('aria-label', 'Steer left')
+  right.setAttribute('aria-label', 'Steer right')
+  steeringButtons.append(left, right)
   const steering = element('div', 'steering-pad')
   steering.dataset.raceSteering = ''
   steering.setAttribute('role', 'slider')
@@ -84,13 +94,16 @@ export function createRaceHud(
   pedals.append(recover, brake, throttle)
   const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
   steeringHint.setAttribute('aria-hidden', 'true')
-  controlsBar.append(steering, steeringHint, pedals)
+  steeringGroup.append(steering, steeringHint, steeringButtons)
+  controlsBar.append(steeringGroup, pedals)
   screen.append(hud, damage, raceBanner, slide, countdown, controlsBar)
 
   const updateControls = (): void => {
     const input = controls.snapshot()
     steering.setAttribute('aria-valuenow', input.steering.toFixed(2))
     steeringThumb.style.transform = `translateX(${input.steering * STEERING_RANGE_PX}px)`
+    left.classList.toggle('pressed', input.steering < 0)
+    right.classList.toggle('pressed', input.steering > 0)
     brake.classList.toggle('pressed', input.braking)
     throttle.classList.toggle('pressed', input.throttle > 0)
   }
@@ -98,6 +111,8 @@ export function createRaceHud(
     steering, 'steering', controls, updateControls,
     () => state.preferences.steeringSensitivity,
   )
+  const leftBinding = bindRacePointer(left, 'left', controls, updateControls)
+  const rightBinding = bindRacePointer(right, 'right', controls, updateControls)
   const brakeBinding = bindRacePointer(brake, 'brake', controls, updateControls)
   const throttleBinding = bindRacePointer(throttle, 'throttle', controls, updateControls)
   const bindPedalKeyboard = (target: HTMLButtonElement, pedal: 'brake' | 'throttle'): (() => void) => {
@@ -128,6 +143,29 @@ export function createRaceHud(
       target.removeEventListener('blur', blur)
     }
   }
+  const bindSteeringKeyboard = (target: HTMLButtonElement, direction: -1 | 1): (() => void) => {
+    const change = (event: KeyboardEvent, pressed: boolean): void => {
+      if (event.key !== ' ' && event.key !== 'Enter') return
+      event.preventDefault()
+      if (pressed) event.stopPropagation()
+      if (pressed && (event.repeat || target.disabled)) return
+      controls.setSteeringButtonKeyboard(direction, event.key, pressed)
+      updateControls()
+    }
+    const down = (event: KeyboardEvent): void => change(event, true)
+    const up = (event: KeyboardEvent): void => change(event, false)
+    const blur = (): void => {
+      controls.setSteeringButtonKeyboard(direction, ' ', false)
+      controls.setSteeringButtonKeyboard(direction, 'Enter', false)
+      updateControls()
+    }
+    target.addEventListener('keydown', down)
+    target.addEventListener('keyup', up)
+    target.addEventListener('blur', blur)
+    return () => { blur(); target.removeEventListener('keydown', down); target.removeEventListener('keyup', up); target.removeEventListener('blur', blur) }
+  }
+  const unbindLeftKeyboard = bindSteeringKeyboard(left, -1)
+  const unbindRightKeyboard = bindSteeringKeyboard(right, 1)
   const unbindBrakeKeyboard = bindPedalKeyboard(brake, 'brake')
   const unbindThrottleKeyboard = bindPedalKeyboard(throttle, 'throttle')
   const onBlur = (): void => {
@@ -158,6 +196,8 @@ export function createRaceHud(
     previousHandling = handling
     previousPaused = paused
     previousPhase = phase
+    left.disabled = paused || phase === 'finished'
+    right.disabled = paused || phase === 'finished'
     throttle.disabled = paused || phase === 'finished'
     brake.disabled = paused || phase === 'finished'
     throttle.hidden = handling !== 'simulation'
@@ -222,8 +262,12 @@ export function createRaceHud(
       unsubscribe?.()
       unsubscribe = undefined
       steeringBinding.destroy()
+      leftBinding.destroy()
+      rightBinding.destroy()
       brakeBinding.destroy()
       throttleBinding.destroy()
+      unbindLeftKeyboard()
+      unbindRightKeyboard()
       unbindBrakeKeyboard()
       unbindThrottleKeyboard()
       window.removeEventListener('blur', onBlur)

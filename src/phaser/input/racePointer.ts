@@ -21,10 +21,11 @@ export interface RacePointerBinding {
 /** Pointer coordinates are viewport CSS pixels, independent of canvas resolution. */
 export function bindRacePointer(
   target: HTMLElement,
-  role: 'steering' | 'brake' | 'throttle',
+  role: 'steering' | 'left' | 'right' | 'brake' | 'throttle',
   controls: RaceControlsPort,
   onChange: () => void = () => undefined,
   getSensitivity: () => SteeringSensitivity | undefined = () => 1,
+  canStart: () => boolean = () => true,
 ): RacePointerBinding {
   const anchors = new Map<number, number>()
 
@@ -43,7 +44,7 @@ export function bindRacePointer(
   }
   const unsubscribeReset = controls.onReset(cancel)
   const onDown = (event: PointerEvent): void => {
-    if (anchors.has(event.pointerId)) return
+    if (anchors.has(event.pointerId) || !canStart() || (target instanceof HTMLButtonElement && target.disabled)) return
     // HUD buttons are separate DOM targets. Accept the whole exposed canvas:
     // a thumb can regrab on either side while another finger holds Brake.
     event.preventDefault()
@@ -56,6 +57,7 @@ export function bindRacePointer(
       // Keep tracking through the window until release or focus loss.
     }
     if (role === 'steering') controls.beginSteering(event.pointerId, 0)
+    else if (role === 'left' || role === 'right') controls.beginSteeringButton(event.pointerId, role === 'left' ? -1 : 1)
     else if (role === 'brake') controls.beginBrake(event.pointerId)
     else controls.beginThrottle(event.pointerId)
     onChange()

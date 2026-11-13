@@ -138,6 +138,8 @@ function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessio
     })),
     setKeyboard: vi.fn(),
     setPedalKeyboard: vi.fn(),
+    beginSteeringButton: vi.fn(),
+    setSteeringButtonKeyboard: vi.fn(),
     beginSteering: vi.fn(),
     updateSteering: vi.fn(),
     beginBrake: vi.fn(),

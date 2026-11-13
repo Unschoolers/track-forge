@@ -50,6 +50,9 @@ export interface Preferences {
   readonly audioEnabled: boolean
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean
+  readonly steeringLayout?: 'drag' | 'buttons'
+  readonly steeringHand?: 'left' | 'right'
+  readonly controlSize?: 'standard' | 'large'
   readonly steeringSensitivity?: SteeringSensitivity
   readonly handling?: HandlingMode
   readonly raceLaps?: 1 | 2 | 3
