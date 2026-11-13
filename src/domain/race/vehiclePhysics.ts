@@ -11,7 +11,6 @@ import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
   ARCADE_BRAKE_TIMING,
-  ARCADE_ASSIST_BRAKING,
   ARCADE_DYNAMICS_TUNING,
   VEHICLE_DYNAMICS_TUNING,
 } from '@/domain/race/vehiclePhysicsConfig'
@@ -30,7 +29,6 @@ export function stepVehicle(
   deltaSeconds: number,
   handling: 'arcade' | 'simulation' = 'simulation',
   speedLimit = Number.POSITIVE_INFINITY,
-  reversed = false,
 ): RaceVehicle {
   if (vehicle.wrecked || vehicle.finishedAt !== null) {
     return {
@@ -57,23 +55,8 @@ export function stepVehicle(
         1,
       )
     : Number(input.braking)
-  const previousAssist = vehicle.arcadeAssistBrake ?? 0
-  // A small deadband and bounded pressure slew avoid flicker at the target.
-  const speedError = vehicle.speed - speedLimit
-  const assistTarget = arcadePlayer
-    ? clamp((speedError - (previousAssist > 0 ? 0 : 2)) * 0.04, 0, ARCADE_ASSIST_BRAKING.maxPressure)
-    : 0
-  // Do not carry corner braking onto an uncapped downhill straight.
-  const downhill = (reversed ? -context.grade : context.grade) < 0
-  const assistBrake = arcadePlayer && !(speedLimit === Infinity && downhill)
-    ? clamp(
-        assistTarget,
-        Math.max(0, previousAssist - dt * ARCADE_ASSIST_BRAKING.pressureSlewPerSecond),
-        Math.min(ARCADE_ASSIST_BRAKING.maxPressure, previousAssist + dt * ARCADE_ASSIST_BRAKING.pressureSlewPerSecond),
-      )
-    : 0
-  const legacySpeedBrake = !vehicle.player && vehicle.speed > speedLimit
-  const brakePressure = Math.max(driverPressure, assistBrake, Number(legacySpeedBrake))
+  const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
+  const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
   const car = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
@@ -96,7 +79,7 @@ export function stepVehicle(
   }
   const physicsSpeedLimit = vehicle.player ? Number.POSITIVE_INFINITY : speedLimit
   const maxSpeed = Math.min(physicsSpeedLimit, car.max * surface.max * terrain.max * condition.max)
-  const braking = input.braking || legacySpeedBrake || assistBrake > 0
+  const braking = input.braking || aiSpeedBrake
   const tuning = handling === 'arcade'
     ? ARCADE_DYNAMICS_TUNING
     : VEHICLE_DYNAMICS_TUNING
@@ -117,11 +100,7 @@ export function stepVehicle(
     },
     {
       ...input,
-      // Manual braking overrides either throttle mode. The corner assist
-      // blends out engine torque as its brake pressure rises.
-      throttle: input.braking || legacySpeedBrake
-        ? 0
-        : input.throttle * (1 - Math.max(driverPressure, assistBrake / ARCADE_ASSIST_BRAKING.maxPressure)),
+      throttle: braking ? 0 : input.throttle * (1 - driverPressure),
       braking,
       brakePressure,
     },
@@ -179,9 +158,6 @@ export function stepVehicle(
     slip: Math.abs(dynamics.lateralSpeed),
     braking: braking || brakePressure > 0,
     ...(arcadePlayer ? { brakePressure: driverPressure } : {}),
-    ...(arcadePlayer || vehicle.arcadeAssistBrake !== undefined
-      ? { arcadeAssistBrake: assistBrake }
-      : {}),
     currentSurface: context.surface,
     surfaceGrip,
     onCurb: context.onCurb,

@@ -451,7 +451,6 @@ export function resetVehicleToTrack(
     slip: 0,
     braking: false,
     ...(vehicle.brakePressure === undefined ? {} : { brakePressure: 0 }),
-    ...(vehicle.arcadeAssistBrake === undefined ? {} : { arcadeAssistBrake: 0 }),
     yawRate: 0,
     pathIndex: nearest.index,
     pathDistance: nearest.point.distance,

@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
-import * as arcadePlanner from '@/domain/race/arcadeSpeedPlanner'
 import {
   getVehicleStepContext,
   resetVehicleToTrack,
@@ -71,7 +70,7 @@ function raceAtCrossing(lane: number, reversed: boolean) {
 }
 
 describe('road branch continuity', () => {
-  it('keeps an Arcade player and its plan on the followed arm of a narrow hairpin', () => {
+  it('keeps an Arcade player on the followed arm of a narrow hairpin', () => {
     const hairpin = buildRoadPath([
       { x: 0, y: 0, surface: 'street' },
       { x: 200, y: 0, surface: 'street' },
@@ -88,17 +87,10 @@ describe('road branch continuity', () => {
       vehicles: [{ ...required(base.vehicles[0]), x: point.x, y: 15, angle: 0,
         vx: 60, vy: 0, speed: 60, pathIndex: index }],
     }
-    const plan = vi.spyOn(arcadePlanner, 'planArcadeSpeed')
-    try {
-      for (let frame = 0; frame < 20; frame += 1) {
-        race = stepRace(race, noInput, 1 / 60, random).state as typeof race
-        const current = required(race.vehicles[0])
-        const plannedIndex = required(plan.mock.calls.at(-1))[1]
-        expect(required(hairpin.points[current.pathIndex]).segment, `frame ${frame}`).toBe(0)
-        expect(required(hairpin.points[plannedIndex]).segment, `plan frame ${frame}`).toBe(0)
-      }
-    } finally {
-      plan.mockRestore()
+    for (let frame = 0; frame < 20; frame += 1) {
+      race = stepRace(race, noInput, 1 / 60, random).state as typeof race
+      const current = required(race.vehicles[0])
+      expect(required(hairpin.points[current.pathIndex]).segment, `frame ${frame}`).toBe(0)
     }
   })
 

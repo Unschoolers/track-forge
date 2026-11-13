@@ -22,8 +22,6 @@ export interface RaceVehicle {
   readonly slip: number
   readonly braking: boolean
   readonly brakePressure?: number
-  /** Smoothed automatic corner-braking pressure, independent of the driver's brake. */
-  readonly arcadeAssistBrake?: number
   readonly lane: number
   readonly ai: AiDriverState | null
   readonly aiPace: number

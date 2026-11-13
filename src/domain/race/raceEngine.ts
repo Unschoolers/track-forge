@@ -25,7 +25,6 @@ import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
-import { planArcadeSpeed } from '@/domain/race/arcadeSpeedPlanner'
 
 export type RaceEvent =
   | {
@@ -83,7 +82,7 @@ export type RaceStep = (
 
 function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previous?: VehicleStepContext) {
   // An Arcade car moves only a few samples per step. Restrict local matching
-  // to its route so a nearby return arm cannot redirect the speed plan.
+  // to its route so a nearby return arm cannot change which road supports it.
   const radius = vehicle.player && race.handling !== 'simulation' ? 12 : undefined
   return getVehicleStepContext(race.path, vehicle, previous, radius)
 }
@@ -118,21 +117,12 @@ function advanceVehicle(
   const previousContext = raceVehicleContext(race, vehicle)
   let moved: RaceVehicle
   if (vehicle.player) {
-    const handling = race.handling ?? 'arcade'
-    const { tangent, nearest, onRoad } = previousContext
-    const travelSpeed = (vehicle.vx * tangent.x + vehicle.vy * tangent.y) *
-      (race.reversed ? -1 : 1)
-    const cornerSpeed = handling === 'arcade' && onRoad && travelSpeed > 0
-      ? planArcadeSpeed(race.path, nearest.index, race.reversed, vehicle.car)
-      : Infinity
     moved = stepVehicle(
       vehicle,
       input,
       previousContext,
       deltaSeconds,
-      handling,
-      cornerSpeed,
-      race.reversed,
+      race.handling ?? 'arcade',
     )
   } else {
     moved = stepAiVehicle(
