@@ -14,6 +14,7 @@ export class PhaserSceneHost implements SceneHost {
   private game: Phaser.Game | undefined
   private mode: AppMode = 'home'
   private raceTrackId: string | undefined
+  private raceLighting: string | undefined
 
   constructor(
     private readonly parent: HTMLElement,
@@ -52,7 +53,9 @@ export class PhaserSceneHost implements SceneHost {
       return
     }
     const trackId = mode === 'race' ? this.controller.snapshot().currentTrack?.id : undefined
-    const trackChanged = mode === 'race' && trackId !== this.raceTrackId
+    const lighting = mode === 'race' ? this.raceSession.snapshot().setup?.lighting : undefined
+    const trackChanged = mode === 'race' && (trackId !== this.raceTrackId || lighting !== this.raceLighting)
+    this.raceLighting = lighting
     this.raceTrackId = trackId
     if (modeChanged) this.syncScene()
     else if (trackChanged) {

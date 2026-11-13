@@ -7,7 +7,7 @@ import type {
   EditorState,
 } from '@/domain/editor/editorState'
 import type { AppMode } from '@/app/createApplication'
-import type { RoadStructure, Track, TrackId } from '@/domain/model'
+import type { LightingMode, RoadStructure, Track, TrackId } from '@/domain/model'
 import type {
   EditorCommandRejection,
 } from '@/domain/editor/editorConstraints'
@@ -47,6 +47,7 @@ export type AppOverlay =
   | { readonly type: 'results' }
 
 export interface AppSnapshot {
+  readonly raceLighting?: LightingMode
   readonly cup?: CircuitCup | null
   readonly mode: AppMode
   readonly paused: boolean
@@ -83,6 +84,7 @@ export type AppCommand =
   | { readonly type: 'go-home' }
   | { readonly type: 'open-editor' }
   | { readonly type: 'start-race' }
+  | { readonly type: 'set-race-lighting'; readonly lighting: LightingMode }
   | { readonly type: 'start-cup' }
   | { readonly type: 'next-cup-race' }
   | { readonly type: 'pause-race' }

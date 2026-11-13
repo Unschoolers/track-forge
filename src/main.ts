@@ -131,6 +131,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
           ? {
               phase: race.phase,
               handling: race.handling,
+              lighting: raceSession.snapshot().setup?.lighting,
               elapsed: race.elapsed,
               paused: race.paused,
               vehicleCount: race.vehicles.length,

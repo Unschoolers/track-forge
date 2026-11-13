@@ -1,3 +1,5 @@
+import type { LightingMode } from '@/domain/model'
+import { DIFFICULTY_SPECS } from '@/domain/config'
 import type { AppSnapshot } from '@/application/appState'
 import { createCarPicker } from '@/ui/components/carPicker'
 import { button, element } from '@/ui/dom'
@@ -9,6 +11,7 @@ export function createRaceSetupModal(
   actions: {
     readonly close: () => void
     readonly preferences: (preferences: AppSnapshot['preferences']) => void
+    readonly lighting: (lighting: LightingMode) => void
     readonly start: () => void
     readonly options: () => void
   },
@@ -24,6 +27,17 @@ export function createRaceSetupModal(
     'race-setup-modal',
   )
   if (flyover) frame.body.append(flyover)
+  const lighting = state.raceLighting ?? state.currentTrack?.lighting ?? 'day'
+  const lightingSection = element('section', 'setup-section')
+  lightingSection.append(element('h3', 'setup-label', 'LIGHTING'))
+  const lightingRow = element('div', 'choice-row')
+  for (const value of ['day', 'night'] as const) {
+    const choice = button(value.toUpperCase(), `lighting-${value}`, () => actions.lighting(value), `setup-choice${value === lighting ? ' active' : ''}`)
+    choice.setAttribute('aria-pressed', String(value === lighting))
+    lightingRow.append(choice)
+  }
+  lightingSection.append(lightingRow)
+  frame.body.append(lightingSection)
   frame.body.append(
     createCarPicker(state.preferences.car, (car) =>
       actions.preferences({ ...state.preferences, car }),
@@ -48,6 +62,10 @@ export function createRaceSetupModal(
   description.id = 'ghost-availability'
   mode.append(modeRow, description)
   frame.body.append(mode)
+  const laps = state.preferences.raceLaps ?? 2
+  const style = state.preferences.handling === 'simulation' ? 'Simulation' : 'Arcade'
+  const lightLabel = lighting === 'night' ? 'Night' : 'Day'
+  frame.body.append(element('p', 'modal-subtitle', `${style} · ${DIFFICULTY_SPECS[state.preferences.difficulty].name} · ${laps} ${laps === 1 ? 'lap' : 'laps'} · ${lightLabel}`))
   frame.footer.append(
     button('BACK', 'setup-back', actions.close, 'button'),
     button('OPTIONS', 'setup-options', actions.options, 'button'),

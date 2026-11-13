@@ -79,7 +79,7 @@ function createRenderingScenario() {
     effectGraphics: new RecordingGraphics(),
     snapshot: {},
     controller: { snapshot: () => ({ preferences: { lighting } }) },
-    raceSession: { advance() {}, snapshot: () => ({ state }) },
+    raceSession: { advance() {}, snapshot: () => ({ state, setup: { lighting } }) },
     controls: {
       snapshot: () => ({ steering: 0, throttle: 1, braking: false }),
     },

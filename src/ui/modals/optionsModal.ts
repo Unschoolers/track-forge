@@ -51,28 +51,6 @@ export function createOptionsModal(
         DIFFICULTY_SPECS[state.preferences.difficulty].description,
       ),
     )
-    const lighting = element('section', 'setup-section')
-    lighting.append(element('h3', 'setup-label', 'LIGHTING'))
-    const lightingRow = element('div', 'choice-row')
-    for (const mode of ['day', 'night'] as const) {
-      const choice = button(
-        mode.toUpperCase(),
-        `lighting-${mode}`,
-        () =>
-          actions.preferences({
-            ...state.preferences,
-            lighting: mode,
-          }),
-        `setup-choice${mode === state.preferences.lighting ? ' active' : ''}`,
-      )
-      choice.dataset.lighting = mode
-      choice.setAttribute(
-        'aria-pressed',
-        String(mode === state.preferences.lighting),
-      )
-      lightingRow.append(choice)
-    }
-    lighting.append(lightingRow, element('p', 'modal-subtitle', 'Lighting follows the selected track; choosing another track loads its lighting.'))
     const handling = element('section', 'setup-section')
     handling.append(element('h3', 'setup-label', 'DRIVING STYLE'))
     const handlingRow = element('div', 'choice-row')
@@ -107,7 +85,7 @@ export function createOptionsModal(
       raceLengthRow.append(choice)
     }
     raceLength.append(raceLengthRow)
-    raceSettings.append(difficulty, raceLength, lighting, handling)
+    raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
   }
   frame.body.append(element('h3', 'setup-label', 'Comfort & feedback'))

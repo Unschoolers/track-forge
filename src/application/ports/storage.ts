@@ -1,7 +1,6 @@
 import type {
   CarId,
   DifficultyId,
-  LightingMode,
   Track,
   TrackId,
 } from '@/domain/model'
@@ -48,7 +47,6 @@ export type SteeringSensitivity = 0.75 | 1 | 1.5
 export interface Preferences {
   readonly car: CarId
   readonly difficulty: DifficultyId
-  readonly lighting: LightingMode
   readonly audioEnabled: boolean
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean

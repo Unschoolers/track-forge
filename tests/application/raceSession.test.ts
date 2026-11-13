@@ -38,6 +38,15 @@ function createScoreStore() {
 }
 
 describe('RaceSession', () => {
+  it('defaults to the authored track lighting and captures an explicit override', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    session.start({ ...track, lighting: 'night' }, setup)
+    expect(session.snapshot().setup?.lighting).toBe('night')
+    session.start({ ...track, lighting: 'night' }, { ...setup, lighting: 'day' })
+    expect(session.snapshot().setup?.lighting).toBe('day')
+  })
+
 
   it('uses the moved reverse start for telemetry, standings, and results', () => {
     for (const terminal of [false, true]) {

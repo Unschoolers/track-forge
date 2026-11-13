@@ -33,6 +33,17 @@ class MemoryStore implements KeyValueStore {
   }
 }
 
+it('does not read or write the obsolete lighting preference', () => {
+  const memory = new MemoryStore()
+  memory.values.set('trackforge-lighting', 'night')
+  memory.failedKeys.add('trackforge-lighting')
+  const repository = new BrowserPreferencesRepository(memory)
+  const loaded = repository.load()
+  expect(loaded).not.toHaveProperty('lighting')
+  expect(repository.save(loaded)).toBe(true)
+  expect(memory.values.get('trackforge-lighting')).toBe('night')
+})
+
 it('persists the explicit race mode and rejects unknown stored modes', () => {
   const memory = new MemoryStore()
   const preferences = new BrowserPreferencesRepository(memory)

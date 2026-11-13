@@ -325,7 +325,7 @@ export class DomUiHost implements UiHost {
               currentTrack,
               geometry,
               preferences.car,
-              preferences.lighting,
+              state.raceLighting ?? currentTrack.lighting,
               preferences.raceMode === 'ghost' && ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0,
               this.flyoverPlayback,
             )
@@ -333,6 +333,7 @@ export class DomUiHost implements UiHost {
         this.overlayCleanup = flyover?.destroy
         return createRaceSetupModal(state, {
           close,
+          lighting: (lighting) => this.controller.dispatch({ type: 'set-race-lighting', lighting }),
           options: () => this.controller.dispatch({ type: 'open-options', returnTo: 'race-setup' }),
           preferences: (preferences) =>
             this.controller.dispatch({

@@ -40,8 +40,7 @@ function appSnapshot(
     preferences: {
       car: 'blue',
       difficulty: 'normal',
-      lighting: 'day',
-      audioEnabled: true,
+          audioEnabled: true,
       hapticsEnabled: true,
       dynamicZoomEnabled: true,
     },

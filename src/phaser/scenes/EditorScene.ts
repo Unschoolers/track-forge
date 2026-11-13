@@ -279,7 +279,7 @@ export class EditorScene extends Phaser.Scene {
   private renderChanges(changes: EditorRenderChanges): void {
     const snapshot = this.currentSnapshot
     if (!snapshot) return
-    const night = snapshot.preferences.lighting === 'night'
+    const night = snapshot.currentTrack?.lighting === 'night'
     this.cameras.main.setBackgroundColor(night ? '#14251b' : '#2d7344')
     const geometry =
       changes.world || changes.overlay
@@ -309,7 +309,7 @@ export class EditorScene extends Phaser.Scene {
       return
     }
     const snapshot = this.currentSnapshot
-    const night = snapshot.preferences.lighting === 'night'
+    const night = snapshot.currentTrack?.lighting === 'night'
     this.terrainGraphics.clear()
     this.sceneryGraphics.clear()
     this.trackGraphics.clear()
@@ -378,7 +378,7 @@ export class EditorScene extends Phaser.Scene {
     renderTerrain(
       this.terrainGraphics,
       geometry.path.terrainSurface,
-      this.currentSnapshot.preferences.lighting === 'night',
+      this.currentSnapshot.currentTrack?.lighting === 'night',
       detail,
     )
     this.renderedTerrainDetail = detail
@@ -387,7 +387,7 @@ export class EditorScene extends Phaser.Scene {
   private renderGridPresentation(): void {
     if (!this.gridGraphics || !this.currentSnapshot) return
     const snapshot = this.currentSnapshot
-    const night = snapshot.preferences.lighting === 'night'
+    const night = snapshot.currentTrack?.lighting === 'night'
     this.gridGraphics.clear()
     if (snapshot.editorUi.grid) {
       const halfWidth = this.cameras.main.width / (2 * this.editorCamera.zoom)
@@ -408,7 +408,7 @@ export class EditorScene extends Phaser.Scene {
 
   private renderTerrainPreviewPresentation(): void {
     if (!this.terrainPreviewGraphics || !this.currentSnapshot) return
-    const night = this.currentSnapshot.preferences.lighting === 'night'
+    const night = this.currentSnapshot.currentTrack?.lighting === 'night'
     const preview = this.editorInput?.terrainPreview() ?? null
     this.terrainPreviewGraphics.clear()
     if (!preview) {
@@ -481,7 +481,7 @@ export class EditorScene extends Phaser.Scene {
       terrain: snapshot.editor.terrain,
       trees: snapshot.editor.trees,
       start: snapshot.editor.start,
-      night: snapshot.preferences.lighting === 'night',
+      night: snapshot.currentTrack?.lighting === 'night',
       grid: snapshot.editorUi.grid,
       selectedPoint: snapshot.editorUi.selectedPoint,
       selectedCrossing: snapshot.editorUi.selectedCrossing,

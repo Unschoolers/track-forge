@@ -12,7 +12,6 @@ const track = createStarterTrack(asTrackId('terrain-ui'), 1)
 const preferences: Preferences = {
   car: 'blue',
   difficulty: 'normal',
-  lighting: 'day',
   audioEnabled: true,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
