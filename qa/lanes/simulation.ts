@@ -29,6 +29,7 @@ export interface LaneRunOptions {
 	readonly laps: number
 	readonly mode: 'solo' | 'traffic'
 	readonly car: CarId
+	readonly handling?: RaceState['handling']
 }
 export interface LaneRun {
 	readonly trackName: string
@@ -100,6 +101,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	}
 	const created = createRace({
 		path,
+		handling: options.handling,
 		playerCar: options.car,
 		difficulty: options.difficulty,
 		laps: options.laps,

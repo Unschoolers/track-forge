@@ -11,10 +11,16 @@ import type { TrafficState } from '@/domain/race/ai/traffic'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import {
   getVehicleStepContext,
+  turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { safeEntrySpeedAhead } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+
+const BEND_LOOKAHEAD = [0, 6, 12, 20, 30]
+const CENTER_LINE_TURN = 0.28
+const LANE_CHANGE_LOOKAHEAD = 24
+const LANE_CHANGE_CLEARANCE = 18
 
 function wrapAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle))
@@ -34,11 +40,13 @@ function advancePassingState(
     if (
       cooldownRemaining <= 0 &&
       ahead &&
-      ahead.distance < tuning.triggerDistance * 1.25 &&
-      ahead.vehicle.speed + 4 < vehicle.speed
+      ahead.distance < tuning.triggerDistance *
+        (ai.personality === 'cautious' ? 1 : ai.personality === 'opportunist' ? 1.4 : 1.25) &&
+      ahead.vehicle.speed + (ai.personality === 'cautious' ? 12 : 4) < vehicle.speed
     ) {
-      const passLane = choosePassingLane(vehicle, traffic, difficulty)
-      if (passLane !== ai.baseLane) {
+      const passLane = choosePassingLane(vehicle, traffic, difficulty,
+        ai.personality === 'opportunist' ? 1 : ai.personality === 'steady' ? -1 : 0, true)
+      if (passLane !== vehicle.lane && passLane !== ai.baseLane) {
         return {
           ...ai,
           phase: 'passing',
@@ -141,10 +149,23 @@ export function stepAiVehicle(
     (context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples) + path.points.length) % path.points.length
   const target = path.points[targetIndex]
   if (!target) return { ...vehicle, ai }
-  const targetX =
-    target.x + context.normal.x * (ai.targetLane + ai.mistakeOffset)
-  const targetY =
-    target.y + context.normal.y * (ai.targetLane + ai.mistakeOffset)
+  let bend = 0
+  const direction = reversed ? -1 : 1
+  for (const sample of BEND_LOOKAHEAD) {
+    bend = Math.max(bend, Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6)))
+  }
+  // A wide passing line can point the car across the return arm of a
+  // hairpin. Ease toward the center on approach if the space is clear.
+  const lane = ai.targetLane + ai.mistakeOffset
+  const centered = lane * (1 - clamp(bend / CENTER_LINE_TURN, 0, 1))
+  const inner = Math.min(vehicle.lane, centered) - LANE_CHANGE_CLEARANCE
+  const outer = Math.max(vehicle.lane, centered) + LANE_CHANGE_CLEARANCE
+  const occupied = traffic.nearby.some((entry) =>
+    Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
+    entry.vehicle.lane > inner && entry.vehicle.lane < outer)
+  const pursuitLane = occupied ? lane : centered
+  const targetX = target.x + context.normal.x * pursuitLane
+  const targetY = target.y + context.normal.y * pursuitLane
   const desiredAngle = Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
   const desiredSteer = clamp(
     wrapAngle(desiredAngle - vehicle.angle) * tuning.steerGain -

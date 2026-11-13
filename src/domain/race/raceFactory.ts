@@ -141,7 +141,8 @@ export function createRace(options: CreateRaceOptions): RaceState {
       ai:
         index === 0
           ? null
-          : createAiDriverState(ROAD_GEOMETRY.aiBaseLanes[index] ?? 0),
+          : createAiDriverState(ROAD_GEOMETRY.aiBaseLanes[index] ?? 0,
+              (['cautious', 'steady', 'opportunist'] as const)[index - 1]),
       aiPace:
         index === 0
           ? 1
