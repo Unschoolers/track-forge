@@ -481,6 +481,18 @@ describe('AppController', () => {
       ...preferences,
       lighting: 'night',
     })
+
+    controller.dispatch({ type: 'open-options', returnTo: 'race-setup' })
+    controller.dispatch({ type: 'set-preferences', preferences: {
+      ...controller.snapshot().preferences, raceLaps: 3, handling: 'simulation',
+    } })
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot()).toMatchObject({
+      overlay: { type: 'race-setup' }, currentTrack: { id: 'ready' },
+      preferences: { raceLaps: 3, handling: 'simulation' },
+    })
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot().overlay).toEqual({ type: 'track-library', purpose: 'race' })
   })
 
   it('deletes scores and selects the newest remaining track', () => {

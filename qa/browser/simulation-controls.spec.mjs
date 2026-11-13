@@ -6,10 +6,24 @@ function telemetry(page) {
 }
 
 test('Simulation starts stationary and keeps steering, gas and brake independent on touch', async ({ page, context }) => {
+  await page.addInitScript(() => {
+    const points = [[0, 0], [800, 0], [1400, 0], [1800, 0], [1800, 600],
+      [800, 600], [-600, 600], [-600, 0], [0, 0]].map(([x, y]) => ({
+      x, y, curve: 'corner', surface: 'street',
+    }))
+    localStorage.setItem('trackforge-library-v2', JSON.stringify([{
+      id: 'simulation-controls', name: 'Simulation test circuit', version: 8,
+      points, trees: [], terrain: { cellSize: 32, cells: [] },
+      lighting: 'day', createdAt: 1, updatedAt: 1,
+    }]))
+    localStorage.setItem('trackforge-library-v1-migrated', '1')
+  })
   await page.goto('/?qa')
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'SELECT', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Race Simulation test circuit', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'OPTIONS' }).click()
   await page.getByRole('button', { name: 'SIMULATION', exact: true }).click()
+  await page.getByRole('button', { name: 'DONE', exact: true }).click()
   await page.getByRole('button', { name: 'START RACE' }).click()
 
   const gas = page.getByRole('button', { name: 'Accelerate', exact: true })

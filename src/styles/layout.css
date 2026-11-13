@@ -58,7 +58,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   .tool-rail { grid-template-columns: repeat(2, auto); }
   .race-setup-modal .modal-card { width: min(48rem, 100%); }
   .race-setup-modal .modal-body { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1rem; }
-  .race-setup-modal .setup-section:first-child { grid-row: span 2; }
+  .race-setup-modal .race-flyover-panel { grid-column: 1 / -1; margin-bottom: 0; }
+  .race-setup-modal .setup-section + .setup-section { margin-top: 0; }
 }
 @media (max-width: 759px), (max-height: 700px) {
   .tool-rail, .history-actions { grid-template-columns: repeat(2, var(--editor-control-size)); }

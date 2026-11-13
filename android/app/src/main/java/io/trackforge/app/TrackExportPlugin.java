@@ -1,11 +1,14 @@
 package io.trackforge.app;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import androidx.activity.result.ActivityResult;
+import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -27,6 +30,7 @@ import java.util.concurrent.Executors;
 @CapacitorPlugin(name = "TrackExport")
 public class TrackExportPlugin extends Plugin {
     private static final String EXPORT_DIRECTORY = "trackforge-exports";
+    private static final String SHARE_DIRECTORY = "trackforge-shares";
     private static final long STALE_AFTER_MS = 24L * 60 * 60 * 1000;
     private static final ExecutorService IO = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "trackforge-export-io");
@@ -82,6 +86,89 @@ public class TrackExportPlugin extends Plugin {
                 call.reject("Track could not be prepared for export.", error);
             }
         });
+    }
+
+    @PluginMethod
+    public void share(PluginCall call) {
+        final String content = call.getString("content");
+        final String filename = call.getString("filename");
+        final String text = call.getString("text");
+        if (content == null || filename == null || filename.isEmpty()) {
+            call.reject("Track share is missing its content or filename.");
+            return;
+        }
+        IO.execute(() -> {
+            File staged = shareFile(getContext(), UUID.randomUUID().toString(), filename);
+            try {
+                cleanupStaleShares(getContext());
+                if (!staged.getParentFile().mkdirs()) throw new IOException("Cannot create share directory.");
+                try (BufferedWriter writer = new BufferedWriter(
+                        new OutputStreamWriter(new FileOutputStream(staged), StandardCharsets.UTF_8))) {
+                    writer.write(content);
+                }
+                call.getData().remove("content");
+                Uri uri = FileProvider.getUriForFile(getContext(),
+                        getContext().getPackageName() + ".shareprovider", staged);
+                Intent chooser = Intent.createChooser(shareIntent(uri, text), "Share track");
+                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                mainHandler.post(() -> {
+                    try {
+                        getActivity().startActivity(chooser);
+                        JSObject response = new JSObject();
+                        response.put("shared", true);
+                        call.resolve(response);
+                    } catch (android.content.ActivityNotFoundException error) {
+                        deleteShare(staged);
+                        JSObject response = new JSObject();
+                        response.put("shared", false);
+                        call.resolve(response);
+                    } catch (Exception error) {
+                        deleteShare(staged);
+                        call.reject("Could not open the share chooser.", error);
+                    }
+                });
+            } catch (Exception error) {
+                deleteShare(staged);
+                call.reject("Track could not be prepared for sharing.", error);
+            }
+        });
+    }
+
+    static Intent shareIntent(Uri uri, String text) {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        if (text != null && !text.isEmpty()) intent.putExtra(Intent.EXTRA_TEXT, text);
+        intent.setClipData(ClipData.newRawUri("Track Forge track", uri));
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
+    static File shareFile(Context context, String id, String filename) {
+        if (!validId(id)) throw new IllegalArgumentException("Invalid share identifier.");
+        String name = filename.replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1).replaceAll("[^\\p{L}\\p{N}_.-]", "-");
+        if (name.isEmpty() || name.equals(".") || name.equals("..")) name = "track.trackforge.json";
+        if (name.length() > 50) name = name.substring(0, 50) + ".trackforge.json";
+        return new File(new File(new File(context.getCacheDir(), SHARE_DIRECTORY), id), name);
+    }
+
+    private static void deleteShare(File file) {
+        file.delete();
+        File directory = file.getParentFile();
+        if (directory != null) directory.delete();
+    }
+
+    private static void cleanupStaleShares(Context context) {
+        File[] directories = new File(context.getCacheDir(), SHARE_DIRECTORY).listFiles();
+        if (directories == null) return;
+        long threshold = System.currentTimeMillis() - STALE_AFTER_MS;
+        for (File directory : directories) {
+            if (!directory.isDirectory() || !validId(directory.getName()) || directory.lastModified() >= threshold) continue;
+            File[] files = directory.listFiles();
+            if (files != null) for (File file : files) if (file.isFile()) file.delete();
+            directory.delete();
+        }
     }
 
     @ActivityCallback

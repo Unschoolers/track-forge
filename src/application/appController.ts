@@ -645,11 +645,13 @@ export class AppController {
       this.update({
         ...this.state,
         overlay:
-          overlay.returnTo === 'race'
-            ? { type: 'pause' }
-            : overlay.returnTo === 'editor'
-              ? { type: 'editor-menu' }
-              : { type: 'none' },
+          overlay.returnTo === 'race-setup'
+            ? { type: 'race-setup' }
+            : overlay.returnTo === 'race'
+              ? { type: 'pause' }
+              : overlay.returnTo === 'editor'
+                ? { type: 'editor-menu' }
+                : { type: 'none' },
         notice: null,
       })
       return

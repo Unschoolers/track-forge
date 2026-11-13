@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 async function setupRace(page) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'SELECT', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
 }
 
 test('Ghost Race stays visible and greyed out without a matching saved replay', async ({ page }) => {
@@ -47,6 +47,14 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await expect(ghost).toBeVisible()
   await expect(ghost).toBeDisabled()
   await page.locator('[data-car="blue"]').click()
+  await expect(ghost).toBeEnabled()
+  await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'OPTIONS' }).click()
+  await page.locator('[data-action="laps-1"]').click()
+  await page.getByRole('button', { name: 'DONE', exact: true }).click()
+  await expect(ghost).toBeDisabled()
+  await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'OPTIONS' }).click()
+  await page.locator('[data-action="laps-2"]').click()
+  await page.getByRole('button', { name: 'DONE', exact: true }).click()
   await expect(ghost).toBeEnabled()
   await page.getByRole('button', { name: 'NORMAL RACE', exact: true }).click()
   await page.getByRole('button', { name: 'START RACE', exact: true }).click()

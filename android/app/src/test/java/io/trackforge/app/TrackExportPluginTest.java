@@ -84,4 +84,23 @@ public class TrackExportPluginTest {
             // User-provided filenames never determine private cache paths.
         }
     }
+    @Test public void shareIntentCarriesReadableContentUriAndOptionalText() {
+        android.net.Uri uri = android.net.Uri.parse("content://io.trackforge.app.fileprovider/shares/id/track.trackforge.json");
+        Intent intent = TrackExportPlugin.shareIntent(uri, "Beat my time!");
+        assertEquals(Intent.ACTION_SEND, intent.getAction());
+        assertEquals("application/json", intent.getType());
+        assertEquals(uri, intent.getParcelableExtra(Intent.EXTRA_STREAM));
+        assertEquals("Beat my time!", intent.getStringExtra(Intent.EXTRA_TEXT));
+        assertTrue((intent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0);
+        assertEquals(uri, intent.getClipData().getItemAt(0).getUri());
+    }
+
+    @Test public void sharedFileNameCannotEscapeItsUniqueDirectory() {
+        Context context = RuntimeEnvironment.getApplication();
+        String id = java.util.UUID.randomUUID().toString();
+        File file = TrackExportPlugin.shareFile(context, id, "../../unsafe.trackforge.json");
+        assertEquals("unsafe.trackforge.json", file.getName());
+        assertEquals(id, file.getParentFile().getName());
+    }
+
 }
