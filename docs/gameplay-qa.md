@@ -40,3 +40,7 @@ occasional device-farm smoke tests using the assembled APK. Frame timings from
 a shared CI machine are diagnostic, not a stable pass/fail FPS target.
 
 Touch events are Chromium browser simulations, not physical finger hardware.
+
+## Deterministic Arcade sector checks
+
+`npm test -- tests/domain/arcadeSectorComparison.test.ts tests/domain/arcadeAssists.test.ts tests/domain/arcadeSpeedPlanner.test.ts tests/domain/rampDriving.test.ts` exercises fixed-step player steering and braking on street and ice hairpins, the capped assist, and straight ramps. The hairpin controller is a repeatable diagnostic, not a substitute for a human driver: compare entry and exit speed, sector time, off-road incidents, and recoveries before drawing conclusions about handling changes. Test Blue and Red on a signed APK with both steering layouts on a physical phone; distinguish a control-layout problem from the car's behavior before tuning physics.

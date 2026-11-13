@@ -246,3 +246,19 @@ it('ignores any old boost state instead of adding a speed burst',()=>{
  expect(stepRace({...race,...{boostRemaining:1}},input,1/60,random).state.vehicles)
   .toEqual(stepRace(race,input,1/60,random).state.vehicles)
 })
+
+it.each([false, true])('releases residual corner assist on a straight descent (reversed=%s)', (reversed) => {
+  const direction = reversed ? -1 : 1
+  const index = path.points.findIndex((_, i) => path.roadSurface.gradeAt(i) * direction < -0.025)
+  expect(index).toBeGreaterThan(0)
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade', reversed })
+  const vehicle = placeOnRoad(path, required(base.vehicles[0]), index, 180, reversed)
+  const drive = (pressure: number) => required(stepRace({
+    ...base, phase: 'running', vehicles: [{ ...vehicle, arcadeAssistBrake: pressure }],
+  }, input, 1 / 60, random).state.vehicles[0])
+  const released = drive(0.65)
+  const unassisted = drive(0)
+  expect(released.arcadeAssistBrake).toBe(0)
+  expect(released.speed).toBeCloseTo(unassisted.speed, 8)
+  expect(released.braking).toBe(false)
+})

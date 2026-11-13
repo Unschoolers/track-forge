@@ -132,6 +132,7 @@ function advanceVehicle(
       deltaSeconds,
       handling,
       cornerSpeed,
+      race.reversed,
     )
   } else {
     moved = stepAiVehicle(
