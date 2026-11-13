@@ -82,6 +82,25 @@ describe('personal-best ghost replay', () => {
     expect(store.load(track, { ...setup, laps: 2 })).toBeNull()
     expect(ghostRaceKey(track, setup)).not.toBe(ghostRaceKey(track, { ...setup, handling: 'simulation' }))
   })
+  it('classifies valid ghosts for the same layout and chooses the closest, then fastest setup', () => {
+    const storage = memory()
+    const store = new BrowserGhostRepository(storage)
+    const run = (car: string, time: number) => ({ car, time, frames: [frames[0], { ...frames[1], t: time }] })
+    const green = { ...setup, car: 'green' as const }
+    const red = { ...setup, car: 'red' as const }
+    storage.set('trackforge-ghost-runs-v1', JSON.stringify({
+      [ghostRaceKey({ ...track, updatedAt: track.updatedAt + 1 }, setup)]: run('blue', 0.5),
+      [ghostRaceKey({ ...track, start: { ...track.start!, reversed: true } }, setup)]: run('blue', 0.5),
+      [ghostRaceKey(track, green)]: run('green', 2),
+      [ghostRaceKey(track, red)]: run('red', 1),
+      [ghostRaceKey(track, setup)]: { car: 'blue', time: 1, frames: [] },
+    }))
+    expect(store.availability(track, setup)).toEqual({ kind: 'different-setup', setup: { car: 'red', laps: 1, handling: 'arcade' } })
+    expect(store.availability({ ...track, updatedAt: track.updatedAt + 2 }, setup)).toEqual({ kind: 'none' })
+    expect(store.record(track, setup, 1, frames)).toBe(true)
+    expect(store.availability(track, setup)).toEqual({ kind: 'exact', time: 1 })
+    expect(store.load(track, green)?.time).toBe(2)
+  })
   it('captures a race finish and loads the best ghost on replay', () => {
     const store = new BrowserGhostRepository(memory())
     const step: RaceStep = (state) => ({

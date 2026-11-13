@@ -6,6 +6,11 @@ export interface GhostSetup {
   readonly laps: number
   readonly handling?: 'arcade' | 'simulation'
 }
+export type GhostAvailability =
+  | { readonly kind: 'exact'; readonly time: number }
+  | { readonly kind: 'different-setup'; readonly setup: GhostSetup }
+  | { readonly kind: 'none' }
+
 export interface GhostFrame {
   readonly t: number
   readonly x: number
@@ -26,6 +31,7 @@ export interface GhostPose extends GhostFrame {
   readonly car: CarId
 }
 export interface GhostStore {
+  availability?(track: Track, setup: GhostSetup): GhostAvailability
   load(track: Track, setup: GhostSetup): GhostRun | null
   record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[], splits?: readonly number[]): boolean
 }

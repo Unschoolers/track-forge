@@ -26,8 +26,13 @@ describe('Ghost Race setup', () => {
     expect(ghost).not.toBeNull()
     expect(ghost?.hidden).toBe(false)
     expect(ghost?.disabled).toBe(true)
-    expect(modal.textContent).toContain('Finish a race with this setup to save a ghost.')
+    expect(modal.textContent).toContain('Finish a race on this layout to save a ghost.')
     expect(modal.querySelector('[data-action="mode-normal"]')?.getAttribute('aria-pressed')).toBe('true')
+  })
+  it('describes a saved ghost with a different setup', () => {
+    const modal = createRaceSetupModal(state, actions(), { kind: 'different-setup', setup: { car: 'green', laps: 1, handling: 'arcade' } })
+    expect(modal.textContent).toContain('Saved ghost: Green · 1 lap · Arcade')
+    expect(modal.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')?.disabled).toBe(true)
   })
   it('offers the saved target and dispatches the selected race mode', () => {
     const callbacks = actions()
