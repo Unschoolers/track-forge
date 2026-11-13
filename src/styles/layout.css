@@ -30,8 +30,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 .editor-screen[data-editor-tool='terrain'] {
   --editor-context-dock-reserved-height: calc(var(--editor-control-size) + var(--editor-control-size) + var(--editor-context-dock-gap) + .7rem + 2px);
 }
-.home-screen { display: grid; place-items: center; padding: 1rem; }
-.home-card { width: min(30rem, 100%); padding: clamp(1.4rem, 5vw, 2.5rem); border: 1px solid var(--color-line); border-radius: var(--radius-lg); background: rgb(20 26 36 / 92%); box-shadow: var(--shadow-deep); backdrop-filter: blur(1rem); }
+.home-screen { display: flex; flex-direction: column; padding: 1rem; overflow: auto; pointer-events: auto; }
+.home-card { width: min(30rem, 100%); margin: auto; padding: clamp(1.4rem, 5vw, 2.5rem); border: 1px solid var(--color-line); border-radius: var(--radius-lg); background: rgb(20 26 36 / 92%); box-shadow: var(--shadow-deep); backdrop-filter: blur(1rem); }
 .topbar, .race-hud { position: absolute; inset: env(safe-area-inset-top) 0 auto; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem; padding: .75rem; }
 .topbar-title { text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-rail { position: absolute; top: calc(5rem + env(safe-area-inset-top)); left: max(.75rem, env(safe-area-inset-left)); display: grid; gap: .4rem; }

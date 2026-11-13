@@ -1,6 +1,9 @@
 import { courseIdentity } from '@/application/race/raceRecords'
+import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
+import { createCup, recordCupResult, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { describe, expect, it, vi } from 'vitest'
 import type {
+  CupStore,
   Preferences,
   PreferencesStore,
   ScoreStore,
@@ -38,7 +41,7 @@ const preferences: Preferences = {
   dynamicZoomEnabled: true,
 }
 
-function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false) {
+function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false, cupStore?: CupStore) {
   const trackStore = new TrackMemory()
   trackStore.tracks.set(track.id, track)
   const preferencesStore: PreferencesStore = {
@@ -78,6 +81,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
     }),
   }) : raceSession
   const controller = new AppController({
+    ...(cupStore ? { cupStore } : {}),
     trackStore,
     preferencesStore,
     scoreStore,
@@ -143,6 +147,31 @@ describe('AppController', () => {
     trackStore.remove(track.id)
     controller.dispatch({ type: 'race-again' })
     expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'track-library', purpose: 'race' }, notice: expect.stringContaining('no longer available') })
+  })
+
+  it('resumes unfinished and scored checkpoints and restores final standings without a race', () => {
+    const values = new Map<string, string>()
+    const store = new BrowserCupRepository({ get: (key) => values.get(key) ?? null, set: (key, value) => { values.set(key, value); return true }, remove: (key) => values.delete(key) })
+    const first = setup(undefined, false, store)
+    first.controller.dispatch({ type: 'start-cup' })
+    first.controller.dispatch({ type: 'go-home' })
+    const resumed = setup(undefined, false, store)
+    resumed.controller.dispatch({ type: 'resume-cup' })
+    expect(resumed.raceSession.start).toHaveBeenCalledWith(CUP_CIRCUITS[0]?.track, expect.objectContaining({ car: 'blue', difficulty: 'normal' }))
+    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
+    let cup = recordCupResult(createCup(), standings)
+    store.save({ checkpoint: cup, bestPlacement: null })
+    const afterScore = setup(undefined, false, store)
+    afterScore.controller.dispatch({ type: 'resume-cup' })
+    expect(afterScore.raceSession.start).toHaveBeenCalledWith(CUP_CIRCUITS[1]?.track, expect.anything())
+    for (let i = 1; i < CUP_CIRCUITS.length; i++) cup = recordCupResult(advanceCup(cup), standings)
+    store.save({ checkpoint: cup, bestPlacement: null })
+    const final = setup(undefined, false, store)
+    final.controller.dispatch({ type: 'resume-cup' })
+    expect(final.controller.snapshot().overlay.type).toBe('cup-final')
+    expect(final.raceSession.start).not.toHaveBeenCalled()
+    final.controller.dispatch({ type: 'next-cup-race' })
+    expect(store.load()).toEqual({ checkpoint: null, bestPlacement: 1 })
   })
 
   it('shows an official race record on Home without adding the circuit to saved tracks', () => {
