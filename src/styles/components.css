@@ -133,6 +133,10 @@
 .setting-row:last-child { border-bottom: 0; }
 .setting-title { display: block; }
 .setting-description { margin: .25rem 0 0; color: var(--color-muted); font-size: .78rem; }
+.volume-row { display: grid; grid-template-columns: auto minmax(3.5rem, 1fr) 3.25rem; gap: .75rem; padding-block: .35rem; }
+.volume-slider { width: 100%; min-height: 44px; margin: 0; accent-color: var(--color-accent); }
+.volume-value { color: var(--color-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.volume-row + .setup-label { margin-top: 1rem; }
 .toggle-button { flex: 0 0 auto; min-width: 4rem; min-height: 2.5rem; }
 @media (max-width: 520px) {
   .modal-footer { flex-wrap: wrap; }

@@ -30,6 +30,8 @@ export interface ToneSink {
 
 export class BrowserToneSink implements ToneSink {
   private context: AudioContext | undefined
+  private output: GainNode | undefined
+  private volume = 1
   private engine: OscillatorNode | undefined
   private enginePulse: OscillatorNode | undefined
   private enginePulseGain: GainNode | undefined
@@ -49,13 +51,32 @@ export class BrowserToneSink implements ToneSink {
   private rivalGain: GainNode | undefined
   private rivalPan: StereoPannerNode | undefined
 
-  unlock(): void {
-    if (this.context) {
-      void this.context.resume()
-      return
+  get audioContext(): AudioContext | undefined {
+    return this.context
+  }
+
+  resume(): void {
+    if (this.context && this.context.state !== 'running') {
+      void this.context.resume().catch(() => undefined)
     }
+  }
+
+  setVolume(volume: number): void {
+    this.volume = volume
+    if (this.context && this.output) {
+      this.output.gain.setValueAtTime(volume, this.context.currentTime)
+    }
+  }
+
+  unlock(): void {
+    if (this.context || typeof AudioContext === 'undefined') return
     const context = new AudioContext()
     this.context = context
+    const output = context.createGain()
+    output.gain.value = this.volume
+    output.connect(context.destination)
+    this.output = output
+    this.resume()
 
     const noiseBuffer = context.createBuffer(
       1,
@@ -114,7 +135,7 @@ export class BrowserToneSink implements ToneSink {
     engineDrive
       .connect(this.engineFilter)
       .connect(this.engineGain)
-      .connect(context.destination)
+      .connect(output)
     this.engine.start()
     this.enginePulse.start()
     this.engineNoise.start()
@@ -130,7 +151,7 @@ export class BrowserToneSink implements ToneSink {
     this.road
       .connect(this.roadFilter)
       .connect(this.roadGain)
-      .connect(context.destination)
+      .connect(output)
     this.road.start()
 
     this.slip = context.createBufferSource()
@@ -141,7 +162,7 @@ export class BrowserToneSink implements ToneSink {
     this.slipFilter.Q.value = 1.4
     this.slipGain = context.createGain()
     this.slipGain.gain.value = 0
-    this.slip.connect(this.slipFilter).connect(this.slipGain).connect(context.destination)
+    this.slip.connect(this.slipFilter).connect(this.slipGain).connect(output)
     this.slip.start()
 
     this.rival = context.createOscillator()
@@ -150,9 +171,9 @@ export class BrowserToneSink implements ToneSink {
     this.rivalGain.gain.value = 0
     if (typeof context.createStereoPanner === 'function') {
       this.rivalPan = context.createStereoPanner()
-      this.rival.connect(this.rivalGain).connect(this.rivalPan).connect(context.destination)
+      this.rival.connect(this.rivalGain).connect(this.rivalPan).connect(output)
     } else {
-      this.rival.connect(this.rivalGain).connect(context.destination)
+      this.rival.connect(this.rivalGain).connect(output)
     }
     this.rival.start()
   }
@@ -164,7 +185,8 @@ export class BrowserToneSink implements ToneSink {
     type: OscillatorType,
   ): void {
     const context = this.context
-    if (!context) return
+    const output = this.output
+    if (!context || !output) return
     const oscillator = context.createOscillator()
     const gain = context.createGain()
     oscillator.frequency.value = frequency
@@ -174,7 +196,7 @@ export class BrowserToneSink implements ToneSink {
       0.0001,
       context.currentTime + duration,
     )
-    oscillator.connect(gain).connect(context.destination)
+    oscillator.connect(gain).connect(output)
     oscillator.start()
     oscillator.stop(context.currentTime + duration)
   }
@@ -299,8 +321,10 @@ export class BrowserToneSink implements ToneSink {
     this.road?.stop()
     this.slip?.stop()
     this.rival?.stop()
+    this.output?.disconnect()
     void this.context?.close()
     this.context = undefined
+    this.output = undefined
     this.engine = undefined
     this.enginePulse = undefined
     this.enginePulseGain = undefined

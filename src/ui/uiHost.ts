@@ -6,6 +6,7 @@ import type {
   AppSnapshot,
 } from '@/application/appState'
 import type { Unsubscribe } from '@/application/eventBus'
+import type { AudioVolumeSetting } from '@/application/audioVolume'
 import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
@@ -40,6 +41,7 @@ export interface UiRuntime {
   readonly raceControls: RaceControlsPort
   readonly feedback: FeedbackPort
   readonly geometry: TrackGeometryService
+  readonly previewAudioVolume?: (setting: AudioVolumeSetting, volume: number) => void
 }
 
 export class DomUiHost implements UiHost {
@@ -357,6 +359,15 @@ export class DomUiHost implements UiHost {
       case 'options':
         return createOptionsModal(state, {
           close,
+          previewVolume: (setting, volume) => this.runtime.previewAudioVolume?.(setting, volume),
+          setVolume: (setting, volume) => this.controller.dispatch({
+            type: 'set-preferences',
+            preferences: {
+              ...this.controller.snapshot().preferences,
+              ...(setting === 'soundEffectsVolume' ? { audioEnabled: volume > 0 } : {}),
+              [setting]: volume,
+            },
+          }),
           preferences: (preferences) =>
             this.controller.dispatch({
               type: 'set-preferences',

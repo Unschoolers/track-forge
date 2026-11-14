@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   difficulty: 'trackforge-difficulty',
   lighting: 'trackforge-lighting',
   audio: 'trackforge-audio-enabled',
+  musicVolume: 'trackforge-music-volume',
+  soundEffectsVolume: 'trackforge-sound-effects-volume',
   haptics: 'trackforge-haptics-enabled',
   steeringLayout: 'trackforge-steering-layout',
   steeringHand: 'trackforge-steering-hand',

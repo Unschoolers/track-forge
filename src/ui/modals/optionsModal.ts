@@ -1,7 +1,9 @@
 import type { AppSnapshot } from '@/application/appState'
+import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
 import { DIFFICULTY_IDS } from '@/domain/model'
 import { DIFFICULTY_SPECS } from '@/domain/config'
 import { createToggleRow } from '@/ui/components/toggleRow'
+import { createVolumeRow } from '@/ui/components/volumeRow'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
@@ -10,6 +12,8 @@ export function createOptionsModal(
   actions: {
     readonly close: () => void
     readonly preferences: (preferences: AppSnapshot['preferences']) => void
+    readonly previewVolume: (setting: AudioVolumeSetting, volume: number) => void
+    readonly setVolume: (setting: AudioVolumeSetting, volume: number) => void
   },
 ): HTMLElement {
   const frame = createModalFrame(
@@ -88,19 +92,19 @@ export function createOptionsModal(
     raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
   }
+  const volumes = audioVolumes(state.preferences)
+  frame.body.append(element('h3', 'setup-label', 'Audio'))
+  for (const [setting, label] of [['musicVolume', 'Music'], ['soundEffectsVolume', 'Sound Effects']] as const) {
+    frame.body.append(createVolumeRow(
+      label,
+      setting,
+      volumes[setting],
+      (volume) => actions.previewVolume(setting, volume),
+      (volume) => actions.setVolume(setting, volume),
+    ))
+  }
   frame.body.append(element('h3', 'setup-label', 'Comfort & feedback'))
   frame.body.append(
-    createToggleRow(
-      'Sound',
-      'Engine, tires, impacts, and UI sounds.',
-      state.preferences.audioEnabled,
-      'toggle-audio',
-      () =>
-        actions.preferences({
-          ...state.preferences,
-          audioEnabled: !state.preferences.audioEnabled,
-        }),
-    ),
     createToggleRow(
       'Haptics',
       'Surface, curb, and collision vibration.',

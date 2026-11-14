@@ -226,11 +226,28 @@ describe('modal application flows', () => {
 
   it('shows comfort settings but hides race settings during a paused race', () => {
     const { root } = setup({ ...state({ type: 'options', returnTo: 'race' }), mode: 'race', paused: true })
-    expect(root.querySelector('[data-action="toggle-audio"]')).not.toBeNull()
+    expect(root.querySelector('input[type="range"][aria-label="Music"]')).not.toBeNull()
+    expect(root.querySelector('input[type="range"][aria-label="Sound Effects"]')).not.toBeNull()
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
     expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
     expect(root.querySelector('[data-action="handling-simulation"]')).toBeNull()
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
+  })
+
+  it('commits a music slider change independently of sound effects', () => {
+    const { root, port } = setup(state({ type: 'options', returnTo: 'home' }))
+    const music = root.querySelector<HTMLInputElement>('input[aria-label="Music"]')
+    if (!music) throw new Error('Missing Music volume slider')
+
+    music.value = '0'
+    music.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(port.dispatch).not.toHaveBeenCalled()
+    music.dispatchEvent(new Event('change', { bubbles: true }))
+
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'set-preferences',
+      preferences: { ...preferences, musicVolume: 0 },
+    })
   })
 
   it('retains the selected option focus and scroll position through a preferences update', () => {
