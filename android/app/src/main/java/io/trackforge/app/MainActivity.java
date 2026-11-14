@@ -18,6 +18,9 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         enterImmersiveMode();
+        if (getBridge() != null) {
+            getBridge().triggerWindowJSEvent("trackforge:resume");
+        }
     }
 
     @Override

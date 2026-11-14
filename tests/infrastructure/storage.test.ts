@@ -54,6 +54,20 @@ it('persists the explicit race mode and rejects unknown stored modes', () => {
   expect(preferences.load().raceMode).toBe('normal')
 })
 
+it('keeps existing muted installs quiet and saves the two volumes independently', () => {
+  const memory = new MemoryStore()
+  memory.values.set('trackforge-audio-enabled', '0')
+  const repository = new BrowserPreferencesRepository(memory)
+
+  expect(repository.load()).toMatchObject({ musicVolume: 0, soundEffectsVolume: 0 })
+  expect(repository.save({ ...repository.load(), musicVolume: 65, soundEffectsVolume: 0 })).toBe(true)
+  expect(new BrowserPreferencesRepository(memory).load()).toMatchObject({
+    audioEnabled: false,
+    musicVolume: 65,
+    soundEffectsVolume: 0,
+  })
+})
+
 describe('BrowserTrackRepository', () => {
   it('round-trips normalized tracks and ignores malformed records', () => {
     const storage = new MemoryStore()

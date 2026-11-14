@@ -1,5 +1,6 @@
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
+import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
 import { createApplication } from '@/app/createApplication'
 import { AppController, type Scheduler } from '@/application/appController'
 import { asTrackId } from '@/domain/model'
@@ -22,7 +23,10 @@ import {
   WebAudioAdapter,
 } from '@/infrastructure/feedback/webAudioAdapter'
 import { HapticsAdapter } from '@/infrastructure/feedback/hapticsAdapter'
+import { BrowserMusicPlayer } from '@/infrastructure/feedback/musicPlayer'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import menuMusic from '@/assets/music/clubb-menu.mp3?url&no-inline'
+import raceMusic from '@/assets/music/clubb-race.mp3?url&no-inline'
 
 const appRoot = document.querySelector<HTMLElement>('#app')
 if (!appRoot) throw new Error('TrackForge requires an #app mount point')
@@ -54,17 +58,14 @@ const scheduler: Scheduler = {
 const scoreStore = new BrowserScoreRepository(storage)
 const geometry = new TrackGeometryService()
 const initialPreferences = new BrowserPreferencesRepository(storage)
+const toneSink = new BrowserToneSink()
+const music = new BrowserMusicPlayer({ menu: menuMusic, race: raceMusic }, () => toneSink.audioContext)
 const feedback = new FeedbackRouter({
-  audio: new WebAudioAdapter(() => new BrowserToneSink(), true),
+  audio: new WebAudioAdapter(() => toneSink, true),
   haptics: new HapticsAdapter(
     navigator.vibrate?.bind(navigator),
     true,
   ),
-})
-const preferences = initialPreferences.load()
-feedback.setChannels({
-  audio: preferences.audioEnabled,
-  haptics: preferences.hapticsEnabled,
 })
 const raceSession = new RaceSession({
   scoreStore,
@@ -89,6 +90,7 @@ const uiHost = new DomUiHost(uiRoot, controller, {
   raceControls,
   feedback,
   geometry,
+  previewAudioVolume: setAudioVolume,
 })
 const sceneHost = new PhaserSceneHost(
   gameContainer,
@@ -98,16 +100,28 @@ const sceneHost = new PhaserSceneHost(
   geometry,
 )
 const application = createApplication({ sceneHost, uiHost })
-const stopSceneSync = controller.subscribe((snapshot) =>
-  {
-    sceneHost.start(snapshot.mode)
-    feedback.setChannels({
-      audio: snapshot.preferences.audioEnabled,
-      haptics: snapshot.preferences.hapticsEnabled,
-    })
-  },
-)
 
+function setAudioVolume(setting: AudioVolumeSetting, volume: number): void {
+  if (setting === 'musicVolume') music.setVolume(volume / 100)
+  else toneSink.setVolume(volume / 100)
+}
+
+function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
+  const { musicVolume, soundEffectsVolume } = audioVolumes(snapshot.preferences)
+  feedback.setChannels({ audio: soundEffectsVolume > 0, haptics: snapshot.preferences.hapticsEnabled })
+  toneSink.setVolume(soundEffectsVolume / 100)
+  const racing = snapshot.mode === 'race' && snapshot.overlay.type !== 'results' && snapshot.overlay.type !== 'cup-final'
+  music.setTrack(snapshot.mode === 'home' ? 'menu' : racing ? 'race' : null)
+  music.setVolume(musicVolume / 100)
+}
+
+const stopSceneSync = controller.subscribe((snapshot) => {
+  sceneHost.start(snapshot.mode)
+  syncAudio(snapshot)
+})
+
+music.setForeground(!document.hidden)
+syncAudio(controller.snapshot())
 application.start()
 
 // QA telemetry is read-only and exists only in development builds explicitly
@@ -160,16 +174,40 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
   }
 }
 
-const unlockFeedback = (): void => feedback.unlock()
-document.addEventListener('pointerdown', unlockFeedback, { once: true })
-document.addEventListener('keydown', unlockFeedback, { once: true })
+const unlockAudio = (): void => {
+  feedback.unlock()
+  toneSink.resume()
+  music.unlock()
+}
+document.addEventListener('pointerup', unlockAudio)
+document.addEventListener('keydown', unlockAudio)
+
+let nativePaused = false
+function syncAudioVisibility(): void {
+  const active = !document.hidden && !nativePaused
+  if (active) toneSink.resume()
+  music.setForeground(active)
+}
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) handleBackground(controller)
+  syncAudioVisibility()
 })
 
-window.addEventListener('pagehide', () => controller.flushPendingEditorSave())
-window.addEventListener('trackforge:pause', () => handleBackground(controller))
+window.addEventListener('pagehide', () => {
+  music.setForeground(false)
+  controller.flushPendingEditorSave()
+})
+window.addEventListener('pageshow', syncAudioVisibility)
+window.addEventListener('trackforge:pause', () => {
+  nativePaused = true
+  syncAudioVisibility()
+  handleBackground(controller)
+})
+window.addEventListener('trackforge:resume', () => {
+  nativePaused = false
+  syncAudioVisibility()
+})
 
 window.addEventListener(
   'beforeunload',
@@ -177,6 +215,7 @@ window.addEventListener(
     stopSceneSync()
     controller.destroy()
     application.destroy()
+    music.destroy()
     feedback.destroy()
   },
   { once: true },

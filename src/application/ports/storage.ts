@@ -50,6 +50,8 @@ export interface Preferences {
   readonly car: CarId
   readonly difficulty: DifficultyId
   readonly audioEnabled: boolean
+  readonly musicVolume?: number
+  readonly soundEffectsVolume?: number
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean
   readonly steeringLayout?: 'drag' | 'buttons'
