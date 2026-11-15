@@ -1,3 +1,4 @@
+import type { SceneryProp } from '@/domain/track/trackEnvironment'
 import { TERRAIN_LIMITS, WORLD_ELEVATION } from '@/domain/config'
 import { distance } from '@/domain/geometry/math'
 import type {
@@ -270,9 +271,10 @@ export function expandAroundBoundsCenter(
   points: readonly TrackPoint[],
   trees: readonly Tree[],
   factor: 2,
-): { readonly points: readonly TrackPoint[]; readonly trees: readonly Tree[] } {
-  const content: readonly Vector2[] = [...points, ...trees]
-  if (content.length === 0) return { points, trees }
+  scenery: readonly SceneryProp[] = [],
+): { readonly points: readonly TrackPoint[]; readonly trees: readonly Tree[]; readonly scenery: readonly SceneryProp[] } {
+  const content: readonly Vector2[] = points.length || trees.length ? [...points, ...trees] : scenery
+  if (content.length === 0) return { points, trees, scenery }
   const center = boundsCenter(content)
   const expand = <T extends Vector2>(item: T): T => ({
     ...item,
@@ -282,6 +284,7 @@ export function expandAroundBoundsCenter(
   return {
     points: points.map(expand),
     trees: trees.map(expand),
+    scenery: scenery.map(expand),
   }
 }
 
@@ -317,8 +320,9 @@ export function planTerrainExpansionAroundBoundsCenter(
   trees: readonly Tree[],
   terrain: TerrainMap,
   factor: 2,
+  scenery: readonly SceneryProp[] = [],
 ): TerrainExpansionPlan {
-  const content: readonly Vector2[] = [...points, ...trees]
+  const content: readonly Vector2[] = points.length || trees.length ? [...points, ...trees] : scenery
   if (content.length === 0 || terrain.cells.length === 0) {
     return { ok: true, terrain }
   }

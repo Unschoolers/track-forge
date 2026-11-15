@@ -212,6 +212,8 @@ export class DomUiHost implements UiHost {
                   type: 'set-editor-terrain-radius',
                   radius,
                 }),
+              scenery: (choice) =>
+                this.controller.dispatch({ type: 'set-editor-scenery', choice }),
               camera: (action) =>
                 this.controller.dispatch({
                   type: 'request-editor-camera',
@@ -388,8 +390,13 @@ export class DomUiHost implements UiHost {
           home: () => this.controller.dispatch({ type: 'go-home' }),
         })
       case 'editor-menu':
-        return createEditorMenuModal({
+        return createEditorMenuModal(state.editor.environmentId, {
           close,
+          setEnvironment: (environmentId) =>
+            this.controller.dispatch({
+              type: 'editor',
+              command: { type: 'set-environment', environmentId },
+            }),
           export: () => {
             const track = this.controller.snapshot().currentTrack
             if (track) void this.exportTrackFile(track)

@@ -1,3 +1,4 @@
+import { serializeTrack } from '@/infrastructure/export/trackExport'
 import { describe, expect, it } from 'vitest'
 import { asTrackId, type Track } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
@@ -76,13 +77,16 @@ describe('shareable track challenges', () => {
       createId: () => asTrackId(`copy-${++next}`),
       now: () => 777,
     })
-    const source = parseTrackImport(exported(track))
+    const appearance = { environmentId: 'cityscape' as const, scenery: [{ kind: 'city-house' as const, x: 12, y: -4 }, { kind: 'desert-cactus' as const, x: 9, y: 3 }] }
+    const source = parseTrackImport(serializeTrack({ ...track, ...appearance }).content)
     if (!source.ok) throw new Error(source.message)
     const first = library.importShared(source.track)
     const second = library.importShared(source.track)
     expect(first.ok).toBe(true)
     expect(second.ok).toBe(true)
     if (!first.ok || !second.ok) return
+    expect(first.track).toMatchObject(appearance)
+    expect(first.track.raceRevision).toBe(777)
     expect(first.track.id).toBe('copy-1')
     expect(second.track.id).toBe('copy-2')
     expect(first.track.name).toMatch(/ \(2\)$/)
@@ -96,4 +100,30 @@ describe('shareable track challenges', () => {
     expect(medalForFinish('finished', 4)).toBeNull()
     expect(medalForFinish('wrecked', 1)).toBeNull()
   })
+})
+
+it('round-trips all scenery and rejects oversized shared scenery', () => {
+  const building = { kind: 'city-building' as const, x: 11, y: -42 }
+  const scenery = [building, { kind: 'desert-rock-spire' as const, x: -7, y: 10 }]
+  const parsed = parseTrackImport(serializeTrack({ ...track, environmentId: 'desert', scenery }).content)
+  expect(parsed.ok).toBe(true)
+  if (parsed.ok) expect(parsed.track).toMatchObject({ environmentId: 'desert', scenery })
+  expect(parseTrackImport(exported({ ...track, scenery: Array.from({ length: 257 }, () => building) })).ok).toBe(false)
+  const invalid = JSON.parse(exported(track))
+  invalid.track.environmentId = 'unknown'
+  invalid.track.scenery = [{ kind: 'city-house', x: 10, y: 20 }, { kind: 'bad', x: 0, y: 0 }, { kind: 'desert-cactus', x: 10000001, y: 0 }]
+  const normalized = parseTrackImport(JSON.stringify(invalid))
+  expect(normalized.ok).toBe(true)
+  if (normalized.ok) expect(normalized.track).toMatchObject({ environmentId: 'grass', scenery: [{ kind: 'city-house', x: 10, y: 20 }] })
+})
+
+it('keeps the effective ghost revision through a rename', () => {
+  const library = new TrackLibraryService({
+    trackStore: { list: () => [track], find: () => track, save: () => true, remove: () => true },
+    scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
+    createId: () => asTrackId('new'), now: () => 99,
+  })
+  const result = library.rename(track.id, 'A new name')
+  expect(result.ok).toBe(true)
+  if (result.ok) expect(result.track).toMatchObject({ updatedAt: 99, raceRevision: track.updatedAt })
 })

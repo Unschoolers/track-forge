@@ -132,3 +132,15 @@ describe('personal-best ghost replay', () => {
     session.destroy()
   })
 })
+
+it('preserves legacy ghost keys across appearance changes and changes them for race edits', () => {
+  const legacy = createStarterTrack(asTrackId('legacy-appearance'), 123)
+  const setup = { car: 'blue' as const, laps: 3 }
+  const appearance = { ...legacy, environmentId: 'desert' as const, scenery: [{ kind: 'desert-cactus' as const, x: 4, y: 7 }], updatedAt: 456, raceRevision: legacy.updatedAt }
+  const store = new BrowserGhostRepository(memory())
+  expect(store.record(legacy, setup, 1, frames)).toBe(true)
+  expect(store.load(appearance, setup)?.time).toBe(1)
+  expect(store.load({ ...appearance, raceRevision: 457 }, setup)).toBeNull()
+  expect(ghostRaceKey(appearance, setup)).toBe(ghostRaceKey(legacy, setup))
+  expect(ghostRaceKey({ ...appearance, raceRevision: 457 }, setup)).not.toBe(ghostRaceKey(legacy, setup))
+})

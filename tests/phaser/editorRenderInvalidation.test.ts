@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   editorPointerRenderChanges,
   editorSnapshotRenderChanges,
+  editorTreeRenderRequired,
+  treePreviewRenderRequired,
   terrainPreviewCompileRequired,
   type EditorRenderState,
 } from '@/phaser/rendering/editorRenderInvalidation'
@@ -13,6 +15,8 @@ function state(
     points: [],
     terrain: {},
     trees: [],
+    scenery: [],
+    environmentId: 'grass',
     start: undefined,
     night: false,
     grid: true,
@@ -31,6 +35,7 @@ describe('editor render invalidation', () => {
 
     expect(editorSnapshotRenderChanges(current, { ...current }, false)).toEqual({
       world: false,
+      appearance: false,
       grid: false,
       overlay: false,
       preview: false,
@@ -48,6 +53,7 @@ describe('editor render invalidation', () => {
       ),
     ).toEqual({
       world: true,
+      appearance: false,
       grid: false,
       overlay: true,
       preview: false,
@@ -59,22 +65,47 @@ describe('editor render invalidation', () => {
 
     expect(editorSnapshotRenderChanges(current, current, true)).toEqual({
       world: false,
+      appearance: false,
       grid: true,
       overlay: false,
       preview: false,
     })
     expect(editorPointerRenderChanges('terrain')).toEqual({
       world: false,
+      appearance: false,
       grid: false,
       overlay: false,
       preview: true,
     })
     expect(editorPointerRenderChanges('pan')).toEqual({
       world: false,
+      appearance: false,
       grid: false,
       overlay: false,
       preview: false,
     })
+  })
+
+  it('refreshes appearance without rebuilding geometry when scenery or theme changes', () => {
+    const previous = state()
+    expect(editorSnapshotRenderChanges(previous, { ...previous, scenery: [] }, false)).toMatchObject({ world: false, appearance: true })
+    expect(editorSnapshotRenderChanges(previous, { ...previous, environmentId: 'desert' }, false)).toMatchObject({ world: false, appearance: true })
+  })
+
+  it('redraws trees only for tree, terrain, lighting, or tree-preview changes', () => {
+    const previous = state()
+    expect(editorTreeRenderRequired(previous, { ...previous, scenery: [] })).toBe(false)
+    expect(editorTreeRenderRequired(previous, { ...previous, points: [] })).toBe(false)
+    expect(editorTreeRenderRequired(previous, { ...previous, trees: [] })).toBe(true)
+    expect(editorTreeRenderRequired(previous, { ...previous, terrain: {} })).toBe(true)
+    expect(editorTreeRenderRequired(previous, { ...previous, night: true })).toBe(true)
+    const tree = { type: 'tree' as const, index: 0, position: { x: 10, y: 20 } }
+    const prop = { type: 'prop' as const, index: 0, position: { x: 10, y: 20 } }
+    expect(treePreviewRenderRequired(null, prop)).toBe(false)
+    expect(treePreviewRenderRequired(prop, { ...prop, position: { x: 20, y: 20 } })).toBe(false)
+    expect(treePreviewRenderRequired(null, tree)).toBe(true)
+    expect(treePreviewRenderRequired(tree, { ...tree, position: { x: 20, y: 20 } })).toBe(true)
+    expect(treePreviewRenderRequired(tree, null)).toBe(true)
   })
 
   it('compiles candidate impact only for a new non-empty preview revision', () => {

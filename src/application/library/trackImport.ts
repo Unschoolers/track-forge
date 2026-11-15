@@ -1,3 +1,4 @@
+import { MAX_SCENERY_PROPS, normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { isSurfaceId, isLightingMode, asTrackId, type Track, type TrackPoint } from '@/domain/model'
 import { EMPTY_TERRAIN, normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
@@ -49,7 +50,8 @@ export function parseTrackImport(content: string): TrackImportResult {
   const terrain = object(source?.terrain)
   if (!name || !Array.isArray(points) || points.length > MAX_POINTS ||
       !Array.isArray(trees) || trees.length > MAX_TREES ||
-      (Array.isArray(terrain?.cells) && terrain.cells.length > MAX_TERRAIN_CELLS)) {
+      (Array.isArray(terrain?.cells) && terrain.cells.length > MAX_TERRAIN_CELLS) ||
+      (Array.isArray(source.scenery) && source.scenery.length > MAX_SCENERY_PROPS)) {
     return { ok: false, message: 'The shared track has invalid or oversized geometry.' }
   }
   if (!points.every((value) => {
@@ -112,6 +114,9 @@ export function parseTrackImport(content: string): TrackImportResult {
         ratio: finite(start?.ratio) ? Math.max(0, Math.min(0.999999, start.ratio)) : 0,
         reversed: start?.reversed === true,
       },
+      environmentId: normalizeTrackEnvironmentId(source.environmentId),
+      scenery: normalizeSceneryProps(source.scenery),
+      raceRevision: now,
       lighting: isLightingMode(source.lighting) ? source.lighting : 'day',
       createdAt: now,
       updatedAt: now,

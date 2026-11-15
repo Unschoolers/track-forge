@@ -691,3 +691,61 @@ describe('AppController', () => {
     expect(scheduler.schedule).not.toHaveBeenCalled()
   })
 })
+
+describe('scenery persistence', () => {
+  it('autosaves appearance before switching and preserves race revision until a road edit', () => {
+    const original = createStarterTrack(asTrackId('first'), 1)
+    const { controller, trackStore } = setup(original)
+    const other = createStarterTrack(asTrackId('second'), 2)
+    trackStore.tracks.set(other.id, other)
+    controller.dispatch({ type: 'editor', command: { type: 'set-environment', environmentId: 'cityscape' } })
+    controller.dispatch({ type: 'editor', command: { type: 'add-scenery-prop', prop: { kind: 'city-house', x: 100, y: 100 } } })
+    expect(controller.snapshot().currentTrack?.raceRevision).toBe(original.raceRevision ?? original.updatedAt)
+    controller.dispatch({ type: 'select-track-for-edit', id: other.id })
+    expect(trackStore.find(original.id)?.scenery).toEqual([{ kind: 'city-house', x: 100, y: 100 }])
+    controller.dispatch({ type: 'select-track-for-edit', id: original.id })
+    expect(controller.snapshot().editor.environmentId).toBe('cityscape')
+    controller.dispatch({ type: 'editor', command: { type: 'add-point', point: { x: 0, y: 0, surface: 'street' } } })
+    const firstRevision = controller.snapshot().currentTrack?.raceRevision ?? 0
+    controller.dispatch({ type: 'editor', command: { type: 'add-point', point: { x: 1, y: 1, surface: 'street' } } })
+    expect(controller.snapshot().currentTrack?.raceRevision).toBe(firstRevision + 1)
+  })
+})
+
+describe('gesture race revisions', () => {
+  it.each(['cancel-gesture', 'undo'] as const)('restores the revision and saves the starting course after %s', (finish) => {
+    const track = createStarterTrack(asTrackId('gesture'), 1)
+    const { controller, trackStore, flush } = setup(track)
+    controller.dispatch({ type: 'editor', command: { type: 'set-environment', environmentId: 'desert' } })
+    const start = controller.snapshot().currentTrack
+    if (!start || start.raceRevision === undefined) throw new Error('Missing starting race revision')
+    controller.dispatch({ type: 'editor', command: { type: 'begin-gesture' } })
+    controller.dispatch({ type: 'editor', command: { type: 'move-point', index: 0, point: { x: 123, y: 456 } } })
+    expect(controller.snapshot().currentTrack?.raceRevision).toBeGreaterThan(start.raceRevision)
+    controller.dispatch({ type: 'editor', command: { type: finish } })
+    expect(controller.snapshot().currentTrack?.raceRevision).toBe(start.raceRevision)
+    flush()
+    expect(trackStore.find(track.id)).toMatchObject({ points: start.points, environmentId: 'desert', raceRevision: start.raceRevision })
+  })
+})
+
+describe('gesture revision isolation', () => {
+  it('keeps a committed revision and does not carry a gesture revision to another track', () => {
+    const track = createStarterTrack(asTrackId('gesture-first'), 1)
+    const { controller, trackStore, flush } = setup(track)
+    const second = createStarterTrack(asTrackId('gesture-second'), 7)
+    trackStore.tracks.set(second.id, second)
+    controller.dispatch({ type: 'editor', command: { type: 'begin-gesture' } })
+    controller.dispatch({ type: 'editor', command: { type: 'move-point', index: 0, point: { x: 10, y: 20 } } })
+    controller.dispatch({ type: 'editor', command: { type: 'end-gesture' } })
+    const committed = controller.snapshot().currentTrack!.raceRevision!
+    expect(committed).toBeGreaterThan(track.raceRevision ?? track.updatedAt)
+    controller.dispatch({ type: 'select-track-for-edit', id: second.id })
+    controller.dispatch({ type: 'editor', command: { type: 'begin-gesture' } })
+    controller.dispatch({ type: 'editor', command: { type: 'move-point', index: 0, point: { x: 10, y: 20 } } })
+    controller.dispatch({ type: 'editor', command: { type: 'cancel-gesture' } })
+    flush()
+    expect(trackStore.find(second.id)?.raceRevision).toBe(second.raceRevision ?? second.updatedAt)
+    expect(trackStore.find(track.id)?.raceRevision).toBe(committed)
+  })
+})

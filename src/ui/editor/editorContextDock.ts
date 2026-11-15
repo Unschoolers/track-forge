@@ -1,4 +1,8 @@
-import type { AppSnapshot } from '@/application/appState'
+import {
+  type AppSnapshot,
+  type EditorSceneryChoice,
+  normalizeEditorSceneryChoice,
+} from '@/application/appState'
 import {
   TERRAIN_LIMITS,
   type TerrainBrushRadius,
@@ -9,6 +13,8 @@ import {
   EDITOR_SURFACES,
   type EditorSurface,
 } from '@/domain/editor/editorGeometry'
+import { SCENERY_KINDS_BY_ENVIRONMENT } from '@/domain/track/trackEnvironment'
+import { getTrackEnvironment } from '@/presentation/environments'
 import { button, element } from '@/ui/dom'
 
 interface SegmentedButtonChoice<Value extends string | number> {
@@ -25,7 +31,7 @@ interface SegmentedButtonChoice<Value extends string | number> {
  * Builds the shared accessible segmented-button pattern used by all editor
  * material, structure, terrain, and brush-size controls.
  */
-function createSegmentedButtons<Value extends string | number>(
+export function createSegmentedButtons<Value extends string | number>(
   label: string,
   choices: readonly SegmentedButtonChoice<Value>[],
 ): HTMLElement {
@@ -52,17 +58,40 @@ function createSegmentedButtons<Value extends string | number>(
 }
 
 export function createEditorContextDock(
-  state: Pick<AppSnapshot, 'editorUi'>,
+  state: Pick<AppSnapshot, 'editorUi' | 'editor'>,
   actions: {
     readonly surface: (surface: EditorSurface) => void
     readonly structure: (structure: RoadStructure) => void
     readonly terrainMode: (mode: TerrainBrushMode) => void
     readonly terrainRadius: (radius: TerrainBrushRadius) => void
+    readonly scenery: (choice: EditorSceneryChoice) => void
   },
 ): HTMLElement {
   const dock = element('footer', 'editor-context-dock')
   dock.dataset.editorContextDock = ''
   dock.dataset.layout = state.editorUi.tool === 'terrain' ? 'two-row' : 'one-row'
+
+  if (state.editorUi.tool === 'tree') {
+    const environmentId = state.editor.environmentId
+    const environment = getTrackEnvironment(environmentId)
+    const kinds = SCENERY_KINDS_BY_ENVIRONMENT[environmentId]
+    const selected = normalizeEditorSceneryChoice(state.editorUi.sceneryChoice, environmentId)
+    const choices = [
+      sceneryChoice('tree', 'Tree', selected, actions.scenery),
+      ...kinds.flatMap((kind) => {
+        const prop = environment.scenery[kind]
+        return prop ? [sceneryChoice(kind, prop.label, selected, actions.scenery)] : []
+      }),
+      sceneryChoice('erase-scenery', 'Erase', selected, actions.scenery),
+    ]
+    const group = createSegmentedButtons('Scenery', choices)
+    if (choices.length > 3) {
+      group.classList.add('editor-scenery-choices')
+      dock.dataset.layout = 'two-row'
+    }
+    dock.append(createContextRow(group))
+    return dock
+  }
 
   if (state.editorUi.tool === 'structure') {
     dock.append(
@@ -139,6 +168,23 @@ function createContextRow(content: HTMLElement): HTMLElement {
   const row = element('div', 'editor-context-row')
   row.append(content)
   return row
+}
+
+function sceneryChoice(
+  value: EditorSceneryChoice,
+  label: string,
+  selected: EditorSceneryChoice,
+  select: (choice: EditorSceneryChoice) => void,
+): SegmentedButtonChoice<EditorSceneryChoice> {
+  return {
+    value,
+    label,
+    action: value === 'erase-scenery' ? value : `scenery-${value}`,
+    pressed: selected === value,
+    ariaLabel: value === 'erase-scenery' ? 'Erase scenery' : label,
+    data: { sceneryKind: value },
+    select: () => select(value),
+  }
 }
 
 function surfaceChoice(

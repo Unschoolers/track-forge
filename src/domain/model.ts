@@ -1,3 +1,5 @@
+import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+
 export const SURFACE_IDS = ['street', 'dirt', 'ice'] as const
 export const CAR_IDS = ['blue', 'red', 'green', 'yellow'] as const
 export const DIFFICULTY_IDS = ['easy', 'normal', 'hard'] as const
@@ -60,6 +62,9 @@ export interface Track {
   readonly terrain: TerrainMap
   readonly start?: TrackStart
   readonly lighting: LightingMode
+  readonly environmentId?: TrackEnvironmentId
+  readonly scenery?: readonly SceneryProp[]
+  readonly raceRevision?: number
   readonly createdAt: number
   readonly updatedAt: number
 }

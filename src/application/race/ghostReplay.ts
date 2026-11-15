@@ -41,7 +41,7 @@ export const MAX_GHOST_FRAMES = 3000 // Long Arcade runs compact older samples.
 /** Track edits and a changed race setup must never reuse a stale ghost. */
 export function ghostRaceKey(track: Track, setup: GhostSetup): string {
   return [
-    track.id, track.updatedAt, track.start?.ratio ?? 0,
+    track.id, track.raceRevision ?? track.updatedAt, track.start?.ratio ?? 0,
     track.start?.reversed ? 'reverse' : 'forward',
     setup.car, setup.laps, setup.handling ?? 'arcade',
   ].join('|')

@@ -1,3 +1,4 @@
+import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { CUP_CIRCUITS, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
@@ -60,6 +61,7 @@ export class AppController {
   private cancelPendingSave: (() => void) | undefined
   private pendingEditorSave = false
   private saveGeneration = 0
+  private gestureRevision: { trackId: TrackId; start: NonNullable<AppSnapshot['editor']['gestureStart']>; revision: number } | null = null
   private unsubscribeRace: (() => void) | undefined
 
   constructor(private readonly dependencies: AppControllerDependencies) {
@@ -90,6 +92,7 @@ export class AppController {
         currentTrack?.trees ?? [],
         currentTrack?.start,
         currentTrack?.terrain,
+        currentTrack ?? {},
       ),
       editorUi: {
         tool: 'draw',
@@ -219,7 +222,7 @@ export class AppController {
         this.update({
           ...this.state,
           currentTrack: saved.track,
-          editor: createEditorState(saved.track.points, saved.track.trees, saved.track.start, saved.track.terrain),
+          editor: createEditorState(saved.track.points, saved.track.trees, saved.track.start, saved.track.terrain, saved.track),
           mode: 'race',
           paused: false,
           cup: null,
@@ -329,6 +332,9 @@ export class AppController {
         break
       case 'save-current-track':
         this.saveCurrentTrack()
+        break
+      case 'set-editor-scenery':
+        this.update({ ...this.state, editorUi: { ...this.state.editorUi, sceneryChoice: normalizeEditorSceneryChoice(command.choice, this.state.editor.environmentId) } })
         break
       case 'set-editor-tool':
         this.update({
@@ -585,6 +591,7 @@ export class AppController {
         track.trees,
         track.start,
         track.terrain,
+        track,
       ),
       notice: null,
     })
@@ -608,6 +615,7 @@ export class AppController {
         track.trees,
         track.start,
         track.terrain,
+        track,
       ),
       notice: null,
     })
@@ -637,6 +645,7 @@ export class AppController {
         track.trees,
         track.start,
         track.terrain,
+        track,
       ),
       raceLighting: track.lighting,
       notice: null,
@@ -666,6 +675,7 @@ export class AppController {
         result.track.trees,
         result.track.start,
         result.track.terrain,
+        result.track,
       ),
       notice: null,
     })
@@ -707,6 +717,7 @@ export class AppController {
               currentTrack?.trees ?? [],
               currentTrack?.start,
               currentTrack?.terrain,
+              currentTrack ?? {},
             )
           : this.state.editor,
       notice: deletingCurrent ? null : this.state.notice,
@@ -821,22 +832,37 @@ export class AppController {
     }
     const editor = result.state
     if (editor === this.state.editor) return
-    const contentChanged =
-      editor.points !== this.state.editor.points ||
-      editor.trees !== this.state.editor.trees ||
-      editor.start !== this.state.editor.start ||
+    const previousRevision = currentTrack.raceRevision ?? currentTrack.updatedAt
+    if (!this.state.editor.gestureStart && editor.gestureStart) {
+      this.gestureRevision = { trackId: currentTrack.id, start: editor.gestureStart, revision: previousRevision }
+    }
+    const savedGesture = this.gestureRevision
+    const restoresGesture = (command.type === 'cancel-gesture' || command.type === 'undo') &&
+      savedGesture?.trackId === currentTrack.id &&
+      savedGesture.start === this.state.editor.gestureStart &&
+      editor.points === savedGesture.start.points && editor.trees === savedGesture.start.trees &&
+      editor.start === savedGesture.start.start && editor.terrain === savedGesture.start.terrain
+    if (this.state.editor.gestureStart && !editor.gestureStart) this.gestureRevision = null
+    const raceChanged = editor.points !== this.state.editor.points ||
+      editor.trees !== this.state.editor.trees || editor.start !== this.state.editor.start ||
       editor.terrain !== this.state.editor.terrain
-    if (!contentChanged) {
+    const contentChanged = raceChanged || editor.environmentId !== this.state.editor.environmentId ||
+      editor.scenery !== this.state.editor.scenery
+    if (!contentChanged && !(restoresGesture && previousRevision !== savedGesture.revision)) {
       this.update({ ...this.state, editor })
       return
     }
+    const now = this.now()
     const updatedTrack = {
       ...currentTrack,
       points: editor.points,
       trees: editor.trees,
       start: editor.start ?? { ratio: 0, reversed: false },
       terrain: editor.terrain,
-      updatedAt: this.now(),
+      environmentId: editor.environmentId,
+      scenery: editor.scenery,
+      raceRevision: restoresGesture ? savedGesture.revision : raceChanged ? Math.max(now, previousRevision + 1) : previousRevision,
+      updatedAt: now,
     }
     this.update({
       ...this.state,
@@ -882,7 +908,8 @@ export class AppController {
   }
 
   private update(state: AppSnapshot): void {
-    this.state = state
-    this.events.publish({ type: 'state-changed', snapshot: state })
+    const normalized = state.editorUi.sceneryChoice === undefined ? state : { ...state, editorUi: { ...state.editorUi, sceneryChoice: normalizeEditorSceneryChoice(state.editorUi.sceneryChoice, state.editor.environmentId) } }
+    this.state = normalized
+    this.events.publish({ type: 'state-changed', snapshot: normalized })
   }
 }

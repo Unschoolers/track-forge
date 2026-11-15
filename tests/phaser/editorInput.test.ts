@@ -11,6 +11,68 @@ import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
 
 describe('EditorInputController', () => {
+  it('previews and commits a scenery drag at the final pointer position with its grab offset', () => {
+    let editor = createEditorState([], [], undefined, undefined, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 100, y: 100 }] })
+    const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => 'desert-cactus', editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })
+    input.pointerDown({ id: 1, x: 105, y: 103 })
+    input.pointerMove({ id: 1, x: 135, y: 133 })
+    expect(input.sceneryPreview()).toEqual({ type: 'prop', index: 0, position: { x: 130, y: 130 } })
+    input.pointerUp({ id: 1, x: 155, y: 153 })
+    expect(editor.scenery).toEqual([{ kind: 'desert-cactus', x: 150, y: 150 }])
+    expect(editor.history).toHaveLength(1)
+    expect(reduceEditor(editor, { type: 'undo' }).scenery[0]).toEqual({ kind: 'desert-cactus', x: 100, y: 100 })
+  })
+
+  it('cancels a scenery move on pinch', () => {
+    let editor = createEditorState([], [], undefined, undefined, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 100, y: 100 }] })
+    const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => 'desert-cactus', editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })
+    input.pointerDown({ id: 1, x: 100, y: 100 })
+    input.pointerMove({ id: 1, x: 140, y: 140 })
+    input.pointerDown({ id: 2, x: 160, y: 140 })
+    expect(input.sceneryPreview()).toBeNull()
+    expect(editor.scenery[0]).toEqual({ kind: 'desert-cactus', x: 100, y: 100 })
+    expect(editor.history).toHaveLength(0)
+  })
+
+  it('moves trees and cancels invalid drops without adding history', () => {
+    const terrain = normalizeTerrain({ cells: [{ column: 4, row: 4, kind: 'water' }] })
+    let editor = createEditorState([], [{ x: 50, y: 50 }], undefined, terrain)
+    const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => 'tree', editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })
+    input.pointerDown({ id: 1, x: 50, y: 50 })
+    input.pointerMove({ id: 1, x: 80, y: 80 })
+    expect(input.sceneryPreview()).toEqual({ type: 'tree', index: 0, position: { x: 80, y: 80 } })
+    input.pointerUp({ id: 1, x: 144, y: 144 })
+    expect(editor.trees).toEqual([{ x: 50, y: 50 }])
+    expect(editor.history).toHaveLength(0)
+    input.pointerDown({ id: 2, x: 50, y: 50 })
+    input.pointerMove({ id: 2, x: 80, y: 80 })
+    input.pointerUp({ id: 2, x: 90, y: 90 })
+    expect(editor.trees).toEqual([{ x: 90, y: 90 }])
+    expect(reduceEditor(editor, { type: 'undo' }).trees).toEqual([{ x: 50, y: 50 }])
+  })
+
+  it('erases only visible scenery and places on empty ground', () => {
+    let choice: 'erase-scenery' | 'desert-cactus' = 'erase-scenery'
+    let editor = createEditorState([], [], undefined, undefined, { environmentId: 'desert', scenery: [{ kind: 'city-house', x: 100, y: 100 }, { kind: 'desert-cactus', x: 200, y: 200 }] })
+    const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => choice, editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })
+    input.pointerDown({ id: 1, x: 100, y: 100 }); input.pointerUp({ id: 1, x: 100, y: 100 })
+    expect(editor.scenery).toHaveLength(2)
+    input.pointerDown({ id: 2, x: 200, y: 200 }); input.pointerUp({ id: 2, x: 200, y: 200 })
+    expect(editor.scenery).toEqual([{ kind: 'city-house', x: 100, y: 100 }])
+    choice = 'desert-cactus'
+    input.pointerDown({ id: 3, x: 300, y: 300 }); input.pointerUp({ id: 3, x: 300, y: 300 })
+    expect(editor.scenery[1]).toEqual({ kind: 'desert-cactus', x: 300, y: 300 })
+  })
+
+  it('discards a move when its source changes during the gesture', () => {
+    let editor = createEditorState([], [], undefined, undefined, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 100, y: 100 }] })
+    const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => 'desert-cactus', editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })
+    input.pointerDown({ id: 1, x: 100, y: 100 })
+    input.pointerMove({ id: 1, x: 140, y: 140 })
+    editor = { ...editor, scenery: [{ kind: 'desert-cactus', x: 200, y: 200 }], gestureStart: null }
+    input.pointerUp({ id: 1, x: 150, y: 150 })
+    expect(editor.scenery[0]).toEqual({ kind: 'desert-cactus', x: 200, y: 200 })
+  })
   it('translates draw gestures into world-space editor commands', () => {
     const dispatch = vi.fn()
     const camera: EditorCamera = { x: 10, y: 20, zoom: 2 }

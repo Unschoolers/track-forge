@@ -3,6 +3,8 @@ import { terrainKindAt } from '@/domain/terrain/terrainField'
 
 export type EditorRejectionCode =
   | 'invalid-tree-position'
+  | 'invalid-scenery-position'
+  | 'scenery-capacity'
   | 'tree-in-water'
   | 'terrain-coordinate-bounds'
   | 'terrain-capacity'
@@ -53,4 +55,14 @@ export const EXPAND_TERRAIN_CAPACITY_REJECTION: EditorCommandRejection = {
   code: 'expand-terrain-capacity',
   message:
     'Expand cancelled: transformed terrain would exceed 20,000 authored cells.',
+}
+
+export const INVALID_SCENERY_POSITION_REJECTION: EditorCommandRejection = {
+  code: 'invalid-scenery-position',
+  message: 'Scenery requires a valid position within the map boundary.',
+}
+
+export const SCENERY_CAPACITY_REJECTION: EditorCommandRejection = {
+  code: 'scenery-capacity',
+  message: 'The map cannot exceed 256 scenery items.',
 }

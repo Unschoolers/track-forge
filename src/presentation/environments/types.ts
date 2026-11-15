@@ -8,3 +8,25 @@ export interface EnvironmentPalette {
   readonly flyoverHill: string
   readonly shorelineLand: number
 }
+
+import type { Vector2 } from '@/domain/model'
+import type { SceneryPropKind } from '@/domain/track/trackEnvironment'
+
+export type SceneryPrimitive =
+  | { readonly kind: 'ellipse'; readonly x: number; readonly y: number; readonly radiusX: number; readonly radiusY: number; readonly color: number; readonly alpha?: number }
+  | { readonly kind: 'polygon'; readonly points: readonly Vector2[]; readonly color: number; readonly alpha?: number }
+
+export interface SceneryArtDefinition {
+  readonly label: string
+  readonly radius: number
+  readonly day: readonly SceneryPrimitive[]
+  readonly night: readonly SceneryPrimitive[]
+}
+
+export interface TrackEnvironmentDefinition {
+  readonly label: string
+  readonly day: EnvironmentPalette
+  readonly night: EnvironmentPalette
+  readonly scenery: Readonly<Partial<Record<SceneryPropKind, SceneryArtDefinition>>>
+  readonly groundArt: (variant: number, night: boolean) => readonly SceneryPrimitive[]
+}

@@ -92,6 +92,35 @@ function setup(
 }
 
 describe('modal application flows', () => {
+  it('chooses the track environment and shows its scenery in the editor', () => {
+    const initial: AppSnapshot = { ...state({ type: 'editor-menu' }), mode: 'editor' }
+    const { root, port, update, host } = setup(initial)
+    const environment = root.querySelector('[role="group"][aria-label="Environment"]')
+    expect(environment?.textContent).toBe('GrassCityscapeDesert')
+    expect(environment?.querySelector('[data-environment="grass"]')?.getAttribute('aria-pressed')).toBe('true')
+    root.querySelector<HTMLButtonElement>('[data-environment="cityscape"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'editor', command: { type: 'set-environment', environmentId: 'cityscape' },
+    })
+
+    update({
+      ...initial,
+      overlay: { type: 'none' },
+      editor: { ...initial.editor, environmentId: 'cityscape' },
+      editorUi: { ...initial.editorUi, tool: 'tree', sceneryChoice: 'desert-cactus' },
+    })
+    expect(root.querySelector('[data-tool="tree"]')?.getAttribute('aria-label')).toBe('Scenery')
+    expect(root.querySelector('[data-editor-context-dock]')?.getAttribute('data-layout')).toBe('two-row')
+    expect(root.querySelector('[data-scenery-kind="tree"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(root.querySelectorAll('[data-scenery-kind]')).toHaveLength(6)
+    expect(root.querySelector('[data-scenery-kind="desert-cactus"]')).toBeNull()
+    root.querySelector<HTMLButtonElement>('[data-scenery-kind="city-bus-stop"]')?.click()
+    root.querySelector<HTMLButtonElement>('[aria-label="Erase scenery"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-scenery', choice: 'city-bus-stop' })
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-scenery', choice: 'erase-scenery' })
+    host.destroy()
+  })
+
   it('opens track selection and options from the home screen', () => {
     const { root, port } = setup()
 

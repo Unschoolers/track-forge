@@ -1,3 +1,5 @@
+import { sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
+import type { SceneryPropKind, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { TimeMedal } from '@/application/race/raceRecords'
 import type { CircuitCup, CupProgress } from '@/application/race/circuitCup'
 import type { Preferences } from '@/application/ports/storage'
@@ -68,7 +70,16 @@ export interface AppSnapshot {
   readonly notice: string | null
 }
 
+export type EditorSceneryChoice = 'tree' | SceneryPropKind | 'erase-scenery'
+
+export function normalizeEditorSceneryChoice(choice: EditorSceneryChoice | undefined, environmentId: TrackEnvironmentId): EditorSceneryChoice {
+  if (choice === 'erase-scenery') return choice
+  if (choice === 'tree') return choice
+  return choice && sceneryKindBelongsToEnvironment(choice, environmentId) ? choice : 'tree'
+}
+
 export interface EditorUiState {
+  readonly sceneryChoice?: EditorSceneryChoice
   readonly tool: EditorTool
   readonly surface: EditorSurface
   readonly structure: RoadStructure
@@ -114,6 +125,7 @@ export type AppCommand =
     }
   | { readonly type: 'open-editor-menu' }
   | { readonly type: 'save-current-track' }
+  | { readonly type: 'set-editor-scenery'; readonly choice: EditorSceneryChoice }
   | { readonly type: 'set-editor-tool'; readonly tool: EditorTool }
   | {
       readonly type: 'set-editor-surface'

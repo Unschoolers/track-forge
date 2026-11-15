@@ -2,8 +2,11 @@ import { CAR_SPECS, ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
 import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
-import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
-import { GRASS_TILE_PADDING, getGrassTileImage } from '@/presentation/environments/grassTileImage'
+import { getTrackEnvironment } from '@/presentation/environments'
+import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { buildSceneryPresentation } from '@/presentation/environments/sceneryPresentation'
+import { GRASS_TILE_PADDING } from '@/presentation/environments/grassTileImage'
+import { getEnvironmentTileImage } from '@/presentation/environments/environmentTileImage'
 import {
   GROUND_TILE_SIZE,
   visibleGroundTilesForViewport,
@@ -14,10 +17,10 @@ interface RoutePosition extends Vector2 {
   readonly angle: number
 }
 
-function drawGroundTexture(ctx: CanvasRenderingContext2D, viewport: GroundViewport, night: boolean): void {
+function drawGroundTexture(ctx: CanvasRenderingContext2D, viewport: GroundViewport, night: boolean, environmentId: TrackEnvironmentId): void {
   for (const tile of visibleGroundTilesForViewport(viewport)) {
     ctx.drawImage(
-      getGrassTileImage(tile.variant, night),
+      getEnvironmentTileImage(environmentId, tile.variant, night),
       tile.x * GROUND_TILE_SIZE - GRASS_TILE_PADDING,
       tile.y * GROUND_TILE_SIZE - GRASS_TILE_PADDING,
     )
@@ -37,7 +40,11 @@ export function createRaceFlyoverRenderer(
   const reverse = geometry.start.reversed
   const direction = reverse ? -1 : 1
   const night = lighting === 'night'
-  const palette = GRASS_ENVIRONMENT[lighting]
+  const environmentId = normalizeTrackEnvironmentId(track.environmentId)
+  const palette = getTrackEnvironment(environmentId)[lighting]
+  const props = track.scenery ?? []
+  let sceneryWindow = ''
+  let scenery = buildSceneryPresentation(environmentId, [], lighting, { left: 0, top: 0, right: 0, bottom: 0 })
   const stride = Math.max(1, Math.ceil(points.length / 1200))
   const sections: { a: RoadPathPoint; b: RoadPathPoint }[] = []
   for (let i = 0; i < points.length - 1; i += stride) {
@@ -171,7 +178,7 @@ export function createRaceFlyoverRenderer(
       zoom: scale,
       rotation,
       minimumZoom: baseScale * (1 - 0.035),
-    }, night)
+    }, night, environmentId)
 
     const cellSize = track.terrain.cellSize
     for (let i = 0; i < runs.length; i += terrainStride) {
@@ -188,6 +195,34 @@ export function createRaceFlyoverRenderer(
         ctx.fillRect(x, y, runWidth, Math.max(2, cellSize * .12))
       }
     }
+    const left = Math.floor((player.x - radius) / GROUND_TILE_SIZE)
+    const right = Math.ceil((player.x + radius) / GROUND_TILE_SIZE)
+    const top = Math.floor((player.y - radius) / GROUND_TILE_SIZE)
+    const bottom = Math.ceil((player.y + radius) / GROUND_TILE_SIZE)
+    const window = `${left}:${top}:${right}:${bottom}`
+    if (window !== sceneryWindow) {
+      sceneryWindow = window
+      scenery = buildSceneryPresentation(environmentId, props, lighting, {
+        left: left * GROUND_TILE_SIZE, right: right * GROUND_TILE_SIZE,
+        top: top * GROUND_TILE_SIZE, bottom: bottom * GROUND_TILE_SIZE,
+      })
+    }
+    for (const primitive of scenery) {
+      ctx.fillStyle = `#${primitive.color.toString(16).padStart(6, '0')}`
+      ctx.globalAlpha = primitive.alpha ?? 1
+      ctx.beginPath()
+      if (primitive.kind === 'ellipse') {
+        ctx.ellipse(primitive.x, primitive.y, primitive.radiusX, primitive.radiusY, 0, 0, Math.PI * 2)
+      } else {
+        for (const [index, point] of primitive.points.entries()) {
+          if (index === 0) ctx.moveTo(point.x, point.y)
+          else ctx.lineTo(point.x, point.y)
+        }
+        ctx.closePath()
+      }
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
     for (const tree of trees) {
       if (!visible(tree.x, tree.y)) continue
       ctx.fillStyle = night ? 'rgba(0, 0, 0, .26)' : 'rgba(21, 54, 31, .24)'

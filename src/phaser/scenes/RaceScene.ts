@@ -38,11 +38,16 @@ import { renderTerrain } from '@/phaser/rendering/terrainRenderer'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
-import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
+import { getTrackEnvironment } from '@/presentation/environments'
+import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
 import { bindRacePointer, type RacePointerBinding } from '@/phaser/input/racePointer'
+
+const EMPTY_SCENERY = [] as const
 
 export class RaceScene extends Phaser.Scene {
   private groundRenderer: GroundTextureRenderer | undefined
+  private environmentSceneryRenderer: SceneryRenderer | undefined
   private terrainGraphics?: Phaser.GameObjects.Graphics
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private worldGraphics?: Phaser.GameObjects.Graphics
@@ -83,13 +88,15 @@ export class RaceScene extends Phaser.Scene {
       .state?.vehicles.find((vehicle) => vehicle.player)
     if (initialPlayer) this.raceCamera = createRaceCamera(initialPlayer)
     const night = this.raceSession.snapshot().setup?.lighting === 'night'
-    const palette = night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day
+    const environment = getTrackEnvironment(track.environmentId)
+    const palette = night ? environment.night : environment.day
     this.cameras.main.setBackgroundColor(palette.raceGround)
     this.groundRenderer = new GroundTextureRenderer(this)
     this.renderGroundPresentation(night)
     this.terrainGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.terrain)
+    this.environmentSceneryRenderer = new SceneryRenderer(this.add.graphics().setDepth(WORLD_RENDER_DEPTH.environmentScenery))
     this.sceneryGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.scenery)
@@ -289,8 +296,9 @@ export class RaceScene extends Phaser.Scene {
 
   private renderGroundPresentation(night: boolean, rotation = 0): void {
     const camera = this.cameras.main
-    this.groundRenderer?.render(
-      {
+    const track = this.snapshot?.currentTrack
+    if (!track) return
+    const view = {
         centerX: camera.scrollX + camera.width / 2,
         centerY: camera.scrollY + camera.height / 2,
         width: camera.width,
@@ -298,9 +306,10 @@ export class RaceScene extends Phaser.Scene {
         zoom: camera.zoom,
         rotation,
         minimumZoom: RACE_CAMERA_TUNING.minimumZoom,
-      },
-      night,
-    )
+      }
+    const environmentId = normalizeTrackEnvironmentId(track.environmentId)
+    this.groundRenderer?.render(view, night, environmentId)
+    this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {

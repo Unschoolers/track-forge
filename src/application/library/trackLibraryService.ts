@@ -7,6 +7,7 @@ import {
   type TrackNameResult,
 } from '@/application/library/trackName'
 import type { Track, TrackId } from '@/domain/model'
+import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
 export type TrackMutationResult =
@@ -46,6 +47,9 @@ export class TrackLibraryService {
       terrain: EMPTY_TERRAIN,
       start: { ratio: 0, reversed: false },
       lighting: 'day',
+      environmentId: DEFAULT_TRACK_ENVIRONMENT_ID,
+      scenery: [],
+      raceRevision: now,
       createdAt: now,
       updatedAt: now,
     }
@@ -68,7 +72,7 @@ export class TrackLibraryService {
     }
     const track: Track = {
       ...source, id: this.dependencies.createId(), name,
-      createdAt: now, updatedAt: now,
+      createdAt: now, updatedAt: now, raceRevision: now,
     }
     return this.dependencies.trackStore.save(track)
       ? { ok: true, track }
@@ -88,6 +92,7 @@ export class TrackLibraryService {
     const track = {
       ...existing,
       name: validated.name,
+      raceRevision: existing.raceRevision ?? existing.updatedAt,
       updatedAt: this.dependencies.now(),
     }
     return this.dependencies.trackStore.save(track)
