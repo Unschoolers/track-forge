@@ -1,5 +1,5 @@
 import type { RandomSource } from '@/application/ports/random'
-import { AI_CAR_UPGRADES, AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
+import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'
 import {
@@ -13,7 +13,7 @@ import {
   getVehicleStepContext,
   turnAmountAt,
 } from '@/domain/race/trackContext'
-import { stepVehicle } from '@/domain/race/vehiclePhysics'
+import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { safeEntrySpeedAhead } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -21,6 +21,7 @@ const BEND_LOOKAHEAD = [0, 6, 12, 20, 30]
 const CENTER_LINE_TURN = 0.28
 const LANE_CHANGE_LOOKAHEAD = 24
 const LANE_CHANGE_CLEARANCE = 18
+const CORNER_THROTTLE_WINDOW = 20
 
 function wrapAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle))
@@ -130,17 +131,11 @@ export function stepAiVehicle(
   reversed = false,
   speedLimit = Number.POSITIVE_INFINITY,
   handling: 'arcade' | 'simulation' = 'simulation',
+  catchUp?: SpeedAssist,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   const tuning = DIFFICULTY_SPECS[difficulty]
-  const baseCar = CAR_SPECS[vehicle.car]
-  const upgrades = AI_CAR_UPGRADES[difficulty]
-  const car = {
-    ...baseCar,
-    max: baseCar.max * upgrades.max,
-    accel: baseCar.accel * upgrades.accel,
-    grip: baseCar.grip * upgrades.grip,
-  }
+  const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
@@ -203,7 +198,13 @@ export function stepAiVehicle(
     car, tuning.pace * vehicle.aiPace, vehicle.car,
   )
   const curveBraking = vehicle.speed > curveSpeed + 3
+  // Ease off on approach so the tires can turn without repeated hard braking.
+  const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / CORNER_THROTTLE_WINDOW, 0, 1)
   const recovering = !context.onRoad
+  const speedAssist = catchUp && !recovering && !emergency && !following && curveThrottle === 1 &&
+    vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015
+      ? catchUp
+      : undefined
   const stepped = stepVehicle(
     vehicle,
     {
@@ -215,7 +216,7 @@ export function stepAiVehicle(
             ? tuning.pace * 0.45
           : following
             ? tuning.pace * 0.72
-            : tuning.pace * vehicle.aiPace,
+            : curveThrottle,
       braking:
         emergency ||
         curveBraking ||
@@ -227,7 +228,7 @@ export function stepAiVehicle(
     deltaSeconds,
     handling,
     speedLimit,
-    car,
+    speedAssist,
   )
   return { ...stepped, ai }
 }

@@ -12,12 +12,16 @@ import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
   ARCADE_BRAKE_TIMING,
   ARCADE_DYNAMICS_TUNING,
-  type CarPhysicsSpec,
   VEHICLE_DYNAMICS_TUNING,
 } from '@/domain/race/vehiclePhysicsConfig'
 
 // An exponential response reaches about 95% of the new grip in 0.15 s.
 const SURFACE_GRIP_TIME_CONSTANT = 0.05
+
+export interface SpeedAssist {
+  readonly multiplier: number
+  readonly ceiling: number
+}
 
 function getSurfaceSpec(surface: SurfaceId | 'grass') {
   return surface === 'grass' ? OFFROAD_SURFACE : SURFACE_SPECS[surface]
@@ -30,7 +34,7 @@ export function stepVehicle(
   deltaSeconds: number,
   handling: 'arcade' | 'simulation' = 'simulation',
   speedLimit = Number.POSITIVE_INFINITY,
-  car: CarPhysicsSpec = CAR_SPECS[vehicle.car],
+  speedAssist?: SpeedAssist,
 ): RaceVehicle {
   if (vehicle.wrecked || vehicle.finishedAt !== null) {
     return {
@@ -59,6 +63,7 @@ export function stepVehicle(
     : Number(input.braking)
   const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
   const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
+  const car = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
   const damageRatio = vehicle.player
@@ -79,7 +84,11 @@ export function stepVehicle(
         VEHICLE_DYNAMICS_TUNING.damage.maximumGripLoss,
   }
   const physicsSpeedLimit = vehicle.player ? Number.POSITIVE_INFINITY : speedLimit
-  const maxSpeed = Math.min(physicsSpeedLimit, car.max * surface.max * terrain.max * condition.max)
+  const stockMaxSpeed = car.max * surface.max * terrain.max * condition.max
+  const engineSpeed = speedAssist
+    ? Math.max(stockMaxSpeed, Math.min(stockMaxSpeed * speedAssist.multiplier, speedAssist.ceiling))
+    : stockMaxSpeed
+  const maxSpeed = Math.min(physicsSpeedLimit, engineSpeed)
   const braking = input.braking || aiSpeedBrake
   const tuning = handling === 'arcade'
     ? ARCADE_DYNAMICS_TUNING

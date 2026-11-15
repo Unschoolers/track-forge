@@ -1,9 +1,13 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
-import type { CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
+import { VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+
+const BRAKE_LOOKAHEAD = [0, 6, 12, 20, 30, 42, 58, 78, 100]
+const BRAKE_TRACTION = VEHICLE_DYNAMICS_TUNING.forces.gravityAcceleration *
+  VEHICLE_DYNAMICS_TUNING.forces.brakeGripUsage
 
 /**
  * Predict a safe entry speed through the next bends. For every sampled apex,
@@ -26,7 +30,7 @@ export function safeEntrySpeedAhead(
   const direction = reversed ? -1 : 1
   const straightSpeed = car.max * pace
   let allowed = straightSpeed
-  for (const step of [0, 6, 12, 20, 30, 42]) {
+  for (const step of BRAKE_LOOKAHEAD) {
     const raw = nearestIndex + direction * step
     if (!path.closed && (raw < 0 || raw >= count)) break
     const index = ((raw % count) + count) % count
@@ -35,20 +39,20 @@ export function safeEntrySpeedAhead(
     const bend = Math.abs(turnAmountAt(path, index, 6))
     const surface = SURFACE_SPECS[point.surface]
     const terrain = VEHICLE_TERRAIN_SPECS[carId][point.surface]
-    const grip = Math.sqrt(car.grip * surface.grip * terrain.grip)
+    const grip = car.grip * surface.grip * terrain.grip
     const surfaceMax = straightSpeed * surface.max * terrain.max
     // Allow the chassis more time to rotate through tight bends, especially
     // when traffic places it away from the center of the racing line.
-    const apexSpeed = Math.min(surfaceMax, clamp(
-      (225 - bend * 350 * cornerSafety) * grip +
+    const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
+      (225 - bend * 350 * cornerSafety) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - 225) * Math.exp(-bend * 20),
       70, straightSpeed,
     ))
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
-    // Units are world units. The AI has a smooth ~95-unit/s^2 braking budget.
-    const entrySpeed = Math.sqrt(apexSpeed ** 2 + 2 * 95 * car.brake * surface.brake * terrain.brake * distance)
+    const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION)
+    const entrySpeed = Math.sqrt(apexSpeed ** 2 + 2 * brakeDeceleration * distance)
     allowed = Math.min(allowed, entrySpeed)
   }
   return allowed
