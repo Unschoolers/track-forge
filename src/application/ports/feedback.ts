@@ -1,7 +1,9 @@
 import type { CarId, SurfaceId } from '@/domain/model'
+import type { CountdownCue } from '@/domain/race/raceState'
 
 export const FEEDBACK_EVENT_TYPES = [
   'ui',
+  'countdown',
   'engine',
   'surface',
   'tire-slip',
@@ -13,6 +15,7 @@ export const FEEDBACK_EVENT_TYPES = [
 ] as const
 
 export type FeedbackEvent =
+  | { readonly type: 'countdown'; readonly cue: CountdownCue }
   | { readonly type: 'ui'; readonly emphasis: 'normal' | 'confirm' | 'danger' }
   | {
       readonly type: 'engine'

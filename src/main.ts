@@ -110,8 +110,9 @@ function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
   const { musicVolume, soundEffectsVolume } = audioVolumes(snapshot.preferences)
   feedback.setChannels({ audio: soundEffectsVolume > 0, haptics: snapshot.preferences.hapticsEnabled })
   toneSink.setVolume(soundEffectsVolume / 100)
-  const racing = snapshot.mode === 'race' && snapshot.overlay.type !== 'results' && snapshot.overlay.type !== 'cup-final'
-  music.setTrack(snapshot.mode === 'home' ? 'menu' : racing ? 'race' : null)
+  const raceMusicActive = snapshot.mode === 'race' || snapshot.overlay.type === 'cup-final'
+  const quieterRaceMusic = snapshot.paused || snapshot.overlay.type === 'cup-final'
+  music.setTrack(raceMusicActive ? 'race' : snapshot.mode === 'home' ? 'menu' : null, quieterRaceMusic ? 0.65 : 1)
   music.setVolume(musicVolume / 100)
 }
 

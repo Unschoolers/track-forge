@@ -3,6 +3,23 @@ import { BrowserToneSink, WebAudioAdapter, type ToneSink } from '@/infrastructur
 import { HapticsAdapter } from '@/infrastructure/feedback/hapticsAdapter'
 
 describe('feedback adapters', () => {
+
+  it('plays gentle countdown tones through the enabled audio channel', () => {
+    const sink: ToneSink = {
+      unlock: vi.fn(), play: vi.fn(), setEngine: vi.fn(), setSurface: vi.fn(),
+      setSlip: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn(),
+    }
+    const audio = new WebAudioAdapter(() => sink, true)
+    audio.unlock()
+    audio.handle({ type: 'countdown', cue: 3 })
+    audio.handle({ type: 'countdown', cue: 'go' })
+    expect(sink.play).toHaveBeenNthCalledWith(1, 660, 0.14, 0.035, 'sine')
+    expect(sink.play).toHaveBeenNthCalledWith(2, 880, 0.22, 0.035, 'sine')
+    audio.setEnabled(false)
+    audio.handle({ type: 'countdown', cue: 2 })
+    expect(sink.play).toHaveBeenCalledTimes(2)
+  })
+
   it('stays locked until a gesture then maps continuous and one-shot audio', () => {
     const sink: ToneSink = {
       unlock: vi.fn(),

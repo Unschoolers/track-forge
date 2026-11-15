@@ -375,7 +375,9 @@ export class WebAudioAdapter implements FeedbackPort {
 
   handle(event: FeedbackEvent): void {
     if (!this.enabled || !this.unlocked || !this.sink) return
-    if (event.type === 'engine') {
+    if (event.type === 'countdown') {
+      this.sink.play(event.cue === 'go' ? 880 : 660, event.cue === 'go' ? 0.22 : 0.14, 0.035, 'sine')
+    } else if (event.type === 'engine') {
       this.sink.setEngine(
         event.car,
         event.speedRatio,

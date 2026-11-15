@@ -39,6 +39,37 @@ function createScoreStore() {
 }
 
 describe('RaceSession', () => {
+
+  it('sounds each displayed countdown cue once, including after pause and restart', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback })
+    const cues = () => vi.mocked(feedback.handle).mock.calls.map(([event]) => event)
+      .filter((event) => event.type === 'countdown')
+    session.start(track, setup)
+    session.advance(1, noInput)
+    session.setPaused(true)
+    session.advance(2, noInput)
+    session.setPaused(false)
+    session.advance(0.7, noInput)
+    session.advance(1, noInput)
+    session.advance(1, noInput)
+    session.advance(0.1, noInput)
+    expect(cues()).toEqual([3, 2, 1, 'go'].map((cue) => ({ type: 'countdown', cue })))
+    session.restart()
+    expect(cues().at(-1)).toEqual({ type: 'countdown', cue: 3 })
+  })
+
+  it('only sounds the cue displayed after a long countdown frame', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    expect(vi.mocked(feedback.handle).mock.calls.map(([event]) => event).filter((event) => event.type === 'countdown'))
+      .toEqual([{ type: 'countdown', cue: 3 }, { type: 'countdown', cue: 'go' }])
+  })
+
   it('defaults to the authored track lighting and captures an explicit override', () => {
     const { store } = createScoreStore()
     const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })

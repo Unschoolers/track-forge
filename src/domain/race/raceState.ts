@@ -8,6 +8,14 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { AiDriverState } from '@/domain/race/ai/aiState'
 import type { RaceEffectsState } from '@/domain/race/effects'
 
+export type CountdownCue = 3 | 2 | 1 | 'go'
+
+export function countdownCue(seconds: number): CountdownCue {
+  if (seconds > 2) return 3
+  if (seconds > 1) return 2
+  return seconds > Number.EPSILON ? 1 : 'go'
+}
+
 export interface RaceVehicle {
   readonly id: string
   readonly car: CarId
