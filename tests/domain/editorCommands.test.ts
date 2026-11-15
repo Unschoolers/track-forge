@@ -361,3 +361,49 @@ describe('reduceEditor', () => {
     )
   })
 })
+
+describe('scenery editing', () => {
+  it('moves visible scenery as one undoable edit and rejects invalid moves', () => {
+    const initial = createEditorState([], [], undefined, EMPTY_TERRAIN, {
+      environmentId: 'cityscape',
+      scenery: [{ kind: 'city-house', x: 20, y: 20 }, { kind: 'desert-cactus', x: 50, y: 50 }],
+    })
+    const moved = reduceEditor(initial, { type: 'move-scenery-prop', index: 0, position: { x: 40, y: 40 } })
+    expect(moved.scenery).toEqual([{ kind: 'city-house', x: 40, y: 40 }, initial.scenery[1]])
+    expect(reduceEditor(moved, { type: 'undo' }).scenery).toEqual(initial.scenery)
+    expect(reduceEditor(reduceEditor(moved, { type: 'undo' }), { type: 'redo' }).scenery).toEqual(moved.scenery)
+    expect(reduceEditor(moved, { type: 'move-scenery-prop', index: 0, position: { x: 40, y: 40 } })).toBe(moved)
+    expect(reduceEditor(moved, { type: 'move-scenery-prop', index: 1, position: { x: 1, y: 1 } })).toBe(moved)
+    expect(reduceEditor(moved, { type: 'move-scenery-prop', index: 0, position: { x: Infinity, y: 1 } })).toBe(moved)
+    expect(reduceEditor(moved, { type: 'clear' }).scenery).toEqual([])
+    expect(reduceEditor(moved, { type: 'clear' }).environmentId).toBe('cityscape')
+  })
+})
+
+describe('scenery constraints and expansion', () => {
+  it('rejects wet placements and transforms scenery using the existing center or its own bounds', () => {
+    const terrain = paintTerrain(EMPTY_TERRAIN, [{ column: 0, row: 0 }], 'water')
+    const initial = createEditorState([], [], undefined, terrain, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 40, y: 40 }, { kind: 'desert-boulder', x: 80, y: 80 }] })
+    expect(reduceEditor(initial, { type: 'move-scenery-prop', index: 0, position: { x: 16, y: 16 } })).toBe(initial)
+    const expanded = reduceEditor(initial, { type: 'expand', factor: 2 })
+    expect(expanded.scenery.map(({ x, y }) => ({ x, y }))).toEqual([{ x: 20, y: 20 }, { x: 100, y: 100 }])
+    const withRoad = createEditorState(square, [], undefined, EMPTY_TERRAIN, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 200, y: 50 }] })
+    expect(reduceEditor(withRoad, { type: 'expand', factor: 2 }).scenery[0]).toEqual({ kind: 'desert-cactus', x: 350, y: 50 })
+  })
+  it('moves legacy trees in any theme and restores them on gesture cancellation', () => {
+    const initial = createEditorState([], [{ x: 40, y: 40 }], undefined, EMPTY_TERRAIN, { environmentId: 'cityscape' })
+    const moving = reduceEditor(reduceEditor(initial, { type: 'begin-gesture' }), { type: 'move-tree', index: 0, position: { x: 60, y: 60 } })
+    expect(moving.trees[0]).toEqual({ x: 60, y: 60 })
+    expect(reduceEditor(moving, { type: 'cancel-gesture' }).trees).toEqual(initial.trees)
+  })
+})
+
+describe('scenery placement feedback', () => {
+  it('reports invalid coordinates and exhausted scenery capacity', () => {
+    const initial = createEditorState([], [], undefined, EMPTY_TERRAIN, { environmentId: 'desert' })
+    const prop = { kind: 'desert-cactus' as const, x: 0, y: 0 }
+    expect(applyEditorCommand(initial, { type: 'add-scenery-prop', prop: { ...prop, x: Infinity } }).rejection?.code).toBe('invalid-scenery-position')
+    const full = createEditorState([], [], undefined, EMPTY_TERRAIN, { environmentId: 'desert', scenery: Array.from({ length: 256 }, () => prop) })
+    expect(applyEditorCommand(full, { type: 'add-scenery-prop', prop }).rejection?.code).toBe('scenery-capacity')
+  })
+})

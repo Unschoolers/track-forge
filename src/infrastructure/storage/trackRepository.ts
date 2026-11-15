@@ -1,3 +1,4 @@
+import { normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { KeyValueStore, TrackStore } from '@/application/ports/storage'
 import {
   asTrackId,
@@ -191,6 +192,9 @@ function decodeTrack(value: unknown, now: number): Track | undefined {
     trees: trees.filter((tree) => tree !== undefined),
     terrain: normalizeTerrain(item.terrain),
     start: decodeStart(item.start),
+    environmentId: normalizeTrackEnvironmentId(item.environmentId),
+    scenery: normalizeSceneryProps(item.scenery),
+    ...(finite(item.raceRevision) && item.raceRevision >= 0 ? { raceRevision: item.raceRevision } : {}),
     lighting: isLightingMode(item.lighting)
       ? item.lighting
       : isLightingMode(item.timeOfDay)

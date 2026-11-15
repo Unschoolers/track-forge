@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import type { AppCommand, AppSnapshot } from '@/application/appState'
+import { normalizeEditorSceneryChoice, type AppCommand, type AppSnapshot } from '@/application/appState'
 import type { Unsubscribe } from '@/application/eventBus'
 import { DEFAULT_TERRAIN_BRUSH_RADIUS } from '@/domain/config'
 import {
@@ -38,11 +38,14 @@ import {
 } from '@/phaser/rendering/lampPostRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
-import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
+import { getTrackEnvironment } from '@/presentation/environments'
+import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
 import { terrainBrushKindForMode } from '@/domain/editor/terrainBrush'
 import {
   editorPointerRenderChanges,
   editorSnapshotRenderChanges,
+  editorTreeRenderRequired,
+  treePreviewRenderRequired,
   terrainPreviewCompileRequired,
   type EditorRenderChanges,
   type EditorRenderState,
@@ -68,6 +71,7 @@ export interface SceneControllerPort {
 
 export class EditorScene extends Phaser.Scene {
   private groundRenderer: GroundTextureRenderer | undefined
+  private environmentSceneryRenderer: SceneryRenderer | undefined
   private gridGraphics?: Phaser.GameObjects.Graphics
   private terrainGraphics?: Phaser.GameObjects.Graphics
   private sceneryGraphics?: Phaser.GameObjects.Graphics
@@ -105,6 +109,7 @@ export class EditorScene extends Phaser.Scene {
     this.terrainGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.terrain)
+    this.environmentSceneryRenderer = new SceneryRenderer(this.add.graphics().setDepth(WORLD_RENDER_DEPTH.environmentScenery))
     this.sceneryGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.scenery)
@@ -133,6 +138,7 @@ export class EditorScene extends Phaser.Scene {
     this.editorInput = new EditorInputController({
       camera: this.editorCamera,
       tool: () => this.currentSnapshot?.editorUi.tool ?? 'draw',
+      sceneryChoice: () => normalizeEditorSceneryChoice(this.currentSnapshot?.editorUi.sceneryChoice, this.currentSnapshot?.editor.environmentId ?? 'grass'),
       surface: () => this.currentSnapshot?.editorUi.surface ?? 'street',
       structure: () =>
         this.currentSnapshot?.editorUi.structure ?? 'overpass',
@@ -200,6 +206,7 @@ export class EditorScene extends Phaser.Scene {
 
   override update(): void {
     this.renderGroundPresentation()
+    this.renderSceneryPresentation()
     if (!this.previewRenderPending) return
     this.previewRenderPending = false
     this.renderTerrainPreviewPresentation()
@@ -207,27 +214,35 @@ export class EditorScene extends Phaser.Scene {
 
   private readonly onPointerDown = (pointer: Phaser.Input.Pointer): void => {
     const changes = this.pointerRenderChanges()
+    const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.editorInput?.pointerDown(this.pointerSample(pointer))
     this.renderChanges(changes)
+    this.refreshTreePreview(previousPreview)
   }
 
   private readonly onPointerMove = (pointer: Phaser.Input.Pointer): void => {
     if (!pointer.isDown) return
     const changes = this.pointerRenderChanges()
+    const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.editorInput?.pointerMove(this.pointerSample(pointer))
     this.renderChanges(changes)
+    this.refreshTreePreview(previousPreview)
   }
 
   private readonly onPointerUp = (pointer: Phaser.Input.Pointer): void => {
     const changes = this.pointerRenderChanges()
+    const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.editorInput?.pointerUp(this.pointerSample(pointer))
     this.renderChanges(changes)
+    this.refreshTreePreview(previousPreview)
   }
 
   private readonly onGameOut = (): void => {
     const changes = this.pointerRenderChanges()
+    const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.editorInput?.cancelActiveGesture()
     this.renderChanges(changes)
+    this.refreshTreePreview(previousPreview)
   }
 
   private readonly onWheel = (
@@ -244,7 +259,13 @@ export class EditorScene extends Phaser.Scene {
 
   private renderSnapshot(snapshot: AppSnapshot): void {
     const previousRenderState = this.currentRenderState
+    const oldSnapshot = this.currentSnapshot
+    const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.currentSnapshot = snapshot
+    const gestureContextChanged = oldSnapshot && (oldSnapshot.currentTrack?.id !== snapshot.currentTrack?.id || oldSnapshot.editorUi.tool !== snapshot.editorUi.tool || oldSnapshot.editorUi.sceneryChoice !== snapshot.editorUi.sceneryChoice || oldSnapshot.editor.environmentId !== snapshot.editor.environmentId)
+    if (gestureContextChanged) {
+      this.editorInput?.cancelActiveGesture()
+    }
     let cameraChanged = false
     const request = snapshot.editorUi.cameraRequest
     if (request && request.sequence !== this.lastCameraRequest) {
@@ -278,6 +299,11 @@ export class EditorScene extends Phaser.Scene {
       cameraChanged,
     )
     this.renderChanges(changes)
+    if (editorTreeRenderRequired(previousRenderState, renderState) ||
+      (gestureContextChanged && treePreviewRenderRequired(previousPreview, this.editorInput?.sceneryPreview() ?? null))) {
+      this.renderSceneryPresentation(true)
+    }
+    if (previousRenderState && previousRenderState.environmentId !== renderState.environmentId && !changes.world) this.renderTerrainPresentation(this.trackGeometry())
     if (cameraChanged && !changes.world) this.refreshTerrainForCamera()
   }
 
@@ -286,7 +312,7 @@ export class EditorScene extends Phaser.Scene {
     if (!snapshot) return
     const night = snapshot.currentTrack?.lighting === 'night'
     this.cameras.main.setBackgroundColor(
-      (night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day).editorGround,
+      (night ? getTrackEnvironment(snapshot.editor.environmentId).night : getTrackEnvironment(snapshot.editor.environmentId).day).editorGround,
     )
     this.renderGroundPresentation()
     const geometry =
@@ -296,6 +322,7 @@ export class EditorScene extends Phaser.Scene {
     if (changes.world && geometry) {
       this.renderWorldPresentation(geometry)
     }
+    if (changes.appearance || changes.world) this.renderSceneryPresentation()
     if (changes.grid) this.renderGridPresentation()
     if (changes.overlay && geometry) {
       this.renderOverlayPresentation(geometry)
@@ -318,28 +345,12 @@ export class EditorScene extends Phaser.Scene {
     }
     const snapshot = this.currentSnapshot
     const night = snapshot.currentTrack?.lighting === 'night'
-    this.terrainGraphics.clear()
-    this.sceneryGraphics.clear()
     this.trackGraphics.clear()
     this.structureUnderlayGraphics.clear()
     this.structureDeckGraphics.clear()
     this.structureWallGraphics.clear()
     this.lampGraphics.clear()
-    const detail = this.terrainDetail(geometry)
-    renderTerrain(
-      this.terrainGraphics,
-      geometry.path.terrainSurface,
-      night,
-      detail,
-      night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day,
-    )
-    this.renderedTerrainDetail = detail
-    renderTrees(
-      this.sceneryGraphics,
-      snapshot.editor.trees,
-      night,
-      geometry.path.terrainSurface,
-    )
+    this.renderTerrainPresentation(geometry)
     renderTrackGeometryBase(
       this.trackGraphics,
       geometry,
@@ -369,6 +380,35 @@ export class EditorScene extends Phaser.Scene {
     )
   }
 
+  private refreshTreePreview(previous: ReturnType<EditorInputController['sceneryPreview']>): void {
+    if (treePreviewRenderRequired(previous, this.editorInput?.sceneryPreview() ?? null)) {
+      this.renderSceneryPresentation(true)
+    }
+  }
+
+  private renderTerrainPresentation(geometry: TrackGeometry): void {
+    if (!this.terrainGraphics || !this.currentSnapshot) return
+    const snapshot = this.currentSnapshot
+    const night = snapshot.currentTrack?.lighting === 'night'
+    const environment = getTrackEnvironment(snapshot.editor.environmentId)
+    const detail = this.terrainDetail(geometry)
+    this.terrainGraphics.clear()
+    renderTerrain(this.terrainGraphics, geometry.path.terrainSurface, night, detail, night ? environment.night : environment.day)
+    this.renderedTerrainDetail = detail
+  }
+
+  private renderSceneryPresentation(renderTreesLayer = false): void {
+    const snapshot = this.currentSnapshot
+    if (!snapshot) return
+    const camera = this.cameras.main
+    const preview = this.editorInput?.sceneryPreview() ?? null
+    this.environmentSceneryRenderer?.render({ centerX: camera.scrollX + camera.width / 2, centerY: camera.scrollY + camera.height / 2, width: camera.width, height: camera.height, zoom: camera.zoom, rotation: 0 }, snapshot.editor.environmentId, snapshot.editor.scenery, snapshot.currentTrack?.lighting === 'night', preview?.type === 'prop' ? preview : undefined)
+    if (!renderTreesLayer || !this.sceneryGraphics) return
+    this.sceneryGraphics.clear()
+    const trees = preview?.type === 'tree' ? snapshot.editor.trees.map((tree, index) => index === preview.index ? preview.position : tree) : snapshot.editor.trees
+    renderTrees(this.sceneryGraphics, trees, snapshot.currentTrack?.lighting === 'night', this.trackGeometry().path.terrainSurface)
+  }
+
   private terrainDetail(geometry: TrackGeometry): TerrainPresentationDetail {
     return terrainDetailForView(
       geometry.path.terrainSurface.authoredCellCount,
@@ -383,17 +423,7 @@ export class EditorScene extends Phaser.Scene {
     const geometry = this.trackGeometry()
     const detail = this.terrainDetail(geometry)
     if (detail === this.renderedTerrainDetail) return
-    this.terrainGraphics.clear()
-    renderTerrain(
-      this.terrainGraphics,
-      geometry.path.terrainSurface,
-      this.currentSnapshot.currentTrack?.lighting === 'night',
-      detail,
-      this.currentSnapshot.currentTrack?.lighting === 'night'
-        ? GRASS_ENVIRONMENT.night
-        : GRASS_ENVIRONMENT.day,
-    )
-    this.renderedTerrainDetail = detail
+    this.renderTerrainPresentation(geometry)
   }
 
   private renderGroundPresentation(): void {
@@ -409,6 +439,7 @@ export class EditorScene extends Phaser.Scene {
         rotation: 0,
       },
       this.currentSnapshot.currentTrack?.lighting === 'night',
+      this.currentSnapshot.editor.environmentId,
     )
   }
 
@@ -508,6 +539,8 @@ export class EditorScene extends Phaser.Scene {
       points: snapshot.editor.points,
       terrain: snapshot.editor.terrain,
       trees: snapshot.editor.trees,
+      scenery: snapshot.editor.scenery,
+      environmentId: snapshot.editor.environmentId,
       start: snapshot.editor.start,
       night: snapshot.currentTrack?.lighting === 'night',
       grid: snapshot.editorUi.grid,
@@ -561,6 +594,7 @@ export class EditorScene extends Phaser.Scene {
     this.input.off('gameout', this.onGameOut, this)
     this.input.off('wheel', this.onWheel, this)
     this.groundRenderer = undefined
+    this.environmentSceneryRenderer = undefined
     this.editorInput = undefined
     this.currentSnapshot = undefined
     this.currentRenderState = undefined

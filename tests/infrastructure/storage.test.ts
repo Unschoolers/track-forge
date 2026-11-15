@@ -392,3 +392,29 @@ describe('score and preference repositories', () => {
     })
   })
 })
+
+it('restores legacy and themed scenery with bounded malformed data', () => {
+  const storage = new MemoryStore()
+  const repository = new BrowserTrackRepository(storage)
+  const track = createStarterTrack(asTrackId('appearance'), 10)
+  storage.values.set('trackforge-library-v2', JSON.stringify([{ ...track, environmentId: undefined, scenery: undefined }]))
+  expect(repository.find(track.id)).toMatchObject({ environmentId: 'grass', scenery: [] })
+  const scenery = [{ kind: 'city-house' as const, x: 13, y: -25 }, { kind: 'desert-cactus' as const, x: -2, y: 5 }]
+  expect(repository.save({ ...track, environmentId: 'cityscape', scenery, raceRevision: 3 })).toBe(true)
+  expect(repository.find(track.id)).toMatchObject({ environmentId: 'cityscape', scenery, raceRevision: 3 })
+})
+
+it('bounds local scenery decoding and drops invalid positions, kinds, and revisions', () => {
+  const storage = new MemoryStore()
+  const track = createStarterTrack(asTrackId('malformed-scenery'), 10)
+  const valid = { kind: 'desert-boulder', x: 10_000_000, y: -10_000_000 }
+  storage.values.set('trackforge-library-v2', JSON.stringify([{ ...track,
+    environmentId: 'unknown', raceRevision: -1,
+    scenery: [{ kind: 'invalid', x: 0, y: 0 }, { ...valid, x: 10_000_001 }, ...Array.from({ length: 255 }, () => valid)],
+  }]))
+  const loaded = new BrowserTrackRepository(storage).find(track.id)!
+  expect(loaded.environmentId).toBe('grass')
+  expect(loaded.scenery).toHaveLength(254)
+  expect(loaded.scenery?.[0]).toEqual(valid)
+  expect(loaded.raceRevision).toBeUndefined()
+})

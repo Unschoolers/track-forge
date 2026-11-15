@@ -1,3 +1,6 @@
+import { DEFAULT_TRACK_ENVIRONMENT_ID, MAX_SCENERY_PROPS, isSceneryPosition, sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
+import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import type { Track } from '@/domain/model'
 import type {
   CurveMode,
   RoadStructure,
@@ -26,6 +29,8 @@ import {
 import {
   EXPAND_TERRAIN_BOUNDS_REJECTION,
   EXPAND_TERRAIN_CAPACITY_REJECTION,
+  INVALID_SCENERY_POSITION_REJECTION,
+  SCENERY_CAPACITY_REJECTION,
   TERRAIN_CAPACITY_REJECTION,
   TERRAIN_COORDINATE_BOUNDS_REJECTION,
   treePlacementRejection,
@@ -33,6 +38,8 @@ import {
 } from '@/domain/editor/editorConstraints'
 
 export interface EditorSnapshot {
+  readonly environmentId: TrackEnvironmentId
+  readonly scenery: readonly SceneryProp[]
   readonly points: readonly TrackPoint[]
   readonly trees: readonly Tree[]
   readonly start?: TrackStart
@@ -85,6 +92,11 @@ export type EditorCommand =
       readonly index: number
       readonly point: TrackPoint
     }
+  | { readonly type: 'set-environment'; readonly environmentId: TrackEnvironmentId }
+  | { readonly type: 'add-scenery-prop'; readonly prop: SceneryProp }
+  | { readonly type: 'move-scenery-prop'; readonly index: number; readonly position: Vector2 }
+  | { readonly type: 'erase-scenery-prop'; readonly index: number }
+  | { readonly type: 'move-tree'; readonly index: number; readonly position: Vector2 }
   | { readonly type: 'add-tree'; readonly tree: Tree }
   | { readonly type: 'erase-tree'; readonly index: number }
   | {
@@ -122,8 +134,11 @@ export function createEditorState(
   trees: readonly Tree[] = [],
   start: TrackStart = { ratio: 0, reversed: false },
   terrain: TerrainMap = EMPTY_TERRAIN,
+  appearance: Pick<Track, 'environmentId' | 'scenery'> = {},
 ): EditorState {
   return {
+    environmentId: appearance.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
+    scenery: appearance.scenery ?? [],
     points: [...points],
     trees: [...trees],
     start,
@@ -137,6 +152,8 @@ export function createEditorState(
 
 function snapshot(state: EditorState): EditorSnapshot {
   return {
+    environmentId: state.environmentId,
+    scenery: state.scenery,
     points: state.points,
     trees: state.trees,
     ...(state.start ? { start: state.start } : {}),
@@ -199,6 +216,20 @@ export function applyEditorCommand(
     const rejection = treePlacementRejection(state.terrain, command.tree)
     if (rejection) return { state, rejection }
   }
+  if (command.type === 'move-tree') {
+    if (!isSceneryPosition(command.position)) return { state, rejection: null }
+    const rejection = treePlacementRejection(state.terrain, command.position)
+    if (rejection) return { state, rejection }
+  }
+  if (command.type === 'add-scenery-prop' || command.type === 'move-scenery-prop') {
+    const prop = command.type === 'add-scenery-prop' ? command.prop : state.scenery[command.index]
+    const position = command.type === 'add-scenery-prop' ? command.prop : command.position
+    if (!prop || !sceneryKindBelongsToEnvironment(prop.kind, state.environmentId)) return { state, rejection: null }
+    if (!isSceneryPosition(position)) return { state, rejection: INVALID_SCENERY_POSITION_REJECTION }
+    if (command.type === 'add-scenery-prop' && state.scenery.length >= MAX_SCENERY_PROPS) return { state, rejection: SCENERY_CAPACITY_REJECTION }
+    const rejection = treePlacementRejection(state.terrain, position)
+    if (rejection) return { state, rejection }
+  }
   if (command.type === 'paint-terrain') {
     const plan = planTerrainPaint(state.terrain, command.cells, command.kind)
     if (!plan.ok) {
@@ -217,7 +248,10 @@ export function applyEditorCommand(
       state.trees,
       state.terrain,
       command.factor,
+      state.scenery,
     )
+    const expanded = expandAroundBoundsCenter(state.points, state.trees, command.factor, state.scenery)
+    if (!expanded.scenery.every(isSceneryPosition)) return { state, rejection: EXPAND_TERRAIN_BOUNDS_REJECTION }
     if (!plan.ok) {
       return {
         state,
@@ -315,6 +349,29 @@ function reduceEditorUnchecked(
           ...state.points.slice(index),
         ],
       })
+    }
+    case 'set-environment':
+      return state.environmentId === command.environmentId ? state : patchEditorState(state, { environmentId: command.environmentId })
+    case 'add-scenery-prop':
+      return patchEditorState(state, { scenery: [...state.scenery, command.prop] })
+    case 'move-scenery-prop': {
+      const prop = state.scenery[command.index]
+      if (!prop || (prop.x === command.position.x && prop.y === command.position.y)) return state
+      const scenery = [...state.scenery]
+      scenery[command.index] = { ...prop, ...command.position }
+      return patchEditorState(state, { scenery })
+    }
+    case 'erase-scenery-prop': {
+      const prop = state.scenery[command.index]
+      return prop && sceneryKindBelongsToEnvironment(prop.kind, state.environmentId)
+        ? patchEditorState(state, { scenery: state.scenery.filter((_, index) => index !== command.index) }) : state
+    }
+    case 'move-tree': {
+      const tree = state.trees[command.index]
+      if (!tree || (tree.x === command.position.x && tree.y === command.position.y)) return state
+      const trees = [...state.trees]
+      trees[command.index] = { ...tree, ...command.position }
+      return patchEditorState(state, { trees })
     }
     case 'add-tree':
       return patchEditorState(state, {
@@ -433,6 +490,7 @@ function reduceEditorUnchecked(
       return patchEditorState(state, {
         points: [],
         trees: [],
+        scenery: [],
         terrain: EMPTY_TERRAIN,
       })
     case 'finalize-draw': {
@@ -458,6 +516,7 @@ function reduceEditorUnchecked(
           state.trees,
           state.terrain,
           command.factor,
+          state.scenery,
         )
         if (!terrain.ok) return state
       return patchEditorState(
@@ -467,6 +526,7 @@ function reduceEditorUnchecked(
             state.points,
             state.trees,
             command.factor,
+            state.scenery,
           ),
           terrain: terrain.terrain,
         },
@@ -487,10 +547,7 @@ function reduceEditorUnchecked(
     case 'end-gesture': {
       if (!state.gestureStart) return state
       return {
-        points: state.points,
-        trees: state.trees,
-        ...(state.start ? { start: state.start } : {}),
-        terrain: state.terrain,
+        ...snapshot(state),
         history: state.gestureChanged
           ? [...state.history, state.gestureStart].slice(-50)
           : state.history,

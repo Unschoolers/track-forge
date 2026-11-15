@@ -1,5 +1,6 @@
 import { STARTER_TREES, TAU } from '@/domain/config'
 import type { SurfaceId, Track, TrackId, TrackPoint } from '@/domain/model'
+import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
 export function createStarterTrack(id: TrackId, now: number): Track {
@@ -33,6 +34,8 @@ export function createStarterTrack(id: TrackId, now: number): Track {
     terrain: EMPTY_TERRAIN,
     start: { ratio: 0, reversed: false },
     lighting: 'day',
+    environmentId: DEFAULT_TRACK_ENVIRONMENT_ID,
+    scenery: [],
     createdAt: now,
     updatedAt: now,
   }

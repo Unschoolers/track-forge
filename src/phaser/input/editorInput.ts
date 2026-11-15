@@ -1,5 +1,8 @@
 import type { EditorCommand } from '@/domain/editor/editorState'
 import type { EditorState } from '@/domain/editor/editorState'
+import type { EditorSceneryChoice } from '@/application/appState'
+import { isSceneryPosition, sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
+import { getTrackEnvironment } from '@/presentation/environments'
 import {
   DEFAULT_TERRAIN_BRUSH_RADIUS,
   TERRAIN_LIMITS,
@@ -35,6 +38,7 @@ import type { TerrainMap } from '@/domain/model'
 import {
   TERRAIN_CAPACITY_REJECTION,
   TERRAIN_COORDINATE_BOUNDS_REJECTION,
+  INVALID_SCENERY_POSITION_REJECTION,
   treePlacementRejection,
   type EditorCommandRejection,
 } from '@/domain/editor/editorConstraints'
@@ -70,12 +74,32 @@ export interface TerrainPreview {
 
 type TerrainPreviewDraft = Omit<TerrainPreview, 'cells' | 'terrain'>
 
+interface SceneryGesture {
+  readonly type: 'tree' | 'prop' | 'empty'
+  readonly index: number
+  readonly source: Vector2 | undefined
+  readonly environmentId: EditorState['environmentId']
+  readonly choice: EditorSceneryChoice
+  readonly start: Vector2
+  readonly offset: Vector2
+  position: Vector2
+  dragging: boolean
+}
+
+interface SceneryHit {
+  readonly type: 'tree' | 'prop'
+  readonly index: number
+  readonly source: Vector2
+  readonly distance: number
+}
+
 export interface EditorInputDependencies {
   readonly camera: EditorCamera
   readonly tool: () => EditorTool
   readonly surface: () => EditorSurface
   readonly structure?: () => RoadStructure
   readonly terrainBrush?: () => TerrainBrush
+  readonly sceneryChoice?: () => EditorSceneryChoice
   readonly editor: () => EditorState
   readonly path?: () => RoadPath
   readonly dispatch: (command: EditorCommand) => void
@@ -114,12 +138,15 @@ function pointInPolygon(
 
 export class EditorInputController {
   private activePointer: number | undefined
+  private gestureTool: EditorTool | undefined
+  private gestureHasTransaction = false
   private readonly pointers = new Map<number, PointerSample>()
   private navigating = false
   private navAnchor: { center: Vector2; distance: number } | undefined
   private lastScreen: Vector2 | undefined
   private selectedPoint = -1
   private drawStartIndex = 0
+  private sceneryGesture: SceneryGesture | undefined
   private terrainPreviewRevision = 0
   private terrainStroke: {
     readonly kind: TerrainBrushKind
@@ -155,9 +182,12 @@ export class EditorInputController {
     }
     if (this.navigating || this.activePointer !== undefined) return
     this.activePointer = pointer.id
+    this.gestureTool = this.dependencies.tool()
     this.lastScreen = pointer
     this.drawStartIndex = this.dependencies.editor().points.length
-    if (this.dependencies.tool() !== 'pan') {
+    this.gestureHasTransaction = this.gestureTool !== 'pan' &&
+      !(this.gestureTool === 'tree' && this.dependencies.sceneryChoice)
+    if (this.gestureHasTransaction) {
       this.dependencies.dispatch({ type: 'begin-gesture' })
     }
     this.applyTool(pointer, 'down')
@@ -185,6 +215,10 @@ export class EditorInputController {
       return
     }
     if (pointer.id !== this.activePointer) return
+    if (this.gestureTool !== this.dependencies.tool()) {
+      this.abortGesture()
+      return
+    }
     const previous = this.lastScreen
     if (this.dependencies.tool() === 'pan' && previous) {
       this.dependencies.camera.x -=
@@ -199,6 +233,9 @@ export class EditorInputController {
   }
 
   pointerUp(pointer: PointerSample): void {
+    if (pointer.id === this.activePointer && this.sceneryGesture) {
+      this.updateSceneryGesture(pointer)
+    }
     this.releasePointer(pointer.id, true)
   }
 
@@ -228,10 +265,13 @@ export class EditorInputController {
   private abortGesture(): void {
     if (this.activePointer === undefined) return
     this.terrainStroke = undefined
-    if (this.dependencies.tool() !== 'pan') {
+    this.sceneryGesture = undefined
+    if (this.gestureHasTransaction) {
       this.dependencies.dispatch({ type: 'cancel-gesture' })
     }
+    this.gestureHasTransaction = false
     this.activePointer = undefined
+    this.gestureTool = undefined
     this.lastScreen = undefined
     this.selectedPoint = -1
     this.drawStartIndex = 0
@@ -249,6 +289,14 @@ export class EditorInputController {
   private finishPointer(id: number, commitTerrain: boolean): void {
     if (id !== this.activePointer) return
     const tool = this.dependencies.tool()
+    const sceneryGesture = this.sceneryGesture
+    if (sceneryGesture) {
+      if (tool !== 'tree' || !this.sceneryGestureValid()) {
+        this.abortGesture()
+        return
+      }
+      this.commitSceneryGesture(sceneryGesture)
+    }
     if (tool === 'draw') {
       this.dependencies.dispatch({
         type: 'finalize-draw',
@@ -262,10 +310,12 @@ export class EditorInputController {
     } else {
       this.terrainStroke = undefined
     }
-    if (tool !== 'pan') {
+    if (this.gestureHasTransaction) {
       this.dependencies.dispatch({ type: 'end-gesture' })
     }
+    this.gestureHasTransaction = false
     this.activePointer = undefined
+    this.gestureTool = undefined
     this.lastScreen = undefined
     this.selectedPoint = -1
     this.drawStartIndex = 0
@@ -282,6 +332,89 @@ export class EditorInputController {
 
   selectedControlPoint(): number {
     return this.selectedPoint
+  }
+
+  sceneryPreview(): { type: 'tree' | 'prop'; index: number; position: Vector2 } | null {
+    const gesture = this.sceneryGesture
+    if (!gesture || gesture.type === 'empty' || !gesture.dragging || !this.sceneryGestureValid()) return null
+    return { type: gesture.type, index: gesture.index, position: gesture.position }
+  }
+
+  private worldPosition(pointer: PointerSample): Vector2 {
+    return this.dependencies.worldPoint?.(pointer) ?? {
+      x: pointer.x / this.dependencies.camera.zoom + this.dependencies.camera.x,
+      y: pointer.y / this.dependencies.camera.zoom + this.dependencies.camera.y,
+    }
+  }
+
+  private sceneryGestureValid(): boolean {
+    const gesture = this.sceneryGesture
+    if (!gesture || this.dependencies.tool() !== 'tree') return false
+    const editor = this.dependencies.editor()
+    return editor.environmentId === gesture.environmentId &&
+      this.dependencies.sceneryChoice?.() === gesture.choice &&
+      (gesture.type === 'empty' || (gesture.type === 'tree' ? editor.trees[gesture.index] : editor.scenery[gesture.index]) === gesture.source)
+  }
+
+  private beginSceneryGesture(pointer: PointerSample, world: Vector2): void {
+    const editor = this.dependencies.editor()
+    const choice = this.dependencies.sceneryChoice?.() ?? 'tree'
+    const candidates: SceneryHit[] = []
+    const margin = 12 / this.dependencies.camera.zoom
+    const art = getTrackEnvironment(editor.environmentId).scenery
+    editor.trees.forEach((source, index) => {
+      const distance = Math.hypot(world.x - source.x, world.y - source.y)
+      if (distance <= 15 + margin) candidates.push({ type: 'tree', index, source, distance })
+    })
+    editor.scenery.forEach((source, index) => {
+      if (!sceneryKindBelongsToEnvironment(source.kind, editor.environmentId)) return
+      const radius = art[source.kind]?.radius ?? 0
+      const distance = Math.hypot(world.x - source.x, world.y - source.y)
+      if (distance <= radius + margin) candidates.push({ type: 'prop', index, source, distance })
+    })
+    // Trees are drawn after themed props, and later items win an exact tie.
+    candidates.sort((a, b) => a.distance - b.distance || (a.type === b.type ? b.index - a.index : a.type === 'tree' ? -1 : 1))
+    const hit = candidates[0]
+    this.sceneryGesture = {
+      type: hit?.type ?? 'empty',
+      index: hit?.index ?? -1,
+      source: hit?.source,
+      environmentId: editor.environmentId,
+      choice,
+      start: { x: pointer.x, y: pointer.y },
+      offset: hit
+        ? { x: world.x - hit.source.x, y: world.y - hit.source.y }
+        : { x: 0, y: 0 },
+      position: hit?.source ?? world,
+      dragging: false,
+    }
+  }
+
+  private updateSceneryGesture(pointer: PointerSample): void {
+    const gesture = this.sceneryGesture
+    if (!gesture || !this.sceneryGestureValid()) return
+    if (Math.hypot(pointer.x - gesture.start.x, pointer.y - gesture.start.y) >= 6) gesture.dragging = true
+    const world = this.worldPosition(pointer)
+    gesture.position = { x: world.x - gesture.offset.x, y: world.y - gesture.offset.y }
+  }
+
+  private commitSceneryGesture(gesture: SceneryGesture): void {
+    this.sceneryGesture = undefined
+    if (gesture.choice === 'erase-scenery') {
+      if (!gesture.dragging && gesture.type !== 'empty') this.dependencies.dispatch({ type: gesture.type === 'tree' ? 'erase-tree' : 'erase-scenery-prop', index: gesture.index })
+      return
+    }
+    if (gesture.type !== 'empty' && !gesture.dragging) return
+    if (gesture.type === 'empty' && gesture.dragging) return
+    const rejection = treePlacementRejection(this.dependencies.editor().terrain, gesture.position)
+    if (rejection || !isSceneryPosition(gesture.position)) {
+      this.dependencies.onRejected?.(rejection ?? INVALID_SCENERY_POSITION_REJECTION)
+      return
+    }
+    if (gesture.type === 'tree') this.dependencies.dispatch({ type: 'move-tree', index: gesture.index, position: gesture.position })
+    else if (gesture.type === 'prop') this.dependencies.dispatch({ type: 'move-scenery-prop', index: gesture.index, position: gesture.position })
+    else if (gesture.choice === 'tree') this.dependencies.dispatch({ type: 'add-tree', tree: gesture.position })
+    else this.dependencies.dispatch({ type: 'add-scenery-prop', prop: { kind: gesture.choice, ...gesture.position } })
   }
 
   terrainPreview(): TerrainPreview | null {
@@ -431,15 +564,7 @@ export class EditorInputController {
     pointer: PointerSample,
     phase: 'down' | 'move',
   ): void {
-    const world =
-      this.dependencies.worldPoint?.(pointer) ?? {
-        x:
-          pointer.x / this.dependencies.camera.zoom +
-          this.dependencies.camera.x,
-        y:
-          pointer.y / this.dependencies.camera.zoom +
-          this.dependencies.camera.y,
-      }
+    const world = this.worldPosition(pointer)
     switch (this.dependencies.tool()) {
       case 'draw': {
         const editor = this.dependencies.editor()
@@ -464,6 +589,11 @@ export class EditorInputController {
         break
       }
       case 'tree':
+        if (this.dependencies.sceneryChoice) {
+          if (phase === 'down') this.beginSceneryGesture(pointer, world)
+          else this.updateSceneryGesture(pointer)
+          break
+        }
         if (phase === 'down') {
           const rejection = treePlacementRejection(
             this.dependencies.editor().terrain,
@@ -471,7 +601,7 @@ export class EditorInputController {
           )
           if (rejection) {
             this.dependencies.onRejected?.(rejection)
-          } else {
+          } else if (!this.dependencies.sceneryChoice) {
             this.dependencies.dispatch({ type: 'add-tree', tree: world })
           }
         }

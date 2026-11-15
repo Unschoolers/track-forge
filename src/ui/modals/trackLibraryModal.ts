@@ -55,7 +55,7 @@ export function createTrackLibraryModal(
     copy.append(
       element('strong', 'track-card-name', track.name),
       meta,
-      createTrackPreview(path, track.points[0]),
+      createTrackPreview(path, track.points[0], track.environmentId),
     )
     if (race) {
       const select = button('', `select-race-${track.id}`, () => actions.selectForRace(track.id), 'track-card-select')
@@ -96,7 +96,7 @@ export function createTrackLibraryModal(
       const meta = element('span', 'track-card-meta', `${medal ? `${medal.toUpperCase()} MEDAL` : 'NO TIME MEDAL'}${next ? ` · NEXT ${next.tier.toUpperCase()} ${formatRaceTime(next.time)}` : ' · ALL MEDALS EARNED'}`)
       meta.id = `race-track-status-${list.childElementCount}`
       select.setAttribute('aria-describedby', meta.id)
-      copy.append(element('strong', 'track-card-name', track.name), meta, createTrackPreview(geometry.get(track).path))
+      copy.append(element('strong', 'track-card-name', track.name), meta, createTrackPreview(geometry.get(track).path, track.points[0], track.environmentId))
       select.append(copy)
       card.append(select)
       list.append(card)

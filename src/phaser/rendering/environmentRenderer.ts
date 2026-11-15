@@ -1,6 +1,8 @@
 import type Phaser from 'phaser'
-import { getGrassTileImage, GRASS_TILE_PADDING } from '@/presentation/environments/grassTileImage'
+import { GRASS_TILE_PADDING } from '@/presentation/environments/grassTileImage'
 import { GROUND_TILE_SIZE, type GroundViewport, visibleGroundTilesForViewport } from '@/presentation/environments/groundTexture'
+import { getEnvironmentTileImage } from '@/presentation/environments/environmentTileImage'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 
 /** Reuses a bounded pool of sprites backed by shared baked tile textures. */
@@ -10,17 +12,17 @@ export class GroundTextureRenderer {
 
   constructor(private readonly scene: Phaser.Scene) {}
 
-  render(view: GroundViewport, night: boolean): void {
+  render(view: GroundViewport, night: boolean, environmentId: TrackEnvironmentId = 'grass'): void {
     const tiles = visibleGroundTilesForViewport(view)
     const first = tiles[0]
     const last = tiles.at(-1)
-    const key = first && last ? `${night}:${first.x},${first.y}:${last.x},${last.y}` : 'fallback'
+    const key = first && last ? `${environmentId}:${night}:${first.x},${first.y}:${last.x},${last.y}` : `${environmentId}:${night}:fallback`
     if (this.key === key) return
     this.key = key
     tiles.forEach((tile, index) => {
-      const textureKey = `trackforge-grass-${tile.variant}-${night ? 'night' : 'day'}`
+      const textureKey = `trackforge-${environmentId}-${tile.variant}-${night ? 'night' : 'day'}`
       if (!this.scene.textures.exists(textureKey)) {
-        this.scene.textures.addCanvas(textureKey, getGrassTileImage(tile.variant, night))
+        this.scene.textures.addCanvas(textureKey, getEnvironmentTileImage(environmentId, tile.variant, night))
       }
       let image = this.images[index]
       if (!image) {

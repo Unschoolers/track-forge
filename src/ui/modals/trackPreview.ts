@@ -1,11 +1,15 @@
 import type { Vector2 } from '@/domain/model'
+import { getTrackEnvironment } from '@/presentation/environments'
+import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
 /** Render the same sampled centerline used by the race and editor. */
-export function createTrackPreview(path: RoadPath, firstPoint?: Vector2): SVGSVGElement {
+export function createTrackPreview(path: RoadPath, firstPoint?: Vector2, environmentId?: TrackEnvironmentId): SVGSVGElement {
   const { points, closed } = path
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.classList.add('track-preview')
+  const theme = normalizeTrackEnvironmentId(environmentId)
+  if (theme !== 'grass') svg.style.backgroundColor = getTrackEnvironment(theme).day.flyoverGround
   svg.setAttribute('aria-hidden', 'true')
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
   if (points.length === 0) {

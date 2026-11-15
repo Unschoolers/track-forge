@@ -1,4 +1,4 @@
-import type { AppSnapshot } from '@/application/appState'
+import type { AppSnapshot, EditorSceneryChoice } from '@/application/appState'
 import type { TerrainBrushRadius } from '@/domain/config'
 import type {
   EditorCameraAction,
@@ -27,6 +27,7 @@ export interface EditorChromeActions extends EditorFrameActions {
   readonly structure: (structure: RoadStructure) => void
   readonly terrainMode: (mode: TerrainBrushMode) => void
   readonly terrainRadius: (radius: TerrainBrushRadius) => void
+  readonly scenery: (choice: EditorSceneryChoice) => void
   readonly camera: (action: EditorCameraAction) => void
 }
 
@@ -39,12 +40,14 @@ export function createEditorChrome(
   const screen = element('section', 'screen editor-screen')
   screen.dataset.screen = 'editor'
   screen.dataset.editorTool = state.editorUi.tool
+  const dock = createEditorContextDock(state, actions)
+  screen.dataset.editorDockLayout = dock.dataset.layout
   screen.append(
     createEditorTopbar(state, actions),
     createEditorToolPalette(state, actions),
     createEditorHistoryActions(state, actions),
     createEditorStatus(state, geometry),
-    createEditorContextDock(state, actions),
+    dock,
     createEditorTrackActions(actions),
     ...createEditorSelectionPanels(state, actions, geometry),
   )

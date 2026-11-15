@@ -7,6 +7,7 @@ export const WORLD_RENDER_DEPTH = {
   ground: -40,
   editorGrid: -30,
   terrain: -20,
+  environmentScenery: -15,
   scenery: -10,
   road: 0,
   structureUnderlay: 2,

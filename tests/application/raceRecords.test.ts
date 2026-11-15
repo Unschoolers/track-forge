@@ -10,6 +10,7 @@ describe('race record identity', () => {
   it('keeps metadata changes but partitions layout and start changes', () => {
     const original = courseIdentity(track)
     expect(courseIdentity({ ...track, name: 'Renamed', updatedAt: 100, lighting: 'night' })).toBe(original)
+    expect(courseIdentity({ ...track, environmentId: 'cityscape', scenery: [{ kind: 'city-house', x: 30, y: -10 }] })).toBe(original)
     expect(courseIdentity({ ...track, points: track.points.map((point, i) => i ? point : { ...point, x: point.x + 1 }) })).not.toBe(original)
     expect(courseIdentity({ ...track, start: { ratio: 0.5, reversed: true } })).not.toBe(original)
   })

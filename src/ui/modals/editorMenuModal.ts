@@ -1,7 +1,10 @@
-import { button } from '@/ui/dom'
+import { SCENERY_KINDS_BY_ENVIRONMENT, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { getTrackEnvironment } from '@/presentation/environments'
+import { button, element } from '@/ui/dom'
+import { createSegmentedButtons } from '@/ui/editor/editorContextDock'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
-export function createEditorMenuModal(actions: {
+export function createEditorMenuModal(environmentId: TrackEnvironmentId, actions: {
   readonly close: () => void
   readonly export: () => void
   readonly save: () => void
@@ -9,14 +12,29 @@ export function createEditorMenuModal(actions: {
   readonly choose: () => void
   readonly options: () => void
   readonly home: () => void
+  readonly setEnvironment: (environmentId: TrackEnvironmentId) => void
 }): HTMLElement {
   const frame = createModalFrame(
     'Editor menu',
     'Track and application actions.',
     actions.close,
   )
+  const environment = element('section', 'editor-menu-environment')
+  const ids = Object.keys(SCENERY_KINDS_BY_ENVIRONMENT) as TrackEnvironmentId[]
+  environment.append(
+    element('h3', 'results-heading', 'Environment'),
+    createSegmentedButtons('Environment', ids.map((id) => ({
+      value: id,
+      label: getTrackEnvironment(id).label,
+      action: `environment-${id}`,
+      pressed: environmentId === id,
+      data: { environment: id },
+      select: () => actions.setEnvironment(id),
+    }))),
+  )
   frame.body.classList.add('menu-buttons')
   frame.body.append(
+    environment,
     button(
       'SAVE TRACK',
       'menu-save',

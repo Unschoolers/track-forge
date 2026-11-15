@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { contact, releaseTouches, touch } from './touch.mjs'
 
 function intersects(a, b) {
   return a.left < b.right - 1 && a.right > b.left + 1
@@ -67,5 +68,99 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await editor.getByRole('button', { name: 'Paint terrain' }).click()
     await expect(editor.locator('.editor-context-dock')).toHaveAttribute('data-layout', 'two-row')
     await assertClearEditorControls(page, 'terrain')
+
+    await editor.getByRole('button', { name: 'Editor menu' }).click()
+    await page.getByRole('button', { name: 'Cityscape', exact: true }).click()
+    await page.getByRole('button', { name: 'Close', exact: true }).click()
+    await editor.getByRole('button', { name: 'Scenery', exact: true }).click()
+    await expect(editor.locator('.editor-context-dock')).toHaveAttribute('data-layout', 'two-row')
+    await assertClearEditorControls(page, 'cityscape scenery')
+  }
+})
+
+test('creates and races a themed track on mobile', async ({ page, context }) => {
+  const points = Array.from({ length: 17 }, (_, index) => {
+    const theta = (index % 16) * Math.PI / 8
+    return { x: 260 * Math.cos(theta), y: 345 * Math.sin(theta), surface: 'street' }
+  })
+  await page.addInitScript((road) => {
+    if (localStorage.getItem('trackforge-library-v2')) return
+    localStorage.setItem('trackforge-library-v2', JSON.stringify([{
+      id: 'environment-qa', name: 'Environment QA', version: 8, points: road, trees: [],
+      terrain: { cellSize: 32, cells: [] }, lighting: 'day', createdAt: 1, updatedAt: 1,
+    }]))
+    localStorage.setItem('trackforge-library-v1-migrated', '1')
+  }, points)
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+
+  const readTrack = () => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('trackforge-library-v2')).find(track => track.id === 'environment-qa'),
+  )
+  async function enterEditor() {
+    await page.goto('/?qa')
+    await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+    await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+    await expect.poll(() => page.evaluate(() => window.__trackForgeQa?.snapshot().camera?.zoom ?? 0)).toBeGreaterThan(0)
+  }
+  async function setEnvironment(name) {
+    await page.getByRole('button', { name: 'Editor menu' }).click()
+    const choice = page.getByRole('button', { name, exact: true })
+    await choice.click()
+    await expect(choice).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Close', exact: true }).click()
+  }
+
+  await enterEditor()
+  await setEnvironment('Cityscape')
+  await page.getByRole('button', { name: 'Scenery', exact: true }).click()
+  await page.locator('[data-scenery-kind="city-bus-stop"]').click()
+  const viewport = await page.locator('#game-container canvas').boundingBox()
+  expect(viewport).not.toBeNull()
+  const camera = await page.evaluate(() => window.__trackForgeQa.snapshot().camera)
+  const a = contact(1, Math.round(viewport.x + viewport.width * .5), Math.round(viewport.y + viewport.height * .54))
+  const b = contact(1, a.x + 46, a.y - 31)
+  const pointer = await context.newCDPSession(page)
+  try {
+    await touch(pointer, 'touchStart', [a])
+    await releaseTouches(pointer)
+    await expect.poll(async () => (await readTrack()).scenery).toHaveLength(1)
+    const [placed] = (await readTrack()).scenery
+    expect(placed.kind).toBe('city-bus-stop')
+    await touch(pointer, 'touchStart', [a])
+    await touch(pointer, 'touchMove', [b])
+    await releaseTouches(pointer)
+    await expect.poll(async () => (await readTrack()).scenery[0]?.x).not.toBe(placed.x)
+    const moved = (await readTrack()).scenery
+    expect(moved).toHaveLength(1)
+    expect(moved[0].x - placed.x).toBeCloseTo((b.x - a.x) / camera.zoom, 1)
+    expect(moved[0].y - placed.y).toBeCloseTo((b.y - a.y) / camera.zoom, 1)
+
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect.poll(async () => (await readTrack()).scenery).toEqual([placed])
+    await page.getByRole('button', { name: 'Redo', exact: true }).click()
+    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
+    await setEnvironment('Desert')
+    await expect(page.locator('[data-scenery-kind="desert-cactus"]')).toBeVisible()
+    await expect(page.locator('[data-scenery-kind="city-bus-stop"]')).toHaveCount(0)
+    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
+    await setEnvironment('Cityscape')
+    await page.getByRole('button', { name: 'Save track', exact: true }).click()
+
+    await enterEditor()
+    await expect.poll(async () => (await readTrack()).environmentId).toBe('cityscape')
+    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
+    await page.getByRole('button', { name: 'Race', exact: true }).click()
+    const track = page.getByRole('button', { name: 'Race Environment QA', exact: true })
+    await expect(track.locator('svg.track-preview')).toHaveAttribute('style', /background-color/)
+    await track.click()
+    await page.getByRole('button', { name: 'NIGHT', exact: true }).click()
+    await expect(page.locator('.race-flyover')).toHaveAttribute('data-lighting', 'night')
+    await page.getByRole('button', { name: 'START RACE', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Brake', exact: true })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => window.__trackForgeQa?.snapshot().race?.lighting)).toBe('night')
+    expect(errors).toEqual([])
+  } finally {
+    await pointer.detach()
   }
 })

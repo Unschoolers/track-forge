@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SceneryPropKind } from '@/domain/track/trackEnvironment'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { getTrackEnvironment } from '@/presentation/environments'
 import { createRaceFlyoverRenderer } from '@/ui/components/raceFlyoverRenderer'
 
 function canvas() {
@@ -42,6 +44,19 @@ describe('race flyover renderer', () => {
     expect(frame.methods.get('drawImage')).toHaveBeenCalled()
     expect(frame.methods.get('drawImage')?.mock.invocationCallOrder[0])
       .toBeLessThan(frame.methods.get('stroke')?.mock.invocationCallOrder[0] ?? 0)
+  })
+
+  it.each(['cityscape', 'desert'] as const)('uses the %s night palette and draws authored scenery', (environmentId) => {
+    const base = createStarterTrack(asTrackId('themed'), 1)
+    const [start] = base.points
+    if (!start) throw new Error('Starter track has no road points')
+    const kind: SceneryPropKind = environmentId === 'cityscape' ? 'city-building' : 'desert-cactus'
+    const track = { ...base, environmentId, scenery: [{ ...start, kind }] }
+    const geometry = new TrackGeometryService().get(track)
+    const frame = canvas()
+    createRaceFlyoverRenderer(geometry, track, 'blue', 'night', true)(frame.ctx, 320, 150, 0)
+    expect(frame.colors[0]).toBe(getTrackEnvironment(environmentId).night.flyoverGround)
+    expect(frame.methods.get('fill')).toHaveBeenCalled()
   })
 
   it('keeps the camera continuous across the closed route seam', () => {

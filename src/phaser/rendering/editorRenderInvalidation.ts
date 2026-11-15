@@ -1,11 +1,15 @@
 import type { TerrainBrushRadius } from '@/domain/config'
 import type { EditorTool } from '@/domain/editor/editorGeometry'
 import type { TerrainBrushMode } from '@/domain/editor/terrainBrush'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import type { Vector2 } from '@/domain/model'
 
 export interface EditorRenderState {
   readonly points: object
   readonly terrain: object
   readonly trees: object
+  readonly scenery: object
+  readonly environmentId: TrackEnvironmentId
   readonly start: object | undefined
   readonly night: boolean
   readonly grid: boolean
@@ -18,9 +22,35 @@ export interface EditorRenderState {
 
 export interface EditorRenderChanges {
   readonly world: boolean
+  readonly appearance: boolean
   readonly grid: boolean
   readonly overlay: boolean
   readonly preview: boolean
+}
+
+export function editorTreeRenderRequired(
+  previous: EditorRenderState | undefined,
+  current: EditorRenderState,
+): boolean {
+  return !previous || previous.trees !== current.trees ||
+    previous.terrain !== current.terrain || previous.night !== current.night
+}
+
+type SceneryPreview = {
+  readonly type: 'tree' | 'prop'
+  readonly index: number
+  readonly position: Vector2
+} | null
+
+export function treePreviewRenderRequired(
+  previous: SceneryPreview,
+  current: SceneryPreview,
+): boolean {
+  const before = previous?.type === 'tree' ? previous : null
+  const after = current?.type === 'tree' ? current : null
+  if (!before || !after) return before !== after
+  return before.index !== after.index || before.position.x !== after.position.x ||
+    before.position.y !== after.position.y
 }
 
 export function editorSnapshotRenderChanges(
@@ -29,7 +59,7 @@ export function editorSnapshotRenderChanges(
   cameraChanged: boolean,
 ): EditorRenderChanges {
   if (!previous) {
-    return { world: true, grid: true, overlay: true, preview: true }
+    return { world: true, appearance: true, grid: true, overlay: true, preview: true }
   }
   const geometryChanged =
     previous.points !== current.points ||
@@ -38,8 +68,8 @@ export function editorSnapshotRenderChanges(
   return {
     world:
       geometryChanged ||
-      previous.trees !== current.trees ||
       previous.night !== current.night,
+    appearance: previous.environmentId !== current.environmentId || previous.scenery !== current.scenery || previous.trees !== current.trees || previous.night !== current.night || (previous.tool !== current.tool && (previous.tool === 'tree' || current.tool === 'tree')),
     grid:
       cameraChanged ||
       previous.grid !== current.grid ||
@@ -61,6 +91,7 @@ export function editorPointerRenderChanges(
 ): EditorRenderChanges {
   return {
     world: false,
+    appearance: tool === 'tree',
     grid: false,
     overlay: false,
     preview: tool === 'terrain',
