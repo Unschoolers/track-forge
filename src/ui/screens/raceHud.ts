@@ -5,6 +5,7 @@ import type {
   RaceSessionSnapshot,
 } from '@/application/race/raceSession'
 import type { Unsubscribe } from '@/application/eventBus'
+import { countdownCue } from '@/domain/race/raceState'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { bindRacePointer, STEERING_RANGE_PX } from '@/phaser/input/racePointer'
@@ -59,8 +60,15 @@ export function createRaceHud(
   slide.dataset.raceDrift = ''
   slide.setAttribute('aria-hidden', 'true')
   const countdown = element('div', 'race-countdown')
-  countdown.dataset.raceCountdown = ''
-  countdown.setAttribute('aria-live', 'polite')
+  const countdownLights = element('div', 'countdown-lights')
+  countdownLights.setAttribute('aria-hidden', 'true')
+  for (const color of ['red', 'yellow', 'green']) {
+    countdownLights.append(element('i', `countdown-light countdown-light-${color}`))
+  }
+  const countdownValue = element('span', 'countdown-value')
+  countdownValue.dataset.raceCountdown = ''
+  countdownValue.setAttribute('aria-live', 'polite')
+  countdown.append(countdownLights, countdownValue)
 
   const controlsBar = element('footer', 'race-controls')
   controlsBar.dataset.layout = state.preferences.steeringLayout ?? 'drag'
@@ -259,13 +267,15 @@ export function createRaceHud(
     damage.setAttribute('aria-valuemin', '0')
     damage.setAttribute('aria-valuemax', String(telemetry.damageLimit))
     damage.setAttribute('aria-valuenow', String(telemetry.damage))
-    countdown.textContent =
+    const countdownText =
       telemetry.phase === 'countdown'
-        ? String(Math.max(1, Math.ceil(telemetry.countdown)))
+        ? String(countdownCue(telemetry.countdown)).toUpperCase()
         : telemetry.phase === 'running' && telemetry.elapsed < 0.7
           ? 'GO'
           : ''
-    countdown.classList.toggle('visible', countdown.textContent !== '')
+    if (countdownValue.textContent !== countdownText) countdownValue.textContent = countdownText
+    countdown.dataset.signal = countdownText === 'GO' ? 'green' : countdownText === '3' ? 'red' : countdownText ? 'yellow' : ''
+    countdown.classList.toggle('visible', countdownText !== '')
   }
   update(raceSession.snapshot())
   let unsubscribe: Unsubscribe | undefined = raceSession.subscribe(update)

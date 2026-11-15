@@ -18,6 +18,7 @@ import {
 } from '@/domain/race/raceEngine'
 import { createRace } from '@/domain/race/raceFactory'
 import { rankVehicles } from '@/domain/race/ranking'
+import { countdownCue } from '@/domain/race/raceState'
 import type {
   DriverInput,
   RaceOutcome,
@@ -190,6 +191,7 @@ export class RaceSession implements RaceSessionPort {
     this.recording = player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
     this.publish(this.buildSnapshot(track, resolved, state, null))
+    this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
   }
 
   ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
@@ -255,9 +257,14 @@ export class RaceSession implements RaceSessionPort {
     let runningTime = deltaSeconds
     let countdownChanged = false
     if (state.phase === 'countdown') {
+      const previousCue = countdownCue(state.countdown)
       const countdown = Math.max(0, state.countdown - deltaSeconds)
+      const cue = countdownCue(countdown)
+      if (cue !== previousCue) {
+        this.dependencies.feedback.handle({ type: 'countdown', cue })
+      }
       runningTime = Math.max(0, deltaSeconds - state.countdown)
-      state = { ...state, countdown, phase: countdown <= Number.EPSILON ? 'running' : 'countdown' }
+      state = { ...state, countdown, phase: cue === 'go' ? 'running' : 'countdown' }
       countdownChanged = true
     }
 

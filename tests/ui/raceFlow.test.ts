@@ -292,13 +292,24 @@ describe('race UI flow', () => {
     updateRace(
       raceSnapshot({
         phase: 'countdown',
-        countdown: 2.2,
+        countdown: 3.7,
         elapsed: 0,
         position: 1,
       }),
     )
     expect(root.querySelector('[data-screen="race"]')).toBe(screen)
-    expect(root.querySelector('[data-race-countdown]')?.textContent).toBe('3')
+    const countdown = requiredElement(root, '[data-race-countdown]')
+    const lights = requiredElement(root, '.race-countdown')
+    expect(countdown.textContent).toBe('3')
+    expect(lights.dataset.signal).toBe('red')
+
+    updateRace(raceSnapshot({ phase: 'countdown', countdown: 0.8, elapsed: 0 }))
+    expect(countdown.textContent).toBe('1')
+    expect(lights.dataset.signal).toBe('yellow')
+
+    updateRace(raceSnapshot({ phase: 'running', elapsed: 0.05 }))
+    expect(countdown.textContent).toBe('GO')
+    expect(lights.dataset.signal).toBe('green')
   })
 
   it('shows the finished best lap and damage only where they are relevant', () => {
