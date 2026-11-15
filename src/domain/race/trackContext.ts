@@ -83,8 +83,13 @@ function nearestContinuousPathPoint(
     : Math.max(0, Math.min(count - 1, Math.round(vehicle.pathIndex)))
   // AI advances only a few samples per physics step. A broad spatial search
   // can pick a distant hairpin arm and make its pursuit target jump backwards.
-  const searchRadius = vehicle.player === false ? 12 : playerSearchRadius
-  const nearest = nearestPathPoint(path, vehicle, start, searchRadius)
+  let searchRadius = vehicle.player === false ? 4 : playerSearchRadius
+  let nearest = nearestPathPoint(path, vehicle, start, searchRadius)
+  // Give a displaced rival a wider search only once it is well off the road.
+  if (vehicle.player === false && nearest && nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30) {
+    searchRadius = 12
+    nearest = nearestPathPoint(path, vehicle, start, searchRadius)
+  }
   const current = path.points[start]
   if (!nearest || !current || nearest.point.segment === current.segment) {
     return nearest
