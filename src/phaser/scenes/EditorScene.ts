@@ -37,6 +37,8 @@ import {
   renderLampPosts,
 } from '@/phaser/rendering/lampPostRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
+import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
 import { terrainBrushKindForMode } from '@/domain/editor/terrainBrush'
 import {
   editorPointerRenderChanges,
@@ -65,6 +67,7 @@ export interface SceneControllerPort {
 }
 
 export class EditorScene extends Phaser.Scene {
+  private groundRenderer: GroundTextureRenderer | undefined
   private gridGraphics?: Phaser.GameObjects.Graphics
   private terrainGraphics?: Phaser.GameObjects.Graphics
   private sceneryGraphics?: Phaser.GameObjects.Graphics
@@ -95,6 +98,7 @@ export class EditorScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.groundRenderer = new GroundTextureRenderer(this)
     this.gridGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.editorGrid)
@@ -195,6 +199,7 @@ export class EditorScene extends Phaser.Scene {
   }
 
   override update(): void {
+    this.renderGroundPresentation()
     if (!this.previewRenderPending) return
     this.previewRenderPending = false
     this.renderTerrainPreviewPresentation()
@@ -280,7 +285,10 @@ export class EditorScene extends Phaser.Scene {
     const snapshot = this.currentSnapshot
     if (!snapshot) return
     const night = snapshot.currentTrack?.lighting === 'night'
-    this.cameras.main.setBackgroundColor(night ? '#14251b' : '#2d7344')
+    this.cameras.main.setBackgroundColor(
+      (night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day).editorGround,
+    )
+    this.renderGroundPresentation()
     const geometry =
       changes.world || changes.overlay
         ? this.trackGeometry()
@@ -323,6 +331,7 @@ export class EditorScene extends Phaser.Scene {
       geometry.path.terrainSurface,
       night,
       detail,
+      night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day,
     )
     this.renderedTerrainDetail = detail
     renderTrees(
@@ -380,8 +389,27 @@ export class EditorScene extends Phaser.Scene {
       geometry.path.terrainSurface,
       this.currentSnapshot.currentTrack?.lighting === 'night',
       detail,
+      this.currentSnapshot.currentTrack?.lighting === 'night'
+        ? GRASS_ENVIRONMENT.night
+        : GRASS_ENVIRONMENT.day,
     )
     this.renderedTerrainDetail = detail
+  }
+
+  private renderGroundPresentation(): void {
+    if (!this.currentSnapshot) return
+    const camera = this.cameras.main
+    this.groundRenderer?.render(
+      {
+        centerX: camera.scrollX + camera.width / 2,
+        centerY: camera.scrollY + camera.height / 2,
+        width: camera.width,
+        height: camera.height,
+        zoom: camera.zoom,
+        rotation: 0,
+      },
+      this.currentSnapshot.currentTrack?.lighting === 'night',
+    )
   }
 
   private renderGridPresentation(): void {
@@ -532,6 +560,7 @@ export class EditorScene extends Phaser.Scene {
     this.input.off('pointerupoutside', this.onPointerUp, this)
     this.input.off('gameout', this.onGameOut, this)
     this.input.off('wheel', this.onWheel, this)
+    this.groundRenderer = undefined
     this.editorInput = undefined
     this.currentSnapshot = undefined
     this.currentRenderState = undefined

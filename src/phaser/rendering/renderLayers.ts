@@ -4,6 +4,7 @@
  * below decks while absolute-height vehicles render above walls.
  */
 export const WORLD_RENDER_DEPTH = {
+  ground: -40,
   editorGrid: -30,
   terrain: -20,
   scenery: -10,

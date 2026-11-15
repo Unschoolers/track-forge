@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
@@ -24,6 +24,26 @@ function canvas() {
 }
 
 describe('race flyover renderer', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvas().ctx)
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([
+    ['day', '#568453'],
+    ['night', '#182d2b'],
+  ] as const)('draws %s ground detail below the road', (lighting, baseColor) => {
+    const track = { ...createStarterTrack(asTrackId('ground'), 1), trees: [] }
+    const geometry = new TrackGeometryService().get(track)
+    const frame = canvas()
+    createRaceFlyoverRenderer(geometry, track, 'blue', lighting, true)(frame.ctx, 320, 150, 0)
+    expect(frame.colors[0]).toBe(baseColor)
+    expect(frame.methods.get('drawImage')).toHaveBeenCalled()
+    expect(frame.methods.get('drawImage')?.mock.invocationCallOrder[0])
+      .toBeLessThan(frame.methods.get('stroke')?.mock.invocationCallOrder[0] ?? 0)
+  })
+
   it('keeps the camera continuous across the closed route seam', () => {
     const track = createStarterTrack(asTrackId('seam'), 1)
     const geometry = new TrackGeometryService().get(track)
