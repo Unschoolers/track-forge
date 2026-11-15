@@ -1,5 +1,5 @@
 import type { RandomSource } from '@/application/ports/random'
-import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
+import { AI_CAR_UPGRADES, AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'
 import {
@@ -133,6 +133,14 @@ export function stepAiVehicle(
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   const tuning = DIFFICULTY_SPECS[difficulty]
+  const baseCar = CAR_SPECS[vehicle.car]
+  const upgrades = AI_CAR_UPGRADES[difficulty]
+  const car = {
+    ...baseCar,
+    max: baseCar.max * upgrades.max,
+    accel: baseCar.accel * upgrades.accel,
+    grip: baseCar.grip * upgrades.grip,
+  }
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
@@ -192,7 +200,7 @@ export function stepAiVehicle(
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const curveSpeed = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
-    CAR_SPECS[vehicle.car], tuning.pace * vehicle.aiPace, vehicle.car,
+    car, tuning.pace * vehicle.aiPace, vehicle.car,
   )
   const curveBraking = vehicle.speed > curveSpeed + 3
   const recovering = !context.onRoad
@@ -219,6 +227,7 @@ export function stepAiVehicle(
     deltaSeconds,
     handling,
     speedLimit,
+    car,
   )
   return { ...stepped, ai }
 }
