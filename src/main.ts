@@ -1,6 +1,6 @@
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
-import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
+import { audioVolumes, musicGain, type AudioVolumeSetting } from '@/application/audioVolume'
 import { createApplication } from '@/app/createApplication'
 import { AppController, type Scheduler } from '@/application/appController'
 import { asTrackId } from '@/domain/model'
@@ -102,7 +102,7 @@ const sceneHost = new PhaserSceneHost(
 const application = createApplication({ sceneHost, uiHost })
 
 function setAudioVolume(setting: AudioVolumeSetting, volume: number): void {
-  if (setting === 'musicVolume') music.setVolume(volume / 100)
+  if (setting === 'musicVolume') music.setVolume(musicGain(volume))
   else toneSink.setVolume(volume / 100)
 }
 
@@ -113,7 +113,7 @@ function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
   const raceMusicActive = snapshot.mode === 'race' || snapshot.overlay.type === 'cup-final'
   const quieterRaceMusic = snapshot.paused || snapshot.overlay.type === 'cup-final'
   music.setTrack(raceMusicActive ? 'race' : snapshot.mode === 'home' ? 'menu' : null, quieterRaceMusic ? 0.65 : 1)
-  music.setVolume(musicVolume / 100)
+  music.setVolume(musicGain(musicVolume))
 }
 
 const stopSceneSync = controller.subscribe((snapshot) => {

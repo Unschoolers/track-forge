@@ -134,6 +134,7 @@ function advanceVehicle(
       random,
       race.reversed,
       aiRampSpeedLimit(race, vehicle, previousContext.nearest.index),
+      race.handling ?? 'arcade',
     )
   }
   const nextContext = raceVehicleContext(race, moved, previousContext)
