@@ -12,6 +12,7 @@ import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
   ARCADE_BRAKE_TIMING,
   ARCADE_DYNAMICS_TUNING,
+  type CarPhysicsSpec,
   VEHICLE_DYNAMICS_TUNING,
 } from '@/domain/race/vehiclePhysicsConfig'
 
@@ -29,6 +30,7 @@ export function stepVehicle(
   deltaSeconds: number,
   handling: 'arcade' | 'simulation' = 'simulation',
   speedLimit = Number.POSITIVE_INFINITY,
+  car: CarPhysicsSpec = CAR_SPECS[vehicle.car],
 ): RaceVehicle {
   if (vehicle.wrecked || vehicle.finishedAt !== null) {
     return {
@@ -57,7 +59,6 @@ export function stepVehicle(
     : Number(input.braking)
   const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
   const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
-  const car = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
   const damageRatio = vehicle.player

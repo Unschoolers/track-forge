@@ -1,5 +1,6 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
+import type { CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -14,7 +15,7 @@ export function safeEntrySpeedAhead(
   nearestIndex: number,
   reversed: boolean,
   cornerSafety: number,
-  car: Pick<(typeof CAR_SPECS)[CarId], "max" | "grip" | "brake"> = CAR_SPECS.blue,
+  car: Pick<CarPhysicsSpec, 'max' | 'grip' | 'brake'> = CAR_SPECS.blue,
   pace = 1,
   carId: CarId = 'blue',
 ): number {
