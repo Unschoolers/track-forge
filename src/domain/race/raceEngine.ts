@@ -1,4 +1,5 @@
 import type { RandomSource } from '@/application/ports/random'
+import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { getTrafficState } from '@/domain/race/ai/traffic'
 import { solveCollisionFrame } from '@/domain/race/collisions'
@@ -19,7 +20,7 @@ import {
   turnAmountAt,
   type VehicleStepContext,
 } from '@/domain/race/trackContext'
-import { stepVehicle } from '@/domain/race/vehiclePhysics'
+import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { advanceRaceEffects } from '@/domain/race/effects'
 import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
@@ -113,6 +114,7 @@ function advanceVehicle(
   input: DriverInput,
   deltaSeconds: number,
   random: RandomSource,
+  catchUp: SpeedAssist | undefined,
 ): RaceVehicle {
   const previousContext = raceVehicleContext(race, vehicle)
   let moved: RaceVehicle
@@ -135,6 +137,7 @@ function advanceVehicle(
       race.reversed,
       aiRampSpeedLimit(race, vehicle, previousContext.nearest.index),
       race.handling ?? 'arcade',
+      catchUp,
     )
   }
   const nextContext = raceVehicleContext(race, moved, previousContext)
@@ -174,8 +177,9 @@ export const stepRace: RaceStep = (
   const elapsed = state.elapsed + dt
   const events: RaceEvent[] = []
   const arcade = !('handling' in state) || state.handling !== 'simulation'
+  const catchUp = rivalCatchUp(state)
   const moved = state.vehicles.map((vehicle) =>
-    advanceVehicle(vehicle, state, input, dt, random),
+    advanceVehicle(vehicle, state, input, dt, random, catchUp),
   )
   const barrierFrame = arcade
     ? { vehicles: moved, activeContacts: [], events: [] }

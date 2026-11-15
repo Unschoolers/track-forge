@@ -280,16 +280,9 @@ export const DIFFICULTY_SPECS = {
     mirrorRival: true,
     aiPaces: [1.012, 1.006, 1],
     description:
-      'Rivals have race-tuned cars, including an upgraded version of yours. Only 3 impacts will wreck you.',
+      'Rivals brake later and take corners more aggressively. Only 3 impacts will wreck you.',
   },
 } as const satisfies Record<DifficultyId, DifficultySpec>
-
-// Fixed opponent upgrades for each difficulty, independent of race position.
-export const AI_CAR_UPGRADES = {
-  easy: { max: 1.02, accel: 1.05, grip: 1.03 },
-  normal: { max: 1.06, accel: 1.16, grip: 1.09 },
-  hard: { max: 1.27, accel: 1.55, grip: 1.33 },
-} as const satisfies Record<DifficultyId, Pick<CarPhysicsSpec, 'max' | 'accel' | 'grip'>>
 
 export const AI_OVERTAKE = {
   easy: {
