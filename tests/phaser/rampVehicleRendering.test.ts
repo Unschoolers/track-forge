@@ -92,6 +92,7 @@ describe('ramp vehicle rendering', () => {
 			const upper = new Graphics()
 			const lower = new Graphics()
 			const scene = {
+    renderGroundPresentation() {},
 				snapshot: {},
 				controller: { snapshot: () => ({ preferences: { lighting: 'day' } }) },
 				controls: {
@@ -164,6 +165,7 @@ describe('ramp vehicle rendering', () => {
 			],
 		}
 		const scene = {
+    renderGroundPresentation() {},
 			snapshot: {},
 			controller: { snapshot: () => ({ preferences: { lighting: 'day' } }) },
 			controls: {

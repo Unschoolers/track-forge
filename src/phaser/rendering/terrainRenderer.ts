@@ -1,4 +1,6 @@
 import type Phaser from 'phaser'
+import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
+import type { EnvironmentPalette } from '@/presentation/environments/types'
 import { WORLD_ELEVATION } from '@/domain/config'
 import type { Vector2 } from '@/domain/model'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
@@ -61,6 +63,7 @@ export function renderTerrain(
   surface: TerrainSurface,
   night: boolean,
   detail: TerrainPresentationDetail = 'full',
+  palette: EnvironmentPalette = night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day,
 ): void {
   for (const primitive of buildTerrainPresentation(surface, detail)) {
     switch (primitive.kind) {
@@ -80,7 +83,7 @@ export function renderTerrain(
         }
         break
       case 'shoreline':
-        graphics.lineStyle(3.5, night ? 0x59715f : 0x83a764, 0.9)
+        graphics.lineStyle(3.5, palette.shorelineLand, 0.9)
         for (const ring of primitive.rings) strokeRing(graphics, ring)
         graphics.lineStyle(1.2, night ? 0x7eb4c1 : 0xc1edf2, 0.75)
         for (const ring of primitive.rings) strokeRing(graphics, ring)
@@ -95,7 +98,7 @@ export function renderTerrain(
         // Adjacent facets do not overlap. Bucket their subtle light gradients
         // so the renderer emits at most nine fill-state changes per chunk
         // instead of one state change for every hill triangle.
-        const base = night ? 0x1b452a : 0x398858
+        const base = palette.hillSlope
         const shadeBuckets: TerrainTriangle[][] = Array.from(
           { length: 9 },
           () => [],
@@ -117,7 +120,7 @@ export function renderTerrain(
         break
       }
       case 'hill-plateau':
-        graphics.fillStyle(night ? 0x235433 : 0x4c9d63, 1)
+        graphics.fillStyle(palette.hillPlateau, 1)
         for (const triangle of primitive.triangles) {
           fillTriangle(graphics, triangle)
         }

@@ -2,9 +2,26 @@ import { CAR_SPECS, ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
 import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
+import { GRASS_TILE_PADDING, getGrassTileImage } from '@/presentation/environments/grassTileImage'
+import {
+  GROUND_TILE_SIZE,
+  visibleGroundTilesForViewport,
+  type GroundViewport,
+} from '@/presentation/environments/groundTexture'
 
 interface RoutePosition extends Vector2 {
   readonly angle: number
+}
+
+function drawGroundTexture(ctx: CanvasRenderingContext2D, viewport: GroundViewport, night: boolean): void {
+  for (const tile of visibleGroundTilesForViewport(viewport)) {
+    ctx.drawImage(
+      getGrassTileImage(tile.variant, night),
+      tile.x * GROUND_TILE_SIZE - GRASS_TILE_PADDING,
+      tile.y * GROUND_TILE_SIZE - GRASS_TILE_PADDING,
+    )
+  }
 }
 
 /** Prepare a bounded amount of scenery once; each frame only paints nearby pieces. */
@@ -20,6 +37,7 @@ export function createRaceFlyoverRenderer(
   const reverse = geometry.start.reversed
   const direction = reverse ? -1 : 1
   const night = lighting === 'night'
+  const palette = GRASS_ENVIRONMENT[lighting]
   const stride = Math.max(1, Math.ceil(points.length / 1200))
   const sections: { a: RoadPathPoint; b: RoadPathPoint }[] = []
   for (let i = 0; i < points.length - 1; i += stride) {
@@ -125,19 +143,35 @@ export function createRaceFlyoverRenderer(
     const heading = Number.isFinite(cameraAngle) ? cameraAngle : player.angle
     const drift = Math.sin(elapsedSeconds * 0.45)
     const altitude = Math.cos(elapsedSeconds * 0.36)
-    const scale = Math.max(0.23, Math.min(0.44, height / 440)) * (1 + altitude * 0.035)
+    const baseScale = Math.max(0.23, Math.min(0.44, height / 440))
+    const scale = baseScale * (1 + altitude * 0.035)
+    const rotation = -heading - Math.PI / 2 + drift * 0.05
+    const focusX = width * (0.5 + drift * 0.03)
+    const focusY = height * (0.66 + altitude * 0.02)
     const radius = Math.hypot(width, height) / scale + 200
     const visible = (x: number, y: number) => Math.abs(x - player.x) < radius && Math.abs(y - player.y) < radius
 
     ctx.clearRect(0, 0, width, height)
-    ctx.fillStyle = night ? '#182d2b' : '#568453'
+    ctx.fillStyle = palette.flyoverGround
     ctx.fillRect(0, 0, width, height)
     ctx.save()
-    ctx.translate(width * (0.5 + drift * 0.03), height * (0.66 + altitude * 0.02))
+    ctx.translate(focusX, focusY)
     // The camera follows the road with a slight drifting yaw, like a hovering drone.
-    ctx.rotate(-heading - Math.PI / 2 + drift * 0.05)
+    ctx.rotate(rotation)
     ctx.scale(scale, scale)
     ctx.translate(-player.x, -player.y)
+    // Map the viewport center back to world space because the car sits below it.
+    const offsetX = (width / 2 - focusX) / scale
+    const offsetY = (height / 2 - focusY) / scale
+    drawGroundTexture(ctx, {
+      centerX: player.x + Math.cos(rotation) * offsetX + Math.sin(rotation) * offsetY,
+      centerY: player.y - Math.sin(rotation) * offsetX + Math.cos(rotation) * offsetY,
+      width,
+      height,
+      zoom: scale,
+      rotation,
+      minimumZoom: baseScale * (1 - 0.035),
+    }, night)
 
     const cellSize = track.terrain.cellSize
     for (let i = 0; i < runs.length; i += terrainStride) {
@@ -147,7 +181,7 @@ export function createRaceFlyoverRenderer(
       const y = run.row * cellSize
       const runWidth = run.count * cellSize
       if (x > player.x + radius || x + runWidth < player.x - radius || Math.abs(y - player.y) > radius + cellSize) continue
-      ctx.fillStyle = run.kind === 'water' ? (night ? '#214b5c' : '#4d9cb1') : (night ? '#34533f' : '#80a66a')
+      ctx.fillStyle = run.kind === 'water' ? (night ? '#214b5c' : '#4d9cb1') : palette.flyoverHill
       ctx.fillRect(x, y, runWidth, cellSize)
       if (run.kind === 'hill') {
         ctx.fillStyle = night ? 'rgba(181, 204, 155, .10)' : 'rgba(226, 239, 186, .18)'

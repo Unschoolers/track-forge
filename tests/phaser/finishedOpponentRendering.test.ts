@@ -71,6 +71,7 @@ function createRenderingScenario() {
   const shadowGraphics = new RecordingGraphics()
   const nightLightGraphics = new RecordingGraphics()
   const scene = {
+    renderGroundPresentation() {},
     vehicleGraphics,
     upperVehicleGraphics,
     shadowGraphics,
