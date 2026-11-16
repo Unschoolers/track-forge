@@ -15,6 +15,7 @@ import { PhaserSceneHost } from '@/phaser/sceneHost'
 import { DomUiHost } from '@/ui/uiHost'
 import '@/styles/layout.css'
 import { RaceSession } from '@/application/race/raceSession'
+import { CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { mathRandom } from '@/application/ports/random'
 import { RaceInputController } from '@/phaser/input/raceInput'
 import { FeedbackRouter } from '@/application/feedback/feedbackRouter'
@@ -25,8 +26,11 @@ import {
 import { HapticsAdapter } from '@/infrastructure/feedback/hapticsAdapter'
 import { BrowserMusicPlayer } from '@/infrastructure/feedback/musicPlayer'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import cityMusic from '@/assets/music/City.mp3?url&no-inline'
+import desertMusic from '@/assets/music/Desert.mp3?url&no-inline'
 import menuMusic from '@/assets/music/clubb-menu.mp3?url&no-inline'
-import raceMusic from '@/assets/music/clubb-race.mp3?url&no-inline'
+import grassMusic from '@/assets/music/clubb-race.mp3?url&no-inline'
 
 const appRoot = document.querySelector<HTMLElement>('#app')
 if (!appRoot) throw new Error('TrackForge requires an #app mount point')
@@ -59,7 +63,12 @@ const scoreStore = new BrowserScoreRepository(storage)
 const geometry = new TrackGeometryService()
 const initialPreferences = new BrowserPreferencesRepository(storage)
 const toneSink = new BrowserToneSink()
-const music = new BrowserMusicPlayer({ menu: menuMusic, race: raceMusic }, () => toneSink.audioContext)
+const music = new BrowserMusicPlayer<'menu' | TrackEnvironmentId>({
+  menu: menuMusic,
+  grass: grassMusic,
+  cityscape: cityMusic,
+  desert: desertMusic,
+}, () => toneSink.audioContext)
 const feedback = new FeedbackRouter({
   audio: new WebAudioAdapter(() => toneSink, true),
   haptics: new HapticsAdapter(
@@ -110,9 +119,14 @@ function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
   const { musicVolume, soundEffectsVolume } = audioVolumes(snapshot.preferences)
   feedback.setChannels({ audio: soundEffectsVolume > 0, haptics: snapshot.preferences.hapticsEnabled })
   toneSink.setVolume(soundEffectsVolume / 100)
-  const raceMusicActive = snapshot.mode === 'race' || snapshot.overlay.type === 'cup-final'
-  const quieterRaceMusic = snapshot.paused || snapshot.overlay.type === 'cup-final'
-  music.setTrack(raceMusicActive ? 'race' : snapshot.mode === 'home' ? 'menu' : null, quieterRaceMusic ? 0.65 : 1)
+  const cupFinal = snapshot.overlay.type === 'cup-final'
+  const track = cupFinal && snapshot.cup
+    ? CUP_CIRCUITS[snapshot.cup.index]?.track
+    : raceSession.snapshot().track
+  const soundtrack = snapshot.mode === 'race' || cupFinal
+    ? normalizeTrackEnvironmentId(track?.environmentId)
+    : snapshot.mode === 'home' ? 'menu' : null
+  music.setTrack(soundtrack, snapshot.paused || cupFinal ? 0.65 : 1)
   music.setVolume(musicGain(musicVolume))
 }
 
