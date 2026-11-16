@@ -152,6 +152,33 @@ describe('Arcade ghost racing', () => {
     expect(saved?.frames[0]?.t).toBe(0)
     expect(saved?.frames.at(-1)?.t).toBeCloseTo(360)
   })
+  it('records five-minute Simulation runs within the replay budget', () => {
+    const store = new BrowserGhostRepository(memory())
+    const race = session(store, finishAt(300))
+    const simulation = { ...setup, handling: 'simulation' as const }
+    race.start(track, simulation)
+    race.advance(3.7, input)
+    for (let frame = 0; frame < 300 * 60 + 1; frame++) race.advance(1 / 60, input)
+    const saved = store.load(track, simulation)
+    expect(saved).not.toBeNull()
+    expect(saved!.frames.length).toBeLessThanOrEqual(MAX_GHOST_FRAMES)
+    expect(saved!.frames.at(-1)?.t).toBeCloseTo(300)
+  })
+  it('uses separate open-route ghosts and falls back to solo Time Trial', () => {
+    const store = new BrowserGhostRepository(memory())
+    const open = { ...track, routeKind: 'point-to-point' as const }
+    expect(store.record(track, setup, 1, frames)).toBe(true)
+    expect(store.load(open, setup)).toBeNull()
+    const race = session(store, finishAt(0.2))
+    race.start(open, { ...setup, laps: 3, mode: 'ghost' })
+    expect(race.snapshot().setup).toMatchObject({ laps: 1, mode: 'time-trial' })
+    expect(race.snapshot().state?.vehicles).toHaveLength(1)
+    race.advance(3.7, input)
+    race.advance(0.25, input)
+    expect(store.load(open, setup)).not.toBeNull()
+    race.start(open, { ...setup, mode: 'ghost' })
+    expect(race.snapshot().setup?.mode).toBe('ghost')
+  })
   it('keeps the original Ghost Race target after saving a faster finish', () => {
     const store = new BrowserGhostRepository(memory())
     store.record(track, setup, 1, frames)

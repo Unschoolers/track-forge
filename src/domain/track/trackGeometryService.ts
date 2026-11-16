@@ -11,7 +11,7 @@ import {
 export class TrackGeometryService {
   private readonly cache = new TrackGeometryCache()
 
-  get<T extends Pick<Track, 'points' | 'start' | 'terrain'>>(
+  get<T extends Pick<Track, 'points' | 'start' | 'terrain' | 'routeKind'>>(
     track: T,
   ): TrackGeometry {
     let key: string | undefined

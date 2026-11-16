@@ -14,6 +14,12 @@ export type TerrainKind = (typeof TERRAIN_KINDS)[number]
 export type TerrainBrushKind = TerrainKind | 'ground'
 export type RoadStructure = 'surface' | 'overpass'
 export type CurveMode = 'smooth' | 'corner'
+export type RouteKind = 'circuit' | 'point-to-point'
+
+export function normalizeRouteKind(value: unknown): RouteKind {
+  return value === 'point-to-point' ? 'point-to-point' : 'circuit'
+}
+
 export type TrackId = string & { readonly __trackId: unique symbol }
 
 export interface Vector2 {
@@ -58,6 +64,7 @@ export interface Track {
   readonly name: string
   readonly version: 8
   readonly points: readonly TrackPoint[]
+  readonly routeKind?: RouteKind
   readonly trees: readonly Tree[]
   readonly terrain: TerrainMap
   readonly start?: TrackStart

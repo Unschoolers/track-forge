@@ -1,4 +1,4 @@
-import type { LightingMode } from '@/domain/model'
+import { normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
 import { raceCategory, sameCategory } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
@@ -13,11 +13,13 @@ import type {
   TrackId,
 } from '@/domain/model'
 import {
+  resetRaceVehicle,
   stepRace,
   type RaceStep,
 } from '@/domain/race/raceEngine'
 import { createRace } from '@/domain/race/raceFactory'
-import { rankVehicles } from '@/domain/race/ranking'
+import { passedPendingCheckpoint } from '@/domain/race/progress'
+import { rankVehicles, raceProgress } from '@/domain/race/ranking'
 import { countdownCue } from '@/domain/race/raceState'
 import type {
   DriverInput,
@@ -26,7 +28,6 @@ import type {
   RaceState,
   RaceVehicle,
 } from '@/domain/race/raceState'
-import { resetVehicleToTrack } from '@/domain/race/trackContext'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import { CAR_SPECS } from '@/domain/config'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
@@ -40,16 +41,24 @@ import {
 import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
 
+export type RaceMode = 'normal' | 'ghost' | 'time-trial'
+
 export interface RaceSetup {
   readonly lighting?: LightingMode
   readonly car: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
   readonly handling?: 'arcade' | 'simulation'
-  readonly mode?: 'normal' | 'ghost'
+  readonly mode?: RaceMode
 }
 
+export interface RaceSplit { readonly lap: number; readonly gate: 1 | 2 | 3 | 4; readonly time: number }
+
 export interface RaceTelemetry {
+  readonly routeKind?: RouteKind
+  readonly routeProgress?: number
+  readonly latestSplit?: RaceSplit
+  readonly missedCheckpoint?: number
   readonly phase: RacePhase
   readonly countdown: number
   readonly elapsed: number
@@ -75,6 +84,9 @@ export interface RaceStanding {
 }
 
 export interface RaceResult {
+  readonly mode?: RaceMode
+  readonly routeKind?: RouteKind
+  readonly splits?: readonly RaceSplit[]
   readonly outcome: RaceOutcome
   readonly trackId: TrackId
   readonly trackName: string
@@ -142,6 +154,10 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
 const FIXED_STEP = 1 / 60
 const MAX_CATCH_UP = 0.25
 
+function oneRunForOpenRoute(track: Track, setup: RaceSetup): RaceSetup {
+  return track.routeKind === 'point-to-point' && setup.laps !== 1 ? { ...setup, laps: 1 } : setup
+}
+
 export class RaceSession implements RaceSessionPort {
   private readonly events = new EventBus<RaceSessionSnapshot>()
   private readonly now: () => number
@@ -171,10 +187,12 @@ export class RaceSession implements RaceSessionPort {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
+    const routeKind = normalizeRouteKind(track.routeKind)
+    setup = oneRunForOpenRoute(track, setup)
     this.bestGhost = this.dependencies.ghostStore?.load(track, setup) ?? null
     this.timing = new LapTiming(setup.mode === 'ghost' && this.bestGhost?.splits?.length === setup.laps * 4
       ? this.bestGhost.splits : undefined)
-    const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && this.bestGhost ? 'ghost' as const : 'normal' as const }
+    const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
       path: this.geometry.get(track).path,
       playerCar: setup.car,
@@ -182,9 +200,10 @@ export class RaceSession implements RaceSessionPort {
       laps: setup.laps,
       handling: setup.handling,
       startRatio: track.start?.ratio,
-      reversed: track.start?.reversed,
+      reversed: routeKind === 'point-to-point' ? false : track.start?.reversed,
+      routeKind,
     })
-    const state = resolved.mode === 'ghost'
+    const state = resolved.mode === 'ghost' || resolved.mode === 'time-trial'
       ? { ...created, vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
       : created
     const player = state.vehicles.find((vehicle) => vehicle.player)
@@ -195,6 +214,7 @@ export class RaceSession implements RaceSessionPort {
   }
 
   ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
+    setup = oneRunForOpenRoute(track, setup)
     const store = this.dependencies.ghostStore
     if (store?.availability) return store.availability(track, setup)
     const time = store?.load(track, setup)?.time
@@ -202,7 +222,7 @@ export class RaceSession implements RaceSessionPort {
   }
 
   ghostTime(track: Track, setup: RaceSetup): number | null {
-    return this.dependencies.ghostStore?.load(track, setup)?.time ?? null
+    return this.dependencies.ghostStore?.load(track, oneRunForOpenRoute(track, setup))?.time ?? null
   }
 
   restart(): void {
@@ -215,10 +235,11 @@ export class RaceSession implements RaceSessionPort {
     const state = this.current.state
     if (state?.phase !== 'running' || state.paused || this.destroyed) return
     const reset = state.vehicles.map((vehicle) => vehicle.player
-      ? resetVehicleToTrack(vehicle, state.path, { reversed: state.reversed }) : vehicle)
+      ? resetRaceVehicle(vehicle, state) : vehicle)
     const before = state.vehicles.find((vehicle) => vehicle.player)
     const after = reset.find((vehicle) => vehicle.player)
-    if (before && after) this.recording?.recover(before, after, state.elapsed)
+    if (!before || !after || before === after) return
+    this.recording?.recover(before, after, state.elapsed)
     this.timing.recover()
     this.publish(
       this.buildSnapshot(
@@ -279,15 +300,18 @@ export class RaceSession implements RaceSessionPort {
       state = next.state
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
-      const recovered = next.events.some((event) => event.type === 'vehicle-recovered' &&
-          next.state.vehicles.some((vehicle) => vehicle.player && vehicle.id === event.vehicleId))
-      if (recovered) {
-        this.timing.recover()
-        const after = next.state.vehicles.find((vehicle) => vehicle.player)
-        if (before && after) this.recording?.recover(before, after, state.elapsed)
-      }
       const player = state.vehicles.find((vehicle) => vehicle.player)
-      if (before && player && !recovered) this.timing.cross(before.lap, before.nextSector, player.lap, player.nextSector, state.elapsed)
+      if (before && player && player.lap === before.lap && player.nextSector < before.nextSector) {
+        this.timing.abandonLap(player.lap)
+      }
+      for (const event of next.events) {
+        if (event.type === 'vehicle-recovered' && event.vehicleId === player?.id) {
+          this.timing.recover()
+          if (before && player) this.recording?.recover(before, player, state.elapsed)
+        } else if (event.type === 'gate-crossed' && event.vehicleId === player?.id) {
+          this.timing.accept(event.lap, event.gate, event.time)
+        }
+      }
       if (player && state.phase !== 'finished') this.recording?.sample(player, state.elapsed)
       if (before && player && !before.grounded && player.grounded) {
         peakLanding = Math.max(peakLanding, player.landingIntensity)
@@ -352,11 +376,12 @@ export class RaceSession implements RaceSessionPort {
     state: RaceState,
     result: RaceResult | null,
   ): RaceSessionSnapshot {
-    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed)
+    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind))
     const standings = ranked.map((vehicle, index) =>
       this.toStanding(vehicle, index),
     )
     const player = ranked.find((vehicle) => vehicle.player)
+    const latestSplit = this.timing.accepted.at(-1)
     return {
       track,
       setup,
@@ -366,6 +391,11 @@ export class RaceSession implements RaceSessionPort {
       ghost: setup?.mode === 'ghost' && this.bestGhost ? ghostPoseAt(this.bestGhost, state.elapsed) : null,
       ...(setup?.mode === 'ghost' && this.bestGhost ? { ghostTime: this.bestGhost.time } : {}),
       telemetry: {
+        routeKind: normalizeRouteKind(track?.routeKind),
+        routeProgress: player ? Math.max(0, Math.min(1, raceProgress(player, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind)) / Math.max(1, state.path.points.length - 1))) : 0,
+        ...(player && state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player)
+          ? { missedCheckpoint: player.nextSector } : {}),
+        ...(latestSplit ? { latestSplit } : {}),
         phase: state.phase,
         countdown: state.countdown,
         elapsed: state.elapsed,
@@ -389,7 +419,7 @@ export class RaceSession implements RaceSessionPort {
     const track = this.current.track
     const setup = this.current.setup
     if (!track || !setup) return null
-    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed)
+    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind))
     const player = ranked.find((vehicle) => vehicle.player)
     if (!player) return null
     const outcome =
@@ -421,6 +451,9 @@ export class RaceSession implements RaceSessionPort {
     }
     return {
       outcome,
+      mode: setup.mode ?? 'normal',
+      routeKind: normalizeRouteKind(track.routeKind),
+      splits: [...this.timing.accepted],
       trackId: track.id,
       trackName: track.name,
       playerPlace: ranked.indexOf(player) + 1,

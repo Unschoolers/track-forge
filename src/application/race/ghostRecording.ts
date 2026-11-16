@@ -48,7 +48,6 @@ export class GhostRecording {
       return
     }
     if (this.frames.length >= MAX_GHOST_FRAMES) {
-      if (!this.arcade) { this.valid = false; return }
       const compact: GhostFrame[] = this.frames[0] ? [this.frames[0]] : []
       for (let index = 1; index < this.frames.length; index += 2) {
         const left = this.frames[index]

@@ -127,3 +127,20 @@ it('keeps the effective ghost revision through a rename', () => {
   expect(result.ok).toBe(true)
   if (result.ok) expect(result.track).toMatchObject({ updatedAt: 99, raceRevision: track.updatedAt })
 })
+
+it('preserves route kind through exported shared tracks and defaults legacy files', () => {
+  const shared = parseTrackImport(serializeTrack({ ...track, routeKind: 'point-to-point' }).content)
+  expect(shared.ok && shared.track.routeKind).toBe('point-to-point')
+  const legacy = parseTrackImport(exported(track))
+  expect(legacy.ok && legacy.track.routeKind).toBe('circuit')
+})
+
+
+it('imports a long winding point-to-point route within the normal distance budget', () => {
+  const winding = { ...track, routeKind: 'point-to-point' as const,
+    points: Array.from({ length: 12 }, (_, index) => ({
+      x: index * 4900, y: Math.sin(index * 0.7) * 350, surface: 'dirt' as const,
+    })),
+  }
+  expect(parseTrackImport(serializeTrack(winding).content).ok).toBe(true)
+})

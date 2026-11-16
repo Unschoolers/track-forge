@@ -1,6 +1,6 @@
 import { DEFAULT_TRACK_ENVIRONMENT_ID, MAX_SCENERY_PROPS, isSceneryPosition, sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import type { Track } from '@/domain/model'
+import { normalizeRouteKind, type RouteKind, type Track } from '@/domain/model'
 import type {
   CurveMode,
   RoadStructure,
@@ -38,6 +38,7 @@ import {
 } from '@/domain/editor/editorConstraints'
 
 export interface EditorSnapshot {
+  readonly routeKind: RouteKind
   readonly environmentId: TrackEnvironmentId
   readonly scenery: readonly SceneryProp[]
   readonly points: readonly TrackPoint[]
@@ -54,6 +55,7 @@ export interface EditorState extends EditorSnapshot {
 }
 
 export type EditorCommand =
+  | { readonly type: 'set-route-kind'; readonly routeKind: RouteKind }
   | { readonly type: 'begin-gesture' }
   | { readonly type: 'add-point'; readonly point: TrackPoint }
   | {
@@ -134,9 +136,10 @@ export function createEditorState(
   trees: readonly Tree[] = [],
   start: TrackStart = { ratio: 0, reversed: false },
   terrain: TerrainMap = EMPTY_TERRAIN,
-  appearance: Pick<Track, 'environmentId' | 'scenery'> = {},
+  appearance: Pick<Track, 'environmentId' | 'scenery' | 'routeKind'> = {},
 ): EditorState {
   return {
+    routeKind: normalizeRouteKind(appearance.routeKind),
     environmentId: appearance.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
     scenery: appearance.scenery ?? [],
     points: [...points],
@@ -152,6 +155,7 @@ export function createEditorState(
 
 function snapshot(state: EditorState): EditorSnapshot {
   return {
+    routeKind: state.routeKind,
     environmentId: state.environmentId,
     scenery: state.scenery,
     points: state.points,
@@ -277,6 +281,8 @@ function reduceEditorUnchecked(
   command: EditorCommand,
 ): EditorState {
   switch (command.type) {
+    case 'set-route-kind':
+      return state.routeKind === command.routeKind ? state : patchEditorState(state, { routeKind: command.routeKind })
     case 'begin-gesture':
       return state.gestureStart
         ? state
@@ -421,7 +427,7 @@ function reduceEditorUnchecked(
         : patchEditorState(state, { points })
     }
     case 'set-track-start':
-      return Number.isFinite(command.ratio)
+      return state.routeKind === 'circuit' && Number.isFinite(command.ratio)
         ? patchEditorState(state, {
             start: {
               ratio: Math.max(0, Math.min(0.999_999, command.ratio)),
@@ -430,6 +436,7 @@ function reduceEditorUnchecked(
           })
         : state
     case 'reverse-track-direction':
+      if (state.routeKind !== 'circuit') return state
       return patchEditorState(state, {
         start: {
           ratio: state.start?.ratio ?? 0,
@@ -456,6 +463,7 @@ function reduceEditorUnchecked(
         })
       }
       if (repair.type === 'move-start') {
+        if (state.routeKind !== 'circuit') return state
         return patchEditorState(state, {
           start: {
             ratio: Math.max(0, Math.min(0.999_999, repair.ratio)),
@@ -504,6 +512,7 @@ function reduceEditorUnchecked(
         : patchEditorState(state, { points })
     }
     case 'normalize-loop': {
+      if (state.routeKind !== 'circuit') return state
       const points = normalizeClosedLoop(state.points)
       return points === state.points
         ? state

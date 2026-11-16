@@ -607,6 +607,7 @@ export class EditorInputController {
         }
         break
       case 'start':
+        if (this.dependencies.editor().routeKind !== 'circuit') break
         if (phase === 'down') {
           const path = this.dependencies.path?.()
           if (!path) break

@@ -327,3 +327,12 @@ describe('track diagnostics', () => {
     })
   })
 })
+
+it('validates point-to-point length and distinct endpoints without closing nearby ends', () => {
+  const points = closedPoints(9)
+  points[8] = { ...points[8]!, x: points[0]!.x + 1, y: points[0]!.y }
+  const candidate = { ...track(points), routeKind: 'point-to-point' as const }
+  expect(validateTrack(candidate).ready).toBe(true)
+  expect(validateTrack({ ...candidate, points: [points[0]!, points[1]!] }).code).toBe('too-short')
+  expect(validateTrack({ ...candidate, points: [...points.slice(0, -1), points[0]!] }).code).toBe('invalid-data')
+})

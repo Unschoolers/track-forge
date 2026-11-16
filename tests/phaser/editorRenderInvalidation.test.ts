@@ -12,6 +12,7 @@ function state(
   overrides: Partial<EditorRenderState> = {},
 ): EditorRenderState {
   return {
+    routeKind: 'circuit',
     points: [],
     terrain: {},
     trees: [],

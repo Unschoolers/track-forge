@@ -1,4 +1,4 @@
-import { CAR_IDS, type CarId, type DifficultyId } from '@/domain/model'
+import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
 import { DIFFICULTY_SPECS, ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
@@ -8,6 +8,7 @@ import type { Vector2 } from '@/domain/model'
 
 export interface CreateRaceOptions {
   readonly path: RoadPath
+  readonly routeKind?: RouteKind
   readonly playerCar: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
@@ -96,6 +97,16 @@ export function samplePathBehindStart(
   }
 }
 
+function sampleOpenStart(path: RoadPath): StartGridSample {
+  const first = path.points[0] ?? { x: 0, y: 0 }
+  const second = path.points[1] ?? { x: first.x + 1, y: first.y }
+  const dx = second.x - first.x
+  const dy = second.y - first.y
+  const length = Math.max(0.001, Math.hypot(dx, dy))
+  const tangent = { x: dx / length, y: dy / length }
+  return { x: first.x, y: first.y, pathIndex: 0, tangent, normal: { x: -tangent.y, y: tangent.x } }
+}
+
 export function createRace(options: CreateRaceOptions): RaceState {
   const difficulty = DIFFICULTY_SPECS[options.difficulty]
   const aiCars: readonly CarId[] =
@@ -103,23 +114,26 @@ export function createRace(options: CreateRaceOptions): RaceState {
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
       : CAR_IDS.filter((car) => car !== options.playerCar)
 
+  const open = options.routeKind === 'point-to-point'
   const startDistance =
     options.path.totalLength *
-    Math.max(0, Math.min(0.999_999, options.startRatio ?? 0))
+    (open ? 0 : Math.max(0, Math.min(0.999_999, options.startRatio ?? 0)))
   const startPathIndex = options.path.points.findIndex(
     (point) => point.distance >= startDistance,
   )
   const resolvedStartIndex = Math.max(0, startPathIndex)
+  const openPlacement = open ? sampleOpenStart(options.path) : undefined
   const vehicles: RaceVehicle[] = ROAD_GEOMETRY.startGrid.map((grid, index) => {
-    const placement = samplePathBehindStart(
+    const placement = openPlacement ?? samplePathBehindStart(
       options.path,
       grid.back,
       resolvedStartIndex,
-      options.reversed ?? false,
+      options.reversed,
     )
+    const lane = open ? ROAD_GEOMETRY.lanes[index] ?? grid.lane : grid.lane
     const position = {
-      x: placement.x + placement.normal.x * grid.lane,
-      y: placement.y + placement.normal.y * grid.lane,
+      x: placement.x + placement.normal.x * lane,
+      y: placement.y + placement.normal.y * lane,
     }
     const roadSurface = options.path.roadSurface.at(
       placement.pathIndex,
@@ -137,7 +151,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
       speed: 0,
       slip: 0,
       braking: false,
-      lane: options.reversed ? -grid.lane : grid.lane,
+      lane: !open && options.reversed ? -lane : lane,
       ai:
         index === 0
           ? null
@@ -174,12 +188,13 @@ export function createRace(options: CreateRaceOptions): RaceState {
 
   return {
     path: options.path,
+    routeKind: options.routeKind ?? 'circuit',
     vehicles,
     difficulty: options.difficulty,
     handling: options.handling ?? 'simulation',
-    totalLaps: Math.max(1, Math.floor(options.laps)),
+    totalLaps: open ? 1 : Math.max(1, Math.floor(options.laps)),
     startPathIndex: resolvedStartIndex,
-    reversed: options.reversed ?? false,
+    reversed: open ? false : options.reversed ?? false,
     elapsed: 0,
     phase: 'countdown',
     countdown: 3.7,

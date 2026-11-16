@@ -295,3 +295,19 @@ describe('TrackGeometry', () => {
     expect(service.get(firstInput)).not.toBe(first)
   })
 })
+
+it('keeps nearby point-to-point endpoints open and keys cache by topology', () => {
+  const service = new TrackGeometryService()
+  const circuit = square()
+  const points = [...circuit.points.slice(0, -1), { x: 1, y: 0, surface: 'street' as const }]
+  const legacy = { ...circuit, points }
+  const closed = service.get(legacy)
+  const open = service.get({ ...legacy, routeKind: 'point-to-point' })
+  expect(closed.path.closed).toBe(true)
+  expect(open.path.closed).toBe(false)
+  expect(open).not.toBe(closed)
+  expect(open.start).toMatchObject({ ratio: 0, reversed: false, position: { x: 0, y: 0 } })
+  expect(open.finish).toMatchObject({ ratio: 1, reversed: false, position: { x: 1, y: 0 } })
+  expect(open.sectors.map((gate) => gate.ratio)).toEqual([0.25, 0.5, 0.75])
+  expect(service.get(legacy)).toBe(closed)
+})

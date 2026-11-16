@@ -75,4 +75,27 @@ describe('Ghost Race setup', () => {
       savedGhostTime: 62.345 }, { retry() {}, edit() {}, home() {} }).textContent)
       .toContain('Replay could not be saved on this device.')
   })
+  it('offers single-run modes and falls back from an unavailable ghost', () => {
+    const openTrack = { ...track, routeKind: 'point-to-point' as const }
+    const openState = { ...state, currentTrack: openTrack, preferences: { ...state.preferences, raceMode: 'ghost' as const } }
+    const callbacks = actions()
+    const modal = createRaceSetupModal(openState, callbacks, null)
+    expect(modal.textContent).toContain('Single run')
+    expect(modal.textContent).toContain('RACE AI')
+    expect(modal.querySelector('[data-action="mode-time-trial"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(modal.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')?.disabled).toBe(true)
+    modal.querySelector<HTMLButtonElement>('[data-action="mode-time-trial"]')?.click()
+    expect(callbacks.preferences).toHaveBeenCalledWith({ ...openState.preferences, raceMode: 'time-trial' })
+    const available = createRaceSetupModal(openState, callbacks, 62)
+    expect(available.querySelector('[data-action="mode-ghost"]')?.getAttribute('aria-pressed')).toBe('true')
+  })
+  it('shows cumulative checkpoint and finish times in results', () => {
+    const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
+      playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false, standings: [], highScores: [],
+      routeKind: 'point-to-point', splits: [{ lap: 0, gate: 1, time: 15 }, { lap: 0, gate: 4, time: 61 }] }
+    const modal = createResultsModal(result, { retry() {}, edit() {}, home() {} })
+    expect(modal.textContent).toContain('CHECKPOINT 1 · 00:15.000')
+    expect(modal.textContent).toContain('FINISH · 01:01.000')
+  })
+
 })

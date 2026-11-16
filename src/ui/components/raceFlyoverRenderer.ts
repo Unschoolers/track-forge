@@ -143,7 +143,9 @@ export function createRaceFlyoverRenderer(
 
   return (ctx, width, height, elapsedSeconds) => {
     if (width <= 0 || height <= 0) return
-    const distance = geometry.start.distance + direction * (45 + Math.max(0, elapsedSeconds) * 70)
+    const travel = 45 + Math.max(0, elapsedSeconds) * 70
+    const routeLength = Math.abs((geometry.finish?.distance ?? geometry.start.distance) - geometry.start.distance)
+    const distance = geometry.start.distance + direction * (!path.closed && routeLength > 0 ? travel % routeLength : travel)
     const player = position(distance)
     const ahead = position(distance + direction * 75)
     const cameraAngle = Math.atan2(ahead.y - player.y, ahead.x - player.x)

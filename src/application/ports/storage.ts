@@ -3,6 +3,7 @@ import type {
   DifficultyId,
   Track,
   TrackId,
+  RouteKind,
 } from '@/domain/model'
 import type { CupProgress } from '@/application/race/circuitCup'
 import type { RaceSetup } from '@/application/race/raceSession'
@@ -24,7 +25,8 @@ export interface ScoreCategory {
   readonly course: string
   readonly laps: number
   readonly handling: HandlingMode
-  readonly mode: 'normal' | 'ghost'
+  readonly mode: 'normal' | 'ghost' | 'time-trial'
+  readonly routeKind?: RouteKind
 }
 
 export interface ScoreEntry {
@@ -60,7 +62,7 @@ export interface Preferences {
   readonly steeringSensitivity?: SteeringSensitivity
   readonly handling?: HandlingMode
   readonly raceLaps?: 1 | 2 | 3
-  readonly raceMode?: 'normal' | 'ghost'
+  readonly raceMode?: 'normal' | 'ghost' | 'time-trial'
 }
 
 export interface PreferencesStore {

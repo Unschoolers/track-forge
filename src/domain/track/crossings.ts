@@ -159,9 +159,10 @@ function sourceSegmentsAdjacent(
   first: number,
   second: number,
   sourceSegmentCount: number,
+  closed: boolean,
 ): boolean {
   const difference = Math.abs(first - second)
-  return difference <= 1 || difference === sourceSegmentCount - 1
+  return difference <= 1 || (closed && difference === sourceSegmentCount - 1)
 }
 
 function crossingCandidates(
@@ -169,7 +170,9 @@ function crossingCandidates(
   maximumPairChecks: number,
 ): readonly [SegmentCandidate, SegmentCandidate][] {
   const segmentCount = path.closed ? path.points.length : path.points.length - 1
-  const cellSize = ROAD_GEOMETRY.edgeWidth * 2
+  // Resampled path segments are roughly six units long. A small grid keeps
+  // ordinary neighboring segments from dominating the bounded pair budget.
+  const cellSize = 24
   const cells = new Map<string, SegmentCandidate[]>()
   const segments: SegmentCandidate[] = []
   for (let index = 0; index < segmentCount; index += 1) {
@@ -235,7 +238,7 @@ export function detectTrackCrossings(
       const rightSource = rightStart.segment
       if (
         leftSource === rightSource ||
-        sourceSegmentsAdjacent(leftSource, rightSource, sourceSegmentCount)
+        sourceSegmentsAdjacent(leftSource, rightSource, sourceSegmentCount, path.closed)
       ) {
         continue
       }

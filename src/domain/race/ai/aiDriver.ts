@@ -149,8 +149,10 @@ export function stepAiVehicle(
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead, 5, 22)
       : 3,
   )
-  const targetIndex =
-    (context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples) + path.points.length) % path.points.length
+  const rawTargetIndex = context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples)
+  const targetIndex = path.closed
+    ? (rawTargetIndex + path.points.length) % path.points.length
+    : clamp(rawTargetIndex, 0, path.points.length - 1)
   const target = path.points[targetIndex]
   if (!target) return { ...vehicle, ai }
   let bend = 0
@@ -170,7 +172,9 @@ export function stepAiVehicle(
   const pursuitLane = occupied ? lane : centered
   const targetX = target.x + context.normal.x * pursuitLane
   const targetY = target.y + context.normal.y * pursuitLane
-  const desiredAngle = Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
+  const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
+    ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
+    : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
   const desiredSteer = clamp(
     wrapAngle(desiredAngle - vehicle.angle) * tuning.steerGain -
       vehicle.yawRate * 0.38,

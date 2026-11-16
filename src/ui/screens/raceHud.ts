@@ -38,12 +38,14 @@ export function createRaceHud(
   timeValue.dataset.raceTime = ''
   const lapTimes = element('span', 'label')
   lapTimes.dataset.raceLapTimes = ''
+  const splitTime = element('span', 'label')
+  splitTime.dataset.raceSplit = ''
   const gap = element('span', 'label')
   gap.dataset.raceGhostGap = ''
   const pause = button('☰', 'pause', actions.pause, 'icon-button')
   pause.setAttribute('aria-label', 'Pause race')
   position.append(gap)
-  lap.append(lapValue, timeValue, lapTimes)
+  lap.append(lapValue, timeValue, lapTimes, splitTime)
   hud.append(position, pause, lap)
 
   const damage = element('div', 'damage-meter')
@@ -227,7 +229,7 @@ export function createRaceHud(
     if (!racing) {
       bannerUntil = 0
       finalLapNotice = false
-    } else if (lastLap !== null && telemetry.lap > lastLap &&
+    } else if (telemetry.routeKind !== 'point-to-point' && lastLap !== null && telemetry.lap > lastLap &&
       telemetry.lap + 1 === telemetry.totalLaps) {
       finalLapNotice = true
       raceBanner.textContent = 'FINAL LAP!'
@@ -244,15 +246,23 @@ export function createRaceHud(
     lastPosition = telemetry.position
     lastLap = telemetry.lap
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
-    positionValue.textContent = ghostRace
+    const openRoute = telemetry.routeKind === 'point-to-point'
+    const timeTrial = snapshot.setup?.mode === 'time-trial'
+    positionValue.textContent = timeTrial ? 'SOLO' : ghostRace
       ? formatRaceTime(snapshot.ghostTime ?? 0)
       : `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
-    positionLabel.textContent = ghostRace ? 'GHOST TARGET' : 'POSITION'
-    lapValue.textContent = `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
+    positionLabel.textContent = timeTrial ? 'TIME TRIAL' : ghostRace ? 'GHOST TARGET' : 'POSITION'
+    lapValue.textContent = openRoute ? `${Math.round(Math.max(0, Math.min(1, telemetry.routeProgress ?? 0)) * 100)}%` : `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
     timeValue.textContent = formatRaceTime(telemetry.elapsed)
     const bestLap = telemetry.bestLapTime
-    lapTimes.hidden = bestLap == null || ghostRace
-    lapTimes.textContent = bestLap == null ? '' : `BEST ${formatRaceTime(bestLap)}`
+    lapTimes.textContent = openRoute || bestLap == null || ghostRace ? '' : `BEST ${formatRaceTime(bestLap)}`
+    lapTimes.hidden = !lapTimes.textContent
+    const split = telemetry.latestSplit
+    const splitLabel = split?.gate === 4 ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
+    splitTime.textContent = telemetry.missedCheckpoint !== undefined
+      ? `MISSED CP ${telemetry.missedCheckpoint}`
+      : split ? `${splitLabel} ${formatRaceTime(split.time)}` : ''
+    splitTime.hidden = !splitTime.textContent
     const delta = telemetry.ghostGap
     gap.textContent = ghostRace && delta != null
       ? `GAP ${delta >= 0 ? '+' : '−'}${formatRaceTime(Math.abs(delta))}` : ''

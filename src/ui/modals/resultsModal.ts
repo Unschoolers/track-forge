@@ -19,6 +19,7 @@ export function createResultsModal(
   cupAction?: { readonly cup: CircuitCup; readonly next: () => void },
   newTimeMedal?: TimeMedal | null,
 ): HTMLElement {
+  const timeTrial = result.mode === 'time-trial'
   const headline = result.outcome === 'water'
     ? 'SUNK'
     : result.outcome === 'wrecked'
@@ -28,14 +29,14 @@ export function createResultsModal(
           : result.playerTime < result.ghostTime ? 'GHOST BEATEN' : 'GHOST WINS'
       : result.newRecord
       ? 'NEW RECORD'
-      : `FINISHED ${result.playerPlace}${ordinalSuffix(result.playerPlace)}`
+      : timeTrial ? 'TIME TRIAL COMPLETE' : `FINISHED ${result.playerPlace}${ordinalSuffix(result.playerPlace)}`
   const subtitle =
     result.playerTime === null
       ? result.trackName
       : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
-  const medal = result.ghostTime === undefined ? medalForFinish(result.outcome, result.playerPlace) : null
+  const medal = result.ghostTime === undefined && !timeTrial ? medalForFinish(result.outcome, result.playerPlace) : null
   if (result.playerTime !== null && result.previousBestTime !== undefined) {
     const delta = result.playerTime - result.previousBestTime
     const copy = delta < 0
@@ -49,8 +50,15 @@ export function createResultsModal(
   if (newTimeMedal) frame.body.append(element('p', 'race-finish-medal', `NEW ${newTimeMedal.toUpperCase()} TIME MEDAL`))
   if (result.ghostTime !== undefined) {
     frame.body.append(element('p', 'modal-subtitle', `Ghost target: ${formatRaceTime(result.ghostTime)}`))
-  } else {
+  } else if (!timeTrial) {
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings))
+  }
+  if (result.splits?.length) {
+    frame.body.append(element('h3', 'results-heading', 'SPLITS'))
+    for (const split of result.splits) {
+      const label = result.routeKind === 'point-to-point' ? (split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`) : `LAP ${split.lap + 1} · ${split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`}`
+      frame.body.append(element('p', 'modal-subtitle', `${label} · ${formatRaceTime(split.time)}`))
+    }
   }
   if (result.scoreSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))

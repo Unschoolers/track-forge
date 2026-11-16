@@ -76,6 +76,7 @@ export function createOptionsModal(
     const raceLength = element('section', 'setup-section')
     raceLength.append(element('h3', 'setup-label', 'RACE LENGTH'))
     const raceLengthRow = element('div', 'choice-row')
+    const openRoute = state.overlay.type === 'options' && state.overlay.returnTo === 'race-setup' && state.currentTrack?.routeKind === 'point-to-point'
     for (const [laps, label] of [[1, 'SPRINT · 1 LAP'], [2, 'CLASSIC · 2'], [3, 'ENDURANCE · 3']] as const) {
       const selected = (state.preferences.raceLaps ?? 2) === laps
       const choice = button(
@@ -88,7 +89,7 @@ export function createOptionsModal(
       choice.setAttribute('aria-pressed', String(selected))
       raceLengthRow.append(choice)
     }
-    raceLength.append(raceLengthRow)
+    raceLength.append(...(openRoute ? [element('p', 'modal-subtitle', 'Single run · no laps')] : [raceLengthRow]))
     raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
   }

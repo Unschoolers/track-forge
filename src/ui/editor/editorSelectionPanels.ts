@@ -34,7 +34,7 @@ export function createEditorSelectionPanels(
     )
   }
 
-  if (state.editorUi.tool === 'start') {
+  if (state.editorUi.tool === 'start' && state.editor.routeKind === 'circuit') {
     panels.push(createStartControl(state, actions.edit))
   }
   return panels

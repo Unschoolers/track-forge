@@ -23,7 +23,7 @@ import {
   type TrackMutationResult,
 } from '@/application/library/trackLibraryService'
 import { parseTrackImport } from '@/application/library/trackImport'
-import { asTrackId, type Track, type TrackId } from '@/domain/model'
+import { asTrackId, normalizeRouteKind, type Track, type TrackId } from '@/domain/model'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type {
@@ -550,12 +550,14 @@ export class AppController {
       this.dependencies.geometry.get(track).path.totalLength,
     )
     if (validation.ready) {
+      const pointToPoint = track.routeKind === 'point-to-point'
+      const preferredMode = this.state.preferences.raceMode ?? 'normal'
       this.dependencies.raceSession.start(track, {
         car: this.state.preferences.car,
         difficulty: this.state.preferences.difficulty,
-        laps: this.state.preferences.raceLaps ?? 2,
+        laps: pointToPoint ? 1 : this.state.preferences.raceLaps ?? 2,
         handling: this.state.preferences.handling ?? 'arcade',
-        mode: this.state.preferences.raceMode ?? 'normal',
+        mode: !pointToPoint && preferredMode === 'time-trial' ? 'normal' : preferredMode,
         lighting: this.state.overlay.type === 'race-setup' ? this.state.raceLighting ?? track.lighting : track.lighting,
       })
       this.rememberRace()
@@ -806,7 +808,8 @@ export class AppController {
     return Object.fromEntries(
       [...tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)].map((track) => [
         track.id,
-        this.dependencies.scoreStore.forTrack(track.id),
+        this.dependencies.scoreStore.forTrack(track.id).filter((score) =>
+          normalizeRouteKind(score.category?.routeKind) === normalizeRouteKind(track.routeKind)),
       ]),
     )
   }
@@ -841,11 +844,12 @@ export class AppController {
       savedGesture?.trackId === currentTrack.id &&
       savedGesture.start === this.state.editor.gestureStart &&
       editor.points === savedGesture.start.points && editor.trees === savedGesture.start.trees &&
-      editor.start === savedGesture.start.start && editor.terrain === savedGesture.start.terrain
+      editor.start === savedGesture.start.start && editor.terrain === savedGesture.start.terrain &&
+      editor.routeKind === savedGesture.start.routeKind
     if (this.state.editor.gestureStart && !editor.gestureStart) this.gestureRevision = null
     const raceChanged = editor.points !== this.state.editor.points ||
       editor.trees !== this.state.editor.trees || editor.start !== this.state.editor.start ||
-      editor.terrain !== this.state.editor.terrain
+      editor.terrain !== this.state.editor.terrain || editor.routeKind !== this.state.editor.routeKind
     const contentChanged = raceChanged || editor.environmentId !== this.state.editor.environmentId ||
       editor.scenery !== this.state.editor.scenery
     if (!contentChanged && !(restoresGesture && previousRevision !== savedGesture.revision)) {
@@ -859,6 +863,7 @@ export class AppController {
       trees: editor.trees,
       start: editor.start ?? { ratio: 0, reversed: false },
       terrain: editor.terrain,
+      routeKind: editor.routeKind,
       environmentId: editor.environmentId,
       scenery: editor.scenery,
       raceRevision: restoresGesture ? savedGesture.revision : raceChanged ? Math.max(now, previousRevision + 1) : previousRevision,
@@ -908,7 +913,17 @@ export class AppController {
   }
 
   private update(state: AppSnapshot): void {
-    const normalized = state.editorUi.sceneryChoice === undefined ? state : { ...state, editorUi: { ...state.editorUi, sceneryChoice: normalizeEditorSceneryChoice(state.editorUi.sceneryChoice, state.editor.environmentId) } }
+    let editorUi = state.editorUi
+    if (editorUi.tool === 'start' && state.editor.routeKind === 'point-to-point') {
+      editorUi = { ...editorUi, tool: 'draw' }
+    }
+    if (editorUi.sceneryChoice !== undefined) {
+      editorUi = {
+        ...editorUi,
+        sceneryChoice: normalizeEditorSceneryChoice(editorUi.sceneryChoice, state.editor.environmentId),
+      }
+    }
+    const normalized = editorUi === state.editorUi ? state : { ...state, editorUi }
     this.state = normalized
     this.events.publish({ type: 'state-changed', snapshot: normalized })
   }

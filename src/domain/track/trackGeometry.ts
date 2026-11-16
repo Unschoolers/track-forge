@@ -1,5 +1,5 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
-import type { SurfaceId, Track, Vector2 } from '@/domain/model'
+import { normalizeRouteKind, type SurfaceId, type Track, type Vector2 } from '@/domain/model'
 import {
   buildRoadPath,
   type RoadPath,
@@ -38,6 +38,7 @@ export interface TrackGeometry {
   readonly ribbon: readonly RoadRibbonSample[]
   readonly crossings: readonly TrackCrossing[]
   readonly start: ResolvedTrackStart
+  readonly finish?: ResolvedTrackStart
   readonly sectors: readonly TrackGate[]
 }
 
@@ -77,11 +78,12 @@ function nearestDistanceIndex(path: RoadPath, target: number): number {
 }
 
 export function buildTrackGeometry(
-  track: Pick<Track, 'points' | 'start' | 'terrain'>,
+  track: Pick<Track, 'points' | 'start' | 'terrain' | 'routeKind'>,
 ): TrackGeometry {
-  const path = buildRoadPath(track.points, track.terrain)
+  const pointToPoint = normalizeRouteKind(track.routeKind) === 'point-to-point'
+  const path = buildRoadPath(track.points, track.terrain, undefined, normalizeRouteKind(track.routeKind))
   const ribbon = buildRoadRibbon(path)
-  const ratio = Math.max(0, Math.min(0.999_999, track.start?.ratio ?? 0))
+  const ratio = pointToPoint ? 0 : Math.max(0, Math.min(0.999_999, track.start?.ratio ?? 0))
   const distance = path.totalLength * ratio
   const pathIndex = nearestDistanceIndex(path, distance)
   const startSample = ribbon[pathIndex] ?? {
@@ -89,7 +91,7 @@ export function buildTrackGeometry(
     tangent: { x: 1, y: 0 },
   }
   const sectors = ([1, 2, 3] as const).map((order) => {
-    const sectorRatio = (ratio + order / 4) % 1
+    const sectorRatio = pointToPoint ? order / 4 : (ratio + order / 4) % 1
     return {
       order,
       ratio: sectorRatio,
@@ -103,11 +105,17 @@ export function buildTrackGeometry(
     start: {
       distance,
       ratio,
-      reversed: track.start?.reversed ?? false,
+      reversed: pointToPoint ? false : (track.start?.reversed ?? false),
       pathIndex,
       position: { x: startSample.center.x, y: startSample.center.y },
       tangent: startSample.tangent,
     },
+    ...(pointToPoint && ribbon.length > 0 ? { finish: {
+      distance: path.totalLength, ratio: 1, reversed: false,
+      pathIndex: ribbon.length - 1,
+      position: { x: ribbon[ribbon.length - 1]!.center.x, y: ribbon[ribbon.length - 1]!.center.y },
+      tangent: ribbon[ribbon.length - 1]!.tangent,
+    } } : {}),
     sectors,
   }
 }

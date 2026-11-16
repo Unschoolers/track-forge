@@ -1,8 +1,8 @@
 import { TERRAIN_LIMITS } from '@/domain/config'
-import type { Track } from '@/domain/model'
+import { normalizeRouteKind, type RouteKind, type Track } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 
-type GeometryInput = Pick<Track, 'points' | 'start' | 'terrain'>
+type GeometryInput = Pick<Track, 'points' | 'start' | 'terrain' | 'routeKind'>
 
 interface GeometryCacheEntry {
   readonly key: string
@@ -12,6 +12,7 @@ interface GeometryCacheEntry {
   readonly terrain: GeometryInput['terrain']
   readonly startRatio: number
   readonly reversed: boolean
+  readonly routeKind: RouteKind
 }
 
 interface GeometryIdentity {
@@ -19,6 +20,7 @@ interface GeometryIdentity {
   readonly terrain: GeometryInput['terrain']
   readonly startRatio: number
   readonly reversed: boolean
+  readonly routeKind: RouteKind
 }
 
 interface GeometryIdentitySlot {
@@ -28,7 +30,7 @@ interface GeometryIdentitySlot {
 
 type GeometryIdentityByTerrain = WeakMap<
   GeometryInput['terrain'],
-  Map<number, GeometryIdentitySlot>
+  Map<string, GeometryIdentitySlot>
 >
 
 // Two maximum-cell checkerboard surfaces fit; a third large graph does not.
@@ -50,7 +52,7 @@ export function trackGeometrySignature(track: GeometryInput): string {
   const terrain = track.terrain.cells
     .map((cell) => `${cell.column},${cell.row},${cell.kind}`)
     .join(';')
-  return `${points}|${track.start?.ratio ?? 0},${track.start?.reversed === true}|${track.terrain.cellSize}|${terrain}`
+  return `${normalizeRouteKind(track.routeKind)}|${points}|${track.start?.ratio ?? 0},${track.start?.reversed === true}|${track.terrain.cellSize}|${terrain}`
 }
 
 function geometryIdentity(
@@ -62,6 +64,7 @@ function geometryIdentity(
     terrain: track.terrain,
     startRatio: start?.ratio ?? 0,
     reversed: start?.reversed === true,
+    routeKind: normalizeRouteKind(track.routeKind),
   }
 }
 
@@ -175,7 +178,7 @@ export class TrackGeometryCache {
     const slot = this.identityByPoints
       .get(identity.points)
       ?.get(identity.terrain)
-      ?.get(identity.startRatio)
+      ?.get(`${identity.routeKind}:${identity.startRatio}`)
     return identity.reversed ? slot?.reversed : slot?.forward
   }
 
@@ -190,10 +193,10 @@ export class TrackGeometryCache {
       byStart = new Map()
       byTerrain.set(entry.terrain, byStart)
     }
-    let slot = byStart.get(entry.startRatio)
+    let slot = byStart.get(`${entry.routeKind}:${entry.startRatio}`)
     if (!slot) {
       slot = {}
-      byStart.set(entry.startRatio, slot)
+      byStart.set(`${entry.routeKind}:${entry.startRatio}`, slot)
     }
     if (entry.reversed) slot.reversed = entry
     else slot.forward = entry
@@ -202,7 +205,7 @@ export class TrackGeometryCache {
   private unindex(entry: GeometryCacheEntry): void {
     const byTerrain = this.identityByPoints.get(entry.points)
     const byStart = byTerrain?.get(entry.terrain)
-    const slot = byStart?.get(entry.startRatio)
+    const slot = byStart?.get(`${entry.routeKind}:${entry.startRatio}`)
     if (!byTerrain || !byStart || !slot) return
     if (entry.reversed) {
       if (slot.reversed !== entry) return
@@ -212,7 +215,7 @@ export class TrackGeometryCache {
       delete slot.forward
     }
     if (slot.forward || slot.reversed) return
-    byStart.delete(entry.startRatio)
+    byStart.delete(`${entry.routeKind}:${entry.startRatio}`)
     if (byStart.size === 0) byTerrain.delete(entry.terrain)
   }
 }

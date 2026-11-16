@@ -18,7 +18,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
   const validCategory = category && typeof category.course === 'string' && category.course.length > 0 &&
     typeof category.laps === 'number' && Number.isInteger(category.laps) && category.laps > 0 &&
     (category.handling === 'arcade' || category.handling === 'simulation') &&
-    (category.mode === 'normal' || category.mode === 'ghost')
+    (category.mode === 'normal' || category.mode === 'ghost' || category.mode === 'time-trial')
   return typeof item.time === 'number' &&
     Number.isFinite(item.time) &&
     isCarId(item.car) &&
@@ -28,7 +28,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
       (typeof item.date === 'number' && Number.isFinite(item.date)))
     ? {
         time: item.time,
-        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, handling: category.handling as 'arcade' | 'simulation', mode: category.mode as 'normal' | 'ghost' } } : {}),
+        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, handling: category.handling as 'arcade' | 'simulation', mode: category.mode as 'normal' | 'ghost' | 'time-trial', ...(category.routeKind === 'point-to-point' ? { routeKind: 'point-to-point' as const } : {}) } } : {}),
         car: item.car,
         difficulty: item.difficulty,
         recordedAt:
@@ -40,7 +40,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
 }
 
 function categoryKey(score: ScoreEntry): string {
-  return score.category ? JSON.stringify([score.category.course, score.category.laps, score.category.handling, score.category.mode, score.car, score.difficulty]) : 'legacy'
+  return score.category ? JSON.stringify([score.category.course, score.category.routeKind ?? 'circuit', score.category.laps, score.category.handling, score.category.mode, score.car, score.difficulty]) : 'legacy'
 }
 
 export class BrowserScoreRepository implements ScoreStore {

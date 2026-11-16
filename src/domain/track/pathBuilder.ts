@@ -1,6 +1,7 @@
 import { distance } from '@/domain/geometry/math'
 import { ROAD_GEOMETRY, TRACK_CLOSE_DISTANCE } from '@/domain/config'
 import type {
+  RouteKind,
   RoadStructure,
   SurfaceId,
   TerrainMap,
@@ -198,6 +199,7 @@ export function buildRoadPath(
   points: readonly TrackPoint[],
   terrain: TerrainMap,
   maximumCrossingPairChecks = Infinity,
+  routeKind: RouteKind = 'circuit',
 ): RoadPath {
   if (points.length < 2) {
     const centerPath: readonly RoadPathPoint[] = []
@@ -220,6 +222,7 @@ export function buildRoadPath(
   const first = points[0]
   const last = points.at(-1)
   const closed =
+    routeKind === 'circuit' &&
     first !== undefined &&
     last !== undefined &&
     points.length >= 3 &&

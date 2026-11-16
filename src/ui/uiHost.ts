@@ -325,7 +325,7 @@ export class DomUiHost implements UiHost {
         const ghostSetup = {
           car: preferences.car,
           difficulty: preferences.difficulty,
-          laps: preferences.raceLaps ?? 2,
+          laps: currentTrack?.routeKind === 'point-to-point' ? 1 : preferences.raceLaps ?? 2,
           handling: preferences.handling ?? 'arcade',
         } as const
         const availability = currentTrack
@@ -390,8 +390,10 @@ export class DomUiHost implements UiHost {
           home: () => this.controller.dispatch({ type: 'go-home' }),
         })
       case 'editor-menu':
-        return createEditorMenuModal(state.editor.environmentId, {
+        return createEditorMenuModal(state.editor.environmentId, state.editor.routeKind, {
           close,
+          setRouteKind: (routeKind) =>
+            this.controller.dispatch({ type: 'editor', command: { type: 'set-route-kind', routeKind } }),
           setEnvironment: (environmentId) =>
             this.controller.dispatch({
               type: 'editor',

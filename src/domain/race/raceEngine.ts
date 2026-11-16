@@ -3,7 +3,7 @@ import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { getTrafficState } from '@/domain/race/ai/traffic'
 import { solveCollisionFrame } from '@/domain/race/collisions'
-import { updateProgress } from '@/domain/race/progress'
+import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
 import type {
   DriverInput,
   RaceOutcome,
@@ -28,6 +28,7 @@ import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynami
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
 
 export type RaceEvent =
+  | { readonly type: 'gate-crossed'; readonly vehicleId: string; readonly gate: 1 | 2 | 3 | 4; readonly lap: number; readonly time: number }
   | {
       readonly type: 'surface-changed'
       readonly vehicleId: string
@@ -84,8 +85,20 @@ export type RaceStep = (
 function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previous?: VehicleStepContext) {
   // An Arcade car moves only a few samples per step. Restrict local matching
   // to its route so a nearby return arm cannot change which road supports it.
-  const radius = vehicle.player && race.handling !== 'simulation' ? 12 : undefined
+  const radius = race.routeKind === 'point-to-point' || (vehicle.player && race.handling !== 'simulation') ? 12 : undefined
   return getVehicleStepContext(race.path, vehicle, previous, radius)
+}
+
+export function resetRaceVehicle(
+  vehicle: RaceVehicle,
+  race: Pick<RaceState, 'path' | 'reversed' | 'routeKind'>,
+): RaceVehicle {
+  if (race.routeKind !== 'point-to-point') {
+    return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
+  }
+  const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector)
+  const pathIndex = findNearestSafeTrackIndex(race.path, vehicle, false, limit)
+  return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex })
 }
 
 function aiRampSpeedLimit(
@@ -179,7 +192,7 @@ export const stepRace: RaceStep = (
   const arcade = !('handling' in state) || state.handling !== 'simulation'
   const catchUp = rivalCatchUp(state)
   const moved = state.vehicles.map((vehicle) =>
-    advanceVehicle(vehicle, state, input, dt, random, catchUp),
+    vehicle.finishedAt !== null ? vehicle : advanceVehicle(vehicle, state, input, dt, random, catchUp),
   )
   const barrierFrame = arcade
     ? { vehicles: moved, activeContacts: [], events: [] }
@@ -208,45 +221,41 @@ export const stepRace: RaceStep = (
       !vehicle.wrecked
         ? vehicle.stuckDuration + dt
         : Math.max(0, vehicle.stuckDuration - dt * 2.5)
-    let updated = updateProgress(
-      {
-        ...vehicle,
-        lane:
-          (vehicle.x - context.nearest.point.x) * context.normal.x +
-          (vehicle.y - context.nearest.point.y) * context.normal.y,
-        currentSurface: context.surface,
-        onCurb: context.onCurb,
-        pathDistance: context.nearest.point.distance,
-        structureRunId: context.structureRunId,
-        stuckDuration,
-      },
-      context.nearest.index,
-      state.path.points.length,
-      elapsed,
-      state.totalLaps,
-      state.startPathIndex,
-      state.reversed,
-    )
-    if (updated.player && updated.stuckDuration > 0.65) {
-      events.push({
-        type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',
-        x: updated.x, y: updated.y, pathIndex: updated.pathIndex,
-      })
-      updated = resetVehicleToTrack(updated, state.path, { reversed: state.reversed })
+    const prepared = {
+      ...vehicle,
+      lane:
+        (vehicle.x - context.nearest.point.x) * context.normal.x +
+        (vehicle.y - context.nearest.point.y) * context.normal.y,
+      currentSurface: context.surface,
+      onCurb: context.onCurb,
+      pathDistance: context.nearest.point.distance,
+      structureRunId: context.structureRunId,
+      stuckDuration,
     }
-    if (
-      !updated.player &&
-      context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30
-    ) {
-      // Traffic contact can throw an opponent beyond any recoverable steering
-      // arc. Rejoin it at the nearest road sample instead of letting a lost AI
-      // circle forever outside the camera.
-      if (updated.grounded) {
+    let updated = state.routeKind === 'point-to-point' && previous
+      ? updateOpenRouteProgress(
+          previous, prepared, state.path, context.nearest.index, elapsed,
+          raceVehicleContext(state, previous).onRoad, context.onRoad, ROAD_GEOMETRY.onRoadRadius,
+        )
+      : updateProgress(
+          prepared, context.nearest.index, state.path.points.length, elapsed,
+          state.totalLaps, state.startPathIndex, state.reversed,
+        )
+    const playerStuck = updated.player && updated.stuckDuration > 0.65
+    const lostRival = !updated.player && updated.grounded &&
+      (context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
+        (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated)))
+    if (playerStuck || lostRival) {
+      const candidate = state.routeKind === 'point-to-point' && previous
+        ? { ...updated, nextSector: previous.nextSector, lap: previous.lap, finishedAt: previous.finishedAt }
+        : updated
+      const reset = resetRaceVehicle(candidate, state)
+      if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',
           x: updated.x, y: updated.y, pathIndex: updated.pathIndex,
         })
-        updated = resetVehicleToTrack(updated, state.path, { reversed: state.reversed })
+        updated = reset
       }
     }
     if (previous && previous.currentSurface !== updated.currentSurface) {
@@ -273,6 +282,8 @@ export const stepRace: RaceStep = (
     dt,
   )
   let vehicles = collisionFrame.vehicles.map((collided, index) => {
+    const prior = state.vehicles[index]
+    if (prior && !prior.player && prior.finishedAt !== null) return prior
     const context = raceVehicleContext(state, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     if (vehicle.player && !arcade) return vehicle
@@ -289,21 +300,26 @@ export const stepRace: RaceStep = (
     if (!waterContact) {
       return vehicle
     }
+    const previous = state.vehicles[index]
+    const recoverySector = previous?.nextSector ?? vehicle.nextSector
     const pathIndex = findNearestSafeTrackIndex(
       state.path,
       vehicle,
       state.reversed,
+      state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector) : undefined,
     )
     events.push({
       type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
       x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
     })
     // Water recovery must not award a lap, sector or finish from the fall.
-    const previous = state.vehicles[index]
-    const recovering = vehicle.player && previous
+    const recovering = previous
       ? { ...vehicle, lap: previous.lap, nextSector: previous.nextSector,
           finishedAt: previous.finishedAt, waterRecoveryProtected: pathIndex === undefined }
       : vehicle
+    if (state.routeKind === 'point-to-point' && pathIndex === undefined) {
+      return { ...recovering, vx: 0, vy: 0, speed: 0, yawRate: 0 }
+    }
     return resetVehicleToTrack(recovering, state.path, {
       ...(pathIndex === undefined ? {} : { pathIndex }),
       reversed: state.reversed,
@@ -336,6 +352,17 @@ export const stepRace: RaceStep = (
   for (const [index, vehicle] of vehicles.entries()) {
     const previous = state.vehicles[index]
     if (!previous) continue
+    const recovered = events.some((event) => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id)
+    if (recovered && (vehicle.nextSector !== previous.nextSector || vehicle.lap !== previous.lap)) {
+      vehicles[index] = { ...vehicle, nextSector: previous.nextSector, lap: previous.lap, finishedAt: previous.finishedAt }
+      continue
+    }
+    if (!recovered) {
+      const endGate = vehicle.lap > previous.lap ? 4 : vehicle.nextSector - 1
+      for (let gate = previous.nextSector; gate <= endGate; gate++) {
+        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate: gate as 1 | 2 | 3 | 4, lap: previous.lap, time: elapsed })
+      }
+    }
     if (previous.finishedAt === null && vehicle.finishedAt !== null) {
       events.push({
         type: 'vehicle-finished',
@@ -347,6 +374,7 @@ export const stepRace: RaceStep = (
       events.push({ type: 'vehicle-wrecked', vehicleId: vehicle.id })
     }
   }
+  player = vehicles.find((vehicle) => vehicle.player)
   const impactShake = Math.min(
     6,
     Math.max(

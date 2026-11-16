@@ -1,5 +1,6 @@
 import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
 import {
+  normalizeRouteKind,
   isLightingMode,
   isSurfaceId,
   type Track,
@@ -43,26 +44,31 @@ export function validateTrack(
     }
   }
 
-  if (track.points.length < 9) {
+  const pointToPoint = normalizeRouteKind(track.routeKind) === 'point-to-point'
+  if (track.points.length < (pointToPoint ? 2 : 9)) {
     return {
       ready: false,
       code: 'too-few-points',
-      message: 'Add more road to complete the circuit',
+      message: pointToPoint ? 'Add more road to complete the route' : 'Add more road to complete the circuit',
     }
   }
 
   const first = track.points[0]
   const last = track.points.at(-1)
   if (
-    first === undefined ||
+    !pointToPoint && (first === undefined ||
     last === undefined ||
-    Math.hypot(first.x - last.x, first.y - last.y) >= TRACK_CLOSE_DISTANCE
+    Math.hypot(first.x - last.x, first.y - last.y) >= TRACK_CLOSE_DISTANCE)
   ) {
     return {
       ready: false,
       code: 'open-loop',
       message: 'Close the circuit to make it race ready',
     }
+  }
+
+  if (pointToPoint && first && last && first.x === last.x && first.y === last.y) {
+    return { ready: false, code: 'invalid-data', message: 'Start and finish must be distinct' }
   }
 
   if (totalLength < EDITOR_LIMITS.minimumTrackLength) {

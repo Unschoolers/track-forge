@@ -2,6 +2,7 @@ import { normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/tra
 import type { KeyValueStore, TrackStore } from '@/application/ports/storage'
 import {
   asTrackId,
+  normalizeRouteKind,
   isLightingMode,
   isSurfaceId,
   type Track,
@@ -189,6 +190,7 @@ function decodeTrack(value: unknown, now: number): Track | undefined {
     name,
     version: 8,
     points: migratedPoints,
+    routeKind: normalizeRouteKind(item.routeKind),
     trees: trees.filter((tree) => tree !== undefined),
     terrain: normalizeTerrain(item.terrain),
     start: decodeStart(item.start),

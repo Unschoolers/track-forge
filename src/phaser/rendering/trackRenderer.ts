@@ -43,6 +43,7 @@ export function renderTrackStartGridPreview(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
 ): void {
+  if (geometry.finish) return
   renderStartGridPreview(graphics, geometry.path, {
     ratio: geometry.start.ratio,
     reversed: geometry.start.reversed,
@@ -61,6 +62,17 @@ export function renderTrackGeometryBase(
     night,
     geometry.start.ratio,
   )
+  if (geometry.finish) {
+    for (const [marker, markerColor] of [[geometry.start, 0x38df9b], [geometry.finish, 0xffd45c]] as const) {
+      const normal = { x: -marker.tangent.y, y: marker.tangent.x }
+      const halfWidth = 30
+      graphics.lineStyle(6, markerColor, 1)
+      graphics.beginPath()
+      graphics.moveTo(marker.position.x - normal.x * halfWidth, marker.position.y - normal.y * halfWidth)
+      graphics.lineTo(marker.position.x + normal.x * halfWidth, marker.position.y + normal.y * halfWidth)
+      graphics.strokePath()
+    }
+  }
 }
 
 export function renderTrackGeometryStructureUnderlay(

@@ -418,3 +418,13 @@ it('bounds local scenery decoding and drops invalid positions, kinds, and revisi
   expect(loaded.scenery?.[0]).toEqual(valid)
   expect(loaded.raceRevision).toBeUndefined()
 })
+
+it('round-trips route topology and defaults legacy tracks to circuits', () => {
+  const storage = new MemoryStore()
+  const repository = new BrowserTrackRepository(storage)
+  const track = createStarterTrack(asTrackId('route-kind'), 10)
+  expect(repository.save({ ...track, routeKind: 'point-to-point' })).toBe(true)
+  expect(new BrowserTrackRepository(storage).find(track.id)?.routeKind).toBe('point-to-point')
+  expect(repository.save(track)).toBe(true)
+  expect(repository.find(track.id)?.routeKind).toBe('circuit')
+})
