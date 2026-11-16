@@ -486,6 +486,7 @@ export class EditorScene extends Phaser.Scene {
       this.terrainPreviewImpacts = buildTerrainPreviewRegions(preview).map(
         (region): TerrainPreviewImpact => {
           const candidate = this.geometry.get({
+            routeKind: snapshot.editor.routeKind,
             points: snapshot.editor.points,
             terrain: region.terrain,
             ...(snapshot.editor.start
@@ -536,6 +537,7 @@ export class EditorScene extends Phaser.Scene {
 
   private editorRenderState(snapshot: AppSnapshot): EditorRenderState {
     return {
+      routeKind: snapshot.editor.routeKind,
       points: snapshot.editor.points,
       terrain: snapshot.editor.terrain,
       trees: snapshot.editor.trees,
@@ -561,6 +563,7 @@ export class EditorScene extends Phaser.Scene {
   private trackGeometry() {
     const snapshot = this.currentSnapshot ?? this.controller.snapshot()
     return this.geometry.get({
+      routeKind: snapshot.editor.routeKind,
       points: snapshot.editor.points,
       terrain: snapshot.editor.terrain,
       ...(snapshot.editor.start ? { start: snapshot.editor.start } : {}),

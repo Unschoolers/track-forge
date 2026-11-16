@@ -100,3 +100,10 @@ describe('track crossings', () => {
     expect(crossing?.upperSegment).toBe(2)
   })
 })
+
+
+it('detects crossings between the first and last sections of an open route', () => {
+  const path = buildRoadPath(bowTie.slice(0, 4), EMPTY_TERRAIN, undefined, 'point-to-point')
+  expect(path.closed).toBe(false)
+  expect(path.crossings.some((crossing) => crossing.key === '0:2')).toBe(true)
+})

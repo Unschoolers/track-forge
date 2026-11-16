@@ -12,7 +12,7 @@ export class BrowserLastRaceRepository implements LastRaceStore {
       const item = value as Record<string, unknown>
       if (item.version !== 1 || typeof item.trackId !== 'string' || !item.trackId || typeof item.course !== 'string' || !item.course || !item.setup || typeof item.setup !== 'object') return null
       const setup = item.setup as Record<string, unknown>
-      if (!isCarId(setup.car) || !isDifficultyId(setup.difficulty) || (setup.laps !== 1 && setup.laps !== 2 && setup.laps !== 3) || (setup.handling !== 'arcade' && setup.handling !== 'simulation') || (setup.mode !== 'normal' && setup.mode !== 'ghost') || !isLightingMode(setup.lighting)) return null
+      if (!isCarId(setup.car) || !isDifficultyId(setup.difficulty) || (setup.laps !== 1 && setup.laps !== 2 && setup.laps !== 3) || (setup.handling !== 'arcade' && setup.handling !== 'simulation') || (setup.mode !== 'normal' && setup.mode !== 'ghost' && setup.mode !== 'time-trial') || !isLightingMode(setup.lighting)) return null
       return { trackId: asTrackId(item.trackId), course: item.course, setup: { car: setup.car, difficulty: setup.difficulty, laps: setup.laps, handling: setup.handling, mode: setup.mode, lighting: setup.lighting } }
     } catch { return null }
   }

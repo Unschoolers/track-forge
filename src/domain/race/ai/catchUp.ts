@@ -14,14 +14,14 @@ export function rivalCatchUp(race: RaceState): SpeedAssist | undefined {
 
   const pointCount = race.path.points.length
   if (pointCount < 2) return undefined
-  const playerProgress = raceProgress(player, pointCount, race.startPathIndex, race.reversed)
+  const playerProgress = raceProgress(player, pointCount, race.startPathIndex, race.reversed, race.routeKind)
   let closestRival = Number.NEGATIVE_INFINITY
   for (const rival of race.vehicles) {
     if (rival.player) continue
     if (rival.finishedAt !== null) return undefined
     if (rival.wrecked) continue
     closestRival = Math.max(closestRival,
-      raceProgress(rival, pointCount, race.startPathIndex, race.reversed))
+      raceProgress(rival, pointCount, race.startPathIndex, race.reversed, race.routeKind))
   }
   if (closestRival === Number.NEGATIVE_INFINITY) return undefined
 

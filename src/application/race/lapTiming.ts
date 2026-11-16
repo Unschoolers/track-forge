@@ -15,26 +15,27 @@ export class LapTiming {
     this.gap = null
   }
 
-  cross(beforeLap: number, beforeSector: number, lap: number, sector: number, elapsed: number): void {
-    const before = beforeLap * 4 + beforeSector - 1
-    const after = lap * 4 + sector - 1
-    if (after <= before) {
-      if (sector < beforeSector || lap < beforeLap) this.recover()
-      return
-    }
-    for (let gate = before; gate < after; gate++) {
-      if (this.valid) this.splits.push(elapsed)
-      const reference = this.target?.[gate]
-      this.gap = this.valid && reference !== undefined ? elapsed - reference : null
-      if ((gate + 1) % 4 === 0) {
-        if (this.lapValid) {
-          const duration = elapsed - this.lapStart
-          this.bestLap = this.bestLap === null ? duration : Math.min(this.bestLap, duration)
-        }
-        this.lapStart = elapsed
-        this.lapValid = true
+  readonly accepted: { lap: number; gate: 1 | 2 | 3 | 4; time: number }[] = []
+
+  accept(lap: number, gate: 1 | 2 | 3 | 4, elapsed: number): void {
+    this.accepted.push({ lap, gate, time: elapsed })
+    const index = lap * 4 + gate - 1
+    if (this.valid) this.splits.push(elapsed)
+    const reference = this.target?.[index]
+    this.gap = this.valid && reference !== undefined ? elapsed - reference : null
+    if (gate === 4) {
+      if (this.lapValid) {
+        const duration = elapsed - this.lapStart
+        this.bestLap = this.bestLap === null ? duration : Math.min(this.bestLap, duration)
       }
+      this.lapStart = elapsed
+      this.lapValid = true
     }
+  }
+
+  abandonLap(lap: number): void {
+    this.recover()
+    while (this.accepted.at(-1)?.lap === lap) this.accepted.pop()
   }
 
   currentLap(elapsed: number): number | null {

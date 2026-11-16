@@ -72,6 +72,7 @@ export function createEditorStatus(
   const validation = state.currentTrack
     ? validateTrack({
         ...state.currentTrack,
+        routeKind: state.editor.routeKind,
         points: state.editor.points,
         trees: state.editor.trees,
         terrain: state.editor.terrain,
@@ -115,6 +116,7 @@ export function createEditorDiagnostics(
   if (!state.currentTrack) return undefined
   const diagnostics = analyzeTrack({
     ...state.currentTrack,
+    routeKind: state.editor.routeKind,
     points: state.editor.points,
     trees: state.editor.trees,
     terrain: state.editor.terrain,

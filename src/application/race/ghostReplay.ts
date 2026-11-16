@@ -1,4 +1,4 @@
-import type { CarId, Track } from '@/domain/model'
+import { normalizeRouteKind, type CarId, type Track } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
 export interface GhostSetup {
@@ -36,13 +36,15 @@ export interface GhostStore {
   record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[], splits?: readonly number[]): boolean
 }
 
-export const MAX_GHOST_FRAMES = 3000 // Long Arcade runs compact older samples.
+export const MAX_GHOST_FRAMES = 3000 // Long runs compact older samples.
 
 /** Track edits and a changed race setup must never reuse a stale ghost. */
 export function ghostRaceKey(track: Track, setup: GhostSetup): string {
+  const open = normalizeRouteKind(track.routeKind) === 'point-to-point'
   return [
-    track.id, track.raceRevision ?? track.updatedAt, track.start?.ratio ?? 0,
-    track.start?.reversed ? 'reverse' : 'forward',
+    ...(open ? ['point-to-point'] : []),
+    track.id, track.raceRevision ?? track.updatedAt, open ? 0 : track.start?.ratio ?? 0,
+    !open && track.start?.reversed ? 'reverse' : 'forward',
     setup.car, setup.laps, setup.handling ?? 'arcade',
   ].join('|')
 }

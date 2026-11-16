@@ -104,6 +104,32 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('saves the new route kind and launches a one-run Time Trial', () => {
+    const starter = createStarterTrack(asTrackId('new-route'), 1)
+    const track: Track = {
+      ...starter,
+      points: [{ x: 0, y: 0, surface: 'street' }, { x: 1_200, y: 0, surface: 'street' }],
+    }
+    const { controller, trackStore, raceSession } = setup(track)
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'set-editor-tool', tool: 'start' })
+    controller.dispatch({ type: 'editor', command: { type: 'set-route-kind', routeKind: 'point-to-point' } })
+    expect(controller.snapshot().editorUi.tool).toBe('draw')
+    expect(controller.snapshot().currentTrack?.raceRevision).toBeGreaterThan(track.updatedAt)
+    controller.dispatch({ type: 'select-track-for-race', id: track.id })
+    expect(trackStore.find(track.id)?.routeKind).toBe('point-to-point')
+    expect(controller.snapshot().overlay.type).toBe('race-setup')
+    controller.dispatch({
+      type: 'set-preferences',
+      preferences: { ...preferences, raceMode: 'time-trial', raceLaps: 3 },
+    })
+    controller.dispatch({ type: 'start-race' })
+    expect(raceSession.start).toHaveBeenCalledWith(
+      expect.objectContaining({ routeKind: 'point-to-point' }),
+      expect.objectContaining({ mode: 'time-trial', laps: 1 }),
+    )
+  })
+
   it('captures setup lighting without changing the track, and retains it on retry', () => {
     const { controller, raceSession, trackStore } = setup(undefined, true)
     const before = JSON.stringify(trackStore.find(asTrackId('starter')))

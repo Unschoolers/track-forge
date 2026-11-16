@@ -407,3 +407,30 @@ describe('scenery placement feedback', () => {
     expect(applyEditorCommand(full, { type: 'add-scenery-prop', prop }).rejection?.code).toBe('scenery-capacity')
   })
 })
+
+
+describe('route kind authoring', () => {
+  it('keeps open endpoints and makes route conversion undoable', () => {
+    const points = [
+      { x: 0, y: 0, surface: 'street' as const },
+      { x: 100, y: 0, surface: 'street' as const },
+      { x: 120, y: 20, surface: 'street' as const },
+      { x: 120, y: 50, surface: 'street' as const },
+      { x: 100, y: 100, surface: 'street' as const },
+      { x: 70, y: 120, surface: 'street' as const },
+      { x: 40, y: 120, surface: 'street' as const },
+      { x: 10, y: 100, surface: 'street' as const },
+      { x: 0, y: 50, surface: 'street' as const },
+      { x: 5, y: 5, surface: 'street' as const },
+    ]
+    const circuit = createEditorState(points)
+    const open = reduceEditor(circuit, { type: 'set-route-kind', routeKind: 'point-to-point' })
+    expect(reduceEditor(open, { type: 'normalize-loop' }).points).toEqual(points)
+    expect(reduceEditor(open, { type: 'reverse-track-direction' })).toBe(open)
+    expect(reduceEditor(open, { type: 'set-track-start', ratio: 0.5 })).toBe(open)
+    const undone = reduceEditor(open, { type: 'undo' })
+    expect(undone.routeKind).toBe('circuit')
+    expect(reduceEditor(undone, { type: 'redo' }).routeKind).toBe('point-to-point')
+    expect(reduceEditor(circuit, { type: 'normalize-loop' }).points.at(-1)).toMatchObject({ x: 0, y: 0 })
+  })
+})

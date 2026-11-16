@@ -1,6 +1,6 @@
 import { OFFICIAL_CIRCUITS, OFFICIAL_TIME_TARGETS } from '@/domain/track/officialCircuits'
 import type { ScoreCategory, ScoreEntry } from '@/application/ports/storage'
-import type { Track } from '@/domain/model'
+import { normalizeRouteKind, type Track } from '@/domain/model'
 import type { RaceSetup } from '@/application/race/raceSession'
 
 /** Versioned, deterministic race-affecting content; metadata and authoring IDs are excluded. */
@@ -19,23 +19,29 @@ export function courseIdentity(track: Track): string {
     first = Math.imul(first ^ code, 0x01000193)
     second = Math.imul(second ^ code, 0x01000193)
   }
-  return `v2:${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
+  return `${normalizeRouteKind(track.routeKind) === 'circuit' ? 'v2' : 'v2:point-to-point'}:${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
 }
 
 export function raceCategory(track: Track, setup: RaceSetup): ScoreCategory {
-  return { course: courseIdentity(track), laps: setup.laps, handling: setup.handling ?? 'arcade', mode: setup.mode ?? 'normal' }
+  return { course: courseIdentity(track), laps: setup.laps, handling: setup.handling ?? 'arcade', mode: setup.mode ?? 'normal', routeKind: normalizeRouteKind(track.routeKind) }
 }
 
 export function sameCategory(score: ScoreEntry, category: ScoreCategory, setup: Pick<RaceSetup, 'car' | 'difficulty'>): boolean {
   const other = score.category
   return !!other && other.course === category.course && other.laps === category.laps &&
     other.handling === category.handling && other.mode === category.mode &&
+    normalizeRouteKind(other.routeKind) === normalizeRouteKind(category.routeKind) &&
     score.car === setup.car && score.difficulty === setup.difficulty
 }
 
 export function scoreCategoryLabel(score: ScoreEntry): string {
   const category = score.category
-  return category ? `${score.car} · ${score.difficulty} · ${category.laps} ${category.laps === 1 ? 'lap' : 'laps'} · ${category.handling} · ${category.mode}` : 'Legacy · settings unknown'
+  if (!category) return 'Legacy · settings unknown'
+  if (category.routeKind === 'point-to-point') {
+    const mode = category.mode === 'normal' ? 'Race AI' : category.mode === 'time-trial' ? 'Time Trial' : 'Ghost Race'
+    return `${score.car} · ${score.difficulty} · ${category.handling} · ${mode}`
+  }
+  return `${score.car} · ${score.difficulty} · ${category.laps} ${category.laps === 1 ? 'lap' : 'laps'} · ${category.handling} · ${category.mode}`
 }
 
 export type TimeMedal = 'bronze' | 'silver' | 'gold'

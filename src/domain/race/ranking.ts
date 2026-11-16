@@ -1,3 +1,4 @@
+import type { RouteKind } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
 export function raceProgress(
@@ -5,7 +6,9 @@ export function raceProgress(
   pathLength: number,
   startPathIndex = 0,
   reversed = false,
+  routeKind: RouteKind = 'circuit',
 ): number {
+  if (routeKind === 'point-to-point') return Math.max(0, Math.min(pathLength - 1, vehicle.pathIndex))
   const length = Math.max(1, pathLength)
   const offset = reversed
     ? startPathIndex - vehicle.pathIndex
@@ -21,6 +24,7 @@ export function rankVehicles(
   pathLength: number,
   startPathIndex = 0,
   reversed = false,
+  routeKind: RouteKind = 'circuit',
 ): readonly RaceVehicle[] {
   return vehicles
     .map((vehicle, gridIndex) => ({ vehicle, gridIndex }))
@@ -36,8 +40,8 @@ export function rankVehicles(
       const lapDifference = right.vehicle.lap - left.vehicle.lap
       if (lapDifference !== 0) return lapDifference
       const progressDifference =
-        raceProgress(right.vehicle, pathLength, startPathIndex, reversed) -
-        raceProgress(left.vehicle, pathLength, startPathIndex, reversed)
+        raceProgress(right.vehicle, pathLength, startPathIndex, reversed, routeKind) -
+        raceProgress(left.vehicle, pathLength, startPathIndex, reversed, routeKind)
       return progressDifference || left.gridIndex - right.gridIndex
     })
     .map(({ vehicle }) => vehicle)

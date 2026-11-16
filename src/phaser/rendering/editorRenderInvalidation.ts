@@ -2,9 +2,10 @@ import type { TerrainBrushRadius } from '@/domain/config'
 import type { EditorTool } from '@/domain/editor/editorGeometry'
 import type { TerrainBrushMode } from '@/domain/editor/terrainBrush'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import type { Vector2 } from '@/domain/model'
+import type { RouteKind, Vector2 } from '@/domain/model'
 
 export interface EditorRenderState {
+  readonly routeKind: RouteKind
   readonly points: object
   readonly terrain: object
   readonly trees: object
@@ -62,6 +63,7 @@ export function editorSnapshotRenderChanges(
     return { world: true, appearance: true, grid: true, overlay: true, preview: true }
   }
   const geometryChanged =
+    previous.routeKind !== current.routeKind ||
     previous.points !== current.points ||
     previous.terrain !== current.terrain ||
     previous.start !== current.start

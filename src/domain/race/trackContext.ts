@@ -55,6 +55,7 @@ export function turnAmountAt(
   index: number,
   distance = 6,
 ): number {
+  if (!path.closed && (index <= 0 || index >= path.points.length - 1)) return 0
   const previous = wrapped(path, index - distance)
   const current = wrapped(path, index)
   const next = wrapped(path, index + distance)
@@ -243,7 +244,7 @@ export function getVehicleStepContext(
   let nearest = local
   let roadSurface = local && path.roadSurface.at(local.index, vehicle)
   if (local && roadSurface && local.distance > ROAD_GEOMETRY.onRoadRadius &&
-      vehicle.player !== false) {
+      vehicle.player !== false && path.closed) {
     const reacquired = reacquireRoad(path, vehicle, roadSurface.terrainHeight)
     if (
       reacquired &&
@@ -379,8 +380,13 @@ export function findNearestSafeTrackIndex(
   path: RoadPath,
   vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex' | 'z'>,
   reversed = false,
+  maxPathIndex?: number,
 ): number | undefined {
-  const nearest = getVehicleStepContext(path, vehicle).nearest.index
+  const limit = !path.closed && maxPathIndex !== undefined
+    ? Math.min(path.points.length - 1, Math.floor(maxPathIndex))
+    : path.points.length - 1
+  if (limit < 0) return undefined
+  const nearest = Math.min(limit, getVehicleStepContext(path, vehicle).nearest.index)
   const travelDirection = reversed ? -1 : 1
   const inspected = new Set<number>()
   for (let distance = 0; distance < path.points.length; distance += 1) {
@@ -394,6 +400,7 @@ export function findNearestSafeTrackIndex(
       const index = normalizedTargetIndex(path, candidate)
       if (
         index === undefined ||
+        index > limit ||
         inspected.has(index)
       ) {
         continue
@@ -408,6 +415,7 @@ export function findNearestSafeTrackIndex(
 export interface TrackResetTarget {
   readonly pathIndex?: number
   readonly reversed?: boolean
+  readonly maxPathIndex?: number
 }
 
 export function resetVehicleToTrack(
@@ -418,7 +426,9 @@ export function resetVehicleToTrack(
   const requestedIndex =
     target.pathIndex === undefined
       ? undefined
-      : normalizedTargetIndex(path, target.pathIndex)
+      : normalizedTargetIndex(path, !path.closed && target.maxPathIndex !== undefined
+        ? Math.min(target.pathIndex, target.maxPathIndex)
+        : target.pathIndex)
   const requestedPoint =
     requestedIndex === undefined ? undefined : path.points[requestedIndex]
   const context = getVehicleStepContext(path, vehicle)
@@ -432,7 +442,13 @@ export function resetVehicleToTrack(
             requestedPoint.y - vehicle.y,
           ),
         }
-      : context.nearest
+      : !path.closed && target.maxPathIndex !== undefined
+        ? (() => {
+            const index = Math.max(0, Math.min(context.nearest.index, Math.floor(target.maxPathIndex)))
+            const point = path.points[index]
+            return point ? { index, point, distance: Math.hypot(point.x - vehicle.x, point.y - vehicle.y) } : context.nearest
+          })()
+        : context.nearest
   // Resetting changes position to the selected road center, so sample support
   // there instead of retaining terrain height from a position under the deck.
   const roadSurface = path.points[nearest.index]
@@ -441,10 +457,10 @@ export function resetVehicleToTrack(
   const direction = target.reversed ? -1 : 1
   const ahead =
     wrapped(path, nearest.index + direction * 4) ?? nearest.point
-  const angle = Math.atan2(
-    ahead.y - nearest.point.y,
-    ahead.x - nearest.point.x,
-  )
+  const behind = wrapped(path, nearest.index - direction * 4) ?? nearest.point
+  const angle = ahead === nearest.point
+    ? Math.atan2(nearest.point.y - behind.y, nearest.point.x - behind.x)
+    : Math.atan2(ahead.y - nearest.point.y, ahead.x - nearest.point.x)
   return {
     ...vehicle,
     x: nearest.point.x,
@@ -511,7 +527,12 @@ export function buildRaceCameraHints(
     if (distance > horizon) break
     preview.push(point)
   }
-  const lookAhead = Math.max(14, Math.min(46, 14 + player.speed * 0.095))
+  const lookAhead = Math.min(
+    Math.max(14, Math.min(46, 14 + player.speed * 0.095)),
+    path.closed ? Infinity : Math.max(0, reversed
+      ? context.nearest.point.distance
+      : path.totalLength - context.nearest.point.distance),
+  )
   return {
     target: {
       x: player.x + Math.cos(roadAngle) * lookAhead,

@@ -20,13 +20,14 @@ const tools: readonly {
 ]
 
 export function createEditorToolPalette(
-  state: Pick<AppSnapshot, 'editorUi'>,
+  state: Pick<AppSnapshot, 'editorUi' | 'editor'>,
   actions: { readonly tool: (tool: EditorTool) => void },
 ): HTMLElement {
   const palette = element('nav', 'tool-rail')
   palette.setAttribute('aria-label', 'Editor tools')
 
   for (const definition of tools) {
+    if (definition.id === 'start' && state.editor.routeKind === 'point-to-point') continue
     const tool = editorIconButton(
       definition.icon,
       definition.id,

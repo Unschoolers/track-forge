@@ -3,6 +3,7 @@ import type {
   DifficultyId,
   SurfaceId,
   Vector2,
+  RouteKind,
 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { AiDriverState } from '@/domain/race/ai/aiState'
@@ -70,6 +71,7 @@ export interface RaceCameraHints {
 
 export interface RaceState {
   readonly path: RoadPath
+  readonly routeKind?: RouteKind
   readonly vehicles: readonly RaceVehicle[]
   readonly difficulty: DifficultyId
   readonly handling?: 'arcade' | 'simulation'

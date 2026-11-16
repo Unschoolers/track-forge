@@ -1,10 +1,11 @@
+import type { RouteKind } from '@/domain/model'
 import { SCENERY_KINDS_BY_ENVIRONMENT, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { button, element } from '@/ui/dom'
 import { createSegmentedButtons } from '@/ui/editor/editorContextDock'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
-export function createEditorMenuModal(environmentId: TrackEnvironmentId, actions: {
+export function createEditorMenuModal(environmentId: TrackEnvironmentId, routeKind: RouteKind, actions: {
   readonly close: () => void
   readonly export: () => void
   readonly save: () => void
@@ -12,6 +13,7 @@ export function createEditorMenuModal(environmentId: TrackEnvironmentId, actions
   readonly choose: () => void
   readonly options: () => void
   readonly home: () => void
+  readonly setRouteKind: (routeKind: RouteKind) => void
   readonly setEnvironment: (environmentId: TrackEnvironmentId) => void
 }): HTMLElement {
   const frame = createModalFrame(
@@ -35,6 +37,12 @@ export function createEditorMenuModal(environmentId: TrackEnvironmentId, actions
   frame.body.classList.add('menu-buttons')
   frame.body.append(
     environment,
+    element('h3', 'results-heading', 'Route type'),
+    createSegmentedButtons('Route type', ([['circuit', 'Circuit'], ['point-to-point', 'Point to point']] as const).map(([value, label]) => ({
+      value, label, action: `route-kind-${value}`, pressed: routeKind === value,
+      select: () => actions.setRouteKind(value),
+    }))),
+    element('p', '', 'Point-to-point races start and finish at the road endpoints.'),
     button(
       'SAVE TRACK',
       'menu-save',

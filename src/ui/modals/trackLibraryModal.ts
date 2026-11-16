@@ -31,7 +31,7 @@ export function createTrackLibraryModal(
   const frame = createModalFrame(
     race ? 'Choose a track' : 'Choose a track to edit',
     race
-      ? 'Tap a circuit to choose your car.'
+      ? 'Tap a track to choose your car.'
       : 'Select an existing named track or create a new one.',
     actions.close,
   )
@@ -50,7 +50,7 @@ export function createTrackLibraryModal(
     const meta = element(
       'span',
       'track-card-meta',
-      `${validation.ready ? 'RACE READY' : 'NEEDS EDITING'} · BEST ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(track) ? ' · past layout' : ''})` : 'NO TIME'}`,
+      `${track.routeKind === 'point-to-point' ? 'POINT TO POINT' : 'CIRCUIT'} · ${validation.ready ? 'RACE READY' : 'NEEDS EDITING'} · BEST ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(track) ? ' · past layout' : ''})` : 'NO TIME'}`,
     )
     copy.append(
       element('strong', 'track-card-name', track.name),

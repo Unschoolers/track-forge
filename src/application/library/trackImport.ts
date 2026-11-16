@@ -1,5 +1,5 @@
 import { MAX_SCENERY_PROPS, normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { isSurfaceId, isLightingMode, asTrackId, type Track, type TrackPoint } from '@/domain/model'
+import { isSurfaceId, isLightingMode, asTrackId, normalizeRouteKind, type Track, type TrackPoint } from '@/domain/model'
 import { EMPTY_TERRAIN, normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -75,13 +75,14 @@ export function parseTrackImport(content: string): TrackImportResult {
       structure: p.structure === 'overpass' ? 'overpass' : 'surface',
     }
   })
+  const routeKind = normalizeRouteKind(source.routeKind)
   let polygonLength = 0
   for (let index = 0; index < normalizedPoints.length; index += 1) {
     const point = normalizedPoints[index]!
     const next = normalizedPoints[(index + 1) % normalizedPoints.length]!
     // Match the compiler: open drafts do not include a last-to-first edge.
     if (index === normalizedPoints.length - 1 &&
-        (normalizedPoints.length < 3 ||
+        (routeKind === 'point-to-point' || normalizedPoints.length < 3 ||
           Math.hypot(next.x - point.x, next.y - point.y) >= TRACK_CLOSE_DISTANCE)) break
     polygonLength += Math.hypot(next.x - point.x, next.y - point.y)
     if (polygonLength > MAX_ROAD_POLYGON_LENGTH) {
@@ -91,7 +92,7 @@ export function parseTrackImport(content: string): TrackImportResult {
   try {
     // Crossing candidates depend on road coordinates, never terrain height.
     // Preflight with a work limit before any untrusted circuit reaches storage.
-    buildRoadPath(normalizedPoints, EMPTY_TERRAIN, MAX_CROSSING_PAIR_CHECKS)
+    buildRoadPath(normalizedPoints, EMPTY_TERRAIN, MAX_CROSSING_PAIR_CHECKS, routeKind)
   } catch (error) {
     if (!(error instanceof CrossingWorkLimitError)) throw error
     return { ok: false, message: 'The shared track has too many overlapping road segments.' }
@@ -105,6 +106,7 @@ export function parseTrackImport(content: string): TrackImportResult {
       name,
       version: 8,
       points: normalizedPoints,
+      routeKind,
       trees: trees.map((value) => {
         const t = object(value)!
         return { x: t.x as number, y: t.y as number }
