@@ -13,6 +13,7 @@ import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository
 import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
 import { PhaserSceneHost } from '@/phaser/sceneHost'
 import { DomUiHost } from '@/ui/uiHost'
+import { installRacePerformance } from '@/infrastructure/qa/racePerformance'
 import '@/styles/layout.css'
 import { RaceSession } from '@/application/race/raceSession'
 import { CUP_CIRCUITS } from '@/application/race/circuitCup'
@@ -101,12 +102,17 @@ const uiHost = new DomUiHost(uiRoot, controller, {
   geometry,
   previewAudioVolume: setAudioVolume,
 })
+const racePerformance = (import.meta.env.DEV || import.meta.env.VITE_TRACKFORGE_RACE_PERF === '1') &&
+  new URLSearchParams(location.search).has('racePerf')
+  ? installRacePerformance()
+  : undefined
 const sceneHost = new PhaserSceneHost(
   gameContainer,
   controller,
   raceSession,
   raceControls,
   geometry,
+  racePerformance,
 )
 const application = createApplication({ sceneHost, uiHost })
 

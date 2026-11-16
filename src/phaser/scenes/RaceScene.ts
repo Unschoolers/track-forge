@@ -19,6 +19,7 @@ import {
   transformVehicleLights,
 } from '@/phaser/rendering/vehicleRenderer'
 import type { SceneControllerPort } from '@/phaser/scenes/EditorScene'
+import type { RacePerformance } from '@/infrastructure/qa/racePerformance'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
 import {
@@ -69,6 +70,7 @@ export class RaceScene extends Phaser.Scene {
     private readonly raceSession: RaceSessionPort,
     private readonly controls: RaceControlsPort,
     private readonly geometry: TrackGeometryService,
+    private readonly racePerformance?: RacePerformance,
   ) {
     super({ key: 'RaceScene' })
   }
@@ -197,11 +199,14 @@ export class RaceScene extends Phaser.Scene {
       !this.effectGraphics ||
       !this.snapshot
     ) return
+    const benchmark = this.racePerformance?.beginUpdate()
     this.snapshot = this.controller.snapshot()
+    benchmark?.beginSimulation()
     this.raceSession.advance(
       Math.max(0, this.game.loop.rawDelta / 1000),
       inputForHandling(this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
     )
+    benchmark?.endSimulation()
     const race = this.raceSession.snapshot().state
     if (!race) return
     const player = race.vehicles.find((vehicle) => vehicle.player)
@@ -294,6 +299,7 @@ export class RaceScene extends Phaser.Scene {
         this.lamps,
       )
     }
+    benchmark?.endUpdate()
   }
 
   private renderGroundPresentation(night: boolean, rotation = 0): void {
