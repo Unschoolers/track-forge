@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { asTrackId } from '@/domain/model'
@@ -315,6 +315,39 @@ describe('track presentation geometry', () => {
     )
     const distances = shadows.map((shadow) => shadow.projectedDistance)
     expect(Math.max(...distances)).toBeGreaterThan(Math.min(...distances))
+  })
+
+  it('builds editor bridge and lamp shadows from local ground samples', () => {
+    const trackGeometry = buildTrackGeometry({
+      points: [
+        { x: 0, y: 80, surface: 'street', structure: 'overpass' },
+        { x: 700, y: 80, surface: 'street', structure: 'overpass' },
+        { x: 1400, y: 80, surface: 'street' },
+      ],
+      terrain: paintTerrain(EMPTY_TERRAIN, terrainBlock(6, 4, 18, 8), 'hill'),
+    })
+    const terrain = trackGeometry.path.terrainSurface
+    const heightAt = vi.fn(terrain.heightAt)
+    const geometry = {
+      ...trackGeometry,
+      path: { ...trackGeometry.path, terrainSurface: { ...terrain, heightAt } },
+    }
+
+    const editorBridge = buildBridgePresentation(geometry, 'local-ground')
+    const editorLamps = buildLampPosts(geometry, 'local-ground')
+    expect(heightAt.mock.calls.length).toBe(0)
+    expect(editorBridge.some(primitive => primitive.kind === 'shadow-core')).toBe(true)
+    expect(editorLamps.length).toBeGreaterThan(0)
+
+    const raceBridge = buildBridgePresentation(geometry)
+    expect(heightAt).toHaveBeenCalled()
+    const deck = (primitives: typeof raceBridge) => primitives.filter(({ kind }) =>
+      kind === 'edge' || kind === 'surface' || kind === 'marking' || kind === 'wall',
+    )
+    expect(deck(editorBridge)).toEqual(deck(raceBridge))
+    heightAt.mockClear()
+    expect(buildLampPosts(geometry)).toHaveLength(editorLamps.length)
+    expect(heightAt).toHaveBeenCalled()
   })
 
   it('terminates solid overpass faces and pillars at local hill terrain', () => {

@@ -10,12 +10,13 @@ export function createEditorSelectionPanels(
   geometry: TrackGeometry,
 ): readonly HTMLElement[] {
   const panels: HTMLElement[] = []
+  const gestureFinished = state.editor.gestureStart === null
   const selectedCrossing = state.editorUi.selectedCrossing
     ? geometry.crossings.find(
         (crossing) => crossing.key === state.editorUi.selectedCrossing,
       )
     : undefined
-  if (selectedCrossing) {
+  if (gestureFinished && selectedCrossing) {
     panels.push(createCrossingControl(selectedCrossing, actions.edit))
   }
 
@@ -23,7 +24,8 @@ export function createEditorSelectionPanels(
     state.editorUi.selectedPoint === null
       ? undefined
       : state.editor.points[state.editorUi.selectedPoint]
-  if (selectedPoint && state.editorUi.selectedPoint !== null) {
+  // The panel can cover the point under the finger as soon as it opens.
+  if (gestureFinished && selectedPoint && state.editorUi.selectedPoint !== null) {
     panels.push(
       createPointControl(
         selectedPoint,

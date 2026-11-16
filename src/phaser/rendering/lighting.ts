@@ -34,6 +34,23 @@ export interface TerrainShadowProjection {
   readonly clearance: number
 }
 
+export type TrackShadowMode = 'terrain' | 'local-ground'
+
+/** Fast projection onto the ground height sampled at the source. */
+export function projectSunShadowOntoLocalGround(
+  point: Vector2,
+  absoluteHeight: number,
+  terrainHeight: number,
+  scale = 1,
+): Omit<TerrainShadowProjection, 'material'> {
+  const clearance = Math.max(0, absoluteHeight - terrainHeight)
+  return {
+    point: projectSunShadow(point, clearance, scale),
+    terrainHeight,
+    clearance,
+  }
+}
+
 /**
  * Intersects the descending sun ray with compiled terrain. A bounded march
  * finds the first receiving bracket, then deterministic bisection converges

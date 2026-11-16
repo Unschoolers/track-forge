@@ -3,7 +3,9 @@ import type { Vector2 } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import {
+  projectSunShadowOntoLocalGround,
   projectSunShadowOntoTerrain,
+  type TrackShadowMode,
   WORLD_LIGHTING,
 } from '@/phaser/rendering/lighting'
 
@@ -28,7 +30,10 @@ export interface LampLight {
   readonly bridge: boolean
 }
 
-const lampCache = new WeakMap<TrackGeometry, readonly LampPost[]>()
+const lampCaches: Record<TrackShadowMode, WeakMap<TrackGeometry, readonly LampPost[]>> = {
+  terrain: new WeakMap(),
+  'local-ground': new WeakMap(),
+}
 // Lamp geometry does not change during a race; avoid remapping it at 60 FPS.
 const lightCache = new WeakMap<readonly LampPost[], readonly LampLight[]>()
 
@@ -47,8 +52,10 @@ function circularDistance(
 
 export function buildLampPosts(
   geometry: TrackGeometry,
+  shadowMode: TrackShadowMode = 'terrain',
 ): readonly LampPost[] {
-  const cached = lampCache.get(geometry)
+  const cache = lampCaches[shadowMode]
+  const cached = cache.get(geometry)
   if (cached) return cached
   const { path, ribbon } = geometry
   if (path.totalLength <= 0 || ribbon.length === 0) return []
@@ -98,11 +105,9 @@ export function buildLampPosts(
     }
     const height = 18
     const localRoad = path.roadSurface.at(index, position)
-    const shadow = projectSunShadowOntoTerrain(
-      position,
-      localRoad.height + height,
-      path.terrainSurface,
-    )
+    const shadow = shadowMode === 'local-ground'
+      ? projectSunShadowOntoLocalGround(position, localRoad.height + height, localRoad.terrainHeight)
+      : projectSunShadowOntoTerrain(position, localRoad.height + height, path.terrainSurface)
     posts.push({
       position,
       roadAnchor: {
@@ -119,7 +124,7 @@ export function buildLampPosts(
       spacing,
     })
   }
-  lampCache.set(geometry, posts)
+  cache.set(geometry, posts)
   return posts
 }
 
