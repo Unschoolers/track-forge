@@ -8,6 +8,7 @@ import type {
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { AiDriverState } from '@/domain/race/ai/aiState'
 import type { RaceEffectsState } from '@/domain/race/effects'
+import type { SceneryColliders } from '@/domain/race/sceneryCollisions'
 
 export type CountdownCue = 3 | 2 | 1 | 'go'
 
@@ -46,6 +47,7 @@ export interface RaceVehicle {
   readonly structureRunId: string | null
   readonly nextSector: 1 | 2 | 3 | 4
   readonly lap: number
+  readonly recoveryCheckpoint?: number | null
   readonly damage: number
   readonly damageLimit: number
   readonly damageCooldown: number
@@ -77,6 +79,8 @@ export interface RaceState {
   readonly handling?: 'arcade' | 'simulation'
   readonly totalLaps: number
   readonly startPathIndex: number
+  readonly recoveryCheckpoints?: readonly number[]
+  readonly sceneryColliders?: SceneryColliders
   readonly reversed: boolean
   readonly elapsed: number
   readonly phase: RacePhase

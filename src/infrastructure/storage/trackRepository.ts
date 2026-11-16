@@ -1,4 +1,5 @@
 import { normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { normalizeRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import type { KeyValueStore, TrackStore } from '@/application/ports/storage'
 import {
   asTrackId,
@@ -191,6 +192,9 @@ function decodeTrack(value: unknown, now: number): Track | undefined {
     version: 8,
     points: migratedPoints,
     routeKind: normalizeRouteKind(item.routeKind),
+    ...(Array.isArray(item.recoveryCheckpoints) ? {
+      recoveryCheckpoints: normalizeRecoveryCheckpoints(item.recoveryCheckpoints),
+    } : {}),
     trees: trees.filter((tree) => tree !== undefined),
     terrain: normalizeTerrain(item.terrain),
     start: decodeStart(item.start),

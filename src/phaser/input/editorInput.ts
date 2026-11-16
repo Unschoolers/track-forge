@@ -5,6 +5,7 @@ import { isSceneryPosition, sceneryKindBelongsToEnvironment } from '@/domain/tra
 import { getTrackEnvironment } from '@/presentation/environments'
 import {
   DEFAULT_TERRAIN_BRUSH_RADIUS,
+  ROAD_GEOMETRY,
   TERRAIN_LIMITS,
   type TerrainBrushRadius,
 } from '@/domain/config'
@@ -28,6 +29,7 @@ import {
   nearestPathPoint,
   type RoadPath,
 } from '@/domain/track/pathBuilder'
+import { isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import {
   planTerrainCellsInBrush,
   planTerrainPaint,
@@ -72,7 +74,8 @@ export interface TerrainPreview {
   readonly terrain: TerrainMap
 }
 
-type TerrainPreviewDraft = Omit<TerrainPreview, 'cells' | 'terrain'>
+export type TerrainCellPreview = Omit<TerrainPreview, 'terrain'>
+type TerrainPreviewDraft = Omit<TerrainCellPreview, 'cells'>
 
 interface SceneryGesture {
   readonly type: 'tree' | 'prop' | 'empty'
@@ -417,6 +420,11 @@ export class EditorInputController {
     else this.dependencies.dispatch({ type: 'add-scenery-prop', prop: { kind: gesture.choice, ...gesture.position } })
   }
 
+  terrainCellPreview(): TerrainCellPreview | null {
+    const stroke = this.terrainStroke
+    return stroke?.preview ? { ...stroke.preview, cells: [...stroke.cellsByKey.values()] } : null
+  }
+
   terrainPreview(): TerrainPreview | null {
     const stroke = this.terrainStroke
     const preview = stroke?.preview
@@ -620,6 +628,22 @@ export class EditorInputController {
           }
         }
         break
+      case 'checkpoint': {
+        if (phase !== 'down') break
+        const path = this.dependencies.path?.()
+        if (!path || path.totalLength <= 0) break
+        const zoom = this.dependencies.camera.zoom
+        const nearest = nearestPathPoint(path, world)
+        if (!nearest || nearest.distance > ROAD_GEOMETRY.onRoadRadius + 10 / zoom) break
+        const ratio = nearest.point.distance / path.totalLength
+        const existing = this.dependencies.editor().recoveryCheckpoints.find(mark =>
+          Math.abs(mark - ratio) * path.totalLength <= Math.min(18, 10 / zoom),
+        )
+        if (existing !== undefined || (ratio < 1 && isSafeRoadRecoverySample(path, nearest.index))) {
+          this.dependencies.dispatch({ type: 'toggle-recovery-checkpoint', ratio: existing ?? ratio })
+        }
+        break
+      }
       case 'select':
         if (phase === 'down') {
           const editor = this.dependencies.editor()

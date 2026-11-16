@@ -20,6 +20,7 @@ import {
 } from '@/domain/editor/editorGeometry'
 import type { TrackRepair } from '@/domain/track/trackDiagnostics'
 import { trackPointSectionId } from '@/domain/track/pathBuilder'
+import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
 import {
   EMPTY_TERRAIN,
   paintTerrain,
@@ -39,6 +40,7 @@ import {
 
 export interface EditorSnapshot {
   readonly routeKind: RouteKind
+  readonly recoveryCheckpoints: readonly number[]
   readonly environmentId: TrackEnvironmentId
   readonly scenery: readonly SceneryProp[]
   readonly points: readonly TrackPoint[]
@@ -56,6 +58,7 @@ export interface EditorState extends EditorSnapshot {
 
 export type EditorCommand =
   | { readonly type: 'set-route-kind'; readonly routeKind: RouteKind }
+  | { readonly type: 'toggle-recovery-checkpoint'; readonly ratio: number }
   | { readonly type: 'begin-gesture' }
   | { readonly type: 'add-point'; readonly point: TrackPoint }
   | {
@@ -136,10 +139,11 @@ export function createEditorState(
   trees: readonly Tree[] = [],
   start: TrackStart = { ratio: 0, reversed: false },
   terrain: TerrainMap = EMPTY_TERRAIN,
-  appearance: Pick<Track, 'environmentId' | 'scenery' | 'routeKind'> = {},
+  appearance: Pick<Track, 'environmentId' | 'scenery' | 'routeKind' | 'recoveryCheckpoints'> = {},
 ): EditorState {
   return {
     routeKind: normalizeRouteKind(appearance.routeKind),
+    recoveryCheckpoints: appearance.recoveryCheckpoints ?? [],
     environmentId: appearance.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
     scenery: appearance.scenery ?? [],
     points: [...points],
@@ -156,6 +160,7 @@ export function createEditorState(
 function snapshot(state: EditorState): EditorSnapshot {
   return {
     routeKind: state.routeKind,
+    recoveryCheckpoints: state.recoveryCheckpoints,
     environmentId: state.environmentId,
     scenery: state.scenery,
     points: state.points,
@@ -283,6 +288,17 @@ function reduceEditorUnchecked(
   switch (command.type) {
     case 'set-route-kind':
       return state.routeKind === command.routeKind ? state : patchEditorState(state, { routeKind: command.routeKind })
+    case 'toggle-recovery-checkpoint': {
+      const { ratio } = command
+      if (!isRecoveryCheckpointRatio(ratio)) return state
+      const current = state.recoveryCheckpoints
+      if (current.includes(ratio)) {
+        return patchEditorState(state, { recoveryCheckpoints: current.filter(mark => mark !== ratio) })
+      }
+      return current.length < MAX_RECOVERY_CHECKPOINTS
+        ? patchEditorState(state, { recoveryCheckpoints: [...current, ratio].sort((a, b) => a - b) })
+        : state
+    }
     case 'begin-gesture':
       return state.gestureStart
         ? state
@@ -499,6 +515,7 @@ function reduceEditorUnchecked(
         points: [],
         trees: [],
         scenery: [],
+        recoveryCheckpoints: [],
         terrain: EMPTY_TERRAIN,
       })
     case 'finalize-draw': {

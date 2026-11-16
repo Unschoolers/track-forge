@@ -168,6 +168,7 @@ export class DomUiHost implements UiHost {
           })
     } else if (state.mode === 'editor') {
       const geometry = this.runtime.geometry.get({
+        routeKind: state.editor.routeKind,
         points: state.editor.points,
         terrain: state.editor.terrain,
         ...(state.editor.start ? { start: state.editor.start } : {}),

@@ -4,6 +4,7 @@ import { EMPTY_TERRAIN, normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { CrossingWorkLimitError } from '@/domain/track/crossings'
+import { MAX_RECOVERY_CHECKPOINTS, normalizeRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 
 export type TrackImportResult =
   | { readonly ok: true; readonly track: Track }
@@ -51,7 +52,8 @@ export function parseTrackImport(content: string): TrackImportResult {
   if (!name || !Array.isArray(points) || points.length > MAX_POINTS ||
       !Array.isArray(trees) || trees.length > MAX_TREES ||
       (Array.isArray(terrain?.cells) && terrain.cells.length > MAX_TERRAIN_CELLS) ||
-      (Array.isArray(source.scenery) && source.scenery.length > MAX_SCENERY_PROPS)) {
+      (Array.isArray(source.scenery) && source.scenery.length > MAX_SCENERY_PROPS) ||
+      (Array.isArray(source.recoveryCheckpoints) && source.recoveryCheckpoints.length > MAX_RECOVERY_CHECKPOINTS)) {
     return { ok: false, message: 'The shared track has invalid or oversized geometry.' }
   }
   if (!points.every((value) => {
@@ -107,6 +109,9 @@ export function parseTrackImport(content: string): TrackImportResult {
       version: 8,
       points: normalizedPoints,
       routeKind,
+      ...(Array.isArray(source.recoveryCheckpoints) ? {
+        recoveryCheckpoints: normalizeRecoveryCheckpoints(source.recoveryCheckpoints),
+      } : {}),
       trees: trees.map((value) => {
         const t = object(value)!
         return { x: t.x as number, y: t.y as number }

@@ -9,6 +9,7 @@ import {
   renderTrackGeometryBase,
   renderTrackGeometryBridgeOverlay,
   renderTrackGeometryStructureUnderlay,
+  renderRecoveryCheckpoints,
 } from '@/phaser/rendering/trackRenderer'
 import {
   renderVehicleShadows,
@@ -175,6 +176,7 @@ export class RaceScene extends Phaser.Scene {
       this.lamps,
       this.raceSession.snapshot().setup?.lighting === 'night',
     )
+    renderRecoveryCheckpoints(this.lampGraphics, geometry.path, this.raceSession.snapshot().state?.recoveryCheckpoints ?? [])
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     this.pointerBinding = bindRacePointer(

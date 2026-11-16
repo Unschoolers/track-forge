@@ -2,14 +2,21 @@ import { OFFICIAL_CIRCUITS, OFFICIAL_TIME_TARGETS } from '@/domain/track/officia
 import type { ScoreCategory, ScoreEntry } from '@/application/ports/storage'
 import { normalizeRouteKind, type Track } from '@/domain/model'
 import type { RaceSetup } from '@/application/race/raceSession'
+import { normalizeTrackEnvironmentId, sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
 
 /** Versioned, deterministic race-affecting content; metadata and authoring IDs are excluded. */
 export function courseIdentity(track: Track): string {
+  const environment = normalizeTrackEnvironmentId(track.environmentId)
   const canonical = JSON.stringify([1,
     track.points.map((p) => [p.x, p.y, p.surface, p.curve ?? 'smooth', p.tension ?? 0.5, p.structure ?? 'surface']),
     track.trees.map((tree) => [tree.x, tree.y]),
     [track.terrain.cellSize, [...track.terrain.cells].sort((a, b) => a.column - b.column || a.row - b.row || a.kind.localeCompare(b.kind)).map((cell) => [cell.column, cell.row, cell.kind])],
     [track.start?.ratio ?? 0, track.start?.reversed ?? false],
+    ...(track.recoveryCheckpoints?.length ? [
+      track.recoveryCheckpoints,
+      (track.scenery ?? []).filter(prop => sceneryKindBelongsToEnvironment(prop.kind, environment))
+        .map(prop => [prop.kind, prop.x, prop.y]),
+    ] : []),
   ])
   // Two independently seeded 32-bit FNV-1a streams yield a compact 64-bit digest.
   let first = 0x811c9dc5

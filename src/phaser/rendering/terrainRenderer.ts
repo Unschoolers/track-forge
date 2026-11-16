@@ -4,7 +4,7 @@ import type { EnvironmentPalette } from '@/presentation/environments/types'
 import { WORLD_ELEVATION } from '@/domain/config'
 import type { Vector2 } from '@/domain/model'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
-import type { TerrainPreview } from '@/phaser/input/editorInput'
+import type { TerrainCellPreview } from '@/phaser/input/editorInput'
 import {
   buildTerrainPresentation,
   type TerrainPresentationDetail,
@@ -131,7 +131,7 @@ export function renderTerrain(
 
 export function renderTerrainPreview(
   graphics: Phaser.GameObjects.Graphics,
-  preview: TerrainPreview | null,
+  preview: TerrainCellPreview | null,
   night: boolean,
 ): void {
   if (!preview) return

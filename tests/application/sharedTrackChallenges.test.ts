@@ -19,6 +19,12 @@ describe('shareable track challenges', () => {
     expect(decoded.track.points).toHaveLength(track.points.length)
     expect(decoded.track.id).not.toBe(track.id)
   })
+  it('keeps authored recovery checkpoint positions in a shared track', () => {
+    const result = parseTrackImport(serializeTrack({
+      ...track, recoveryCheckpoints: [0.6, 0.15, 0.6, -1, 1],
+    }).content)
+    expect(result.ok && result.track.recoveryCheckpoints).toEqual([0.15, 0.6])
+  })
   it('rejects malformed, oversized and dangerous shared geometry', () => {
     expect(parseTrackImport('not json').ok).toBe(false)
     expect(parseTrackImport(JSON.stringify({ format: 'other', track })).ok).toBe(false)
