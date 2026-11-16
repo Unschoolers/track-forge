@@ -6,7 +6,7 @@ import {
   renderNightShade,
 } from '@/phaser/rendering/nightRenderer'
 import {
-  renderTrackGeometryBase,
+  renderRaceTrackGeometryBase,
   renderTrackGeometryBridgeOverlay,
   renderTrackGeometryStructureUnderlay,
   renderRecoveryCheckpoints,
@@ -38,6 +38,7 @@ import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { renderTerrain } from '@/phaser/rendering/terrainRenderer'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import type { UpdateRoadRibbonVisibility } from '@/phaser/rendering/roadRibbonRenderer'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
@@ -51,7 +52,7 @@ export class RaceScene extends Phaser.Scene {
   private environmentSceneryRenderer: SceneryRenderer | undefined
   private terrainGraphics?: Phaser.GameObjects.Graphics
   private sceneryGraphics?: Phaser.GameObjects.Graphics
-  private worldGraphics?: Phaser.GameObjects.Graphics
+  private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
   private vehicleGraphics?: Phaser.GameObjects.Graphics
   private upperVehicleGraphics?: Phaser.GameObjects.Graphics
@@ -101,9 +102,6 @@ export class RaceScene extends Phaser.Scene {
     this.sceneryGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.scenery)
-    this.worldGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.road)
     const structureUnderlayGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.structureUnderlay)
@@ -149,11 +147,7 @@ export class RaceScene extends Phaser.Scene {
       this.raceSession.snapshot().setup?.lighting === 'night',
       geometry.path.terrainSurface,
     )
-    renderTrackGeometryBase(
-      this.worldGraphics,
-      geometry,
-      this.raceSession.snapshot().setup?.lighting === 'night',
-    )
+    this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night)
     renderTrackGeometryStructureUnderlay(
       structureUnderlayGraphics,
       geometry,
@@ -311,6 +305,7 @@ export class RaceScene extends Phaser.Scene {
       }
     const environmentId = normalizeTrackEnvironmentId(track.environmentId)
     this.groundRenderer?.render(view, night, environmentId)
+    this.updateRoadRibbonVisibility?.(view)
     this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
   }
 
@@ -349,6 +344,7 @@ export class RaceScene extends Phaser.Scene {
     document.removeEventListener('visibilitychange', this.onVisibility)
     this.lamps = []
     this.groundRenderer = undefined
+    this.updateRoadRibbonVisibility = undefined
     this.raceCamera = undefined
   }
 }

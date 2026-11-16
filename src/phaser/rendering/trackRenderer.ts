@@ -1,9 +1,14 @@
 import Phaser from 'phaser'
 import { SURFACE_SPECS } from '@/domain/config'
-import type { buildRoadPath, RoadPath } from '@/domain/track/pathBuilder'
+import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
-import { renderRoadRibbon } from '@/phaser/rendering/roadRibbonRenderer'
+import {
+  renderRaceRoadRibbon,
+  renderRoadRibbon,
+  type UpdateRoadRibbonVisibility,
+} from '@/phaser/rendering/roadRibbonRenderer'
+import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
   renderCurbs,
   renderStartGridPreview,
@@ -77,24 +82,20 @@ export function renderTrackGeometryBase(
   geometry: TrackGeometry,
   night: boolean,
 ): void {
-  renderPathBase(
-    graphics,
-    geometry.path,
-    geometry.ribbon,
-    night,
-    geometry.start.ratio,
-  )
-  if (geometry.finish) {
-    for (const [marker, markerColor] of [[geometry.start, 0x38df9b], [geometry.finish, 0xffd45c]] as const) {
-      const normal = { x: -marker.tangent.y, y: marker.tangent.x }
-      const halfWidth = 30
-      graphics.lineStyle(6, markerColor, 1)
-      graphics.beginPath()
-      graphics.moveTo(marker.position.x - normal.x * halfWidth, marker.position.y - normal.y * halfWidth)
-      graphics.lineTo(marker.position.x + normal.x * halfWidth, marker.position.y + normal.y * halfWidth)
-      graphics.strokePath()
-    }
-  }
+  renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night)
+  renderTrackGeometryMarkings(graphics, geometry, night)
+}
+
+export function renderRaceTrackGeometryBase(
+  scene: Phaser.Scene,
+  geometry: TrackGeometry,
+  night: boolean,
+): UpdateRoadRibbonVisibility | undefined {
+  const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night)
+  const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
+  if (!updateVisibility) renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night)
+  renderTrackGeometryMarkings(graphics, geometry, night)
+  return updateVisibility
 }
 
 export function renderTrackGeometryStructureUnderlay(
@@ -118,17 +119,15 @@ export function renderTrackGeometryBridgeOverlay(
   }
 }
 
-function renderPathBase(
+function renderTrackGeometryMarkings(
   graphics: Phaser.GameObjects.Graphics,
-  path: ReturnType<typeof buildRoadPath>,
-  ribbon: TrackGeometry['ribbon'],
+  geometry: TrackGeometry,
   night: boolean,
-  startRatio = 0,
 ): void {
+  const { path } = geometry
   const segmentCount = path.closed
     ? path.points.length
     : path.points.length - 1
-  renderRoadRibbon(graphics, path, ribbon, night)
   renderCurbs(graphics, path, night)
 
   for (let index = 0; index < segmentCount; index += 3) {
@@ -146,6 +145,17 @@ function renderPathBase(
     graphics.lineTo(current.x, current.y)
     graphics.strokePath()
   }
-  renderStartLine(graphics, path, night, startRatio)
+  renderStartLine(graphics, path, night, geometry.start.ratio)
   renderCrossingUnderlay(graphics, path, night)
+  if (geometry.finish) {
+    for (const [marker, markerColor] of [[geometry.start, 0x38df9b], [geometry.finish, 0xffd45c]] as const) {
+      const normal = { x: -marker.tangent.y, y: marker.tangent.x }
+      const halfWidth = 30
+      graphics.lineStyle(6, markerColor, 1)
+      graphics.beginPath()
+      graphics.moveTo(marker.position.x - normal.x * halfWidth, marker.position.y - normal.y * halfWidth)
+      graphics.lineTo(marker.position.x + normal.x * halfWidth, marker.position.y + normal.y * halfWidth)
+      graphics.strokePath()
+    }
+  }
 }
