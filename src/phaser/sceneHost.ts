@@ -6,6 +6,7 @@ import {
   type SceneControllerPort,
 } from '@/phaser/scenes/EditorScene'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
+import type { RacePerformance } from '@/infrastructure/qa/racePerformance'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
 import type { LightingMode, Track } from '@/domain/model'
@@ -27,6 +28,7 @@ export class PhaserSceneHost implements SceneHost {
     private readonly raceSession: RaceSessionPort,
     private readonly raceControls: RaceControlsPort,
     private readonly geometry: TrackGeometryService,
+    private readonly racePerformance?: RacePerformance,
   ) {}
 
   start(mode: AppMode): void {
@@ -48,6 +50,7 @@ export class PhaserSceneHost implements SceneHost {
             this.raceSession,
             this.raceControls,
             this.geometry,
+            this.racePerformance,
           ),
         ],
         input: { activePointers: 3 },
@@ -56,6 +59,13 @@ export class PhaserSceneHost implements SceneHost {
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
       })
+      const racePerformance = this.racePerformance
+      if (racePerformance) {
+        this.game.events.on(Phaser.Core.Events.PRE_RENDER, () => racePerformance.beginRender())
+        this.game.events.on(Phaser.Core.Events.POST_RENDER, (_renderer: unknown, time: number) => {
+          racePerformance.afterRender(time, this.raceSession.snapshot())
+        })
+      }
       return
     }
     const trackId = mode === 'race' ? this.controller.snapshot().currentTrack?.id : undefined

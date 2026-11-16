@@ -41,6 +41,11 @@ a shared CI machine are diagnostic, not a stable pass/fail FPS target.
 
 Touch events are Chromium browser simulations, not physical finger hardware.
 
+## Race performance
+
+See the [race performance baseline](race-performance.md) for repeatable frame,
+simulation and race entry measurements on Android and Chromium.
+
 ## Deterministic Arcade sector checks
 
 `npm test -- tests/domain/arcadeSectorComparison.test.ts tests/domain/arcadeAssists.test.ts tests/domain/rampDriving.test.ts` exercises fixed-step player steering and manual braking on street and ice hairpins and straight ramps. Verify the player can approach a bend in both directions with full throttle and only applies the service brake in response to input. Compare entry and exit speed, sector time, off-road incidents, and recoveries. Test Blue and Red on a signed APK with both steering layouts on a physical phone.
