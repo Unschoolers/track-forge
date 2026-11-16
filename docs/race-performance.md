@@ -13,14 +13,22 @@ Beach. Use the same saved track files before and after a change.
 Choose Blue, Arcade, Normal difficulty and Dynamic zoom on. Use two laps for
 closed circuits and one run for point-to-point tracks. Each race should report
 four cars. Keep audio settings fixed and leave the controls untouched for the
-first five seconds after **GO**. Reload the app before each run, open Race Setup,
-and wait for its flyover to appear before pressing **Start Race**. Record three
-runs per scenario and compare medians of the reported values.
+first five seconds after **GO**.
+
+1. Reload the app, open Race Setup for the track and choose the lighting and mode
+   from the table. Leave the flyover playing for five seconds after setting
+   those options, then press **Start Race**. Save this as the first-run capture.
+2. After the capture completes, use the race menu to **Quit to Home**. Open the
+   same Race Setup again, apply the same settings, and press **Start Race**
+   after the same five seconds of flyover playback. Save this as the warm run.
+3. Capture three pairs per scenario on each build. Compare the median of the
+   three first runs and the median of the three warm runs separately.
 
 ## Physical Android debug APK
 
 Build an instrumented debug APK locally using the Android prerequisites in the
-[README](../README.md).
+[README](../README.md). Install it on a spare device or update a local build that
+uses the same signing key and an equal or lower version code.
 
 ```sh
 npm ci
@@ -46,7 +54,7 @@ copy(JSON.stringify(window.__trackForgeRacePerformance.report(), null, 2))
 Compare results with `status: "complete"`. Pausing, backgrounding, or reaching
 the finish during sampling interrupts the capture. Keep the device, Android and
 WebView versions, display refresh rate, and build commit with the JSON. Use
-`location.reload()` between runs to retain the benchmark query.
+`location.reload()` before each new pair to retain the benchmark query.
 
 ## Mobile Chromium smoke test
 
@@ -62,15 +70,18 @@ npm run qa:mobile -- race-performance
 
 For all four scenarios, place the exports in a local directory with filenames
 `City-Harbor.trackforge.json`, `Rally.trackforge.json` and
-`Sandy-Beach.trackforge.json`. Keep the Track Forge track names from the table.
+`Sandy-Beach.trackforge.json`. The harness selects tracks by their imported
+names.
 
 ```sh
 TRACKFORGE_RACE_PERF_TRACKS=/path/to/exports npm run qa:mobile -- race-performance
 ```
 
-Open `race-performance.json` in the Playwright test attachments. The smoke
-test checks the report and records timing for diagnosis. Use the physical
-device runs to compare against the frame time targets.
+Open `race-performance.json` in the default smoke test attachments. The
+export-based scenarios use the first-run and warm-run procedure and attach
+`race-performance-first.json` and `race-performance-warm.json`. Add
+`--repeat-each=3` for three capture pairs per scenario. Use the physical device
+runs to compare against the performance targets.
 
 ## Report fields
 
@@ -85,4 +96,5 @@ device runs to compare against the frame time targets.
 The four sampled fields give nearest-rank p50, p95 and p99 in milliseconds. The
 sample starts after the first running frame and spans five seconds or 2,048
 samples, whichever comes first. Rendering timings are on the WebView thread.
-For a 60 Hz device, aim for frame p95 below 20 ms and frame p99 below 33 ms.
+On physical Android, aim for warm Start → countdown under 500 ms. On a 60 Hz
+device, aim for frame p95 below 20 ms and frame p99 below 33 ms.
