@@ -5,11 +5,13 @@ import {
   trackPointSectionId,
 } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { MAX_ROAD_CONTROL_LENGTH, recoverableCircuitPointCount, roadControlLength } from '@/domain/track/roadLength'
 import { findRoadWaterExposure } from '@/domain/track/waterExposure'
 
 export type TrackDiagnosticSeverity = 'error' | 'warning'
 
 export type TrackRepair =
+  | { readonly type: 'remove-road-after-closed-circuit' }
   | { readonly type: 'smooth-point'; readonly index: number }
   | {
       readonly type: 'flatten-crossing'
@@ -103,6 +105,17 @@ export function analyzeTrack(
   track: Track,
   geometry: TrackGeometry,
 ): readonly TrackDiagnostic[] {
+  if (roadControlLength(track) > MAX_ROAD_CONTROL_LENGTH) {
+    const first = track.points[0]
+    if (!first || recoverableCircuitPointCount(track) === undefined) return []
+    return [{
+      id: 'road-after-closed-circuit',
+      severity: 'error',
+      message: 'Extra road extends far beyond the closed circuit.',
+      position: first,
+      repair: { type: 'remove-road-after-closed-circuit' },
+    }]
+  }
   const diagnostics: TrackDiagnostic[] = []
   const controlCount = track.points.length - 1
   for (let first = 0; first < controlCount; first += 1) {

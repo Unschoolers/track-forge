@@ -2,6 +2,7 @@ import type { TerrainMap, Tree } from '@/domain/model'
 import { terrainKindAt } from '@/domain/terrain/terrainField'
 
 export type EditorRejectionCode =
+  | 'road-too-long'
   | 'invalid-tree-position'
   | 'invalid-scenery-position'
   | 'scenery-capacity'
@@ -14,6 +15,11 @@ export type EditorRejectionCode =
 export interface EditorCommandRejection {
   readonly code: EditorRejectionCode
   readonly message: string
+}
+
+export const ROAD_LENGTH_REJECTION: EditorCommandRejection = {
+  code: 'road-too-long',
+  message: 'The edit would make the road too long.',
 }
 
 export function treePlacementRejection(

@@ -19,6 +19,7 @@ import {
   planTerrainExpansionAroundBoundsCenter,
 } from '@/domain/editor/editorGeometry'
 import type { TrackRepair } from '@/domain/track/trackDiagnostics'
+import { MAX_ROAD_CONTROL_LENGTH, recoverableCircuitPointCount, roadControlLength } from '@/domain/track/roadLength'
 import { trackPointSectionId } from '@/domain/track/pathBuilder'
 import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
 import {
@@ -31,6 +32,7 @@ import {
   EXPAND_TERRAIN_BOUNDS_REJECTION,
   EXPAND_TERRAIN_CAPACITY_REJECTION,
   INVALID_SCENERY_POSITION_REJECTION,
+  ROAD_LENGTH_REJECTION,
   SCENERY_CAPACITY_REJECTION,
   TERRAIN_CAPACITY_REJECTION,
   TERRAIN_COORDINATE_BOUNDS_REJECTION,
@@ -271,7 +273,16 @@ export function applyEditorCommand(
       }
     }
   }
-  return { state: reduceEditorUnchecked(state, command), rejection: null }
+  const next = reduceEditorUnchecked(state, command)
+  // History must be able to restore the original legacy geometry after repair.
+  if ((next.points !== state.points || next.routeKind !== state.routeKind) &&
+    command.type !== 'undo' && command.type !== 'redo' && command.type !== 'cancel-gesture') {
+    const length = roadControlLength(next)
+    if (!Number.isFinite(length) || (length > MAX_ROAD_CONTROL_LENGTH && length > roadControlLength(state))) {
+      return { state, rejection: ROAD_LENGTH_REJECTION }
+    }
+  }
+  return { state: next, rejection: null }
 }
 
 export function reduceEditor(
@@ -461,6 +472,11 @@ function reduceEditorUnchecked(
       })
     case 'apply-track-repair': {
       const repair = command.repair
+      if (repair.type === 'remove-road-after-closed-circuit') {
+        if (roadControlLength(state) <= MAX_ROAD_CONTROL_LENGTH) return state
+        const count = recoverableCircuitPointCount(state)
+        return count === undefined ? state : patchEditorState(state, { points: state.points.slice(0, count) })
+      }
       if (repair.type === 'smooth-point') {
         const point = state.points[repair.index]
         if (!point) return state

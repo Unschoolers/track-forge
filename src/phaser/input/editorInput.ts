@@ -149,6 +149,7 @@ export class EditorInputController {
   private lastScreen: Vector2 | undefined
   private selectedPoint = -1
   private drawStartIndex = 0
+  private pendingDrawStart: { screen: Vector2; world: Vector2 } | undefined
   private sceneryGesture: SceneryGesture | undefined
   private terrainPreviewRevision = 0
   private terrainStroke: {
@@ -193,7 +194,12 @@ export class EditorInputController {
     if (this.gestureHasTransaction) {
       this.dependencies.dispatch({ type: 'begin-gesture' })
     }
-    this.applyTool(pointer, 'down')
+    if (this.gestureTool === 'draw') {
+      // Wait for a stroke or tap so a pinch can start without rebuilding the road.
+      this.pendingDrawStart = { screen: pointer, world: this.worldPosition(pointer) }
+    } else {
+      this.applyTool(pointer, 'down')
+    }
   }
 
   pointerMove(pointer: PointerSample): void {
@@ -230,6 +236,9 @@ export class EditorInputController {
         (pointer.y - previous.y) / this.dependencies.camera.zoom
       this.dependencies.onCameraChanged?.()
     } else {
+      const start = this.pendingDrawStart
+      if (start && Math.hypot(pointer.x - start.screen.x, pointer.y - start.screen.y) < 4) return
+      this.commitPendingDrawStart()
       this.applyTool(pointer, 'move')
     }
     this.lastScreen = pointer
@@ -269,6 +278,7 @@ export class EditorInputController {
     if (this.activePointer === undefined) return
     this.terrainStroke = undefined
     this.sceneryGesture = undefined
+    this.pendingDrawStart = undefined
     if (this.gestureHasTransaction) {
       this.dependencies.dispatch({ type: 'cancel-gesture' })
     }
@@ -301,6 +311,7 @@ export class EditorInputController {
       this.commitSceneryGesture(sceneryGesture)
     }
     if (tool === 'draw') {
+      this.commitPendingDrawStart()
       this.dependencies.dispatch({
         type: 'finalize-draw',
         startIndex: this.drawStartIndex,
@@ -322,6 +333,7 @@ export class EditorInputController {
     this.lastScreen = undefined
     this.selectedPoint = -1
     this.drawStartIndex = 0
+    this.pendingDrawStart = undefined
   }
 
   zoomBy(delta: number): void {
@@ -568,34 +580,40 @@ export class EditorInputController {
     this.dependencies.onRejected?.(rejection)
   }
 
+  private commitPendingDrawStart(): void {
+    const start = this.pendingDrawStart
+    if (!start) return
+    this.pendingDrawStart = undefined
+    this.drawRoadAt(start.world)
+  }
+
+  private drawRoadAt(world: Vector2): void {
+    const editor = this.dependencies.editor()
+    const points = appendDrawPoint(
+      editor.points,
+      world,
+      this.dependencies.surface(),
+      this.dependencies.camera.zoom,
+    )
+    if (points === editor.points) return
+    const point = points.at(-1)
+    if (!point) return
+    if (points.length === editor.points.length) {
+      this.dependencies.dispatch({ type: 'move-point', index: points.length - 1, point })
+    } else {
+      this.dependencies.dispatch({ type: 'add-point', point })
+    }
+  }
+
   private applyTool(
     pointer: PointerSample,
     phase: 'down' | 'move',
   ): void {
     const world = this.worldPosition(pointer)
     switch (this.dependencies.tool()) {
-      case 'draw': {
-        const editor = this.dependencies.editor()
-        const points = appendDrawPoint(
-          editor.points,
-          world,
-          this.dependencies.surface(),
-          this.dependencies.camera.zoom,
-        )
-        if (points === editor.points) break
-        const point = points.at(-1)
-        if (!point) break
-        if (points.length === editor.points.length) {
-          this.dependencies.dispatch({
-            type: 'move-point',
-            index: points.length - 1,
-            point,
-          })
-        } else {
-          this.dependencies.dispatch({ type: 'add-point', point })
-        }
+      case 'draw':
+        this.drawRoadAt(world)
         break
-      }
       case 'tree':
         if (this.dependencies.sceneryChoice) {
           if (phase === 'down') this.beginSceneryGesture(pointer, world)

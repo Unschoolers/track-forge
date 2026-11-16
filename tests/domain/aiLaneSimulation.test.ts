@@ -54,7 +54,7 @@ describe('AI lane simulations', () => {
 				y: p.y * 1e30,
 			})),
 		}
-		expect(() => prepareLanePath(enormous)).toThrow(/budget|close/i)
+		expect(() => prepareLanePath(enormous)).toThrow(/road-too-long/i)
 		const tooMany = {
 			...track,
 			points: Array.from({ length: 2001 }, () => ({

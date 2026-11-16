@@ -6,6 +6,7 @@ import {
   type RoadPathPoint,
 } from '@/domain/track/pathBuilder'
 import type { TrackCrossing } from '@/domain/track/crossings'
+import { roadPointsForPreview } from '@/domain/track/roadLength'
 
 export interface RoadRibbonSample {
   readonly center: RoadPathPoint
@@ -80,8 +81,9 @@ function nearestDistanceIndex(path: RoadPath, target: number): number {
 export function buildTrackGeometry(
   track: Pick<Track, 'points' | 'start' | 'terrain' | 'routeKind'>,
 ): TrackGeometry {
-  const pointToPoint = normalizeRouteKind(track.routeKind) === 'point-to-point'
-  const path = buildRoadPath(track.points, track.terrain, undefined, normalizeRouteKind(track.routeKind))
+  const routeKind = normalizeRouteKind(track.routeKind)
+  const pointToPoint = routeKind === 'point-to-point'
+  const path = buildRoadPath(roadPointsForPreview(track), track.terrain, undefined, routeKind)
   const ribbon = buildRoadRibbon(path)
   const ratio = pointToPoint ? 0 : Math.max(0, Math.min(0.999_999, track.start?.ratio ?? 0))
   const distance = path.totalLength * ratio
