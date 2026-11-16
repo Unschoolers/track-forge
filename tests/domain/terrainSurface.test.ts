@@ -202,6 +202,38 @@ describe('compiled terrain surface', () => {
     ])
   })
 
+  it('returns flat ground beside a hill without searching the road path', () => {
+    const terrain = paintTerrain(EMPTY_TERRAIN, [{ column: 0, row: 0 }], 'hill')
+    let coordinateReads = 0
+    const surface = compile(terrain, [
+      {
+        get x() {
+          coordinateReads += 1
+          return 34
+        },
+        y: 16,
+      },
+      { x: 100, y: 16 },
+    ])
+    const readsAfterCompile = coordinateReads
+
+    expect(surface.heightSampleAt({ x: 35, y: 16 })).toEqual({
+      height: WORLD_ELEVATION.baseHeight, gradient: { x: 0, y: 0 },
+    })
+    expect(coordinateReads).toBe(readsAfterCompile)
+  })
+
+  it('reuses terrain contours across road changes and recalculates nearby heights', () => {
+    const terrain = paintTerrain(EMPTY_TERRAIN, rectangle(0, 3, 0, 3), 'hill')
+    const point = { x: 16, y: 64 }
+    const before = compile(terrain, [{ x: 16, y: 0 }, { x: 16, y: 128 }])
+    const after = compile(terrain, [{ x: 400, y: 0 }, { x: 400, y: 128 }])
+
+    expect(before.heightAt(point)).toBeCloseTo(4)
+    expect(after.heightAt(point)).toBeCloseTo(16)
+    expect(after.contours).toBe(before.contours)
+  })
+
   it('caches by terrain and center-path identity', () => {
     const terrain = paintTerrain(
       EMPTY_TERRAIN,

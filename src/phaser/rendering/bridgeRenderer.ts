@@ -6,8 +6,11 @@ import {
 } from '@/domain/config'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import type { RoadSurfaceSample } from '@/domain/track/roadSurface'
 import {
+  projectSunShadowOntoLocalGround,
   projectSunShadowOntoTerrain,
+  type TrackShadowMode,
   WORLD_LIGHTING,
 } from '@/phaser/rendering/lighting'
 
@@ -43,10 +46,10 @@ export type BridgePrimitive =
   | BridgePolygonPrimitive
   | BridgeLinePrimitive
 
-const presentationCache = new WeakMap<
-  TrackGeometry,
-  readonly BridgePrimitive[]
->()
+const presentationCaches: Record<TrackShadowMode, WeakMap<TrackGeometry, readonly BridgePrimitive[]>> = {
+  terrain: new WeakMap(),
+  'local-ground': new WeakMap(),
+}
 
 function shadowDistance(height: number, scale = 1): number {
   return (
@@ -72,8 +75,10 @@ function elevationBase(
 
 export function buildBridgePresentation(
   geometry: TrackGeometry,
+  shadowMode: TrackShadowMode = 'terrain',
 ): readonly BridgePrimitive[] {
-  const cached = presentationCache.get(geometry)
+  const cache = presentationCaches[shadowMode]
+  const cached = cache.get(geometry)
   if (cached) return cached
   const softShadows: BridgePrimitive[] = []
   const coreShadows: BridgePrimitive[] = []
@@ -84,6 +89,10 @@ export function buildBridgePresentation(
   const walls: BridgePrimitive[] = []
   const { path, ribbon } = geometry
   const count = path.closed ? ribbon.length : ribbon.length - 1
+  const projectShadow = (point: Vector2, road: RoadSurfaceSample, scale = 1) =>
+    shadowMode === 'local-ground'
+      ? projectSunShadowOntoLocalGround(point, road.height, road.terrainHeight, scale)
+      : projectSunShadowOntoTerrain(point, road.height, path.terrainSurface, scale)
 
   for (let index = 0; index < count; index += 1) {
     const current = ribbon[index]
@@ -108,28 +117,24 @@ export function buildBridgePresentation(
     const currentRightRoad = path.roadSurface.at(index, current.edgeRight)
     const nextLeftRoad = path.roadSurface.at(nextIndex, next.edgeLeft)
     const nextRightRoad = path.roadSurface.at(nextIndex, next.edgeRight)
-    const softCurrentLeft = projectSunShadowOntoTerrain(
+    const softCurrentLeft = projectShadow(
       current.edgeLeft,
-      currentLeftRoad.height,
-      path.terrainSurface,
+      currentLeftRoad,
       WORLD_LIGHTING.penumbraScale,
     )
-    const softNextLeft = projectSunShadowOntoTerrain(
+    const softNextLeft = projectShadow(
       next.edgeLeft,
-      nextLeftRoad.height,
-      path.terrainSurface,
+      nextLeftRoad,
       WORLD_LIGHTING.penumbraScale,
     )
-    const softNextRight = projectSunShadowOntoTerrain(
+    const softNextRight = projectShadow(
       next.edgeRight,
-      nextRightRoad.height,
-      path.terrainSurface,
+      nextRightRoad,
       WORLD_LIGHTING.penumbraScale,
     )
-    const softCurrentRight = projectSunShadowOntoTerrain(
+    const softCurrentRight = projectShadow(
       current.edgeRight,
-      currentRightRoad.height,
-      path.terrainSurface,
+      currentRightRoad,
       WORLD_LIGHTING.penumbraScale,
     )
     const softClearance = Math.max(
@@ -161,26 +166,10 @@ export function buildBridgePresentation(
         softNextLeft.terrainHeight,
       ],
     })
-    const currentLeftShadow = projectSunShadowOntoTerrain(
-      current.edgeLeft,
-      currentLeftRoad.height,
-      path.terrainSurface,
-    )
-    const nextLeftShadow = projectSunShadowOntoTerrain(
-      next.edgeLeft,
-      nextLeftRoad.height,
-      path.terrainSurface,
-    )
-    const nextRightShadow = projectSunShadowOntoTerrain(
-      next.edgeRight,
-      nextRightRoad.height,
-      path.terrainSurface,
-    )
-    const currentRightShadow = projectSunShadowOntoTerrain(
-      current.edgeRight,
-      currentRightRoad.height,
-      path.terrainSurface,
-    )
+    const currentLeftShadow = projectShadow(current.edgeLeft, currentLeftRoad)
+    const nextLeftShadow = projectShadow(next.edgeLeft, nextLeftRoad)
+    const nextRightShadow = projectShadow(next.edgeRight, nextRightRoad)
+    const currentRightShadow = projectShadow(current.edgeRight, currentRightRoad)
     const coreClearance = Math.max(
       currentLeftShadow.clearance,
       nextLeftShadow.clearance,
@@ -226,18 +215,10 @@ export function buildBridgePresentation(
       ? current.edgeLeft
       : current.edgeRight
     const nextFace = shadowOnLeft ? next.edgeLeft : next.edgeRight
-    const currentFaceRoad = path.roadSurface.at(index, currentFace)
-    const nextFaceRoad = path.roadSurface.at(nextIndex, nextFace)
-    const currentFaceGround = projectSunShadowOntoTerrain(
-      currentFace,
-      currentFaceRoad.height,
-      path.terrainSurface,
-    )
-    const nextFaceGround = projectSunShadowOntoTerrain(
-      nextFace,
-      nextFaceRoad.height,
-      path.terrainSurface,
-    )
+    const currentFaceRoad = shadowOnLeft ? currentLeftRoad : currentRightRoad
+    const nextFaceRoad = shadowOnLeft ? nextLeftRoad : nextRightRoad
+    const currentFaceGround = shadowOnLeft ? currentLeftShadow : currentRightShadow
+    const nextFaceGround = shadowOnLeft ? nextLeftShadow : nextRightShadow
     sideFaces.push({
       kind: 'side-face',
       ...elevationBase(
@@ -360,12 +341,8 @@ export function buildBridgePresentation(
       Math.floor(currentDistance / ROAD_GEOMETRY.bridgePillarSpacing) !==
         Math.floor(nextDistance / ROAD_GEOMETRY.bridgePillarSpacing)
     ) {
-      const pillarGround = projectSunShadowOntoTerrain(
-        current.center,
-        currentRoad.height,
-        path.terrainSurface,
-      )
-      if (pillarGround.material === 'water') continue
+      const pillarGround = projectShadow(current.center, currentRoad)
+      if (path.terrainSurface.materialAt(pillarGround.point) === 'water') continue
       pillars.push({
         kind: 'pillar',
         ...elevationBase(
@@ -388,7 +365,7 @@ export function buildBridgePresentation(
     ...markings,
     ...walls,
   ]
-  presentationCache.set(geometry, presentation)
+  cache.set(geometry, presentation)
   return presentation
 }
 
@@ -430,8 +407,9 @@ export function renderBridgeUnderlay(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night = false,
+  shadowMode: TrackShadowMode = 'terrain',
 ): void {
-  for (const primitive of buildBridgePresentation(geometry)) {
+  for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
     if (primitive.kind === 'shadow-soft' && !night) {
       fill(graphics, primitive.polygon, 0x050807, 0.15)
     } else if (primitive.kind === 'shadow-core' && !night) {
@@ -446,8 +424,9 @@ export function renderBridgeDeck(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night: boolean,
+  shadowMode: TrackShadowMode = 'terrain',
 ): void {
-  for (const primitive of buildBridgePresentation(geometry)) {
+  for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
     const spec = SURFACE_SPECS[primitive.surface]
     if (primitive.kind === 'edge') {
       fill(
@@ -484,8 +463,9 @@ export function renderBridgeSideWalls(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night: boolean,
+  shadowMode: TrackShadowMode = 'terrain',
 ): void {
-  for (const primitive of buildBridgePresentation(geometry)) {
+  for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
     if (primitive.kind !== 'wall') continue
     stroke(graphics, primitive, 7, night ? 0x8f9aa4 : 0xd8dde1)
     stroke(graphics, primitive, 2, night ? 0x303941 : 0x59636d)

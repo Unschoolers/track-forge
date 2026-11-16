@@ -279,6 +279,10 @@ export class EditorInputController {
     this.terrainStroke = undefined
     this.sceneryGesture = undefined
     this.pendingDrawStart = undefined
+    if (this.gestureTool === 'select') {
+      if (this.selectedPoint >= 0) this.dependencies.onPointSelected?.(null)
+      else this.dependencies.onCrossingSelected?.(null)
+    }
     if (this.gestureHasTransaction) {
       this.dependencies.dispatch({ type: 'cancel-gesture' })
     }
@@ -318,6 +322,10 @@ export class EditorInputController {
         zoom: this.dependencies.camera.zoom,
       })
       this.dependencies.dispatch({ type: 'normalize-loop' })
+    }
+    if (tool === 'select' && this.selectedPoint >= 0 && this.dependencies.editor().gestureChanged) {
+      // A completed drag leaves the canvas clear for another drag.
+      this.dependencies.onPointSelected?.(null)
     }
     if (commitTerrain) {
       this.commitTerrainStroke()

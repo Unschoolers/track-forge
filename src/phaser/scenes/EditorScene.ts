@@ -9,11 +9,14 @@ import {
 } from '@/phaser/rendering/editorRenderer'
 import {
   renderTrackGeometryBase,
-  renderTrackGeometryBridgeOverlay,
-  renderTrackGeometryStructureUnderlay,
   renderTrackStartGridPreview,
   renderRecoveryCheckpoints,
 } from '@/phaser/rendering/trackRenderer'
+import {
+  renderBridgeDeck,
+  renderBridgeSideWalls,
+  renderBridgeUnderlay,
+} from '@/phaser/rendering/bridgeRenderer'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { roadPointsForPreview } from '@/domain/track/roadLength'
@@ -90,6 +93,8 @@ export class EditorScene extends Phaser.Scene {
   private readonly editorCamera: EditorCamera = { x: 0, y: 0, zoom: 1 }
   private cameraTrackId: TrackId | undefined
   private lastCameraRequest = -1
+  private worldRenderPending = false
+  private overlayRenderPending = false
   private previewRenderPending = false
   private compiledTerrainPreviewRevision: number | undefined
   private terrainPreviewImpacts: readonly TerrainPreviewImpact[] = []
@@ -221,6 +226,7 @@ export class EditorScene extends Phaser.Scene {
   }
 
   override update(): void {
+    this.renderPendingGeometry()
     const { width, height } = this.viewport()
     this.terrainRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
     this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
@@ -319,7 +325,7 @@ export class EditorScene extends Phaser.Scene {
       (gestureContextChanged && treePreviewRenderRequired(previousPreview, this.editorInput?.sceneryPreview() ?? null))) {
       this.renderSceneryPresentation(true)
     }
-    if (previousRenderState && previousRenderState.environmentId !== renderState.environmentId && !changes.world) this.renderTerrainPresentation(this.trackGeometry())
+    if (previousRenderState && previousRenderState.environmentId !== renderState.environmentId && !this.worldRenderPending) this.renderTerrainPresentation(this.trackGeometry())
     if (cameraChanged && !changes.world) this.refreshTerrainForCamera()
   }
 
@@ -331,19 +337,25 @@ export class EditorScene extends Phaser.Scene {
       (night ? getTrackEnvironment(snapshot.editor.environmentId).night : getTrackEnvironment(snapshot.editor.environmentId).day).editorGround,
     )
     this.renderGroundPresentation()
-    const geometry =
-      changes.world || changes.overlay
-        ? this.trackGeometry()
-        : undefined
-    if (changes.world && geometry) {
-      this.renderWorldPresentation(geometry)
-    }
+    // A touch release can append, simplify and close a stroke in one frame.
+    this.worldRenderPending ||= changes.world
+    this.overlayRenderPending ||= changes.overlay
     if (changes.appearance || changes.world) this.renderSceneryPresentation()
     if (changes.grid) this.renderGridPresentation()
-    if (changes.overlay && geometry) {
+    if (changes.preview) this.previewRenderPending = true
+  }
+
+  private renderPendingGeometry(): void {
+    if (!this.worldRenderPending && !this.overlayRenderPending) return
+    const geometry = this.trackGeometry()
+    if (this.worldRenderPending) {
+      this.worldRenderPending = false
+      this.renderWorldPresentation(geometry)
+    }
+    if (this.overlayRenderPending) {
+      this.overlayRenderPending = false
       this.renderOverlayPresentation(geometry)
     }
-    if (changes.preview) this.previewRenderPending = true
   }
 
   private renderWorldPresentation(geometry: TrackGeometry): void {
@@ -375,25 +387,27 @@ export class EditorScene extends Phaser.Scene {
       night,
     )
     renderTrackStartGridPreview(this.trackGraphics, geometry)
-    renderTrackGeometryStructureUnderlay(
+    renderBridgeUnderlay(
       this.structureUnderlayGraphics,
       geometry,
       night,
+      'local-ground',
     )
-    renderTrackGeometryBridgeOverlay(
+    renderBridgeDeck(
       this.structureDeckGraphics,
       geometry,
       night,
+      'local-ground',
     )
-    renderTrackGeometryBridgeOverlay(
+    renderBridgeSideWalls(
       this.structureWallGraphics,
       geometry,
       night,
-      true,
+      'local-ground',
     )
     renderLampPosts(
       this.lampGraphics,
-      buildLampPosts(geometry),
+      buildLampPosts(geometry, 'local-ground'),
       night,
     )
     this.roadRaster?.invalidate()
@@ -439,7 +453,7 @@ export class EditorScene extends Phaser.Scene {
   /** Zooming only rebuilds terrain when crossing a detail threshold.
    * Road, bridges, and authored geometry stay exactly as they were. */
   private refreshTerrainForCamera(): void {
-    if (!this.terrainGraphics || !this.currentSnapshot) return
+    if (!this.terrainGraphics || !this.currentSnapshot || this.worldRenderPending) return
     const geometry = this.trackGeometry()
     const detail = this.terrainDetail(geometry)
     if (detail === this.renderedTerrainDetail) return
@@ -638,6 +652,8 @@ export class EditorScene extends Phaser.Scene {
     this.editorInput = undefined
     this.currentSnapshot = undefined
     this.currentRenderState = undefined
+    this.worldRenderPending = false
+    this.overlayRenderPending = false
     this.previewRenderPending = false
     this.compiledTerrainPreviewRevision = undefined
     this.terrainPreviewImpacts = []

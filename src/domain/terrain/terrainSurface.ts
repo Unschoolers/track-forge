@@ -53,6 +53,15 @@ interface DistanceSample {
   readonly gradient: Vector2
 }
 
+interface CompiledTerrainField {
+  readonly lookup: ReadonlyMap<string, TerrainKind>
+  readonly hillDistance: BoundaryDistanceLookup
+  readonly contours: readonly TerrainContour[]
+}
+
+// Undo history can retain a raw map after its compiled geometry is evicted.
+const terrainFields = new WeakMap<TerrainMap, WeakRef<CompiledTerrainField>>()
+
 const openTerrainSurfaceCache = new WeakMap<
   TerrainMap,
   WeakMap<object, TerrainSurface>
@@ -471,23 +480,9 @@ function compileRoadDistance(
   }
 }
 
-export function compileTerrainSurface(
-  terrain: TerrainMap,
-  centerPath: readonly Vector2[],
-  closed = false,
-): TerrainSurface {
-  const cacheKey = centerPath as object
-  const cache = closed
-    ? closedTerrainSurfaceCache
-    : openTerrainSurfaceCache
-  let surfacesByPath = cache.get(terrain)
-  if (!surfacesByPath) {
-    surfacesByPath = new WeakMap<object, TerrainSurface>()
-    cache.set(terrain, surfacesByPath)
-  }
-  const cached = surfacesByPath.get(cacheKey)
+function compileTerrainField(terrain: TerrainMap): CompiledTerrainField {
+  const cached = terrainFields.get(terrain)?.deref()
   if (cached) return cached
-
   const lookup = kindLookup(terrain)
   const hillMask = maskFor(lookup, 'hill')
   const waterMask = maskFor(lookup, 'water')
@@ -497,24 +492,41 @@ export function compileTerrainSurface(
     hillMask,
     terrain.cellSize,
   )
-  const roadDistance = compileRoadDistance(centerPath, closed)
   const contours = [
     ...traceContours('water', boundaryEdges(terrain, waterMask)),
     ...traceContours('hill', hillEdges),
   ]
-  const materialAt = (position: Vector2): TerrainMaterial => {
-    const coordinate = cellAt(position, terrain.cellSize)
-    return lookup.get(terrainCellKey(coordinate)) === 'water'
-      ? 'water'
-      : 'grass'
+  const field = { lookup, hillDistance, contours }
+  terrainFields.set(terrain, new WeakRef(field))
+  return field
+}
+
+export function compileTerrainSurface(
+  terrain: TerrainMap,
+  centerPath: readonly Vector2[],
+  closed = false,
+): TerrainSurface {
+  const cache = closed ? closedTerrainSurfaceCache : openTerrainSurfaceCache
+  let surfacesByPath = cache.get(terrain)
+  if (!surfacesByPath) {
+    surfacesByPath = new WeakMap<object, TerrainSurface>()
+    cache.set(terrain, surfacesByPath)
   }
+  const cached = surfacesByPath.get(centerPath)
+  if (cached) return cached
+
+  const field = compileTerrainField(terrain)
+  let roadDistance: RoadDistanceLookup | undefined
+  const kindAt = (position: Vector2) => field.lookup.get(terrainCellKey(cellAt(position, terrain.cellSize)))
+  const materialAt = (position: Vector2): TerrainMaterial => kindAt(position) === 'water' ? 'water' : 'grass'
   const heightSampleAt = (position: Vector2): TerrainHeightSample => {
-    if (materialAt(position) === 'water') {
+    if (kindAt(position) !== 'hill') {
       return {
         height: WORLD_ELEVATION.baseHeight,
         gradient: { x: 0, y: 0 },
       }
     }
+    roadDistance ??= compileRoadDistance(centerPath, closed)
     const road = roadDistance.sampleAt(position)
     const blendRatio =
       (road.distance - ROAD_GEOMETRY.edgeWidth) /
@@ -524,7 +536,7 @@ export function compileTerrainSurface(
       roadBlend > 0
         ? WORLD_ELEVATION.roadSlopeRun
         : WORLD_ELEVATION.naturalSlopeRun
-    const boundary = hillDistance.sampleAt(
+    const boundary = field.hillDistance.sampleAt(
       position,
       maximumBoundaryDistance,
     )
@@ -580,7 +592,7 @@ export function compileTerrainSurface(
     }
   }
   const surface: TerrainSurface = {
-    contours,
+    contours: field.contours,
     authoredCellCount: terrain.cells.length,
     materialAt,
     heightSampleAt,
@@ -588,22 +600,20 @@ export function compileTerrainSurface(
       return heightSampleAt(position).height
     },
     gradeAt(position: Vector2, slope: TerrainSlopeKind): number {
-      if (materialAt(position) === 'water') return 0
-      const coordinate = cellAt(position, terrain.cellSize)
-      if (!hillMask.has(terrainCellKey(coordinate))) return 0
+      if (kindAt(position) !== 'hill') return 0
       const slopeRun =
         slope === 'road'
           ? WORLD_ELEVATION.roadSlopeRun
           : WORLD_ELEVATION.naturalSlopeRun
       const inside = Math.max(
         0,
-        hillDistance.sampleAt(position, slopeRun).distance,
+        field.hillDistance.sampleAt(position, slopeRun).distance,
       )
       return inside >= 0 && inside < slopeRun
         ? WORLD_ELEVATION.levelHeight / slopeRun
         : 0
     },
   }
-  surfacesByPath.set(cacheKey, surface)
+  surfacesByPath.set(centerPath, surface)
   return surface
 }
