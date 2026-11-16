@@ -5,6 +5,21 @@ import { getEnvironmentTileImage } from '@/presentation/environments/environment
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 
+export type GroundTextureManager = Pick<Phaser.Textures.TextureManager, 'exists' | 'addCanvas'>
+
+export function ensureGroundTexture(
+  textures: GroundTextureManager,
+  environmentId: TrackEnvironmentId,
+  variant: number,
+  night: boolean,
+): string {
+  const key = `trackforge-${environmentId}-${variant}-${night ? 'night' : 'day'}`
+  if (!textures.exists(key)) {
+    textures.addCanvas(key, getEnvironmentTileImage(environmentId, variant, night))
+  }
+  return key
+}
+
 /** Reuses a bounded pool of sprites backed by shared baked tile textures. */
 export class GroundTextureRenderer {
   private key: string | undefined
@@ -20,10 +35,7 @@ export class GroundTextureRenderer {
     if (this.key === key) return
     this.key = key
     tiles.forEach((tile, index) => {
-      const textureKey = `trackforge-${environmentId}-${tile.variant}-${night ? 'night' : 'day'}`
-      if (!this.scene.textures.exists(textureKey)) {
-        this.scene.textures.addCanvas(textureKey, getEnvironmentTileImage(environmentId, tile.variant, night))
-      }
+      const textureKey = ensureGroundTexture(this.scene.textures, environmentId, tile.variant, night)
       let image = this.images[index]
       if (!image) {
         image = this.scene.add.image(0, 0, textureKey).setOrigin(0).setDepth(WORLD_RENDER_DEPTH.ground)

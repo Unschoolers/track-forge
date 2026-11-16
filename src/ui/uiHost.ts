@@ -1,6 +1,7 @@
 import { exportTrack, shareTrack } from '@/infrastructure/export/trackExport'
 import { formatRaceTime } from '@/ui/format'
-import type { Track, TrackId } from '@/domain/model'
+import type { LightingMode, Track, TrackId } from '@/domain/model'
+import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type {
   AppCommand,
   AppSnapshot,
@@ -41,6 +42,7 @@ export interface UiRuntime {
   readonly raceControls: RaceControlsPort
   readonly feedback: FeedbackPort
   readonly geometry: TrackGeometryService
+  readonly prepareRace?: (track: Track, geometry: TrackGeometry, lighting: LightingMode) => () => void
   readonly previewAudioVolume?: (setting: AudioVolumeSetting, volume: number) => void
 }
 
@@ -48,6 +50,7 @@ export class DomUiHost implements UiHost {
   private unsubscribe: Unsubscribe | undefined
   private screenCleanup: (() => void) | undefined
   private overlayCleanup: (() => void) | undefined
+  private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
   private flyoverTrackId: TrackId | undefined
   private flyoverPlayback: RaceFlyoverPlayback = { elapsedSeconds: 0 }
   private mounted = false
@@ -84,6 +87,7 @@ export class DomUiHost implements UiHost {
     this.screenCleanup = undefined
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
+    this.cancelRacePreparation()
     this.flyoverTrackId = undefined
     this.dialogs.destroy()
     this.root.replaceChildren()
@@ -136,11 +140,23 @@ export class DomUiHost implements UiHost {
     })
   }
 
+  private cancelRacePreparation(): void {
+    this.racePreparation?.cancel()
+    this.racePreparation = undefined
+  }
+
   private render(state: AppSnapshot): void {
     this.screenCleanup?.()
     this.screenCleanup = undefined
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
+    if (
+      state.overlay.type !== 'race-setup' ||
+      this.racePreparation?.track !== state.currentTrack ||
+      this.racePreparation?.lighting !== (state.raceLighting ?? state.currentTrack?.lighting)
+    ) {
+      this.cancelRacePreparation()
+    }
     const isRaceSetup = state.overlay.type === 'race-setup' ||
       (state.overlay.type === 'options' && state.overlay.returnTo === 'race-setup')
     const flyoverTrackId = isRaceSetup ? state.currentTrack?.id : undefined
@@ -323,6 +339,7 @@ export class DomUiHost implements UiHost {
         })
       case 'race-setup': {
         const { currentTrack, preferences } = state
+        const lighting = state.raceLighting ?? currentTrack?.lighting ?? 'day'
         const ghostSetup = {
           car: preferences.car,
           difficulty: preferences.difficulty,
@@ -340,12 +357,16 @@ export class DomUiHost implements UiHost {
               currentTrack,
               geometry,
               preferences.car,
-              state.raceLighting ?? currentTrack.lighting,
+              lighting,
               preferences.raceMode === 'ghost' && ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0,
               this.flyoverPlayback,
             )
           : undefined
         this.overlayCleanup = flyover?.destroy
+        if (currentTrack && geometry && flyover && !this.racePreparation) {
+          const cancel = this.runtime.prepareRace?.(currentTrack, geometry, lighting)
+          if (cancel) this.racePreparation = { track: currentTrack, lighting, cancel }
+        }
         return createRaceSetupModal(state, {
           close,
           lighting: (lighting) => this.controller.dispatch({ type: 'set-race-lighting', lighting }),

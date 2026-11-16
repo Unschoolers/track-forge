@@ -99,6 +99,7 @@ const uiHost = new DomUiHost(uiRoot, controller, {
   raceControls,
   feedback,
   geometry,
+  prepareRace: (track, trackGeometry, lighting) => sceneHost.prepareRace(track, trackGeometry, lighting),
   previewAudioVolume: setAudioVolume,
 })
 const sceneHost = new PhaserSceneHost(
@@ -135,6 +136,7 @@ const stopSceneSync = controller.subscribe((snapshot) => {
   syncAudio(snapshot)
 })
 
+sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
 application.start()
@@ -198,30 +200,32 @@ document.addEventListener('pointerup', unlockAudio)
 document.addEventListener('keydown', unlockAudio)
 
 let nativePaused = false
-function syncAudioVisibility(): void {
+function syncForeground(): void {
   const active = !document.hidden && !nativePaused
+  sceneHost.setRacePreparationForeground(active)
   if (active) toneSink.resume()
   music.setForeground(active)
 }
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) handleBackground(controller)
-  syncAudioVisibility()
+  syncForeground()
 })
 
 window.addEventListener('pagehide', () => {
+  sceneHost.setRacePreparationForeground(false)
   music.setForeground(false)
   controller.flushPendingEditorSave()
 })
-window.addEventListener('pageshow', syncAudioVisibility)
+window.addEventListener('pageshow', syncForeground)
 window.addEventListener('trackforge:pause', () => {
   nativePaused = true
-  syncAudioVisibility()
+  syncForeground()
   handleBackground(controller)
 })
 window.addEventListener('trackforge:resume', () => {
   nativePaused = false
-  syncAudioVisibility()
+  syncForeground()
 })
 
 window.addEventListener(
