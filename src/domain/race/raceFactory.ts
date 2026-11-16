@@ -204,6 +204,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
     ...(recoveryCheckpoints.length ? { recoveryCheckpoints } : {}),
     ...(sceneryColliders?.size ? { sceneryColliders } : {}),
     reversed: open ? false : options.reversed ?? false,
+    tick: 0,
     elapsed: 0,
     phase: 'countdown',
     countdown: 3.7,

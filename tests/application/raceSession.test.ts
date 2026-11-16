@@ -122,6 +122,7 @@ describe('RaceSession', () => {
     if (!reference) throw new Error('Missing player')
     for (const state of snapshots) {
       expect(state.elapsed).toBeCloseTo(1.3, 8)
+      expect(state.tick).toBe(78)
       expect(state.vehicles[0]?.x).toBeCloseTo(reference.x, 8)
       expect(state.vehicles[0]?.y).toBeCloseTo(reference.y, 8)
     }
@@ -226,9 +227,12 @@ describe('RaceSession', () => {
     const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
     session.start({ ...track, start: { ratio: 0.35, reversed: true } }, setup)
     session.advance(4, noInput)
+    const tickBeforeReset = session.snapshot().state?.tick
     session.resetPlayer()
     const state = session.snapshot().state
     if (!state) throw new Error('Missing race state')
+    expect(tickBeforeReset).toBe(15)
+    expect(state.tick).toBe(tickBeforeReset)
     const car = state.vehicles[0]
     if (!car) throw new Error('Missing player')
     const point = state.path.points[car.pathIndex]

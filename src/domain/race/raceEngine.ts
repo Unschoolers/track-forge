@@ -72,6 +72,17 @@ export type RaceEvent =
       readonly reason: RaceOutcome
     }
 
+export const RACE_TICK_SECONDS = 1 / 60
+
+const NEUTRAL_INPUT: DriverInput = { steering: 0, throttle: 0, braking: false }
+
+export interface RaceTickInput {
+  /** Running ticks are consecutive and begin at 1. */
+  readonly tick: number
+  /** Vehicle IDs with direct controls. Omitted rivals use AI and the primary car coasts. */
+  readonly controls: Readonly<Record<string, DriverInput | undefined>>
+}
+
 export interface RaceStepResult {
   readonly state: RaceState
   readonly events: readonly RaceEvent[]
@@ -146,17 +157,24 @@ function aiRampSpeedLimit(
   return Number.POSITIVE_INFINITY
 }
 
+function controlsForVehicle(
+  controls: RaceTickInput['controls'],
+  id: string,
+): DriverInput | undefined {
+  return Object.hasOwn(controls, id) ? controls[id] : undefined
+}
+
 function advanceVehicle(
   vehicle: RaceVehicle,
   race: RaceState,
-  input: DriverInput,
+  input: DriverInput | undefined,
   deltaSeconds: number,
   random: RandomSource,
   catchUp: SpeedAssist | undefined,
 ): RaceVehicle {
   const previousContext = raceVehicleContext(race, vehicle)
   let moved: RaceVehicle
-  if (vehicle.player) {
+  if (input) {
     moved = stepVehicle(
       vehicle,
       input,
@@ -202,12 +220,28 @@ function advanceVehicle(
   return { ...moved, ...vertical }
 }
 
-export const stepRace: RaceStep = (
-  state,
-  input,
-  deltaSeconds,
-  random,
-) => {
+export const stepRace: RaceStep = advanceRace
+
+/** Advances one 60 Hz tick while the race is running and unpaused. */
+export function stepRaceTick(
+  state: RaceState,
+  input: RaceTickInput,
+  random: RandomSource,
+): RaceStepResult {
+  const expectedTick = state.tick + 1
+  if (input.tick !== expectedTick) {
+    throw new RangeError(`Expected race tick ${expectedTick}, received ${input.tick}`)
+  }
+  return advanceRace(state, NEUTRAL_INPUT, RACE_TICK_SECONDS, random, input.controls)
+}
+
+function advanceRace(
+  state: RaceState,
+  playerInput: DriverInput,
+  deltaSeconds: number,
+  random: RandomSource,
+  controls?: RaceTickInput['controls'],
+): RaceStepResult {
   if (state.phase !== 'running' || state.paused || deltaSeconds <= 0) {
     return { state, events: [] }
   }
@@ -216,9 +250,12 @@ export const stepRace: RaceStep = (
   const events: RaceEvent[] = []
   const arcade = !('handling' in state) || state.handling !== 'simulation'
   const catchUp = rivalCatchUp(state)
-  const moved = state.vehicles.map((vehicle) =>
-    vehicle.finishedAt !== null ? vehicle : advanceVehicle(vehicle, state, input, dt, random, catchUp),
-  )
+  const moved = state.vehicles.map((vehicle) => {
+    if (vehicle.finishedAt !== null) return vehicle
+    const directInput = controls && controlsForVehicle(controls, vehicle.id)
+    const input = directInput ?? (vehicle.player ? playerInput : undefined)
+    return advanceVehicle(vehicle, state, input, dt, random, catchUp)
+  })
   const barrierFrame = arcade
     ? { vehicles: moved, activeContacts: [], events: [] }
     : solveBridgeBarrierFrame(
@@ -237,15 +274,12 @@ export const stepRace: RaceStep = (
   const progressed = barrierFrame.vehicles.map((vehicle, index) => {
     const context = raceVehicleContext(state, vehicle)
     const previous = state.vehicles[index]
-    const stuckDuration =
-      vehicle.player &&
-      elapsed > 1.1 &&
-      vehicle.speed < 13 &&
-      input.throttle > 0 &&
-      !input.braking &&
-      !vehicle.wrecked
-        ? vehicle.stuckDuration + dt
-        : Math.max(0, vehicle.stuckDuration - dt * 2.5)
+    const stuckInput = vehicle.player && elapsed > 1.1 && vehicle.speed < 13 && !vehicle.wrecked
+      ? (controls && controlsForVehicle(controls, vehicle.id)) ?? playerInput
+      : undefined
+    const stuckDuration = stuckInput && stuckInput.throttle > 0 && !stuckInput.braking
+      ? vehicle.stuckDuration + dt
+      : Math.max(0, vehicle.stuckDuration - dt * 2.5)
     const prepared = {
       ...vehicle,
       lane:
@@ -446,6 +480,7 @@ export const stepRace: RaceStep = (
     state: {
       ...state,
       vehicles,
+      tick: state.tick + 1,
       elapsed,
       phase: terminalReason ? 'finished' : 'running',
       activeContacts: [

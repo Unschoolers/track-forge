@@ -13,6 +13,7 @@ import type {
   TrackId,
 } from '@/domain/model'
 import {
+  RACE_TICK_SECONDS,
   resetRaceVehicle,
   stepRace,
   type RaceStep,
@@ -151,7 +152,6 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
 }
 
 // Limit running catch-up to 250 ms per frame after background stalls.
-const FIXED_STEP = 1 / 60
 const MAX_CATCH_UP = 0.25
 
 function oneRunForOpenRoute(track: Track, setup: RaceSetup): RaceSetup {
@@ -296,9 +296,9 @@ export class RaceSession implements RaceSessionPort {
     let stepped = false
     let peakShake = 0
     let peakLanding = 0
-    while (state.phase === 'running' && this.remainder + 1e-10 >= FIXED_STEP) {
+    while (state.phase === 'running' && this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       const before = state.vehicles.find((vehicle) => vehicle.player)
-      const next = this.step(state, input, FIXED_STEP, this.dependencies.random)
+      const next = this.step(state, input, RACE_TICK_SECONDS, this.dependencies.random)
       state = next.state
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
@@ -318,7 +318,7 @@ export class RaceSession implements RaceSessionPort {
       if (before && player && !before.grounded && player.grounded) {
         peakLanding = Math.max(peakLanding, player.landingIntensity)
       }
-      this.remainder = Math.max(0, this.remainder - FIXED_STEP)
+      this.remainder = Math.max(0, this.remainder - RACE_TICK_SECONDS)
       stepped = true
     }
     if (!stepped && !countdownChanged) return
