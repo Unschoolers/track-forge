@@ -3,9 +3,10 @@ import { asTrackId, type Track } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
+import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
-import { isVehicleAboveStructures } from '@/phaser/rendering/vehicleRenderer'
+import { isVehicleAboveStructures, renderVehicles } from '@/phaser/rendering/vehicleRenderer'
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
 
@@ -72,10 +73,15 @@ describe('ramp vehicle rendering', () => {
       pathIndex: index,
       structureRunId: surface.structureRunId,
     }
-    expect(isVehicleAboveStructures(car, path)).toBe(true)
+    const pose = required(captureRaceSnapshot({ ...race, vehicles: [car] }).vehicles[0])
+    expect(isVehicleAboveStructures(pose, path)).toBe(true)
     expect(isVehicleAboveStructures({
-      ...car, z: 0, structureRunId: null,
+      ...pose, z: 0, structureRunId: null,
     }, path)).toBe(false)
+
+    const graphics = new Graphics()
+    renderVehicles(graphics as never, [pose])
+    expect(graphics.bodies).toEqual([{ x: car.x, y: car.y }])
   })
 
 	it.each([false, true])(

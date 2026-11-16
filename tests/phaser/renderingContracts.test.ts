@@ -105,7 +105,7 @@ describe('race rendering contracts', () => {
       false,
     )
     const airborne = projectVehicleShadow(
-      { ...vehicle, z: 18, grounded: false },
+      { ...vehicle, z: 18 },
       terrainSurface,
       false,
     )
@@ -157,7 +157,7 @@ describe('race rendering contracts', () => {
       false,
     )
     const airborne = projectVehicleShadow(
-      { ...vehicle, ...position, z: 60, grounded: false },
+      { ...vehicle, ...position, z: 60 },
       terrainSurface,
       false,
     )

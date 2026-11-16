@@ -82,6 +82,8 @@ export interface RaceState {
   readonly recoveryCheckpoints?: readonly number[]
   readonly sceneryColliders?: SceneryColliders
   readonly reversed: boolean
+  /** Number of running simulation updates completed since this race started. */
+  readonly tick: number
   readonly elapsed: number
   readonly phase: RacePhase
   readonly countdown: number

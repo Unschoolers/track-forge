@@ -33,6 +33,8 @@ export interface VehicleShadow {
   readonly alpha: number
 }
 
+type VehicleShadowPose = Pick<RaceVehicle, 'car' | 'x' | 'y' | 'z' | 'angle'>
+
 const GEOMETRIES: Record<CarId, VehicleGeometry> = {
   blue: {
     id: 'blue',
@@ -121,7 +123,10 @@ export function getVehicleGeometry(car: CarId): VehicleGeometry {
 }
 
 /** Supported ramps share the deck's draw layer even near ground level. */
-export function isVehicleAboveStructures(vehicle: RaceVehicle, path: RoadPath): boolean {
+export function isVehicleAboveStructures(
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'z' | 'player' | 'grounded' | 'pathIndex' | 'structureRunId'>,
+  path: RoadPath,
+): boolean {
   // A car can briefly be matched to the underpass at a 2D crossing even
   // while its last supported road sample is on the ramp. Trust that authored
   // support only while the car is physically near its sample and at deck height.
@@ -175,7 +180,7 @@ export function transformVehicleLights(
 }
 
 export function projectVehicleShadow(
-  vehicle: RaceVehicle,
+  vehicle: VehicleShadowPose,
   terrainSurface: TerrainSurface,
   night: boolean,
 ): VehicleShadow | null {
@@ -218,7 +223,7 @@ function hexColor(value: string): number {
 
 export function renderVehicles(
   graphics: Phaser.GameObjects.Graphics,
-  vehicles: readonly RaceVehicle[],
+  vehicles: readonly Pick<RaceVehicle, 'car' | 'x' | 'y' | 'angle' | 'wrecked' | 'braking'>[],
 ): void {
   for (const vehicle of vehicles) {
     const geometry = getVehicleGeometry(vehicle.car)
@@ -262,7 +267,7 @@ export function renderGhostVehicle(
 
 export function renderVehicleShadows(
   graphics: Phaser.GameObjects.Graphics,
-  vehicles: readonly RaceVehicle[],
+  vehicles: readonly VehicleShadowPose[],
   terrainSurface: TerrainSurface,
   night: boolean,
 ): void {
