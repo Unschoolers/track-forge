@@ -3,20 +3,31 @@ import { expect, test } from '@playwright/test'
 const menuTrack = /\/clubb-menu(?:-[^/]+)?\.mp3$/
 const raceTrack = /\/clubb-race(?:-[^/]+)?\.mp3$/
 
-test('plays the bundled soundtrack and resumes after the app returns to the foreground', async ({ page }) => {
+async function observeMusic(page) {
   await page.addInitScript(() => {
     const play = HTMLMediaElement.prototype.play
     HTMLMediaElement.prototype.play = function () {
-      window.trackForgeMusic = this
+      window.trackForgeMusicPlays ??= []
+      window.trackForgeMusicPlays.push(this)
       return play.call(this)
     }
   })
 
-  const music = () => page.evaluate(() => {
-    const audio = window.trackForgeMusic
-    return audio && { src: new URL(audio.src).pathname, time: audio.currentTime, paused: audio.paused }
+  return () => page.evaluate(() => {
+    const plays = window.trackForgeMusicPlays ?? []
+    const audio = plays.at(-1)
+    return audio && {
+      src: new URL(audio.src).pathname,
+      time: audio.currentTime,
+      paused: audio.paused,
+      plays: plays.length,
+      playing: [...new Set(plays)].filter((deck) => !deck.paused).map((deck) => new URL(deck.src).pathname),
+    }
   })
+}
 
+test('plays the bundled soundtrack and resumes after the app returns to the foreground', async ({ page }) => {
+  const music = await observeMusic(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'OPTIONS' }).tap()
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(menuTrack), paused: false })
@@ -48,4 +59,56 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   const pausedAt = (await music()).time
   await page.evaluate(() => window.dispatchEvent(new Event('trackforge:resume')))
   await expect.poll(async () => (await music())?.time).toBeGreaterThan(pausedAt)
+})
+
+for (const [environmentId, soundtrack] of [
+  ['cityscape', /\/City(?:-[^/]+)?\.mp3$/],
+  ['desert', /\/Desert(?:-[^/]+)?\.mp3$/],
+]) {
+  test(`plays the ${environmentId} soundtrack during a race and its pause menu`, async ({ page }) => {
+    const music = await observeMusic(page)
+    await page.goto('/')
+    await page.evaluate((environmentId) => {
+      const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
+      localStorage.setItem('trackforge-library-v2', JSON.stringify([{ ...tracks[0], environmentId }]))
+    }, environmentId)
+    await page.reload()
+
+    await page.getByRole('button', { name: 'RACE', exact: true }).tap()
+    await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).tap()
+    await expect.poll(music).toMatchObject({ src: expect.stringMatching(menuTrack), paused: false })
+    await page.getByRole('button', { name: 'START RACE', exact: true }).tap()
+    const playing = { src: expect.stringMatching(soundtrack), paused: false }
+    await expect.poll(music).toMatchObject(playing)
+    const { plays } = await music()
+
+    await page.locator('[data-action="pause"]').tap()
+    const pause = page.getByRole('dialog', { name: 'Race paused' })
+    await expect(pause).toBeVisible()
+    const pausedMusic = await music()
+    await expect.poll(async () => (await music())?.time).toBeGreaterThan(pausedMusic.time)
+    await expect.poll(music).toMatchObject({ ...playing, plays })
+    await pause.getByRole('button', { name: 'QUIT TO HOME', exact: true }).tap()
+    await expect.poll(async () => (await music())?.playing).toEqual([expect.stringMatching(menuTrack)])
+  })
+}
+
+test('uses the final Cup circuit soundtrack when restoring standings', async ({ page }) => {
+  const music = await observeMusic(page)
+  await page.goto('/')
+  await page.evaluate(() => {
+    const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
+    localStorage.setItem('trackforge-library-v2', JSON.stringify([{ ...tracks[0], environmentId: 'cityscape' }]))
+    localStorage.setItem('trackforge-cup-v1', JSON.stringify({
+      version: 1, bestPlacement: null, checkpoint: {
+        car: 'blue', difficulty: 'normal', index: 3,
+        rounds: Array.from({ length: 4 }, () => [{ id: 'player', label: 'You', points: 10 }]),
+      },
+    }))
+  })
+  await page.reload()
+
+  await page.getByRole('button', { name: 'RESUME CUP', exact: true }).tap()
+  await expect(page.getByRole('dialog', { name: 'CUP STANDINGS' })).toBeVisible()
+  await expect.poll(music).toMatchObject({ src: expect.stringMatching(raceTrack), paused: false })
 })

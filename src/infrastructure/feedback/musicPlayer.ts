@@ -1,5 +1,3 @@
-type MusicTrack = 'menu' | 'race'
-
 interface MusicDeck {
   readonly audio: HTMLAudioElement
   readonly source: MediaElementAudioSourceNode | undefined
@@ -12,7 +10,7 @@ interface MusicDeck {
 const CROSSFADE_MS = 1500
 const MIX_FADE_MS = 300
 
-export class BrowserMusicPlayer {
+export class BrowserMusicPlayer<MusicTrack extends string> {
   private readonly decks = new Map<MusicTrack, MusicDeck>()
   private frame: number | undefined
   private track: MusicTrack | null = null

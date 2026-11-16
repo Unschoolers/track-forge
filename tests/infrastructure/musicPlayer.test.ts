@@ -3,7 +3,7 @@ import { BrowserMusicPlayer } from '@/infrastructure/feedback/musicPlayer'
 
 describe('race music transitions', () => {
   const decks: HTMLAudioElement[] = []
-  let music: BrowserMusicPlayer
+  let music: BrowserMusicPlayer<'menu' | 'race'>
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['performance', 'requestAnimationFrame', 'cancelAnimationFrame'] })
