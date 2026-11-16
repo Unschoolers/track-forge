@@ -7,6 +7,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import {
   DomUiHost,
   type UiControllerPort,
+  type UiRuntime,
 } from '@/ui/uiHost'
 import { createUiRuntime } from './uiRuntime'
 
@@ -43,7 +44,10 @@ function snapshot(mode: AppSnapshot['mode']): AppSnapshot {
   }
 }
 
-function setup(mode: AppSnapshot['mode'] = 'home') {
+function setup(
+  mode: AppSnapshot['mode'] = 'home',
+  prepareRace?: UiRuntime['prepareRace'],
+) {
   const root = document.createElement('div')
   let listener: ((value: AppSnapshot) => void) | undefined
   const port: UiControllerPort = {
@@ -56,7 +60,7 @@ function setup(mode: AppSnapshot['mode'] = 'home') {
       }
     }),
   }
-  const runtime = createUiRuntime()
+  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}) }
   const geometry = vi.spyOn(runtime.geometry, 'get')
   const host = new DomUiHost(root, port, runtime)
   host.mount()
@@ -148,6 +152,37 @@ describe('DomUiHost', () => {
     host.destroy()
     expect(root.childElementCount).toBe(0)
     expect(port.subscribe).toHaveBeenCalledOnce()
+  })
+
+  it('reuses setup preparation across car changes and cancels it when rendering inputs change', () => {
+    const cancelDay = vi.fn()
+    const cancelNight = vi.fn()
+    const cancelNextTrack = vi.fn()
+    const prepareRace = vi.fn<NonNullable<UiRuntime['prepareRace']>>()
+      .mockReturnValueOnce(cancelDay)
+      .mockReturnValueOnce(cancelNight)
+      .mockReturnValueOnce(cancelNextTrack)
+    const { update, host, geometry } = setup('home', prepareRace)
+    const raceSetup: AppSnapshot = { ...snapshot('home'), overlay: { type: 'race-setup' } }
+
+    update(raceSetup)
+    expect(prepareRace).toHaveBeenLastCalledWith(track, geometry.mock.results[0]?.value, 'day')
+    update({ ...raceSetup, preferences: { ...preferences, car: 'red' } })
+    expect(prepareRace).toHaveBeenCalledOnce()
+    expect(cancelDay).not.toHaveBeenCalled()
+
+    update({ ...raceSetup, raceLighting: 'night' })
+    expect(cancelDay).toHaveBeenCalledOnce()
+    expect(prepareRace).toHaveBeenLastCalledWith(track, geometry.mock.results[0]?.value, 'night')
+
+    const nextTrack = createStarterTrack(asTrackId('next'), 2)
+    update({ ...raceSetup, currentTrack: nextTrack, raceLighting: 'night' })
+    expect(cancelNight).toHaveBeenCalledOnce()
+    expect(prepareRace).toHaveBeenCalledTimes(3)
+
+    update({ ...raceSetup, overlay: { type: 'options', returnTo: 'race-setup' } })
+    expect(cancelNextTrack).toHaveBeenCalledOnce()
+    host.destroy()
   })
 
   it('shows contextual at-grade and branch controls for a selected junction', () => {

@@ -8,13 +8,18 @@ import {
 import { RaceScene } from '@/phaser/scenes/RaceScene'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
+import type { LightingMode, Track } from '@/domain/model'
+import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { RacePresentationPreparation } from '@/phaser/rendering/racePresentationPreparation'
 
 export class PhaserSceneHost implements SceneHost {
   private game: Phaser.Game | undefined
   private mode: AppMode = 'home'
   private raceTrackId: string | undefined
   private raceLighting: string | undefined
+  private readonly racePreparation = new RacePresentationPreparation()
 
   constructor(
     private readonly parent: HTMLElement,
@@ -25,6 +30,7 @@ export class PhaserSceneHost implements SceneHost {
   ) {}
 
   start(mode: AppMode): void {
+    if (mode === 'race') this.racePreparation.cancel()
     const modeChanged = this.mode !== mode
     this.mode = mode
     if (!this.game) {
@@ -64,6 +70,20 @@ export class PhaserSceneHost implements SceneHost {
     }
   }
 
+  prepareRace(track: Track, geometry: TrackGeometry, lighting: LightingMode): () => void {
+    const game = this.game
+    return this.racePreparation.prepare(
+      geometry,
+      normalizeTrackEnvironmentId(track.environmentId),
+      lighting === 'night',
+      game?.isRunning ? { textures: game.textures, width: game.scale.width, height: game.scale.height } : undefined,
+    )
+  }
+
+  setRacePreparationForeground(foreground: boolean): void {
+    this.racePreparation.setForeground(foreground)
+  }
+
   /** Read-only camera position for the browser gameplay harness. */
   editorCameraSnapshot(): { x: number; y: number; zoom: number } | null {
     if (!this.game?.scene.isActive('EditorScene')) return null
@@ -72,6 +92,7 @@ export class PhaserSceneHost implements SceneHost {
   }
 
   destroy(): void {
+    this.racePreparation.cancel()
     this.game?.destroy(true)
     this.game = undefined
   }

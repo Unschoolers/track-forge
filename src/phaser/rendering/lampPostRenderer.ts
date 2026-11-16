@@ -54,6 +54,18 @@ export function buildLampPosts(
   geometry: TrackGeometry,
   shadowMode: TrackShadowMode = 'terrain',
 ): readonly LampPost[] {
+  const cached = lampCaches[shadowMode].get(geometry)
+  if (cached) return cached
+  const work = prepareLampPosts(geometry, shadowMode)
+  let step = work.next()
+  while (!step.done) step = work.next()
+  return step.value
+}
+
+export function* prepareLampPosts(
+  geometry: TrackGeometry,
+  shadowMode: TrackShadowMode = 'terrain',
+): Generator<void, readonly LampPost[], void> {
   const cache = lampCaches[shadowMode]
   const cached = cache.get(geometry)
   if (cached) return cached
@@ -65,7 +77,9 @@ export function buildLampPosts(
   let nextDistance = 0
   let nextSide: -1 | 1 = -1
   for (const [index, sample] of ribbon.entries()) {
+    if (index % 64 === 0) yield
     if (sample.center.distance + 0.001 < nextDistance) continue
+    yield
     const roadSurface = path.roadSurface.at(index)
     const bridge =
       roadSurface.structureHeight >=
@@ -124,6 +138,8 @@ export function buildLampPosts(
       spacing,
     })
   }
+  const completed = cache.get(geometry)
+  if (completed) return completed
   cache.set(geometry, posts)
   return posts
 }

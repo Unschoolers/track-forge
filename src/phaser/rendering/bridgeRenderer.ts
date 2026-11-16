@@ -77,6 +77,19 @@ export function buildBridgePresentation(
   geometry: TrackGeometry,
   shadowMode: TrackShadowMode = 'terrain',
 ): readonly BridgePrimitive[] {
+  const cached = presentationCaches[shadowMode].get(geometry)
+  if (cached) return cached
+  const work = prepareBridgePresentation(geometry, shadowMode)
+  let step = work.next()
+  while (!step.done) step = work.next()
+  return step.value
+}
+
+/** Builds the same presentation as the synchronous renderer one section at a time. */
+export function* prepareBridgePresentation(
+  geometry: TrackGeometry,
+  shadowMode: TrackShadowMode = 'terrain',
+): Generator<void, readonly BridgePrimitive[], void> {
   const cache = presentationCaches[shadowMode]
   const cached = cache.get(geometry)
   if (cached) return cached
@@ -95,6 +108,7 @@ export function buildBridgePresentation(
       : projectSunShadowOntoTerrain(point, road.height, path.terrainSurface, scale)
 
   for (let index = 0; index < count; index += 1) {
+    if (index % 64 === 0) yield
     const current = ribbon[index]
     const next = ribbon[(index + 1) % ribbon.length]
     if (
@@ -105,6 +119,7 @@ export function buildBridgePresentation(
     ) {
       continue
     }
+    yield
     const currentRoad = path.roadSurface.at(index)
     const nextIndex = (index + 1) % path.points.length
     const nextRoad = path.roadSurface.at(nextIndex)
@@ -127,6 +142,7 @@ export function buildBridgePresentation(
       nextLeftRoad,
       WORLD_LIGHTING.penumbraScale,
     )
+    yield
     const softNextRight = projectShadow(
       next.edgeRight,
       nextRightRoad,
@@ -166,8 +182,10 @@ export function buildBridgePresentation(
         softNextLeft.terrainHeight,
       ],
     })
+    yield
     const currentLeftShadow = projectShadow(current.edgeLeft, currentLeftRoad)
     const nextLeftShadow = projectShadow(next.edgeLeft, nextLeftRoad)
+    yield
     const nextRightShadow = projectShadow(next.edgeRight, nextRightRoad)
     const currentRightShadow = projectShadow(current.edgeRight, currentRightRoad)
     const coreClearance = Math.max(
@@ -365,6 +383,8 @@ export function buildBridgePresentation(
     ...markings,
     ...walls,
   ]
+  const completed = cache.get(geometry)
+  if (completed) return completed
   cache.set(geometry, presentation)
   return presentation
 }
