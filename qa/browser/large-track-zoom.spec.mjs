@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { contact, releaseTouches, touch } from './touch.mjs'
 
 const trackPoints = Array.from({ length: 36 }, (_, index) => {
   const theta = (index % 35) * Math.PI * 2 / 35
@@ -11,6 +13,86 @@ const trackPoints = Array.from({ length: 36 }, (_, index) => {
     tension: 0.5,
     structure: index >= 10 && index <= 18 ? 'overpass' : 'surface',
   }
+})
+
+const rallyFixture = JSON.parse(readFileSync(new URL('./fixtures/rally.json', import.meta.url), 'utf8'))
+const rallyTrack = {
+  id: 'rally-regression', name: 'Rally', version: 8,
+  routeKind: rallyFixture.routeKind, points: rallyFixture.points, trees: [],
+  terrain: {
+    cellSize: rallyFixture.terrain.cellSize,
+    // Each run stores the original cells on one row as [row, firstColumn, count, kind].
+    cells: rallyFixture.terrain.runs.flatMap(([row, firstColumn, count, kind]) =>
+      Array.from({ length: count }, (_, offset) => ({ column: firstColumn + offset, row, kind }))),
+  },
+  start: { ratio: 0, reversed: false },
+  lighting: 'day', createdAt: 1, updatedAt: 1,
+}
+
+function readCamera(page) {
+  return page.evaluate(() => window.__trackForgeQa?.snapshot().camera ?? null)
+}
+
+async function openRallyEditor(page) {
+  await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.getByRole('button', { name: 'EDIT', exact: true }).click()
+  await expect.poll(() => readCamera(page)).not.toBeNull()
+}
+
+test.describe('Rally editor zoom', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 844, height: 390 })
+    await page.addInitScript(track => {
+      localStorage.setItem('trackforge-library-v2', JSON.stringify([track]))
+      localStorage.setItem('trackforge-library-v1-migrated', '1')
+    }, rallyTrack)
+    await page.goto('/?qa')
+    await openRallyEditor(page)
+  })
+
+  test('fits the actual course in landscape and can zoom out from that view', async ({ page, context }) => {
+    await page.getByRole('button', { name: 'Fit track', exact: true }).click()
+    const fit = await readCamera(page)
+    const canvas = page.locator('#game-container canvas')
+    const { x, y, width, height } = await canvas.boundingBox()
+    const dock = await page.locator('.editor-context-dock').boundingBox()
+    for (const point of rallyTrack.points) {
+      expect(Math.abs(point.x - fit.x) * fit.zoom).toBeLessThan(width / 2)
+      const screenY = y + height / 2 + (point.y - fit.y) * fit.zoom
+      expect(screenY).toBeGreaterThan(y)
+      expect(screenY).toBeLessThan(dock.y)
+    }
+    const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true })
+    await zoomOut.click()
+    const first = await readCamera(page)
+    expect(first.zoom).toBeLessThan(fit.zoom)
+    await zoomOut.click()
+    const second = await readCamera(page)
+    expect(second.zoom).toBeLessThan(first.zoom)
+    expect(second).toMatchObject({ x: fit.x, y: fit.y })
+    expect(await roadPixelCount(page, await canvas.screenshot({ scale: 'css' }))).toBeGreaterThan(40)
+
+    const midX = x + width / 2
+    const midY = y + height / 2
+    const cdp = await context.newCDPSession(page)
+    try {
+      await touch(cdp, 'touchStart', [contact(1, midX - 80, midY), contact(2, midX + 80, midY)])
+      await touch(cdp, 'touchMove', [contact(1, midX - 50, midY), contact(2, midX + 50, midY)])
+      await expect.poll(async () => (await readCamera(page)).zoom).toBeLessThan(second.zoom)
+    } finally {
+      await releaseTouches(cdp)
+      await cdp.detach()
+    }
+  })
+
+  test('restores the chosen zoom and center when the same course is reopened', async ({ page }) => {
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+    const chosen = await readCamera(page)
+    await page.getByRole('button', { name: 'Home', exact: true }).click()
+    await expect.poll(() => readCamera(page)).toBeNull()
+    await openRallyEditor(page)
+    expect(await readCamera(page)).toEqual(chosen)
+  })
 })
 
 async function roadPixelCount(page, screenshot) {
