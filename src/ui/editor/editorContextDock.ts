@@ -71,6 +71,11 @@ export function createEditorContextDock(
   dock.dataset.editorContextDock = ''
   dock.dataset.layout = state.editorUi.tool === 'terrain' ? 'two-row' : 'one-row'
 
+  if (state.editorUi.tool === 'checkpoint') {
+    dock.append(createContextRow(element('span', 'label', 'Tap the road to place a checkpoint. Tap a checkpoint to remove it.')))
+    return dock
+  }
+
   if (state.editorUi.tool === 'tree') {
     const environmentId = state.editor.environmentId
     const environment = getTrackEnvironment(environmentId)

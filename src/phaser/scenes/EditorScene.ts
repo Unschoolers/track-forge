@@ -11,10 +11,12 @@ import {
   renderTrackGeometryBridgeOverlay,
   renderTrackGeometryStructureUnderlay,
   renderTrackStartGridPreview,
+  renderRecoveryCheckpoints,
 } from '@/phaser/rendering/trackRenderer'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
+import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import {
   EditorInputController,
   type EditorCamera,
@@ -40,6 +42,7 @@ import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
+import { EditorWorldRaster } from '@/phaser/rendering/editorWorldRaster'
 import { terrainBrushKindForMode } from '@/domain/editor/terrainBrush'
 import {
   editorPointerRenderChanges,
@@ -92,6 +95,9 @@ export class EditorScene extends Phaser.Scene {
   private compiledTerrainPreviewRevision: number | undefined
   private terrainPreviewImpacts: readonly TerrainPreviewImpact[] = []
   private renderedTerrainDetail: TerrainPresentationDetail | undefined
+  private terrainRaster: EditorWorldRaster | undefined
+  private roadRaster: EditorWorldRaster | undefined
+  private rasterizeWorld = false
   private unsubscribe: Unsubscribe | undefined
 
   constructor(
@@ -134,6 +140,11 @@ export class EditorScene extends Phaser.Scene {
     this.overlayGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.editorOverlay)
+    this.terrainRaster = new EditorWorldRaster(this, [this.terrainGraphics], WORLD_RENDER_DEPTH.terrain)
+    this.roadRaster = new EditorWorldRaster(this, [
+      this.trackGraphics, this.structureUnderlayGraphics, this.structureDeckGraphics,
+      this.structureWallGraphics, this.lampGraphics,
+    ], WORLD_RENDER_DEPTH.road)
     this.currentSnapshot = this.controller.snapshot()
     this.editorInput = new EditorInputController({
       camera: this.editorCamera,
@@ -196,6 +207,7 @@ export class EditorScene extends Phaser.Scene {
     this.input.on('pointerupoutside', this.onPointerUp, this)
     this.input.on('gameout', this.onGameOut, this)
     this.input.on('wheel', this.onWheel, this)
+    this.game.renderer?.on(Phaser.Renderer.Events.RESTORE_WEBGL, this.invalidateRasters)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this)
   }
 
@@ -205,6 +217,9 @@ export class EditorScene extends Phaser.Scene {
   }
 
   override update(): void {
+    const { width, height } = this.viewport()
+    this.terrainRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
+    this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
     this.renderGroundPresentation()
     this.renderSceneryPresentation()
     if (!this.previewRenderPending) return
@@ -345,6 +360,8 @@ export class EditorScene extends Phaser.Scene {
     }
     const snapshot = this.currentSnapshot
     const night = snapshot.currentTrack?.lighting === 'night'
+    this.rasterizeWorld = (geometry.path.terrainSurface.authoredCellCount ?? 0) >= 1_600 ||
+      geometry.path.points.length >= 2_200
     this.trackGraphics.clear()
     this.structureUnderlayGraphics.clear()
     this.structureDeckGraphics.clear()
@@ -378,6 +395,7 @@ export class EditorScene extends Phaser.Scene {
       buildLampPosts(geometry),
       night,
     )
+    this.roadRaster?.invalidate()
   }
 
   private refreshTreePreview(previous: ReturnType<EditorInputController['sceneryPreview']>): void {
@@ -395,6 +413,7 @@ export class EditorScene extends Phaser.Scene {
     this.terrainGraphics.clear()
     renderTerrain(this.terrainGraphics, geometry.path.terrainSurface, night, detail, night ? environment.night : environment.day)
     this.renderedTerrainDetail = detail
+    this.terrainRaster?.invalidate()
   }
 
   private renderSceneryPresentation(renderTreesLayer = false): void {
@@ -468,8 +487,14 @@ export class EditorScene extends Phaser.Scene {
   private renderTerrainPreviewPresentation(): void {
     if (!this.terrainPreviewGraphics || !this.currentSnapshot) return
     const night = this.currentSnapshot.currentTrack?.lighting === 'night'
-    const preview = this.editorInput?.terrainPreview() ?? null
     this.terrainPreviewGraphics.clear()
+    if (terrainDetailForView(this.currentSnapshot.editor.terrain.cells.length, this.editorCamera.zoom) === 'overview') {
+      this.compiledTerrainPreviewRevision = undefined
+      this.terrainPreviewImpacts = []
+      renderTerrainPreview(this.terrainPreviewGraphics, this.editorInput?.terrainCellPreview() ?? null, night)
+      return
+    }
+    const preview = this.editorInput?.terrainPreview() ?? null
     if (!preview) {
       this.compiledTerrainPreviewRevision = undefined
       this.terrainPreviewImpacts = []
@@ -533,6 +558,10 @@ export class EditorScene extends Phaser.Scene {
       snapshot.editorUi.selectedPoint ?? undefined,
       snapshot.editorUi.selectedCrossing,
     )
+    renderRecoveryCheckpoints(
+      this.overlayGraphics, geometry.path,
+      resolveRecoveryCheckpoints(geometry.path, snapshot.editor.recoveryCheckpoints),
+    )
   }
 
   private editorRenderState(snapshot: AppSnapshot): EditorRenderState {
@@ -542,6 +571,7 @@ export class EditorScene extends Phaser.Scene {
       terrain: snapshot.editor.terrain,
       trees: snapshot.editor.trees,
       scenery: snapshot.editor.scenery,
+      recoveryCheckpoints: snapshot.editor.recoveryCheckpoints,
       environmentId: snapshot.editor.environmentId,
       start: snapshot.editor.start,
       night: snapshot.currentTrack?.lighting === 'night',
@@ -586,6 +616,11 @@ export class EditorScene extends Phaser.Scene {
     this.cameras.main.centerOn(this.editorCamera.x, this.editorCamera.y)
   }
 
+  private readonly invalidateRasters = (): void => {
+    this.terrainRaster?.invalidate()
+    this.roadRaster?.invalidate()
+  }
+
   private dispose(): void {
     this.editorInput?.cancelActiveGesture()
     this.unsubscribe?.()
@@ -596,6 +631,7 @@ export class EditorScene extends Phaser.Scene {
     this.input.off('pointerupoutside', this.onPointerUp, this)
     this.input.off('gameout', this.onGameOut, this)
     this.input.off('wheel', this.onWheel, this)
+    this.game.renderer?.off(Phaser.Renderer.Events.RESTORE_WEBGL, this.invalidateRasters)
     this.groundRenderer = undefined
     this.environmentSceneryRenderer = undefined
     this.editorInput = undefined
@@ -605,5 +641,8 @@ export class EditorScene extends Phaser.Scene {
     this.compiledTerrainPreviewRevision = undefined
     this.terrainPreviewImpacts = []
     this.renderedTerrainDetail = undefined
+    this.terrainRaster = undefined
+    this.roadRaster = undefined
+    this.rasterizeWorld = false
   }
 }

@@ -74,27 +74,44 @@ export function updateOpenRouteProgress(
   const result = { ...vehicle, pathIndex: index }
   if (last < 1 || previous.finishedAt !== null || !onRoadBefore || !onRoadAfter) return result
   const gate = previous.nextSector
-  const gatePosition = last * gate / 4
-  const lower = Math.min(last - 1, Math.floor(gatePosition))
-  const upper = lower + 1
+  if (!crossesRoadGate(path, previous, result, last * gate / 4, roadRadius)) return result
+  return gate === 4
+    ? { ...result, lap: previous.lap + 1, finishedAt: elapsed }
+    : { ...result, nextSector: (gate + 1) as 2 | 3 | 4 }
+}
+
+/** A forward crossing must stay on the route near this gate, even at crossings. */
+export function crossesRoadGate(
+  path: RoadPath,
+  previous: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
+  gatePosition: number,
+  roadRadius: number,
+  reversed = false,
+): boolean {
+  const count = path.points.length
+  const sampleDistance = (index: number): number => {
+    const distance = Math.abs(index - gatePosition)
+    return path.closed ? Math.min(distance, count - distance) : distance
+  }
+  if (sampleDistance(previous.pathIndex) > 12 || sampleDistance(vehicle.pathIndex) > 12) return false
+  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(gatePosition))
   const a = path.points[lower]
-  const b = path.points[upper]
-  if (!a || !b) return result
+  const b = path.points[(lower + 1) % count]
+  if (!a || !b) return false
   const fraction = gatePosition - lower
   const gx = a.x + (b.x - a.x) * fraction
   const gy = a.y + (b.y - a.y) * fraction
   const length = Math.hypot(b.x - a.x, b.y - a.y)
-  if (length < 0.001 || Math.abs(previous.pathIndex - gatePosition) > 12 || Math.abs(index - gatePosition) > 12) return result
-  const tx = (b.x - a.x) / length
-  const ty = (b.y - a.y) / length
+  if (length < 0.001) return false
+  const direction = reversed ? -1 : 1
+  const tx = direction * (b.x - a.x) / length
+  const ty = direction * (b.y - a.y) / length
   const before = (previous.x - gx) * tx + (previous.y - gy) * ty
   const after = (vehicle.x - gx) * tx + (vehicle.y - gy) * ty
-  if (before >= 0 || after < 0 || after <= before) return result
+  if (before >= 0 || after < 0 || after <= before) return false
   const t = -before / (after - before)
   const x = previous.x + (vehicle.x - previous.x) * t - gx
   const y = previous.y + (vehicle.y - previous.y) * t - gy
-  if (Math.abs(-x * ty + y * tx) > roadRadius) return result
-  return gate === 4
-    ? { ...result, lap: previous.lap + 1, finishedAt: elapsed }
-    : { ...result, nextSector: (gate + 1) as 2 | 3 | 4 }
+  return Math.abs(-x * ty + y * tx) <= roadRadius
 }

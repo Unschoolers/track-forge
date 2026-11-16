@@ -11,6 +11,25 @@ import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
 
 describe('EditorInputController', () => {
+  it('places and removes a Checkpoint on the road with a tap', () => {
+    const points = [{ x: 0, y: 0, surface: 'street' as const }, { x: 1_200, y: 0, surface: 'street' as const }]
+    let editor = createEditorState(points, [], undefined, undefined, { routeKind: 'point-to-point' })
+    const geometry = new TrackGeometryService()
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'checkpoint', surface: () => 'street',
+      editor: () => editor, path: () => geometry.get(editor).path,
+      dispatch: command => { editor = reduceEditor(editor, command) },
+    })
+    const tap = { id: 1, x: 300, y: 0 }
+    input.pointerDown(tap)
+    input.pointerUp(tap)
+    expect(editor.recoveryCheckpoints).toEqual([0.25])
+    input.pointerDown(tap)
+    input.pointerUp(tap)
+    expect(editor.recoveryCheckpoints).toEqual([])
+    expect(reduceEditor(editor, { type: 'undo' }).recoveryCheckpoints).toEqual([0.25])
+  })
+
   it('previews and commits a scenery drag at the final pointer position with its grab offset', () => {
     let editor = createEditorState([], [], undefined, undefined, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 100, y: 100 }] })
     const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => 'desert-cactus', editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })

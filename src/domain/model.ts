@@ -68,6 +68,7 @@ export interface Track {
   readonly trees: readonly Tree[]
   readonly terrain: TerrainMap
   readonly start?: TrackStart
+  readonly recoveryCheckpoints?: readonly number[]
   readonly lighting: LightingMode
   readonly environmentId?: TrackEnvironmentId
   readonly scenery?: readonly SceneryProp[]

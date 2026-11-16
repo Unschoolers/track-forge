@@ -19,6 +19,7 @@ const paths = {
   draw: 'm4 20 4-1 12-12-3-3L5 16z M14 7l3 3',
   select: 'M5 3v16l5-5 3 7 3-2-3-6h7z',
   start: 'M5 21V4 M5 5c6-3 9 3 15 0v10c-6 3-9-3-15 0',
+  checkpoint: 'M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0z M12 7v6 M9 10h6',
   paint: 'm12 3 9 9-9 9-9-9z M3 12h18',
   structure: 'M3 21h18 M5 18V8 M19 18V8 M5 10c4-6 10-6 14 0 M9 18v-7 M15 18v-7',
   terrain: 'M2 20 9 9l5 7 3-4 5 8z M3 5h4 M5 3v4',

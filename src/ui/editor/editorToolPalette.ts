@@ -11,6 +11,7 @@ const tools: readonly {
   { id: 'draw', icon: 'draw', label: 'Draw road' },
   { id: 'select', icon: 'select', label: 'Move points' },
   { id: 'start', icon: 'start', label: 'Place start line' },
+  { id: 'checkpoint', icon: 'checkpoint', label: 'Place checkpoint' },
   { id: 'paint', icon: 'paint', label: 'Paint surface' },
   { id: 'structure', icon: 'structure', label: 'Paint structure' },
   { id: 'terrain', icon: 'terrain', label: 'Paint terrain' },

@@ -15,6 +15,7 @@ export const EDITOR_TOOLS = [
   'draw',
   'select',
   'start',
+  'checkpoint',
   'paint',
   'structure',
   'terrain',

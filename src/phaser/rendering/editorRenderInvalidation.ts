@@ -10,6 +10,7 @@ export interface EditorRenderState {
   readonly terrain: object
   readonly trees: object
   readonly scenery: object
+  readonly recoveryCheckpoints?: object
   readonly environmentId: TrackEnvironmentId
   readonly start: object | undefined
   readonly night: boolean
@@ -78,6 +79,7 @@ export function editorSnapshotRenderChanges(
       previous.night !== current.night,
     overlay:
       geometryChanged ||
+      previous.recoveryCheckpoints !== current.recoveryCheckpoints ||
       previous.selectedPoint !== current.selectedPoint ||
       previous.selectedCrossing !== current.selectedCrossing,
     preview:

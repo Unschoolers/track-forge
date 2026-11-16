@@ -1,6 +1,8 @@
 import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
 import { DIFFICULTY_SPECS, ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
+import { buildSceneryColliders, type RecoveryScenery } from '@/domain/race/sceneryCollisions'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRaceEffectsState } from '@/domain/race/effects'
@@ -9,6 +11,8 @@ import type { Vector2 } from '@/domain/model'
 export interface CreateRaceOptions {
   readonly path: RoadPath
   readonly routeKind?: RouteKind
+  readonly recoveryCheckpoints?: readonly number[] | undefined
+  readonly recoveryScenery?: RecoveryScenery | undefined
   readonly playerCar: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
@@ -122,6 +126,9 @@ export function createRace(options: CreateRaceOptions): RaceState {
     (point) => point.distance >= startDistance,
   )
   const resolvedStartIndex = Math.max(0, startPathIndex)
+  const recoveryCheckpoints = resolveRecoveryCheckpoints(options.path, options.recoveryCheckpoints)
+  const sceneryColliders = recoveryCheckpoints.length && options.recoveryScenery
+    ? buildSceneryColliders(options.recoveryScenery, options.path.terrainSurface) : undefined
   const openPlacement = open ? sampleOpenStart(options.path) : undefined
   const vehicles: RaceVehicle[] = ROAD_GEOMETRY.startGrid.map((grid, index) => {
     const placement = openPlacement ?? samplePathBehindStart(
@@ -194,6 +201,8 @@ export function createRace(options: CreateRaceOptions): RaceState {
     handling: options.handling ?? 'simulation',
     totalLaps: open ? 1 : Math.max(1, Math.floor(options.laps)),
     startPathIndex: resolvedStartIndex,
+    ...(recoveryCheckpoints.length ? { recoveryCheckpoints } : {}),
+    ...(sceneryColliders?.size ? { sceneryColliders } : {}),
     reversed: open ? false : options.reversed ?? false,
     elapsed: 0,
     phase: 'countdown',

@@ -845,13 +845,19 @@ export class AppController {
       savedGesture.start === this.state.editor.gestureStart &&
       editor.points === savedGesture.start.points && editor.trees === savedGesture.start.trees &&
       editor.start === savedGesture.start.start && editor.terrain === savedGesture.start.terrain &&
-      editor.routeKind === savedGesture.start.routeKind
+      editor.routeKind === savedGesture.start.routeKind &&
+      editor.recoveryCheckpoints === savedGesture.start.recoveryCheckpoints &&
+      (!editor.recoveryCheckpoints.length || (editor.environmentId === savedGesture.start.environmentId &&
+        editor.scenery === savedGesture.start.scenery))
     if (this.state.editor.gestureStart && !editor.gestureStart) this.gestureRevision = null
+    const sceneryChanged = editor.environmentId !== this.state.editor.environmentId ||
+      editor.scenery !== this.state.editor.scenery
     const raceChanged = editor.points !== this.state.editor.points ||
       editor.trees !== this.state.editor.trees || editor.start !== this.state.editor.start ||
-      editor.terrain !== this.state.editor.terrain || editor.routeKind !== this.state.editor.routeKind
-    const contentChanged = raceChanged || editor.environmentId !== this.state.editor.environmentId ||
-      editor.scenery !== this.state.editor.scenery
+      editor.terrain !== this.state.editor.terrain || editor.routeKind !== this.state.editor.routeKind ||
+      editor.recoveryCheckpoints !== this.state.editor.recoveryCheckpoints ||
+      (editor.recoveryCheckpoints.length > 0 && sceneryChanged)
+    const contentChanged = raceChanged || sceneryChanged
     if (!contentChanged && !(restoresGesture && previousRevision !== savedGesture.revision)) {
       this.update({ ...this.state, editor })
       return
@@ -864,6 +870,7 @@ export class AppController {
       start: editor.start ?? { ratio: 0, reversed: false },
       terrain: editor.terrain,
       routeKind: editor.routeKind,
+      recoveryCheckpoints: editor.recoveryCheckpoints,
       environmentId: editor.environmentId,
       scenery: editor.scenery,
       raceRevision: restoresGesture ? savedGesture.revision : raceChanged ? Math.max(now, previousRevision + 1) : previousRevision,

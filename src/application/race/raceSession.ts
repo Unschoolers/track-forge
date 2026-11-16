@@ -202,6 +202,8 @@ export class RaceSession implements RaceSessionPort {
       startRatio: track.start?.ratio,
       reversed: routeKind === 'point-to-point' ? false : track.start?.reversed,
       routeKind,
+      recoveryCheckpoints: track.recoveryCheckpoints,
+      recoveryScenery: track,
     })
     const state = resolved.mode === 'ghost' || resolved.mode === 'time-trial'
       ? { ...created, vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
