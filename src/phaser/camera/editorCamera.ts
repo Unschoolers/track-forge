@@ -3,9 +3,9 @@ import type { Vector2 } from '@/domain/model'
 import type { EditorCamera } from '@/phaser/input/editorInput'
 import type { EditorCameraAction } from '@/domain/editor/editorGeometry'
 
-/** Small tracks stay readable; larger authored layouts still fit on phones. */
+/** Keep the zoom positive and leave room to zoom out past large course overviews. */
 export const EDITOR_ZOOM_LIMITS = {
-  minimum: 0.035,
+  minimum: 0.001,
   maximum: 2.7,
 } as const
 
@@ -25,13 +25,15 @@ export function fitEditorCamera(
   const maximumX = Math.max(...xValues)
   const minimumY = Math.min(...yValues)
   const maximumY = Math.max(...yValues)
+  // Leave room for the editor controls above and below the course.
+  const verticalPadding = Math.min(160, viewport.height / 2)
   return {
     x: (minimumX + maximumX) / 2,
     y: (minimumY + maximumY) / 2,
     zoom: clamp(
       Math.min(
         viewport.width / Math.max(300, maximumX - minimumX + 180),
-        viewport.height / Math.max(420, maximumY - minimumY + 220),
+        (viewport.height - verticalPadding) / Math.max(420, maximumY - minimumY + 220),
       ),
       EDITOR_ZOOM_LIMITS.minimum,
       1,

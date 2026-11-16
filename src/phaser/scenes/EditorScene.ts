@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { normalizeEditorSceneryChoice, type AppCommand, type AppSnapshot } from '@/application/appState'
 import type { Unsubscribe } from '@/application/eventBus'
 import { DEFAULT_TERRAIN_BRUSH_RADIUS } from '@/domain/config'
+import type { TrackId } from '@/domain/model'
 import {
   renderEditorGrid,
   renderEditorOverlay,
@@ -22,10 +23,7 @@ import {
   type EditorCamera,
   type PointerSample,
 } from '@/phaser/input/editorInput'
-import {
-  applyEditorCameraAction,
-  fitEditorCamera,
-} from '@/phaser/camera/editorCamera'
+import { applyEditorCameraAction } from '@/phaser/camera/editorCamera'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import {
   renderTerrain,
@@ -89,7 +87,7 @@ export class EditorScene extends Phaser.Scene {
   private currentSnapshot: AppSnapshot | undefined
   private currentRenderState: EditorRenderState | undefined
   private readonly editorCamera: EditorCamera = { x: 0, y: 0, zoom: 1 }
-  private cameraInitialized = false
+  private cameraTrackId: TrackId | undefined
   private lastCameraRequest = -1
   private previewRenderPending = false
   private compiledTerrainPreviewRevision: number | undefined
@@ -213,7 +211,12 @@ export class EditorScene extends Phaser.Scene {
 
   /** Read-only editor camera telemetry used by development-only gameplay QA. */
   cameraSnapshot(): EditorCamera {
-    return { ...this.editorCamera }
+    const camera = this.cameras.main
+    return {
+      x: camera.scrollX + camera.width / 2,
+      y: camera.scrollY + camera.height / 2,
+      zoom: camera.zoom,
+    }
   }
 
   override update(): void {
@@ -281,31 +284,27 @@ export class EditorScene extends Phaser.Scene {
     if (gestureContextChanged) {
       this.editorInput?.cancelActiveGesture()
     }
-    let cameraChanged = false
+    const trackId = snapshot.currentTrack?.id
+    const trackChanged = trackId !== this.cameraTrackId
     const request = snapshot.editorUi.cameraRequest
-    if (request && request.sequence !== this.lastCameraRequest) {
+    const requestedAction = request && request.sequence !== this.lastCameraRequest ? request.action : undefined
+    const cameraAction = trackChanged ? 'fit' : requestedAction
+    this.cameraTrackId = trackId
+    this.lastCameraRequest = request?.sequence ?? -1
+    if (cameraAction) {
       Object.assign(
         this.editorCamera,
         applyEditorCameraAction(
           this.editorCamera,
-          request.action,
+          cameraAction,
           snapshot.editor.points,
           this.viewport(),
         ),
       )
-      this.lastCameraRequest = request.sequence
-      this.cameraInitialized = true
-      this.applyCamera()
-      cameraChanged = true
-    } else if (!this.cameraInitialized && snapshot.editor.points.length > 0) {
-      Object.assign(
-        this.editorCamera,
-        fitEditorCamera(snapshot.editor.points, this.viewport()),
-      )
-      this.cameraInitialized = true
-      this.applyCamera()
-      cameraChanged = true
     }
+    const cameraChanged = cameraAction !== undefined
+    // Phaser creates a new camera each time the scene starts.
+    if (cameraChanged || !previousRenderState) this.applyCamera()
     const renderState = this.editorRenderState(snapshot)
     this.currentRenderState = renderState
     const changes = editorSnapshotRenderChanges(
