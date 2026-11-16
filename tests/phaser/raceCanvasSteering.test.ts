@@ -9,7 +9,7 @@ vi.mock('phaser', () => ({
 }))
 vi.mock('@/phaser/rendering/nightRenderer', () => ({ renderNightLights: vi.fn(), renderNightShade: vi.fn() }))
 vi.mock('@/phaser/rendering/trackRenderer', () => ({
-  renderTrackGeometryBase: vi.fn(), renderTrackGeometryBridgeOverlay: vi.fn(), renderTrackGeometryStructureUnderlay: vi.fn(),
+  renderRaceTrackGeometryBase: vi.fn(), renderTrackGeometryBridgeOverlay: vi.fn(), renderTrackGeometryStructureUnderlay: vi.fn(),
   renderRecoveryCheckpoints: vi.fn(),
 }))
 vi.mock('@/phaser/rendering/lampPostRenderer', () => ({ buildLampPosts: () => [], renderLampPosts: vi.fn() }))
