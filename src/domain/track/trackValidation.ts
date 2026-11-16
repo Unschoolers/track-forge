@@ -7,12 +7,14 @@ import {
   type Vector2,
 } from '@/domain/model'
 import { EDITOR_LIMITS } from '@/domain/editor/editorGeometry'
+import { MAX_ROAD_CONTROL_LENGTH, roadControlLength } from '@/domain/track/roadLength'
 
 export type TrackValidationCode =
   | 'ready'
   | 'too-few-points'
   | 'open-loop'
   | 'too-short'
+  | 'road-too-long'
   | 'invalid-data'
 
 export interface TrackValidationResult {
@@ -51,6 +53,10 @@ export function validateTrack(
       code: 'too-few-points',
       message: pointToPoint ? 'Add more road to complete the route' : 'Add more road to complete the circuit',
     }
+  }
+
+  if (roadControlLength(track) > MAX_ROAD_CONTROL_LENGTH) {
+    return { ready: false, code: 'road-too-long', message: 'Road is too long. Shorten it to race.' }
   }
 
   const first = track.points[0]

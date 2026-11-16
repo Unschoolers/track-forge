@@ -16,6 +16,7 @@ import {
 } from '@/phaser/rendering/trackRenderer'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { roadPointsForPreview } from '@/domain/track/roadLength'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import {
@@ -292,12 +293,13 @@ export class EditorScene extends Phaser.Scene {
     this.cameraTrackId = trackId
     this.lastCameraRequest = request?.sequence ?? -1
     if (cameraAction) {
+      const preview = cameraAction === 'fit' ? roadPointsForPreview(snapshot.editor) : snapshot.editor.points
       Object.assign(
         this.editorCamera,
         applyEditorCameraAction(
           this.editorCamera,
           cameraAction,
-          snapshot.editor.points,
+          preview.length ? preview : snapshot.editor.points,
           this.viewport(),
         ),
       )

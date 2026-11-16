@@ -11,6 +11,7 @@ import { validateTrack as validateTrackWithGeometry } from '@/domain/track/track
 import { analyzeTrack as analyzeTrackWithGeometry } from '@/domain/track/trackDiagnostics'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import {
+  applyEditorCommand,
   createEditorState,
   reduceEditor,
 } from '@/domain/editor/editorState'
@@ -110,6 +111,59 @@ describe('validateTrack', () => {
       code: 'ready',
       message: 'Track ready',
     })
+  })
+})
+
+describe('oversized saved roads', () => {
+  const loop = closedPoints(21, 'street', 1300)
+  loop[20] = { x: 1300, y: 0, surface: 'street' }
+  const strayRoad: TrackPoint[] = Array.from({ length: 52 }, (_, index) => ({
+    x: (index + 1) * 10_000, y: 4000, surface: 'street',
+  }))
+  const saved = track([...loop, ...strayRoad])
+
+  it('builds the closed loop preview without sampling the oversized appended road', () => {
+    const preview = geometry.get(saved)
+    expect(preview.path.closed).toBe(true)
+    expect(preview.path.points.length).toBeLessThan(2_000)
+    expect(preview.path.totalLength).toBeCloseTo(geometry.get(track(loop)).path.totalLength)
+    expect(validateTrack(saved)).toMatchObject({ ready: false, code: 'road-too-long' })
+    expect(saved.points).toHaveLength(73)
+  })
+
+  it('repairs an oversized circuit as one undoable edit', () => {
+    const warning = analyzeTrack(saved).find(({ id }) => id === 'road-after-closed-circuit')
+    expect(warning).toBeDefined()
+    if (!warning) return
+    const state = createEditorState(saved.points, saved.trees, saved.start, saved.terrain, saved)
+    const repaired = reduceEditor(state, { type: 'apply-track-repair', repair: warning.repair })
+    expect(repaired.points).toEqual(loop)
+    expect(repaired.terrain).toBe(state.terrain)
+    expect(validateTrack({ ...saved, points: repaired.points }).ready).toBe(true)
+    const undone = reduceEditor(repaired, { type: 'undo' })
+    expect(undone.points).toEqual(saved.points)
+    expect(reduceEditor(undone, { type: 'redo' }).points).toEqual(loop)
+  })
+
+  it('never proposes deleting an oversized point-to-point route', () => {
+    const open = { ...saved, routeKind: 'point-to-point' as const }
+    expect(geometry.get(open).path.points).toHaveLength(0)
+    expect(validateTrack(open)).toMatchObject({ ready: false, code: 'road-too-long' })
+    expect(analyzeTrack(open)).toEqual([])
+  })
+
+  it('rejects edits beyond the road length budget and allows shortening a legacy road', () => {
+    const editor = createEditorState(loop)
+    const added = applyEditorCommand(editor, { type: 'add-point', point: { x: 100_000, y: 0, surface: 'street' } })
+    expect(added.state).toBe(editor)
+    expect(added.rejection?.code).toBe('road-too-long')
+    const moved = applyEditorCommand(editor, { type: 'move-point', index: 7, point: { x: 0, y: 100_000 } })
+    expect(moved.state).toBe(editor)
+    expect(moved.rejection?.code).toBe('road-too-long')
+    const oversized = createEditorState(saved.points)
+    const shortened = applyEditorCommand(oversized, { type: 'erase-point', index: 72 })
+    expect(shortened.state.points).toHaveLength(72)
+    expect(shortened.rejection).toBeNull()
   })
 })
 

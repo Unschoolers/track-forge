@@ -165,6 +165,7 @@ describe('EditorInputController', () => {
     })
     input.pointerDown({ id: 1, x: 60, y: 100 })
     input.pointerDown({ id: 2, x: 140, y: 100 })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'add-point' }))
     dispatch.mockClear()
     input.pointerMove({ id: 1, x: 40, y: 100 })
     input.pointerMove({ id: 2, x: 180, y: 100 })

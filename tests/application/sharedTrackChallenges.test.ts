@@ -48,6 +48,12 @@ describe('shareable track challenges', () => {
       })),
     })).ok).toBe(false)
   })
+  it('imports an oversized export with an identifiable closed circuit for repair', () => {
+    const loop = [...track.points.slice(0, -1), ...track.points.slice(0, 1)]
+    const points = [...loop, { x: 220_000, y: 0, surface: 'street' as const }]
+    const parsed = parseTrackImport(exported({ ...track, points }))
+    expect(parsed.ok && parsed.track.points).toHaveLength(points.length)
+  })
   it('allows a normal-sized circuit far from the origin', () => {
     const translated = { ...track, points: track.points.map((point) => ({
       ...point, x: point.x + 1_000_000, y: point.y - 1_000_000,

@@ -138,7 +138,7 @@ export function createEditorDiagnostics(
     row.append(
       element('span', 'diagnostic-message', diagnostic.message),
       button(
-        'Repair',
+          diagnostic.repair.type === 'remove-road-after-closed-circuit' ? 'Remove extra road' : 'Repair',
         `repair-${diagnostic.id}`,
         () =>
           actions.edit({
