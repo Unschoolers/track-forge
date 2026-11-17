@@ -9,3 +9,5 @@ coverage/
 *.p12
 *.pfx
 qa/results/
+playwright-report/
+test-results/

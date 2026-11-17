@@ -15,6 +15,7 @@ export default defineConfig({
   use: {
     ...devices['Pixel 7'],
     browserName: 'chromium',
+    launchOptions: { executablePath: process.env.TRACKFORGE_CHROMIUM_EXECUTABLE },
     baseURL: 'http://127.0.0.1:4174',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

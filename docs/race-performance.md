@@ -63,7 +63,6 @@ emulation in an 844 × 390 viewport. The default run uses Starter Circuit.
 
 ```sh
 npm ci
-npm install --no-save --package-lock=false @playwright/test@1.64.1
 npx playwright install chromium
 npm run qa:mobile -- race-performance
 ```

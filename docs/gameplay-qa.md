@@ -8,15 +8,17 @@ sends overlapping fingers to the actual Phaser canvas and the DOM brake button.
 
 ```sh
 npm ci
-npm install --no-save --package-lock=false @playwright/test@1.64.1
 npx playwright install chromium
 npm run qa:mobile
+npm run qa:mobile:production
 ```
 
 The separate `Mobile gameplay QA` GitHub workflow runs these scenarios on
-every gameplay-code PR and uploads reports and failure screenshots for seven
-days. The QA runner version is pinned in the workflow without changing the
-existing Android dependency lockfile.
+gameplay-code and dependency PRs and uploads reports and failure screenshots
+for seven days. `npm ci` installs the pinned Playwright runner. The production
+smoke builds the game and starts a race through the same UI players use.
+Set `TRACKFORGE_CHROMIUM_EXECUTABLE` to a locally installed Chromium executable
+to use it for either suite.
 
 ## First pass: what is actually tested
 
