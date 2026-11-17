@@ -9,6 +9,55 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 
 describe('race camera', () => {
+  function screenPosition(
+    player: { x: number; y: number },
+    camera: ReturnType<typeof createRaceCamera>,
+    viewport: { width: number; height: number },
+  ) {
+    const rotation = -camera.angle - Math.PI / 2
+    const dx = player.x - camera.x
+    const dy = player.y - camera.y
+    return {
+      x: viewport.width / 2 + (dx * Math.cos(rotation) - dy * Math.sin(rotation)) * camera.zoom,
+      y: viewport.height / 2 + (dx * Math.sin(rotation) + dy * Math.cos(rotation)) * camera.zoom,
+    }
+  }
+
+  it('keeps the player away from the screen edge when previewing a distant bend', () => {
+    const viewport = { width: 320, height: 640 }
+    const player = { x: 0, y: 0 }
+    const camera = advanceRaceCamera(
+      createRaceCamera({ ...player, angle: 0 }),
+      { target: player, preview: [player, { x: 0, y: 1000 }], roadAngle: 0, upcomingCurve: 1, speed: 150, shake: 0 },
+      { dynamicZoom: true, steering: 0, viewport },
+      1,
+    )
+    const screen = screenPosition(player, camera, viewport)
+    expect(screen.x).toBeGreaterThanOrEqual(viewport.width * 0.2)
+    expect(screen.x).toBeLessThanOrEqual(viewport.width * 0.8)
+  })
+
+  it.each([true, false])(
+    'keeps the player visible immediately after a distant recovery (dynamic zoom: %s)',
+    (dynamicZoom) => {
+      const viewport = { width: 320, height: 640 }
+      const player = { x: 3000, y: -2400 }
+      for (const angle of [0, Math.PI / 2, -Math.PI / 3]) {
+        const camera = advanceRaceCamera(
+          createRaceCamera({ x: 0, y: 0, angle }),
+          { target: player, preview: [player], roadAngle: angle, upcomingCurve: 0, speed: 0, shake: 0 },
+          { dynamicZoom, steering: 0, viewport },
+          1 / 60,
+        )
+        const screen = screenPosition(player, camera, viewport)
+        expect(screen.x).toBeGreaterThanOrEqual(viewport.width * 0.2 - 0.001)
+        expect(screen.x).toBeLessThanOrEqual(viewport.width * 0.8 + 0.001)
+        expect(screen.y).toBeGreaterThanOrEqual(viewport.height * 0.2 - 0.001)
+        expect(screen.y).toBeLessThanOrEqual(viewport.height * 0.8 + 0.001)
+      }
+    },
+  )
+
   it('caps camera rotation on abrupt route-heading discontinuities', () => {
     const camera = createRaceCamera({ x: 0, y: 0, angle: 0 })
     const next = advanceRaceCamera(

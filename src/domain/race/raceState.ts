@@ -66,6 +66,10 @@ export interface RaceCameraHints {
   /** Player position followed by route points inside the approach preview. */
   readonly preview?: readonly Vector2[]
   readonly roadAngle: number
+  /** Camera preview follows travel opposite the configured course direction. */
+  readonly followingOppositeTravel?: boolean
+  /** Time spent consistently moving toward a change in camera travel direction. */
+  readonly directionChangeSeconds?: number
   readonly upcomingCurve: number
   readonly speed: number
   readonly shake: number

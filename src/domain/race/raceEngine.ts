@@ -98,9 +98,10 @@ export type RaceStep = (
 ) => RaceStepResult
 
 function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previous?: VehicleStepContext) {
-  // An Arcade car moves only a few samples per step. Restrict local matching
-  // to its route so a nearby return arm cannot change which road supports it.
-  const radius = race.routeKind === 'point-to-point' || (vehicle.player && race.handling !== 'simulation') ? 12 : undefined
+  // A car moves only a few samples per step. Keep the player on its current
+  // road when a nearby return arm is closer; off-road reacquisition remains
+  // available for closed circuits in getVehicleStepContext.
+  const radius = race.routeKind === 'point-to-point' || vehicle.player ? 12 : undefined
   return getVehicleStepContext(race.path, vehicle, previous, radius)
 }
 
@@ -127,7 +128,11 @@ export function recoverRacePlayer(state: RaceState): RaceState {
   if (recovered === player) return state
   const vehicles = [...state.vehicles]
   vehicles[index] = recovered
-  return { ...state, vehicles }
+  return {
+    ...state,
+    vehicles,
+    cameraHints: buildRaceCameraHints(state.path, recovered, state.reversed),
+  }
 }
 
 function resetAtAuthoredCheckpoint(vehicle: RaceVehicle, race: RecoveryCourse): RaceVehicle | undefined {
@@ -504,7 +509,15 @@ function advanceRace(
       ],
       cameraHints: player
         ? {
-            ...buildRaceCameraHints(state.path, player, state.reversed),
+            ...buildRaceCameraHints(
+              state.path,
+              player,
+              state.reversed,
+              events.some((event) => event.type === 'vehicle-recovered' && event.vehicleId === player.id)
+                ? undefined
+                : state.cameraHints,
+              dt,
+            ),
             shake: impactShake,
           }
         : state.cameraHints,

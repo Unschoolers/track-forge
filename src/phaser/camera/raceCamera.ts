@@ -142,15 +142,37 @@ export function advanceRaceCamera(
             : RACE_CAMERA_TUNING.zoomOutResponse),
       )
     : 1
+  const zoom = clamp(
+    camera.zoom + (targetZoom - camera.zoom) * zoomFollow,
+    RACE_CAMERA_TUNING.minimumZoom,
+    RACE_CAMERA_TUNING.maximumZoom,
+  )
+  let x = camera.x + (target.x - camera.x) * positionFollow
+  let y = camera.y + (target.y - camera.y) * positionFollow
+  const player = hints.preview?.[0]
+  const viewport = options.viewport
+  if (player && viewport && viewport.width > 0 && viewport.height > 0) {
+    // The preview may include another arm of a bend, or the car may have just
+    // recovered far away. Preserve the look-ahead where possible, but keep
+    // the player clear of the screen edges in camera-relative coordinates.
+    const forwardX = Math.cos(angle)
+    const forwardY = Math.sin(angle)
+    const dx = player.x - x
+    const dy = player.y - y
+    const along = dx * forwardX + dy * forwardY
+    const across = dy * forwardX - dx * forwardY
+    const alongLimit = viewport.height * 0.28 / zoom
+    const acrossLimit = viewport.width * 0.25 / zoom
+    const alongExcess = along - clamp(along, -alongLimit, alongLimit)
+    const acrossExcess = across - clamp(across, -acrossLimit, acrossLimit)
+    x += alongExcess * forwardX - acrossExcess * forwardY
+    y += alongExcess * forwardY + acrossExcess * forwardX
+  }
   return {
-    x: camera.x + (target.x - camera.x) * positionFollow,
-    y: camera.y + (target.y - camera.y) * positionFollow,
+    x,
+    y,
     angle,
-    zoom: clamp(
-      camera.zoom + (targetZoom - camera.zoom) * zoomFollow,
-      RACE_CAMERA_TUNING.minimumZoom,
-      RACE_CAMERA_TUNING.maximumZoom,
-    ),
+    zoom,
     shake: {
       x: hints.shake,
       y: hints.shake * 0.5,

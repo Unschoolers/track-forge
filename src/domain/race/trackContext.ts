@@ -1,4 +1,5 @@
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
+import { clamp } from '@/domain/geometry/math'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type {
   RaceCameraHints,
@@ -492,20 +493,48 @@ export function buildRaceCameraHints(
   path: RoadPath,
   player: RaceVehicle,
   reversed = false,
+  previous?: RaceCameraHints,
+  deltaSeconds = 0,
 ): RaceCameraHints {
-  const context = getVehicleStepContext(path, player)
+  // The simulation already resolved this index for the current tick. A second
+  // spatial search can jump to a different arm of the same tight bend.
+  const playerPoint = path.points[player.pathIndex]
+  const nearest = playerPoint
+    ? { index: player.pathIndex, point: playerPoint }
+    : getVehicleStepContext(path, player).nearest
   const sample = Math.max(5, Math.min(10, Math.round(5 + player.speed / 65)))
-  const direction = reversed ? -1 : 1
-  const behind = wrapped(path, context.nearest.index - direction * sample) ?? player
-  const ahead = wrapped(path, context.nearest.index + direction * sample) ?? player
-  const roadAngle = Math.atan2(ahead.y - behind.y, ahead.x - behind.x)
+  const courseDirection = reversed ? -1 : 1
+  const behind = wrapped(path, nearest.index - courseDirection * sample) ?? player
+  const ahead = wrapped(path, nearest.index + courseDirection * sample) ?? player
+  const courseAngle = Math.atan2(ahead.y - behind.y, ahead.x - behind.x)
+  const motionSpeed = Math.hypot(player.vx, player.vy)
+  const moving = motionSpeed > 20
+  const motionAngle = moving ? Math.atan2(player.vy, player.vx) : courseAngle
+  const alignment = Math.cos(angleDifference(courseAngle, motionAngle))
+  let followingOppositeTravel = previous?.followingOppositeTravel ?? false
+  let directionChangeSeconds = previous?.directionChangeSeconds ?? 0
+  // Require sustained motion, with separate entry/exit thresholds, so a brief
+  // skid or collision cannot flip the preview between opposite directions.
+  const changeDirection = moving && (followingOppositeTravel ? alignment > -0.15 : alignment < -0.65)
+  directionChangeSeconds = changeDirection ? directionChangeSeconds + Math.max(0, deltaSeconds) : 0
+  if (directionChangeSeconds >= 0.25) {
+    followingOppositeTravel = !followingOppositeTravel
+    directionChangeSeconds = 0
+  }
+  const direction = followingOppositeTravel ? -courseDirection : courseDirection
+  let roadAngle = followingOppositeTravel ? courseAngle + Math.PI : courseAngle
+  // If a tight bend or an off-road excursion puts the sampled road far away
+  // from the direction of motion, avoid looking backward at the player.
+  if (moving) {
+    roadAngle = motionAngle + clamp(angleDifference(roadAngle, motionAngle), -Math.PI / 4, Math.PI / 4)
+  }
   const curveDistances = [8, 14, 20, 28] as const
   let weightedCurve = 0
   let weightTotal = 0
   for (const [index, distance] of curveDistances.entries()) {
     const weight = 1 - index * 0.18
     weightedCurve +=
-      Math.abs(turnAmountAt(path, context.nearest.index + direction * distance, 5)) *
+      Math.abs(turnAmountAt(path, nearest.index + direction * distance, 5)) *
       weight
     weightTotal += weight
   }
@@ -518,20 +547,20 @@ export function buildRaceCameraHints(
   )
   const preview: Vector2[] = [player]
   for (let offset = 1; offset < path.points.length; offset += 1) {
-    const index = context.nearest.index + direction * offset
+    const index = nearest.index + direction * offset
     if (!path.closed && (index < 0 || index >= path.points.length)) break
     const point = wrapped(path, index)
     if (!point) break
-    let distance = (point.distance - context.nearest.point.distance) * direction
+    let distance = (point.distance - nearest.point.distance) * direction
     if (path.closed && distance < 0) distance += path.totalLength
     if (distance > horizon) break
     preview.push(point)
   }
   const lookAhead = Math.min(
     Math.max(14, Math.min(46, 14 + player.speed * 0.095)),
-    path.closed ? Infinity : Math.max(0, reversed
-      ? context.nearest.point.distance
-      : path.totalLength - context.nearest.point.distance),
+    path.closed ? Infinity : Math.max(0, direction < 0
+      ? nearest.point.distance
+      : path.totalLength - nearest.point.distance),
   )
   return {
     target: {
@@ -540,6 +569,8 @@ export function buildRaceCameraHints(
     },
     preview,
     roadAngle,
+    followingOppositeTravel,
+    directionChangeSeconds,
     upcomingCurve: weightTotal > 0 ? weightedCurve / weightTotal : 0,
     speed: player.speed,
     shake: 0,
