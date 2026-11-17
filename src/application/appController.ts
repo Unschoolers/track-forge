@@ -13,7 +13,6 @@ import type {
   TrackStore,
 } from '@/application/ports/storage'
 import {
-  applyEditorCommand,
   createEditorState,
   type EditorCommand,
 } from '@/domain/editor/editorState'
@@ -34,10 +33,9 @@ import type {
 } from '@/application/appState'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { EditorSession, type Scheduler } from '@/application/editor/editorSession'
 
-export interface Scheduler {
-  schedule(delayMs: number, task: () => void): () => void
-}
+export type { Scheduler } from '@/application/editor/editorSession'
 
 export interface AppControllerDependencies {
   readonly lastRaceStore?: LastRaceStore
@@ -58,14 +56,12 @@ export class AppController {
   private readonly library: TrackLibraryService
   private state: AppSnapshot
   private preCupTrack: Track | null = null
-  private cancelPendingSave: (() => void) | undefined
-  private pendingEditorSave = false
-  private saveGeneration = 0
-  private gestureRevision: { trackId: TrackId; start: NonNullable<AppSnapshot['editor']['gestureStart']>; revision: number } | null = null
+  private readonly editorSession: EditorSession
   private unsubscribeRace: (() => void) | undefined
 
   constructor(private readonly dependencies: AppControllerDependencies) {
     this.now = dependencies.now ?? (() => Date.now())
+    this.editorSession = new EditorSession(dependencies.trackStore, dependencies.scheduler, this.now)
     this.library = new TrackLibraryService({
       trackStore: dependencies.trackStore,
       scoreStore: dependencies.scoreStore,
@@ -584,7 +580,7 @@ export class AppController {
     if (!this.flushPendingEditorSave()) return
     const track = this.library.select(id)
     if (!track) return
-    this.cancelPendingEditorSave()
+    this.editorSession.discardPendingSave()
     this.update({
       ...this.state,
       currentTrack: track,
@@ -603,7 +599,7 @@ export class AppController {
     if (!this.flushPendingEditorSave()) return
     const track = this.library.select(id)
     if (!track) return
-    this.cancelPendingEditorSave()
+    this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
       ...this.state,
@@ -635,7 +631,7 @@ export class AppController {
       this.update({ ...this.state, notice: validation.message })
       return
     }
-    this.cancelPendingEditorSave()
+    this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
       ...this.state,
@@ -662,7 +658,7 @@ export class AppController {
       this.update({ ...this.state, notice: result.message })
       return
     }
-    this.cancelPendingEditorSave()
+    this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
       ...this.state,
@@ -700,7 +696,7 @@ export class AppController {
       return
     }
     if (this.state.currentTrack?.id === id) {
-      this.cancelPendingEditorSave()
+      this.editorSession.discardPendingSave()
     }
     const tracks = this.library.list()
     const currentTrack =
@@ -767,7 +763,7 @@ export class AppController {
     this.update({
       ...this.state,
       overlay: { type: 'none' },
-      notice: this.pendingEditorSave && this.state.notice === 'Save unavailable.'
+      notice: this.editorSession.hasPendingSave && this.state.notice === 'Save unavailable.'
         ? this.state.notice
         : null,
     })
@@ -790,11 +786,7 @@ export class AppController {
   private saveCurrentTrack(): void {
     const track = this.state.currentTrack
     if (!track) return
-    this.cancelPendingSave?.()
-    this.cancelPendingSave = undefined
-    this.saveGeneration++
-    const saved = this.dependencies.trackStore.save(track)
-    this.pendingEditorSave = !saved
+    const saved = this.editorSession.save(track)
     this.update({
       ...this.state,
       overlay: { type: 'none' },
@@ -828,95 +820,38 @@ export class AppController {
   private edit(command: EditorCommand): void {
     const currentTrack = this.state.currentTrack
     if (!currentTrack) return
-    const result = applyEditorCommand(this.state.editor, command)
-    if (result.rejection) {
-      this.update({ ...this.state, notice: result.rejection.message })
+    const result = this.editorSession.apply(this.state.editor, currentTrack, command)
+    if ('rejection' in result) {
+      this.update({ ...this.state, notice: result.rejection })
       return
     }
-    const editor = result.state
+    const { editor, track } = result
     if (editor === this.state.editor) return
-    const previousRevision = currentTrack.raceRevision ?? currentTrack.updatedAt
-    if (!this.state.editor.gestureStart && editor.gestureStart) {
-      this.gestureRevision = { trackId: currentTrack.id, start: editor.gestureStart, revision: previousRevision }
-    }
-    const savedGesture = this.gestureRevision
-    const restoresGesture = (command.type === 'cancel-gesture' || command.type === 'undo') &&
-      savedGesture?.trackId === currentTrack.id &&
-      savedGesture.start === this.state.editor.gestureStart &&
-      editor.points === savedGesture.start.points && editor.trees === savedGesture.start.trees &&
-      editor.start === savedGesture.start.start && editor.terrain === savedGesture.start.terrain &&
-      editor.routeKind === savedGesture.start.routeKind &&
-      editor.recoveryCheckpoints === savedGesture.start.recoveryCheckpoints &&
-      (!editor.recoveryCheckpoints.length || (editor.environmentId === savedGesture.start.environmentId &&
-        editor.scenery === savedGesture.start.scenery))
-    if (this.state.editor.gestureStart && !editor.gestureStart) this.gestureRevision = null
-    const sceneryChanged = editor.environmentId !== this.state.editor.environmentId ||
-      editor.scenery !== this.state.editor.scenery
-    const raceChanged = editor.points !== this.state.editor.points ||
-      editor.trees !== this.state.editor.trees || editor.start !== this.state.editor.start ||
-      editor.terrain !== this.state.editor.terrain || editor.routeKind !== this.state.editor.routeKind ||
-      editor.recoveryCheckpoints !== this.state.editor.recoveryCheckpoints ||
-      (editor.recoveryCheckpoints.length > 0 && sceneryChanged)
-    const contentChanged = raceChanged || sceneryChanged
-    if (!contentChanged && !(restoresGesture && previousRevision !== savedGesture.revision)) {
+    if (!track) {
       this.update({ ...this.state, editor })
       return
-    }
-    const now = this.now()
-    const updatedTrack = {
-      ...currentTrack,
-      points: editor.points,
-      trees: editor.trees,
-      start: editor.start ?? { ratio: 0, reversed: false },
-      terrain: editor.terrain,
-      routeKind: editor.routeKind,
-      recoveryCheckpoints: editor.recoveryCheckpoints,
-      environmentId: editor.environmentId,
-      scenery: editor.scenery,
-      raceRevision: restoresGesture ? savedGesture.revision : raceChanged ? Math.max(now, previousRevision + 1) : previousRevision,
-      updatedAt: now,
     }
     this.update({
       ...this.state,
       mode: 'editor',
-      currentTrack: updatedTrack,
-      tracks: this.state.tracks.map((track) =>
-        track.id === updatedTrack.id ? updatedTrack : track,
-      ),
+      currentTrack: track,
+      tracks: this.state.tracks.map((entry) => entry.id === track.id ? track : entry),
       editor,
       notice: null,
     })
-    this.cancelPendingSave?.()
-    this.pendingEditorSave = true
-    const generation = ++this.saveGeneration
-    this.cancelPendingSave = this.dependencies.scheduler.schedule(120, () => {
-      if (generation !== this.saveGeneration) return
-      this.flushPendingEditorSave()
-    })
+    this.editorSession.queueSave(() => this.flushPendingEditorSave())
   }
 
   flushPendingEditorSave(): boolean {
-    if (!this.pendingEditorSave) return true
-    this.cancelPendingSave?.()
-    this.cancelPendingSave = undefined
-    this.saveGeneration++
-    const track = this.state.currentTrack
-    if (!track || !this.dependencies.trackStore.save(track)) {
+    if (!this.editorSession.hasPendingSave) return true
+    if (!this.editorSession.save(this.state.currentTrack)) {
       this.update({ ...this.state, notice: 'Save unavailable.' })
       return false
     }
-    this.pendingEditorSave = false
     if (this.state.notice === 'Save unavailable.') {
       this.update({ ...this.state, notice: null })
     }
     return true
-  }
-
-  private cancelPendingEditorSave(): void {
-    this.cancelPendingSave?.()
-    this.cancelPendingSave = undefined
-    this.pendingEditorSave = false
-    this.saveGeneration++
   }
 
   private update(state: AppSnapshot): void {
