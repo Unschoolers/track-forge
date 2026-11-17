@@ -1,13 +1,14 @@
 import { serializeTrack } from '@/infrastructure/export/trackExport'
 import { describe, expect, it } from 'vitest'
 import { asTrackId, type Track } from '@/domain/model'
+import { TERRAIN_LIMITS } from '@/domain/config'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { parseTrackImport } from '@/application/library/trackImport'
 import { TrackLibraryService } from '@/application/library/trackLibraryService'
 import { medalForFinish } from '@/ui/components/finishMedal'
 
 const track = createStarterTrack(asTrackId('original'), 10)
-const exported = (value: Track): string =>
+const exported = (value: unknown): string =>
   JSON.stringify({ format: 'trackforge-track', formatVersion: 1, track: value })
 
 describe('shareable track challenges', () => {
@@ -24,6 +25,32 @@ describe('shareable track challenges', () => {
       ...track, recoveryCheckpoints: [0.6, 0.15, 0.6, -1, 1],
     }).content)
     expect(result.ok && result.track.recoveryCheckpoints).toEqual([0.15, 0.6])
+  })
+  it('round-trips compact exports at the terrain and tree limits', () => {
+    const cells = Array.from({ length: TERRAIN_LIMITS.maximumCells }, (_, index) => ({
+      column: TERRAIN_LIMITS.minimumCoordinate + index % 200,
+      row: TERRAIN_LIMITS.minimumCoordinate + Math.floor(index / 200),
+      kind: 'hill' as const,
+    }))
+    const trees = Array.from({ length: 5000 }, (_, index) => ({
+      x: 3500 + index % 100 * 23.25,
+      y: 3500 + Math.floor(index / 100) * 29.75,
+    }))
+    const result = parseTrackImport(serializeTrack({
+      ...track, trees, terrain: { ...track.terrain, cells },
+    }).content)
+    if (!result.ok) throw new Error(result.message)
+    expect(result.track.terrain.cells).toEqual(cells)
+    expect(result.track.trees).toEqual(trees)
+  })
+  it('preserves authored overpasses when importing an older export', () => {
+    const points = track.points.map(({ x, y, surface }, index) => ({
+      x, y, surface, elevation: index === 0 ? 'overhead' : 'ground',
+    }))
+    const result = parseTrackImport(exported({ ...track, version: 7, points }))
+    if (!result.ok) throw new Error(result.message)
+    expect(result.track.version).toBe(8)
+    expect(result.track.points[0]?.structure).toBe('overpass')
   })
   it('rejects malformed, oversized and dangerous shared geometry', () => {
     expect(parseTrackImport('not json').ok).toBe(false)

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { requireFixture } from '../fixtures/requireFixture'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { serializeTrack } from '@/infrastructure/export/trackExport'
 import {
 	createLaneScenarios,
 	decodeTrackInput,
@@ -191,10 +192,13 @@ describe('AI lane simulations', () => {
 			).crossings.length,
 		).toBeGreaterThan(0)
 	})
-	it('imports a saved track or full library with the existing track decoder', () => {
+	it('imports a saved track, export, or full library with the existing track decoder', () => {
 		const tracks = createLaneScenarios()
 		expect(decodeTrackInput(tracks[0])).toHaveLength(1)
 		expect(decodeTrackInput(tracks)).toHaveLength(3)
+		const exportedTrack = requireFixture(tracks[2])
+		const decoded = decodeTrackInput(JSON.parse(serializeTrack(exportedTrack).content))
+		expect(decoded[0]).toMatchObject({ name: exportedTrack.name, points: exportedTrack.points })
 		expect(() =>
 			decodeTrackInput({ ...tracks[0], points: [{ x: 'bad', y: 0 }] }),
 		).toThrow(/invalid/i)

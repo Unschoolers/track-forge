@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { Track } from '@/domain/model'
+import { TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
 
 const nativeExporter = registerPlugin<{
   save(options: { filename: string; content: string }): Promise<{ saved: boolean }>
@@ -10,7 +11,7 @@ export function serializeTrack(track: Track): { filename: string; content: strin
   const name = track.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'track'
   return {
     filename: `${name}.trackforge.json`,
-    content: JSON.stringify({ format: 'trackforge-track', formatVersion: 1, track }, null, 2),
+    content: JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION, track }),
   }
 }
 
