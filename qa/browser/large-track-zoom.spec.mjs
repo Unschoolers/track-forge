@@ -85,6 +85,45 @@ test.describe('Rally editor zoom', () => {
     }
   })
 
+  test('keeps a pinch active over the editor controls and holds the zoom on release', async ({ page, context }) => {
+    const fitButton = page.getByRole('button', { name: 'Fit track', exact: true })
+    const bounds = await fitButton.boundingBox()
+    const x = Math.round(bounds.x + bounds.width / 2)
+    const y = Math.round(bounds.y + bounds.height / 2)
+    const first = contact(1, x - 190, y)
+    const second = contact(2, x, y + 88)
+    const overFit = contact(2, x, y)
+    const closer = contact(1, x - 95, y)
+    const initial = await readCamera(page)
+    const readEditor = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor)
+    const editor = await readEditor()
+    const cdp = await context.newCDPSession(page)
+    let chosen
+    try {
+      await touch(cdp, 'touchStart', [first])
+      await touch(cdp, 'touchStart', [second])
+      await touch(cdp, 'touchMove', [contact(2, x, y + 68)])
+      await expect.poll(async () => (await readCamera(page)).zoom).toBeLessThan(initial.zoom)
+      await touch(cdp, 'touchMove', [overFit])
+      await touch(cdp, 'touchMove', [closer])
+      await expect.poll(async () => (await readCamera(page)).zoom)
+        .toBeCloseTo(initial.zoom * 95 / Math.hypot(190, 88), 6)
+      chosen = await readCamera(page)
+
+      await touch(cdp, 'touchEnd', [overFit])
+      await touch(cdp, 'touchMove', [contact(1, closer.x - 20, closer.y)])
+    } finally {
+      await releaseTouches(cdp)
+      await cdp.detach()
+    }
+
+    expect(await readCamera(page)).toEqual(chosen)
+    expect(await readEditor()).toEqual(editor)
+    await fitButton.tap()
+    expect(await readCamera(page)).toEqual(initial)
+    expect(await readEditor()).toEqual(editor)
+  })
+
   test('restores the chosen zoom and center when the same course is reopened', async ({ page }) => {
     await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
     const chosen = await readCamera(page)
@@ -149,6 +188,12 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     const camera = await page.evaluate(() => window.__trackForgeQa.snapshot().camera)
     expect(camera.zoom).toBeLessThan(0.16)
     expect(camera.zoom).toBeGreaterThan(0.03)
+    if (width < height) {
+      const { y, height: canvasHeight } = await canvas.boundingBox()
+      const actions = await page.locator('.editor-actions').boundingBox()
+      const lowestY = Math.max(...trackPoints.map(point => point.y))
+      expect(y + canvasHeight / 2 + (lowestY - camera.y) * camera.zoom).toBeLessThan(actions.y)
+    }
 
     const before = await canvas.screenshot({ scale: 'css' })
     await testInfo.attach(`large-${width}-fit.png`, { body: before, contentType: 'image/png' })

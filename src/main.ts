@@ -137,15 +137,15 @@ function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
   music.setVolume(musicGain(musicVolume))
 }
 
-const stopSceneSync = controller.subscribe((snapshot) => {
-  sceneHost.start(snapshot.mode)
-  syncAudio(snapshot)
-})
-
 sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
 application.start()
+// Render the controls before a scene uses their bounds to fit the camera.
+const stopSceneSync = controller.subscribe((snapshot) => {
+  sceneHost.start(snapshot.mode)
+  syncAudio(snapshot)
+})
 
 // QA telemetry is read-only and exists only in development builds explicitly
 // opened with ?qa. Production APKs never expose this inspection surface.

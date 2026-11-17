@@ -27,7 +27,7 @@ import {
   type EditorCamera,
   type PointerSample,
 } from '@/phaser/input/editorInput'
-import { applyEditorCameraAction } from '@/phaser/camera/editorCamera'
+import { applyEditorCameraAction, type EditorViewport } from '@/phaser/camera/editorCamera'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import {
   renderTerrain,
@@ -88,6 +88,7 @@ export class EditorScene extends Phaser.Scene {
   private terrainPreviewGraphics?: Phaser.GameObjects.Graphics
   private overlayGraphics?: Phaser.GameObjects.Graphics
   private editorInput: EditorInputController | undefined
+  private pointerListeners: AbortController | undefined
   private currentSnapshot: AppSnapshot | undefined
   private currentRenderState: EditorRenderState | undefined
   private readonly editorCamera: EditorCamera = { x: 0, y: 0, zoom: 1 }
@@ -205,11 +206,17 @@ export class EditorScene extends Phaser.Scene {
       this.renderSnapshot(snapshot),
     )
 
-    this.input.on('pointerdown', this.onPointerDown, this)
-    this.input.on('pointermove', this.onPointerMove, this)
-    this.input.on('pointerup', this.onPointerUp, this)
-    this.input.on('pointerupoutside', this.onPointerUp, this)
-    this.input.on('gameout', this.onGameOut, this)
+    this.pointerListeners = new AbortController()
+    const { signal } = this.pointerListeners
+    // Canvas gestures need capture across the HTML controls. Phaser's touch
+    // hit test stops delivering moves as soon as a finger covers a button.
+    const canvas = this.game.canvas
+    canvas.addEventListener('pointerdown', this.onPointerEvent, { signal })
+    canvas.addEventListener('pointermove', this.onPointerEvent, { signal })
+    canvas.addEventListener('pointerup', this.onPointerEvent, { signal })
+    canvas.addEventListener('pointercancel', this.onPointerEvent, { signal })
+    canvas.addEventListener('lostpointercapture', this.onPointerEvent, { signal })
+    window.addEventListener('blur', this.cancelPointerGesture, { signal })
     this.input.on('wheel', this.onWheel, this)
     this.game.renderer?.on(Phaser.Renderer.Events.RESTORE_WEBGL, this.invalidateRasters)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this)
@@ -237,32 +244,43 @@ export class EditorScene extends Phaser.Scene {
     this.renderTerrainPreviewPresentation()
   }
 
-  private readonly onPointerDown = (pointer: Phaser.Input.Pointer): void => {
+  private readonly onPointerEvent = (event: PointerEvent): void => {
+    const input = this.editorInput
+    if (!input) return
+    const canvas = this.game.canvas
+    if (event.type === 'pointerdown') {
+      if (event.button !== 0) return
+      canvas.setPointerCapture(event.pointerId)
+    } else if (event.type === 'pointermove' && !canvas.hasPointerCapture(event.pointerId)) {
+      return
+    }
+
     const changes = this.pointerRenderChanges()
-    const previousPreview = this.editorInput?.sceneryPreview() ?? null
-    this.editorInput?.pointerDown(this.pointerSample(pointer))
+    const previousPreview = input.sceneryPreview()
+    switch (event.type) {
+      case 'pointerdown':
+        input.pointerDown(this.pointerSample(event))
+        break
+      case 'pointermove':
+        if (!input.navigationActive() && document.elementFromPoint(event.clientX, event.clientY) !== canvas) {
+          input.cancelActiveGesture()
+        } else {
+          input.pointerMove(this.pointerSample(event))
+        }
+        break
+      case 'pointerup':
+        input.pointerUp(this.pointerSample(event))
+        break
+      case 'pointercancel':
+      case 'lostpointercapture':
+        input.pointerCancel(event.pointerId)
+        break
+    }
     this.renderChanges(changes)
     this.refreshTreePreview(previousPreview)
   }
 
-  private readonly onPointerMove = (pointer: Phaser.Input.Pointer): void => {
-    if (!pointer.isDown) return
-    const changes = this.pointerRenderChanges()
-    const previousPreview = this.editorInput?.sceneryPreview() ?? null
-    this.editorInput?.pointerMove(this.pointerSample(pointer))
-    this.renderChanges(changes)
-    this.refreshTreePreview(previousPreview)
-  }
-
-  private readonly onPointerUp = (pointer: Phaser.Input.Pointer): void => {
-    const changes = this.pointerRenderChanges()
-    const previousPreview = this.editorInput?.sceneryPreview() ?? null
-    this.editorInput?.pointerUp(this.pointerSample(pointer))
-    this.renderChanges(changes)
-    this.refreshTreePreview(previousPreview)
-  }
-
-  private readonly onGameOut = (): void => {
+  private readonly cancelPointerGesture = (): void => {
     const changes = this.pointerRenderChanges()
     const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.editorInput?.cancelActiveGesture()
@@ -306,7 +324,7 @@ export class EditorScene extends Phaser.Scene {
           this.editorCamera,
           cameraAction,
           preview.length ? preview : snapshot.editor.points,
-          this.viewport(),
+          cameraAction === 'fit' ? this.fitViewport() : this.viewport(),
         ),
       )
     }
@@ -615,14 +633,40 @@ export class EditorScene extends Phaser.Scene {
     })
   }
 
-  private pointerSample(pointer: Phaser.Input.Pointer): PointerSample {
-    return { id: pointer.id, x: pointer.x, y: pointer.y }
+  private pointerSample(event: PointerEvent): PointerSample {
+    return {
+      id: event.pointerId,
+      x: this.scale.transformX(event.pageX),
+      y: this.scale.transformY(event.pageY),
+    }
   }
 
-  private viewport(): { width: number; height: number } {
+  private viewport(): EditorViewport {
     return {
       width: Math.max(1, this.cameras.main.width),
       height: Math.max(1, this.cameras.main.height),
+    }
+  }
+
+  private fitViewport(): EditorViewport {
+    const viewport = this.viewport()
+    const editor = document.querySelector('[data-screen="editor"]')
+    const canvas = this.game.canvas.getBoundingClientRect()
+    if (!editor || canvas.height === 0) return viewport
+
+    const topbar = editor.querySelector('.topbar')?.getBoundingClientRect()
+    const dock = editor.querySelector('.editor-context-dock')?.getBoundingClientRect()
+    const actions = editor.querySelector('.editor-actions')?.getBoundingClientRect()
+    const centerX = canvas.left + canvas.width / 2
+    const actionsCoverCenter = actions && centerX >= actions.left && centerX <= actions.right
+    const bottom = Math.min(dock?.top ?? canvas.bottom, actionsCoverCenter ? actions.top : canvas.bottom)
+    const scale = viewport.height / canvas.height
+    return {
+      ...viewport,
+      fitArea: {
+        top: ((topbar?.bottom ?? canvas.top) - canvas.top) * scale,
+        bottom: (bottom - canvas.top) * scale,
+      },
     }
   }
 
@@ -637,14 +681,11 @@ export class EditorScene extends Phaser.Scene {
   }
 
   private dispose(): void {
+    this.pointerListeners?.abort()
+    this.pointerListeners = undefined
     this.editorInput?.cancelActiveGesture()
     this.unsubscribe?.()
     this.unsubscribe = undefined
-    this.input.off('pointerdown', this.onPointerDown, this)
-    this.input.off('pointermove', this.onPointerMove, this)
-    this.input.off('pointerup', this.onPointerUp, this)
-    this.input.off('pointerupoutside', this.onPointerUp, this)
-    this.input.off('gameout', this.onGameOut, this)
     this.input.off('wheel', this.onWheel, this)
     this.game.renderer?.off(Phaser.Renderer.Events.RESTORE_WEBGL, this.invalidateRasters)
     this.groundRenderer = undefined
