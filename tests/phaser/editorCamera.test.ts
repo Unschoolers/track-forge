@@ -78,4 +78,23 @@ describe('editor camera', () => {
     expect(camera.zoom).toBeGreaterThan(0)
   })
 
+  it('fits a long road in the clear space on a short viewport', () => {
+    const viewport = {
+      width: 320,
+      height: 180,
+      coveredAreas: [
+        { left: 0, right: 320, top: 0, bottom: 80 },
+        { left: 0, right: 320, top: 120, bottom: 180 },
+      ],
+    }
+    const road = [{ x: 0, y: -30_000 }, { x: 0, y: 30_000 }]
+    const camera = fitEditorCamera(road, viewport)
+    expect(camera.zoom).toBeLessThan(0.001)
+    for (const point of road) {
+      const screenY = viewport.height / 2 + (point.y - camera.y) * camera.zoom
+      expect(screenY).toBeGreaterThan(80)
+      expect(screenY).toBeLessThan(120)
+    }
+  })
+
 })

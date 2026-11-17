@@ -8,6 +8,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'index.html'
+      - 'trackforge.html'
       - 'vite.config.ts'
       - 'playwright.mobile.config.mjs'
       - 'playwright.production.config.mjs'

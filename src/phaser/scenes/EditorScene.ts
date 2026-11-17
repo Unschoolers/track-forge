@@ -19,7 +19,6 @@ import {
 } from '@/phaser/rendering/bridgeRenderer'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
-import { roadPointsForPreview } from '@/domain/track/roadLength'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import {
@@ -317,14 +316,15 @@ export class EditorScene extends Phaser.Scene {
     this.cameraTrackId = trackId
     this.lastCameraRequest = request?.sequence ?? -1
     if (cameraAction) {
-      const preview = cameraAction === 'fit' ? roadPointsForPreview(snapshot.editor) : snapshot.editor.points
+      const framingRoad = cameraAction !== 'zoom-in'
+      const path = framingRoad ? this.trackGeometry().path.points : []
       Object.assign(
         this.editorCamera,
         applyEditorCameraAction(
           this.editorCamera,
           cameraAction,
-          preview.length ? preview : snapshot.editor.points,
-          cameraAction === 'fit' ? this.fitViewport() : this.viewport(),
+          path.length ? path : snapshot.editor.points,
+          framingRoad ? this.fitViewport() : this.viewport(),
         ),
       )
     }
@@ -652,22 +652,24 @@ export class EditorScene extends Phaser.Scene {
     const viewport = this.viewport()
     const editor = document.querySelector('[data-screen="editor"]')
     const canvas = this.game.canvas.getBoundingClientRect()
-    if (!editor || canvas.height === 0) return viewport
+    if (!editor || canvas.width === 0 || canvas.height === 0) return viewport
 
-    const topbar = editor.querySelector('.topbar')?.getBoundingClientRect()
-    const dock = editor.querySelector('.editor-context-dock')?.getBoundingClientRect()
-    const actions = editor.querySelector('.editor-actions')?.getBoundingClientRect()
-    const centerX = canvas.left + canvas.width / 2
-    const actionsCoverCenter = actions && centerX >= actions.left && centerX <= actions.right
-    const bottom = Math.min(dock?.top ?? canvas.bottom, actionsCoverCenter ? actions.top : canvas.bottom)
-    const scale = viewport.height / canvas.height
-    return {
-      ...viewport,
-      fitArea: {
-        top: ((topbar?.bottom ?? canvas.top) - canvas.top) * scale,
-        bottom: (bottom - canvas.top) * scale,
-      },
-    }
+    const controls = editor.querySelectorAll(
+      '.topbar, .tool-rail, .history-actions, .status-pill, .editor-context-dock, .editor-actions, ' +
+      '.diagnostic-panel, .crossing-control, .point-control, .start-control',
+    )
+    const margin = 4
+    const scaleX = viewport.width / canvas.width
+    const scaleY = viewport.height / canvas.height
+    const coveredAreas = Array.from(controls, control => control.getBoundingClientRect())
+      .filter(rect => rect.width > 0 && rect.height > 0)
+      .map(rect => ({
+        left: (rect.left - canvas.left - margin) * scaleX,
+        right: (rect.right - canvas.left + margin) * scaleX,
+        top: (rect.top - canvas.top - margin) * scaleY,
+        bottom: (rect.bottom - canvas.top + margin) * scaleY,
+      }))
+    return { ...viewport, coveredAreas }
   }
 
   private applyCamera(): void {

@@ -33,6 +33,41 @@ function readCamera(page) {
   return page.evaluate(() => window.__trackForgeQa?.snapshot().camera ?? null)
 }
 
+function readRoadOutline(page, track) {
+  return page.evaluate(async track => {
+    const { buildTrackGeometry } = await import('/src/domain/track/trackGeometry.ts')
+    return buildTrackGeometry(track).ribbon.flatMap(({ center, edgeLeft, edgeRight }) =>
+      [center, edgeLeft, edgeRight].map(({ x, y }) => ({ x, y })))
+  }, track)
+}
+
+async function expectClearRoad(page, outline) {
+  expect(outline.length).toBeGreaterThan(0)
+  const obstruction = await page.evaluate(outline => {
+    const { x, y, zoom } = window.__trackForgeQa.snapshot().camera
+    const canvas = document.querySelector('#game-container canvas').getBoundingClientRect()
+    const controls = Array.from(document.querySelectorAll([
+      '.topbar button', '.tool-rail button', '.history-actions button', '.editor-actions button',
+      '.status-pill', '.diagnostic-panel', '.editor-context-dock',
+    ].join(', ')), element => ({
+      name: element.getAttribute('aria-label') ?? element.className,
+      bounds: element.getBoundingClientRect(),
+    }))
+    for (const point of outline) {
+      const screenX = canvas.left + canvas.width / 2 + (point.x - x) * zoom
+      const screenY = canvas.top + canvas.height / 2 + (point.y - y) * zoom
+      if (screenX < canvas.left || screenX > canvas.right || screenY < canvas.top || screenY > canvas.bottom) {
+        return 'canvas edge'
+      }
+      const coveredBy = controls.find(({ bounds }) =>
+        screenX > bounds.left && screenX < bounds.right && screenY > bounds.top && screenY < bounds.bottom)
+      if (coveredBy) return coveredBy.name
+    }
+    return null
+  }, outline)
+  expect(obstruction, 'The rendered road fits clear of the editor controls').toBeNull()
+}
+
 async function openRallyEditor(page) {
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.getByRole('button', { name: 'EDIT', exact: true }).click()
@@ -56,12 +91,14 @@ test.describe('Rally editor zoom', () => {
     const canvas = page.locator('#game-container canvas')
     const { x, y, width, height } = await canvas.boundingBox()
     const dock = await page.locator('.editor-context-dock').boundingBox()
+    const road = await readRoadOutline(page, rallyTrack)
     for (const point of rallyTrack.points) {
       expect(Math.abs(point.x - fit.x) * fit.zoom).toBeLessThan(width / 2)
       const screenY = y + height / 2 + (point.y - fit.y) * fit.zoom
       expect(screenY).toBeGreaterThan(y)
       expect(screenY).toBeLessThan(dock.y)
     }
+    await expectClearRoad(page, road)
     const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true })
     await zoomOut.click()
     const first = await readCamera(page)
@@ -70,7 +107,8 @@ test.describe('Rally editor zoom', () => {
     const second = await readCamera(page)
     expect(second.zoom).toBeLessThan(first.zoom)
     expect(second).toMatchObject({ x: fit.x, y: fit.y })
-    expect(await roadPixelCount(page, await canvas.screenshot({ scale: 'css' }))).toBeGreaterThan(40)
+    await expectClearRoad(page, road)
+    expect((await roadPixels(page, await canvas.screenshot({ scale: 'css' }))).count).toBeGreaterThan(0)
 
     const midX = x + width / 2
     const midY = y + height / 2
@@ -132,9 +170,46 @@ test.describe('Rally editor zoom', () => {
     await openRallyEditor(page)
     expect(await readCamera(page)).toEqual(chosen)
   })
+
+  test('brings the route back into view with Zoom out after panning', async ({ page, context }) => {
+    const canvas = await page.locator('#game-container canvas').boundingBox()
+    const dock = await page.locator('.editor-context-dock').boundingBox()
+    const fit = await readCamera(page)
+    const x = canvas.x + canvas.width / 2
+    const y = canvas.y + canvas.height * 0.34
+    const horizontalPan = canvas.width * 0.38
+    const road = await readRoadOutline(page, rallyTrack)
+    const bottomOfRoad = camera => canvas.y + canvas.height / 2 +
+      (Math.max(...rallyTrack.points.map(point => point.y)) - camera.y) * camera.zoom
+    const cdp = await context.newCDPSession(page)
+    try {
+      await touch(cdp, 'touchStart', [contact(1, x - 65, y), contact(2, x + 65, y)])
+      const nextY = y + canvas.height * 0.39
+      await touch(cdp, 'touchMove', [
+        contact(1, x - 65 - horizontalPan, nextY),
+        contact(2, x + 65 - horizontalPan, nextY),
+      ])
+    } finally {
+      await releaseTouches(cdp)
+      await cdp.detach()
+    }
+    expect(bottomOfRoad(await readCamera(page))).toBeGreaterThan(dock.y)
+
+    const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true })
+    await zoomOut.tap()
+    const overview = await readCamera(page)
+    expect(overview.zoom).toBeLessThan(fit.zoom)
+    expect(bottomOfRoad(overview)).toBeLessThan(dock.y)
+    await expectClearRoad(page, road)
+
+    await zoomOut.tap()
+    expect((await readCamera(page)).zoom).toBeLessThan(overview.zoom)
+    await page.getByRole('button', { name: 'Fit track', exact: true }).tap()
+    expect(await readCamera(page)).toEqual(fit)
+  })
 })
 
-async function roadPixelCount(page, screenshot) {
+async function roadPixels(page, screenshot) {
   return page.evaluate(async base64 => {
     const image = new Image()
     image.src = `data:image/png;base64,${base64}`
@@ -146,16 +221,70 @@ async function roadPixelCount(page, screenshot) {
     context.drawImage(image, 0, 0)
     const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
     let count = 0
+    let left = canvas.width
+    let right = -1
+    let top = canvas.height
+    let bottom = -1
     for (let i = 0; i < data.length; i += 4) {
       // Daylight street asphalt, distinct from green terrain/background.
-      if (Math.abs(data[i] - 72) < 16 &&
-          Math.abs(data[i + 1] - 78) < 16 &&
-          Math.abs(data[i + 2] - 86) < 16) count++
+      if (Math.abs(data[i] - 72) >= 16 || Math.abs(data[i + 1] - 78) >= 16 || Math.abs(data[i + 2] - 86) >= 16) continue
+      const x = i / 4 % canvas.width
+      const y = Math.floor(i / 4 / canvas.width)
+      count++
+      left = Math.min(left, x)
+      right = Math.max(right, x)
+      top = Math.min(top, y)
+      bottom = Math.max(bottom, y)
     }
-    return count
+    return { count, left, right, top, bottom }
   }, screenshot.toString('base64'))
 }
 
+for (const [width, height] of [[390, 844], [844, 390]]) {
+  test(`standalone zoom controls show a tall road at ${width}x${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    await page.addInitScript(() => {
+      const points = [-3_000, 3_000].map(y => ({ x: 0, y, surface: 'street' }))
+      localStorage.setItem('trackforge-library-v1', JSON.stringify([{
+        id: 'track-tall-overview', name: 'Tall overview', points, trees: [], timeOfDay: 'day',
+      }]))
+    })
+    const html = readFileSync(new URL('../../trackforge.html', import.meta.url), 'utf8')
+    const endOfScript = html.lastIndexOf('})();')
+    expect(endOfScript).toBeGreaterThan(0)
+    // Read camera telemetry from the standalone closure only in this test.
+    const probe = '\nwindow.__standaloneEditorCamera = () => ({ zoom: state.camera.zoom, points: state.points.map(worldToScreen) });\n'
+    await page.route('**/trackforge.html', route => route.fulfill({
+      contentType: 'text/html',
+      body: html.slice(0, endOfScript) + probe + html.slice(endOfScript),
+    }))
+    await page.goto('/trackforge.html')
+    await page.locator('#loading').waitFor({ state: 'detached' })
+    await page.locator('#homeEditorBtn').click()
+    await page.getByRole('button', { name: 'EDIT', exact: true }).click()
+    const fit = page.locator('#fitBtn')
+    const zoomOut = page.locator('#zoomOutBtn')
+    await expect(fit).toBeInViewport({ ratio: 0.75 })
+    await expect(zoomOut).toBeInViewport({ ratio: 0.75 })
+
+    const overview = () => page.locator('#game').evaluate(canvas => {
+      const { zoom, points } = window.__standaloneEditorCamera()
+      const status = document.querySelector('#status')
+      return {
+        zoom,
+        fits: points.length === 2 && points.every(({ x, y }) =>
+          x > 0 && x < canvas.clientWidth && y > status.offsetTop + status.offsetHeight && y < canvas.clientHeight),
+      }
+    })
+    await fit.tap()
+    const fitted = await overview()
+    expect(fitted.fits).toBe(true)
+    await zoomOut.tap()
+    const zoomed = await overview()
+    expect(zoomed.zoom).toBeLessThan(fitted.zoom)
+    expect(zoomed.fits).toBe(true)
+  })
+}
 test('Papou-sized terrain and road remain visible at fit and after zooming out', async ({ page }, testInfo) => {
   const pageErrors = []
   page.on('pageerror', error => pageErrors.push(error.message))
@@ -185,30 +314,52 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     await expect(page.locator('[data-screen="editor"]')).toBeVisible()
     const canvas = page.locator('#game-container canvas')
     await expect(canvas).toBeVisible()
-    const camera = await page.evaluate(() => window.__trackForgeQa.snapshot().camera)
+    await expect.poll(() => readCamera(page)).not.toBeNull()
+    const camera = await readCamera(page)
     expect(camera.zoom).toBeLessThan(0.16)
-    expect(camera.zoom).toBeGreaterThan(0.03)
-    if (width < height) {
-      const { y, height: canvasHeight } = await canvas.boundingBox()
-      const actions = await page.locator('.editor-actions').boundingBox()
-      const lowestY = Math.max(...trackPoints.map(point => point.y))
-      expect(y + canvasHeight / 2 + (lowestY - camera.y) * camera.zoom).toBeLessThan(actions.y)
+    const savedTrack = await page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0])
+    const outline = await readRoadOutline(page, savedTrack)
+    const canvasBounds = await canvas.boundingBox()
+    const xs = outline.map(point => point.x)
+    const ys = outline.map(point => point.y)
+    const roadBounds = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }
+    const expectRenderedBounds = (pixels, view) => {
+      for (const side of ['left', 'right']) {
+        const expected = canvasBounds.width / 2 + (roadBounds[side] - view.x) * view.zoom
+        expect(Math.abs(pixels[side] - expected), `Rendered asphalt ${side} edge`).toBeLessThan(8)
+      }
+      for (const side of ['top', 'bottom']) {
+        const expected = canvasBounds.height / 2 + (roadBounds[side] - view.y) * view.zoom
+        expect(Math.abs(pixels[side] - expected), `Rendered asphalt ${side} edge`).toBeLessThan(8)
+      }
+    }
+    const captureRoad = async () => {
+      await page.locator('#ui-root').evaluate(element => { element.style.opacity = '0' })
+      try {
+        return await canvas.screenshot({ scale: 'css' })
+      } finally {
+        await page.locator('#ui-root').evaluate(element => { element.style.opacity = '' })
+      }
     }
 
-    const before = await canvas.screenshot({ scale: 'css' })
+    await expectClearRoad(page, outline)
+    const before = await captureRoad()
     await testInfo.attach(`large-${width}-fit.png`, { body: before, contentType: 'image/png' })
-    const initialRoadPixels = await roadPixelCount(page, before)
-    expect(initialRoadPixels, 'Road is rendered at fit zoom').toBeGreaterThan(60)
+    const initialRoad = await roadPixels(page, before)
+    expect(initialRoad.count, 'Road is rendered at fit zoom').toBeGreaterThan(40)
+    expectRenderedBounds(initialRoad, camera)
 
     await page.getByRole('button', { name: 'Zoom out' }).click()
     await page.getByRole('button', { name: 'Zoom out' }).click()
-    const zoomed = await page.evaluate(() => window.__trackForgeQa.snapshot().camera)
+    const zoomed = await readCamera(page)
     expect(zoomed.zoom).toBeLessThan(camera.zoom)
-    const after = await canvas.screenshot({ scale: 'css' })
+    await expectClearRoad(page, outline)
+    const after = await captureRoad()
     await testInfo.attach(`large-${width}-zoomed-out.png`, { body: after, contentType: 'image/png' })
-    const remainingRoadPixels = await roadPixelCount(page, after)
-    expect(remainingRoadPixels, 'Road must not disappear when zoomed out').toBeGreaterThan(40)
-    metrics.push({ width, height, fitZoom: camera.zoom, zoomed: zoomed.zoom, initialRoadPixels, remainingRoadPixels })
+    const remainingRoad = await roadPixels(page, after)
+    expect(remainingRoad.count, 'Road is rendered after zooming out').toBeGreaterThan(20)
+    expectRenderedBounds(remainingRoad, zoomed)
+    metrics.push({ width, height, fitZoom: camera.zoom, zoomed: zoomed.zoom, initialRoad, remainingRoad })
   }
   expect(pageErrors).toEqual([])
   await testInfo.attach('large-track-zoom.json', {
@@ -249,9 +400,11 @@ test('opens an oversized beach export and repairs its closed loop without changi
   await expect(repair).toBeVisible()
   await expect.poll(() => readCamera(page)).not.toBeNull()
   const before = await readCamera(page)
-  expect(before.zoom).toBeGreaterThan(0.05)
+  expect(before.zoom).toBeGreaterThan(0.02)
   const canvas = page.locator('#game-container canvas')
-  expect(await roadPixelCount(page, await canvas.screenshot({ scale: 'css' }))).toBeGreaterThan(60)
+  const outline = await readRoadOutline(page, track)
+  await expectClearRoad(page, outline)
+  expect((await roadPixels(page, await canvas.screenshot({ scale: 'css' }))).count).toBeGreaterThan(0)
 
   const readEditor = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor)
   const cdp = await context.newCDPSession(page)

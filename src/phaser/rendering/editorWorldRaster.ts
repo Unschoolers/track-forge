@@ -53,7 +53,7 @@ export class EditorWorldRaster {
     const textureHeight = Math.ceil(paddedHeight * resolution)
     const x = left - VIEW_PADDING / camera.zoom
     const y = top - VIEW_PADDING / camera.zoom
-    const capture = { x: -x * scale, y: -y * scale, scale }
+    const capture = { x: -x * scale, y: -y * scale, scaleX: scale, scaleY: scale }
 
     this.texture ??= this.scene.add.renderTexture(0, 0, 1, 1).setDepth(this.depth).setOrigin(0)
     const texture = this.texture
