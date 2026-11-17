@@ -18,6 +18,7 @@ export interface LaneOptions {
 	readonly out: string
 	readonly trackFiles: readonly string[]
 	readonly strict: boolean
+	readonly failOnRegressions: boolean
 	readonly help: boolean
 }
 
@@ -25,6 +26,7 @@ export function parseLaneOptions(args: readonly string[]): LaneOptions {
 	const values = new Map<string, string>()
 	const trackFiles: string[] = []
 	let strict = false
+	let failOnRegressions = false
 	let help = false
 	const names = [
 		'--seed',
@@ -43,6 +45,10 @@ export function parseLaneOptions(args: readonly string[]): LaneOptions {
 		const name = args[i] ?? ''
 		if (name === '--strict') {
 			strict = true
+			continue
+		}
+		if (name === '--fail-on-regressions') {
+			failOnRegressions = true
 			continue
 		}
 		if (name === '--help' || name === '-h') {
@@ -114,6 +120,7 @@ export function parseLaneOptions(args: readonly string[]): LaneOptions {
 		out: values.get('--out') ?? 'qa/results/lanes',
 		trackFiles,
 		strict,
+		failOnRegressions,
 		help,
 	}
 }

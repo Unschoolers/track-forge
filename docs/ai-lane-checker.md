@@ -32,10 +32,10 @@ npm run qa:lanes -- --scenario bridge --mode traffic --seed 17 --seeds 1 --direc
 # Stress every car and difficulty with a larger simulation budget.
 npm run qa:lanes -- --scenario all --mode both --difficulty all --car all --seeds 5 --seconds 180 --laps 3
 
-# A saved track object or the app's JSON track array; --track can be repeated.
-npm run qa:lanes -- --track ./my-tracks.json --seeds 10
+# A shared export, saved track object, or JSON track array. Repeat --track for more files.
+npm run qa:lanes -- --track ./my-course.trackforge.json --seeds 10
 
-# Fail on error findings; without --strict findings are diagnostic output.
+# Fail on every error finding.
 npm run qa:lanes -- --strict
 ```
 
@@ -80,12 +80,14 @@ are candidates to inspect, not proof of a bug, particularly intentional passing,
 random mistakes, and ice driving. Timeout depends on budget/track length.
 No AI tuning or physics simplification is applied by this tool.
 
-Exit codes: 0 completed diagnostics, 1 error findings with `--strict`, 2 invalid
-inputs or execution failure. `--help` prints all options. Report files are
+Exit codes are 0 for completed diagnostics, 1 for errors with `--strict` or
+regressions with `--fail-on-regressions`, and 2 for invalid inputs or execution
+failure. `--help` prints all options. Report files are
 ignored by git. Simulation time and wall time are printed separately; shared CI
 performance is not a stable benchmark.
 
-The **AI lane QA** workflow runs a small matrix for domain/gameplay PRs and can
-be started manually with more seeds. Download its `ai-lane-report` artifact and
-open `report.html`. Findings do not fail this baseline workflow while existing
-AI faults are being investigated. Input/runtime failures still fail the job.
+The **AI lane QA** workflow checks the built-in solo and traffic fixtures in
+both directions with seed 1. It fails on timeouts, invalid state, other errors,
+or increases over the known recovery counts in `qa/lanes/regressions.ts`.
+Use manual dispatch to investigate more seeds. The `ai-lane-report` artifact
+contains the findings and dot trails, including when the regression check fails.

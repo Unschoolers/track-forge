@@ -14,7 +14,7 @@ import type {
 } from '@/domain/model'
 import {
   RACE_TICK_SECONDS,
-  resetRaceVehicle,
+  recoverRacePlayer,
   stepRace,
   type RaceStep,
 } from '@/domain/race/raceEngine'
@@ -235,22 +235,19 @@ export class RaceSession implements RaceSessionPort {
 
   resetPlayer(): void {
     const state = this.current.state
-    if (state?.phase !== 'running' || state.paused || this.destroyed) return
-    const reset = state.vehicles.map((vehicle) => vehicle.player
-      ? resetRaceVehicle(vehicle, state) : vehicle)
+    if (!state || this.destroyed) return
+    const recovered = recoverRacePlayer(state)
+    if (recovered === state) return
     const before = state.vehicles.find((vehicle) => vehicle.player)
-    const after = reset.find((vehicle) => vehicle.player)
-    if (!before || !after || before === after) return
+    const after = recovered.vehicles.find((vehicle) => vehicle.player)
+    if (!before || !after) return
     this.recording?.recover(before, after, state.elapsed)
     this.timing.recover()
     this.publish(
       this.buildSnapshot(
         this.current.track,
         this.current.setup,
-        {
-          ...state,
-          vehicles: reset,
-        },
+        recovered,
         this.current.result,
       ),
     )

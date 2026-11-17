@@ -81,6 +81,8 @@ export interface RaceTickInput {
   readonly tick: number
   /** Vehicle IDs with direct controls. Omitted rivals use AI and the primary car coasts. */
   readonly controls: Readonly<Record<string, DriverInput | undefined>>
+  /** Apply manual recovery for the primary car before advancing this tick. */
+  readonly recoverPlayer?: boolean
 }
 
 export interface RaceStepResult {
@@ -114,6 +116,18 @@ export function resetRaceVehicle(
   const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector)
   const pathIndex = findNearestSafeTrackIndex(race.path, vehicle, false, limit)
   return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex })
+}
+
+export function recoverRacePlayer(state: RaceState): RaceState {
+  if (state.phase !== 'running' || state.paused) return state
+  const index = state.vehicles.findIndex((vehicle) => vehicle.player)
+  const player = state.vehicles[index]
+  if (!player) return state
+  const recovered = resetRaceVehicle(player, state)
+  if (recovered === player) return state
+  const vehicles = [...state.vehicles]
+  vehicles[index] = recovered
+  return { ...state, vehicles }
 }
 
 function resetAtAuthoredCheckpoint(vehicle: RaceVehicle, race: RecoveryCourse): RaceVehicle | undefined {
@@ -232,7 +246,8 @@ export function stepRaceTick(
   if (input.tick !== expectedTick) {
     throw new RangeError(`Expected race tick ${expectedTick}, received ${input.tick}`)
   }
-  return advanceRace(state, NEUTRAL_INPUT, RACE_TICK_SECONDS, random, input.controls)
+  const beforeStep = input.recoverPlayer ? recoverRacePlayer(state) : state
+  return advanceRace(beforeStep, NEUTRAL_INPUT, RACE_TICK_SECONDS, random, input.controls)
 }
 
 function advanceRace(

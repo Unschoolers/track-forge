@@ -6,9 +6,11 @@ on:
       - 'src/**'
       - 'qa/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'index.html'
       - 'vite.config.ts'
       - 'playwright.mobile.config.mjs'
+      - 'playwright.production.config.mjs'
       - '.github/workflows/gameplay-qa.yml'
   workflow_dispatch:
 
@@ -30,13 +32,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Locked, isolated QA runner; avoids changing the existing APK lockfile.
-      - name: Install browser test runner
-        run: npm install --no-save --package-lock=false @playwright/test@1.64.1
       - name: Install Chromium and OS dependencies
         run: npx playwright install --with-deps chromium
       - name: Simulate mobile gameplay
         run: npm run qa:mobile
+      - name: Start a race from the production build
+        run: npm run qa:mobile:production
       - uses: actions/upload-artifact@v7.0.2
         if: ${{ always() }}
         with:

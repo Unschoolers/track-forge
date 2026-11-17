@@ -157,10 +157,13 @@ export function getTrafficState(
   const nearby = typeof path !== 'number' && !path.closed
     ? observations.filter((observation) => Math.abs(observation.signedDistance) <= AI_OVERTAKE.hard.triggerDistance)
     : observations
+  const atOpenStart = typeof path !== 'number' && !path.closed && vehicle.pathIndex === 0
   return {
-    ahead:
-      observations.find((observation) => observation.signedDistance >= 0 && observation.laneGap <= TRAFFIC_CLEARANCE) ??
-      null,
+    ahead: observations.find(({ signedDistance, laneGap }) => {
+      // The point-to-point grid starts abreast, with adjacent lanes inside braking clearance.
+      const alongsideAtStart = atOpenStart && Math.abs(signedDistance) <= 1e-6 && laneGap > 0
+      return !alongsideAtStart && signedDistance >= 0 && laneGap <= TRAFFIC_CLEARANCE
+    }) ?? null,
     nearby,
   }
 }

@@ -1,6 +1,7 @@
+import { decodeTrackExport } from '@/application/library/trackImport'
 import { asTrackId, type Track, type TrackPoint } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
+import { decodeTrack, TRACK_EXPORT_FORMAT } from '@/domain/track/trackCodec'
 import { buildRoadPath, type RoadPath } from '@/domain/track/pathBuilder'
 import { validateTrack } from '@/domain/track/trackValidation'
 
@@ -84,34 +85,16 @@ export function createLaneScenarios(): Track[] {
 
 /** Reuse the app's migrations/validation; no parallel track-file format. */
 export function decodeTrackInput(input: unknown): Track[] {
-	const raw = Array.isArray(input) ? input : [input]
+	const raw: readonly unknown[] = Array.isArray(input) ? input : [input]
 	if (raw.length === 0) throw new Error('Track input is empty')
-	const storage = new Map<string, string>()
-	const repository = new BrowserTrackRepository(
-		{
-			get: (key) => storage.get(key) ?? null,
-			set: (key, value) => {
-				storage.set(key, value)
-				return true
-			},
-			remove: (key) => {
-				storage.delete(key)
-				return true
-			},
-		},
-		{ now: () => 1 },
-	)
-	const tracks: Track[] = []
-	for (const value of raw) {
-		try {
-			if (!repository.save(value as Track)) throw new Error('Invalid track')
-			const id = (value as Track).id
-			const track = repository.find(id)
-			if (!track) throw new Error('Invalid track')
-			tracks.push(track)
-		} catch {
-			throw new Error(`Invalid track at input index ${tracks.length}`)
+	return raw.map((value, index) => {
+		if (value && typeof value === 'object' && 'format' in value && value.format === TRACK_EXPORT_FORMAT) {
+			const result = decodeTrackExport(value)
+			if (!result.ok) throw new Error(`Invalid track at input index ${index}: ${result.message}`)
+			return result.track
 		}
-	}
-	return tracks
+		const track = decodeTrack(value, 1)
+		if (!track) throw new Error(`Invalid track at input index ${index}`)
+		return track
+	})
 }
