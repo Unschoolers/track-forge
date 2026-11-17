@@ -263,6 +263,10 @@ export class EditorInputController {
     this.terrainStroke = undefined
   }
 
+  navigationActive(): boolean {
+    return this.navigating
+  }
+
   private releasePointer(id: number, commit: boolean): void {
     if (!this.pointers.delete(id)) return
     if (this.navigating) {

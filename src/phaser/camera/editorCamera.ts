@@ -12,6 +12,7 @@ export const EDITOR_ZOOM_LIMITS = {
 export interface EditorViewport {
   readonly width: number
   readonly height: number
+  readonly fitArea?: { readonly top: number; readonly bottom: number }
 }
 
 export function fitEditorCamera(
@@ -25,19 +26,25 @@ export function fitEditorCamera(
   const maximumX = Math.max(...xValues)
   const minimumY = Math.min(...yValues)
   const maximumY = Math.max(...yValues)
-  // Leave room for the editor controls above and below the course.
-  const verticalPadding = Math.min(160, viewport.height / 2)
+  const margin = Math.min(80, viewport.height / 4)
+  let top = Math.max(margin, viewport.fitArea?.top ?? 0)
+  let bottom = Math.min(viewport.height - margin, viewport.fitArea?.bottom ?? viewport.height)
+  if (bottom <= top) {
+    top = margin
+    bottom = viewport.height - margin
+  }
+  const zoom = clamp(
+    Math.min(
+      viewport.width / Math.max(300, maximumX - minimumX + 180),
+      (bottom - top) / Math.max(420, maximumY - minimumY + 220),
+    ),
+    EDITOR_ZOOM_LIMITS.minimum,
+    1,
+  )
   return {
     x: (minimumX + maximumX) / 2,
-    y: (minimumY + maximumY) / 2,
-    zoom: clamp(
-      Math.min(
-        viewport.width / Math.max(300, maximumX - minimumX + 180),
-        (viewport.height - verticalPadding) / Math.max(420, maximumY - minimumY + 220),
-      ),
-      EDITOR_ZOOM_LIMITS.minimum,
-      1,
-    ),
+    y: (minimumY + maximumY) / 2 + (viewport.height - top - bottom) / (2 * zoom),
+    zoom,
   }
 }
 
