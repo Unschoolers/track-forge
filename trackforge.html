@@ -717,33 +717,47 @@ const DYNAMIC_ZOOM_PREF_KEY='trackforge-dynamic-zoom';
 const CAR_PREF_KEY='trackforge-last-car';
 const DIFFICULTY_PREF_KEY='trackforge-difficulty';
 
-const Storage=Object.freeze({
-  get(key,fallback=null){
-    try{
-      const value=localStorage.getItem(key);
-      return value===null?fallback:value;
-    }catch(_){return fallback}
-  },
-  set(key,value){
-    try{localStorage.setItem(key,String(value));return true}catch(_){return false}
-  },
-  getJSON(key,fallback){
-    try{
-      const value=localStorage.getItem(key);
-      return value===null?fallback:JSON.parse(value);
-    }catch(_){return fallback}
-  },
-  setJSON(key,value){
-    try{localStorage.setItem(key,JSON.stringify(value));return true}catch(_){return false}
-  },
-  getBoolean(key,fallback=true){
-    const value=this.get(key,null);
-    return value===null?fallback:value!=='0';
-  },
-  setBoolean(key,value){
-    return this.set(key,value?'1':'0');
+function createStorage(storageName){
+  const pending=new Map();
+  function readPersistent(key){
+    try{return window[storageName].getItem(key)}catch(_){return null}
   }
-});
+  return Object.freeze({
+    get(key,fallback=null){
+      const value=readPersistent(key);
+      const cached=pending.get(key);
+      // Discard an unsaved snapshot once another tab changes the stored value.
+      if(cached&&value===cached.baseline)return cached.text;
+      pending.delete(key);
+      return value??fallback;
+    },
+    set(key,value,{sessionOnly=false,cacheOnFailure=true}={}){
+      const text=String(value);
+      const baseline=readPersistent(key);
+      const cached=pending.get(key);
+      // A temporary library cannot overwrite the data it was created to preserve.
+      const temporary=sessionOnly||(cached?.sessionOnly&&cached.baseline===baseline);
+      if(!temporary){
+        try{
+          window[storageName].setItem(key,text);
+          pending.delete(key);
+          return true;
+        }catch(_){}
+      }
+      if(cacheOnFailure)pending.set(key,{text,baseline,sessionOnly:temporary});
+      return false;
+    },
+    getBoolean(key,fallback=true){
+      const value=this.get(key,null);
+      return value===null?fallback:value!=='0';
+    },
+    setBoolean(key,value){
+      return this.set(key,value?'1':'0');
+    }
+  });
+}
+const Storage=createStorage('localStorage');
+const SessionStorage=createStorage('sessionStorage');
 
 const wrapAngle = a => Math.atan2(Math.sin(a),Math.cos(a));
 
@@ -879,7 +893,7 @@ const state = {
 };
 
 const audio = {
-  enabled:localStorage.getItem(AUDIO_PREF_KEY)!=='0',ctx:null,master:null,
+  enabled:Storage.getBoolean(AUDIO_PREF_KEY),ctx:null,master:null,
   engineGain:null,engineFilter:null,engineOsc1:null,engineOsc2:null,
   surfaceGain:null,surfaceFilter:null,surfaceSource:null,
   squealGain:null,squealFilter:null,squealSource:null,
@@ -1008,12 +1022,12 @@ function triggerImpactFeedback(strength){
   state.camera.shakeTime=Math.max(state.camera.shakeTime,.08+amount*.055);
   haptic(amount>.55?[10,18,12]:7);
 }
-function playFinishSound(place,newRecord){
+function playFinishSound(place){
   const base=place===1?523:place===2?440:392;
   playTone(base,.12,.045,'triangle');
   playTone(base*1.25,.14,.04,'triangle',.11);
   playTone(base*1.5,.20,.045,'triangle',.23);
-  if(newRecord)playTone(base*2,.28,.035,'sine',.42);
+  return base;
 }
 function updateAudio(){
   if(!audio.ctx||!audio.master)return;
@@ -1095,68 +1109,183 @@ function toast(msg){
 function serial(){
   return JSON.stringify({version:5,points:state.points,trees:state.trees,selectedCar:state.selectedCar,timeOfDay:state.timeOfDay});
 }
+const LIMITS=Object.freeze({
+  bytes:2_000_000,
+  tracks:100,
+  points:1_000,
+  trees:2_000,
+  coordinate:100_000,
+  samples:12_000,
+  scoreTracks:100,
+  scoreEntries:100,
+  raceSeconds:86_400
+});
+const TRACK_ID_PATTERN=/^track-[a-zA-Z0-9-]{1,64}$/;
+const storageEncoder=new TextEncoder();
+
+function validId(id){
+  return typeof id==='string'&&TRACK_ID_PATTERN.test(id);
+}
 function makeId(){
-  return 'track-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+  const source=globalThis.crypto;
+  if(typeof source.randomUUID==='function')return 'track-'+source.randomUUID();
+  const bytes=source.getRandomValues(new Uint8Array(16));
+  return 'track-'+Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
 }
 function cleanName(value){
-  return String(value||'').replace(/\s+/g,' ').trim().slice(0,32);
+  return typeof value==='string'?value.replace(/\s+/g,' ').trim().slice(0,32):'';
+}
+function normalizeTrackData(data){
+  const points=data?.points,trees=data?.trees??[];
+  if(!Array.isArray(trees)||trees.length>LIMITS.trees||!trees.every(isValidCoordinate)||!withinRoadBudget(points))return null;
+  return {
+    points:points.map(({x,y,surface})=>({
+      x,y,surface:typeof surface==='string'&&Object.hasOwn(surfaceSpecs,surface)?surface:'street'
+    })),
+    trees:trees.map(({x,y})=>({x,y})),
+    timeOfDay:data.timeOfDay==='night'?'night':'day'
+  };
+}
+function validDate(value){
+  return Number.isFinite(value)&&value>=0&&value<=8.64e15;
+}
+function normalizeSavedTrack(track){
+  if(!validId(track?.id))return null;
+  const name=cleanName(track.name);
+  if(!name)return null;
+  const geometry=normalizeTrackData(track);
+  if(!geometry)return null;
+  return {
+    id:track.id,name,version:5,...geometry,
+    createdAt:validDate(track.createdAt)?track.createdAt:Date.now(),
+    updatedAt:validDate(track.updatedAt)?track.updatedAt:0
+  };
+}
+function fitsStorageLimit(text){
+  return text.length<=LIMITS.bytes&&storageEncoder.encode(text).length<=LIMITS.bytes;
+}
+function parseBoundedJSON(text){
+  if(text===null||!fitsStorageLimit(text))return null;
+  try{return JSON.parse(text)}catch(_){return null}
+}
+function readBoundedJSON(key,empty){
+  const text=Storage.get(key);
+  return text===null?empty:parseBoundedJSON(text);
+}
+function writeBoundedJSON(key,value,options){
+  try{
+    const text=JSON.stringify(value);
+    return fitsStorageLimit(text)&&Storage.set(key,text,options);
+  }catch(_){return false}
+}
+// All cooperating tabs use the same lock for library and score transactions.
+let localTransactions=null;
+function transact(fn){
+  const result=(localTransactions??Promise.resolve()).then(async()=>{
+    let acquired=false;
+    try{
+      const locks=navigator.locks;
+      if(locks){
+        return await locks.request('trackforge-storage-v1',()=>{
+          acquired=true;
+          return fn();
+        });
+      }
+    }catch(error){
+      if(acquired)throw error;
+    }
+    return fn();
+  });
+  const settled=result.catch(()=>{}).finally(()=>{
+    if(localTransactions===settled)localTransactions=null;
+  });
+  localTransactions=settled;
+  return result;
 }
 const TrackRepository=Object.freeze({
-  all(){
-    const tracks=Storage.getJSON(LIBRARY_KEY,[]);
-    return Array.isArray(tracks)?tracks.filter(track=>track&&track.id&&cleanName(track.name)):[];
+  raw(){
+    const tracks=readBoundedJSON(LIBRARY_KEY,[]);
+    return Array.isArray(tracks)&&tracks.length<=LIMITS.tracks?tracks:null;
   },
-  saveAll(tracks){
-    return Storage.setJSON(LIBRARY_KEY,tracks);
+  all(records=this.raw()){
+    const tracks=new Map();
+    for(const record of records??[]){
+      const track=normalizeSavedTrack(record);
+      if(track&&!tracks.has(track.id))tracks.set(track.id,track);
+    }
+    return [...tracks.values()];
   },
   find(id){
-    return this.all().find(track=>track.id===id)||null;
+    if(!validId(id))return null;
+    for(const record of this.raw()??[]){
+      if(record?.id!==id)continue;
+      const track=normalizeSavedTrack(record);
+      if(track)return track;
+    }
+    return null;
   },
-  upsert(track){
-    const tracks=this.all();
-    const index=tracks.findIndex(item=>item.id===track.id);
-    if(index>=0)tracks[index]=track;else tracks.push(track);
-    this.saveAll(tracks);
-    return track;
+  upsert(track,allowCreate=false){
+    const valid=normalizeSavedTrack(track),tracks=this.raw();
+    if(!valid||!tracks)return false;
+    // Mutate the raw list so unrelated records skipped on read remain intact.
+    const index=tracks.findIndex(item=>item?.id===valid.id);
+    if(index>=0){
+      const createdAt=tracks[index].createdAt;
+      if(validDate(createdAt))valid.createdAt=createdAt;
+      tracks[index]=valid;
+    }else{
+      if(!allowCreate||tracks.length===LIMITS.tracks)return false;
+      tracks.push(valid);
+    }
+    return writeBoundedJSON(LIBRARY_KEY,tracks);
   },
   remove(id){
-    this.saveAll(this.all().filter(track=>track.id!==id));
+    const tracks=this.raw();
+    if(!tracks)return false;
+    const remaining=tracks.filter(track=>track?.id!==id);
+    if(remaining.length===tracks.length)return true;
+    return writeBoundedJSON(LIBRARY_KEY,remaining,{cacheOnFailure:false});
   }
 });
-
+function validScore(score){
+  return score&&Number.isFinite(score.time)&&score.time>0&&score.time<=LIMITS.raceSeconds&&
+    typeof score.car==='string'&&Object.hasOwn(carSpecs,score.car)&&
+    typeof score.difficulty==='string'&&Object.hasOwn(difficultySpecs,score.difficulty)&&validDate(score.date);
+}
 const ScoreRepository=Object.freeze({
-  all(){
-    const scores=Storage.getJSON(SCORES_KEY,{});
-    return scores&&typeof scores==='object'?scores:{};
+  raw(){
+    const scores=readBoundedJSON(SCORES_KEY,{});
+    return scores&&typeof scores==='object'&&!Array.isArray(scores)&&
+      Object.keys(scores).length<=LIMITS.scoreTracks?scores:null;
+  },
+  forTrack(id,scores=this.raw()){
+    if(!validId(id))return [];
+    const list=scores?.[id];
+    if(!Array.isArray(list)||list.length>LIMITS.scoreEntries)return [];
+    return list.filter(validScore).sort((a,b)=>a.time-b.time).slice(0,5)
+      .map(({time,car,difficulty,date})=>({time,car,difficulty,date}));
   },
   saveAll(scores){
-    return Storage.setJSON(SCORES_KEY,scores);
+    return Object.keys(scores).length<=LIMITS.scoreTracks&&writeBoundedJSON(SCORES_KEY,scores);
   },
-  forTrack(trackId){
-    const list=this.all()[trackId];
-    return Array.isArray(list)?list:[];
-  },
-  removeTrack(trackId){
-    const scores=this.all();
-    delete scores[trackId];
-    this.saveAll(scores);
+  removeTrack(id){
+    const scores=this.raw();
+    if(scores&&Object.hasOwn(scores,id)){
+      delete scores[id];
+      this.saveAll(scores);
+    }
   }
 });
-
-const readLibrary=()=>TrackRepository.all();
-const writeLibrary=library=>TrackRepository.saveAll(library);
-const readScores=()=>ScoreRepository.all();
-const writeScores=scores=>ScoreRepository.saveAll(scores);
-function currentTrackRecord(existing=null){
+function currentTrackRecord(){
   const now=Date.now();
   return{
     id:state.currentTrackId,
     name:cleanName(state.currentTrackName),
     version:5,
-    points:state.points.map(p=>({x:+p.x,y:+p.y,surface:surfaceSpecs[p.surface]?p.surface:'street'})),
-    trees:state.trees.map(t=>({x:+t.x,y:+t.y})),
+    points:state.points.map(({x,y,surface})=>({x,y,surface})),
+    trees:state.trees.map(({x,y})=>({x,y})),
     timeOfDay:state.timeOfDay,
-    createdAt:existing?.createdAt||now,
+    createdAt:now,
     updatedAt:now
   };
 }
@@ -1171,30 +1300,33 @@ function updateTrackNameUI(){
     homeMeta.textContent=best==='NO TIME'?'Best time: no time yet':'Best time: '+best;
   }
 }
-function persistCurrentTrack(notify=false){
-  const name=cleanName(state.currentTrackName);
-  if(!state.currentTrackId||!name){
-    if(notify)openNameModal('new');
-    return false;
-  }
-  const existing=TrackRepository.find(state.currentTrackId);
-  const record=currentTrackRecord(existing);
-  TrackRepository.upsert(record);
-  updateTrackNameUI();
-  if(notify)toast('Track saved');
-  return true;
+function persistCurrentTrack(notify=false,allowCreate=false){
+  if(!state.currentTrackId||!cleanName(state.currentTrackName))return;
+  // The player can switch tracks while the save waits for another tab.
+  const record=currentTrackRecord();
+  return transact(()=>TrackRepository.upsert(record,allowCreate)).catch(()=>false).then(saved=>{
+    if(state.currentTrackId!==record.id)return saved;
+    if(saved){
+      if(notify)toast('Track saved');
+    }else if(notify||!persistCurrentTrack.warned){
+      toast('Save unavailable. Changes kept for this session');
+    }
+    persistCurrentTrack.warned=!saved;
+    return saved;
+  });
 }
-function recordHighScore(time){
-  if(!state.currentTrackId||!Number.isFinite(time))return{rank:0,newRecord:false};
-  const scores=readScores();
-  const previous=Array.isArray(scores[state.currentTrackId])?scores[state.currentTrackId]:[];
-  const previousBest=previous[0]?.time??Infinity;
-  const entry={time,car:state.selectedCar,difficulty:state.selectedDifficulty,date:Date.now()};
-  const list=[...previous,entry].sort((a,b)=>a.time-b.time);
-  const rank=list.indexOf(entry)+1;
-  scores[state.currentTrackId]=list.slice(0,5);
-  writeScores(scores);
-  return{rank:rank<=5?rank:0,newRecord:time<previousBest};
+function recordHighScore(id,player,difficulty){
+  const entry={time:player.finishTime,car:player.colorKey,difficulty,date:Date.now()};
+  if(!player.finished||!validId(id)||!validScore(entry))return Promise.resolve(null);
+  return transact(()=>{
+    if(!TrackRepository.find(id))return null;
+    const scores=ScoreRepository.raw();
+    if(!scores)return {saved:false,newRecord:false};
+    const previous=ScoreRepository.forTrack(id,scores);
+    scores[id]=[...previous,entry].sort((a,b)=>a.time-b.time).slice(0,5);
+    const saved=ScoreRepository.saveAll(scores);
+    return {saved,newRecord:saved&&entry.time<(previous[0]?.time??Infinity)};
+  }).catch(()=>({saved:false,newRecord:false}));
 }
 function snapshot(){
   state.history.push(serial());
@@ -1202,10 +1334,9 @@ function snapshot(){
   state.future.length=0;
 }
 function restore(raw,saveAfter=true){
-  const d=typeof raw==='string'?JSON.parse(raw):raw;
-  state.points=(d.points||[]).map(p=>({x:+p.x,y:+p.y,surface:surfaceSpecs[p.surface]?p.surface:'street'}));
-  state.trees=(d.trees||[]).map(t=>({x:+t.x,y:+t.y}));
-  state.timeOfDay=d.timeOfDay==='night'?'night':'day';
+  const normalized=normalizeTrackData(typeof raw==='string'?parseBoundedJSON(raw):raw);
+  if(!normalized)return;
+  Object.assign(state,normalized);
   updateTimeButton();
   state.pathDirty=true;
   if(saveAfter)autoSave();
@@ -1221,7 +1352,13 @@ function redo(){
 }
 function autoSave(){
   clearTimeout(autoSave.timer);
-  autoSave.timer=setTimeout(()=>{try{persistCurrentTrack(false)}catch(_){}},120);
+  autoSave.timer=setTimeout(flushAutoSave,120);
+}
+function flushAutoSave(){
+  if(!autoSave.timer)return;
+  clearTimeout(autoSave.timer);
+  autoSave.timer=null;
+  persistCurrentTrack(false);
 }
 function saveTrack(){
   try{
@@ -1230,6 +1367,8 @@ function saveTrack(){
   }catch(_){toast('Save unavailable')}
 }
 function loadTrackById(id){
+  finishEditorGesture();
+  flushAutoSave();
   const track=TrackRepository.find(id);
   if(!track)return false;
   state.currentTrackId=track.id;
@@ -1243,11 +1382,13 @@ function loadTrackById(id){
 function createTrack(name){
   const cleaned=cleanName(name);
   if(!cleaned)return false;
+  finishEditorGesture();
+  flushAutoSave();
   state.currentTrackId=makeId();
   state.currentTrackName=cleaned;
   state.points=[];state.trees=[];state.path=[];state.pathDirty=true;state.history=[];state.future=[];
   state.timeOfDay='day';updateTimeButton();updateTrackNameUI();
-  persistCurrentTrack(false);
+  persistCurrentTrack(false,true);
   fitTrack();updateStatus();
   return true;
 }
@@ -1303,20 +1444,46 @@ function fitTrack(){
   state.camera.x=(minX+maxX)/2;state.camera.y=(minY+maxY)/2;
   state.camera.zoom=clamp(Math.min(canvas.clientWidth/Math.max(300,maxX-minX+180),canvas.clientHeight/Math.max(420,maxY-minY+220)),EDITOR_FIT_MIN,1.55);
 }
+function isValidCoordinate(point){
+  return !!point&&Number.isFinite(point.x)&&Number.isFinite(point.y)
+    &&Math.abs(point.x)<=LIMITS.coordinate&&Math.abs(point.y)<=LIMITS.coordinate;
+}
+function isClosed(points=state.points){
+  return points.length>=9&&Math.hypot(points[0].x-points.at(-1).x,points[0].y-points.at(-1).y)<74;
+}
+function roadSteps(a,b){
+  return Math.max(3,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/14));
+}
+function withinRoadBudget(points){
+  if(!Array.isArray(points)||points.length>LIMITS.points||!points.every(isValidCoordinate))return false;
+  if(points.length<2)return true;
+  const closed=isClosed(points),count=closed?points.length-1:points.length;
+  let samples=closed?1:0;
+  for(let i=0;i<(closed?count:count-1);i++){
+    samples+=roadSteps(points[i],points[(i+1)%count]);
+    if(samples>LIMITS.samples)return false;
+  }
+  return true;
+}
+function gestureSnapshot(){
+  if(!state.pointer.snapshot){
+    snapshot();
+    state.pointer.snapshot=true;
+  }
+}
 function expandTrack(){
   if(state.points.length<2)return toast('Draw a track first');
-  snapshot();
   const all=[...state.points,...state.trees];
   const minX=Math.min(...all.map(p=>p.x)),maxX=Math.max(...all.map(p=>p.x));
   const minY=Math.min(...all.map(p=>p.y)),maxY=Math.max(...all.map(p=>p.y));
   const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
-  for(const p of state.points){p.x=cx+(p.x-cx)*2;p.y=cy+(p.y-cy)*2}
-  for(const p of state.trees){p.x=cx+(p.x-cx)*2;p.y=cy+(p.y-cy)*2}
+  const expand=p=>({...p,x:cx+(p.x-cx)*2,y:cy+(p.y-cy)*2});
+  const points=state.points.map(expand),trees=state.trees.map(expand);
+  if(!withinRoadBudget(points)||trees.length>LIMITS.trees||!trees.every(isValidCoordinate))return toast('Track size limit reached');
+  snapshot();
+  state.points=points;state.trees=trees;
   state.pathDirty=true;autoSave();fitTrack();updateStatus();
   toast('Track expanded to 2× size');
-}
-function isClosed(){
-  return state.points.length>=9 && Math.hypot(state.points[0].x-state.points.at(-1).x,state.points[0].y-state.points.at(-1).y)<74;
 }
 function normalizeClosed(){
   if(isClosed()){
@@ -1373,14 +1540,14 @@ function pointLineDistance(p,a,b){
 }
 function rebuildPath(){
   if(!state.pathDirty)return;
-  state.path=[];state.totalLength=0;
+  state.path=[];state.totalLength=0;state.pathDirty=false;
   if(state.points.length<2)return;
   const pts=state.points;
-  const count=isClosed()?pts.length-1:pts.length;
   const closed=isClosed();
+  const count=closed?pts.length-1:pts.length;
   for(let i=0;i<(closed?count:count-1);i++){
     const p0=pts[(i-1+count)%count],p1=pts[i%count],p2=pts[(i+1)%count],p3=pts[(i+2)%count];
-    const steps=Math.max(3,Math.ceil(Math.hypot(p2.x-p1.x,p2.y-p1.y)/14));
+    const steps=roadSteps(p1,p2);
     for(let j=0;j<steps;j++){
       const q=adaptiveRoadPoint(p0,p1,p2,p3,j/steps);
       q.surface=surfaceSpecs[p1.surface]?p1.surface:'street';
@@ -1395,7 +1562,6 @@ function rebuildPath(){
     state.path.push(q);
   }
   state.totalLength=state.path.at(-1)?.len||0;
-  state.pathDirty=false;
 }
 function nearestPath(p,start=0,range=Infinity){
   rebuildPath();
@@ -1441,11 +1607,37 @@ function nearestSegmentPointIndex(p,max=44/state.camera.zoom){
   }
   return bi>=0?seg:-1;
 }
+function moveRoadPoint(point,position){
+  if(point.x===position.x&&point.y===position.y)return;
+  if(!isValidCoordinate(position)){
+    state.pointer.limitReached=true;
+    return;
+  }
+  const {x,y}=point;
+  point.x=position.x;
+  point.y=position.y;
+  const valid=withinRoadBudget(state.points);
+  point.x=x;
+  point.y=y;
+  if(!valid){
+    state.pointer.limitReached=true;
+    return;
+  }
+  gestureSnapshot();
+  point.x=position.x;
+  point.y=position.y;
+  state.pathDirty=true;
+}
 function addDrawPoint(p){
+  if(!isValidCoordinate(p)){
+    state.pointer.limitReached=true;
+    return;
+  }
   const last=state.points.at(-1);
   const minimumGap=27/state.camera.zoom;
   if(!last){
     const surf=state.surface==='mixed'?['street','dirt','ice'][0]:state.surface;
+    gestureSnapshot();
     state.points.push({x:p.x,y:p.y,surface:surf});
     state.pathDirty=true;
     return;
@@ -1463,29 +1655,48 @@ function addDrawPoint(p){
     // While the finger is travelling mostly straight, extend the existing segment
     // instead of recording every small wobble as a new bend.
     if(combined>minimumGap*1.8&&turn<.24&&deviation<10/state.camera.zoom){
-      last.x=p.x;last.y=p.y;
-      state.pathDirty=true;
+      moveRoadPoint(last,p);
       return;
     }
   }
 
   const surf=state.surface==='mixed'?['street','dirt','ice'][state.points.length%3]:state.surface;
-  state.points.push({x:p.x,y:p.y,surface:surf});
+  if(state.points.length>=LIMITS.points){
+    state.pointer.limitReached=true;
+    return;
+  }
+  const point={x:p.x,y:p.y,surface:surf};
+  state.points.push(point);
+  const valid=withinRoadBudget(state.points);
+  state.points.pop();
+  if(!valid){
+    state.pointer.limitReached=true;
+    return;
+  }
+  gestureSnapshot();
+  state.points.push(point);
   state.pathDirty=true;
 }
 function paintAt(p){
   const seg=nearestSegmentPointIndex(p);
   if(seg<0||seg>=state.points.length)return;
   const surf=state.surface==='mixed'?['street','dirt','ice'][seg%3]:state.surface;
+  if(state.points[seg].surface===surf)return;
+  gestureSnapshot();
   state.points[seg].surface=surf;state.pathDirty=true;
 }
 function eraseAt(p){
   const pi=nearestPoint(p);
   if(pi>=0){
+    const removed=state.points.splice(pi,1)[0];
+    const valid=withinRoadBudget(state.points);
+    state.points.splice(pi,0,removed);
+    if(!valid)return;
+    gestureSnapshot();
     state.points.splice(pi,1);state.pathDirty=true;return;
   }
   const ti=state.trees.findIndex(t=>Math.hypot(t.x-p.x,t.y-p.y)<24/state.camera.zoom);
-  if(ti>=0)state.trees.splice(ti,1);
+  if(ti>=0){gestureSnapshot();state.trees.splice(ti,1)}
 }
 
 const NAVIGATION_LAYERS=Object.freeze([
@@ -1512,6 +1723,8 @@ const ScreenManager=Object.freeze({
 });
 function hideNavigationLayers(){ScreenManager.hideNavigation()}
 function showHome(){
+  finishEditorGesture();
+  flushAutoSave();
   hideNavigationLayers();
   state.mode='home';state.race=null;state.paused=false;state.brake=false;state.steer=0;
   ScreenManager.configure();
@@ -1530,8 +1743,8 @@ function setEditorMode(){
 }
 const SelectionController=Object.freeze({
   apply({value,specs,stateKey,selector,preferenceKey,describe,notify=true}){
+    if(!Object.hasOwn(specs,value))return false;
     const spec=specs[value];
-    if(!spec)return false;
     state[stateKey]=value;
     DOM.active($$(selector),value,(button,current)=>button.dataset.car===current||button.dataset.difficulty===current);
     Storage.set(preferenceKey,value);
@@ -1643,8 +1856,8 @@ function startRace(){
   });
   ensureAudio();
   updateDamageHud();
-  if(!sessionStorage.getItem('trackforge-smooth-camera-tip')){
-    sessionStorage.setItem('trackforge-smooth-camera-tip','1');
+  if(!SessionStorage.get('trackforge-smooth-camera-tip')){
+    SessionStorage.set('trackforge-smooth-camera-tip','1');
     setTimeout(()=>toast('Adaptive chase camera active'),450);
   }
 }
@@ -1669,7 +1882,7 @@ function finishRace(){
     return(b.lap+b.progress)-(a.lap+a.progress);
   });
   const place=ordered.indexOf(player)+1;
-  const scoreResult=player.finished?recordHighScore(player.finishTime):{rank:0,newRecord:false};
+  const race=state.race,trackId=state.currentTrackId;
   $('#resultTitle').textContent=player.wrecked
     ?'WRECKED'
     :(['1ST PLACE','2ND PLACE','3RD PLACE','4TH PLACE'][place-1]||'RACE RESULTS');
@@ -1681,8 +1894,19 @@ function finishRace(){
   renderRaceScoreboard(ordered);
   renderHighScores();
   $('#results').style.display='flex';
-  playFinishSound(place,scoreResult.newRecord);
-  if(scoreResult.newRecord)toast('NEW TRACK RECORD');
+  const finishNote=playFinishSound(place);
+  if(player.finished){
+    recordHighScore(trackId,player,race.difficulty).then(result=>{
+      if(!result||state.race!==race||state.currentTrackId!==trackId)return;
+      renderHighScores();
+      updateTrackNameUI();
+      if(!result.saved)toast('Score could not be saved');
+      if(result.newRecord){
+        playTone(finishNote*2,.28,.035,'sine',.42);
+        toast('NEW TRACK RECORD');
+      }
+    });
+  }
   if(place===1)haptic([30,40,60]);
 }
 const ScoreboardRenderer=Object.freeze({
@@ -3141,44 +3365,62 @@ function closeOptions(){
   if(state.optionsReturn==='race')DOM.show('raceMenuModal');
   else if(state.optionsReturn==='editor')DOM.show('editorMenuModal');
 }
-function simpleTrackReady(track){
-  const pts=track?.points||[];
-  if(pts.length<9)return false;
-  const first=pts[0],last=pts[pts.length-1];
-  return Math.hypot(first.x-last.x,first.y-last.y)<74;
-}
-function bestTimeForTrack(id){
-  const list=readScores()[id];
-  return Array.isArray(list)&&list.length?formatTime(list[0].time):'NO TIME';
+function bestTimeForTrack(id,scores){
+  const [best]=ScoreRepository.forTrack(id,scores);
+  return best?formatTime(best.time):'NO TIME';
 }
 const TrackCardRenderer=Object.freeze({
-  render(track,mode){
-    const ready=simpleTrackReady(track);
-    const selected=track.id===state.currentTrackId?' selected':'';
-    const raceMode=mode==='race';
-    const action=raceMode?(ready?'SELECT':'LOCKED'):'EDIT';
-    const deleteButton=raceMode?'':`<button class="trackMiniBtn delete" data-delete-track="${track.id}">DEL</button>`;
-    return `<div class="trackCard${selected}" data-track="${track.id}">
-      <div>
-        <div class="trackCardName">${escapeHtml(track.name)}</div>
-        <div class="trackCardMeta">${ready?'RACE READY':'NEEDS EDITING'} • BEST ${bestTimeForTrack(track.id)}</div>
-      </div>
-      <div class="trackCardActions">
-        <button class="trackMiniBtn ${raceMode&&ready?'primary':''}" data-select-track="${track.id}" ${raceMode&&!ready?'disabled':''}>${action}</button>
-        ${deleteButton}
-      </div>
-    </div>`;
+  render(track,mode,scores){
+    const ready=isClosed(track.points),raceMode=mode==='race';
+    const card=document.createElement('div');
+    card.className='trackCard'+(track.id===state.currentTrackId?' selected':'');
+    card.dataset.track=track.id;
+
+    const info=document.createElement('div');
+    const name=document.createElement('div');
+    name.className='trackCardName';
+    name.textContent=track.name;
+    const meta=document.createElement('div');
+    meta.className='trackCardMeta';
+    meta.textContent=(ready?'RACE READY':'NEEDS EDITING')+' • BEST '+bestTimeForTrack(track.id,scores);
+    info.append(name,meta);
+
+    const actions=document.createElement('div');
+    actions.className='trackCardActions';
+    const select=document.createElement('button');
+    select.className='trackMiniBtn'+(raceMode&&ready?' primary':'');
+    select.dataset.selectTrack=track.id;
+    select.disabled=raceMode&&!ready;
+    select.textContent=raceMode?(ready?'SELECT':'LOCKED'):'EDIT';
+    actions.append(select);
+    if(!raceMode){
+      const remove=document.createElement('button');
+      remove.className='trackMiniBtn delete';
+      remove.dataset.deleteTrack=track.id;
+      remove.textContent='DEL';
+      actions.append(remove);
+    }
+    card.append(info,actions);
+    return card;
   },
   renderList(tracks,mode){
-    return tracks.length
-      ?tracks.map(track=>this.render(track,mode)).join('')
-      :'<div class="emptyTracks">No tracks saved yet.</div>';
+    if(!tracks.length){
+      const empty=document.createElement('div');
+      empty.className='emptyTracks';
+      empty.textContent='No tracks saved yet.';
+      return empty;
+    }
+    const scores=ScoreRepository.raw();
+    const fragment=document.createDocumentFragment();
+    for(const track of tracks)fragment.append(this.render(track,mode,scores));
+    return fragment;
   }
 });
 
 function openTrackPicker(mode='edit',cancelable=true){
+  finishEditorGesture();
+  flushAutoSave();
   state.pickerMode=mode;
-  const library=TrackRepository.all().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   DOM.text('trackModalTitle',mode==='race'?'Choose a track':'Choose a track to edit');
   DOM.text('trackModalSubtitle',mode==='race'
     ?'Select a race-ready circuit. Car and difficulty come next.'
@@ -3186,7 +3428,22 @@ function openTrackPicker(mode='edit',cancelable=true){
   DOM.visible('newTrackBtn',mode==='edit','block');
   DOM.visible('trackModalCancel',cancelable,'block');
   DOM.visible('trackModalClose',cancelable,'block');
-  DOM.byId('trackList').innerHTML=TrackCardRenderer.renderList(library,mode);
+  const list=DOM.byId('trackList');
+  const render=()=>{
+    const library=TrackRepository.all().sort((a,b)=>b.updatedAt-a.updatedAt);
+    list.replaceChildren(TrackCardRenderer.renderList(library,mode));
+  };
+  const pending=localTransactions;
+  if(pending){
+    const loading=document.createElement('div');
+    loading.className='emptyTracks';
+    loading.textContent='Loading tracks…';
+    list.replaceChildren(loading);
+    // A chooser opened just after editing must use the saved version.
+    pending.then(()=>{
+      if(list.firstChild===loading)render();
+    });
+  }else render();
   DOM.show('trackModal');
 }
 function closeTrackPicker(){
@@ -3200,8 +3457,9 @@ function openRaceSetup(){
   $('#raceSetupTrackName').textContent=state.currentTrackName||'Selected track';
   DOM.show('raceSetupModal');
 }
+const deletingTracks=new Set();
 function chooseTrack(id){
-  if(!loadTrackById(id))return toast('Track unavailable');
+  if(deletingTracks.has(id)||!loadTrackById(id))return toast('Track unavailable');
   if(state.pickerMode==='race'){
     const validation=validateTrack();
     if(validation!=='Track ready')return toast(validation);
@@ -3211,20 +3469,38 @@ function chooseTrack(id){
     setEditorMode();
   }
 }
-function deleteTrack(id){
+async function deleteTrack(id){
+  if(deletingTracks.has(id))return;
   const track=TrackRepository.find(id);
   if(!track)return;
   if(!confirm(`Delete "${track.name}"?`))return;
-  TrackRepository.remove(id);
-  ScoreRepository.removeTrack(id);
+  // Flush before removal so a pending timer cannot recreate a deleted track.
+  flushAutoSave();
+  deletingTracks.add(id);
+  const deleted=await transact(()=>{
+    if(!TrackRepository.remove(id))return false;
+    ScoreRepository.removeTrack(id);
+    return true;
+  }).catch(()=>false);
+  deletingTracks.delete(id);
+  if(!deleted)return toast('Delete unavailable');
   if(state.currentTrackId===id){
-    state.currentTrackId=null;state.currentTrackName='';state.points=[];state.trees=[];state.path=[];state.pathDirty=true;
+    state.currentTrackId=null;
+    state.currentTrackName='';
+    state.points=[];
+    state.trees=[];
+    state.path=[];
+    state.totalLength=0;
+    state.pathDirty=true;
+    state.history=[];
+    state.future=[];
+    state.selectedPoint=-1;
     updateTrackNameUI();
+    updateStatus();
   }
-  openTrackPicker('edit',false);
-}
-function escapeHtml(value){
-  return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  if(DOM.byId('trackModal').style.display==='flex'){
+    openTrackPicker(state.pickerMode,DOM.byId('trackModalCancel').style.display!=='none');
+  }
 }
 function openNameModal(action){
   state.nameAction=action;
@@ -3245,7 +3521,7 @@ function submitTrackName(){
     $('#trackNameError').textContent='Enter a track name.';
     return;
   }
-  const duplicate=readLibrary().some(t=>
+  const duplicate=TrackRepository.all().some(t=>
     (state.nameAction!=='rename'||t.id!==state.currentTrackId)&&t.name.toLowerCase()===name.toLowerCase()
   );
   if(duplicate){
@@ -3278,35 +3554,46 @@ function starterTrackRecord(){
     timeOfDay:'day',createdAt:now,updatedAt:now
   };
 }
-function initializeTrackLibrary(){
+function recoverLegacyTrack(){
+  for(const key of ['trackforge-autosave-v2','trackforge-manual-v2']){
+    const data=normalizeTrackData(parseBoundedJSON(Storage.get(key)));
+    if(!data?.points.length)continue;
+    const now=Date.now();
+    return {id:makeId(),name:'Recovered Track',version:5,...data,createdAt:now,updatedAt:now};
+  }
+  return null;
+}
+async function initializeTrackLibrary(){
   const savedCar=Storage.get(CAR_PREF_KEY);
   const savedDifficulty=Storage.get(DIFFICULTY_PREF_KEY);
   const savedHaptics=Storage.get(HAPTIC_PREF_KEY);
   const savedZoom=Storage.get(DYNAMIC_ZOOM_PREF_KEY);
-  if(carSpecs[savedCar])state.selectedCar=savedCar;
-  if(difficultySpecs[savedDifficulty])state.selectedDifficulty=savedDifficulty;
+  if(Object.hasOwn(carSpecs,savedCar))state.selectedCar=savedCar;
+  if(Object.hasOwn(difficultySpecs,savedDifficulty))state.selectedDifficulty=savedDifficulty;
   state.hapticsEnabled=savedHaptics===null?true:savedHaptics!=='0';
   state.dynamicZoom=savedZoom===null?true:savedZoom!=='0';
   selectCar(state.selectedCar,false);
   selectDifficulty(state.selectedDifficulty,false);
   updateOptionsUI();
-  let library=readLibrary();
-  if(!library.length){
-    let first=null;
-    const legacy=localStorage.getItem('trackforge-autosave-v2')||localStorage.getItem('trackforge-manual-v2');
-    if(legacy){
-      try{
-        const data=JSON.parse(legacy),now=Date.now();
-        if(Array.isArray(data.points)&&data.points.length){
-          first={id:makeId(),name:'Recovered Track',version:5,points:data.points,trees:data.trees||[],
-            timeOfDay:data.timeOfDay||'day',createdAt:now,updatedAt:now};
-        }
-      }catch(_){}
+  const track=await transact(()=>{
+    const savedTracks=TrackRepository.raw();
+    const [first]=TrackRepository.all(savedTracks);
+    if(first)return first;
+    const legacy=Storage.get(LIBRARY_KEY)===null?recoverLegacyTrack():null;
+    const starter=legacy||starterTrackRecord();
+    if(!TrackRepository.upsert(starter,true)){
+      // Keep the picker usable even if the saved library cannot be read or extended.
+      if(!TrackRepository.find(starter.id)){
+        writeBoundedJSON(LIBRARY_KEY,[starter],{sessionOnly:true});
+      }
+      toast('Track storage unavailable. Changes kept for this session');
     }
-    library=[first||starterTrackRecord()];
-    writeLibrary(library);
+    return starter;
+  });
+  if(!loadTrackById(track.id)){
+    const [current]=TrackRepository.all();
+    if(current)loadTrackById(current.id);
   }
-  loadTrackById(library[0].id);
 }
 
 function canvasLocal(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
@@ -3316,18 +3603,23 @@ canvas.addEventListener('pointerdown',e=>{
     if(state.activePointers.size>=2){state.brake=true;$('#brakeBtn').classList.add('active')}
     return;
   }
+  if(state.mode!=='edit'||state.pointer.down)return;
   const sp=canvasLocal(e),p=screenToWorld(sp.x,sp.y);
   canvas.setPointerCapture(e.pointerId);
   state.pointer={down:true,id:e.pointerId,last:p,lastScreen:sp,snapshot:false};
-  if(['draw','paint','tree','erase'].includes(state.tool)){snapshot();state.pointer.snapshot=true}
   if(state.tool==='draw')addDrawPoint(p);
   else if(state.tool==='paint')paintAt(p);
-  else if(state.tool==='tree')state.trees.push(p);
+  else if(state.tool==='tree'){
+    if(state.trees.length<LIMITS.trees&&isValidCoordinate(p)){
+      gestureSnapshot();
+      state.trees.push(p);
+    }else state.pointer.limitReached=true;
+  }
   else if(state.tool==='erase')eraseAt(p);
   else if(state.tool==='select')state.selectedPoint=nearestPoint(p);
 });
 canvas.addEventListener('pointermove',e=>{
-  if(state.mode==='race')return;
+  if(state.mode!=='edit')return;
   if(!state.pointer.down||e.pointerId!==state.pointer.id)return;
   const sp=canvasLocal(e),p=screenToWorld(sp.x,sp.y);
   if(state.tool==='pan'){
@@ -3338,8 +3630,8 @@ canvas.addEventListener('pointermove',e=>{
   }else if(state.tool==='draw')addDrawPoint(p);
   else if(state.tool==='paint')paintAt(p);
   else if(state.tool==='select'&&state.selectedPoint>=0){
-    if(!state.pointer.snapshot){snapshot();state.pointer.snapshot=true}
-    state.points[state.selectedPoint].x=p.x;state.points[state.selectedPoint].y=p.y;state.pathDirty=true;
+    const point=state.points[state.selectedPoint];
+    if(point)moveRoadPoint(point,p);
   }
   state.pointer.last=p;
 });
@@ -3349,9 +3641,19 @@ function endCanvasPointer(e){
     if(state.activePointers.size<2){state.brake=false;$('#brakeBtn').classList.remove('active')}
     return;
   }
-  if(state.tool==='draw')normalizeClosed();
+  if(!state.pointer.down||e.pointerId!==state.pointer.id)return;
+  finishEditorGesture();
+}
+function finishEditorGesture(){
+  if(!state.pointer.down)return;
+  const changed=state.pointer.snapshot;
+  if(changed&&state.tool==='draw')normalizeClosed();
   state.pointer.down=false;state.pointer.id=null;state.selectedPoint=state.tool==='select'?state.selectedPoint:-1;
-  state.pathDirty=true;autoSave();updateStatus();
+  if(changed){
+    autoSave();
+    updateStatus();
+  }
+  if(state.pointer.limitReached)toast('Track size limit reached');
 }
 canvas.addEventListener('pointerup',endCanvasPointer);
 canvas.addEventListener('pointercancel',endCanvasPointer);
@@ -3473,6 +3775,7 @@ addEventListener('keydown',e=>{
   if(['ArrowLeft','ArrowRight','ArrowDown',' '].includes(e.key))e.preventDefault();
 });
 document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){finishEditorGesture();flushAutoSave()}
   if(document.hidden&&state.mode==='race'&&state.race&&!state.race.finished){
     setRacePaused(true);
     DOM.show('raceMenuModal');
@@ -3483,12 +3786,10 @@ addEventListener('keyup',e=>{
   if(['ArrowDown','s',' '].includes(e.key))state.brake=false;
 });
 
-function seedTrack(){
-  initializeTrackLibrary();
-}
+addEventListener('pagehide',()=>{finishEditorGesture();flushAutoSave()});
 
-resize();seedTrack();updateTimeButton();updateSoundButton();updateTrackNameUI();updateStatus();requestAnimationFrame(frame);
-setTimeout(showHome,180);
+resize();updateTimeButton();updateSoundButton();requestAnimationFrame(frame);
+initializeTrackLibrary().catch(()=>toast('Track storage unavailable')).finally(showHome);
 let p=0;const loader=setInterval(()=>{
   p=Math.min(100,p+18);$('#loadFill').style.width=p+'%';$('#loadText').textContent=p<45?'Preparing physics…':p<75?'Calibrating lights…':'Loading track editor…';
   if(p>=100){clearInterval(loader);setTimeout(()=>$('#loading').classList.add('hide'),100);setTimeout(()=>$('#loading').remove(),520)}
