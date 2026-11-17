@@ -22,7 +22,7 @@ try {
 
 npm run qa:lanes -- [options]
   --scenario starter|hairpin|bridge|all   Default: starter
-  --track file.json                      Saved track or track array; repeatable
+  --track file.json                      Shared export, saved track, or track array; repeatable
   --mode solo|traffic|both                Default: traffic
   --direction forward|reverse|both       Default: both
   --difficulty easy|normal|hard|all       Default: normal
@@ -31,6 +31,7 @@ npm run qa:lanes -- [options]
   --seconds N --laps N                   Per-run budget (default 60), laps (default 1)
   --out directory                       Default: qa/results/lanes
   --strict                              Exit 1 if any error findings
+  --fail-on-regressions                 Exit 1 if results exceed built-in recovery limits or any other errors occur
 
 Custom tracks replace built-in scenarios and keep their authored start ratio.
 Default directions test both ways. Reports: report.html and report.json.`)
@@ -43,6 +44,7 @@ Default directions test both ways. Reports: report.html and report.json.`)
 		const { renderLaneReport } = await server.ssrLoadModule(
 			'/qa/lanes/report.ts',
 		)
+		const { laneRegressions } = await server.ssrLoadModule('/qa/lanes/regressions.ts')
 		const tracks =
 			options.trackFiles.length > 0
 				? (
@@ -58,6 +60,7 @@ Default directions test both ways. Reports: report.html and report.json.`)
 						options.scenarios.includes(track.id),
 					)
 		const runs = []
+		const regressions = []
 		const started = performance.now()
 		for (const track of tracks) {
 			const path = prepareLanePath(track)
@@ -82,9 +85,14 @@ Default directions test both ways. Reports: report.html and report.json.`)
 								const errors = run.issues.filter(
 									(issue) => issue.severity === 'error',
 								).length
+								const label = `${track.name} | ${mode} ${difficulty} ${car} ${reversed ? 'reverse' : 'forward'} seed ${seed}`
 								console.log(
-									`${runs.length}. ${track.name} | ${mode} ${difficulty} ${car} ${reversed ? 'reverse' : 'forward'} seed ${seed}: ${run.vehicles.filter((v) => v.finishedAt !== null).length}/${run.vehicles.length} finished, ${errors} errors, ${run.issues.length - errors} warnings`,
+									`${runs.length}. ${label}: ${run.vehicles.filter((v) => v.finishedAt !== null).length}/${run.vehicles.length} finished, ${errors} errors, ${run.issues.length - errors} warnings`,
 								)
+								if (options.failOnRegressions) {
+									const failures = laneRegressions(run, options.trackFiles.length ? undefined : track.id)
+									if (failures.length) regressions.push(`${label}: ${failures.join(', ')}`)
+								}
 							}
 		}
 		const elapsed = (performance.now() - started) / 1000
@@ -104,7 +112,8 @@ Default directions test both ways. Reports: report.html and report.json.`)
 		console.log(
 			`\n${runs.length} runs: ${simulated.toFixed(1)} simulated seconds in ${elapsed.toFixed(2)} s (${(simulated / Math.max(0.001, elapsed)).toFixed(1)}× real time).\nReport: ${resolve(out, 'report.html')}`,
 		)
-		if (options.strict && errors > 0) process.exitCode = 1
+		for (const regression of regressions) console.error(`Lane regression: ${regression}`)
+		if (regressions.length || (options.strict && errors > 0)) process.exitCode = 1
 	}
 } catch (error) {
 	console.error(

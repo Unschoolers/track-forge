@@ -34,7 +34,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Simulate solo and traffic on all fixtures in both directions
+      - name: Check for AI lane regressions
+        if: github.event_name == 'pull_request'
+        run: npm run qa:lanes -- --scenario all --mode both --seeds 1 --fail-on-regressions
+      - name: Simulate the requested seed range
+        if: github.event_name == 'workflow_dispatch'
         env:
           LANE_SEEDS: ${{ inputs.seeds || 1 }}
         run: npm run qa:lanes -- --scenario all --mode both --seeds "$LANE_SEEDS"
@@ -48,6 +52,7 @@ jobs:
           retention-days: 14
           if-no-files-found: error
       - name: Link report
+        if: always() && steps.report.outputs.artifact-url != ''
         env:
           REPORT_URL: ${{ steps.report.outputs.artifact-url }}
-        run: printf '## AI lane checker\n\n[Download dot trails and JSON telemetry](%s).\n\nDiagnostic findings are recorded without failing this baseline workflow. Use --strict locally to gate error findings.\n' "$REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
+        run: printf '## AI lane checker\n\n[Download dot trails and JSON telemetry](%s).\n\nPull requests fail for new errors or recoveries above the fixture limits. Manual runs report all findings.\n' "$REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
