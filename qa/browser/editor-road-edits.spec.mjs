@@ -63,8 +63,19 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   const y = canvas.y + canvas.height / 2
   const pointer = await context.newCDPSession(page)
   try {
+    const camera = (await read()).camera
+    const last = points.at(-1)
+    const endX = x + (last.x - camera.x) * camera.zoom
+    const endY = y + (last.y - camera.y) * camera.zoom
+    const drawPoint = await page.evaluate(({ endX, endY }) => {
+      const canvas = document.querySelector('#game-container canvas')
+      return [[60, 0], [-60, 0], [0, 60], [0, -60], [45, 45], [-45, -45]]
+        .map(([dx, dy]) => ({ x: endX + dx, y: endY + dy }))
+        .find(({ x, y }) => document.elementFromPoint(x, y) === canvas)
+    }, { endX, endY })
+    expect(drawPoint).toBeDefined()
     let before = await work()
-    await touch(pointer, 'touchStart', [contact(1, x + 150, y + 70)])
+    await touch(pointer, 'touchStart', [contact(1, drawPoint.x, drawPoint.y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
     await expect.poll(async () => (await saved()).length).toBe(points.length + 1)
@@ -76,10 +87,10 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     await expectEditWork(before)
 
     await page.getByRole('button', { name: 'Move points', exact: true }).click()
-    const camera = (await read()).camera
+    const moveCamera = (await read()).camera
     const control = points[4]
-    const screenX = x + (control.x - camera.x) * camera.zoom
-    const screenY = y + (control.y - camera.y) * camera.zoom
+    const screenX = x + (control.x - moveCamera.x) * moveCamera.zoom
+    const screenY = y + (control.y - moveCamera.y) * moveCamera.zoom
     before = await work()
     await touch(pointer, 'touchStart', [contact(1, screenX, screenY)])
     await touch(pointer, 'touchMove', [contact(1, screenX + 45, screenY)])

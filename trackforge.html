@@ -351,6 +351,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .hidden{display:none!important}
 @media (min-width:700px){#app{max-width:560px;left:50%;transform:translateX(-50%);box-shadow:0 0 70px #000}}
+@media (orientation:landscape) and (max-height:520px){
+  #rightRail{display:grid;grid-template-columns:repeat(3,48px);gap:6px}
+}
 </style>
 </head>
 <body>
@@ -669,8 +672,7 @@ let renderDpr = 1;
 const TAU = Math.PI*2;
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp = (a,b,t)=>a+(b-a)*t;
-const EDITOR_MIN_ZOOM=.16;
-const EDITOR_FIT_MIN=.18;
+const EDITOR_MIN_ZOOM=.00001;
 const EDITOR_MAX_ZOOM=2.7;
 
 const ROAD_GEOMETRY=Object.freeze({
@@ -1436,13 +1438,45 @@ function screenToWorld(x,y){
 function screenAngle(worldAngle){
   return worldAngle+cameraRotation();
 }
+function editorTrackFrame(){
+  rebuildPath();
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const point of [...state.points,...state.path]){
+    minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);
+    minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);
+  }
+  const viewportWidth=Math.max(1,canvas.clientWidth),viewportHeight=Math.max(1,canvas.clientHeight);
+  const status=$('#status');
+  const margin=Math.min(8,viewportHeight/8);
+  const top=Math.min(viewportHeight/2,status.offsetTop+status.offsetHeight+margin);
+  const bottom=viewportHeight-margin;
+  const width=Math.max(300,maxX-minX+180),height=Math.max(420,maxY-minY+220);
+  const visibleHeight=bottom-top,offsetY=(viewportHeight-top-bottom)/2;
+  const zoom=clamp(Math.min(viewportWidth/width,visibleHeight/height),EDITOR_MIN_ZOOM,1.55);
+  return {x:(minX+maxX)/2,y:(minY+maxY)/2,width,height,visibleHeight,offsetY,zoom};
+}
 function fitTrack(){
   state.camera.angle=0;
   if(!state.points.length){state.camera={x:0,y:0,zoom:1,angle:0,vx:0,vy:0,vzoom:0,vangle:0};return}
-  const xs=state.points.map(p=>p.x),ys=state.points.map(p=>p.y);
-  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
-  state.camera.x=(minX+maxX)/2;state.camera.y=(minY+maxY)/2;
-  state.camera.zoom=clamp(Math.min(canvas.clientWidth/Math.max(300,maxX-minX+180),canvas.clientHeight/Math.max(420,maxY-minY+220)),EDITOR_FIT_MIN,1.55);
+  const frame=editorTrackFrame();
+  state.camera.x=frame.x;
+  state.camera.y=frame.y+frame.offsetY/frame.zoom;
+  state.camera.zoom=frame.zoom;
+}
+function zoomEditorOut(){
+  const camera=state.camera;
+  const zoom=clamp(camera.zoom/1.2,EDITOR_MIN_ZOOM,EDITOR_MAX_ZOOM);
+  if(state.points.length){
+    const frame=editorTrackFrame();
+    if(zoom<=frame.zoom){
+      const xRoom=Math.max(0,(canvas.clientWidth/zoom-frame.width)/2);
+      const yRoom=Math.max(0,(frame.visibleHeight/zoom-frame.height)/2);
+      const centerY=frame.y+frame.offsetY/zoom;
+      camera.x=clamp(camera.x,frame.x-xRoom,frame.x+xRoom);
+      camera.y=clamp(camera.y,centerY-yRoom,centerY+yRoom);
+    }
+  }
+  camera.zoom=zoom;
 }
 function isValidCoordinate(point){
   return !!point&&Number.isFinite(point.x)&&Number.isFinite(point.y)
@@ -3704,7 +3738,7 @@ $$('.difficultyPick').forEach(button=>button.addEventListener('click',()=>select
 
 $('#undoBtn').onclick=undo;$('#redoBtn').onclick=redo;
 $('#zoomInBtn').onclick=()=>state.camera.zoom=clamp(state.camera.zoom*1.2,EDITOR_MIN_ZOOM,EDITOR_MAX_ZOOM);
-$('#zoomOutBtn').onclick=()=>state.camera.zoom=clamp(state.camera.zoom/1.2,EDITOR_MIN_ZOOM,EDITOR_MAX_ZOOM);
+$('#zoomOutBtn').onclick=zoomEditorOut;
 $('#fitBtn').onclick=fitTrack;
 $('#expandBtn').onclick=expandTrack;
 $('#gridBtn').onclick=()=>{state.grid=!state.grid;$('#gridBtn').classList.toggle('active',state.grid)};
