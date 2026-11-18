@@ -31,6 +31,12 @@ describe('AI approach speed planning', () => {
     expect(safeEntrySpeedAhead(ice, approach, false, 1, CAR_SPECS.blue, 1))
       .toBeLessThan(safeEntrySpeedAhead(path, approach, false, 1, CAR_SPECS.blue, 1))
   })
+  it('applies the sharp-bend safety floor only when requested', () => {
+    const approach = path.points.findIndex((point) => point.distance > 355)
+    const normal = safeEntrySpeedAhead(path, approach, false, 0.1, CAR_SPECS.blue, 1, 'blue')
+    const hard = safeEntrySpeedAhead(path, approach, false, 0.1, CAR_SPECS.blue, 1, 'blue', true)
+    expect(hard).toBeLessThan(normal)
+  })
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)
