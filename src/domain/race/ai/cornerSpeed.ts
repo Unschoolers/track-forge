@@ -44,7 +44,7 @@ export function safeEntrySpeedAhead(
     // Allow the chassis more time to rotate through tight bends, especially
     // when traffic places it away from the center of the racing line.
     const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
-      (225 - bend * 350 * cornerSafety) * Math.sqrt(grip) +
+      (225 - bend * 350 * Math.max(cornerSafety, clamp(0.32 + bend * 1.25, 0, 0.9))) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - 225) * Math.exp(-bend * 20),
       70, straightSpeed,
     ))
