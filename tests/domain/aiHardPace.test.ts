@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { expect, it } from 'vitest'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { prepareLanePath } from '../../qa/lanes/scenarios'
+import { createLaneScenarios, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 import { requireFixture } from '../fixtures/requireFixture'
 
@@ -22,4 +22,16 @@ it('laps Pine Hairpins faster on Hard with the same car and no traffic', () => {
   })
 
   expect(requireFixture(hard)).toBeLessThan(requireFixture(medium) * 0.98)
+})
+
+
+it.each([false, true])('keeps Hard traffic on the hairpin circuit in reverse=%s', (reversed) => {
+  const track = requireFixture(createLaneScenarios().find(({ id }) => id === 'hairpin'))
+  const run = runLaneCheck({
+    path: prepareLanePath(track), trackName: track.name, seed: 1,
+    difficulty: 'hard', car: 'blue', mode: 'traffic', handling: 'simulation',
+    reversed, seconds: 45, laps: 1,
+  })
+  expect(run.stoppedReason).toBe('finished')
+  expect(run.vehicles.reduce((total, vehicle) => total + vehicle.recoveries, 0)).toBeLessThanOrEqual(3)
 })
