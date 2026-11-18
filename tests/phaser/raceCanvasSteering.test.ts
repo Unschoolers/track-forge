@@ -114,6 +114,45 @@ describe('race canvas steering', () => {
     }
   })
 
+  it.each(['canvas', 'pad'] as const)(
+    'responds to a rapid steering reversal on the %s after the brake finger slides and lifts', (surface) => {
+      const controls = new RaceInputController()
+      const { session } = recoverySession()
+      const { canvas, shutdown } = createScene(controls, session)
+      const hud = createRaceHud({ preferences: {} } as never, session, controls, { pause() {} })
+      document.body.append(hud.element)
+      try {
+        const pad = hud.element.querySelector<HTMLElement>('[data-race-steering]')
+        const brake = hud.element.querySelector<HTMLElement>('[data-action="brake"]')
+        if (!pad || !brake) throw new Error('Missing race controls')
+        const steering = surface === 'canvas' ? canvas : pad
+
+        steering.dispatchEvent(pointer('pointerdown', 1, 200))
+        steering.dispatchEvent(pointer('pointermove', 1, 248))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: false })
+        brake.dispatchEvent(pointer('pointerdown', 2, 480))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: true })
+        canvas.dispatchEvent(pointer('pointermove', 2, 320))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: true })
+        canvas.dispatchEvent(pointer('pointerup', 2, 320))
+        expect(controls.snapshot()).toMatchObject({ steering: 1, braking: false })
+
+        // The browser batches an overshoot and the first counter-steer into
+        // one move. Its final position alone is still beyond the old lock.
+        const reversal = pointer('pointermove', 1, 280)
+        Object.defineProperty(reversal, 'getCoalescedEvents', {
+          value: () => [pointer('pointermove', 1, 350), pointer('pointermove', 1, 280)],
+        })
+        steering.dispatchEvent(reversal)
+        expect(controls.snapshot().steering).toBeLessThan(0)
+        expect(controls.snapshot().braking).toBe(false)
+      } finally {
+        hud.destroy()
+        shutdown()
+      }
+    },
+  )
+
   it.each(['pointercancel', 'lostpointercapture'])(
     'cancels only the affected finger on %s', (eventType) => {
       const controls = new RaceInputController()

@@ -105,10 +105,18 @@ for (const side of ['left', 'right']) {
         await expect.poll(async () => (await telemetry(page)).controls.steering).toBeLessThan(-0.5)
         expect((await telemetry(page)).controls.braking).toBe(true)
 
-        // Lift and reapply only Brake; steering must remain held.
-        await touch(cdp, 'touchEnd', [pedal])
+        // Slide the brake finger into the playfield, then lift it and reverse
+        // the still-held steering finger from the same drag.
+        const offPedal = contact(pedal.id, pedal.x, y)
+        await touch(cdp, 'touchMove', [offPedal])
+        expect((await telemetry(page)).controls.braking).toBe(true)
+        expect((await telemetry(page)).controls.steering).toBeLessThan(-0.5)
+        await touch(cdp, 'touchEnd', [offPedal])
         await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(false)
         expect((await telemetry(page)).controls.steering).toBeLessThan(-0.5)
+        steering = contact(1, first.x + 40, y)
+        await touch(cdp, 'touchMove', [steering])
+        await expect.poll(async () => (await telemetry(page)).controls.steering).toBeGreaterThan(0.5)
         await touch(cdp, 'touchStart', [pedal])
         await expect.poll(async () => (await telemetry(page)).controls.braking).toBe(true)
 
