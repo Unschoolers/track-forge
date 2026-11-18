@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 async function setupRace(page) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
@@ -7,6 +8,7 @@ async function setupRace(page) {
 
 test('Ghost Race stays visible and greyed out without a matching saved replay', async ({ page }) => {
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await setupRace(page)
   const ghost = page.getByRole('button', { name: 'GHOST RACE', exact: true })
   await expect(ghost).toBeVisible()
@@ -17,6 +19,7 @@ test('Ghost Race stays visible and greyed out without a matching saved replay', 
 
 test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the ghost', async ({ page }) => {
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.evaluate(() => {
     const track = JSON.parse(localStorage.getItem('trackforge-library-v2'))[0]
     const key = [track.id, track.updatedAt, track.start?.ratio ?? 0,
@@ -30,6 +33,7 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
     localStorage.setItem('trackforge-audio-enabled', '0')
   })
   await page.reload()
+  await enterTrackForge(page)
   await setupRace(page)
   const ghost = page.getByRole('button', { name: 'GHOST RACE', exact: true })
   await expect(ghost).toBeEnabled()

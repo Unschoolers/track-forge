@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 const trackDirectory = process.env.TRACKFORGE_RACE_PERF_TRACKS
 const scenarios = trackDirectory ? [
@@ -16,6 +17,7 @@ for (const scenario of scenarios) {
     await page.setViewportSize({ width: 844, height: 390 })
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     await page.goto('/?racePerf')
+    await enterTrackForge(page)
     const report = () => page.evaluate(() => window.__trackForgeRacePerformance.report())
     const openPicker = () => page.getByRole('button', { name: 'RACE', exact: true }).click()
     const picker = page.getByRole('dialog', { name: 'Choose a track' })
@@ -38,6 +40,7 @@ for (const scenario of scenarios) {
         await expect(editor.getByRole('status')).toHaveText('Track saved.')
       }
       await page.reload()
+      await enterTrackForge(page)
     }
 
     expect((await report()).status).toBe('idle')

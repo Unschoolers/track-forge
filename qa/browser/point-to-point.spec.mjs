@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 const trackId = 'mobile-open-route'
 
@@ -18,6 +19,7 @@ test('converts a route in the editor and races it in all three modes', async ({ 
     localStorage.setItem('trackforge-library-v1-migrated', '1')
   }, trackId)
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
   await page.getByRole('button', { name: 'Editor menu' }).click()
@@ -29,6 +31,7 @@ test('converts a route in the editor and races it in all three modes', async ({ 
   await expect(page.locator('[data-tool="start"]')).toHaveCount(0)
 
   await page.reload()
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
   const selectStage = () => page.getByRole('button', { name: 'Race Open Stage', exact: true }).click()
   await selectStage()

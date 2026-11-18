@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 function telemetry(page) {
@@ -25,6 +26,7 @@ test('Simulation starts stationary and keeps steering, gas and brake independent
     }))
   })
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
   await page.getByRole('button', { name: 'Race Simulation test circuit', exact: true }).click()
   await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'OPTIONS' }).click()

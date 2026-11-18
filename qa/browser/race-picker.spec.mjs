@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 async function openPicker(page) {
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
   return page.getByRole('dialog', { name: 'Choose a track' })
 }

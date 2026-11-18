@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 test('downloads the shared track when file sharing is unavailable', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'canShare', { value: () => false })
   })
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Share Starter Circuit', exact: true }).click()

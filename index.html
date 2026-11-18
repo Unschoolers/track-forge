@@ -6,11 +6,32 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
     />
-    <meta name="theme-color" content="#0d1118" />
+    <meta name="theme-color" content="#080b10" />
     <title>TrackForge 2D</title>
+    <link rel="stylesheet" href="/src/styles/title-screen.css" />
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app" inert></div>
+    <section id="title-screen" class="title-screen" data-state="loading" aria-labelledby="title-heading">
+      <picture class="title-screen__art">
+        <source media="(orientation: portrait)" srcset="/src/assets/title/city-harbor-portrait.webp" />
+        <img src="/src/assets/title/city-harbor.webp" width="1600" height="956" alt="" fetchpriority="high" />
+      </picture>
+      <div class="title-screen__content">
+        <h1 id="title-heading" class="title-screen__brand" aria-label="Track Forge">
+          <span>TRACK</span>
+          <span class="title-screen__forge" data-glitch="FORGE">FORGE</span>
+        </h1>
+        <div class="title-screen__action">
+          <p id="title-status" class="title-screen__status" role="status">Loading Track Forge…</p>
+          <button id="title-start" class="title-screen__start" type="button" hidden>Tap to start</button>
+        </div>
+      </div>
+      <div class="title-screen__circuit">
+        <img src="/src/assets/title/city-harbor-route.webp" width="192" height="116" alt="" />
+        <span>City Harbor</span>
+      </div>
+    </section>
+    <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>

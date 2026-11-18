@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 function intersects(a, b) {
@@ -49,6 +50,7 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
   for (const [width, height] of [[320, 568], [390, 720], [844, 390]]) {
     await page.setViewportSize({ width, height })
     await page.goto('/?qa')
+    await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
     await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
 
@@ -99,6 +101,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
   )
   async function enterEditor() {
     await page.goto('/?qa')
+    await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
     await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
     await expect.poll(() => page.evaluate(() => window.__trackForgeQa?.snapshot().camera?.zoom ?? 0)).toBeGreaterThan(0)

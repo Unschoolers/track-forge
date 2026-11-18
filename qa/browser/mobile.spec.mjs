@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 async function telemetry(page) {
@@ -11,6 +12,7 @@ async function telemetry(page) {
 
 async function launch(page) {
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await expect(page.locator('[data-screen="home"]')).toBeVisible()
   await expect.poll(async () => (await telemetry(page)).mode).toBe('home')
 }
