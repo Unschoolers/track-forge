@@ -146,7 +146,7 @@ export function stepAiVehicle(
   // an enormous high-speed arc around a distant point.
   const lookAheadSamples = Math.round(
     context.onRoad
-      ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead, 5, 22)
+      ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + (difficulty === 'hard' ? 2 : 0), 5, 22)
       : 3,
   )
   const rawTargetIndex = context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples)
@@ -176,7 +176,7 @@ export function stepAiVehicle(
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
   const desiredSteer = clamp(
-    wrapAngle(desiredAngle - vehicle.angle) * tuning.steerGain -
+    wrapAngle(desiredAngle - vehicle.angle - (difficulty === 'hard' && vehicle.speed > 20 ? wrapAngle(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * 0.65 : 0)) * tuning.steerGain -
       vehicle.yawRate * 0.38,
     -1,
     1,
