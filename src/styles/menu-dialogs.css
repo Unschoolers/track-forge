@@ -1,0 +1,98 @@
+/* Menu surfaces share the title screen's dark harbor palette and racing typography. */
+.modal-overlay {
+  --menu-accent: #ff7846;
+  --menu-ink: #edf2f8;
+  --menu-muted: #aab9c8;
+  --menu-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  background: rgb(5 8 13 / 84%);
+}
+.modal-overlay .modal-card {
+  border: 1px solid #3c4c5b;
+  border-radius: 0;
+  background: linear-gradient(145deg, #18222d, #0b111a 72%);
+  box-shadow: 0 1.5rem 5rem #000b, inset 0 2px var(--menu-accent);
+  color: var(--menu-ink);
+}
+.modal-overlay .modal-header {
+  align-items: center;
+  padding: 1.3rem 1.4rem 1rem;
+  border-color: #34414e;
+}
+.modal-overlay .modal-title {
+  font: italic 800 clamp(1.65rem, 4vw, 2.35rem)/1 'Track Forge Title', system-ui, sans-serif;
+  letter-spacing: -.045em;
+  text-transform: uppercase;
+}
+.modal-overlay .modal-subtitle { color: var(--menu-muted); }
+.modal-overlay .modal-body { padding: 1.25rem 1.4rem; }
+.modal-overlay .modal-footer { padding: 1rem 1.4rem 1.25rem; border-color: #34414e; }
+.modal-overlay .modal-footer:empty { display: none; }
+.modal-overlay .modal-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #53616c;
+  border-radius: 0;
+  background: #151e28;
+  color: var(--menu-ink);
+}
+.modal-overlay .button {
+  border: 1px solid #50606d;
+  border-radius: 0;
+  background: #1b2834;
+  color: var(--menu-ink);
+  font: 800 .75rem/1.2 var(--menu-mono);
+  letter-spacing: .08em;
+}
+.modal-overlay .button-primary {
+  border-color: var(--menu-accent);
+  background: var(--menu-accent);
+  color: #101017;
+  clip-path: polygon(0 0, 100% 0, 100% 76%, calc(100% - .65rem) 100%, 0 100%);
+}
+.modal-overlay .button-danger { border-color: #784651; background: #302028; color: #ffadb3; }
+.modal-overlay :is(button, input):focus-visible { outline: 2px solid #edf2f8; outline-offset: 3px; }
+.modal-overlay .menu-buttons { gap: .6rem; }
+.modal-overlay .menu-buttons > .button { text-align: left; padding-inline: 1rem; }
+.modal-overlay :is(.name-label, .setup-label, .results-heading) {
+  color: #aab9c8;
+  font: 800 .7rem/1.3 var(--menu-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.modal-overlay .name-input { border-radius: 0; border-color: #53616c; background: #090f16; }
+
+.options-modal .modal-card { width: min(42rem, 100%); }
+.options-modal .modal-body > .setup-label { margin: 1.3rem 0 .55rem; color: var(--menu-accent); }
+.options-modal .modal-body > .setup-label:first-child { margin-top: 0; }
+.options-modal .options-race-settings > .setup-label { color: var(--menu-accent); }
+.options-modal .setup-section {
+  gap: .65rem;
+  border: 1px solid #34414e;
+  border-radius: 0;
+  background: #101923;
+}
+.options-modal .setup-choice, .options-modal .toggle-button {
+  border: 1px solid #465767;
+  border-radius: 0;
+  background: #1b2935;
+  color: var(--menu-ink);
+  font: 800 .7rem/1.2 var(--menu-mono);
+  letter-spacing: .035em;
+}
+.options-modal :is(.setup-choice, .toggle-button).active {
+  border-color: var(--menu-accent);
+  background: #563025;
+  color: #ffd0bd;
+  box-shadow: inset 0 -2px var(--menu-accent);
+}
+.options-modal .setting-row { border-color: #34414e; }
+.options-modal .setting-description, .options-modal .volume-value { color: var(--menu-muted); }
+.options-modal .volume-slider { accent-color: var(--menu-accent); }
+@media (max-width: 520px) {
+  .modal-overlay .modal-header { padding: 1rem; }
+  .modal-overlay .modal-body { padding: 1rem; }
+  .modal-overlay .modal-footer { padding: .8rem 1rem 1rem; }
+  .options-modal .choice-row { flex-wrap: wrap; }
+  .options-modal .setup-choice { min-width: 5rem; }
+}

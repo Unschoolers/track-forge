@@ -1,0 +1,120 @@
+/* The menu continues the City Harbor title screen's visual language. */
+.home-screen {
+  --home-ink: #edf2f8;
+  --home-accent: #ff7846;
+  --home-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-start;
+  padding: max(2rem, env(safe-area-inset-top)) max(clamp(1.4rem, 6.25vw, 7rem), env(safe-area-inset-right))
+    max(2rem, env(safe-area-inset-bottom)) max(clamp(1.4rem, 6.25vw, 7rem), env(safe-area-inset-left));
+  background: #080b10 url('../assets/title/city-harbor.webp') 60% 56% / cover no-repeat;
+  color: var(--home-ink);
+}
+.home-screen::before, .home-screen::after {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+}
+.home-screen::before {
+  background: linear-gradient(90deg, #080b10 0%, rgb(8 11 16 / 96%) 18%, rgb(8 11 16 / 83%) 35%, rgb(8 11 16 / 18%) 72%),
+    linear-gradient(0deg, rgb(8 11 16 / 82%), transparent 38%, rgb(8 11 16 / 25%));
+}
+.home-screen::after { background: repeating-linear-gradient(0deg, rgb(4 6 9 / 8%) 0 1px, transparent 1px 5px); }
+.home-card {
+  width: min(25rem, 100%);
+  margin: auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.home-heading { margin-bottom: clamp(1.5rem, 4vh, 2.5rem); }
+.home-card .brand {
+  font: italic 800 clamp(3.5rem, min(7vw, 13vh), 6rem)/.88 'Track Forge Title', system-ui, sans-serif;
+  letter-spacing: -.075em;
+}
+.home-card .brand span { display: block; width: max-content; padding-right: .09em; }
+.home-card .brand-accent { color: transparent; -webkit-text-stroke: .016em var(--home-ink); }
+.home-card .eyebrow {
+  margin: 1.1rem 0 0;
+  color: #aab8c7;
+  font: 600 .65rem/1.4 var(--home-mono);
+  letter-spacing: .16em;
+}
+.home-actions { gap: .45rem; }
+.home-actions .button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.2rem;
+  padding: .75rem 1rem;
+  border: 1px solid rgb(206 221 235 / 24%);
+  border-radius: 0;
+  background: rgb(15 21 29 / 78%);
+  color: var(--home-ink);
+  font: 800 .75rem/1.25 var(--home-mono);
+  letter-spacing: .09em;
+  text-align: left;
+  touch-action: manipulation;
+}
+.home-actions .button::after {
+  flex: none;
+  width: .45rem;
+  height: .45rem;
+  border-top: .12rem solid;
+  border-right: .12rem solid;
+  transform: rotate(45deg);
+  content: '';
+}
+.home-actions .button-primary {
+  border-color: var(--home-accent);
+  background: var(--home-accent);
+  color: #101017;
+  clip-path: polygon(0 0, 100% 0, 100% 75%, calc(100% - .8rem) 100%, 0 100%);
+}
+.home-actions .button:hover { translate: none; filter: brightness(1.16); }
+.home-actions .button:focus-visible { outline: 2px solid var(--home-ink); outline-offset: 3px; }
+.home-card .current-track {
+  gap: .3rem;
+  margin: 1.5rem 0 0;
+  padding: .85rem 0 0;
+  border: 0;
+  border-top: 1px solid rgb(206 221 235 / 28%);
+  border-radius: 0;
+  background: transparent;
+}
+.home-card .label { color: var(--home-accent); font: 700 .62rem/1.3 var(--home-mono); letter-spacing: .15em; }
+.home-card .track-name { font-size: 1rem; letter-spacing: .01em; }
+.home-card .track-meta { color: #b3c0cd; font: 500 .7rem/1.45 var(--home-mono); }
+@media (orientation: portrait) {
+  .home-screen {
+    align-items: stretch;
+    background-image: url('../assets/title/city-harbor-portrait.webp');
+    background-position: center top;
+  }
+  .home-screen::before {
+    background: linear-gradient(0deg, #080b10 5%, rgb(8 11 16 / 96%) 35%, rgb(8 11 16 / 68%) 70%, rgb(8 11 16 / 28%));
+  }
+  .home-card { margin: auto 0 0; }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  .home-screen { align-items: flex-start; padding-top: max(1rem, env(safe-area-inset-top)); padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .home-card { display: grid; grid-template-columns: minmax(10rem, 14rem) minmax(14rem, 21rem); column-gap: 2rem; width: min(40rem, 100%); margin: auto 0; }
+  .home-heading { grid-column: 1; margin-bottom: 1rem; }
+  .home-card .brand { font-size: clamp(2.8rem, 10vh, 4.5rem); }
+  .home-actions { grid-column: 2; grid-row: 1 / span 2; }
+  .home-actions .button { min-height: 2.75rem; }
+  .home-card .current-track { grid-column: 1; margin: 0; }
+}
+@media (max-width: 340px) {
+  .home-screen { padding-left: 1rem; padding-right: 1rem; }
+  .home-card .brand { font-size: 3.25rem; }
+}
+@media (prefers-reduced-motion: reduce) { .home-actions .button { transition: none; } }

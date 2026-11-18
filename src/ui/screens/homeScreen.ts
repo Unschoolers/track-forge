@@ -21,7 +21,8 @@ export function createHomeScreen(
   const card = element('div', 'home-card')
   const eyebrow = element('p', 'eyebrow', 'BUILD IT · RACE IT · MASTER IT')
   const title = element('h1', 'brand')
-  title.append('TRACK', element('span', 'brand-accent', 'FORGE'))
+  title.setAttribute('aria-label', 'Track Forge')
+  title.append(element('span', 'home-brand-track', 'TRACK'), element('span', 'brand-accent', 'FORGE'))
   const trackCard = element('div', 'current-track')
   const best = state.currentTrack
     ? state.scoresByTrack[state.currentTrack.id]?.[0]
@@ -55,7 +56,9 @@ export function createHomeScreen(
     button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),
     button('OPTIONS', 'options', actions.options, 'button button-large'),
   )
-  card.append(title, eyebrow, trackCard, actionsNode)
+  const heading = element('header', 'home-heading')
+  heading.append(title, eyebrow)
+  card.append(heading, actionsNode, trackCard)
   screen.append(card)
   return screen
 }

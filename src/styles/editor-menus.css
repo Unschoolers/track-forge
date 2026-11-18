@@ -1,0 +1,55 @@
+/* Editor controls remain opaque enough to read over every track environment. */
+.editor-screen {
+  --editor-menu-accent: #ff7846;
+  --editor-menu-ink: #edf2f8;
+  --editor-menu-muted: #b5c3d0;
+  --editor-menu-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+.editor-screen :is(.editor-context-dock, .point-control, .crossing-control, .start-control, .diagnostic-panel) {
+  border-color: #53616c;
+  border-radius: 0;
+  background: rgb(12 19 27 / 96%);
+  color: var(--editor-menu-ink);
+  box-shadow: 0 .9rem 2.3rem #0009;
+}
+.editor-screen :is(.point-control, .crossing-control, .start-control) {
+  border-top: 2px solid var(--editor-menu-accent);
+}
+.editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button, .point-choice, .point-insert, .crossing-choice, .diagnostic-repair),
+.modal-overlay .editor-segmented-button {
+  border-color: #53616c;
+  border-radius: 0;
+  background: #1a2834;
+  color: #edf2f8;
+}
+.editor-screen :is(.editor-segmented-button, .point-choice, .point-insert, .crossing-choice, .diagnostic-repair),
+.modal-overlay .editor-segmented-button {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-weight: 800;
+  letter-spacing: .035em;
+}
+.editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button, .point-choice, .crossing-choice).active,
+.modal-overlay .editor-segmented-button.active {
+  border-color: #ff7846;
+  background: #563025;
+  color: #ffd0bd;
+  box-shadow: inset 0 -2px #ff7846;
+}
+.editor-screen :is(.point-control-title, .crossing-control-title, .point-tension-label, .editor-context-dock .label) {
+  color: var(--editor-menu-muted);
+  font-family: var(--editor-menu-mono);
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.editor-screen :is(.start-control-help, .diagnostic-message) { color: var(--editor-menu-muted); }
+.editor-screen .point-tension-label input { accent-color: var(--editor-menu-accent); }
+.editor-screen .status-pill {
+  border: 1px solid #53616c;
+  border-radius: 0;
+  background: rgb(12 19 27 / 96%);
+  color: var(--editor-menu-ink);
+  font-family: var(--editor-menu-mono);
+}
+.editor-screen .topbar-title { color: var(--editor-menu-ink); text-shadow: 0 1px 4px #000, 0 1px 8px #000; }
+.editor-screen :is(button, input):focus-visible,
+.modal-overlay .editor-segmented-button:focus-visible { outline: 2px solid #edf2f8; outline-offset: 3px; }

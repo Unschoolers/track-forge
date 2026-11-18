@@ -1,0 +1,75 @@
+/* Track selection and race screens carry the harbor menu's angular visual language. */
+.track-library-modal .modal-card { width: min(52rem, 100%); }
+.track-library-modal .track-list { gap: .65rem; }
+.track-library-modal .results-heading { margin: 1.1rem 0 .1rem; color: var(--menu-accent); }
+.track-library-modal .results-heading:first-child { margin-top: 0; }
+.track-library-modal .track-card {
+  border: 1px solid #3b4b59;
+  border-radius: 0;
+  background: linear-gradient(110deg, #17232e, #101922);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.track-library-modal .track-card:focus-within,
+.track-library-modal .track-card:hover { border-color: #81909d; }
+.track-library-modal .track-card.selected { box-shadow: inset .2rem 0 var(--menu-accent); }
+.track-library-modal .track-card-name { font-size: 1rem; letter-spacing: .01em; }
+.track-library-modal .track-card-meta { color: #acbac7; font: 700 .65rem/1.5 var(--menu-mono); letter-spacing: .06em; }
+.track-library-modal .track-preview { height: 6rem; color: var(--menu-accent); }
+.track-library-modal .track-share-button,
+.track-library-modal .track-mini-button {
+  border: 1px solid #52616e;
+  border-radius: 0;
+  background: #1b2935;
+  color: var(--menu-ink);
+}
+.track-library-modal .track-card-select + .track-card-actions { pointer-events: auto; }
+.track-library-modal .track-mini-button { font: 800 .65rem/1.2 var(--menu-mono); letter-spacing: .06em; }
+.track-library-modal .track-mini-button.danger { color: #ffabb2; }
+.track-library-modal .empty-state { color: var(--menu-muted); }
+
+.race-setup-modal .setup-section {
+  gap: .7rem;
+  border: 1px solid #344554;
+  border-radius: 0;
+  background: #101923;
+}
+.race-setup-modal .setup-label { color: var(--menu-accent); }
+.race-setup-modal .race-flyover-panel { border-color: #465866; border-radius: 0; }
+.race-setup-modal .race-flyover-toggle { border-radius: 0; }
+.race-setup-modal :is(.car-choice, .setup-choice) {
+  min-width: 0;
+  border: 1px solid #465767;
+  border-radius: 0;
+  background: #1b2935;
+  color: var(--menu-ink);
+  font: 800 .7rem/1.2 var(--menu-mono);
+  letter-spacing: .035em;
+}
+.race-setup-modal .car-choice { border-bottom: .25rem solid var(--car-color); }
+.race-setup-modal :is(.car-choice, .setup-choice).active {
+  border-color: var(--menu-accent);
+  background: #563025;
+  color: #ffd0bd;
+  box-shadow: inset 0 -2px var(--menu-accent);
+}
+.race-setup-modal .car-choice.active { border-bottom-color: var(--car-color); }
+.race-setup-modal .car-summary-title { margin-top: .2rem; color: var(--menu-ink); }
+.race-setup-modal .car-stat { border: 1px solid #2e3f4d; border-radius: 0; background: #0a1119; }
+.race-setup-modal .car-stat strong { color: #f2f5f8; font: 800 .85rem/1.2 var(--menu-mono); }
+.race-setup-modal .car-stat .label { color: #aab9c8; font: 700 .58rem/1.2 var(--menu-mono); letter-spacing: .04em; }
+
+.results-modal .results-heading { color: var(--menu-accent); }
+.results-modal .scoreboard { gap: .35rem; }
+.results-modal .scoreboard-row { border-color: #344554; border-radius: 0; background: #121d27; }
+.results-modal .scoreboard-row.player { border-color: var(--menu-accent); box-shadow: inset .2rem 0 var(--menu-accent); }
+.results-modal .scoreboard-row span { color: var(--menu-muted); font-variant-numeric: tabular-nums; }
+.results-modal .race-finish-medal { color: #ffc66d; font-family: var(--menu-mono); }
+.results-modal .ghost-save-status { color: #a6e4c7; font: 800 .7rem/1.4 var(--menu-mono); letter-spacing: .08em; }
+.results-modal .results-secondary { padding-top: .8rem; border-top: 1px solid #34414e; }
+@media (max-width: 520px) {
+  .track-library-modal .track-preview { height: 4.5rem; }
+  .race-setup-modal .car-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .race-setup-modal .car-choice { min-height: 2.75rem; }
+  .race-setup-modal .car-stat .label { font-size: .52rem; }
+}
+@media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
