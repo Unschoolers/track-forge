@@ -97,3 +97,23 @@ sample starts after the first running frame and spans five seconds or 2,048
 samples, whichever comes first. Rendering timings are on the WebView thread.
 On physical Android, aim for warm Start → countdown under 500 ms. On a 60 Hz
 device, aim for frame p95 below 20 ms and frame p99 below 33 ms.
+
+## Sandy Beach terrain culling comparison
+
+On the supplied Sandy Beach export, import the track and use **Remove extra
+road** before saving. The repair retains the first 21 road controls and the
+original terrain, trees, and scenery. With the export-based browser harness,
+the repair is applied automatically when offered.
+
+A three-pair comparison in headless Chromium with SwiftShader, Pixel 7 emulation,
+and the 844 × 390 viewport produced the following medians of per-run p95s:
+
+| Warm run metric | Before | After terrain culling |
+| --- | ---: | ---: |
+| Frame interval | 66.7 ms | 50.0 ms |
+| Render submission | 19.6 ms | 11.6 ms |
+
+The baseline frame p95 ranged from 50.1 to 300 ms, showing substantial host
+and software-rendering variation. These numbers demonstrate the harness and
+an observed reduction in this environment; they do not establish Android GPU
+performance. Repeat the documented physical-device protocol for device targets.

@@ -15,7 +15,7 @@ vi.mock('@/phaser/rendering/trackRenderer', () => ({
 }))
 vi.mock('@/phaser/rendering/lampPostRenderer', () => ({ buildLampPosts: () => [], renderLampPosts: vi.fn() }))
 vi.mock('@/phaser/rendering/treeRenderer', () => ({ renderTrees: vi.fn() }))
-vi.mock('@/phaser/rendering/terrainRenderer', () => ({ renderTerrain: vi.fn() }))
+vi.mock('@/phaser/rendering/terrainRenderer', () => ({ buildTerrainPresentation: vi.fn(() => []), renderTerrainPrimitives: vi.fn() }))
 vi.mock('@/phaser/rendering/environmentRenderer', () => ({ GroundTextureRenderer: class { render() {} } }))
 
 import { RaceInputController } from '@/phaser/input/raceInput'

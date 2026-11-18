@@ -65,7 +65,16 @@ export function renderTerrain(
   detail: TerrainPresentationDetail = 'full',
   palette: EnvironmentPalette = night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day,
 ): void {
-  for (const primitive of buildTerrainPresentation(surface, detail)) {
+  renderTerrainPrimitives(graphics, buildTerrainPresentation(surface, detail), night, palette)
+}
+
+export function renderTerrainPrimitives(
+  graphics: Phaser.GameObjects.Graphics,
+  primitives: readonly import('@/phaser/rendering/terrainMesh').TerrainPrimitive[],
+  night: boolean,
+  palette: EnvironmentPalette,
+): void {
+  for (const primitive of primitives) {
     switch (primitive.kind) {
       case 'water':
         graphics.fillStyle(night ? 0x183f52 : 0x287c9c, 1)
