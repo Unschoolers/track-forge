@@ -80,6 +80,13 @@ export class PhaserSceneHost implements SceneHost {
     }
   }
 
+  whenReady(): Promise<void> {
+    const game = this.game
+    if (!game) throw new Error('Phaser must start before waiting for it to be ready')
+    if (game.isRunning) return Promise.resolve()
+    return new Promise((resolve) => game.events.once(Phaser.Core.Events.READY, resolve))
+  }
+
   prepareRace(track: Track, geometry: TrackGeometry, lighting: LightingMode): () => void {
     const game = this.game
     return this.racePreparation.prepare(

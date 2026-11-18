@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <!-- Simplified centerline of City Harbor, matching the title screen. -->
+    <group android:pivotX="144" android:pivotY="144" android:scaleX="1.25" android:scaleY="1.25">
+        <path
+            android:pathData="M178.7,155.7 L181.9,162 L187.7,166.2 L187.3,168.3 L181.6,172.7 L173.4,173.9
+                L158,181.1 L154,191.8 L150,195 L108,180.6 L101.3,171.9 L100,152.1 L101.4,148 L105.6,142.2
+                L131.8,124.3 L140.1,96.6 L144.8,93.5 L161.5,93.6 L172.3,105.5 L173.5,109.3 L171.2,117.3
+                L156,131.8 L153.5,140.9 L159.6,149 Z"
+            android:strokeColor="#EDF2F8"
+            android:strokeLineJoin="round"
+            android:strokeWidth="4" />
+        <path
+            android:pathData="M178.7,155.7 L181.9,162 L187.7,166.2"
+            android:strokeColor="#FF7846"
+            android:strokeLineCap="round"
+            android:strokeWidth="6" />
+    </group>
+</vector>

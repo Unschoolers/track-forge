@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 test('bounds editing work on a course with Sandy Beach-sized terrain and scenery', async ({ page, context }) => {
@@ -25,6 +26,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     localStorage.setItem('trackforge-library-v1-migrated', '1')
   }, { points, cells, scenery })
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.evaluate(async () => {
     const { EditorScene } = await import('/src/phaser/scenes/EditorScene.ts')
     const { TrackGeometryCache } = await import('/src/domain/track/trackGeometryCache.ts')
@@ -111,6 +113,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
 test('can drag the same starter control point twice, then tap for point controls', async ({ page, context }) => {
   await page.setViewportSize({ width: 844, height: 390 })
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.getByRole('button', { name: 'EDIT', exact: true }).click()
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())

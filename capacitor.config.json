@@ -2,6 +2,9 @@
   "appId": "io.trackforge.app",
   "appName": "TrackForge",
   "webDir": "dist",
+  "android": {
+    "backgroundColor": "#080b10"
+  },
   "server": {
     "hostname": "trackforge.local",
     "androidScheme": "https"

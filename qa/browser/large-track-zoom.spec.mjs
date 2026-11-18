@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 const trackPoints = Array.from({ length: 36 }, (_, index) => {
@@ -82,6 +83,7 @@ test.describe('Rally editor zoom', () => {
       localStorage.setItem('trackforge-library-v1-migrated', '1')
     }, rallyTrack)
     await page.goto('/?qa')
+    await enterTrackForge(page)
     await openRallyEditor(page)
   })
 
@@ -309,6 +311,7 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
   for (const [width, height] of [[844, 390], [320, 568]]) {
     await page.setViewportSize({ width, height })
     await page.goto('/?qa')
+    await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
     await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
     await expect(page.locator('[data-screen="editor"]')).toBeVisible()
@@ -391,6 +394,7 @@ test('opens an oversized beach export and repairs its closed loop without changi
 
   await page.setViewportSize({ width: 844, height: 390 })
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.locator('input[type=file]').setInputFiles({
     name: 'oversized-beach.trackforge.json', mimeType: 'application/json',

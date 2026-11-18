@@ -141,6 +141,7 @@ sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
 application.start()
+export const gameReady = sceneHost.whenReady()
 // Render the controls before a scene uses their bounds to fit the camera.
 const stopSceneSync = controller.subscribe((snapshot) => {
   sceneHost.start(snapshot.mode)
@@ -202,8 +203,13 @@ const unlockAudio = (): void => {
   toneSink.resume()
   music.unlock()
 }
-document.addEventListener('pointerup', unlockAudio)
-document.addEventListener('keydown', unlockAudio)
+
+export function enterGame(): void {
+  unlockAudio()
+  feedback.handle({ type: 'ui', emphasis: 'confirm' })
+  document.addEventListener('pointerup', unlockAudio)
+  document.addEventListener('keydown', unlockAudio)
+}
 
 let nativePaused = false
 function syncForeground(): void {

@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 test('Race Again restores the original night race setup after reload', async ({ page }) => {
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
   await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
   const setup = page.getByRole('dialog', { name: 'Race setup' })
@@ -13,6 +15,7 @@ test('Race Again restores the original night race setup after reload', async ({ 
   await page.locator('[data-action="pause"]').click()
   await page.getByRole('button', { name: 'QUIT TO HOME', exact: true }).click()
   await page.reload()
+  await enterTrackForge(page)
   await page.getByRole('button', { name: /RACE AGAIN.*Starter Circuit/i }).click()
   await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup)).toEqual(original)
 })

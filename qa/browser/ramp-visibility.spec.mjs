@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 // Reproduce the real failure: drive up a ramp, jump, and land on its long deck.
 // The old drawing-layer test placed cars directly at the correct height and
@@ -49,6 +50,7 @@ for (const reversed of [false, true]) {
       localStorage.setItem('trackforge-handling-mode', 'arcade')
     }, reversed)
     await page.goto('/?qa')
+    await enterTrackForge(page)
     await page.getByRole('button', { name: 'RACE', exact: true }).click()
     await page.getByRole('button', { name: 'Race Ramp visibility regression', exact: true }).click()
     await page.getByRole('button', { name: 'START RACE' }).click()

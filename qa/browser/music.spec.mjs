@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 const menuTrack = /\/clubb-menu(?:-[^/]+)?\.mp3$/
 const raceTrack = /\/clubb-race(?:-[^/]+)?\.mp3$/
@@ -29,8 +30,12 @@ async function observeMusic(page) {
 test('plays the bundled soundtrack and resumes after the app returns to the foreground', async ({ page }) => {
   const music = await observeMusic(page)
   await page.goto('/')
-  await page.getByRole('button', { name: 'OPTIONS' }).tap()
+  const start = page.getByRole('button', { name: /^tap to start$/i })
+  await expect(start).toBeVisible()
+  expect(await music()).toBeUndefined()
+  await enterTrackForge(page)
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(menuTrack), paused: false })
+  await page.getByRole('button', { name: 'OPTIONS' }).tap()
   await expect.poll(async () => (await music())?.time).toBeGreaterThan(0)
 
   const options = page.getByRole('dialog', { name: 'Options' })
@@ -44,6 +49,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   await expect.poll(music).toMatchObject({ paused: false })
 
   await page.reload()
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'OPTIONS' }).tap()
   await expect(soundtrack).toHaveValue('100')
   await expect(effects).toHaveValue('0')
@@ -68,11 +74,13 @@ for (const [environmentId, soundtrack] of [
   test(`plays the ${environmentId} soundtrack during a race and its pause menu`, async ({ page }) => {
     const music = await observeMusic(page)
     await page.goto('/')
+    await enterTrackForge(page)
     await page.evaluate((environmentId) => {
       const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
       localStorage.setItem('trackforge-library-v2', JSON.stringify([{ ...tracks[0], environmentId }]))
     }, environmentId)
     await page.reload()
+    await enterTrackForge(page)
 
     await page.getByRole('button', { name: 'RACE', exact: true }).tap()
     await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).tap()
@@ -96,6 +104,7 @@ for (const [environmentId, soundtrack] of [
 test('uses the final Cup circuit soundtrack when restoring standings', async ({ page }) => {
   const music = await observeMusic(page)
   await page.goto('/')
+  await enterTrackForge(page)
   await page.evaluate(() => {
     const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
     localStorage.setItem('trackforge-library-v2', JSON.stringify([{ ...tracks[0], environmentId: 'cityscape' }]))
@@ -107,6 +116,7 @@ test('uses the final Cup circuit soundtrack when restoring standings', async ({ 
     }))
   })
   await page.reload()
+  await enterTrackForge(page)
 
   await page.getByRole('button', { name: 'RESUME CUP', exact: true }).tap()
   await expect(page.getByRole('dialog', { name: 'CUP STANDINGS' })).toBeVisible()

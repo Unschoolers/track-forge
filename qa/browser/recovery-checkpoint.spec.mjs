@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { enterTrackForge } from '../enter-game.mjs'
 
 test('places a recovery checkpoint and returns to it after hitting scenery', async ({ page }) => {
   const id = 'checkpoint-qa'
@@ -14,6 +15,7 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
   }, id)
   const qa = () => page.evaluate(() => window.__trackForgeQa?.snapshot())
   await page.goto('/?qa')
+  await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
   await page.getByRole('button', { name: 'Place checkpoint' }).click()
