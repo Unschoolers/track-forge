@@ -63,18 +63,25 @@ export function bindRacePointer(
     onChange()
   }
   const onMove = (event: PointerEvent): void => {
-    const anchor = anchors.get(event.pointerId)
-    if (anchor === undefined || role !== 'steering') return
+    const initialAnchor = anchors.get(event.pointerId)
+    if (initialAnchor === undefined || role !== 'steering') return
     event.preventDefault()
     const sensitivity = getSensitivity() ?? 1
     const range = STEERING_RANGE_PX / sensitivity
-    // Keep the origin one full-lock distance behind the thumb at most,
-    // so a reversal reduces steering even after dragging past full lock.
-    const delta = event.clientX - anchor
-    const travel = Number.isFinite(delta) ? clamp(delta, -range, range) : 0
-    if (Number.isFinite(delta) && delta !== travel) {
-      anchors.set(event.pointerId, event.clientX - travel)
+    // Track the whole drag in order. A browser may batch crossing full lock
+    // and starting the reversal into one event, so the endpoint alone can
+    // leave the steering stuck at full lock for the first counter-steer.
+    const samples = event.getCoalescedEvents?.()
+    let anchor = initialAnchor
+    let travel = 0
+    for (const sample of samples?.length ? samples : [event]) {
+      const delta = sample.clientX - anchor
+      travel = Number.isFinite(delta) ? clamp(delta, -range, range) : 0
+      if (Number.isFinite(delta) && delta !== travel) {
+        anchor = sample.clientX - travel
+      }
     }
+    anchors.set(event.pointerId, anchor)
     controls.updateSteering(event.pointerId, steeringFromDrag(travel * sensitivity))
     onChange()
   }
