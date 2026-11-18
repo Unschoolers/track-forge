@@ -22,6 +22,7 @@ export function createOptionsModal(
       ? 'Comfort and feedback settings.'
       : 'Race, comfort, and feedback settings.',
     actions.close,
+    'options-modal',
   )
   if (state.overlay.type !== 'options' || state.overlay.returnTo !== 'race') {
     const raceSettings = element('section', 'options-race-settings')

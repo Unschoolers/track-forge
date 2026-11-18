@@ -34,6 +34,7 @@ export function createTrackLibraryModal(
       ? 'Tap a track to choose your car.'
       : 'Select an existing named track or create a new one.',
     actions.close,
+    'track-library-modal',
   )
   const list = element('div', 'track-list')
   if (race) list.append(element('h3', 'results-heading', 'SAVED TRACKS'))
