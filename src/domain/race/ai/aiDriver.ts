@@ -17,6 +17,10 @@ import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { safeEntrySpeedAhead } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
+const HARD_LOOKAHEAD_SAMPLES = 4
+const SIDESLIP_CORRECTION_GAIN = 0.65
+const SIDESLIP_MIN_SPEED = 20
+
 const BEND_LOOKAHEAD = [0, 6, 12, 20, 30]
 const CENTER_LINE_TURN = 0.28
 const LANE_CHANGE_LOOKAHEAD = 24
@@ -144,9 +148,10 @@ export function stepAiVehicle(
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
+  const hardLookAhead = difficulty === 'hard' ? HARD_LOOKAHEAD_SAMPLES : 0
   const lookAheadSamples = Math.round(
     context.onRoad
-      ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + (difficulty === 'hard' ? 2 : 0), 5, 22)
+      ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)
       : 3,
   )
   const rawTargetIndex = context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples)
@@ -175,8 +180,11 @@ export function stepAiVehicle(
   const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
+  const sideslip = difficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
+    ? wrapAngle(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * SIDESLIP_CORRECTION_GAIN
+    : 0
   const desiredSteer = clamp(
-    wrapAngle(desiredAngle - vehicle.angle - (difficulty === 'hard' && vehicle.speed > 20 ? wrapAngle(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * 0.65 : 0)) * tuning.steerGain -
+    wrapAngle(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
       vehicle.yawRate * 0.38,
     -1,
     1,
@@ -199,7 +207,7 @@ export function stepAiVehicle(
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const curveSpeed = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
-    car, tuning.pace * vehicle.aiPace, vehicle.car,
+    car, tuning.pace * vehicle.aiPace, vehicle.car, difficulty === 'hard',
   )
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
