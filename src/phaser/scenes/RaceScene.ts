@@ -15,6 +15,7 @@ import {
   renderVehicleShadows,
   renderVehicles,
   renderGhostVehicle,
+  renderCoveredPlayerOutline,
   isVehicleAboveStructures,
   transformVehicleLights,
 } from '@/phaser/rendering/vehicleRenderer'
@@ -39,6 +40,10 @@ import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { renderTerrain } from '@/phaser/rendering/terrainRenderer'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import {
+  getBridgeDeckOcclusion,
+  type BridgeDeckOcclusion,
+} from '@/phaser/rendering/bridgeRenderer'
 import type { UpdateRoadRibbonVisibility } from '@/phaser/rendering/roadRibbonRenderer'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
 import { getTrackEnvironment } from '@/presentation/environments'
@@ -57,6 +62,7 @@ export class RaceScene extends Phaser.Scene {
   private shadowGraphics?: Phaser.GameObjects.Graphics
   private vehicleGraphics?: Phaser.GameObjects.Graphics
   private upperVehicleGraphics?: Phaser.GameObjects.Graphics
+  private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics?: Phaser.GameObjects.Graphics
   private nightShadeGraphics?: Phaser.GameObjects.Graphics
@@ -136,6 +142,7 @@ export class RaceScene extends Phaser.Scene {
       .setDepth(WORLD_RENDER_DEPTH.nightLight)
       .setBlendMode(Phaser.BlendModes.ADD)
     const geometry = this.geometry.get(track)
+    this.isCoveredByBridgeDeck = getBridgeDeckOcclusion(geometry)
     renderTerrain(
       this.terrainGraphics,
       geometry.path.terrainSurface,
@@ -264,6 +271,9 @@ export class RaceScene extends Phaser.Scene {
         ghost,
       )
     }
+    if (player && !upperVehicles.has(player.id) && this.isCoveredByBridgeDeck?.(player)) {
+      renderCoveredPlayerOutline(this.upperVehicleGraphics, player)
+    }
     this.nightShadeGraphics?.clear()
     this.nightLightGraphics?.clear()
     if (
@@ -352,5 +362,6 @@ export class RaceScene extends Phaser.Scene {
     this.groundRenderer = undefined
     this.updateRoadRibbonVisibility = undefined
     this.raceCamera = undefined
+    this.isCoveredByBridgeDeck = undefined
   }
 }

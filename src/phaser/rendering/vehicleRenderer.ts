@@ -201,7 +201,7 @@ export function projectVehicleShadow(
   }
 }
 
-function fillPolygon(
+function tracePolygon(
   graphics: Phaser.GameObjects.Graphics,
   points: readonly Vector2[],
 ): void {
@@ -214,6 +214,13 @@ function fillPolygon(
     if (point) graphics.lineTo(point.x, point.y)
   }
   graphics.closePath()
+}
+
+function fillPolygon(
+  graphics: Phaser.GameObjects.Graphics,
+  points: readonly Vector2[],
+): void {
+  tracePolygon(graphics, points)
   graphics.fillPath()
 }
 
@@ -262,6 +269,22 @@ export function renderGhostVehicle(
   fillPolygon(graphics, geometry.body)
   graphics.fillStyle(0xe8fbff, 0.16)
   fillPolygon(graphics, geometry.cabin)
+  graphics.restore()
+}
+
+/** Keep the player readable through an overhead deck without moving the car body. */
+export function renderCoveredPlayerOutline(
+  graphics: Phaser.GameObjects.Graphics,
+  player: Pick<RaceVehicle, 'car' | 'x' | 'y' | 'angle'>,
+): void {
+  graphics.save()
+  graphics.translateCanvas(player.x, player.y)
+  graphics.rotateCanvas(player.angle)
+  tracePolygon(graphics, getVehicleGeometry(player.car).body)
+  graphics.lineStyle(4, 0x101820, 0.85)
+  graphics.strokePath()
+  graphics.lineStyle(2, 0xf4faff, 0.95)
+  graphics.strokePath()
   graphics.restore()
 }
 

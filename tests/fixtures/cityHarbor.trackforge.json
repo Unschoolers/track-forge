@@ -1,0 +1,2978 @@
+{
+  "format": "trackforge-track",
+  "formatVersion": 1,
+  "track": {
+    "id": "track-mwi9krw9-ktjrkv",
+    "name": "City harbor",
+    "version": 8,
+    "points": [
+      {
+        "x": 254.8325958251953,
+        "y": 543.8671875,
+        "surface": "street",
+        "id": "point-0",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 304.5055847167969,
+        "y": 642.2659912109375,
+        "surface": "street",
+        "id": "point-1",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 394.30580139160156,
+        "y": 714.14990234375,
+        "surface": "street",
+        "id": "point-2",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 393.73326110839844,
+        "y": 741.5982055664062,
+        "surface": "street",
+        "id": "point-3",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 295.2529754638672,
+        "y": 801.4642944335938,
+        "surface": "street",
+        "id": "point-4",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 177.23065185546875,
+        "y": 817.6972045898438,
+        "surface": "street",
+        "id": "point-5",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -63.22071667299065,
+        "y": 930.855919354473,
+        "surface": "street",
+        "id": "point-6",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -118.51589819098007,
+        "y": 1088.310586298352,
+        "surface": "street",
+        "id": "point-7",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -185.37387027422034,
+        "y": 1136.7795504629448,
+        "surface": "street",
+        "id": "point-8",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "overpass"
+      },
+      {
+        "x": -808.1033408645726,
+        "y": 921.3305780383675,
+        "surface": "street",
+        "id": "point-9",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -911.1947702801128,
+        "y": 797.8673324833317,
+        "surface": "street",
+        "id": "point-10",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -931.846639573004,
+        "y": 477.75099230031947,
+        "surface": "street",
+        "id": "point-11",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -845.8091265033506,
+        "y": 338.4297164265713,
+        "surface": "street",
+        "id": "point-12",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "overpass"
+      },
+      {
+        "x": -449.737309819119,
+        "y": 64.25948393013391,
+        "surface": "street",
+        "id": "point-13",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "overpass"
+      },
+      {
+        "x": -314.00602990471293,
+        "y": -370.5044157244074,
+        "surface": "street",
+        "id": "point-14",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -10.739718512589434,
+        "y": -393.9762168356044,
+        "surface": "street",
+        "id": "point-15",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 102.38764616142294,
+        "y": -295.2787262411084,
+        "surface": "street",
+        "id": "point-16",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 174.80131979867838,
+        "y": -168.41136652098749,
+        "surface": "street",
+        "id": "point-17",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 135.31349704673084,
+        "y": -26.432292706404496,
+        "surface": "street",
+        "id": "point-18",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -85.83727588528382,
+        "y": 180.78472842838255,
+        "surface": "street",
+        "id": "point-19",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -125.24503657580385,
+        "y": 324.9778135523211,
+        "surface": "street",
+        "id": "point-20",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": -36.39353892089139,
+        "y": 440.38317356019115,
+        "surface": "street",
+        "id": "point-21",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      },
+      {
+        "x": 254.8325958251953,
+        "y": 543.8671875,
+        "surface": "street",
+        "id": "point-22",
+        "curve": "smooth",
+        "tension": 0.5,
+        "structure": "surface"
+      }
+    ],
+    "routeKind": "circuit",
+    "trees": [
+      {
+        "x": 171.3260265195853,
+        "y": 1022.5165584550874
+      },
+      {
+        "x": 165.64521716688978,
+        "y": 314.53708851247575
+      },
+      {
+        "x": -113.47847697548741,
+        "y": -129.27197971423482
+      },
+      {
+        "x": -532.524705755719,
+        "y": -68.326408740538
+      },
+      {
+        "x": -912.6234224236285,
+        "y": 251.24748661494914
+      },
+      {
+        "x": -680.7415753010814,
+        "y": 1195.1231321944078
+      },
+      {
+        "x": -214.45346526199648,
+        "y": 903.6781557492509
+      },
+      {
+        "x": -294.51224510518387,
+        "y": 794.2885851055325
+      },
+      {
+        "x": -428.6647373690371,
+        "y": 576.2907509377478
+      },
+      {
+        "x": -498.9865963853649,
+        "y": 423.14535203654236
+      },
+      {
+        "x": -430.4678465077427,
+        "y": 409.8623640483406
+      },
+      {
+        "x": -335.62345120580744,
+        "y": 416.8944568198301
+      },
+      {
+        "x": -389.35653084224464,
+        "y": 510.6570085515168
+      },
+      {
+        "x": -261.6953739120685,
+        "y": 934.1509960185365
+      }
+    ],
+    "terrain": {
+      "cellSize": 32,
+      "cells": [
+        {
+          "column": -11,
+          "row": -1,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": -1,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 0,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 0,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 0,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 0,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 0,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 0,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 1,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 2,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 3,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 4,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 5,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 6,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 7,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 8,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 8,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 8,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 8,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 8,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 8,
+          "kind": "water"
+        },
+        {
+          "column": -10,
+          "row": 8,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 8,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 8,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 8,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 9,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 10,
+          "kind": "hill"
+        },
+        {
+          "column": -19,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 11,
+          "kind": "hill"
+        },
+        {
+          "column": -19,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 12,
+          "kind": "hill"
+        },
+        {
+          "column": -20,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -19,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 13,
+          "kind": "hill"
+        },
+        {
+          "column": -21,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -20,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -19,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 14,
+          "kind": "hill"
+        },
+        {
+          "column": -6,
+          "row": 14,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 14,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 15,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 15,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -17,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 16,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 16,
+          "kind": "water"
+        },
+        {
+          "column": -26,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -16,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 17,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -1,
+          "row": 17,
+          "kind": "water"
+        },
+        {
+          "column": -26,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 18,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 18,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 18,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 18,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 18,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 18,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -1,
+          "row": 18,
+          "kind": "water"
+        },
+        {
+          "column": -26,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 19,
+          "kind": "hill"
+        },
+        {
+          "column": -15,
+          "row": 19,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 19,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 19,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 19,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 19,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -1,
+          "row": 19,
+          "kind": "water"
+        },
+        {
+          "column": -26,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 20,
+          "kind": "hill"
+        },
+        {
+          "column": -14,
+          "row": 20,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 20,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 20,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 20,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -9,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -1,
+          "row": 20,
+          "kind": "water"
+        },
+        {
+          "column": -26,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 21,
+          "kind": "hill"
+        },
+        {
+          "column": -13,
+          "row": 21,
+          "kind": "hill"
+        },
+        {
+          "column": -12,
+          "row": 21,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 21,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 21,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -1,
+          "row": 21,
+          "kind": "water"
+        },
+        {
+          "column": -26,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 22,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 22,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 22,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -8,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -2,
+          "row": 22,
+          "kind": "water"
+        },
+        {
+          "column": -25,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 23,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 23,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 23,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -7,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -6,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -4,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -3,
+          "row": 23,
+          "kind": "water"
+        },
+        {
+          "column": -24,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 24,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 24,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 24,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 24,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 24,
+          "kind": "hill"
+        },
+        {
+          "column": -6,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -5,
+          "row": 24,
+          "kind": "water"
+        },
+        {
+          "column": -23,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -22,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 25,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -6,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -5,
+          "row": 25,
+          "kind": "hill"
+        },
+        {
+          "column": -22,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 26,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -6,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -5,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -4,
+          "row": 26,
+          "kind": "hill"
+        },
+        {
+          "column": -22,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -21,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 27,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -6,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -5,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -4,
+          "row": 27,
+          "kind": "hill"
+        },
+        {
+          "column": -21,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -20,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 28,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -6,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -5,
+          "row": 28,
+          "kind": "hill"
+        },
+        {
+          "column": -20,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -19,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -18,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -13,
+          "row": 29,
+          "kind": "water"
+        },
+        {
+          "column": -12,
+          "row": 29,
+          "kind": "hill"
+        },
+        {
+          "column": -11,
+          "row": 29,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 29,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 29,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 29,
+          "kind": "hill"
+        },
+        {
+          "column": -7,
+          "row": 29,
+          "kind": "hill"
+        },
+        {
+          "column": -18,
+          "row": 30,
+          "kind": "water"
+        },
+        {
+          "column": -17,
+          "row": 30,
+          "kind": "water"
+        },
+        {
+          "column": -16,
+          "row": 30,
+          "kind": "water"
+        },
+        {
+          "column": -15,
+          "row": 30,
+          "kind": "water"
+        },
+        {
+          "column": -14,
+          "row": 30,
+          "kind": "water"
+        },
+        {
+          "column": -11,
+          "row": 30,
+          "kind": "hill"
+        },
+        {
+          "column": -10,
+          "row": 30,
+          "kind": "hill"
+        },
+        {
+          "column": -9,
+          "row": 30,
+          "kind": "hill"
+        },
+        {
+          "column": -8,
+          "row": 30,
+          "kind": "hill"
+        }
+      ]
+    },
+    "start": {
+      "ratio": 0,
+      "reversed": false
+    },
+    "environmentId": "cityscape",
+    "scenery": [
+      {
+        "kind": "city-trash-bin",
+        "x": 67.1946035875435,
+        "y": 1018.537424054904
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": 64.67022888038059,
+        "y": 387.98444991959695
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -15.749183747035318,
+        "y": 332.50824791321156
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": 16.346531442497508,
+        "y": 237.96438906187313
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -50.008476512190555,
+        "y": -298.8258689944354
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -187.76724183589215,
+        "y": -305.076654646273
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -678.2172005939187,
+        "y": 117.63586135378296
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -780.9098237214587,
+        "y": 162.17310629579652
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -773.061554809026,
+        "y": 1082.6081139423336
+      },
+      {
+        "kind": "city-bus-stop",
+        "x": -27.68978289356346,
+        "y": 1044.321764217032
+      },
+      {
+        "kind": "city-bus-stop",
+        "x": 159.15393661565008,
+        "y": 434.8656162205659
+      },
+      {
+        "kind": "city-bus-stop",
+        "x": -188.17060492115343,
+        "y": -463.60075758118865
+      },
+      {
+        "kind": "city-bus-stop",
+        "x": -843.0228084323438,
+        "y": 1044.321764217032
+      },
+      {
+        "kind": "city-house",
+        "x": 255.0801754878339,
+        "y": 965.4050338425993
+      },
+      {
+        "kind": "city-house",
+        "x": 126.69786255407485,
+        "y": 167.64258482798255
+      },
+      {
+        "kind": "city-house",
+        "x": -541.1797008386742,
+        "y": -220.69044573965448
+      },
+      {
+        "kind": "city-house",
+        "x": -1066.0897424806792,
+        "y": 435.1146846952515
+      },
+      {
+        "kind": "city-house",
+        "x": -1153.883557710132,
+        "y": 649.1121045809869
+      },
+      {
+        "kind": "city-building",
+        "x": -1031.6705534635921,
+        "y": 849.0592768413176
+      },
+      {
+        "kind": "city-building",
+        "x": -1021.6939956065685,
+        "y": 1016.5824276798767
+      },
+      {
+        "kind": "city-building",
+        "x": -1204.2652241430792,
+        "y": 914.9877465662671
+      },
+      {
+        "kind": "city-building",
+        "x": -1165.8554347162492,
+        "y": 764.8864602461786
+      },
+      {
+        "kind": "city-building",
+        "x": -807.1977743498932,
+        "y": 439.43790775865796
+      },
+      {
+        "kind": "city-building",
+        "x": -860.572438450703,
+        "y": 169.2391942637487
+      },
+      {
+        "kind": "city-building",
+        "x": -756.8160700285014,
+        "y": 86.01798383895039
+      },
+      {
+        "kind": "city-building",
+        "x": -623.6288672946133,
+        "y": 21.170244102963352
+      },
+      {
+        "kind": "city-building",
+        "x": -394.6666485117871,
+        "y": -492.2073418481199
+      },
+      {
+        "kind": "city-building",
+        "x": -233.81262551828468,
+        "y": -725.8230443066666
+      },
+      {
+        "kind": "city-building",
+        "x": 23.939968895260336,
+        "y": -984.5055305637463
+      },
+      {
+        "kind": "city-building",
+        "x": 20.592544711511437,
+        "y": -608.5698018846085
+      },
+      {
+        "kind": "city-building",
+        "x": 182.38550460533384,
+        "y": -505.8220925092469
+      },
+      {
+        "kind": "city-building",
+        "x": -40.777096410374725,
+        "y": -756.043003697195
+      },
+      {
+        "kind": "city-building",
+        "x": -501.6075772344293,
+        "y": -635.1633356377868
+      },
+      {
+        "kind": "city-bus-stop",
+        "x": 229.2496126805238,
+        "y": 16.377859933988248
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -2.839509326083544,
+        "y": -459.88787627759143
+      },
+      {
+        "kind": "city-trash-bin",
+        "x": -265.3159326905193,
+        "y": -499.1847162671436
+      }
+    ],
+    "raceRevision": 1794773378741,
+    "lighting": "day",
+    "createdAt": 1794773121849,
+    "updatedAt": 1794773378741
+  }
+}
