@@ -55,9 +55,11 @@ test('supports keyboard entry and reduced motion in portrait', async ({ page }) 
 })
 
 test('offers a retry when the game bundle fails to load', async ({ page }) => {
-  await page.route(gameBundle, route => route.abort(), { times: 1 })
+  let bundleAvailable = false
+  await page.route(gameBundle, route => bundleAvailable ? route.continue() : route.abort())
   await page.goto('/')
   await expect(page.getByRole('status')).toHaveText('Track Forge couldn’t load.')
+  bundleAvailable = true
   await page.getByRole('button', { name: /^try again$/i }).tap()
   await expect(startButton(page)).toBeVisible()
 })
