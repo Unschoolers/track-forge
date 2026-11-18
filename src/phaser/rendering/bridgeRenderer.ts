@@ -4,6 +4,7 @@ import {
   SURFACE_SPECS,
   WORLD_ELEVATION,
 } from '@/domain/config'
+import { clamp } from '@/domain/geometry/math'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { RoadSurfaceSample } from '@/domain/track/roadSurface'
@@ -85,6 +86,63 @@ export function buildBridgePresentation(
   return step.value
 }
 
+export type BridgeDeckOcclusion = (position: Vector2 & { readonly z: number }) => boolean
+
+const deckOcclusionCache = new WeakMap<TrackGeometry, BridgeDeckOcclusion>()
+
+export function getBridgeDeckOcclusion(geometry: TrackGeometry): BridgeDeckOcclusion {
+  buildBridgePresentation(geometry)
+  return deckOcclusionCache.get(geometry) ?? (() => false)
+}
+
+function deckCell(coordinate: number): number {
+  return Math.floor(coordinate / ROAD_GEOMETRY.edgeWidth)
+}
+
+function indexBridgeDeck(
+  cells: Map<string, BridgePolygonPrimitive[]>,
+  deck: BridgePolygonPrimitive,
+): void {
+  const xs = deck.polygon.map(({ x }) => deckCell(x))
+  const ys = deck.polygon.map(({ y }) => deckCell(y))
+  const right = Math.max(...xs)
+  const bottom = Math.max(...ys)
+  for (let x = Math.min(...xs); x <= right; x++) {
+    for (let y = Math.min(...ys); y <= bottom; y++) {
+      const key = `${x}:${y}`
+      const cell = cells.get(key)
+      if (cell) cell.push(deck)
+      else cells.set(key, [deck])
+    }
+  }
+}
+
+function deckHeightAt(deck: BridgePolygonPrimitive, point: Vector2): number {
+  const [leftStart, leftEnd, rightEnd, rightStart] = deck.polygon
+  const startX = (leftStart.x + rightStart.x) / 2
+  const startY = (leftStart.y + rightStart.y) / 2
+  const dx = (leftEnd.x + rightEnd.x) / 2 - startX
+  const dy = (leftEnd.y + rightEnd.y) / 2 - startY
+  const lengthSquared = dx * dx + dy * dy
+  const ratio = lengthSquared > 0
+    ? clamp(((point.x - startX) * dx + (point.y - startY) * dy) / lengthSquared, 0, 1)
+    : 0
+  const [startHeight, endHeight] = deck.deckHeights
+  return startHeight + (endHeight - startHeight) * ratio
+}
+
+function containsDeckPoint(
+  [a, b, c, d]: BridgePolygonPrimitive['polygon'],
+  point: Vector2,
+): boolean {
+  const crossesRay = (start: Vector2, end: Vector2) =>
+    (start.y > point.y) !== (end.y > point.y) &&
+    point.x < start.x + (end.x - start.x) * (point.y - start.y) / (end.y - start.y)
+  const crossings = Number(crossesRay(a, b)) + Number(crossesRay(b, c)) +
+    Number(crossesRay(c, d)) + Number(crossesRay(d, a))
+  return crossings % 2 === 1
+}
+
 /** Builds the same presentation as the synchronous renderer one section at a time. */
 export function* prepareBridgePresentation(
   geometry: TrackGeometry,
@@ -100,6 +158,7 @@ export function* prepareBridgePresentation(
   const decks: BridgePrimitive[] = []
   const markings: BridgePrimitive[] = []
   const walls: BridgePrimitive[] = []
+  const deckCells = new Map<string, BridgePolygonPrimitive[]>()
   const { path, ribbon } = geometry
   const count = path.closed ? ribbon.length : ribbon.length - 1
   const projectShadow = (point: Vector2, road: RoadSurfaceSample, scale = 1) =>
@@ -262,27 +321,29 @@ export function* prepareBridgePresentation(
         nextFaceGround.terrainHeight,
       ],
     })
+    const deck: BridgePolygonPrimitive = {
+      kind: 'edge',
+      ...elevationBase(
+        current.surface,
+        currentRoad.height,
+        currentRoad.terrainHeight,
+        0,
+      ),
+      polygon: [
+        current.edgeLeft,
+        next.edgeLeft,
+        next.edgeRight,
+        current.edgeRight,
+      ],
+      deckHeights: [currentRoad.height, nextRoad.height],
+      terrainHeights: [
+        currentRoad.terrainHeight,
+        nextRoad.terrainHeight,
+      ],
+    }
+    if (shadowMode === 'terrain') indexBridgeDeck(deckCells, deck)
     decks.push(
-      {
-        kind: 'edge',
-        ...elevationBase(
-          current.surface,
-          currentRoad.height,
-          currentRoad.terrainHeight,
-          0,
-        ),
-        polygon: [
-          current.edgeLeft,
-          next.edgeLeft,
-          next.edgeRight,
-          current.edgeRight,
-        ],
-        deckHeights: [currentRoad.height, nextRoad.height],
-        terrainHeights: [
-          currentRoad.terrainHeight,
-          nextRoad.terrainHeight,
-        ],
-      },
+      deck,
       {
         kind: 'surface',
         ...elevationBase(
@@ -386,6 +447,13 @@ export function* prepareBridgePresentation(
   const completed = cache.get(geometry)
   if (completed) return completed
   cache.set(geometry, presentation)
+  if (shadowMode === 'terrain') {
+    deckOcclusionCache.set(geometry, (position) =>
+      deckCells.get(`${deckCell(position.x)}:${deckCell(position.y)}`)?.some((deck) =>
+        containsDeckPoint(deck.polygon, position) && position.z < deckHeightAt(deck, position) - 2,
+      ) ?? false,
+    )
+  }
   return presentation
 }
 

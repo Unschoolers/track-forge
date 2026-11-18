@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { asTrackId, type Track } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { buildTrackGeometry } from '@/domain/track/trackGeometry'
+import { getBridgeDeckOcclusion } from '@/phaser/rendering/bridgeRenderer'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
@@ -31,8 +33,10 @@ const track: Track = {
 
 class Graphics {
 	readonly bodies: { x: number; y: number }[] = []
+	strokes = 0
 	clear() {
 		this.bodies.length = 0
+		this.strokes = 0
 	}
 	translateCanvas(x: number, y: number) {
 		this.bodies.push({ x, y })
@@ -46,6 +50,8 @@ class Graphics {
 	lineTo() {}
 	closePath() {}
 	fillPath() {}
+	lineStyle() {}
+	strokePath() { this.strokes++ }
 	fillCircle() {}
 	fillEllipse() {}
 }
@@ -143,7 +149,7 @@ describe('ramp vehicle rendering', () => {
 		},
 	)
 
-	it('keeps ground-level traffic below an overhead deck', () => {
+	it('draws only a player outline above a deck that covers a lower car', () => {
 		const path = buildRoadPath(track.points, track.terrain)
 		const base = createRace({
 			path,
@@ -152,17 +158,17 @@ describe('ramp vehicle rendering', () => {
 			laps: 2,
 		})
 		const index = path.points.findIndex(
-			(_, i) => path.roadSurface.at(i).structureHeight === 24,
+			(_, i) => path.roadSurface.at(i).structureHeight === 24 && path.roadSurface.at(i + 1).structureHeight === 24,
 		)
 		const point = required(path.points[index])
 		const upper = new Graphics()
 		const lower = new Graphics()
-		const state = {
+		let state = {
 			...base,
 			vehicles: [
 				{
 					...required(base.vehicles[0]),
-					x: point.x,
+					x: (point.x + required(path.points[index + 1]).x) / 2,
 					y: point.y,
 					pathIndex: index,
 					z: 0,
@@ -182,8 +188,21 @@ describe('ramp vehicle rendering', () => {
 			shadowGraphics: new Graphics(),
 			effectGraphics: new Graphics(),
 			game: { loop: { rawDelta: 16 } },
+			isCoveredByBridgeDeck: getBridgeDeckOcclusion(buildTrackGeometry(track)),
 			raceSession: { advance() {}, snapshot: () => ({ state }) },
 		}
+		RaceScene.prototype.update.call(scene as never, 0, 16)
+		expect(lower.bodies).toHaveLength(1)
+		expect(upper.bodies).toEqual(lower.bodies)
+		expect(upper.strokes).toBeGreaterThan(0)
+
+		const covered = required(state.vehicles[0])
+		state = { ...state, vehicles: [{ ...covered, player: false }] }
+		RaceScene.prototype.update.call(scene as never, 0, 16)
+		expect(lower.bodies).toHaveLength(1)
+		expect(upper.bodies).toHaveLength(0)
+
+		state = { ...state, vehicles: [{ ...covered, y: covered.y + 200 }] }
 		RaceScene.prototype.update.call(scene as never, 0, 16)
 		expect(lower.bodies).toHaveLength(1)
 		expect(upper.bodies).toHaveLength(0)
