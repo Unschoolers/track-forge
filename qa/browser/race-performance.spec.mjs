@@ -29,6 +29,14 @@ for (const scenario of scenarios) {
       await expect(editor).toBeVisible()
       trackName = await editor.locator('[data-action="rename-track"]').textContent()
       expect(trackName).toBeTruthy()
+      // Older Sandy Beach exports have a recoverable tail after the closed loop.
+      const repair = editor.getByRole('button', { name: 'Remove extra road', exact: true })
+      if (await repair.isVisible()) {
+        await repair.click()
+        await expect(repair).toHaveCount(0)
+        await editor.getByRole('button', { name: 'Save track', exact: true }).click()
+        await expect(editor.getByRole('status')).toHaveText('Track saved.')
+      }
       await page.reload()
     }
 

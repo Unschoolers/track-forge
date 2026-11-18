@@ -37,7 +37,9 @@ import {
   type LampPost,
 } from '@/phaser/rendering/lampPostRenderer'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
-import { renderTerrain } from '@/phaser/rendering/terrainRenderer'
+import { buildTerrainPresentation, renderTerrainPrimitives } from '@/phaser/rendering/terrainRenderer'
+import { chunkRaceTerrain, terrainChunkVisible } from '@/phaser/rendering/raceTerrainChunks'
+import { groundViewportBounds } from '@/presentation/environments/groundTexture'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
@@ -56,7 +58,7 @@ const EMPTY_SCENERY = [] as const
 export class RaceScene extends Phaser.Scene {
   private groundRenderer: GroundTextureRenderer | undefined
   private environmentSceneryRenderer: SceneryRenderer | undefined
-  private terrainGraphics?: Phaser.GameObjects.Graphics
+  private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: ReturnType<typeof groundViewportBounds> }[] = []
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
@@ -103,9 +105,6 @@ export class RaceScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(palette.raceGround)
     this.groundRenderer = new GroundTextureRenderer(this)
     this.renderGroundPresentation(night)
-    this.terrainGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.terrain)
     this.environmentSceneryRenderer = new SceneryRenderer(this.add.graphics().setDepth(WORLD_RENDER_DEPTH.environmentScenery))
     this.sceneryGraphics = this.add
       .graphics()
@@ -143,13 +142,14 @@ export class RaceScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD)
     const geometry = this.geometry.get(track)
     this.isCoveredByBridgeDeck = getBridgeDeckOcclusion(geometry)
-    renderTerrain(
-      this.terrainGraphics,
-      geometry.path.terrainSurface,
-      this.raceSession.snapshot().setup?.lighting === 'night',
-      terrainDetailForView(geometry.path.terrainSurface.authoredCellCount, 1),
-      palette,
-    )
+    const terrain = geometry.path.terrainSurface
+    this.terrainChunks = chunkRaceTerrain(buildTerrainPresentation(
+      terrain, terrainDetailForView(terrain.authoredCellCount, 1),
+    )).map(({ primitive, bounds }) => {
+      const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.terrain)
+      renderTerrainPrimitives(graphics, [primitive], night, palette)
+      return { graphics, bounds }
+    })
     renderTrees(
       this.sceneryGraphics,
       track.trees,
@@ -321,6 +321,10 @@ export class RaceScene extends Phaser.Scene {
       }
     const environmentId = normalizeTrackEnvironmentId(track.environmentId)
     this.groundRenderer?.render(view, night, environmentId)
+    const viewport = groundViewportBounds(view)
+    for (const { graphics, bounds } of this.terrainChunks) {
+      graphics.setVisible(terrainChunkVisible(bounds, viewport))
+    }
     this.updateRoadRibbonVisibility?.(view)
     this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
   }
@@ -359,6 +363,7 @@ export class RaceScene extends Phaser.Scene {
     window.removeEventListener('blur', this.onBlur)
     document.removeEventListener('visibilitychange', this.onVisibility)
     this.lamps = []
+    this.terrainChunks = []
     this.groundRenderer = undefined
     this.updateRoadRibbonVisibility = undefined
     this.raceCamera = undefined
