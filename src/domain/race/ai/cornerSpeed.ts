@@ -5,6 +5,10 @@ import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
+const SHARP_BEND_SAFETY_BASE = 0.32
+const SHARP_BEND_SAFETY_GAIN = 1.25
+const SHARP_BEND_SAFETY_MAX = 0.9
+
 const BRAKE_LOOKAHEAD = [0, 6, 12, 20, 30, 42, 58, 78, 100]
 const BRAKE_TRACTION = VEHICLE_DYNAMICS_TUNING.forces.gravityAcceleration *
   VEHICLE_DYNAMICS_TUNING.forces.brakeGripUsage
@@ -22,6 +26,7 @@ export function safeEntrySpeedAhead(
   car: Pick<CarPhysicsSpec, 'max' | 'grip' | 'brake'> = CAR_SPECS.blue,
   pace = 1,
   carId: CarId = 'blue',
+  useSharpBendSafety = false,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -43,8 +48,12 @@ export function safeEntrySpeedAhead(
     const surfaceMax = straightSpeed * surface.max * terrain.max
     // Allow the chassis more time to rotate through tight bends, especially
     // when traffic places it away from the center of the racing line.
+    const sharpBendSafety = clamp(
+      SHARP_BEND_SAFETY_BASE + bend * SHARP_BEND_SAFETY_GAIN, 0, SHARP_BEND_SAFETY_MAX,
+    )
+    const effectiveSafety = useSharpBendSafety ? Math.max(cornerSafety, sharpBendSafety) : cornerSafety
     const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
-      (225 - bend * 350 * Math.max(cornerSafety, clamp(0.32 + bend * 1.25, 0, 0.9))) * Math.sqrt(grip) +
+      (225 - bend * 350 * effectiveSafety) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - 225) * Math.exp(-bend * 20),
       70, straightSpeed,
     ))
