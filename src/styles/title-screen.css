@@ -52,7 +52,7 @@ html { background: #080b10; }
 .title-screen::after {
   z-index: -1;
   content: '';
-  background: repeating-linear-gradient(0deg, rgb(4 6 9 / 15%) 0 1px, transparent 1px 5px);
+  background: repeating-linear-gradient(0deg, rgb(4 6 9 / 8%) 0 1px, transparent 1px 5px);
 }
 
 .title-screen__content { width: max-content; max-width: 100%; }

@@ -42,7 +42,7 @@ try {
   loadingStatus.hidden = true
   start.textContent = 'Tap to start'
   start.hidden = false
-  start.focus({ preventScroll: true })
+  start.focus({ preventScroll: true, focusVisible: false })
 } catch (error) {
   console.error('Track Forge startup failed', error)
   showRetry()
