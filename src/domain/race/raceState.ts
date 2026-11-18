@@ -37,6 +37,9 @@ export interface RaceVehicle {
   readonly aiPace: number
   readonly pathIndex: number
   readonly pathDistance: number
+  /** Previous followed road while a displaced car reacquires another arm. */
+  readonly recoveryAnchorIndex?: number | undefined
+  readonly recoveryReacquiredIndex?: number | undefined
   /** Absolute world-space height above the base datum, in world units. */
   readonly z: number
   readonly verticalVelocity: number

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
-import { stepRace } from '@/domain/race/raceEngine'
+import { recoverRacePlayer, resetRaceVehicle, stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
-import { buildRoadPath } from '@/domain/track/pathBuilder'
+import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 
 function required<T>(value: T | undefined): T {
@@ -157,4 +157,111 @@ describe('automatic player recovery', () => {
       expect(Math.abs(headingDifference)).toBeLessThan(0.05)
     },
   )
+})
+
+const closeArmsPath = buildRoadPath([
+  { x: 0, y: 0, surface: 'street' },
+  { x: 220, y: 0, surface: 'street' },
+  { x: 440, y: 0, surface: 'street' },
+  { x: 660, y: 0, surface: 'street' },
+  { x: 880, y: 0, surface: 'street' },
+  { x: 880, y: 100, surface: 'street' },
+  { x: 660, y: 100, surface: 'street' },
+  { x: 440, y: 100, surface: 'street' },
+  { x: 220, y: 100, surface: 'street' },
+  { x: 0, y: 100, surface: 'street' },
+  { x: 0, y: 0, surface: 'street' },
+], EMPTY_TERRAIN)
+
+describe('fallback recovery on a circuit', () => {
+  it.each([false, true])('stays on the previously followed road arm (reversed: %s)', reversed => {
+    const race = createRace({
+      path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed,
+    })
+    const index = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+    const player = {
+      ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: index,
+      lap: 1, nextSector: reversed ? 4 as const : 1 as const, damage: 20,
+    }
+    const result = recoverRacePlayer({ ...race, phase: 'running', elapsed: 40, vehicles: [player] })
+    expect(result.vehicles[0]).toMatchObject({
+      x: expect.closeTo(440, -1), y: expect.closeTo(0),
+      nextSector: player.nextSector, lap: 1, damage: 20, finishedAt: null,
+    })
+    expect(Math.cos(required(result.vehicles[0]).angle)).toBeCloseTo(reversed ? -1 : 1)
+    expect(result.elapsed).toBe(40)
+  })
+
+  it('returns to a dry sample before a missed timing gate', () => {
+    const wetPath = buildRoadPath([
+      { x: -200, y: 16, surface: 'street' },
+      { x: 200, y: 16, surface: 'street' },
+      { x: 200, y: 216, surface: 'street' },
+      { x: -200, y: 216, surface: 'street' },
+      { x: -200, y: 16, surface: 'street' },
+    ], { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] })
+    const wetIndex = required(nearestPathPoint(wetPath, { x: 16, y: 16 })).index
+    const race = createRace({ path: wetPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const player = {
+      ...required(race.vehicles[0]), ...required(wetPath.points[wetIndex]), pathIndex: wetIndex,
+    }
+    const recovered = required(resetRaceVehicle(player, {
+      ...race, startPathIndex: (wetIndex - Math.ceil(wetPath.points.length / 4) + wetPath.points.length) % wetPath.points.length,
+    }))
+    expect(recovered.x).toBeLessThan(0)
+    expect(wetPath.terrainSurface.materialAt(recovered)).not.toBe('water')
+    expect(recovered.nextSector).toBe(1)
+  })
+
+  it('retains the followed arm when automatically recovering on a displaced tick', () => {
+    const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const index = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+    const player = {
+      ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: index, stuckDuration: 0.65,
+    }
+    const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
+      { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'off-road' }))
+    expect(result.state.vehicles[0]).toMatchObject({ y: expect.closeTo(0), nextSector: 1, lap: 0 })
+    expect(result.events.some(event => event.type === 'gate-crossed')).toBe(false)
+  })
+})
+
+it('still recovers to the original arm after a displaced non-recovery tick', () => {
+  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const index = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+  const player = { ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: index }
+  const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
+    { steering: 0, throttle: 0, braking: true }, 1 / 60, random)
+  const recovered = recoverRacePlayer(result.state)
+  expect(recovered.vehicles[0]).toMatchObject({ y: expect.closeTo(0), nextSector: 1, lap: 0 })
+  expect(result.events.some(event => event.type === 'gate-crossed')).toBe(false)
+})
+
+it.each([false, true])('does not recover at an authored checkpoint beyond the pending gate (reversed: %s)', reversed => {
+  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed })
+  const count = closeArmsPath.points.length
+  const direction = reversed ? -1 : 1
+  const indexAt = (progress: number) => ((race.startPathIndex + direction * progress) % count + count) % count
+  const anchor = indexAt(Math.floor(count / 8))
+  const missed = indexAt(Math.ceil(count / 2))
+  const player = { ...required(race.vehicles[0]), pathIndex: anchor, nextSector: 1 as const, recoveryCheckpoint: missed }
+  const recovered = resetRaceVehicle(player, { ...race, recoveryCheckpoints: [missed] })
+  expect(recovered.pathIndex).toBe(anchor)
+  expect(recovered.nextSector).toBe(1)
+})
+
+it('clears the recovery anchor after sustained travel on a newly acquired arm', () => {
+  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const origin = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+  const destination = required(nearestPathPoint(closeArmsPath, { x: 440, y: 100 })).index
+  const player = { ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: origin }
+  const acquired = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
+    { steering: 0, throttle: 0, braking: true }, 1 / 60, random).state
+  expect(required(acquired.vehicles[0]).recoveryAnchorIndex).toBe(origin)
+  const farther = required(closeArmsPath.points[(destination + 16) % closeArmsPath.points.length])
+  const moving = { ...required(acquired.vehicles[0]), x: farther.x, y: farther.y, pathIndex: (destination + 16) % closeArmsPath.points.length }
+  const travelled = stepRace({ ...acquired, vehicles: [moving] },
+    { steering: 0, throttle: 0, braking: true }, 1 / 60, random).state
+  expect(required(travelled.vehicles[0]).recoveryAnchorIndex).toBeUndefined()
 })

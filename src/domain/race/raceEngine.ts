@@ -3,7 +3,7 @@ import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { getTrafficState } from '@/domain/race/ai/traffic'
 import { solveCollisionFrame } from '@/domain/race/collisions'
-import { authoredRecoveryTarget, reachedRecoveryCheckpoint, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
+import { authoredRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { hitScenery } from '@/domain/race/sceneryCollisions'
 import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
 import type {
@@ -97,11 +97,13 @@ export type RaceStep = (
   random: RandomSource,
 ) => RaceStepResult
 
+const PLAYER_ROUTE_WINDOW = 12
+
 function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previous?: VehicleStepContext) {
   // A car moves only a few samples per step. Keep the player on its current
   // road when a nearby return arm is closer; off-road reacquisition remains
   // available for closed circuits in getVehicleStepContext.
-  const radius = race.routeKind === 'point-to-point' || vehicle.player ? 12 : undefined
+  const radius = race.routeKind === 'point-to-point' || vehicle.player ? PLAYER_ROUTE_WINDOW : undefined
   return getVehicleStepContext(race.path, vehicle, previous, radius)
 }
 
@@ -111,6 +113,10 @@ export function resetRaceVehicle(
 ): RaceVehicle {
   const checkpoint = resetAtAuthoredCheckpoint(vehicle, race)
   if (checkpoint) return checkpoint
+  if (vehicle.player) {
+    const pathIndex = safeFallbackRecoveryTarget(race, vehicle)
+    return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex, reversed: race.reversed })
+  }
   if (race.routeKind !== 'point-to-point') {
     return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
   }
@@ -307,22 +313,39 @@ function advanceRace(
         (vehicle.y - context.nearest.point.y) * context.normal.y,
       currentSurface: context.surface,
       onCurb: context.onCurb,
-      pathDistance: context.nearest.point.distance,
       structureRunId: context.structureRunId,
       stuckDuration,
     }
+    // Physical support can reacquire a different arm after going off-road.
+    // A jump outside the local driving window cannot change circuit progress.
+    const indexDelta = Math.abs(vehicle.pathIndex - context.nearest.index)
+    const unrelatedArm = vehicle.player && state.path.closed &&
+      Math.min(indexDelta, state.path.points.length - indexDelta) > PLAYER_ROUTE_WINDOW
+    const progressIndex = unrelatedArm ? vehicle.pathIndex : context.nearest.index
+    const reacquiredDistance = vehicle.recoveryReacquiredIndex === undefined ? 0 : Math.abs(context.nearest.index - vehicle.recoveryReacquiredIndex)
+    const travelledOnNewArm = vehicle.recoveryReacquiredIndex !== undefined && context.onRoad &&
+      Math.min(reacquiredDistance, state.path.points.length - reacquiredDistance) > PLAYER_ROUTE_WINDOW
+    const recoveryAnchorIndex = travelledOnNewArm ? undefined :
+      vehicle.recoveryAnchorIndex ?? (unrelatedArm ? vehicle.pathIndex : undefined)
+    const recoveryReacquiredIndex = travelledOnNewArm ? undefined :
+      vehicle.recoveryReacquiredIndex ?? (unrelatedArm ? context.nearest.index : undefined)
     const usesCheckpoints = prepared.player && Boolean(state.recoveryCheckpoints?.length)
     const onRoadBefore = previous && (state.routeKind === 'point-to-point' || usesCheckpoints)
       ? raceVehicleContext(state, previous).onRoad : false
     let updated = state.routeKind === 'point-to-point' && previous
       ? updateOpenRouteProgress(
-          previous, prepared, state.path, context.nearest.index, elapsed,
+          previous, { ...prepared, pathDistance: context.nearest.point.distance }, state.path, context.nearest.index, elapsed,
           onRoadBefore, context.onRoad, ROAD_GEOMETRY.onRoadRadius,
         )
       : updateProgress(
-          prepared, context.nearest.index, state.path.points.length, elapsed,
+          { ...prepared, pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance },
+          progressIndex, state.path.points.length, elapsed,
           state.totalLaps, state.startPathIndex, state.reversed,
         )
+    if (vehicle.player && state.path.closed) {
+      updated = { ...updated, pathIndex: context.nearest.index, pathDistance: context.nearest.point.distance,
+        recoveryAnchorIndex, recoveryReacquiredIndex }
+    }
     if (usesCheckpoints && previous) {
       const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, onRoadBefore && context.onRoad)
       updated = { ...updated, recoveryCheckpoint: checkpoint }
@@ -332,8 +355,8 @@ function advanceRace(
       (context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
         (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated)))
     if (playerStuck || lostRival) {
-      const candidate = (state.routeKind === 'point-to-point' || usesCheckpoints) && previous
-        ? restoreFrameProgress(updated, previous)
+      const candidate = previous && (updated.player || state.routeKind === 'point-to-point')
+        ? restoreFrameProgress({ ...updated, pathIndex: previous.pathIndex }, previous)
         : updated
       const reset = resetRaceVehicle(candidate, state)
       if (reset !== candidate) {
@@ -384,9 +407,11 @@ function advanceRace(
       !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
       hitScenery(state.sceneryColliders, previous, vehicle)
     if (usesCheckpoints && (waterContact || vehicle.wrecked || sceneryHit)) {
-      const candidate = previous ? restoreFrameProgress(vehicle, previous) : vehicle
-      const reset = resetAtAuthoredCheckpoint(candidate, state)
-      if (reset) {
+      const candidate = previous
+        ? restoreFrameProgress({ ...vehicle, pathIndex: previous.pathIndex }, previous)
+        : vehicle
+      const reset = resetRaceVehicle(candidate, state)
+      if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: vehicle.id,
           reason: waterContact ? 'water' : vehicle.wrecked ? 'wreck' : 'scenery',
@@ -405,12 +430,16 @@ function advanceRace(
       return vehicle
     }
     const recoverySector = previous?.nextSector ?? vehicle.nextSector
-    const pathIndex = findNearestSafeTrackIndex(
-      state.path,
-      vehicle,
-      state.reversed,
-      state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector) : undefined,
-    )
+    const pathIndex = vehicle.player
+      ? safeFallbackRecoveryTarget(state, {
+          ...vehicle, pathIndex: previous?.pathIndex ?? vehicle.pathIndex, nextSector: recoverySector,
+        })
+      : findNearestSafeTrackIndex(
+          state.path,
+          vehicle,
+          state.reversed,
+          state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector) : undefined,
+        )
     events.push({
       type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
       x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
@@ -419,7 +448,7 @@ function advanceRace(
     const recovering = previous
       ? { ...restoreFrameProgress(vehicle, previous), waterRecoveryProtected: pathIndex === undefined }
       : vehicle
-    if (state.routeKind === 'point-to-point' && pathIndex === undefined) {
+    if (pathIndex === undefined && (vehicle.player || state.routeKind === 'point-to-point')) {
       return { ...recovering, vx: 0, vy: 0, speed: 0, yawRate: 0 }
     }
     return resetVehicleToTrack(recovering, state.path, {
