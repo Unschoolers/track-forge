@@ -32,7 +32,7 @@ interface RoadStructureSample {
 
 interface RoadStructureProfile {
   readonly runs: readonly RoadStructureRun[]
-  at(pathIndex: number, position?: Vector2): RoadStructureSample
+  at(pathIndex: number, segmentRatio?: number): RoadStructureSample
 }
 
 interface IndexRange {
@@ -146,31 +146,16 @@ function distanceIntoRun(
   path: RoadStructurePath,
   run: RoadStructureRun,
   pathIndex: number,
-  position?: Vector2,
+  segmentRatio: number,
 ): number {
-  const sample = path.points[pathIndex]
-  let distance =
-    (sample?.distance ?? run.startDistance) - run.startDistance
+  const startDistance = path.points[pathIndex]?.distance ?? run.startDistance
+  let distance = startDistance - run.startDistance
   if (run.wraps && pathIndex <= run.endIndex) {
     distance += path.totalLength
   }
-  const nextIndex = path.closed
-    ? (pathIndex + 1) % path.points.length
-    : pathIndex + 1
-  const next = path.points[nextIndex]
-  if (position && sample && next) {
-    const x = next.x - sample.x
-    const y = next.y - sample.y
-    const lengthSquared = x * x + y * y
-    if (lengthSquared > 0.000_001) {
-      const ratio = clamp(
-        ((position.x - sample.x) * x + (position.y - sample.y) * y) /
-          lengthSquared,
-        0,
-        1,
-      )
-      distance += Math.hypot(x, y) * ratio
-    }
+  if (segmentRatio > 0) {
+    const endDistance = path.points[pathIndex + 1]?.distance ?? path.totalLength
+    distance += (endDistance - startDistance) * segmentRatio
   }
   return clamp(distance, 0, run.length)
 }
@@ -181,13 +166,13 @@ export function buildRoadStructureProfile(
   const runs = deriveRuns(path)
   const sample = (
     pathIndex: number,
-    position?: Vector2,
+    segmentRatio = 0,
   ): RoadStructureSample => {
     if (path.points.length === 0) return { height: 0, runId: null }
     const index = sampleIndex(path, pathIndex)
     const run = runs.find((candidate) => contains(candidate, index))
     if (!run || run.length <= 0) return { height: 0, runId: null }
-    const along = distanceIntoRun(path, run, index, position)
+    const along = distanceIntoRun(path, run, index, segmentRatio)
     const ratio =
       run.rampLength <= 0
         ? 1
@@ -204,8 +189,8 @@ export function buildRoadStructureProfile(
   const samples = path.points.map((_, index) => sample(index))
   return {
     runs,
-    at(pathIndex: number, position?: Vector2): RoadStructureSample {
-      if (position) return sample(pathIndex, position)
+    at(pathIndex: number, segmentRatio = 0): RoadStructureSample {
+      if (segmentRatio > 0) return sample(pathIndex, segmentRatio)
       return samples[sampleIndex(path, pathIndex)] ?? {
         height: 0,
         runId: null,

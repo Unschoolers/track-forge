@@ -7,10 +7,12 @@ vi.mock('phaser', () => ({
     Scenes: { Events: { SHUTDOWN: 'shutdown' } },
   },
 }))
-vi.mock('@/phaser/rendering/bridgeRenderer', () => ({ getBridgeDeckOcclusion: () => () => false }))
+vi.mock('@/phaser/rendering/bridgeRenderer', () => ({
+  getBridgeDeckOcclusion: () => () => false, renderBridgeDeck: vi.fn(), renderBridgeSideWalls: vi.fn(),
+}))
 vi.mock('@/phaser/rendering/nightRenderer', () => ({ renderNightLights: vi.fn(), renderNightShade: vi.fn() }))
 vi.mock('@/phaser/rendering/trackRenderer', () => ({
-  renderRaceTrackGeometryBase: vi.fn(), renderTrackGeometryBridgeOverlay: vi.fn(), renderTrackGeometryStructureUnderlay: vi.fn(),
+  renderRaceTrackGeometryBase: vi.fn(), renderTrackGeometryStructureUnderlay: vi.fn(),
   renderRecoveryCheckpoints: vi.fn(),
 }))
 vi.mock('@/phaser/rendering/lampPostRenderer', () => ({ buildLampPosts: () => [], renderLampPosts: vi.fn() }))

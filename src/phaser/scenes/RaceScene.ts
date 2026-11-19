@@ -7,7 +7,6 @@ import {
 } from '@/phaser/rendering/nightRenderer'
 import {
   renderRaceTrackGeometryBase,
-  renderTrackGeometryBridgeOverlay,
   renderTrackGeometryStructureUnderlay,
   renderRecoveryCheckpoints,
 } from '@/phaser/rendering/trackRenderer'
@@ -44,6 +43,8 @@ import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
   getBridgeDeckOcclusion,
+  renderBridgeDeck,
+  renderBridgeSideWalls,
   type BridgeDeckOcclusion,
 } from '@/phaser/rendering/bridgeRenderer'
 import type { UpdateRoadRibbonVisibility } from '@/phaser/rendering/roadRibbonRenderer'
@@ -162,17 +163,8 @@ export class RaceScene extends Phaser.Scene {
       geometry,
       this.raceSession.snapshot().setup?.lighting === 'night',
     )
-    renderTrackGeometryBridgeOverlay(
-      bridgeGraphics,
-      geometry,
-      this.raceSession.snapshot().setup?.lighting === 'night',
-    )
-    renderTrackGeometryBridgeOverlay(
-      wallGraphics,
-      geometry,
-      this.raceSession.snapshot().setup?.lighting === 'night',
-      true,
-    )
+    renderBridgeDeck(bridgeGraphics, geometry, night, 'terrain', structureUnderlayGraphics)
+    renderBridgeSideWalls(wallGraphics, geometry, night)
     this.lamps = buildLampPosts(geometry)
     renderLampPosts(
       this.lampGraphics,

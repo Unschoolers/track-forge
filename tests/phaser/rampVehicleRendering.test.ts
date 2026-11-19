@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { asTrackId, type Track } from '@/domain/model'
+import { asTrackId, type Track, type Vector2 } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
-import { getBridgeDeckOcclusion } from '@/phaser/rendering/bridgeRenderer'
+import { buildBridgePresentation, getBridgeDeckOcclusion, renderBridgeDeck, type BridgePolygonPrimitive } from '@/phaser/rendering/bridgeRenderer'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
@@ -63,6 +63,44 @@ function required<T>(value: T | undefined): T {
 }
 
 describe('ramp vehicle rendering', () => {
+  it('draws both ramp entrances below ground-level cars and leaves the deck above them', () => {
+    const geometry = buildTrackGeometry(track)
+    const decks = buildBridgePresentation(geometry).filter(
+      (primitive): primitive is BridgePolygonPrimitive => primitive.kind === 'edge',
+    )
+    const approaches = decks.filter(({ deckHeights }) => Math.max(...deckHeights) <= 2)
+    const deck = required(decks.find(({ deckHeights }) => Math.min(...deckHeights) === 24))
+    expect(approaches.length).toBeGreaterThan(2)
+
+    function recordFills() {
+      const fills: Vector2[][] = []
+      let points: Vector2[] = []
+      const addPoint = (x: number, y: number) => points.push({ x, y })
+      return {
+        fills,
+        graphics: {
+          beginPath() { points = [] },
+          moveTo: addPoint,
+          lineTo: addPoint,
+          closePath() {},
+          fillPath() { fills.push(points) },
+          fillStyle() {},
+          lineStyle() {},
+          lineBetween() {},
+        },
+      }
+    }
+    const upper = recordFills()
+    const lower = recordFills()
+    renderBridgeDeck(upper.graphics as never, geometry, false, 'terrain', lower.graphics as never)
+    for (const approach of approaches) {
+      expect(lower.fills).toContainEqual(approach.polygon)
+      expect(upper.fills).not.toContainEqual(approach.polygon)
+    }
+    expect(upper.fills).toContainEqual(deck.polygon)
+    expect(lower.fills).not.toContainEqual(deck.polygon)
+  })
+
   it('retains a known ramp deck layer during a crossing lookup and slight suspension drop', () => {
     const path = buildRoadPath(track.points, track.terrain)
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })

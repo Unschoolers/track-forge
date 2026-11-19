@@ -205,9 +205,9 @@ describe('vehicle vertical dynamics', () => {
     )
 
     const simulate = (speed: number, reversed = false): boolean => {
-      let previousIndex = reversed ? path.points.length - 1 : 0
-      let previousHeight = path.roadSurface.at(previousIndex).height
-      let state = groundedAt(previousHeight)
+      const startIndex = reversed ? path.points.length - 1 : 0
+      let previousSurface = path.roadSurface.at(startIndex)
+      let state = groundedAt(previousSurface.height)
       let distance = reversed ? path.totalLength : 0
       for (
         ;
@@ -225,20 +225,14 @@ describe('vehicle vertical dynamics', () => {
             : path.points.length - 1
           : foundIndex
         if (index < 0) break
-        const height = path.roadSurface.at(index).height
+        const surface = path.roadSurface.at(index, { x: distance, y: 0 })
         state = stepVehicleVerticalDynamics(
           state,
           {
-            previousSurfaceHeight: previousHeight,
-            surfaceHeight: height,
-            previousGrade: gradeForTravel(
-              path.roadSurface.gradeAt(previousIndex),
-              reversed,
-            ),
-            grade: gradeForTravel(
-              path.roadSurface.gradeAt(index),
-              reversed,
-            ),
+            previousSurfaceHeight: previousSurface.height,
+            surfaceHeight: surface.height,
+            previousGrade: gradeForTravel(previousSurface.grade, reversed),
+            grade: gradeForTravel(surface.grade, reversed),
             longitudinalSpeed: speed,
             previousOverRoad: true,
             overRoad: true,
@@ -246,8 +240,7 @@ describe('vehicle vertical dynamics', () => {
           1 / 60,
         )
         if (!state.grounded) return true
-        previousIndex = index
-        previousHeight = height
+        previousSurface = surface
       }
       return false
     }

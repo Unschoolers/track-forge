@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { assert, describe, expect, it } from 'vitest'
 import { CAR_IDS } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
@@ -15,6 +15,35 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('driving onto a raised road', () => {
+  it.each([1, -1])('samples a continuous height and grade on the ramp (direction=%s)', (direction) => {
+    const samples = path.points
+    const entrance = samples.findIndex((_, index) =>
+      path.roadSurface.at(index).structureRunId !== null &&
+      path.roadSurface.at(index - direction).structureRunId === null,
+    )
+    expect(entrance).toBeGreaterThan(6)
+
+    for (let offset = -2; offset < 10; offset++) {
+      const index = entrance + offset * direction
+      const start = samples[index]
+      const end = samples[index + direction]
+      assert(start && end, 'Missing ramp samples')
+      const at = (ratio: number) => getVehicleStepContext(path, {
+        x: start.x + (end.x - start.x) * ratio,
+        y: 0,
+        z: path.roadSurface.at(index).height,
+        pathIndex: index,
+        grounded: true,
+      })
+      const before = at(0.49)
+      const after = at(0.51)
+      expect(before.nearest.index).not.toBe(after.nearest.index)
+      expect(after.surfaceHeight - before.surfaceHeight).toBeGreaterThanOrEqual(0)
+      expect(after.surfaceHeight - before.surfaceHeight).toBeLessThan(0.06)
+      expect(Math.abs(after.grade - before.grade)).toBeLessThan(0.004)
+    }
+  })
+
   for (const reversed of [false, true]) {
     for (const car of CAR_IDS) {
       it.each([1 / 120, 1 / 60, 1 / 30, 0.05])(
