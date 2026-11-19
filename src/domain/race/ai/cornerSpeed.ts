@@ -12,6 +12,57 @@ const SHARP_BEND_SAFETY_MAX = 0.9
 const BRAKE_LOOKAHEAD = [0, 6, 12, 20, 30, 42, 58, 78, 100]
 const BRAKE_TRACTION = VEHICLE_DYNAMICS_TUNING.forces.gravityAcceleration *
   VEHICLE_DYNAMICS_TUNING.forces.brakeGripUsage
+const PAVEMENT_PREVIEW = [0, 6, 12, 20, 30, 39, 48, 58]
+const RECENT_SURFACE_SAMPLES = [8, 18]
+const PAVEMENT_FULL_PACE_TURN = 0.23
+const PAVEMENT_BASE_PACE_TURN = 0.68
+const PAVEMENT_SWITCHBACK_TURN = 0.32
+const pavementPreviewByPath = new WeakMap<RoadPath, Map<number, number>>()
+
+/** Fraction of extra pavement pace a sweeping approach can support. */
+export function sweepingPavementAllowance(path: RoadPath, index: number, reversed: boolean): number {
+  let preview = pavementPreviewByPath.get(path)
+  if (!preview) {
+    preview = new Map()
+    pavementPreviewByPath.set(path, preview)
+  }
+  const key = reversed ? -index - 1 : index
+  const cached = preview.get(key)
+  if (cached !== undefined) return cached
+
+  const count = path.points.length
+  const direction = reversed ? -1 : 1
+  let paved = count > 0
+  let peakTurn = 0
+  let absoluteTurn = 0
+  let netTurn = 0
+  for (const offset of PAVEMENT_PREVIEW) {
+    const rawIndex = index + direction * offset
+    if (!path.closed && (rawIndex < 0 || rawIndex >= count)) break
+    const sample = path.points[((rawIndex % count) + count) % count]
+    if (sample?.surface !== 'street') {
+      paved = false
+      break
+    }
+    const turn = turnAmountAt(path, rawIndex, 6)
+    peakTurn = Math.max(peakTurn, Math.abs(turn))
+    absoluteTurn += Math.abs(turn)
+    netTurn += turn
+  }
+  // Keep a margin through surface transitions in either travel direction.
+  for (const offset of RECENT_SURFACE_SAMPLES) {
+    const rawIndex = index - direction * offset
+    if (!path.closed && (rawIndex < 0 || rawIndex >= count)) break
+    if (path.points[((rawIndex % count) + count) % count]?.surface !== 'street') paved = false
+  }
+  const sweep = 1 - clamp((peakTurn - PAVEMENT_FULL_PACE_TURN) /
+    (PAVEMENT_BASE_PACE_TURN - PAVEMENT_FULL_PACE_TURN), 0, 1)
+  // Signed turn cancels through a switchback even though both bends need grip.
+  const directionChanges = absoluteTurn - Math.abs(netTurn)
+  const allowance = paved ? sweep * (1 - clamp(directionChanges / PAVEMENT_SWITCHBACK_TURN, 0, 1)) : 0
+  preview.set(key, allowance)
+  return allowance
+}
 
 /**
  * Predict a safe entry speed through the next bends. For every sampled apex,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { CAR_SPECS } from '@/domain/config'
-import { safeEntrySpeedAhead } from '@/domain/race/ai/cornerSpeed'
+import { safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 
 const path = buildRoadPath([
   { x: 0, y: 0, surface: 'street', curve: 'corner' },
@@ -13,6 +13,31 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('AI approach speed planning', () => {
+  it('allows more pace on open pavement and backs off for sharp corners', () => {
+    const straight = path.points.findIndex((point) => point.distance > 80)
+    const approach = path.points.findIndex((point) => point.distance > 460)
+    expect(sweepingPavementAllowance(path, straight, false)).toBe(1)
+    expect(sweepingPavementAllowance(path, approach, false)).toBe(0)
+    expect(sweepingPavementAllowance(path, straight, true)).toBe(0)
+  })
+
+  it('backs off at loose-surface transitions in both directions', () => {
+    const straight = buildRoadPath([
+      { x: 0, y: 0, surface: 'street' },
+      { x: 1400, y: 0, surface: 'street' },
+    ], EMPTY_TERRAIN, undefined, 'point-to-point')
+    const index = straight.points.findIndex((point) => point.distance > 700)
+    const mixed = {
+      ...straight,
+      points: straight.points.map((point, i) => i === index + 18 || i === index - 18
+        ? { ...point, surface: 'dirt' as const } : point),
+    }
+    expect(sweepingPavementAllowance(straight, index, false)).toBe(1)
+    expect(sweepingPavementAllowance(straight, index, true)).toBe(1)
+    expect(sweepingPavementAllowance(mixed, index, false)).toBe(0)
+    expect(sweepingPavementAllowance(mixed, index, true)).toBe(0)
+  })
+
   it('slows for a bend ahead instead of waiting for the target to enter the corner', () => {
     const straight = path.points.findIndex((point) => point.distance > 80 && point.distance < 120)
     const approach = path.points.findIndex((point) => point.distance > 355 && point.distance < 365)
