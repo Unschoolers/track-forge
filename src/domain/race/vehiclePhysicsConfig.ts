@@ -309,7 +309,7 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
 export const VERTICAL_DYNAMICS = {
   maximumDeltaSeconds: 0.05,
   maximumGrade: 0.6,
-  gravity: 160,
+  gravity: 200,
   suspensionTravel: 0.85,
   suspensionResponse: 15,
   takeoffVelocityThreshold: 9.5,

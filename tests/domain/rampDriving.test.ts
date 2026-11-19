@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { assert, describe, expect, it } from 'vitest'
 import { CAR_IDS } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
@@ -6,6 +7,9 @@ import type { RaceState } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
+import { decodeTrack } from '@/domain/track/trackCodec'
+import { buildTrackGeometry } from '@/domain/track/trackGeometry'
+import { requireFixture } from '../fixtures/requireFixture'
 
 const path = buildRoadPath([
   { x: -600, y: 0, surface: 'street', curve: 'corner' },
@@ -15,6 +19,69 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('driving onto a raised road', () => {
+  it.each([false, true])('climbs the Figure-eight ramp before a single real jump (reverse=%s)', (reversed) => {
+    const raw = JSON.parse(readFileSync('tests/fixtures/figureEight.trackforge.json', 'utf8'))
+    const { path } = buildTrackGeometry(requireFixture(decodeTrack(raw, 1)))
+    const direction = reversed ? -1 : 1
+    const entrance = path.points.findIndex((_, index) =>
+      path.roadSurface.at(index).structureRunId !== null &&
+      path.roadSurface.at(index - direction).structureRunId === null,
+    )
+    const startIndex = entrance - 12 * direction
+    const start = requireFixture(path.points[startIndex])
+    const next = requireFixture(path.points[startIndex + direction])
+    const angle = Math.atan2(next.y - start.y, next.x - start.x)
+    const speed = 190
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, reversed, handling: 'arcade' })
+    let race: RaceState = {
+      ...base,
+      phase: 'running',
+      vehicles: [{
+        ...requireFixture(base.vehicles[0]),
+        x: start.x,
+        y: start.y,
+        z: path.roadSurface.at(startIndex).height,
+        pathIndex: startIndex,
+        angle,
+        speed,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        grounded: true,
+        structureRunId: null,
+      }],
+    }
+    let launches = 0
+    let landings = 0
+    let airborneFrames = 0
+    let reachedDeck = false
+    for (let frame = 0; frame < 110; frame++) {
+      const car = requireFixture(race.vehicles[0])
+      const target = requireFixture(path.points[car.pathIndex + 7 * direction])
+      const error = Math.atan2(target.y - car.y, target.x - car.x) - car.angle
+      const steering = Math.max(-1, Math.min(1, Math.atan2(Math.sin(error), Math.cos(error)) * 4))
+      const step = stepRace(race, { steering, throttle: 0.8, braking: false }, 1 / 60, { next: () => 0.5 })
+      race = step.state
+      const updated = requireFixture(race.vehicles[0])
+      const surface = path.roadSurface.at(updated.pathIndex, updated)
+      if (!updated.grounded) {
+        airborneFrames++
+        if (car.grounded) {
+          launches++
+          expect(updated.z).toBeGreaterThan(surface.height + 0.01)
+        }
+      }
+      landings += step.events.filter(({ type }) => type === 'vehicle-landed').length
+      if ((updated.pathIndex - entrance) * direction > 42) {
+        reachedDeck = true
+        break
+      }
+    }
+    expect(reachedDeck).toBe(true)
+    expect(launches).toBe(1)
+    expect(airborneFrames).toBeGreaterThan(5)
+    expect(landings).toBe(1)
+  })
+
   it.each([1, -1])('samples a continuous height and grade on the ramp (direction=%s)', (direction) => {
     const samples = path.points
     const entrance = samples.findIndex((_, index) =>

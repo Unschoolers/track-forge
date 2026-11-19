@@ -135,16 +135,21 @@ export function stepVehicleVerticalDynamics(
   )
   const launchVelocity = Math.min(
     VERTICAL_DYNAMICS.maximumLaunchVelocity,
-    carriedVelocity * crestStrength,
+    carriedVelocity,
   )
+  const nextLaunchVelocity = launchVelocity - VERTICAL_DYNAMICS.gravity * dt
+  const launchHeight = z + (launchVelocity + nextLaunchVelocity) * 0.5 * dt
   if (
     environment.allowTakeoff !== false &&
     environment.overRoad &&
-    launchVelocity >= VERTICAL_DYNAMICS.takeoffVelocityThreshold
+    carriedVelocity * crestStrength >= VERTICAL_DYNAMICS.takeoffVelocityThreshold &&
+    // The carried momentum must lift the chassis clear of the rising road.
+    nextLaunchVelocity > surfaceVelocity &&
+    launchHeight > surfaceHeight + SUPPORT_HEIGHT_EPSILON
   ) {
     return {
-      z: Math.max(surfaceHeight, z + launchVelocity * dt),
-      verticalVelocity: launchVelocity,
+      z: launchHeight,
+      verticalVelocity: nextLaunchVelocity,
       grounded: false,
       suspensionCompression: Math.min(
         0,
