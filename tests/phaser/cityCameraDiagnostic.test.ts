@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { expect, it } from 'vitest'
+import { assert, expect, it } from 'vitest'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
@@ -18,9 +18,39 @@ function contains(point: { x: number; y: number }, polygon: readonly { x: number
   return inside
 }
 
-it('marks the player through City Harbor decks without marking supported ramp traffic', () => {
+function cityHarborGeometry() {
   const raw = JSON.parse(readFileSync('tests/fixtures/cityHarbor.trackforge.json', 'utf8'))
-  const geometry = buildTrackGeometry(decodeTrack(raw.track, 1)!)
+  return buildTrackGeometry(decodeTrack(raw.track, 1)!)
+}
+
+it('keeps the road height and grade continuous at each City Harbor ramp entrance', () => {
+  const { path } = cityHarborGeometry()
+  const { points, roadSurface } = path
+  let approachCount = 0
+  for (const direction of [1, -1]) {
+    for (let index = 0; index < points.length; index++) {
+      if (roadSurface.at(index).structureRunId === null ||
+          roadSurface.at(index - direction).structureRunId !== null) continue
+      approachCount++
+      for (let offset = -2; offset <= 9; offset++) {
+        const first = (index + offset * direction + points.length) % points.length
+        const second = (first + direction + points.length) % points.length
+        const start = points[first]
+        const end = points[second]
+        assert(start && end, 'Missing City Harbor ramp samples')
+        const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+        const before = roadSurface.at(first, midpoint)
+        const after = roadSurface.at(second, midpoint)
+        expect(after.height).toBeCloseTo(before.height, 6)
+        expect(after.grade).toBeCloseTo(before.grade, 6)
+      }
+    }
+  }
+  expect(approachCount).toBe(4)
+})
+
+it('marks the player through City Harbor decks without marking supported ramp traffic', () => {
+  const geometry = cityHarborGeometry()
   const path = geometry.path
   const presentation = buildBridgePresentation(geometry)
   const decks = presentation.filter((primitive): primitive is BridgePolygonPrimitive => primitive.kind === 'edge')

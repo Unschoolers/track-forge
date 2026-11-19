@@ -28,6 +28,7 @@ interface BridgePrimitiveBase {
   readonly projectedDistance: number
   readonly deckHeight: number
   readonly terrainHeight: number
+  readonly rampApproach?: boolean
 }
 
 export interface BridgePolygonPrimitive extends BridgePrimitiveBase {
@@ -186,6 +187,10 @@ export function* prepareBridgePresentation(
     const nextHeight = nextRoad.structureHeight
     const visibleHeight = Math.max(currentHeight, nextHeight)
     if (visibleHeight <= 0.005) continue
+    const wallClearance = ROAD_GEOMETRY.bridgeWallClearance * WORLD_ELEVATION.levelHeight
+    // The nose of a car overlaps the ramp before its center reaches the
+    // deck layer. Treat these shallow strips as part of the ground road.
+    const rampApproach = Math.min(currentHeight, nextHeight) < wallClearance
 
     const currentLeftRoad = path.roadSurface.at(index, current.edgeLeft)
     const currentRightRoad = path.roadSurface.at(index, current.edgeRight)
@@ -298,6 +303,7 @@ export function* prepareBridgePresentation(
     const nextFaceGround = shadowOnLeft ? nextLeftShadow : nextRightShadow
     sideFaces.push({
       kind: 'side-face',
+      rampApproach,
       ...elevationBase(
         current.surface,
         currentFaceRoad.height,
@@ -323,6 +329,7 @@ export function* prepareBridgePresentation(
     })
     const deck: BridgePolygonPrimitive = {
       kind: 'edge',
+      rampApproach,
       ...elevationBase(
         current.surface,
         currentRoad.height,
@@ -341,11 +348,12 @@ export function* prepareBridgePresentation(
         nextRoad.terrainHeight,
       ],
     }
-    if (shadowMode === 'terrain') indexBridgeDeck(deckCells, deck)
+    if (shadowMode === 'terrain' && !rampApproach) indexBridgeDeck(deckCells, deck)
     decks.push(
       deck,
       {
         kind: 'surface',
+        rampApproach,
         ...elevationBase(
           current.surface,
           currentRoad.height,
@@ -368,6 +376,7 @@ export function* prepareBridgePresentation(
     if (index % 3 === 0) {
       markings.push({
         kind: 'marking',
+        rampApproach,
         ...elevationBase(
           current.surface,
           currentRoad.height,
@@ -378,12 +387,7 @@ export function* prepareBridgePresentation(
         end: next.center,
       })
     }
-    if (
-      currentHeight >=
-        ROAD_GEOMETRY.bridgeWallClearance * WORLD_ELEVATION.levelHeight &&
-      nextHeight >=
-        ROAD_GEOMETRY.bridgeWallClearance * WORLD_ELEVATION.levelHeight
-    ) {
+    if (!rampApproach) {
       walls.push(
         {
           kind: 'wall',
@@ -509,12 +513,14 @@ export function renderBridgeUnderlay(
 }
 
 export function renderBridgeDeck(
-  graphics: Phaser.GameObjects.Graphics,
+  deckGraphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night: boolean,
   shadowMode: TrackShadowMode = 'terrain',
+  rampApproachGraphics = deckGraphics,
 ): void {
   for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
+    const graphics = primitive.rampApproach ? rampApproachGraphics : deckGraphics
     const spec = SURFACE_SPECS[primitive.surface]
     if (primitive.kind === 'edge') {
       fill(

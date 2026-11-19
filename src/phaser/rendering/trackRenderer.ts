@@ -169,19 +169,6 @@ export function renderTrackGeometryStructureUnderlay(
   renderBridgeUnderlay(graphics, geometry, night)
 }
 
-export function renderTrackGeometryBridgeOverlay(
-  graphics: Phaser.GameObjects.Graphics,
-  geometry: TrackGeometry,
-  night: boolean,
-  walls = false,
-): void {
-  if (walls) {
-    renderBridgeSideWalls(graphics, geometry, night)
-  } else {
-    renderBridgeDeck(graphics, geometry, night)
-  }
-}
-
 function renderTrackGeometryMarkings(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
