@@ -22,7 +22,7 @@ export class HapticsAdapter implements FeedbackPort {
   handle(event: FeedbackEvent): void {
     if (!this.enabled || !this.vibrate) return
     if (event.type === 'collision') this.vibrate([35, 20, 45])
-    else if (event.type === 'landing') this.vibrate([10, 20, 12])
+    else if (event.type === 'landing') this.vibrate(Math.round(12 + 28 * event.strength))
     else if (event.type === 'curb') this.vibrate([12])
     else if (event.type === 'finish') this.vibrate([30, 35, 30, 35, 80])
     else if (event.type === 'ui') {

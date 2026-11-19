@@ -275,6 +275,7 @@ export class RaceSession implements RaceSessionPort {
     let state = this.current.state
     if (!state || state.paused || state.phase === 'finished' || this.destroyed ||
         !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return
+    const previouslyMissedGate = state.missedCheckpoint?.gate
 
     let runningTime = deltaSeconds
     let countdownChanged = false
@@ -321,6 +322,10 @@ export class RaceSession implements RaceSessionPort {
       stepped = true
     }
     if (!stepped && !countdownChanged) return
+    if (state.phase === 'running' && state.missedCheckpoint &&
+        state.missedCheckpoint.gate !== previouslyMissedGate) {
+      this.dependencies.feedback.handle({ type: 'ui', emphasis: 'danger' })
+    }
     if (stepped) state = { ...state, cameraHints: { ...state.cameraHints, shake: peakShake } }
     if (state.phase === 'finished') this.remainder = 0
     const terminalEvent = events.find((event) => event.type === 'race-finished')
@@ -394,7 +399,8 @@ export class RaceSession implements RaceSessionPort {
       telemetry: {
         routeKind: normalizeRouteKind(track?.routeKind),
         routeProgress: player ? Math.max(0, Math.min(1, raceProgress(player, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind)) / Math.max(1, state.path.points.length - 1))) : 0,
-        ...(player && state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player)
+        ...(player && state.handling === 'simulation' &&
+          state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player)
           ? { missedCheckpoint: player.nextSector } : {}),
         ...(latestSplit ? { latestSplit } : {}),
         phase: state.phase,

@@ -265,6 +265,16 @@ describe('race simulation', () => {
 
     expect(stepped.state.cameraHints.shake).toBeGreaterThan(0)
     expect(stepped.state.cameraHints.shake).toBeLessThanOrEqual(6)
+    const burst = stepped.state.effects.particles.filter(({ kind }) => kind === 'landing-dust')
+    expect(burst).toHaveLength(4)
+    const next = stepRace(
+      stepped.state,
+      { steering: 0, throttle: 0, braking: false },
+      1 / 60,
+      { next: () => 0.5 },
+    )
+    expect(next.events.some(({ type }) => type === 'vehicle-landed')).toBe(false)
+    expect(next.state.effects.particles.filter(({ kind }) => kind === 'landing-dust')).toHaveLength(4)
   })
 
   it('ranks finishers first and preserves grid order through ties', () => {

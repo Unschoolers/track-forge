@@ -204,14 +204,15 @@ export function projectVehicleShadow(
 function tracePolygon(
   graphics: Phaser.GameObjects.Graphics,
   points: readonly Vector2[],
+  offsetX = 0,
 ): void {
   const first = points[0]
   if (!first) return
   graphics.beginPath()
-  graphics.moveTo(first.x, first.y)
+  graphics.moveTo(first.x + offsetX, first.y)
   for (let index = 1; index < points.length; index += 1) {
     const point = points[index]
-    if (point) graphics.lineTo(point.x, point.y)
+    if (point) graphics.lineTo(point.x + offsetX, point.y)
   }
   graphics.closePath()
 }
@@ -219,8 +220,9 @@ function tracePolygon(
 function fillPolygon(
   graphics: Phaser.GameObjects.Graphics,
   points: readonly Vector2[],
+  offsetX = 0,
 ): void {
-  tracePolygon(graphics, points)
+  tracePolygon(graphics, points, offsetX)
   graphics.fillPath()
 }
 
@@ -230,20 +232,34 @@ function hexColor(value: string): number {
 
 export function renderVehicles(
   graphics: Phaser.GameObjects.Graphics,
-  vehicles: readonly Pick<RaceVehicle, 'car' | 'x' | 'y' | 'angle' | 'wrecked' | 'braking'>[],
+  vehicles: readonly RaceVehicle[],
+  path: RoadPath,
 ): void {
   for (const vehicle of vehicles) {
     const geometry = getVehicleGeometry(vehicle.car)
+    const compression = Math.max(0, vehicle.suspensionCompression)
+    const impact = vehicle.landingIntensity
+    const clearance = vehicle.grounded ? 0 : Math.max(
+      0, vehicle.z - path.roadSurface.at(vehicle.pathIndex, vehicle).height,
+    )
+    // From above, pitch shortens the silhouette and shifts the roof toward
+    // the raised axle. A falling car visibly noses down before touchdown.
+    const pitch = vehicle.grounded ? -impact : Math.max(-1, Math.min(1, vehicle.verticalVelocity / 35))
+    const lift = Math.min(0.11, clearance * 0.012)
     graphics.save()
     graphics.translateCanvas(vehicle.x, vehicle.y)
     graphics.rotateCanvas(vehicle.angle)
+    graphics.scaleCanvas(
+      1 + lift - 0.12 * Math.abs(pitch),
+      1 + lift + 0.1 * Math.max(impact * 0.55, compression),
+    )
     graphics.fillStyle(
       hexColor(CAR_SPECS[vehicle.car].color),
       vehicle.wrecked ? 0.55 : 1,
     )
     fillPolygon(graphics, geometry.body)
     graphics.fillStyle(0x18212c, 0.9)
-    fillPolygon(graphics, geometry.cabin)
+    fillPolygon(graphics, geometry.cabin, pitch * 3.5)
     graphics.fillStyle(0xeaf7ff, 0.95)
     for (const lamp of geometry.headlights) {
       graphics.fillCircle(lamp.x, lamp.y, 1.7)

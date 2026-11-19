@@ -77,7 +77,8 @@ export function stepVehicleVerticalDynamics(
       z >= previousSurfaceHeight - SUPPORT_HEIGHT_EPSILON
     if ((nextVerticalVelocity <= 0 || risingRoadContact) && nextZ <= surfaceHeight) {
       const impact = clamp(
-        -nextVerticalVelocity * VERTICAL_DYNAMICS.landingVelocityScale,
+        (speed * Math.sin(grade) - nextVerticalVelocity) *
+          VERTICAL_DYNAMICS.landingVelocityScale,
         0,
         1,
       )

@@ -15,6 +15,7 @@ export interface ToneSink {
     volume: number,
     type: OscillatorType,
   ): void
+  playLanding(strength: number): void
   setEngine(
     car: CarId,
     speedRatio: number,
@@ -199,6 +200,39 @@ export class BrowserToneSink implements ToneSink {
     oscillator.connect(gain).connect(output)
     oscillator.start()
     oscillator.stop(context.currentTime + duration)
+  }
+
+  playLanding(strength: number): void {
+    const context = this.context
+    const output = this.output
+    const buffer = this.road?.buffer
+    if (!context || !output || !buffer) return
+    const force = Math.min(1, Math.max(0, strength))
+    const now = context.currentTime
+    const end = now + 0.16
+    const body = context.createOscillator()
+    const bodyGain = context.createGain()
+    body.type = 'triangle'
+    body.frequency.setValueAtTime(138 + 40 * force, now)
+    body.frequency.exponentialRampToValueAtTime(67, now + 0.08)
+    bodyGain.gain.setValueAtTime(0.001, now)
+    bodyGain.gain.linearRampToValueAtTime(0.05 + 0.20 * force, now + 0.006)
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, end)
+    body.connect(bodyGain).connect(output)
+    body.start(now)
+    body.stop(end)
+
+    const tire = context.createBufferSource()
+    tire.buffer = buffer
+    const filter = context.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 680
+    filter.Q.value = 0.8
+    const tireGain = context.createGain()
+    tireGain.gain.setValueAtTime(0.04 + 0.24 * force, now)
+    tireGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07)
+    tire.connect(filter).connect(tireGain).connect(output)
+    tire.start(now, 0, 0.075)
   }
 
   setEngine(
@@ -391,7 +425,7 @@ export class WebAudioAdapter implements FeedbackPort {
     } else if (event.type === 'rival') {
       this.sink.setRival?.(event.proximity, event.pan, event.speedRatio)
     } else if (event.type === 'landing') {
-      this.sink.play(75, 0.1, Math.min(0.08, event.strength * 0.05), 'triangle')
+      this.sink.playLanding(event.strength)
     } else if (event.type === 'collision') {
       this.sink.play(
         90,
