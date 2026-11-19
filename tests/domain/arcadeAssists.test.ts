@@ -163,6 +163,22 @@ it.each(['arcade', 'simulation'] as const)('preserves AI approach speeds on a st
   }
 })
 
+it('lets Hard Arcade AI carry speed onto a straight ramp without extra engine power', () => {
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, handling: 'arcade' })
+  const start = required(nearestPathPoint(path, { x: -200, y: 0 })).index
+  const rival = required(base.vehicles[1])
+  let race: RaceState = {
+    ...base,
+    phase: 'running',
+    vehicles: [placeOnRoad(path, rival, start, 220, false)],
+  }
+  for (let frame = 0; frame < 180 && required(race.vehicles[0]).x < 20; frame += 1) {
+    race = stepRace(race, input, 1 / 60, random).state
+  }
+  expect(required(race.vehicles[0]).x).toBeGreaterThan(0)
+  expect(required(race.vehicles[0]).speed).toBeGreaterThan(180)
+})
+
 const climbingBend = buildRoadPath([
   { x: -1200, y: 0, surface: 'street' },
   { x: -250, y: 0, surface: 'street' },

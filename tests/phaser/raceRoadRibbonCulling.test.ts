@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import { describe, expect, it, vi } from 'vitest'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
+import { boundsVisible } from '@/phaser/rendering/roadRibbonRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
   renderRaceTrackGeometryBase,
@@ -130,6 +131,42 @@ describe('race road ribbon culling', () => {
     expect(ribbon.filter(({ visible }) => visible)).toEqual(firstBatches)
     update({ ...view, zoom: Number.NaN })
     expect(ribbon.every(({ visible }) => visible)).toBe(true)
+  })
+
+  it('culls distant markings and restores them when the camera moves', () => {
+    const { scene, graphics } = createRecordingScene()
+    const update = renderRaceTrackGeometryBase(scene, lineGeometry(5000), false)
+    if (!update) throw new Error('Expected batched road markings')
+    const strokes = (objects: readonly RecordingGraphics[]) => objects.reduce(
+      (sum, object) => sum + object.paints.filter(([kind]) => kind === 'stroke').length, 0,
+    )
+    const view = { centerX: -3500, centerY: -240, width: 844, height: 390, zoom: 1, rotation: 0 }
+    const total = strokes(graphics)
+    update(view)
+    const first = graphics.filter(({ visible }) => visible)
+    expect(strokes(first)).toBeLessThan(total / 2)
+    update({ ...view, centerX: 3500 })
+    expect(strokes(graphics.filter(({ visible }) => visible))).toBeLessThan(total / 2)
+    update({ ...view, zoom: Number.NaN })
+    expect(strokes(graphics.filter(({ visible }) => visible))).toBe(total)
+  })
+
+  it('keeps batches visible when either set of bounds is invalid', () => {
+    const viewport = { left: 0, top: 0, right: 10, bottom: 10 }
+    expect(boundsVisible({ left: Number.NaN, top: 20, right: 30, bottom: 30 }, viewport)).toBe(true)
+    expect(boundsVisible({ left: 30, top: 20, right: 20, bottom: 30 }, viewport)).toBe(true)
+    expect(boundsVisible({ left: 20, top: 20, right: 30, bottom: 30 }, viewport)).toBe(false)
+  })
+
+  it('limits marking batches on very long roads', () => {
+    const { scene, graphics } = createRecordingScene()
+    const source = lineGeometry(2400)
+    const points = Array.from({ length: 40 }, () => source.path.points).flat()
+    const ribbon = Array.from({ length: 40 }, () => source.ribbon).flat()
+    const geometry = { ...source, path: { ...source.path, points }, ribbon }
+    expect(renderRaceTrackGeometryBase(scene, geometry, false)).toBeDefined()
+    // At most 64 edge, 64 road, 64 curb and 64 stripe batches, plus markers.
+    expect(graphics.length).toBeLessThanOrEqual(257)
   })
 
   it('uses the rotated, resized camera bounds', () => {

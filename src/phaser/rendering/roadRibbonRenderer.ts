@@ -93,10 +93,17 @@ export function renderRoadRibbon(
   renderRoadRibbonPass(graphics, quads, 'road', night)
 }
 
-function validBounds({ left, top, right, bottom }: WorldBounds): boolean {
+export function validBounds({ left, top, right, bottom }: WorldBounds): boolean {
   return Number.isFinite(left) && Number.isFinite(top) &&
     Number.isFinite(right) && Number.isFinite(bottom) &&
     left <= right && top <= bottom
+}
+
+export function boundsVisible(bounds: WorldBounds | undefined, viewport: WorldBounds): boolean {
+  return !validBounds(viewport) || !bounds || !validBounds(bounds) || (
+    bounds.left <= viewport.right && bounds.right >= viewport.left &&
+    bounds.top <= viewport.bottom && bounds.bottom >= viewport.top
+  )
 }
 
 function ribbonChunkBounds(quads: readonly RoadRibbonQuad[]): WorldBounds {
@@ -144,12 +151,8 @@ export function renderRaceRoadRibbon(
 
   return (view) => {
     const viewport = groundViewportBounds(view)
-    const valid = validBounds(viewport)
     for (const { bounds, edge, road } of chunks) {
-      const visible = !valid || !bounds || (
-        bounds.left <= viewport.right && bounds.right >= viewport.left &&
-        bounds.top <= viewport.bottom && bounds.bottom >= viewport.top
-      )
+      const visible = boundsVisible(bounds, viewport)
       if (edge.visible === visible) continue
       edge.setVisible(visible)
       road.setVisible(visible)
