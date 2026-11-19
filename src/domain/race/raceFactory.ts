@@ -1,3 +1,4 @@
+import { EMILE_COURSE } from '@/domain/race/ai/emileRematch'
 import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
 import { DIFFICULTY_SPECS, ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -9,6 +10,7 @@ import { createRaceEffectsState } from '@/domain/race/effects'
 import type { Vector2 } from '@/domain/model'
 
 export interface CreateRaceOptions {
+  readonly courseIdentity?: string | undefined
   readonly path: RoadPath
   readonly routeKind?: RouteKind
   readonly recoveryCheckpoints?: readonly number[] | undefined
@@ -118,6 +120,9 @@ export function createRace(options: CreateRaceOptions): RaceState {
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
       : CAR_IDS.filter((car) => car !== options.playerCar)
 
+  const rematch = options.courseIdentity === EMILE_COURSE && options.playerCar === 'blue' &&
+    options.difficulty === 'hard' && options.handling === 'arcade' && !options.reversed &&
+    options.routeKind !== 'point-to-point'
   const open = options.routeKind === 'point-to-point'
   const startDistance =
     options.path.totalLength *
@@ -150,6 +155,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
       id: index === 0 ? 'player' : `ai-${index}`,
       car: index === 0 ? options.playerCar : (aiCars[index - 1] ?? 'blue'),
       player: index === 0,
+      ...(rematch && index === 1 ? { emileRematch: true as const } : {}),
       ...position,
       angle: Math.atan2(placement.tangent.y, placement.tangent.x),
       vx: 0,

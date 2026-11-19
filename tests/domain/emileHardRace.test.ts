@@ -1,3 +1,4 @@
+import { courseIdentity } from '@/application/race/raceRecords'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodeTrackInput } from '../../qa/lanes/scenarios'
@@ -20,6 +21,7 @@ const ghostSeconds = 31.633
 
 function raceSeed(seed: number) {
 	let race = createRace({
+		courseIdentity: courseIdentity(track),
 		path,
 		routeKind: normalizeRouteKind(track.routeKind),
 		recoveryCheckpoints: track.recoveryCheckpoints,
@@ -81,7 +83,7 @@ describe('Émile hard arcade race', () => {
 				expect(vehicle.finishedAt).toBeLessThan(ghostSeconds + 3)
 			}
 			// The mirror rival uses the same Blue car as the recorded ghost.
-			expect(opponents[0]?.finishedAt).toBeLessThan(ghostSeconds + 1.5)
+			expect(opponents[0]?.finishedAt).toBeLessThan(30.616)
 		},
 		30000,
 	)

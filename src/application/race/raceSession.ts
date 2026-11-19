@@ -1,5 +1,5 @@
 import { normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
-import { raceCategory, sameCategory } from '@/application/race/raceRecords'
+import { courseIdentity, raceCategory, sameCategory } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
 import type {
@@ -194,6 +194,8 @@ export class RaceSession implements RaceSessionPort {
       ? this.bestGhost.splits : undefined)
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
+      courseIdentity: resolved.mode === 'normal' && setup.car === 'blue' &&
+        setup.difficulty === 'hard' && setup.handling === 'arcade' ? courseIdentity(track) : undefined,
       path: this.geometry.get(track).path,
       playerCar: setup.car,
       difficulty: setup.difficulty,
