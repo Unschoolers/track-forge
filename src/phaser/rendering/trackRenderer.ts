@@ -4,12 +4,17 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import {
+  boundsVisible,
   renderRaceRoadRibbon,
   renderRoadRibbon,
   type UpdateRoadRibbonVisibility,
 } from '@/phaser/rendering/roadRibbonRenderer'
+import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
+import type { Vector2 } from '@/domain/model'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
+  buildCurbSegments,
+  renderCurbSegments,
   renderCurbs,
   renderStartGridPreview,
   renderStartLine,
@@ -92,10 +97,68 @@ export function renderRaceTrackGeometryBase(
   night: boolean,
 ): UpdateRoadRibbonVisibility | undefined {
   const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night)
+  if (!updateVisibility) {
+    const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
+    renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night)
+    renderTrackGeometryMarkings(graphics, geometry, night)
+    return undefined
+  }
+
+  // Keep the original paint order (all curbs, then stripes, then markers),
+  // while allowing Phaser to skip off-screen marking commands each frame.
+  const batches: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  const addBatch = <T>(
+    items: readonly T[],
+    endpoints: (item: T) => readonly [Vector2, Vector2],
+    paint: (graphics: Phaser.GameObjects.Graphics) => void,
+  ) => {
+    const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
+    paint(graphics)
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity
+    for (const item of items) {
+      for (const point of endpoints(item)) {
+        left = Math.min(left, point.x)
+        top = Math.min(top, point.y)
+        right = Math.max(right, point.x)
+        bottom = Math.max(bottom, point.y)
+      }
+    }
+    batches.push({ graphics, bounds: {
+      left: left - 8, top: top - 8, right: right + 8, bottom: bottom + 8,
+    } })
+  }
+  const batchSize = (count: number) => Math.max(128, Math.ceil(count / 64))
+  const curbs = buildCurbSegments(geometry.path)
+  const curbBatchSize = batchSize(curbs.length)
+  for (let i = 0; i < curbs.length; i += curbBatchSize) {
+    const batch = curbs.slice(i, i + curbBatchSize)
+    addBatch(batch, curb => [curb.start, curb.end], graphics => renderCurbSegments(graphics, batch, night))
+  }
+  const { path } = geometry
+  const count = path.closed ? path.points.length : path.points.length - 1
+  const stripes = []
+  for (let index = 0; index < count; index += 3) {
+    const previous = path.points[index]
+    const current = path.points[(index + 1) % path.points.length]
+    if (previous && current) stripes.push({ previous, current })
+  }
+  const stripeBatchSize = batchSize(stripes.length)
+  for (let i = 0; i < stripes.length; i += stripeBatchSize) {
+    const batch = stripes.slice(i, i + stripeBatchSize)
+    addBatch(batch, stripe => [stripe.previous, stripe.current], graphics => {
+      for (const { previous, current } of batch) renderStripe(graphics, previous, current, night)
+    })
+  }
   const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-  if (!updateVisibility) renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night)
-  renderTrackGeometryMarkings(graphics, geometry, night)
-  return updateVisibility
+  renderTrackMarkers(graphics, geometry, night)
+  return view => {
+    updateVisibility(view)
+    const viewport = groundViewportBounds(view)
+    for (const { graphics, bounds } of batches) {
+      const visible = boundsVisible(bounds, viewport)
+      if (graphics.visible !== visible) graphics.setVisible(visible)
+    }
+  }
 }
 
 export function renderTrackGeometryStructureUnderlay(
@@ -134,17 +197,22 @@ function renderTrackGeometryMarkings(
     const previous = path.points[index]
     const current = path.points[(index + 1) % path.points.length]
     if (!previous || !current) continue
-    const spec = SURFACE_SPECS[previous.surface]
-    graphics.lineStyle(
-      previous.surface === 'street' ? 2.2 : 1.5,
-      color(night ? spec.nightStripe : spec.stripe),
-      previous.surface === 'street' ? 0.78 : 0.45,
-    )
-    graphics.beginPath()
-    graphics.moveTo(previous.x, previous.y)
-    graphics.lineTo(current.x, current.y)
-    graphics.strokePath()
+    renderStripe(graphics, previous, current, night)
   }
+  renderTrackMarkers(graphics, geometry, night)
+}
+
+function renderStripe(graphics: Phaser.GameObjects.Graphics, previous: RoadPath['points'][number], current: RoadPath['points'][number], night: boolean): void {
+  const spec = SURFACE_SPECS[previous.surface]
+  graphics.lineStyle(previous.surface === 'street' ? 2.2 : 1.5, color(night ? spec.nightStripe : spec.stripe), previous.surface === 'street' ? 0.78 : 0.45)
+  graphics.beginPath()
+  graphics.moveTo(previous.x, previous.y)
+  graphics.lineTo(current.x, current.y)
+  graphics.strokePath()
+}
+
+function renderTrackMarkers(graphics: Phaser.GameObjects.Graphics, geometry: TrackGeometry, night: boolean): void {
+  const { path } = geometry
   renderStartLine(graphics, path, night, geometry.start.ratio)
   renderCrossingUnderlay(graphics, path, night)
   if (geometry.finish) {

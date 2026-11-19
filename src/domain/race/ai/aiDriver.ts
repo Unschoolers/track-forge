@@ -204,14 +204,23 @@ export function stepAiVehicle(
     ahead !== null &&
     ahead.distance < tuning.followDistance &&
     ahead.vehicle.speed < vehicle.speed
+  // Leave more margin when the road changes direction repeatedly: a car
+  // needs time to settle before it can turn in for the next corner.
+  let nearbyTurn = 0
+  if (difficulty === 'hard' && handling === 'arcade') {
+    for (let sample = -30; sample <= 60; sample += 10) {
+      nearbyTurn += Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6))
+    }
+  }
+  const fastCorners = difficulty === 'hard' && handling === 'arcade' && nearbyTurn < 1.15
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const curveSpeed = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
-    car, tuning.pace * vehicle.aiPace, vehicle.car, difficulty === 'hard',
+    car, tuning.pace * vehicle.aiPace, vehicle.car, difficulty === 'hard', fastCorners,
   )
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
-  const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / CORNER_THROTTLE_WINDOW, 0, 1)
+  const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / (fastCorners ? 5 : CORNER_THROTTLE_WINDOW), 0, 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && curveThrottle === 1 &&
     vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015

@@ -124,8 +124,16 @@ export function renderCurbs(
   path: RoadPath,
   night: boolean,
 ): void {
+  renderCurbSegments(graphics, buildCurbSegments(path), night)
+}
+
+export function renderCurbSegments(
+  graphics: Phaser.GameObjects.Graphics,
+  curbs: readonly CurbSegment[],
+  night: boolean,
+): void {
   const palette = night ? CURB_COLORS.night : CURB_COLORS.day
-  for (const curb of buildCurbSegments(path)) {
+  for (const curb of curbs) {
     graphics.lineStyle(curb.width, palette[curb.color], 1)
     graphics.beginPath()
     graphics.moveTo(curb.start.x, curb.start.y)

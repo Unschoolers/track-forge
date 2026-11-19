@@ -27,12 +27,14 @@ export function safeEntrySpeedAhead(
   pace = 1,
   carId: CarId = 'blue',
   useSharpBendSafety = false,
+  fastCorners = false,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
   const at = path.points[((nearestIndex % count) + count) % count]
   if (!at) return 225
   const direction = reversed ? -1 : 1
+  const cornerBaseline = fastCorners ? 270 : 225
   const straightSpeed = car.max * pace
   let allowed = straightSpeed
   for (const step of BRAKE_LOOKAHEAD) {
@@ -53,8 +55,8 @@ export function safeEntrySpeedAhead(
     )
     const effectiveSafety = useSharpBendSafety ? Math.max(cornerSafety, sharpBendSafety) : cornerSafety
     const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
-      (225 - bend * 350 * effectiveSafety) * Math.sqrt(grip) +
-        Math.max(0, straightSpeed - 225) * Math.exp(-bend * 20),
+      (cornerBaseline - bend * (fastCorners ? 600 : 350) * effectiveSafety) * Math.sqrt(grip) +
+        Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
       70, straightSpeed,
     ))
     let distance = direction * (point.distance - at.distance)

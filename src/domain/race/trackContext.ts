@@ -51,12 +51,37 @@ function angleDifference(left: number, right: number): number {
   return Math.atan2(Math.sin(left - right), Math.cos(left - right))
 }
 
+// These two spans are used by drivers and camera hints every physics tick.
+const drivingTurns = new WeakMap<RoadPath, number[]>()
+const cameraTurns = new WeakMap<RoadPath, number[]>()
+
 export function turnAmountAt(
   path: RoadPath,
   index: number,
   distance = 6,
 ): number {
-  if (!path.closed && (index <= 0 || index >= path.points.length - 1)) return 0
+  const count = path.points.length
+  if (count === 0 || (!path.closed && (index <= 0 || index >= count - 1))) return 0
+  const cache = distance === 6 ? drivingTurns : distance === 5 ? cameraTurns : undefined
+  if (!cache) return calculateTurn(path, index, distance)
+  const sample = path.closed ? ((index % count) + count) % count : index
+  let turns = cache.get(path)
+  if (!turns) {
+    turns = new Array<number>(count)
+    cache.set(path, turns)
+  }
+  const cached = turns[sample]
+  if (cached !== undefined) return cached
+  const turn = calculateTurn(path, sample, distance)
+  turns[sample] = turn
+  return turn
+}
+
+function calculateTurn(
+  path: RoadPath,
+  index: number,
+  distance: number,
+): number {
   const previous = wrapped(path, index - distance)
   const current = wrapped(path, index)
   const next = wrapped(path, index + distance)
