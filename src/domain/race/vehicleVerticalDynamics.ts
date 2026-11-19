@@ -7,10 +7,8 @@ export interface VehicleVerticalState {
 }
 
 export interface VehicleVerticalEnvironment {
-  readonly allowTakeoff?: boolean
   readonly previousSurfaceHeight: number
   readonly surfaceHeight: number
-  readonly previousGrade: number
   readonly grade: number
   readonly longitudinalSpeed: number
   readonly previousOverRoad: boolean
@@ -38,17 +36,6 @@ export function stepVehicleVerticalDynamics(
     finiteOr(environment.previousSurfaceHeight),
   )
   const surfaceHeight = Math.max(0, finiteOr(environment.surfaceHeight))
-  const previousGrade = clamp(
-    finiteOr(environment.previousGrade),
-    -VERTICAL_DYNAMICS.maximumGrade,
-    VERTICAL_DYNAMICS.maximumGrade,
-  )
-  const grade = clamp(
-    finiteOr(environment.grade),
-    -VERTICAL_DYNAMICS.maximumGrade,
-    VERTICAL_DYNAMICS.maximumGrade,
-  )
-  const speed = Math.max(0, finiteOr(environment.longitudinalSpeed))
   const z = Math.max(
     0,
     finiteOr(state.z, state.grounded ? previousSurfaceHeight : surfaceHeight),
@@ -76,6 +63,12 @@ export function stepVehicleVerticalDynamics(
       surfaceHeight > previousSurfaceHeight + SUPPORT_HEIGHT_EPSILON &&
       z >= previousSurfaceHeight - SUPPORT_HEIGHT_EPSILON
     if ((nextVerticalVelocity <= 0 || risingRoadContact) && nextZ <= surfaceHeight) {
+      const grade = clamp(
+        finiteOr(environment.grade),
+        -VERTICAL_DYNAMICS.maximumGrade,
+        VERTICAL_DYNAMICS.maximumGrade,
+      )
+      const speed = Math.max(0, finiteOr(environment.longitudinalSpeed))
       const impact = clamp(
         (speed * Math.sin(grade) - nextVerticalVelocity) *
           VERTICAL_DYNAMICS.landingVelocityScale,
@@ -113,7 +106,7 @@ export function stepVehicleVerticalDynamics(
   if (lostRaisedRoadSupport) {
     return {
       z,
-      verticalVelocity,
+      verticalVelocity: Math.min(0, verticalVelocity),
       grounded: false,
       suspensionCompression: 0,
       landingIntensity,
@@ -123,43 +116,6 @@ export function stepVehicleVerticalDynamics(
 
   const surfaceVelocity =
     dt > 0 ? (surfaceHeight - previousSurfaceHeight) / dt : 0
-  const crestDrop = Math.max(0, previousGrade - grade)
-  const crestStrength = clamp(
-    crestDrop / VERTICAL_DYNAMICS.crestDropForFullLaunch,
-    0,
-    1,
-  )
-  const carriedVelocity = Math.max(
-    verticalVelocity,
-    speed * Math.sin(previousGrade),
-  )
-  const launchVelocity = Math.min(
-    VERTICAL_DYNAMICS.maximumLaunchVelocity,
-    carriedVelocity,
-  )
-  const nextLaunchVelocity = launchVelocity - VERTICAL_DYNAMICS.gravity * dt
-  const launchHeight = z + (launchVelocity + nextLaunchVelocity) * 0.5 * dt
-  if (
-    environment.allowTakeoff !== false &&
-    environment.overRoad &&
-    carriedVelocity * crestStrength >= VERTICAL_DYNAMICS.takeoffVelocityThreshold &&
-    // The carried momentum must lift the chassis clear of the rising road.
-    nextLaunchVelocity > surfaceVelocity &&
-    launchHeight > surfaceHeight + SUPPORT_HEIGHT_EPSILON
-  ) {
-    return {
-      z: launchHeight,
-      verticalVelocity: nextLaunchVelocity,
-      grounded: false,
-      suspensionCompression: Math.min(
-        0,
-        finiteOr(state.suspensionCompression),
-      ),
-      landingIntensity,
-      contactLoad: 0,
-    }
-  }
-
   const compressionTarget = clamp(
     (surfaceVelocity - verticalVelocity) *
       (VERTICAL_DYNAMICS.suspensionTravel /

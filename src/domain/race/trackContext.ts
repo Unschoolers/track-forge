@@ -383,6 +383,7 @@ export function reconcileSupportAfterCollision(
   return {
     ...vehicle,
     grounded: false,
+    verticalVelocity: Math.min(0, vehicle.verticalVelocity),
     suspensionCompression: 0,
     contactLoad: 0,
   }

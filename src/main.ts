@@ -192,6 +192,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
                     lap: player.lap,
                     damage: player.damage,
                     wrecked: player.wrecked,
+                    grounded: player.grounded,
                     surface: player.currentSurface,
                   }
                 : null,

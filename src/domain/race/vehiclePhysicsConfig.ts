@@ -106,12 +106,9 @@ export interface VerticalDynamicsTuning {
   readonly gravity: number
   readonly suspensionTravel: number
   readonly suspensionResponse: number
-  readonly takeoffVelocityThreshold: number
-  readonly maximumLaunchVelocity: number
   readonly landingVelocityScale: number
   readonly landingDecay: number
   readonly bridgeWallHeight: number
-  readonly crestDropForFullLaunch: number
   readonly suspensionGradeScale: number
   readonly suspensionContactScale: number
   readonly landingContactScale: number
@@ -312,12 +309,9 @@ export const VERTICAL_DYNAMICS = {
   gravity: 200,
   suspensionTravel: 0.85,
   suspensionResponse: 15,
-  takeoffVelocityThreshold: 9.5,
-  maximumLaunchVelocity: 42,
   landingVelocityScale: 0.032,
   landingDecay: 9,
   bridgeWallHeight: 3.2,
-  crestDropForFullLaunch: 0.12,
   suspensionGradeScale: 12,
   suspensionContactScale: 0.35,
   landingContactScale: 0.35,

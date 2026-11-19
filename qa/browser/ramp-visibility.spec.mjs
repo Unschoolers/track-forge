@@ -1,9 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
 
-// Reproduce the real failure: drive up a ramp, jump, and land on its long deck.
-// The old drawing-layer test placed cars directly at the correct height and
-// could not catch a live car falling through the ramp and becoming invisible.
+// Drive through the transition at race speed and check both support and visibility.
 async function blueBodyPixels(page, image) {
   return page.evaluate(async (base64) => {
     const bitmap = new Image()
@@ -27,7 +25,7 @@ async function blueBodyPixels(page, image) {
 }
 
 for (const reversed of [false, true]) {
-  test(`player body stays visible after driving onto a ramp (reverse=${reversed})`, async ({ page }, testInfo) => {
+  test(`player stays grounded and visible when driving onto a ramp (reverse=${reversed})`, async ({ page }, testInfo) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     await page.addInitScript((reverse) => {
@@ -53,6 +51,17 @@ for (const reversed of [false, true]) {
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'RACE', exact: true }).click()
     await page.getByRole('button', { name: 'Race Ramp visibility regression', exact: true }).click()
+    await page.evaluate(() => {
+      window.__rampAirborneFrames = 0
+      const monitor = () => {
+        const race = window.__trackForgeQa.snapshot().race
+        if (race?.phase === 'running' && race.player?.grounded === false) {
+          window.__rampAirborneFrames++
+        }
+        requestAnimationFrame(monitor)
+      }
+      requestAnimationFrame(monitor)
+    })
     await page.getByRole('button', { name: 'START RACE' }).click()
     await expect(page.locator('[data-screen="race"]')).toBeVisible()
     for (const [stage, threshold] of [
@@ -70,6 +79,7 @@ for (const reversed of [false, true]) {
       expect(await blueBodyPixels(page, image), `${stage}: the blue car body must be rendered`)
         .toBeGreaterThan(100)
     }
+    expect(await page.evaluate(() => window.__rampAirborneFrames)).toBe(0)
     expect(errors).toEqual([])
   })
 }
