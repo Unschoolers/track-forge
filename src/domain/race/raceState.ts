@@ -81,6 +81,7 @@ export interface RaceCameraHints {
 
 export interface RaceState {
   readonly path: RoadPath
+  readonly missedCheckpoint?: { readonly gate: 1 | 2 | 3 | 4; readonly remainingSeconds: number; readonly position: Vector2 } | undefined
   readonly routeKind?: RouteKind
   readonly vehicles: readonly RaceVehicle[]
   readonly difficulty: DifficultyId

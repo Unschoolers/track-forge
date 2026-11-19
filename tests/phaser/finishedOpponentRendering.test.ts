@@ -35,6 +35,7 @@ class RecordingGraphics {
   save() {}
   restore() {}
   rotateCanvas() {}
+  scaleCanvas() {}
   fillStyle() {}
   beginPath() {}
   moveTo() {}

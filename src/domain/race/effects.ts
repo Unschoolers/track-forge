@@ -10,6 +10,7 @@ export type RaceParticleKind =
   | 'spark'
   | 'damage-smoke'
   | 'speed-line'
+  | 'landing-dust'
 
 export interface RaceParticle extends Vector2 {
   readonly kind: RaceParticleKind
@@ -38,6 +39,7 @@ export interface RaceEffectEvent {
   readonly type: string
   readonly leftId?: string
   readonly rightId?: string
+  readonly vehicleId?: string
   readonly strength?: number
 }
 
@@ -92,6 +94,7 @@ export function advanceRaceEffects(
 
   for (const vehicle of vehicles) {
     if (
+      vehicle.grounded &&
       vehicle.speed > 50 &&
       (vehicle.currentSurface === 'dirt' ||
         vehicle.currentSurface === 'grass') &&
@@ -108,6 +111,7 @@ export function advanceRaceEffects(
       )
     }
     if (
+      vehicle.grounded &&
       vehicle.currentSurface === 'ice' &&
       vehicle.speed > 65 &&
       (vehicle.braking || vehicle.slip > 14) &&
@@ -115,7 +119,7 @@ export function advanceRaceEffects(
     ) {
       particles.push(particle('ice', vehicle, random, 0.42, 3))
     }
-    if (vehicle.braking && vehicle.speed > 70) {
+    if (vehicle.grounded && vehicle.braking && vehicle.speed > 70) {
       particles.push(particle('tire-smoke', vehicle, random, 0.38, 3.5))
     }
     if (
@@ -148,6 +152,7 @@ export function advanceRaceEffects(
     }
     if (
       previous &&
+      vehicle.grounded &&
       vehicle.speed > 58 &&
       vehicle.currentSurface !== 'grass' &&
       (vehicle.braking || vehicle.slip > skidThreshold)
@@ -164,6 +169,30 @@ export function advanceRaceEffects(
   }
 
   for (const event of events) {
+    if (event.type === 'vehicle-landed') {
+      const vehicle = vehicles.find(({ id }) => id === event.vehicleId)
+      if (!vehicle) continue
+      const strength = event.strength ?? 0
+      const cosine = Math.cos(vehicle.angle)
+      const sine = Math.sin(vehicle.angle)
+      const kind = vehicle.currentSurface === 'street' ? 'landing-dust' : vehicle.currentSurface
+      for (const side of [-1, 1]) {
+        for (const axle of [-1, 1]) {
+          const life = 0.18 + strength * 0.14
+          particles.push({
+            kind,
+            x: vehicle.x + axle * cosine * 10 - side * sine * 7,
+            y: vehicle.y + axle * sine * 10 + side * cosine * 7,
+            vx: -vehicle.vx * 0.04 - side * sine * 28 * strength,
+            vy: -vehicle.vy * 0.04 + side * cosine * 28 * strength,
+            life,
+            maxLife: life,
+            size: 1.6 + strength * 2.4,
+          })
+        }
+      }
+      continue
+    }
     if (event.type !== 'collision') continue
     const involved = vehicles.find(
       ({ id }) => id === event.leftId || id === event.rightId,

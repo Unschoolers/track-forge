@@ -6,7 +6,7 @@ describe('feedback adapters', () => {
 
   it('plays gentle countdown tones through the enabled audio channel', () => {
     const sink: ToneSink = {
-      unlock: vi.fn(), play: vi.fn(), setEngine: vi.fn(), setSurface: vi.fn(),
+      unlock: vi.fn(), play: vi.fn(), playLanding: vi.fn(), setEngine: vi.fn(), setSurface: vi.fn(),
       setSlip: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn(),
     }
     const audio = new WebAudioAdapter(() => sink, true)
@@ -24,6 +24,7 @@ describe('feedback adapters', () => {
     const sink: ToneSink = {
       unlock: vi.fn(),
       play: vi.fn(),
+      playLanding: vi.fn(),
       setEngine: vi.fn(),
       setSurface: vi.fn(),
       setSlip: vi.fn(),
@@ -53,6 +54,8 @@ describe('feedback adapters', () => {
     expect(sink.setEngine).toHaveBeenCalledWith('green', 0.7, 1, 0.6)
     expect(sink.setSurface).toHaveBeenCalledWith('dirt', 0.6)
     expect(sink.setSlip).toHaveBeenCalledWith(0.4, undefined, undefined)
+    audio.handle({ type: 'landing', strength: 0.8 })
+    expect(sink.playLanding).toHaveBeenCalledWith(0.8)
     expect(sink.play).toHaveBeenCalledWith(
       90,
       0.12,

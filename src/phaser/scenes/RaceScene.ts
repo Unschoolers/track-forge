@@ -257,11 +257,30 @@ export class RaceScene extends Phaser.Scene {
     renderVehicles(
       this.vehicleGraphics,
       visibleVehicles.filter(({ id }) => !upperVehicles.has(id)),
+      race.path,
     )
     renderVehicles(
       this.upperVehicleGraphics,
       visibleVehicles.filter(({ id }) => upperVehicles.has(id)),
+      race.path,
     )
+    if (player && race.missedCheckpoint && race.phase === 'running' && !race.paused) {
+      const target = race.missedCheckpoint.position
+      const angle = Math.atan2(target.y - player.y, target.x - player.x)
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const alpha = reducedMotion ? 0.8 : 0.55 + 0.3 * Math.sin(_time / 150)
+      const graphics = this.upperVehicleGraphics
+      graphics.lineStyle(4, 0xff4054, alpha)
+      graphics.strokeCircle(player.x, player.y, 25)
+      const x = player.x + Math.cos(angle) * 46
+      const y = player.y + Math.sin(angle) * 46
+      graphics.fillStyle(0xff4054, 0.95)
+      graphics.fillTriangle(
+        x + Math.cos(angle) * 12, y + Math.sin(angle) * 12,
+        x + Math.cos(angle + 2.4) * 10, y + Math.sin(angle + 2.4) * 10,
+        x + Math.cos(angle - 2.4) * 10, y + Math.sin(angle - 2.4) * 10,
+      )
+    }
     const ghost = this.raceSession.snapshot().ghost
     if (ghost) {
       const raised = ghost.structureRunId !== null ||

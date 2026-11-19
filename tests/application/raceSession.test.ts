@@ -293,6 +293,45 @@ describe('RaceSession', () => {
     expect(session.snapshot()).toBe(finished)
   })
 
+  it('warns once for a missed stage gate and offers recovery without rolling back the clock', () => {
+    const { store } = createScoreStore()
+    const feedback = createFeedback()
+    const stage = {
+      ...track,
+      routeKind: 'point-to-point' as const,
+      points: [0, 600, 1200].map((x) => ({ x, y: 0, surface: 'street' as const })),
+      recoveryCheckpoints: [0.1],
+    }
+    const step: RaceStep = (state, input, dt, random) => {
+      if (state.tick !== 0) return stepRace(state, input, dt, random)
+      const pathIndex = state.path.points.findIndex(({ x }) => x >= 290)
+      const vehicles = state.vehicles.map((vehicle) => vehicle.player
+        ? { ...vehicle, x: 290, y: 60, vx: 200, speed: 200, pathIndex }
+        : vehicle)
+      return stepRace({ ...state, vehicles }, input, dt, random)
+    }
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback, step })
+    session.start(stage, { ...setup, handling: 'arcade', mode: 'time-trial' })
+    session.advance(3.7, noInput)
+    session.advance(0.2, noInput)
+    const missed = session.snapshot()
+    expect(missed.state?.missedCheckpoint?.gate).toBe(1)
+    expect(missed.state?.vehicles[0]?.nextSector).toBe(1)
+    expect(missed.telemetry.missedCheckpoint).toBeUndefined()
+
+    session.advance(0.2, noInput)
+    const warnings = vi.mocked(feedback.handle).mock.calls
+      .filter(([event]) => event.type === 'ui' && event.emphasis === 'danger')
+    expect(warnings).toHaveLength(1)
+    const elapsed = session.snapshot().telemetry.elapsed
+    session.resetPlayer()
+    const recovered = session.snapshot()
+    expect(recovered.state?.missedCheckpoint).toBeUndefined()
+    expect(recovered.state?.vehicles[0]?.nextSector).toBe(1)
+    expect(recovered.state?.vehicles[0]?.x).toBeLessThan(300)
+    expect(recovered.telemetry.elapsed).toBe(elapsed)
+  })
+
   it('owns countdown, pause, restart, and observable snapshots', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({ state, events: [] }))

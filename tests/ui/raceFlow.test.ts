@@ -199,6 +199,37 @@ function recoverySession() {
 }
 
 describe('race UI flow', () => {
+  it('shows the missed gate countdown and lets the player recover immediately', () => {
+    const controls = new RaceInputController()
+    const step: RaceStep = (state) => ({
+      state: {
+        ...state,
+        elapsed: 2,
+        missedCheckpoint: { gate: 1, remainingSeconds: 4.8, position: { x: 25, y: 20 } },
+      },
+      events: [],
+    })
+    const session = new RaceSession({
+      scoreStore: { forTrack: () => [], record: () => false, removeTrack: () => false },
+      random: { next: () => 0.5 },
+      feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
+      step,
+    })
+    session.start(track, { car: 'blue', difficulty: 'normal', laps: 1, handling: 'arcade' })
+    const { root } = setup(controls, session)
+    const warning = requiredElement(root, '[data-checkpoint-warning]')
+    expect(warning.hidden).toBe(true)
+    session.advance(3.8, controls.snapshot())
+    expect(warning.hidden).toBe(false)
+    expect(warning.textContent).toContain('MISSED CHECKPOINT 1')
+    expect(warning.textContent).toContain('Reset in 5 s')
+    controls.setKeyboard('ArrowRight', true)
+    requiredElement(warning, 'button[data-action="reset-checkpoint"]').click()
+    expect(warning.hidden).toBe(true)
+    expect(controls.snapshot().steering).toBe(0)
+    expect(session.snapshot().telemetry.elapsed).toBe(2)
+  })
+
   it('recovers on touch and clears steering, braking, and their feedback', () => {
     const controls = new RaceInputController()
     const { session } = recoverySession()

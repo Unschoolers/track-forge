@@ -16,7 +16,7 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   const track = createStarterTrack(asTrackId('gate-test'), 1)
   const points = [0, 200, 400, 600, 800].map((x) => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const }))
   const path = buildRoadPath(points, track.terrain, undefined, 'point-to-point')
-  const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
+  const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling: 'arcade' })
   const gateIndex = (path.points.length - 1) / 4
   const gateX = path.totalLength / 4
   const player = { ...race.vehicles[0]!, x: gateX - 1, y: 80, pathIndex: Math.floor(gateIndex) }
@@ -35,4 +35,92 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   movement.x = gateX + 1
   const crossing = stepRace({ ...rejoin.state, vehicles: [recovered] }, input, 0.01, { next: () => 0.5 })
   expect(crossing.events).toContainEqual({ type: 'gate-crossed', vehicleId: 'player', gate: 1, lap: 0, time: crossing.state.elapsed })
+})
+
+it('counts down after a missed gate, freezes while paused, and recovers before the gate', () => {
+  const track = createStarterTrack(asTrackId('missed-gate'), 1)
+  const points = [0, 200, 400, 600, 800].map((x) => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const }))
+  const path = buildRoadPath(points, track.terrain, undefined, 'point-to-point')
+  const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling: 'arcade' })
+  const gateIndex = (path.points.length - 1) / 4
+  const lower = Math.floor(gateIndex)
+  const gateX = path.points[lower]!.x + (path.points[lower + 1]!.x - path.points[lower]!.x) * (gateIndex - lower)
+  const player = { ...race.vehicles[0]!, x: gateX - 1, y: 80, pathIndex: lower }
+  const input = { steering: 0, throttle: 0, braking: false }
+  const random = { next: () => 0.5 }
+  movement.x = gateX + 1
+  movement.y = 80
+  const missed = stepRace({ ...race, phase: 'running', vehicles: [player] }, input, 0.01, random)
+  expect(missed.state.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+  expect(missed.state.vehicles[0]!.nextSector).toBe(1)
+  const paused = stepRace({ ...missed.state, paused: true }, input, 0.05, random)
+  expect(paused.state.missedCheckpoint?.remainingSeconds).toBe(5)
+  const countdown = stepRace(missed.state, input, 0.05, random)
+  expect(countdown.state.missedCheckpoint?.remainingSeconds).toBeCloseTo(4.95)
+  let lastTick = countdown
+  for (let i = 0; i < 98; i++) lastTick = stepRace(lastTick.state, input, 0.05, random)
+  expect(lastTick.state.missedCheckpoint?.remainingSeconds).toBeCloseTo(0.05)
+  const recovered = stepRace(lastTick.state, input, 0.05, random)
+  expect(recovered.state.missedCheckpoint).toBeUndefined()
+  expect(recovered.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'missed-checkpoint' }))
+  expect(recovered.state.vehicles[0]!.pathIndex).toBe(0)
+  expect(recovered.state.vehicles[0]!.nextSector).toBe(1)
+  expect(recovered.state.elapsed).toBeCloseTo(missed.state.elapsed + 5)
+})
+
+it('clears the countdown only on a valid forward recross', () => {
+  const track = createStarterTrack(asTrackId('recross-gate'), 1)
+  const path = buildRoadPath([0, 200, 400, 600, 800].map(x => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const })), track.terrain, undefined, 'point-to-point')
+  const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling: 'arcade' })
+  const index = (path.points.length - 1) / 4
+  const lower = Math.floor(index)
+  const x = path.points[lower]!.x + (path.points[lower + 1]!.x - path.points[lower]!.x) * (index - lower)
+  const input = { steering: 0, throttle: 0, braking: false }
+  const random = { next: () => 0.5 }
+  movement.x = x + 1; movement.y = 80
+  const missed = stepRace({ ...race, phase: 'running', vehicles: [{ ...race.vehicles[0]!, x: x - 1, y: 80, pathIndex: lower }] }, input, 0.01, random)
+  movement.x = x - 1; movement.y = 0
+  const back = stepRace(missed.state, input, 0.01, random)
+  expect(back.state.missedCheckpoint).toBeDefined()
+  movement.x = x + 1
+  const crossed = stepRace(back.state, input, 0.01, random)
+  expect(crossed.state.missedCheckpoint).toBeUndefined()
+  expect(crossed.state.vehicles[0]!.nextSector).toBe(2)
+})
+
+it.each([false, true])('requires the actual circuit gate line in either direction (reversed=%s)', (reversed) => {
+  const terrain = createStarterTrack(asTrackId('circuit-gate'), 1).terrain
+  const points = [{ x: 0, y: 0 }, { x: 800, y: 0 }, { x: 800, y: 800 }, { x: 0, y: 800 }, { x: 0, y: 0 }]
+    .map(point => ({ ...point, surface: 'street' as const, curve: 'corner' as const }))
+  const path = buildRoadPath(points, terrain)
+  expect(path.closed).toBe(true)
+  const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, handling: 'arcade', startRatio: 0.13, reversed })
+  const direction = reversed ? -1 : 1
+  const count = path.points.length
+  const position = (race.startPathIndex + direction * count / 4 + count) % count
+  const index = Math.floor(position)
+  const a = path.points[index]!
+  const b = path.points[(index + 1) % count]!
+  const x = a.x + (b.x - a.x) * (position - index)
+  const y = a.y + (b.y - a.y) * (position - index)
+  const length = Math.hypot(b.x - a.x, b.y - a.y)
+  const tx = direction * (b.x - a.x) / length
+  const ty = direction * (b.y - a.y) / length
+  const player = { ...race.vehicles[0]!, x: x - tx - ty * 60, y: y - ty + tx * 60, pathIndex: index }
+  const input = { steering: 0, throttle: 0, braking: false }
+  const random = { next: () => 0.5 }
+  movement.x = x + tx - ty * 60
+  movement.y = y + ty + tx * 60
+  const missed = stepRace({ ...race, phase: 'running', vehicles: [player] }, input, 1 / 60, random)
+  expect(missed.state.missedCheckpoint?.gate).toBe(1)
+  expect(missed.state.vehicles[0]!.nextSector).toBe(1)
+  movement.x = x - tx
+  movement.y = y - ty
+  const back = stepRace(missed.state, input, 1 / 60, random)
+  expect(back.state.missedCheckpoint).toBeDefined()
+  movement.x = x + tx
+  movement.y = y + ty
+  const crossed = stepRace(back.state, input, 1 / 60, random)
+  expect(crossed.state.missedCheckpoint).toBeUndefined()
+  expect(crossed.state.vehicles[0]!.nextSector).toBe(2)
 })

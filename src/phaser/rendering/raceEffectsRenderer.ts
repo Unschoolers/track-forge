@@ -9,6 +9,7 @@ const PARTICLE_COLORS: Record<RaceParticleKind, number> = {
   spark: 0xffb347,
   'damage-smoke': 0x62676e,
   'speed-line': 0xe8f3ff,
+  'landing-dust': 0xa6afb9,
 }
 
 export function renderRaceEffects(
@@ -32,7 +33,7 @@ export function renderRaceEffects(
     const progress = 1 - particle.life / particle.maxLife
     graphics.fillStyle(
       PARTICLE_COLORS[particle.kind],
-      Math.max(0, particle.life / particle.maxLife),
+      (particle.kind === 'landing-dust' ? 0.6 : 1) * Math.max(0, particle.life / particle.maxLife),
     )
     graphics.fillCircle(
       particle.x,

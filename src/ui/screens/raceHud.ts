@@ -96,13 +96,27 @@ export function createRaceHud(
   brake.setAttribute('aria-label', 'Brake')
   const throttle = button('GAS', 'throttle', () => undefined, 'throttle-button')
   throttle.setAttribute('aria-label', 'Accelerate')
-  const recover = button('RECOVER', 'recover', () => {
+  const recoverPlayer = (): void => {
     const state = raceSession.snapshot().state
     if (state?.phase !== 'running' || state.paused) return
     controls.reset()
     updateControls()
     raceSession.resetPlayer()
-  }, 'button recover-button')
+  }
+  const recover = button('RECOVER', 'recover', recoverPlayer, 'button recover-button')
+  const checkpointWarning = element('div', 'checkpoint-warning')
+  checkpointWarning.dataset.checkpointWarning = ''
+  checkpointWarning.hidden = true
+  const checkpointMessage = element('strong', 'checkpoint-message')
+  const checkpointTimer = element('span', 'checkpoint-timer')
+  checkpointTimer.setAttribute('aria-hidden', 'true')
+  const checkpointAnnouncement = element('span', 'visually-hidden')
+  checkpointAnnouncement.setAttribute('aria-live', 'polite')
+  const resetNow = button('RESET NOW', 'reset-checkpoint', () => {
+    const current = raceSession.snapshot().state
+    if (current?.missedCheckpoint) recoverPlayer()
+  }, 'button checkpoint-reset')
+  checkpointWarning.append(checkpointMessage, checkpointTimer, resetNow)
   const pedals = element('div', 'race-pedals')
   pedals.append(recover, brake, throttle)
   const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
@@ -110,7 +124,7 @@ export function createRaceHud(
   steeringGroup.append(steering, steeringHint, steeringButtons)
   controlsBar.append(steeringGroup, pedals)
   position.append(damage)
-  screen.append(hud, raceBanner, slide, countdown, controlsBar)
+  screen.append(hud, raceBanner, slide, countdown, checkpointWarning, checkpointAnnouncement, controlsBar)
 
   const updateControls = (): void => {
     const input = controls.snapshot()
@@ -220,6 +234,21 @@ export function createRaceHud(
     updateControls()
     recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused
     const telemetry = snapshot.telemetry
+    const missed = snapshot.state?.missedCheckpoint
+    checkpointWarning.hidden = !missed || phase !== 'running' || paused
+    resetNow.disabled = checkpointWarning.hidden
+    if (missed && !checkpointWarning.hidden) {
+      const message = `MISSED CHECKPOINT ${missed.gate}`
+      if (checkpointMessage.textContent !== message) {
+        checkpointMessage.textContent = message
+        checkpointAnnouncement.textContent = `Missed checkpoint ${missed.gate}. Return to the checkpoint or reset now.`
+      }
+      const timerLabel = `Reset in ${Math.max(0, Math.ceil(missed.remainingSeconds))} s`
+      if (checkpointTimer.textContent !== timerLabel) checkpointTimer.textContent = timerLabel
+    } else {
+      if (checkpointMessage.textContent) checkpointMessage.textContent = ''
+      if (checkpointAnnouncement.textContent) checkpointAnnouncement.textContent = ''
+    }
     const player = snapshot.state?.vehicles.find((car) => car.player)
     const cue = driftCue(player, telemetry.phase, snapshot.state?.paused ?? false)
     slide.textContent = cue ?? ''
@@ -259,7 +288,7 @@ export function createRaceHud(
     lapTimes.hidden = !lapTimes.textContent
     const split = telemetry.latestSplit
     const splitLabel = split?.gate === 4 ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
-    splitTime.textContent = telemetry.missedCheckpoint !== undefined
+    splitTime.textContent = !missed && telemetry.missedCheckpoint !== undefined
       ? `MISSED CP ${telemetry.missedCheckpoint}`
       : split ? `${splitLabel} ${formatRaceTime(split.time)}` : ''
     splitTime.hidden = !splitTime.textContent

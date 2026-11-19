@@ -44,6 +44,7 @@ class Graphics {
 	save() {}
 	restore() {}
 	rotateCanvas() {}
+	scaleCanvas() {}
 	fillStyle() {}
 	beginPath() {}
 	moveTo() {}
@@ -86,7 +87,7 @@ describe('ramp vehicle rendering', () => {
     }, path)).toBe(false)
 
     const graphics = new Graphics()
-    renderVehicles(graphics as never, [pose])
+    renderVehicles(graphics as never, [car], path)
     expect(graphics.bodies).toEqual([{ x: car.x, y: car.y }])
   })
 
