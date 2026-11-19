@@ -67,6 +67,23 @@ describe('vehicle vertical dynamics', () => {
     expect(result.z).toBe(10)
   })
 
+  it('keeps contact when a rising ramp is still moving up faster than the launch', () => {
+    const result = stepVehicleVerticalDynamics(
+      { ...groundedAt(14), verticalVelocity: 100 },
+      environment({
+        previousSurfaceHeight: 14,
+        surfaceHeight: 15.5,
+        previousGrade: 0.42,
+        grade: 0.4,
+        longitudinalSpeed: 230,
+      }),
+      1 / 60,
+    )
+    expect(result.grounded).toBe(true)
+    expect(result.z).toBe(15.5)
+    expect(result.landingIntensity).toBe(0)
+  })
+
   it('applies gravity throughout an airborne arc', () => {
     const result = stepVehicleVerticalDynamics(
       {

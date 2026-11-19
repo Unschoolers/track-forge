@@ -235,8 +235,9 @@ export class RaceScene extends Phaser.Scene {
     )
     renderVehicleShadows(
       this.shadowGraphics,
+      this.upperVehicleGraphics,
       visibleVehicles,
-      race.path.terrainSurface,
+      race.path,
       this.raceSession.snapshot().setup?.lighting === 'night',
     )
     const upperVehicles = new Set(

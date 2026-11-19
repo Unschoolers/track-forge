@@ -33,9 +33,11 @@ const track: Track = {
 
 class Graphics {
 	readonly bodies: { x: number; y: number }[] = []
+	readonly shadows: { x: number; y: number }[] = []
 	strokes = 0
 	clear() {
 		this.bodies.length = 0
+		this.shadows.length = 0
 		this.strokes = 0
 	}
 	translateCanvas(x: number, y: number) {
@@ -54,7 +56,9 @@ class Graphics {
 	lineStyle() {}
 	strokePath() { this.strokes++ }
 	fillCircle() {}
-	fillEllipse() {}
+	fillEllipse() {
+		this.shadows.push(required(this.bodies.pop()))
+	}
 }
 
 function required<T>(value: T | undefined): T {
@@ -183,6 +187,10 @@ describe('ramp vehicle rendering', () => {
 					`ramp index ${index}, height ${road.height}`,
 				).toHaveLength(4)
 				expect(lower.bodies).toHaveLength(0)
+				expect(upper.shadows).toHaveLength(4)
+				for (const shadow of upper.shadows) {
+					expect(Math.hypot(shadow.x - point.x, shadow.y - point.y)).toBeLessThan(2)
+				}
 			}
 			expect(lowRampSamples).toBeGreaterThan(4)
 		},
@@ -234,6 +242,7 @@ describe('ramp vehicle rendering', () => {
 		expect(lower.bodies).toHaveLength(1)
 		expect(upper.bodies).toEqual(lower.bodies)
 		expect(upper.strokes).toBeGreaterThan(0)
+		expect(upper.shadows).toHaveLength(0)
 
 		const covered = required(state.vehicles[0])
 		state = { ...state, vehicles: [{ ...covered, player: false }] }

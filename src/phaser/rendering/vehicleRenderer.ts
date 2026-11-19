@@ -183,13 +183,14 @@ export function projectVehicleShadow(
   vehicle: VehicleShadowPose,
   terrainSurface: TerrainSurface,
   night: boolean,
+  receiverHeight?: number,
 ): VehicleShadow | null {
   if (night) return null
   const geometry = getVehicleGeometry(vehicle.car)
-  const terrainHeight = terrainSurface.heightAt(vehicle)
+  const surfaceHeight = receiverHeight ?? terrainSurface.heightAt(vehicle)
   const height = Math.max(
     0,
-    (Number.isFinite(vehicle.z) ? vehicle.z : terrainHeight) - terrainHeight,
+    (Number.isFinite(vehicle.z) ? vehicle.z : surfaceHeight) - surfaceHeight,
   )
   const separation = Math.min(1, height / WORLD_ELEVATION.levelHeight)
   return {
@@ -305,14 +306,24 @@ export function renderCoveredPlayerOutline(
 }
 
 export function renderVehicleShadows(
-  graphics: Phaser.GameObjects.Graphics,
-  vehicles: readonly VehicleShadowPose[],
-  terrainSurface: TerrainSurface,
+  groundGraphics: Phaser.GameObjects.Graphics,
+  bridgeGraphics: Phaser.GameObjects.Graphics,
+  vehicles: readonly RaceVehicle[],
+  path: RoadPath,
   night: boolean,
 ): void {
+  if (night) return
   for (const vehicle of vehicles) {
-    const shadow = projectVehicleShadow(vehicle, terrainSurface, night)
+    const support = vehicle.structureRunId === null
+      ? undefined
+      : path.roadSurface.at(vehicle.pathIndex, vehicle)
+    const bridgeHeight = support?.structureRunId === vehicle.structureRunId &&
+      vehicle.z >= support.height - 2
+      ? support.height
+      : undefined
+    const shadow = projectVehicleShadow(vehicle, path.terrainSurface, false, bridgeHeight)
     if (!shadow) continue
+    const graphics = bridgeHeight === undefined ? groundGraphics : bridgeGraphics
     graphics.save()
     graphics.translateCanvas(shadow.center.x, shadow.center.y)
     graphics.rotateCanvas(shadow.angle)
