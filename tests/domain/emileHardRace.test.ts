@@ -1,11 +1,11 @@
-import { courseIdentity } from '@/application/race/raceRecords'
+import { RaceSession } from '@/application/race/raceSession'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodeTrackInput } from '../../qa/lanes/scenarios'
-import { normalizeRouteKind } from '@/domain/model'
+import { CAR_IDS, type CarId, type DifficultyId } from '@/domain/model'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import { createRace } from '@/domain/race/raceFactory'
 import { RACE_TICK_SECONDS, stepRace } from '@/domain/race/raceEngine'
+import type { RaceState } from '@/domain/race/raceState'
 
 // Real exported circuit, including terrain, start direction, checkpoints and scenery.
 function loadCircuit() {
@@ -16,24 +16,10 @@ function loadCircuit() {
 	return track
 }
 const track = loadCircuit()
-const path = new TrackGeometryService().get(track).path
+const geometry = new TrackGeometryService()
 const ghostSeconds = 31.633
 
-function raceSeed(seed: number) {
-	let race = createRace({
-		courseIdentity: courseIdentity(track),
-		path,
-		routeKind: normalizeRouteKind(track.routeKind),
-		recoveryCheckpoints: track.recoveryCheckpoints,
-		recoveryScenery: track,
-		playerCar: 'blue',
-		difficulty: 'hard',
-		handling: 'arcade',
-		laps: 1,
-		startRatio: track.start?.ratio,
-		reversed: track.start?.reversed,
-	})
-	race = { ...race, phase: 'running', countdown: 0 }
+function raceSeed(seed: number, laps = 1, difficulty: DifficultyId = 'hard', playerCar: CarId = 'blue') {
 	let value = seed >>> 0
 	const random = {
 		next() {
@@ -41,6 +27,17 @@ function raceSeed(seed: number) {
 			return value / 2 ** 32
 		},
 	}
+	const session = new RaceSession({
+		geometry,
+		random,
+		scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
+		feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
+	})
+	session.start(track, { car: playerCar, difficulty, laps, handling: 'arcade' })
+	const initial = session.snapshot().state
+	session.destroy()
+	if (!initial) throw new Error('Missing Émile race')
+	let race: RaceState = { ...initial, phase: 'running', countdown: 0 }
 	const rivalRecoveries = []
 	for (let i = 0; i < 90 / RACE_TICK_SECONDS; i++) {
 		const result = stepRace(
@@ -87,4 +84,36 @@ describe('Émile hard arcade race', () => {
 		},
 		30000,
 	)
+})
+
+describe('Émile arcade difficulty balance', () => {
+	it('keeps the Hard field close over two laps in all four starting grids', () => {
+		let redWins = 0
+		for (const playerCar of CAR_IDS) {
+			const { opponents } = raceSeed(4331, 2, 'hard', playerCar)
+			const times = opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
+			const fastest = Math.min(...times)
+			expect(Math.max(...times) - fastest, playerCar).toBeLessThan(2.5)
+			const redTime = opponents.find(({ car }) => car === 'red')?.finishedAt
+			if (redTime === fastest) redWins++
+			if (playerCar === 'blue') expect(redTime).toBeLessThan(61.866)
+		}
+		expect(redWins).toBeGreaterThan(0)
+	}, 30000)
+
+	it('gives Medium and Easy progressively lower race pace', () => {
+		const meanTime = (difficulty: DifficultyId) => {
+			const times = (['blue', 'yellow'] as const).flatMap((playerCar) =>
+				raceSeed(4331, 2, difficulty, playerCar).opponents.map(({ finishedAt }) => finishedAt ?? Infinity),
+			)
+			return times.reduce((sum, time) => sum + time, 0) / times.length
+		}
+		const hard = meanTime('hard')
+		const mediumPace = hard / meanTime('normal')
+		const easyPace = hard / meanTime('easy')
+		expect(mediumPace).toBeGreaterThan(0.925)
+		expect(mediumPace).toBeLessThan(0.975)
+		expect(easyPace).toBeGreaterThan(0.875)
+		expect(easyPace).toBeLessThan(0.925)
+	}, 30000)
 })

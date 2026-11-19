@@ -1,4 +1,3 @@
-import { EMILE_LINE } from '@/domain/race/ai/emileRematch'
 import type { RandomSource } from '@/application/ports/random'
 import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
@@ -139,7 +138,10 @@ export function stepAiVehicle(
   catchUp?: SpeedAssist,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
-  const tuning = DIFFICULTY_SPECS[difficulty]
+  // Keep the cornering technique on a practiced line at every difficulty.
+  // The selected difficulty still controls traffic decisions and mistakes.
+  const drivingDifficulty = vehicle.racingLine ? 'hard' : difficulty
+  const tuning = DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
@@ -149,14 +151,15 @@ export function stepAiVehicle(
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
-  const hardLookAhead = difficulty === 'hard' ? HARD_LOOKAHEAD_SAMPLES : 0
+  const hardLookAhead = drivingDifficulty === 'hard' ? HARD_LOOKAHEAD_SAMPLES : 0
   const lookAheadSamples = Math.round(
     context.onRoad
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)
       : 3,
   )
-  const notes = vehicle.emileRematch && context.onRoad ? EMILE_LINE[context.nearest.point.segment] : undefined
-  const pursuitSamples = lookAheadSamples + (notes?.extraSamples ?? 0)
+  const racingLine = context.onRoad ? vehicle.racingLine?.sections : undefined
+  const notes = racingLine?.[context.nearest.point.segment]
+  const pursuitSamples = Math.max(1, lookAheadSamples + (notes?.extraSamples ?? 0))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
     ? (rawTargetIndex + path.points.length) % path.points.length
@@ -177,13 +180,13 @@ export function stepAiVehicle(
   const occupied = traffic.nearby.some((entry) =>
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
-  const pursuitLane = (occupied ? lane : centered) + (notes ? EMILE_LINE[target.segment]?.laneOffset ?? 0 : 0)
+  const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
   const targetX = target.x + context.normal.x * pursuitLane
   const targetY = target.y + context.normal.y * pursuitLane
   const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
-  const sideslip = difficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
+  const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
     ? wrapAngle(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * SIDESLIP_CORRECTION_GAIN
     : 0
   const desiredSteer = clamp(
@@ -210,17 +213,20 @@ export function stepAiVehicle(
   // Leave more margin when the road changes direction repeatedly: a car
   // needs time to settle before it can turn in for the next corner.
   let nearbyTurn = 0
-  if (difficulty === 'hard' && handling === 'arcade') {
+  const hardArcadeLine = drivingDifficulty === 'hard' && handling === 'arcade'
+  if (hardArcadeLine) {
     for (let sample = -30; sample <= 60; sample += 10) {
       nearbyTurn += Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6))
     }
   }
-  const fastCorners = difficulty === 'hard' && handling === 'arcade' && nearbyTurn < 1.15
+  const fastCorners = hardArcadeLine && nearbyTurn < 1.15
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
-  const curveSpeed = safeEntrySpeedAhead(
+  const cornerTarget = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
-    car, tuning.pace * vehicle.aiPace, vehicle.car, difficulty === 'hard', fastCorners,
+    car, tuning.pace * vehicle.aiPace, vehicle.car, drivingDifficulty === 'hard', fastCorners,
   ) * (notes?.cornerPace ?? 1)
+  const speedRatio = vehicle.racingLine?.speedRatio ?? 1
+  const curveSpeed = speedRatio < 1 ? Math.min(cornerTarget, car.max) * speedRatio : cornerTarget
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / (fastCorners ? 5 : CORNER_THROTTLE_WINDOW), 0, 1)

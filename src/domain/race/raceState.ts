@@ -6,7 +6,7 @@ import type {
   RouteKind,
 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
-import type { AiDriverState } from '@/domain/race/ai/aiState'
+import type { AiDriverState, RacingLine } from '@/domain/race/ai/aiState'
 import type { RaceEffectsState } from '@/domain/race/effects'
 import type { SceneryColliders } from '@/domain/race/sceneryCollisions'
 
@@ -19,7 +19,7 @@ export function countdownCue(seconds: number): CountdownCue {
 }
 
 export interface RaceVehicle {
-  readonly emileRematch?: true
+  readonly racingLine?: RacingLine
   readonly id: string
   readonly car: CarId
   readonly player: boolean

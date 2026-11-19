@@ -167,9 +167,9 @@ function aiRampSpeedLimit(
   vehicle: RaceVehicle,
   startIndex: number,
 ): number {
-  // Arcade Hard rivals can carry speed over climbs using the same vehicle
-  // physics as the player; other modes retain the conservative ramp limit.
-  if (race.difficulty === 'hard' && (race.handling ?? 'arcade') === 'arcade') {
+  // Practiced lines account for ramps at each pace. Arcade Hard rivals on
+  // other circuits can also carry their speed over climbs.
+  if (vehicle.racingLine || (race.difficulty === 'hard' && (race.handling ?? 'arcade') === 'arcade')) {
     return Number.POSITIVE_INFINITY
   }
   // Anticipate climbs in the travel direction; descents keep their speed.
