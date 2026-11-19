@@ -207,19 +207,47 @@ describe('RaceSession', () => {
     expect(session.snapshot().state?.cameraHints).toMatchObject({ shake: 0.8, speed: 3 })
   })
 
-  it('stops substeps at a terminal result and records it once', () => {
+  it('posts the player result once and advances active rivals for up to five seconds', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({
-      state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 1 } : vehicle) },
+      state: { ...state, phase: 'finished', elapsed: 1, vehicles: state.vehicles.map((vehicle) => {
+        if (vehicle.player) return { ...vehicle, finishedAt: 1 }
+        const finish = state.path.points[state.startPathIndex]
+        return vehicle.id === 'ai-1' && finish ? {
+          ...vehicle, x: finish.x, y: finish.y, pathIndex: state.path.points.length - 2,
+          lap: state.totalLaps - 1, nextSector: 4,
+        } : vehicle
+      }) },
       events: [{ type: 'race-finished', reason: 'finished' }],
     }))
-    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    const feedback = createFeedback()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback, step })
     session.start(track, setup)
     session.advance(3.7, noInput)
-    session.advance(0.1, noInput)
-    session.advance(0.1, noInput)
+    session.advance(0.25, noInput)
+    const initial = session.snapshot()
+    const player = initial.state?.vehicles.find((vehicle) => vehicle.player)
+    expect(initial.result).toMatchObject({ playerTime: 1, playerPlace: 1, rivalsFinishing: true })
+    expect(initial.result?.standings.find(({ id }) => id === 'ai-1')?.finishTime).toBeNull()
+
+    session.advance(0.25, noInput)
+    const live = session.snapshot()
+    expect(live.result?.standings.find(({ id }) => id === 'ai-1')?.finishTime).toBeGreaterThan(1)
+    expect(live.state?.vehicles.find((vehicle) => vehicle.player)).toBe(player)
+    expect(live.telemetry.elapsed).toBe(1)
+
+    for (let i = 0; i < 18; i++) session.advance(0.25, noInput)
+    expect(session.snapshot().result?.rivalsFinishing).toBe(true)
+    session.advance(0.25, noInput)
+    const settled = session.snapshot()
+    expect(settled.result).toMatchObject({ playerTime: 1, playerPlace: 1, rivalsFinishing: false })
+    expect(settled.state?.elapsed).toBeCloseTo(6)
+    expect(settled.result?.standings.some(({ finishTime }) => finishTime === null)).toBe(true)
+    session.advance(0.25, noInput)
+    expect(session.snapshot()).toBe(settled)
     expect(step).toHaveBeenCalledOnce()
     expect(store.record).toHaveBeenCalledOnce()
+    expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'finish')).toHaveLength(1)
   })
 
   it('resets a reverse-race player facing reverse travel', () => {

@@ -51,7 +51,7 @@ export function createResultsModal(
   if (result.ghostTime !== undefined) {
     frame.body.append(element('p', 'modal-subtitle', `Ghost target: ${formatRaceTime(result.ghostTime)}`))
   } else if (!timeTrial) {
-    frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings))
+    frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings, result.rivalsFinishing))
   }
   if (result.splits?.length) {
     frame.body.append(element('h3', 'results-heading', 'SPLITS'))

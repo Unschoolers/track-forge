@@ -8,6 +8,7 @@ export function createUiRuntime(): UiRuntime {
     raceSession: {
       start: vi.fn(),
       restart: vi.fn(),
+      stop: vi.fn(),
       resetPlayer: vi.fn(),
       setPaused: vi.fn(),
       advance: vi.fn(),

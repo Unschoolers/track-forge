@@ -14,7 +14,9 @@ import type {
 } from '@/domain/model'
 import {
   RACE_TICK_SECONDS,
+  isRivalRacing,
   recoverRacePlayer,
+  stepFinishingRivals,
   stepRace,
   type RaceStep,
 } from '@/domain/race/raceEngine'
@@ -98,6 +100,7 @@ export interface RaceResult {
   readonly previousBestTime?: number
   readonly scoreSaveFailed?: boolean
   readonly standings: readonly RaceStanding[]
+  readonly rivalsFinishing?: boolean
   readonly highScores: readonly ScoreEntry[]
   readonly ghostTime?: number
   readonly ghostSaved?: boolean
@@ -121,6 +124,7 @@ export interface RaceSessionPort {
   ghostTime?(track: Track, setup: RaceSetup): number | null
   start(track: Track, setup: RaceSetup): void
   restart(): void
+  stop(): void
   resetPlayer(): void
   setPaused(paused: boolean): void
   advance(deltaSeconds: number, input: DriverInput): void
@@ -153,6 +157,10 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
 
 // Limit running catch-up to 250 ms per frame after background stalls.
 const MAX_CATCH_UP = 0.25
+const RIVAL_FINISH_SECONDS = 5
+const EMPTY_RACE: RaceSessionSnapshot = {
+  track: null, setup: null, state: null, telemetry: EMPTY_TELEMETRY, standings: [], result: null,
+}
 
 function oneRunForOpenRoute(track: Track, setup: RaceSetup): RaceSetup {
   return track.routeKind === 'point-to-point' && setup.laps !== 1 ? { ...setup, laps: 1 } : setup
@@ -162,15 +170,9 @@ export class RaceSession implements RaceSessionPort {
   private readonly events = new EventBus<RaceSessionSnapshot>()
   private readonly now: () => number
   private readonly step: RaceStep
-  private current: RaceSessionSnapshot = {
-    track: null,
-    setup: null,
-    state: null,
-    telemetry: EMPTY_TELEMETRY,
-    standings: [],
-    result: null,
-  }
+  private current = EMPTY_RACE
   private remainder = 0
+  private rivalFinishRemaining = 0
   private destroyed = false
   private readonly geometry: TrackGeometryService
   private bestGhost: GhostRun | null = null
@@ -187,6 +189,7 @@ export class RaceSession implements RaceSessionPort {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
+    this.rivalFinishRemaining = 0
     const routeKind = normalizeRouteKind(track.routeKind)
     setup = oneRunForOpenRoute(track, setup)
     this.bestGhost = this.dependencies.ghostStore?.load(track, setup) ?? null
@@ -235,6 +238,17 @@ export class RaceSession implements RaceSessionPort {
     this.start(track, setup)
   }
 
+  stop(): void {
+    if (!this.current.state || this.destroyed) return
+    this.dependencies.feedback.silenceContinuous()
+    this.remainder = 0
+    this.rivalFinishRemaining = 0
+    this.bestGhost = null
+    this.recording = null
+    this.timing = new LapTiming()
+    this.publish(EMPTY_RACE)
+  }
+
   resetPlayer(): void {
     const state = this.current.state
     if (!state || this.destroyed) return
@@ -273,8 +287,12 @@ export class RaceSession implements RaceSessionPort {
 
   advance(deltaSeconds: number, input: DriverInput): void {
     let state = this.current.state
-    if (!state || state.paused || state.phase === 'finished' || this.destroyed ||
+    if (!state || state.paused || this.destroyed ||
         !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return
+    if (state.phase === 'finished') {
+      this.advanceFinishingRivals(state, deltaSeconds)
+      return
+    }
     const previouslyMissedGate = state.missedCheckpoint?.gate
 
     let runningTime = deltaSeconds
@@ -335,6 +353,10 @@ export class RaceSession implements RaceSessionPort {
       : null
     if (stepped) this.routeFeedback(resultState, events, input, peakLanding)
     if (result && !this.current.result) {
+      if (result.outcome === 'finished' && resultState.vehicles.some(isRivalRacing)) {
+        this.rivalFinishRemaining = RIVAL_FINISH_SECONDS
+        result = { ...result, rivalsFinishing: true }
+      }
       const track = this.current.track
       const setup = this.current.setup
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
@@ -356,8 +378,36 @@ export class RaceSession implements RaceSessionPort {
         place: result.playerPlace,
         newRecord: result.newRecord,
       })
+      this.recording = null
     }
     this.publish(this.buildSnapshot(this.current.track, this.current.setup, resultState, result))
+  }
+
+  private advanceFinishingRivals(state: RaceState, deltaSeconds: number): void {
+    const { track, setup, result } = this.current
+    if (!result || this.rivalFinishRemaining === 0) return
+    const remainingTime = Math.min(deltaSeconds, this.rivalFinishRemaining)
+    this.rivalFinishRemaining -= remainingTime
+    if (this.rivalFinishRemaining < 1e-10) this.rivalFinishRemaining = 0
+    this.remainder += Math.min(remainingTime, MAX_CATCH_UP)
+    if (this.remainder + 1e-10 < RACE_TICK_SECONDS && this.rivalFinishRemaining > 0) return
+    while (this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
+      state = stepFinishingRivals(state, this.dependencies.random)
+      this.remainder = Math.max(0, this.remainder - RACE_TICK_SECONDS)
+      if (!state.vehicles.some(isRivalRacing)) {
+        this.rivalFinishRemaining = 0
+        break
+      }
+    }
+    const snapshot = this.buildSnapshot(track, setup, state, result)
+    const rivalsFinishing = this.rivalFinishRemaining > 0
+    const standingsChanged = snapshot.standings.some((standing, index) => {
+      const before = result.standings[index]
+      return standing.id !== before?.id || standing.finishTime !== before.finishTime || standing.wrecked !== before.wrecked
+    })
+    this.publish(rivalsFinishing === result.rivalsFinishing && !standingsChanged
+      ? snapshot
+      : { ...snapshot, result: { ...result, standings: snapshot.standings, rivalsFinishing } })
   }
 
   snapshot(): RaceSessionSnapshot {
@@ -388,6 +438,7 @@ export class RaceSession implements RaceSessionPort {
     )
     const player = ranked.find((vehicle) => vehicle.player)
     const latestSplit = this.timing.accepted.at(-1)
+    const elapsed = result?.playerTime ?? state.elapsed
     return {
       track,
       setup,
@@ -405,14 +456,14 @@ export class RaceSession implements RaceSessionPort {
         ...(latestSplit ? { latestSplit } : {}),
         phase: state.phase,
         countdown: state.countdown,
-        elapsed: state.elapsed,
+        elapsed,
         position: player ? ranked.indexOf(player) + 1 : 1,
         vehicleCount: state.vehicles.length,
         lap: player?.lap ?? 0,
         totalLaps: state.totalLaps,
         damage: player?.damage ?? 0,
         damageLimit: player?.damageLimit ?? 0,
-        currentLapTime: this.timing.currentLap(state.elapsed),
+        currentLapTime: this.timing.currentLap(elapsed),
         bestLapTime: this.timing.bestLap,
         ghostGap: this.timing.gap,
       },
