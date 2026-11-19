@@ -448,14 +448,18 @@ function advanceRace(
       updated = { ...updated, recoveryCheckpoint: checkpoint }
     }
     const playerStuck = updated.player && updated.stuckDuration > 0.65
+    const rivalBelowDeck = !updated.player && !context.onRoad &&
+      context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
     const lostRival = !updated.player && updated.grounded &&
-      (context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
+      (rivalBelowDeck || context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
         (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated)))
     if (playerStuck || lostRival) {
-      const candidate = previous && (updated.player || state.routeKind === 'point-to-point')
+      const candidate = previous && (rivalBelowDeck || updated.player || state.routeKind === 'point-to-point')
         ? restoreFrameProgress({ ...updated, pathIndex: previous.pathIndex }, previous)
         : updated
-      const reset = resetRaceVehicle(candidate, state)
+      const reset = rivalBelowDeck
+        ? resetVehicleToTrack(candidate, state.path, { pathIndex: candidate.pathIndex, reversed: state.reversed })
+        : resetRaceVehicle(candidate, state)
       if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',

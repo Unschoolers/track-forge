@@ -5,8 +5,29 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
+import { createLaneScenarios, prepareLanePath } from '../../qa/lanes/scenarios'
 
 describe('AI recovery telemetry', () => {
+	it('recovers a rival that fell below a bridge on the same arm without awarding progress', () => {
+		const track = requireFixture(createLaneScenarios().find(({ id }) => id === 'bridge'))
+		const path = prepareLanePath(track)
+		const crossing = requireFixture(path.crossings.find(({ upperPathIndex }) => upperPathIndex !== null))
+		const pathIndex = requireFixture(crossing.upperPathIndex)
+		const race = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, handling: 'arcade' })
+		const rival = {
+			...requireFixture(race.vehicles[1]), ...crossing.position, pathIndex,
+			z: Math.min(crossing.firstHeight, crossing.secondHeight), lap: 1, nextSector: 3 as const,
+		}
+		const { state, events } = stepRace(
+			{ ...race, phase: 'running', vehicles: [rival] },
+			{ steering: 0, throttle: 0, braking: false }, 1 / 60, { next: () => 0.5 },
+		)
+		expect(events).toEqual([expect.objectContaining({ type: 'vehicle-recovered', vehicleId: rival.id })])
+		const recovered = requireFixture(state.vehicles[0])
+		expect(recovered).toMatchObject({ pathIndex, lap: 1, nextSector: 3, finishedAt: null })
+		expect(recovered.z).toBeGreaterThan(rival.z)
+	})
+
 	it('reports water recovery separately with the pre-reset location', () => {
 		const path = buildRoadPath(
 			[
