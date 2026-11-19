@@ -19,6 +19,7 @@ export function countdownCue(seconds: number): CountdownCue {
 }
 
 export interface RaceVehicle {
+  readonly emileRematch?: true
   readonly id: string
   readonly car: CarId
   readonly player: boolean

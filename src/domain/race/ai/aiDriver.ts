@@ -1,3 +1,4 @@
+import { EMILE_LINE } from '@/domain/race/ai/emileRematch'
 import type { RandomSource } from '@/application/ports/random'
 import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
@@ -154,7 +155,9 @@ export function stepAiVehicle(
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)
       : 3,
   )
-  const rawTargetIndex = context.nearest.index + (reversed ? -lookAheadSamples : lookAheadSamples)
+  const notes = vehicle.emileRematch && context.onRoad ? EMILE_LINE[context.nearest.point.segment] : undefined
+  const pursuitSamples = lookAheadSamples + (notes?.extraSamples ?? 0)
+  const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
     ? (rawTargetIndex + path.points.length) % path.points.length
     : clamp(rawTargetIndex, 0, path.points.length - 1)
@@ -174,7 +177,7 @@ export function stepAiVehicle(
   const occupied = traffic.nearby.some((entry) =>
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
-  const pursuitLane = occupied ? lane : centered
+  const pursuitLane = (occupied ? lane : centered) + (notes ? EMILE_LINE[target.segment]?.laneOffset ?? 0 : 0)
   const targetX = target.x + context.normal.x * pursuitLane
   const targetY = target.y + context.normal.y * pursuitLane
   const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
@@ -217,7 +220,7 @@ export function stepAiVehicle(
   const curveSpeed = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
     car, tuning.pace * vehicle.aiPace, vehicle.car, difficulty === 'hard', fastCorners,
-  )
+  ) * (notes?.cornerPace ?? 1)
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / (fastCorners ? 5 : CORNER_THROTTLE_WINDOW), 0, 1)
