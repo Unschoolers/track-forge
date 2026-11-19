@@ -26,6 +26,9 @@ const CENTER_LINE_TURN = 0.28
 const LANE_CHANGE_LOOKAHEAD = 24
 const LANE_CHANGE_CLEARANCE = 18
 const CORNER_THROTTLE_WINDOW = 20
+const HARD_PAVEMENT_LOOKAHEAD_SAMPLES = 5
+const HARD_PAVEMENT_CORNER_PACE = 1.07
+const HARD_PAVEMENT_THROTTLE_WINDOW = 13
 
 function wrapAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle))
@@ -148,6 +151,10 @@ export function stepAiVehicle(
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
   const context = getVehicleStepContext(path, vehicle)
+  const hardArcadeLine = drivingDifficulty === 'hard' && handling === 'arcade'
+  // Carry more speed on high-grip roads. Authored lines already account for
+  // their own approach, and loose surfaces need the usual braking margin.
+  const hardPavement = hardArcadeLine && !vehicle.racingLine && context.surface === 'street'
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
@@ -159,7 +166,8 @@ export function stepAiVehicle(
   )
   const racingLine = context.onRoad ? vehicle.racingLine?.sections : undefined
   const notes = racingLine?.[context.nearest.point.segment]
-  const pursuitSamples = Math.max(1, lookAheadSamples + (notes?.extraSamples ?? 0))
+  const extraSamples = notes?.extraSamples ?? (hardPavement ? HARD_PAVEMENT_LOOKAHEAD_SAMPLES : 0)
+  const pursuitSamples = Math.max(1, lookAheadSamples + extraSamples)
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
     ? (rawTargetIndex + path.points.length) % path.points.length
@@ -213,23 +221,24 @@ export function stepAiVehicle(
   // Leave more margin when the road changes direction repeatedly: a car
   // needs time to settle before it can turn in for the next corner.
   let nearbyTurn = 0
-  const hardArcadeLine = drivingDifficulty === 'hard' && handling === 'arcade'
   if (hardArcadeLine) {
     for (let sample = -30; sample <= 60; sample += 10) {
       nearbyTurn += Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6))
     }
   }
   const fastCorners = hardArcadeLine && nearbyTurn < 1.15
+  const cornerPace = notes?.cornerPace ?? (hardPavement ? HARD_PAVEMENT_CORNER_PACE : 1)
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const cornerTarget = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
     car, tuning.pace * vehicle.aiPace, vehicle.car, drivingDifficulty === 'hard', fastCorners,
-  ) * (notes?.cornerPace ?? 1)
+  ) * cornerPace
   const speedRatio = vehicle.racingLine?.speedRatio ?? 1
   const curveSpeed = speedRatio < 1 ? Math.min(cornerTarget, car.max) * speedRatio : cornerTarget
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
-  const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / (fastCorners ? 5 : CORNER_THROTTLE_WINDOW), 0, 1)
+  const throttleWindow = fastCorners ? 5 : hardPavement ? HARD_PAVEMENT_THROTTLE_WINDOW : CORNER_THROTTLE_WINDOW
+  const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / throttleWindow, 0, 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && curveThrottle === 1 &&
     vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015

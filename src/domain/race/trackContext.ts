@@ -281,7 +281,10 @@ export function getVehicleStepContext(
     }
   }
   if (
-    nearest && roadSurface && roadAboveVehicle(roadSurface, vehicle, previousSupport)
+    // Rivals must recover on their own route after falling off a deck. Taking
+    // the lower arm here could advance their race progress without driving it.
+    vehicle.player !== false && nearest && roadSurface &&
+    roadAboveVehicle(roadSurface, vehicle, previousSupport)
   ) {
     const lower = lowerCrossingRoad(
       path,
