@@ -19,7 +19,6 @@ import {
   getVehicleStepContext,
   reconcileSupportAfterCollision,
   resetVehicleToTrack,
-  turnAmountAt,
   type VehicleStepContext,
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
@@ -307,12 +306,8 @@ function advanceVehicle(
     {
       previousSurfaceHeight: previousContext.surfaceHeight,
       surfaceHeight: nextContext.surfaceHeight,
-      previousGrade: gradeForTravel(previousContext.grade, race.reversed),
       grade: gradeForTravel(nextContext.grade, race.reversed),
       longitudinalSpeed,
-      allowTakeoff: [0, 6, 12, 18].every((offset) =>
-        Math.abs(turnAmountAt(race.path, nextContext.nearest.index + offset * (race.reversed ? -1 : 1), 6)) < 0.08,
-      ),
       previousOverRoad: previousContext.onRoad,
       overRoad: nextContext.onRoad,
     },
@@ -394,7 +389,7 @@ function advanceRace(
       stuckDuration,
     }
     // Physical support can reacquire a different arm after going off-road.
-    // A jump outside the local driving window cannot change circuit progress.
+    // Only an arm within the local driving window can change circuit progress.
     const indexDelta = Math.abs(vehicle.pathIndex - context.nearest.index)
     const unrelatedArm = vehicle.player && state.path.closed &&
       Math.min(indexDelta, state.path.points.length - indexDelta) > PLAYER_ROUTE_WINDOW

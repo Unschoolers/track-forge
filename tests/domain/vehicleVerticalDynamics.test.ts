@@ -24,7 +24,6 @@ function environment(
   return {
     previousSurfaceHeight: 9.8,
     surfaceHeight: 10,
-    previousGrade: 0.18,
     grade: 0,
     longitudinalSpeed: 40,
     previousOverRoad: true,
@@ -47,41 +46,16 @@ describe('vehicle vertical dynamics', () => {
     expect(result.contactLoad).toBeGreaterThan(1)
   })
 
-  it('launches from the same crest at high speed', () => {
+  it('follows the crest at high speed with the tires still loaded', () => {
     const result = stepVehicleVerticalDynamics(
-      groundedAt(9.8),
+      { ...groundedAt(9.8), verticalVelocity: 42 },
       environment({ longitudinalSpeed: 250 }),
       1 / 60,
     )
 
-    expect(result.grounded).toBe(false)
-    expect(result.z).toBeGreaterThanOrEqual(10)
-    expect(result.verticalVelocity).toBeGreaterThan(20)
-    expect(result.contactLoad).toBe(0)
-  })
-
-  it('keeps curved ramp crests grounded when takeoff is disallowed', () => {
-    const result = stepVehicleVerticalDynamics(groundedAt(9.8),
-      { ...environment({ longitudinalSpeed: 250 }), allowTakeoff: false }, 1 / 60)
     expect(result.grounded).toBe(true)
     expect(result.z).toBe(10)
-  })
-
-  it('keeps contact when a rising ramp is still moving up faster than the launch', () => {
-    const result = stepVehicleVerticalDynamics(
-      { ...groundedAt(14), verticalVelocity: 100 },
-      environment({
-        previousSurfaceHeight: 14,
-        surfaceHeight: 15.5,
-        previousGrade: 0.42,
-        grade: 0.4,
-        longitudinalSpeed: 230,
-      }),
-      1 / 60,
-    )
-    expect(result.grounded).toBe(true)
-    expect(result.z).toBe(15.5)
-    expect(result.landingIntensity).toBe(0)
+    expect(result.contactLoad).toBeGreaterThan(0)
   })
 
   it('applies gravity throughout an airborne arc', () => {
@@ -94,7 +68,6 @@ describe('vehicle vertical dynamics', () => {
       environment({
         previousSurfaceHeight: 0,
         surfaceHeight: 0,
-        previousGrade: 0,
         grade: 0,
         overRoad: false,
       }),
@@ -117,7 +90,6 @@ describe('vehicle vertical dynamics', () => {
       environment({
         previousSurfaceHeight: 0,
         surfaceHeight: 0,
-        previousGrade: 0,
         grade: 0,
         overRoad: false,
       }),
@@ -136,7 +108,7 @@ describe('vehicle vertical dynamics', () => {
       { ...groundedAt(14), grounded: false, verticalVelocity: 10 },
       environment({
         previousSurfaceHeight: 14, surfaceHeight: 16,
-        previousGrade: 0.38, grade: 0.35, longitudinalSpeed: 200,
+        grade: 0.35, longitudinalSpeed: 200,
       }),
       1 / 60,
     )
@@ -145,13 +117,12 @@ describe('vehicle vertical dynamics', () => {
     expect(result.contactLoad).toBeGreaterThan(0)
   })
 
-  it('preserves deck height and becomes airborne after losing lateral support', () => {
+  it.each([0, 30, -30])('falls after losing lateral support with vertical speed %s', (verticalVelocity) => {
     const departed = stepVehicleVerticalDynamics(
-      groundedAt(24),
+      { ...groundedAt(24), verticalVelocity },
       environment({
         previousSurfaceHeight: 24,
         surfaceHeight: 0,
-        previousGrade: 0,
         grade: 0,
         longitudinalSpeed: 0,
         previousOverRoad: true,
@@ -162,6 +133,7 @@ describe('vehicle vertical dynamics', () => {
 
     expect(departed.grounded).toBe(false)
     expect(departed.z).toBe(24)
+    expect(departed.verticalVelocity).toBe(Math.min(0, verticalVelocity))
 
     let state = departed
     for (let step = 0; step < 180 && !state.grounded; step += 1) {
@@ -170,7 +142,6 @@ describe('vehicle vertical dynamics', () => {
         environment({
           previousSurfaceHeight: 0,
           surfaceHeight: 0,
-          previousGrade: 0,
           grade: 0,
           previousOverRoad: false,
           overRoad: false,
@@ -195,7 +166,6 @@ describe('vehicle vertical dynamics', () => {
       environment({
         previousSurfaceHeight: Number.NaN,
         surfaceHeight: Number.NaN,
-        previousGrade: Number.NaN,
         grade: Number.NaN,
         longitudinalSpeed: Number.NaN,
       }),
@@ -209,7 +179,7 @@ describe('vehicle vertical dynamics', () => {
     expect(result.contactLoad).toBeGreaterThanOrEqual(0)
   })
 
-  it('turns a real eased bridge crest into a speed-dependent jump', () => {
+  it('follows an eased bridge profile in both directions over a range of speeds', () => {
     const path = buildRoadPath(
       [
         { x: 0, y: 0, surface: 'street', structure: 'surface' },
@@ -248,7 +218,6 @@ describe('vehicle vertical dynamics', () => {
           {
             previousSurfaceHeight: previousSurface.height,
             surfaceHeight: surface.height,
-            previousGrade: gradeForTravel(previousSurface.grade, reversed),
             grade: gradeForTravel(surface.grade, reversed),
             longitudinalSpeed: speed,
             previousOverRoad: true,
@@ -263,9 +232,9 @@ describe('vehicle vertical dynamics', () => {
     }
 
     expect(simulate(55)).toBe(false)
-    expect(simulate(240)).toBe(true)
+    expect(simulate(240)).toBe(false)
     expect(simulate(55, true)).toBe(false)
-    expect(simulate(240, true)).toBe(true)
+    expect(simulate(240, true)).toBe(false)
 
     const rampIndex = path.points.findIndex(
       (_, index) => path.roadSurface.gradeAt(index) > 0.01,

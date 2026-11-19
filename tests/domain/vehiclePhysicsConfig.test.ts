@@ -22,7 +22,7 @@ describe('vehicle physics configuration', () => {
     )
     expect(VEHICLE_TERRAIN_PHYSICS_SPECS.yellow.grass.grip).toBeGreaterThan(1)
     expect(VERTICAL_DYNAMICS.gravity).toBeGreaterThan(0)
-    expect(VERTICAL_DYNAMICS.crestDropForFullLaunch).toBeGreaterThan(0)
+    expect(VERTICAL_DYNAMICS.suspensionResponse).toBeGreaterThan(0)
     expect(VERTICAL_DYNAMICS.maximumContactLoad).toBeGreaterThan(1)
   })
 })

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { assert, describe, expect, it } from 'vitest'
+import { ROAD_GEOMETRY } from '@/domain/config'
 import { CAR_IDS } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
@@ -19,7 +20,7 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('driving onto a raised road', () => {
-  it.each([false, true])('climbs the Figure-eight ramp before a single real jump (reverse=%s)', (reversed) => {
+  it.each([false, true])('stays grounded from the Figure-eight ramp entrance onto the deck (reverse=%s)', (reversed) => {
     const raw = JSON.parse(readFileSync('tests/fixtures/figureEight.trackforge.json', 'utf8'))
     const { path } = buildTrackGeometry(requireFixture(decodeTrack(raw, 1)))
     const direction = reversed ? -1 : 1
@@ -50,9 +51,6 @@ describe('driving onto a raised road', () => {
         structureRunId: null,
       }],
     }
-    let launches = 0
-    let landings = 0
-    let airborneFrames = 0
     let reachedDeck = false
     for (let frame = 0; frame < 110; frame++) {
       const car = requireFixture(race.vehicles[0])
@@ -63,22 +61,61 @@ describe('driving onto a raised road', () => {
       race = step.state
       const updated = requireFixture(race.vehicles[0])
       const surface = path.roadSurface.at(updated.pathIndex, updated)
-      if (!updated.grounded) {
-        airborneFrames++
-        if (car.grounded) {
-          launches++
-          expect(updated.z).toBeGreaterThan(surface.height + 0.01)
-        }
-      }
-      landings += step.events.filter(({ type }) => type === 'vehicle-landed').length
+      expect(updated.grounded, `Figure-eight frame ${frame}`).toBe(true)
+      expect(updated.z).toBeCloseTo(surface.height, 6)
+      expect(step.events.some(({ type }) => type === 'vehicle-landed')).toBe(false)
       if ((updated.pathIndex - entrance) * direction > 42) {
         reachedDeck = true
         break
       }
     }
     expect(reachedDeck).toBe(true)
-    expect(launches).toBe(1)
-    expect(airborneFrames).toBeGreaterThan(5)
+  })
+
+  it('drops the car when it drives off the side of a rising ramp', () => {
+    const pathIndex = path.points.findIndex((point) => point.x >= 48)
+    const point = requireFixture(path.points[pathIndex])
+    const position = { x: point.x, y: ROAD_GEOMETRY.onRoadRadius - 1 }
+    const ramp = path.roadSurface.at(pathIndex, position)
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade' })
+    let race: RaceState = {
+      ...base,
+      phase: 'running',
+      vehicles: [{
+        ...requireFixture(base.vehicles[0]),
+        ...position,
+        z: ramp.height,
+        pathIndex,
+        angle: Math.PI / 2,
+        speed: 165,
+        vx: 0,
+        vy: 165,
+        verticalVelocity: 40,
+        structureRunId: ramp.structureRunId,
+      }],
+    }
+    expect(ramp.height).toBeGreaterThan(0)
+    const drive = (state: RaceState) => stepRace(
+      state, { steering: 0, throttle: 0, braking: false }, 1 / 60, { next: () => 0.5 },
+    )
+    race = drive(race).state
+    const departed = requireFixture(race.vehicles[0])
+    expect(departed.grounded).toBe(false)
+    expect(departed.verticalVelocity).toBeLessThanOrEqual(0)
+    expect(departed.z).toBeCloseTo(ramp.height)
+
+    let car = departed
+    let landings = 0
+    for (let frame = 0; frame < 90 && !car.grounded; frame++) {
+      const step = drive(race)
+      race = step.state
+      const next = requireFixture(race.vehicles[0])
+      expect(next.z).toBeLessThan(car.z)
+      landings += step.events.filter(({ type }) => type === 'vehicle-landed').length
+      car = next
+    }
+    expect(car.grounded).toBe(true)
+    expect(car.z).toBe(0)
     expect(landings).toBe(1)
   })
 
@@ -114,7 +151,7 @@ describe('driving onto a raised road', () => {
   for (const reversed of [false, true]) {
     for (const car of CAR_IDS) {
       it.each([1 / 120, 1 / 60, 1 / 30, 0.05])(
-        `keeps ${car} on top through the ramp and landing (reverse=${reversed}, dt=%s)`,
+        `keeps ${car} grounded across the bridge (reverse=${reversed}, dt=%s)`,
         (dt) => {
           const base = createRace({
             path, playerCar: car, difficulty: 'normal', laps: 2,
@@ -134,7 +171,8 @@ describe('driving onto a raised road', () => {
           }
           let rampFrames = 0
           let deckFrames = 0
-          let minimumClearance = Number.POSITIVE_INFINITY
+          let maximumClearance = 0
+          let airborneFrames = 0
           for (let frame = 0; frame < 8 / dt; frame++) {
             race = stepRace(race, { steering: 0, throttle: 1, braking: false },
               dt, { next: () => 0.5 }).state
@@ -145,19 +183,20 @@ describe('driving onto a raised road', () => {
             if (road.structureHeight <= 0.005) continue
             if (road.structureHeight < 23.99) rampFrames++
             else deckFrames++
-            minimumClearance = Math.min(minimumClearance, vehicle.z - road.height)
+            maximumClearance = Math.max(maximumClearance, Math.abs(vehicle.z - road.height))
+            if (!vehicle.grounded) airborneFrames++
           }
           expect(rampFrames).toBeGreaterThan(2)
           expect(deckFrames).toBeGreaterThan(10)
-          expect(minimumClearance, 'A car entering from the ramp must never fall under its deck')
-            .toBeGreaterThanOrEqual(-0.01)
+          expect(maximumClearance).toBeLessThanOrEqual(0.01)
+          expect(airborneFrames).toBe(0)
         },
       )
     }
   }
 
-  it.each([false, true])('keeps AI traffic above its ramp (reverse=%s)', (reversed) => {
-    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
+  it.each([false, true])('keeps Hard AI traffic grounded across the bridge (reverse=%s)', (reversed) => {
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, reversed })
     const x = reversed ? 1950 : -150
     let race: RaceState = {
       ...base, phase: 'running',
@@ -173,8 +212,8 @@ describe('driving onto a raised road', () => {
       for (const vehicle of race.vehicles) {
         const context = getVehicleStepContext(path, vehicle)
         const road = path.roadSurface.at(context.nearest.index, vehicle)
-        expect(vehicle.z - road.height, `${vehicle.car} frame ${frame}`)
-          .toBeGreaterThanOrEqual(-0.01)
+        expect(vehicle.grounded, `${vehicle.car} frame ${frame}`).toBe(true)
+        expect(vehicle.z, `${vehicle.car} frame ${frame}`).toBeCloseTo(road.height, 6)
       }
     }
   })
