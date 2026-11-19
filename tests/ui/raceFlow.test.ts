@@ -102,7 +102,7 @@ function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessio
   const root = document.createElement('div')
   document.body.append(root)
   let appListener: ((snapshot: AppSnapshot) => void) | undefined
-  let raceListener: ((snapshot: RaceSessionSnapshot) => void) | undefined
+  const raceListeners = new Set<(snapshot: RaceSessionSnapshot) => void>()
   let race = raceSnapshot()
   const controller = {
     snapshot: () => appSnapshot(),
@@ -117,15 +117,14 @@ function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessio
   const mockSession: RaceSessionPort = {
     start: vi.fn(),
     restart: vi.fn(),
+    stop: vi.fn(),
     resetPlayer: vi.fn(),
     setPaused: vi.fn(),
     advance: vi.fn(),
     snapshot: () => race,
     subscribe: vi.fn((listener) => {
-      raceListener = listener
-      return () => {
-        raceListener = undefined
-      }
+      raceListeners.add(listener)
+      return () => raceListeners.delete(listener)
     }),
     destroy: vi.fn(),
   }
@@ -170,7 +169,7 @@ function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessio
     updateApp: (snapshot: AppSnapshot) => appListener?.(snapshot),
     updateRace: (snapshot: RaceSessionSnapshot) => {
       race = snapshot
-      raceListener?.(snapshot)
+      for (const listener of raceListeners) listener(snapshot)
     },
   }
 }
@@ -727,5 +726,38 @@ describe('race UI flow', () => {
     expect(
       root.querySelector('[data-modal="results"] .modal-title')?.textContent,
     ).toBe('SUNK')
+  })
+
+  it('fills in late rival times without replacing the medal dialog or its focused action', () => {
+    const { root, updateApp, updateRace } = setup()
+    const race = raceSnapshot({ phase: 'finished', elapsed: 40 })
+    const result = {
+      outcome: 'finished' as const, trackId: track.id, trackName: track.name, playerPlace: 1,
+      playerTime: 40, playerWrecked: false, newRecord: false, rivalsFinishing: true, highScores: [],
+      standings: [
+        { id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 40, wrecked: false, lap: 3 },
+        { id: 'ai-1', car: 'red' as const, player: false, place: 2, finishTime: null, wrecked: false, lap: 2 },
+        { id: 'ai-2', car: 'yellow' as const, player: false, place: 3, finishTime: null, wrecked: false, lap: 2 },
+      ],
+    }
+    updateRace({ ...race, result })
+    updateApp({ ...appSnapshot({ type: 'results' }), paused: true })
+    const dialog = requiredElement(root, '[data-modal="results"]')
+    const standings = requiredElement(dialog, '[data-results-standings]')
+    const retry = requiredElement(dialog, '[data-action="retry-race"]')
+    retry.focus()
+    expect(standings.textContent).toContain('RACING…')
+
+    const finished = { ...result, standings: result.standings.map((standing) => standing.id === 'ai-1'
+      ? { ...standing, finishTime: 42.5, lap: 3 } : standing) }
+    updateRace({ ...race, result: finished })
+    expect(standings.textContent).toContain('00:42.500')
+    expect(standings.textContent).toContain('RACING…')
+
+    updateRace({ ...race, result: { ...finished, rivalsFinishing: false } })
+    expect(standings.textContent).toContain('UNFINISHED')
+    expect(standings.textContent).not.toContain('RACING…')
+    expect(requiredElement(root, '[data-modal="results"]')).toBe(dialog)
+    expect(document.activeElement).toBe(retry)
   })
 })

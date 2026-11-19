@@ -318,6 +318,23 @@ function advanceVehicle(
 
 export const stepRace: RaceStep = advanceRace
 
+export function isRivalRacing(vehicle: RaceVehicle): boolean {
+  return !vehicle.player && vehicle.finishedAt === null && !vehicle.wrecked
+}
+
+/** Advance only active rivals after the player has finished. */
+export function stepFinishingRivals(state: RaceState, random: RandomSource): RaceState {
+  const rivals = state.vehicles.filter(isRivalRacing)
+  if (rivals.length === 0) return state
+  const frame = advanceRace({ ...state, phase: 'running', vehicles: rivals }, NEUTRAL_INPUT, RACE_TICK_SECONDS, random)
+  let index = 0
+  return {
+    ...frame.state,
+    phase: 'finished',
+    vehicles: state.vehicles.map((vehicle) => isRivalRacing(vehicle) ? frame.state.vehicles[index++] ?? vehicle : vehicle),
+  }
+}
+
 /** Advances one 60 Hz tick while the race is running and unpaused. */
 export function stepRaceTick(
   state: RaceState,

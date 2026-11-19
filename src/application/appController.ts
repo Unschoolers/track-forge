@@ -108,29 +108,34 @@ export class AppController {
       notice: null,
     }
     this.unsubscribeRace = dependencies.raceSession.subscribe((snapshot) => {
-      if (
-        snapshot.result &&
-        this.state.mode === 'race' &&
-        this.state.overlay.type !== 'results'
-      ) {
-        const cup = this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null
-        const scores = this.scoresForTracks(this.state.tracks)
-        const track = this.state.currentTrack
-        const previousMedal = track ? timeMedal(track, this.state.scoresByTrack[track.id] ?? []) : null
-        const earnedMedal = track ? timeMedal(track, scores[track.id] ?? []) : null
-        const rank = (medal: typeof earnedMedal) => medal === 'gold' ? 3 : medal === 'silver' ? 2 : medal === 'bronze' ? 1 : 0
-        const savedCup = cup ? this.persistCup(cup) : null
-        this.update({
-          ...this.state,
-          paused: true,
-          scoresByTrack: scores,
-          newTimeMedal: rank(earnedMedal) > rank(previousMedal) ? earnedMedal : null,
-          cupProgress: savedCup?.progress ?? this.state.cupProgress,
-          cup,
-          overlay: { type: 'results' },
-          notice: savedCup?.notice ?? this.state.notice,
-        })
+      if (!snapshot.result || this.state.mode !== 'race') return
+      if (this.state.overlay.type === 'results') {
+        const { cup } = this.state
+        const { standings } = snapshot.result
+        if (cup?.rounds[cup.index]?.some((driver, index) => driver.id !== standings[index]?.id)) {
+          const updated = recordCupResult(retryCupRace(cup), standings)
+          const { progress, notice } = this.persistCup(updated)
+          this.update({ ...this.state, cup: updated, cupProgress: progress, notice })
+        }
+        return
       }
+      const cup = this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null
+      const scores = this.scoresForTracks(this.state.tracks)
+      const track = this.state.currentTrack
+      const previousMedal = track ? timeMedal(track, this.state.scoresByTrack[track.id] ?? []) : null
+      const earnedMedal = track ? timeMedal(track, scores[track.id] ?? []) : null
+      const rank = (medal: typeof earnedMedal) => medal === 'gold' ? 3 : medal === 'silver' ? 2 : medal === 'bronze' ? 1 : 0
+      const savedCup = cup ? this.persistCup(cup) : null
+      this.update({
+        ...this.state,
+        paused: true,
+        scoresByTrack: scores,
+        newTimeMedal: rank(earnedMedal) > rank(previousMedal) ? earnedMedal : null,
+        cupProgress: savedCup?.progress ?? this.state.cupProgress,
+        cup,
+        overlay: { type: 'results' },
+        notice: savedCup?.notice ?? this.state.notice,
+      })
     })
   }
 
@@ -146,9 +151,6 @@ export class AppController {
     switch (command.type) {
       case 'go-home':
         if (!this.flushPendingEditorSave()) break
-        if (this.state.mode === 'race') {
-          this.dependencies.raceSession.setPaused(true)
-        }
         this.update({
           ...this.state,
           mode: 'home',
@@ -164,12 +166,8 @@ export class AppController {
         if (this.state.currentTrack && OFFICIAL_CIRCUITS.some(({ track }) => track.id === this.state.currentTrack?.id)) {
           const copy = this.library.importShared(this.state.currentTrack)
           if (!copy.ok) { this.update({ ...this.state, notice: copy.message }); break }
-          if (this.state.mode === 'race') this.dependencies.raceSession.setPaused(true)
           this.applyTrackMutation(copy, true)
           break
-        }
-        if (this.state.mode === 'race') {
-          this.dependencies.raceSession.setPaused(true)
         }
         this.update({ ...this.state, cup: null, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
         break
@@ -231,7 +229,7 @@ export class AppController {
         this.startRace()
         break
       case 'pause-race':
-        if (this.state.mode === 'race') {
+        if (this.state.mode === 'race' && this.state.overlay.type !== 'results') {
           this.dependencies.raceSession.setPaused(true)
           this.update({
             ...this.state,
@@ -241,7 +239,7 @@ export class AppController {
         }
         break
       case 'resume-race':
-        if (this.state.mode === 'race') {
+        if (this.state.mode === 'race' && this.state.overlay.type !== 'results') {
           this.dependencies.raceSession.setPaused(false)
           this.update({
             ...this.state,
@@ -280,7 +278,6 @@ export class AppController {
         break
       case 'open-track-library': {
         this.flushPendingEditorSave()
-        if (this.state.mode === 'race') this.dependencies.raceSession.setPaused(true)
         const library = this.librarySnapshot()
         this.update({
           ...this.state,
@@ -725,7 +722,7 @@ export class AppController {
 
   private closeOverlay(): void {
     const overlay = this.state.overlay
-    if (overlay.type === 'cup-final') {
+    if (overlay.type === 'cup-final' || overlay.type === 'results') {
       this.dispatch({ type: 'go-home' })
       return
     }
@@ -866,7 +863,9 @@ export class AppController {
       }
     }
     const normalized = editorUi === state.editorUi ? state : { ...state, editorUi }
+    const leavingRace = this.state.mode === 'race' && normalized.mode !== 'race'
     this.state = normalized
+    if (leavingRace) this.dependencies.raceSession.stop()
     this.events.publish({ type: 'state-changed', snapshot: normalized })
   }
 }

@@ -64,6 +64,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
   const raceSession: RaceSessionPort = {
     start: vi.fn(),
     restart: vi.fn(),
+    stop: vi.fn(),
     resetPlayer: vi.fn(),
     setPaused: vi.fn(),
     advance: vi.fn(),
@@ -282,8 +283,7 @@ describe('AppController', () => {
 
     controller.dispatch({ type: 'go-home' })
 
-    expect(raceSession.setPaused).toHaveBeenLastCalledWith(true)
-    expect(raceSession.setPaused).toHaveBeenCalledTimes(2)
+    expect(raceSession.stop).toHaveBeenCalledOnce()
     expect(controller.snapshot().mode).toBe('home')
   })
 
@@ -300,7 +300,7 @@ describe('AppController', () => {
     controller.dispatch({ type: 'open-editor' })
 
     expect(controller.snapshot()).toMatchObject({ mode: 'editor', paused: false, overlay: { type: 'none' }, currentTrack: { id: 'starter' } })
-    expect(raceSession.snapshot().state?.paused).toBe(true)
+    expect(raceSession.snapshot().state).toBeNull()
     expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
     expect(controller.snapshot().editor.trees).toContainEqual({ x: 4, y: 5 })
     controller.dispatch({ type: 'editor', command: { type: 'undo' } })
@@ -317,12 +317,28 @@ describe('AppController', () => {
     controller.dispatch({ type: 'restart-race' })
     expect(controller.snapshot()).toMatchObject({ mode: 'race', paused: false, overlay: { type: 'none' } })
     expect(raceSession.snapshot().result).toBeNull()
+    raceSession.advance(0.25, input)
+    expect(raceSession.snapshot().state).toMatchObject({ phase: 'countdown', elapsed: 0 })
     raceSession.advance(3.7, input)
     raceSession.advance(0.02, input)
     expect(controller.snapshot().overlay.type).toBe('results')
     controller.dispatch({ type: 'go-home' })
     expect(controller.snapshot()).toMatchObject({ mode: 'home', paused: false, overlay: { type: 'none' } })
-    expect(raceSession.snapshot().state?.paused).toBe(true)
+    expect(raceSession.snapshot().state).toBeNull()
+  })
+
+  it('cancels the rival finish window as soon as the player opens the track picker', () => {
+    const { controller, raceSession } = setup(undefined, true)
+    const input = { steering: 0, throttle: 1, braking: false }
+    controller.dispatch({ type: 'start-race' })
+    raceSession.advance(3.7, input)
+    raceSession.advance(0.02, input)
+    expect(raceSession.snapshot().result?.rivalsFinishing).toBe(true)
+
+    controller.dispatch({ type: 'open-track-library', purpose: 'race' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'track-library' } })
+    raceSession.advance(0.25, input)
+    expect(raceSession.snapshot()).toMatchObject({ state: null, result: null })
   })
 
   it('races the best ghost using the active session setup', () => {

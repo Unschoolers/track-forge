@@ -24,6 +24,7 @@ import { createToast } from '@/ui/toast'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
 import { createResultsModal, createCupFinalModal } from '@/ui/modals/resultsModal'
+import { updateStandings } from '@/ui/components/scoreboard'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 
@@ -279,21 +280,28 @@ export class DomUiHost implements UiHost {
         return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' })) : undefined
       case 'results': {
         const result = this.runtime.raceSession.snapshot().result
-        return result
-          ? createResultsModal(result, {
-              retry: () =>
-                this.controller.dispatch({ type: 'restart-race' }),
-              raceBestGhost: (() => {
-                const { track, setup } = this.runtime.raceSession.snapshot()
-                return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null
-                  ? () => this.controller.dispatch({ type: 'race-best-ghost' }) : undefined
-              })(),
-              changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
-              edit: () =>
-                this.controller.dispatch({ type: 'open-editor' }),
-              home: () => this.controller.dispatch({ type: 'go-home' }),
-            }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined, state.newTimeMedal)
-          : undefined
+        if (!result) return undefined
+        const modal = createResultsModal(result, {
+          retry: () => this.controller.dispatch({ type: 'restart-race' }),
+          raceBestGhost: (() => {
+            const { track, setup } = this.runtime.raceSession.snapshot()
+            return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null
+              ? () => this.controller.dispatch({ type: 'race-best-ghost' }) : undefined
+          })(),
+          changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
+          edit: () => this.controller.dispatch({ type: 'open-editor' }),
+          home: () => this.controller.dispatch({ type: 'go-home' }),
+        }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined, state.newTimeMedal)
+        const standings = modal.querySelector<HTMLElement>('[data-results-standings]')
+        if (standings && result.rivalsFinishing) {
+          let previous = result
+          this.overlayCleanup = this.runtime.raceSession.subscribe(({ result: next }) => {
+            if (!next || next === previous) return
+            previous = next
+            updateStandings(standings, next.standings, next.rivalsFinishing)
+          })
+        }
+        return modal
       }
       case 'track-library':
         return createTrackLibraryModal(state, {
