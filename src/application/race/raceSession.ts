@@ -194,8 +194,8 @@ export class RaceSession implements RaceSessionPort {
       ? this.bestGhost.splits : undefined)
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
-      courseIdentity: resolved.mode === 'normal' && setup.car === 'blue' &&
-        setup.difficulty === 'hard' && setup.handling === 'arcade' ? courseIdentity(track) : undefined,
+      courseIdentity: resolved.mode === 'normal' &&
+        routeKind === 'circuit' && setup.handling === 'arcade' ? courseIdentity(track) : undefined,
       path: this.geometry.get(track).path,
       playerCar: setup.car,
       difficulty: setup.difficulty,

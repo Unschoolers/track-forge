@@ -2,6 +2,17 @@ export type AiPersonality = 'cautious' | 'steady' | 'opportunist'
 
 export type AiPhase = 'follow' | 'passing' | 'rejoin'
 
+export interface RacingLineSection {
+  readonly extraSamples: number
+  readonly laneOffset: number
+  readonly cornerPace: number
+}
+
+export interface RacingLine {
+  readonly sections: readonly RacingLineSection[]
+  readonly speedRatio: number
+}
+
 export interface AiDriverState {
   readonly personality?: AiPersonality
   readonly passTargetId?: string | null

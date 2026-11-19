@@ -1,4 +1,4 @@
-import { EMILE_COURSE } from '@/domain/race/ai/emileRematch'
+import { EMILE_COURSE, EMILE_RACING_LINES, EMILE_SPEED_RATIOS } from '@/domain/race/ai/emileRacingLines'
 import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
 import { DIFFICULTY_SPECS, ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -120,8 +120,8 @@ export function createRace(options: CreateRaceOptions): RaceState {
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
       : CAR_IDS.filter((car) => car !== options.playerCar)
 
-  const rematch = options.courseIdentity === EMILE_COURSE && options.playerCar === 'blue' &&
-    options.difficulty === 'hard' && options.handling === 'arcade' && !options.reversed &&
+  const emile = options.courseIdentity === EMILE_COURSE &&
+    options.handling === 'arcade' && !options.reversed &&
     options.routeKind !== 'point-to-point'
   const open = options.routeKind === 'point-to-point'
   const startDistance =
@@ -151,11 +151,16 @@ export function createRace(options: CreateRaceOptions): RaceState {
       placement.pathIndex,
       position,
     )
+    const car = index === 0 ? options.playerCar : (aiCars[index - 1] ?? 'blue')
+    const racingLine = emile && index > 0 ? {
+      sections: EMILE_RACING_LINES[car],
+      speedRatio: EMILE_SPEED_RATIOS[options.difficulty],
+    } : undefined
     return {
       id: index === 0 ? 'player' : `ai-${index}`,
-      car: index === 0 ? options.playerCar : (aiCars[index - 1] ?? 'blue'),
+      car,
       player: index === 0,
-      ...(rematch && index === 1 ? { emileRematch: true as const } : {}),
+      ...(racingLine ? { racingLine } : {}),
       ...position,
       angle: Math.atan2(placement.tangent.y, placement.tangent.x),
       vx: 0,
