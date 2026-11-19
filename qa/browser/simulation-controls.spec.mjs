@@ -56,6 +56,12 @@ test('Simulation starts stationary and keeps steering, gas and brake independent
   expect(canvas).not.toBeNull()
   expect(gasBox).not.toBeNull()
   expect(brakeBox).not.toBeNull()
+  const pedalSize = await page.evaluate(() =>
+    window.matchMedia('(max-width: 400px), (max-height: 320px)').matches ? 80 : 110)
+  for (const box of [gasBox, brakeBox]) {
+    expect(box.width).toBeCloseTo(pedalSize)
+    expect(box.height).toBeCloseTo(pedalSize)
+  }
   const midX = canvas.x + canvas.width / 2
   const accelerator = contact(2, gasBox.x + gasBox.width / 2, gasBox.y + gasBox.height / 2)
   const pedal = contact(3, brakeBox.x + brakeBox.width / 2, brakeBox.y + brakeBox.height / 2)
@@ -104,6 +110,7 @@ test('Simulation starts stationary and keeps steering, gas and brake independent
     const gasNext = await gas.boundingBox()
     const brakeNext = await brake.boundingBox()
     expect(left.x).toBeGreaterThan(gasNext.x)
+    expect(Math.max(gasNext.x + gasNext.width, brakeNext.x + brakeNext.width)).toBeLessThan(left.x)
     expect(left.x + left.width).toBeLessThan(right.x)
     for (const box of [left, right, gasNext, brakeNext]) {
       expect(box.width).toBeGreaterThanOrEqual(44)
