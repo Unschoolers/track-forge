@@ -44,14 +44,18 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 .editor-scenery-choices .editor-segmented-button { white-space: normal; line-height: 1.15; }
 .editor-menu-environment { display: grid; gap: .35rem; }
 .editor-actions { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: var(--editor-track-actions-bottom); display: flex; gap: .4rem; }
-.race-controls { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: max(.75rem, env(safe-area-inset-bottom)); left: max(.75rem, env(safe-area-inset-left)); display: flex; gap: .5rem; }
+.race-controls { --race-control-gap: .5rem; position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: max(.75rem, env(safe-area-inset-bottom)); left: max(.75rem, env(safe-area-inset-left)); display: flex; gap: var(--race-control-gap); container-type: inline-size; }
 .race-hud { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: .35rem; padding: .45rem max(.5rem, env(safe-area-inset-right)) .45rem max(.5rem, env(safe-area-inset-left)); }
 .race-controls { justify-content: space-between; align-items: end; }
 .race-controls[data-hand='right'] { flex-direction: row-reverse; }
 .race-steering { min-width: 0; }
-.steering-buttons { gap: .5rem; }
-.race-pedals { display: grid; flex: 0 0 auto; justify-items: center; gap: .5rem; }
+.steering-buttons { gap: var(--race-control-gap); }
+.race-pedals { display: grid; flex: 0 0 auto; justify-items: center; gap: var(--race-control-gap); }
 .race-pedals.simulation { grid-template-columns: repeat(2, auto); }
+.race-controls[data-layout='buttons'] .race-pedals.simulation {
+  /* Leave room for both steering buttons and the three horizontal gaps. */
+  --fitted-pedal-size: min(var(--pedal-size), calc((100cqi - 2 * var(--steer-button-size) - 3 * var(--race-control-gap)) / 2));
+}
 .race-pedals.simulation .recover-button { grid-column: 1 / -1; }
 .modal-overlay { position: absolute; z-index: 20; inset: 0; display: grid; place-items: center; padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom)); background: rgb(3 6 10 / 78%); pointer-events: auto; backdrop-filter: blur(.65rem); }
 .modal-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(38rem, 100%); max-height: 100%; overflow: hidden; border: 1px solid var(--color-line); border-radius: var(--radius-lg); background: rgb(20 26 36 / 97%); box-shadow: var(--shadow-deep); }
