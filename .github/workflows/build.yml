@@ -43,16 +43,20 @@ jobs:
             sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
           fi
       - run: npm ci
-      - run: npm test -- --maxWorkers=4
-      - run: npm run lint
-      - run: npm run build
-      - run: npx cap sync android
       - name: Set unique Android build version
         id: version
         run: |
           node scripts/android-build-policy.mjs version "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/trackforge-version.env"
           cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_OUTPUT"
+      - run: npm test -- --maxWorkers=4
+      - run: npm run lint
+      - name: Build web assets with embedded release identity
+        run: npm run build
+        env:
+          VITE_TRACKFORGE_BUILD_RUN: ${{ steps.version.outputs.TRACKFORGE_BUILD_RUN }}
+          VITE_TRACKFORGE_BUILD_ATTEMPT: ${{ steps.version.outputs.TRACKFORGE_BUILD_ATTEMPT }}
+      - run: npx cap sync android
       - name: Test native Android behavior and assemble unsigned APK
         run: cd android && ./gradlew testDebugUnitTest assembleDebug --build-cache
       - name: Verify unsigned APK metadata
