@@ -1,3 +1,4 @@
+import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -72,9 +73,15 @@ export function updateOpenRouteProgress(
   const last = path.points.length - 1
   const index = Math.max(0, Math.min(last, nextPathIndex))
   const result = { ...vehicle, pathIndex: index }
-  if (last < 1 || previous.finishedAt !== null || !onRoadBefore || !onRoadAfter) return result
+  if (last < 1 || previous.finishedAt !== null) return result
   const gate = previous.nextSector
-  if (!crossesRoadGate(path, previous, result, last * gate / 4, roadRadius)) return result
+  // A diagonal crossing can clip the road edge for one frame. Validate the
+  // swept crossing against the visible checkpoint stripe in that case instead
+  // of rejecting it solely because an endpoint was classified off-road.
+  const crossingRadius = onRoadBefore && onRoadAfter
+    ? roadRadius
+    : Math.min(roadRadius, ROAD_GEOMETRY.checkpointHalfWidth)
+  if (!crossesRoadGate(path, previous, result, last * gate / 4, crossingRadius)) return result
   return gate === 4
     ? { ...result, lap: previous.lap + 1, finishedAt: elapsed }
     : { ...result, nextSector: (gate + 1) as 2 | 3 | 4 }
@@ -83,8 +90,8 @@ export function updateOpenRouteProgress(
 /** A forward crossing must stay on the route near this gate, even at crossings. */
 export function crossesRoadGate(
   path: RoadPath,
-  previous: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
-  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
+  previous: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'z'>>,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'z'>>,
   gatePosition: number,
   roadRadius: number,
   reversed = false,
@@ -113,5 +120,15 @@ export function crossesRoadGate(
   const t = -before / (after - before)
   const x = previous.x + (vehicle.x - previous.x) * t - gx
   const y = previous.y + (vehicle.y - previous.y) * t - gy
-  return Math.abs(-x * ty + y * tx) <= roadRadius
+  if (Math.abs(-x * ty + y * tx) > roadRadius) return false
+
+  // Checkpoint ribbons can lie on a bridge. A car crossing beneath that
+  // ribbon must not get credit merely because its 2D projection overlaps it.
+  const road = path.roadSurface.at(lower, { x: gx, y: gy })
+  const chassisHeight = Math.max(previous.z ?? Number.NaN, vehicle.z ?? Number.NaN)
+  const halfLevel = WORLD_ELEVATION.levelHeight / 2
+  if (Number.isFinite(chassisHeight) &&
+      road.structureHeight > halfLevel &&
+      road.height - chassisHeight > halfLevel) return false
+  return true
 }

@@ -169,8 +169,14 @@ function advanceArcadeTimingGate(
   if (!crossedLine && (path.closed || !onRoad || !passedPendingCheckpoint(path, vehicle))) {
     return { vehicle, missedCheckpoint }
   }
-  if (crossedLine && onRoad && wasOnRoad() &&
-      crossesRoadGate(path, previous, vehicle, position, ROAD_GEOMETRY.onRoadRadius, reversed)) {
+  // Road classification at a diagonal gate can change on the crossing frame.
+  // If either endpoint falls off the road, require the actual swept crossing
+  // to intersect the painted stripe rather than granting a grass shortcut.
+  const crossingRadius = onRoad && wasOnRoad()
+    ? ROAD_GEOMETRY.onRoadRadius
+    : ROAD_GEOMETRY.checkpointHalfWidth
+  if (crossedLine &&
+      crossesRoadGate(path, previous, vehicle, position, crossingRadius, reversed)) {
     if (gate === 4) {
       const lap = previous.lap + 1
       return {

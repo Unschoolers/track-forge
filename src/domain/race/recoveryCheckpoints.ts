@@ -12,7 +12,7 @@ export function reachedRecoveryCheckpoint(
   onRoad: boolean,
 ): number | null {
   const last = previous.lap === vehicle.lap ? previous.recoveryCheckpoint ?? null : null
-  if (!onRoad || !race.recoveryCheckpoints?.length || vehicle.finishedAt !== null) return last
+  if (!race.recoveryCheckpoints?.length || vehicle.finishedAt !== null) return last
   const length = race.path.points.length
   const direction = race.reversed ? -1 : 1
   const forwardDistance = (from: number, to: number): number => {
@@ -27,7 +27,10 @@ export function reachedRecoveryCheckpoint(
     const distance = forwardDistance(previous.pathIndex, index)
     // A recovery cannot land on the far side of a missed timing gate.
     if (fromStart >= nextRequiredGate || distance < furthest) continue
-    if (crossesRoadGate(race.path, previous, vehicle, index, ROAD_GEOMETRY.onRoadRadius, race.reversed)) {
+    // At angled checkpoints the car may be just off the sampled road at one
+    // endpoint even though it actually crossed the painted gate on the asphalt.
+    const radius = onRoad ? ROAD_GEOMETRY.onRoadRadius : ROAD_GEOMETRY.checkpointHalfWidth
+    if (crossesRoadGate(race.path, previous, vehicle, index, radius, race.reversed)) {
       checkpoint = index
       furthest = distance
     }
