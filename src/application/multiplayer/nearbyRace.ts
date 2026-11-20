@@ -423,7 +423,11 @@ export class NearbyRace {
     if (!ids.length) return
     const active = this.generation
     void this.transport.send(ids, controlBytes(message)).catch(() => {
-      if (active === this.generation) this.fail('A nearby race message could not be sent.')
+      if (active !== this.generation) return
+      if (message.type === 'finish' || message.type === 'left') {
+        this.error = 'A player did not receive the latest race result.'
+        this.changed()
+      } else this.fail('A nearby race message could not be sent.')
     })
   }
 

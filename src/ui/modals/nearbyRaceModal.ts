@@ -77,7 +77,11 @@ export function createNearbyRaceResults(nearby: NearbyRace, result: RaceResult, 
   }
   const list = element('ol', 'scoreboard')
   list.setAttribute('aria-live', 'polite')
+  const status = element('p', 'modal-subtitle')
+  status.setAttribute('role', 'status')
   function update() {
+    status.textContent = nearby.snapshot().error ?? ''
+    status.hidden = !status.textContent
     list.replaceChildren(...nearby.standings().map(({ slot, car, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
       const label = local ? 'You' : `Player ${slot + 1}`
@@ -89,7 +93,7 @@ export function createNearbyRaceResults(nearby: NearbyRace, result: RaceResult, 
     }))
   }
   update()
-  frame.body.append(list)
+  frame.body.append(list, status)
   frame.footer.append(button('LEAVE ROOM', 'results-home', home, 'button button-primary'))
   return { element: frame.overlay, cleanup: nearby.subscribe(update) }
 }

@@ -50,11 +50,11 @@ public class NearbyRacePlugin extends Plugin {
     private static final int MAX_BYTES = 16_003;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Set<String> connected = new HashSet<>();
-    private final Map<Long, PoseSend> pendingPoses = new HashMap<>();
+    private final Map<Long, PendingSend> pendingSends = new HashMap<>();
     private ConnectionsClient client;
     private int generation;
 
-    private record PoseSend(PluginCall call, Set<String> remaining) {}
+    private record PendingSend(PluginCall call, Set<String> remaining) {}
 
     private ConnectionsClient client() {
         if (client == null) client = Nearby.getConnectionsClient(getContext());
@@ -152,18 +152,18 @@ public class NearbyRacePlugin extends Plugin {
             }
             if (recipients.isEmpty()) { call.resolve(); return; }
             Payload payload = Payload.fromBytes(bytes);
-            if (bytes[0] != 1) {
-                resolve(client().sendPayload(new ArrayList<>(recipients), payload), call, "Could not send nearby data.");
-                return;
-            }
             long id = payload.getId();
-            pendingPoses.put(id, new PoseSend(call, recipients));
-            client().sendPayload(new ArrayList<>(recipients), payload).addOnFailureListener(error -> finishPose(id));
+            boolean pose = bytes[0] == 1;
+            // Task success means the transfer was queued. Keep control and track
+            // packets pending until each endpoint reports successful delivery.
+            pendingSends.put(id, new PendingSend(call, recipients));
+            client().sendPayload(new ArrayList<>(recipients), payload)
+                .addOnFailureListener(error -> finishSend(id, "Could not send nearby data."));
             main.postDelayed(() -> {
-                if (!pendingPoses.containsKey(id)) return;
+                if (!pendingSends.containsKey(id)) return;
                 client().cancelPayload(id);
-                finishPose(id);
-            }, 250);
+                finishSend(id, "Nearby data transfer timed out.");
+            }, pose ? 250 : 10_000);
         });
     }
 
@@ -184,8 +184,8 @@ public class NearbyRacePlugin extends Plugin {
             client.stopAllEndpoints();
         }
         connected.clear();
-        pendingPoses.values().forEach(pose -> pose.call().resolve());
-        pendingPoses.clear();
+        pendingSends.values().forEach(send -> send.call().resolve());
+        pendingSends.clear();
     }
 
     private ConnectionLifecycleCallback lifecycle(int active) {
@@ -226,17 +226,23 @@ public class NearbyRacePlugin extends Plugin {
 
             @Override public void onPayloadTransferUpdate(String endpoint, PayloadTransferUpdate update) {
                 if (active != generation || update.getStatus() == PayloadTransferUpdate.Status.IN_PROGRESS) return;
-                PoseSend pending = pendingPoses.get(update.getPayloadId());
-                if (pending != null && pending.remaining().remove(endpoint) && pending.remaining().isEmpty()) {
-                    finishPose(update.getPayloadId());
+                long id = update.getPayloadId();
+                PendingSend pending = pendingSends.get(id);
+                if (pending == null || !pending.remaining().remove(endpoint)) return;
+                if (update.getStatus() != PayloadTransferUpdate.Status.SUCCESS) {
+                    finishSend(id, "Nearby data could not reach a player.");
+                } else if (pending.remaining().isEmpty()) {
+                    finishSend(id, null);
                 }
             }
         };
     }
 
-    private void finishPose(long id) {
-        PoseSend pending = pendingPoses.remove(id);
-        if (pending != null) pending.call().resolve();
+    private void finishSend(long id, String error) {
+        PendingSend pending = pendingSends.remove(id);
+        if (pending == null) return;
+        if (error == null) pending.call().resolve();
+        else pending.call().reject(error);
     }
 
     private void emit(int active, String type, String id, String key, String value) {
