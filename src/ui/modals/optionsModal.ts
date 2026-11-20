@@ -12,6 +12,9 @@ import { createModalFrame } from '@/ui/modals/modalFrame'
 type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
 const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<void> }>('TrackForgeUpdates')
 
+type OptionsTab = 'race' | 'audio' | 'controls' | 'updates'
+let selectedOptionsTab: OptionsTab = 'race'
+
 export function createOptionsModal(
   state: AppSnapshot,
   actions: {
@@ -29,6 +32,14 @@ export function createOptionsModal(
     actions.close,
     'options-modal',
   )
+  const tabSections = new Map<OptionsTab, HTMLElement>()
+  const capture = (tab: OptionsTab, from: number) => {
+    const section = element('section', 'options-tab-panel')
+    section.dataset.optionsTab = tab
+    section.append(...Array.from(frame.body.children).slice(from))
+    tabSections.set(tab, section)
+  }
+  const raceStart = frame.body.children.length
   if (state.overlay.type !== 'options' || state.overlay.returnTo !== 'race') {
     const raceSettings = element('section', 'options-race-settings')
     raceSettings.append(element('h3', 'setup-label', 'Race settings'))
@@ -99,6 +110,8 @@ export function createOptionsModal(
     raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
   }
+  capture('race', raceStart)
+  const audioStart = frame.body.children.length
   const volumes = audioVolumes(state.preferences)
   frame.body.append(element('h3', 'setup-label', 'Audio'))
   for (const [setting, label] of [['musicVolume', 'Music'], ['soundEffectsVolume', 'Sound Effects']] as const) {
@@ -136,6 +149,8 @@ export function createOptionsModal(
         }),
     ),
   )
+  capture('audio', audioStart)
+  const controlsStart = frame.body.children.length
   frame.body.append(element('h3', 'setup-label', 'Controls'))
   const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize'>(
     title: string, key: K, values: readonly NonNullable<AppSnapshot['preferences'][K]>[], fallback: NonNullable<AppSnapshot['preferences'][K]>,
@@ -175,6 +190,8 @@ export function createOptionsModal(
   }
   steering.append(choices)
   if ((state.preferences.steeringLayout ?? 'drag') === 'drag') frame.body.append(steering)
+  capture('controls', controlsStart)
+  const updatesStart = frame.body.children.length
   if (Capacitor.isNativePlatform()) {
     frame.body.append(element('h3', 'setup-label', 'Game updates'))
     const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Android build.')
@@ -283,6 +300,47 @@ export function createOptionsModal(
       status.textContent = error instanceof Error ? error.message : 'Could not restore download.'
     })
   }
+  if (Capacitor.isNativePlatform()) capture('updates', updatesStart)
+  const tabs = element('div', 'choice-row options-tab-list')
+  tabs.setAttribute('role', 'tablist')
+  tabs.setAttribute('aria-label', 'Options categories')
+  const available = Array.from(tabSections.keys())
+  if (!available.includes(selectedOptionsTab)) selectedOptionsTab = available[0] ?? 'audio'
+  const buttons = new Map<OptionsTab, HTMLButtonElement>()
+  const selectTab = (tab: OptionsTab) => {
+    selectedOptionsTab = tab
+    for (const [key, panel] of tabSections) {
+      const active = key === tab
+      panel.hidden = !active
+      panel.style.display = active ? '' : 'none'
+      buttons.get(key)?.setAttribute('aria-selected', String(active))
+      buttons.get(key)?.classList.toggle('active', active)
+      buttons.get(key)?.setAttribute('tabindex', active ? '0' : '-1')
+    }
+  }
+  for (const tab of available) {
+    const choice = button(tab.toUpperCase(), `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
+    choice.setAttribute('role', 'tab')
+    choice.setAttribute('aria-controls', `options-panel-${tab}`)
+    choice.id = `options-tab-${tab}`
+    const panel = tabSections.get(tab)!
+    panel.id = `options-panel-${tab}`
+    panel.setAttribute('role', 'tabpanel')
+    panel.setAttribute('aria-labelledby', choice.id)
+    buttons.set(tab, choice)
+    tabs.append(choice)
+  }
+  tabs.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+    const index = available.indexOf(selectedOptionsTab)
+    const next = available[(index + (event.key === 'ArrowRight' ? 1 : -1) + available.length) % available.length]
+    selectTab(next)
+    buttons.get(next)?.focus()
+    event.preventDefault()
+  })
+  frame.body.prepend(tabs)
+  for (const panel of tabSections.values()) frame.body.append(panel)
+  selectTab(selectedOptionsTab)
   frame.footer.append(
     button('DONE', 'options-done', actions.close, 'button button-primary'),
   )
