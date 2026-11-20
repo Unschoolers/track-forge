@@ -39,6 +39,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   await expect.poll(async () => (await music())?.time).toBeGreaterThan(0)
 
   const options = page.getByRole('dialog', { name: 'Options' })
+  await options.getByRole('tab', { name: 'AUDIO' }).tap()
   const soundtrack = options.getByRole('slider', { name: 'Music', exact: true })
   const effects = options.getByRole('slider', { name: 'Sound Effects', exact: true })
   await soundtrack.press('Home')
@@ -51,6 +52,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   await page.reload()
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'OPTIONS' }).tap()
+  await options.getByRole('tab', { name: 'AUDIO' }).tap()
   await expect(soundtrack).toHaveValue('100')
   await expect(effects).toHaveValue('0')
   await options.getByRole('button', { name: 'DONE' }).tap()
