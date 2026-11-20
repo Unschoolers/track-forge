@@ -178,7 +178,11 @@ public class NearbyRacePlugin extends Plugin {
 
     private void stopConnections() {
         generation++;
-        if (client != null) client.stopAllEndpoints();
+        if (client != null) {
+            client.stopAdvertising();
+            client.stopDiscovery();
+            client.stopAllEndpoints();
+        }
         connected.clear();
         pendingPoses.values().forEach(pose -> pose.call().resolve());
         pendingPoses.clear();

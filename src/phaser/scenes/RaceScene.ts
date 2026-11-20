@@ -197,7 +197,7 @@ export class RaceScene extends Phaser.Scene {
     benchmark?.beginSimulation()
     this.raceSession.advance(
       Math.max(0, this.game.loop.rawDelta / 1000),
-      inputForHandling(this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
+      inputForHandling(this.snapshot.paused ? { steering: 0, throttle: 0, braking: false } : this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
     )
     benchmark?.endSimulation()
     const race = this.raceSession.snapshot().state
@@ -274,8 +274,9 @@ export class RaceScene extends Phaser.Scene {
         x + Math.cos(angle - 2.4) * 10, y + Math.sin(angle - 2.4) * 10,
       )
     }
-    const ghost = this.raceSession.snapshot().ghost
-    if (ghost) {
+    const replayGhost = this.raceSession.snapshot().ghost
+    const liveGhosts = this.raceSession.nearbyGhosts?.() ?? []
+    for (const ghost of replayGhost ? [replayGhost, ...liveGhosts] : liveGhosts) {
       const raised = ghost.structureRunId !== null ||
         ghost.z - race.path.terrainSurface.heightAt(ghost) > 10
       renderGhostVehicle(
@@ -349,13 +350,13 @@ export class RaceScene extends Phaser.Scene {
     }
     if (event.key.toLowerCase() === 'r' && !event.repeat) {
       const state = this.raceSession.snapshot().state
-      if (state?.phase !== 'running' || state.paused) return
+      if (state?.phase !== 'running' || state.paused || this.controller.snapshot().paused) return
       this.controls.reset()
       this.raceSession.resetPlayer()
       return
     }
     const race = this.raceSession.snapshot().state
-    if (race?.paused || race?.phase === 'finished') return
+    if (race?.paused || race?.phase === 'finished' || this.controller.snapshot().paused) return
     this.controls.setKeyboard(event.key, true)
   }
   private readonly onKeyUp = (event: KeyboardEvent): void => {

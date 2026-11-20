@@ -7,11 +7,7 @@ export const POSE_PERIOD_MS = 50
 const SCALE = 32
 const TURN = 2 * Math.PI
 
-export const enum Packet {
-  Control = 0,
-  Pose = 1,
-  Track = 2,
-}
+export const Packet = { Control: 0, Pose: 1, Track: 2 } as const
 
 export interface PosePacket {
   readonly slot: number
@@ -36,18 +32,20 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
 }
 
 export function decodePose(bytes: Uint8Array): PosePacket | null {
-  if (bytes.length !== POSE_BYTES || bytes[0] !== Packet.Pose || bytes[1]! > 7) return null
+  if (bytes.length !== POSE_BYTES || bytes[0] !== Packet.Pose) return null
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const flags = view.getUint8(1)
+  if (flags > 7) return null
   return {
-    slot: bytes[1]! & 3,
+    slot: flags & 3,
     sequence: view.getUint16(3, true),
-    recovery: bytes[2]!,
+    recovery: view.getUint8(2),
     pose: {
       x: view.getInt32(5, true) / SCALE,
       y: view.getInt32(9, true) / SCALE,
       z: view.getInt32(13, true) / SCALE,
       angle: view.getUint16(17, true) * TURN / 65536,
-      structureRunId: bytes[1]! & 4 ? 'elevated' : null,
+      structureRunId: flags & 4 ? 'elevated' : null,
     },
   }
 }
@@ -82,8 +80,9 @@ export class RemoteGhost {
 
   pose(now: number): GhostPose | null {
     const last = this.frames.at(-1)
-    if (!last || now - this.arrival > 750) return null
-    const target = Math.min(last.t, Math.max(this.frames[0]!.t, now - 100))
+    const first = this.frames[0]
+    if (!first || !last || now - this.arrival > 750) return null
+    const target = Math.min(last.t, Math.max(first.t, now - 100))
     return ghostPoseAt({ car: this.car, frames: this.frames, time: last.t }, target)
   }
 }

@@ -1,3 +1,6 @@
+import { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import { createAndroidNearby } from '@/infrastructure/multiplayer/androidNearby'
+import { validateTrack } from '@/domain/track/trackValidation'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
 import { audioVolumes, musicGain, type AudioVolumeSetting } from '@/application/audioVolume'
@@ -66,6 +69,9 @@ const scheduler: Scheduler = {
 
 const scoreStore = new BrowserScoreRepository(storage)
 const geometry = new TrackGeometryService()
+const nearbyTransport = createAndroidNearby()
+const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
+  (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
 const toneSink = new BrowserToneSink()
 const music = new BrowserMusicPlayer<'menu' | TrackEnvironmentId>({
@@ -82,6 +88,7 @@ const feedback = new FeedbackRouter({
   ),
 })
 const raceSession = new RaceSession({
+  nearby,
   scoreStore,
   ghostStore: new BrowserGhostRepository(storage),
   random: mathRandom,
@@ -90,6 +97,7 @@ const raceSession = new RaceSession({
 })
 const raceControls = new RaceInputController()
 const controller = new AppController({
+  nearby,
   cupStore: new BrowserCupRepository(storage),
   trackStore,
   scoreStore,
@@ -100,6 +108,7 @@ const controller = new AppController({
   geometry,
 })
 const uiHost = new DomUiHost(uiRoot, controller, {
+  nearby,
   raceSession,
   raceControls,
   feedback,
@@ -216,6 +225,12 @@ export function enterGame(): void {
   document.addEventListener('keydown', unlockAudio)
 }
 
+function background(): void {
+  if (raceSession.snapshot().setup?.mode === 'nearby' && !raceSession.snapshot().result) {
+    controller.dispatch({ type: 'leave-nearby' })
+  } else handleBackground(controller)
+}
+
 let nativePaused = false
 function syncForeground(): void {
   const active = !document.hidden && !nativePaused
@@ -225,7 +240,7 @@ function syncForeground(): void {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) handleBackground(controller)
+  if (document.hidden) background()
   syncForeground()
 })
 
@@ -238,7 +253,7 @@ window.addEventListener('pageshow', syncForeground)
 window.addEventListener('trackforge:pause', () => {
   nativePaused = true
   syncForeground()
-  handleBackground(controller)
+  background()
 })
 window.addEventListener('trackforge:resume', () => {
   nativePaused = false

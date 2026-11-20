@@ -27,7 +27,7 @@ export async function packTrack(track: Track): Promise<Uint8Array[]> {
 }
 
 export class TrackReceiver {
-  private readonly chunks = new Map<number, Uint8Array>()
+  private readonly chunks = new Map<number, Uint8Array<ArrayBuffer>>()
   private count: number | undefined
 
   async receive(packet: Uint8Array<ArrayBuffer>): Promise<Track | null> {
@@ -39,7 +39,7 @@ export class TrackReceiver {
     this.count = count
     this.chunks.set(index, packet.subarray(3))
     if (this.chunks.size !== count) return null
-    const parts = Array.from({ length: count }, (_, i) => this.chunks.get(i)!)
+    const parts = [...this.chunks].sort(([a], [b]) => a - b).map(([, part]) => part)
     this.chunks.clear()
     const reader = new Blob(parts).stream().pipeThrough(new DecompressionStream('gzip')).getReader()
     const decoder = new TextDecoder('utf-8', { fatal: true })

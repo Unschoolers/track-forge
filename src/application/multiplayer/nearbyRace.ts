@@ -37,7 +37,7 @@ export interface NearbyStart extends Course {
 type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'racing'
 type Control =
   | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode }
-  | { type: 'ready'; car: CarId; sentAt: number }
+  | { type: 'ready'; car: CarId }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number }
   | { type: 'finish'; slot: number; time: number | null }
   | { type: 'left'; slot: number }
@@ -70,7 +70,7 @@ function readControl(bytes: Uint8Array): Control | null {
           Number.isInteger(value.laps) && value.laps >= 1 && value.laps <= 5 &&
           (value.lighting === 'day' || value.lighting === 'night') ? value : null
       case 'ready':
-        return CAR_IDS.includes(value.car) && Number.isFinite(value.sentAt) ? value : null
+        return CAR_IDS.includes(value.car) ? value : null
       case 'start':
         return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
           value.cars.every((car) => car === null || CAR_IDS.includes(car)) &&
@@ -97,12 +97,14 @@ export class NearbyRace {
   private room: string | null = null
   private hostId: string | null = null
   private course: Course | null = null
-  private localCar: CarId = CAR_IDS[0]!
+  private localCar: CarId = CAR_IDS[0]
   private readonly rooms = new Map<string, string>()
   private readonly pairs = new Map<string, string>()
+  private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
   private readonly ready = new Map<string, { car: CarId; receivedAt: number }>()
   private readonly racers = new Map<number, Racer>()
+  private readonly forwarding = new Set<string>()
   private receiver: TrackReceiver | null = null
   private prepared: Pick<Course, 'laps' | 'lighting'> | null = null
   private readySentAt = 0
@@ -125,7 +127,7 @@ export class NearbyRace {
     return {
       phase: this.phase, error: this.error, room: this.room, track: this.course?.track.name,
       rooms: [...this.rooms], pairing: [...this.pairs], players: 1 + this.guests.size,
-      canStart: this.phase === 'hosting' && this.guests.size > 0 && this.pairs.size === 0,
+      canStart: this.phase === 'hosting' && this.guests.size > 0 && this.pairs.size === 0 && this.pendingPairs.size === 0,
     }
   }
 
@@ -135,9 +137,11 @@ export class NearbyRace {
   host(course: Course): void {
     if (this.phase !== 'idle') return
     this.course = course
-    this.room = `Room ${1000 + crypto.getRandomValues(new Uint16Array(1))[0]! % 9000}`
+    const random = crypto.getRandomValues(new Uint16Array(1))[0] ?? 0
+    const room = `Room ${1000 + random % 9000}`
+    this.room = room
     const active = this.begin('opening')
-    this.perform(() => this.transport.host(this.room!), active, () => this.setPhase('hosting'))
+    this.perform(() => this.transport.host(room), active, () => this.setPhase('hosting'))
   }
 
   scan(car: CarId): void {
@@ -148,9 +152,10 @@ export class NearbyRace {
   }
 
   connect(id: string): void {
-    if (this.phase !== 'scanning' || !this.rooms.has(id)) return
+    const room = this.rooms.get(id)
+    if (this.phase !== 'scanning' || !room) return
     this.hostId = id
-    this.room = this.rooms.get(id)!
+    this.room = room
     this.setPhase('connecting')
     this.armTimeout('Could not connect to the nearby room.')
     this.perform(() => this.transport.connect(id), this.generation)
@@ -239,8 +244,6 @@ export class NearbyRace {
     this.starts.clear()
   }
 
-  private readonly pendingPairs = new Set<string>()
-
   private onEvent(event: NearbyEvent): void {
     if (this.phase === 'idle') return
     switch (event.type) {
@@ -306,7 +309,7 @@ export class NearbyRace {
         this.receiver = null
         this.course = { ...this.prepared, track, car: this.localCar }
         this.readySentAt = this.now()
-        this.sendControl([id], { type: 'ready', car: this.localCar, sentAt: this.readySentAt })
+        this.sendControl([id], { type: 'ready', car: this.localCar })
         this.changed()
       }).catch((error: unknown) => {
         if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not load the nearby track.')
@@ -338,8 +341,6 @@ export class NearbyRace {
     }
   }
 
-  private readonly forwarding = new Set<string>()
-
   private relayPose(id: string, bytes: Uint8Array): void {
     const recipients = this.endpoints(id)
     if (!recipients.length || this.forwarding.has(id)) return
@@ -353,7 +354,11 @@ export class NearbyRace {
   private startHost(): void {
     if (!this.course) return
     const cars: (CarId | null)[] = [this.course.car, null, null, null]
-    for (const [id, slot] of this.guests) cars[slot] = this.ready.get(id)!.car
+    for (const [id, slot] of this.guests) {
+      const guest = this.ready.get(id)
+      if (!guest) return
+      cars[slot] = guest.car
+    }
     const startsAt = this.now() + 4000
     for (const [id, guest] of this.ready) {
       const now = this.now()
@@ -381,7 +386,15 @@ export class NearbyRace {
     this.pairs.delete(id)
     this.pendingPairs.delete(id)
     if (id === this.hostId) {
-      this.fail('The host left the nearby room.')
+      if (this.phase !== 'racing') {
+        this.fail('The host left the nearby room.')
+        return
+      }
+      this.hostId = null
+      for (const [slot, racer] of this.racers) {
+        if (slot !== this.slot && racer.time === undefined) racer.left = true
+      }
+      this.changed()
       return
     }
     const slot = this.guests.get(id)
