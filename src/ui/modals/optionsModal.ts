@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
 import type { AppSnapshot } from '@/application/appState'
 import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
@@ -8,6 +8,8 @@ import { createToggleRow } from '@/ui/components/toggleRow'
 import { createVolumeRow } from '@/ui/components/volumeRow'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
+
+const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<{ downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }> }>('TrackForgeUpdates')
 
 export function createOptionsModal(
   state: AppSnapshot,
@@ -188,13 +190,57 @@ export function createOptionsModal(
           return
         }
         status.textContent = `New version available: ${update.version}`
-        const link = document.createElement('a')
-        link.href = update.url
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        link.textContent = 'OPEN DOWNLOAD PAGE'
-        link.className = 'button'
-        frame.body.append(link)
+        const download = button('DOWNLOAD APK', 'download-update', () => {
+          download.disabled = true
+          status.textContent = 'Starting Android download…'
+          const progress = document.createElement('progress')
+          progress.setAttribute('aria-label', 'APK download progress')
+          progress.style.width = '100%'
+          progress.setAttribute('max', '100')
+          const progressText = element('p', 'modal-subtitle', 'Preparing download…')
+          frame.body.append(progress, progressText)
+          void updates.download({ url: update.apkUrl, version: update.version }).then(({ downloadId }) => {
+            status.textContent = `Downloading ${update.version}`
+            const timer = window.setInterval(() => {
+              if (!progress.isConnected) {
+                window.clearInterval(timer)
+                return
+              }
+              void updates.progress({ downloadId }).then(({ downloaded, total, state }) => {
+                if (total > 0) {
+                  const percent = Math.min(100, Math.round(downloaded * 100 / total))
+                  progress.value = percent
+                  progressText.textContent = `${percent}% · ${(downloaded / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB`
+                } else {
+                  progress.removeAttribute('value')
+                  progressText.textContent = `${(downloaded / 1048576).toFixed(1)} MB downloaded`
+                }
+                if (state === 'complete' || state === 'failed') {
+                  window.clearInterval(timer)
+                  if (state === 'complete') {
+                    progress.value = 100
+                    progressText.textContent = 'Download complete. Open the Android notification to install.'
+                  } else {
+                    progressText.textContent = 'Download failed. Please retry.'
+                    download.disabled = false
+                  }
+                } else if (state === 'paused') {
+                  progressText.textContent += ' · Paused'
+                }
+              }).catch((error: unknown) => {
+                window.clearInterval(timer)
+                progressText.textContent = error instanceof Error ? error.message : 'Could not read download progress.'
+                download.disabled = false
+              })
+            }, 750)
+          }).catch((error: unknown) => {
+            status.textContent = error instanceof Error ? error.message : 'Could not start download.'
+            download.disabled = false
+            progress.remove()
+            progressText.remove()
+          })
+        }, 'button')
+        frame.body.append(download)
       }).catch((error: unknown) => {
         status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
       }).finally(() => { check.disabled = false })

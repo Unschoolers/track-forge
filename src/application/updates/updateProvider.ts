@@ -2,6 +2,7 @@
 export interface UpdateInfo {
   readonly version: string
   readonly url: string
+  readonly apkUrl: string
 }
 export interface UpdateProvider {
   check(): Promise<UpdateInfo | null>
@@ -41,6 +42,13 @@ export class GitHubUpdateProvider implements UpdateProvider {
       throw new Error('Invalid update response.')
     }
     if (!isNewerRelease(release.tag_name, this.run, this.attempt)) return null
-    return { version: release.tag_name, url: RELEASES_PAGE }
+    const apkUrl = `https://github.com/Unschoolers/track-forge/releases/download/${release.tag_name}/trackforge-debug.apk`
+    if (!('assets' in release) || !Array.isArray(release.assets) ||
+      !release.assets.some((asset: unknown) => asset && typeof asset === 'object' &&
+        'name' in asset && asset.name === 'trackforge-debug.apk' &&
+        'browser_download_url' in asset && asset.browser_download_url === apkUrl)) {
+      throw new Error('The latest release has no verified APK download.')
+    }
+    return { version: release.tag_name, url: RELEASES_PAGE, apkUrl }
   }
 }
