@@ -100,6 +100,7 @@ test('Simulation starts stationary and keeps steering, gas and brake independent
 
     await page.locator('[data-action="pause"]').click()
     await page.getByRole('button', { name: 'OPTIONS' }).click()
+    await page.getByRole('tab', { name: 'CONTROLS' }).click()
     await page.getByRole('button', { name: 'BUTTONS', exact: true }).click()
     await page.getByRole('button', { name: 'RIGHT', exact: true }).click()
     await page.getByRole('button', { name: 'LARGE', exact: true }).click()
