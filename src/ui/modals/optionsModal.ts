@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
 import type { AppSnapshot } from '@/application/appState'
 import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
 import { DIFFICULTY_IDS } from '@/domain/model'
@@ -170,6 +172,35 @@ export function createOptionsModal(
   }
   steering.append(choices)
   if ((state.preferences.steeringLayout ?? 'drag') === 'drag') frame.body.append(steering)
+  if (Capacitor.isNativePlatform()) {
+    frame.body.append(element('h3', 'setup-label', 'Game updates'))
+    const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Android build.')
+    const check = button('CHECK FOR UPDATES', 'check-updates', () => {
+      check.disabled = true
+      status.textContent = 'Checking for updates…'
+      const provider = new GitHubUpdateProvider(
+        Number(import.meta.env.VITE_TRACKFORGE_BUILD_RUN),
+        Number(import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT),
+      )
+      void provider.check().then((update) => {
+        if (!update) {
+          status.textContent = 'You are running the latest GitHub release.'
+          return
+        }
+        status.textContent = `New version available: ${update.version}`
+        const link = document.createElement('a')
+        link.href = update.url
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        link.textContent = 'OPEN DOWNLOAD PAGE'
+        link.className = 'button'
+        frame.body.append(link)
+      }).catch((error: unknown) => {
+        status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
+      }).finally(() => { check.disabled = false })
+    }, 'button')
+    frame.body.append(check, status)
+  }
   frame.footer.append(
     button('DONE', 'options-done', actions.close, 'button button-primary'),
   )
