@@ -48,8 +48,17 @@ function raceSeed(seed: number, laps = 1, difficulty: DifficultyId = 'hard', pla
 		)
 		race = result.state
 		for (const event of result.events) {
-			if (event.type === 'vehicle-recovered' && event.vehicleId !== 'player')
+			if (event.type === 'vehicle-recovered' && event.vehicleId !== 'player') {
+				const crashed = race.vehicles.find(vehicle => vehicle.id === event.vehicleId)
+				const road = race.path.points[crashed?.pathIndex ?? 0]
+				console.info('AI-TUNE-DIAG', JSON.stringify({
+					event, car: crashed?.car, lap: crashed?.lap,
+					speed: crashed?.speed, x: event.x, y: event.y,
+					pathIndex: event.pathIndex, segment: road?.segment,
+					time: race.elapsed,
+				}))
 				rivalRecoveries.push(event.vehicleId)
+			}
 		}
 		if (
 			race.vehicles
