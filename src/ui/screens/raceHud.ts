@@ -43,7 +43,7 @@ export function createRaceHud(
   const gap = element('span', 'label')
   gap.dataset.raceGhostGap = ''
   const pause = button('☰', 'pause', actions.pause, 'icon-button')
-  pause.setAttribute('aria-label', 'Pause race')
+  pause.setAttribute('aria-label', raceSession.snapshot().setup?.mode === 'nearby' ? 'Race menu' : 'Pause race')
   position.append(gap)
   lap.append(lapValue, timeValue, lapTimes, splitTime)
   hud.append(position, pause, lap)
@@ -277,10 +277,11 @@ export function createRaceHud(
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
     const openRoute = telemetry.routeKind === 'point-to-point'
     const timeTrial = snapshot.setup?.mode === 'time-trial'
-    positionValue.textContent = timeTrial ? 'SOLO' : ghostRace
+    const nearby = snapshot.setup?.mode === 'nearby'
+    positionValue.textContent = nearby ? 'LIVE' : timeTrial ? 'SOLO' : ghostRace
       ? formatRaceTime(snapshot.ghostTime ?? 0)
       : `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
-    positionLabel.textContent = timeTrial ? 'TIME TRIAL' : ghostRace ? 'GHOST TARGET' : 'POSITION'
+    positionLabel.textContent = nearby ? 'NEARBY' : timeTrial ? 'TIME TRIAL' : ghostRace ? 'GHOST TARGET' : 'POSITION'
     lapValue.textContent = openRoute ? `${Math.round(Math.max(0, Math.min(1, telemetry.routeProgress ?? 0)) * 100)}%` : `${Math.min(telemetry.lap + 1, telemetry.totalLaps)}/${telemetry.totalLaps}`
     timeValue.textContent = formatRaceTime(telemetry.elapsed)
     const bestLap = telemetry.bestLapTime

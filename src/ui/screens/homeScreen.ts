@@ -11,6 +11,7 @@ export function createHomeScreen(
     readonly edit: () => void
     readonly race: () => void
     readonly raceAgain: () => void
+    readonly nearby?: (() => void) | undefined
     readonly cup?: () => void
     readonly resumeCup?: () => void
     readonly options: () => void
@@ -51,6 +52,7 @@ export function createHomeScreen(
   actionsNode.append(
     ...(state.raceAgainTrackName ? [button(`RACE AGAIN · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain, 'button button-primary button-large')] : []),
     button('RACE', 'race', actions.race, 'button button-primary button-large'),
+    ...(actions.nearby ? [button('NEARBY RACE', 'nearby', actions.nearby, 'button button-large')] : []),
     ...(checkpoint && actions.resumeCup ? [button('RESUME CUP', 'resume-cup', actions.resumeCup, 'button button-large')] : []),
     ...(actions.cup && !checkpoint ? [button('ARCADE CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
     button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),

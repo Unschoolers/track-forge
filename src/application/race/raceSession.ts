@@ -1,3 +1,4 @@
+import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
 import { courseIdentity, raceCategory, sameCategory } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
@@ -44,7 +45,7 @@ import {
 import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
 
-export type RaceMode = 'normal' | 'ghost' | 'time-trial'
+export type RaceMode = 'normal' | 'ghost' | 'time-trial' | 'nearby'
 
 export interface RaceSetup {
   readonly lighting?: LightingMode
@@ -122,18 +123,20 @@ export interface RaceSessionSnapshot {
 export interface RaceSessionPort {
   ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
-  start(track: Track, setup: RaceSetup): void
+  start(track: Track, setup: RaceSetup, startsAt?: number): void
   restart(): void
   stop(): void
   resetPlayer(): void
   setPaused(paused: boolean): void
   advance(deltaSeconds: number, input: DriverInput): void
   snapshot(): RaceSessionSnapshot
+  nearbyGhosts?(): readonly GhostPose[]
   subscribe(listener: (snapshot: RaceSessionSnapshot) => void): Unsubscribe
   destroy(): void
 }
 
 export interface RaceSessionDependencies {
+  readonly nearby?: Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish'> | undefined
   readonly scoreStore: ScoreStore
   readonly random: RandomSource
   readonly feedback: FeedbackPort
@@ -172,6 +175,7 @@ export class RaceSession implements RaceSessionPort {
   private readonly step: RaceStep
   private current = EMPTY_RACE
   private remainder = 0
+  private startsAt: number | undefined
   private rivalFinishRemaining = 0
   private destroyed = false
   private readonly geometry: TrackGeometryService
@@ -185,14 +189,16 @@ export class RaceSession implements RaceSessionPort {
     this.geometry = dependencies.geometry ?? new TrackGeometryService()
   }
 
-  start(track: Track, setup: RaceSetup): void {
+  start(track: Track, setup: RaceSetup, startsAt?: number): void {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
     this.rivalFinishRemaining = 0
     const routeKind = normalizeRouteKind(track.routeKind)
     setup = oneRunForOpenRoute(track, setup)
-    this.bestGhost = this.dependencies.ghostStore?.load(track, setup) ?? null
+    this.startsAt = setup.mode === 'nearby' ? startsAt : undefined
+    const nearby = setup.mode === 'nearby'
+    this.bestGhost = nearby ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
     this.timing = new LapTiming(setup.mode === 'ghost' && this.bestGhost?.splits?.length === setup.laps * 4
       ? this.bestGhost.splits : undefined)
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
@@ -210,11 +216,12 @@ export class RaceSession implements RaceSessionPort {
       recoveryCheckpoints: track.recoveryCheckpoints,
       recoveryScenery: track,
     })
-    const state = resolved.mode === 'ghost' || resolved.mode === 'time-trial'
-      ? { ...created, vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
+    const state = nearby || resolved.mode === 'ghost' || resolved.mode === 'time-trial'
+      ? { ...created, countdown: this.startsAt === undefined ? created.countdown : Math.max(0, (this.startsAt - performance.now()) / 1000),
+          vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
       : created
     const player = state.vehicles.find((vehicle) => vehicle.player)
-    this.recording = player && this.dependencies.ghostStore
+    this.recording = !nearby && player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
     this.publish(this.buildSnapshot(track, resolved, state, null))
     this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
@@ -234,7 +241,7 @@ export class RaceSession implements RaceSessionPort {
 
   restart(): void {
     const { track, setup } = this.current
-    if (!track || !setup || this.destroyed) return
+    if (!track || !setup || setup.mode === 'nearby' || this.destroyed) return
     this.start(track, setup)
   }
 
@@ -258,6 +265,7 @@ export class RaceSession implements RaceSessionPort {
     const after = recovered.vehicles.find((vehicle) => vehicle.player)
     if (!before || !after) return
     this.recording?.recover(before, after, state.elapsed)
+    if (this.current.setup?.mode === 'nearby') this.dependencies.nearby?.recovered()
     this.timing.recover()
     this.publish(
       this.buildSnapshot(
@@ -293,18 +301,22 @@ export class RaceSession implements RaceSessionPort {
       this.advanceFinishingRivals(state, deltaSeconds)
       return
     }
+    const nearby = this.current.setup?.mode === 'nearby' ? this.dependencies.nearby : undefined
     const previouslyMissedGate = state.missedCheckpoint?.gate
 
     let runningTime = deltaSeconds
     let countdownChanged = false
     if (state.phase === 'countdown') {
       const previousCue = countdownCue(state.countdown)
-      const countdown = Math.max(0, state.countdown - deltaSeconds)
+      const remaining = this.startsAt === undefined
+        ? state.countdown - deltaSeconds
+        : (this.startsAt - performance.now()) / 1000
+      const countdown = Math.max(0, remaining)
       const cue = countdownCue(countdown)
       if (cue !== previousCue) {
         this.dependencies.feedback.handle({ type: 'countdown', cue })
       }
-      runningTime = Math.max(0, deltaSeconds - state.countdown)
+      runningTime = Math.min(deltaSeconds, Math.max(0, -remaining))
       state = { ...state, countdown, phase: cue === 'go' ? 'running' : 'countdown' }
       countdownChanged = true
     }
@@ -327,6 +339,7 @@ export class RaceSession implements RaceSessionPort {
       for (const event of next.events) {
         if (event.type === 'vehicle-recovered' && event.vehicleId === player?.id) {
           this.timing.recover()
+          nearby?.recovered()
           if (before && player) this.recording?.recover(before, player, state.elapsed)
         } else if (event.type === 'gate-crossed' && event.vehicleId === player?.id) {
           this.timing.accept(event.lap, event.gate, event.time)
@@ -351,6 +364,11 @@ export class RaceSession implements RaceSessionPort {
     let result = resultState.phase === 'finished'
       ? (this.current.result ?? this.createResult(resultState, terminalEvent?.reason))
       : null
+    if (nearby) {
+      const player = resultState.vehicles.find((vehicle) => vehicle.player)
+      if (player && !result) nearby.update(player)
+      if (result && !this.current.result) nearby.finish(result.playerTime)
+    }
     if (stepped) this.routeFeedback(resultState, events, input, peakLanding)
     if (result && !this.current.result) {
       if (result.outcome === 'finished' && resultState.vehicles.some(isRivalRacing)) {
@@ -360,7 +378,7 @@ export class RaceSession implements RaceSessionPort {
       const track = this.current.track
       const setup = this.current.setup
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
-      if (track && setup && player && this.dependencies.ghostStore &&
+      if (track && setup && setup.mode !== 'nearby' && player && this.dependencies.ghostStore &&
           result.outcome === 'finished' && result.playerTime !== null) {
         const frames = this.recording?.finish(player, result.playerTime)
         if (frames) {
@@ -408,6 +426,10 @@ export class RaceSession implements RaceSessionPort {
     this.publish(rivalsFinishing === result.rivalsFinishing && !standingsChanged
       ? snapshot
       : { ...snapshot, result: { ...result, standings: snapshot.standings, rivalsFinishing } })
+  }
+
+  nearbyGhosts(): readonly GhostPose[] {
+    return this.current.setup?.mode === 'nearby' ? this.dependencies.nearby?.remotePoses() ?? [] : []
   }
 
   snapshot(): RaceSessionSnapshot {
@@ -488,6 +510,13 @@ export class RaceSession implements RaceSessionPort {
           ? 'finished'
           : null)
     if (!outcome) return null
+    if (setup.mode === 'nearby') {
+      return {
+        mode: 'nearby', outcome, trackId: track.id, trackName: track.name,
+        playerPlace: 1, playerTime: outcome === 'finished' ? player.finishedAt : null,
+        playerWrecked: player.wrecked, newRecord: false, standings: [], highScores: [],
+      }
+    }
     const category = raceCategory(track, setup)
     const comparable = (score: ScoreEntry) => sameCategory(score, category, setup)
     const oldScores = this.dependencies.scoreStore.forTrack(track.id).filter(comparable)

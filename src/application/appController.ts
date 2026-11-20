@@ -1,3 +1,4 @@
+import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
@@ -38,6 +39,7 @@ import { EditorSession, type Scheduler } from '@/application/editor/editorSessio
 export type { Scheduler } from '@/application/editor/editorSession'
 
 export interface AppControllerDependencies {
+  readonly nearby?: NearbyRace | undefined
   readonly lastRaceStore?: LastRaceStore
   readonly cupStore?: CupStore
   readonly trackStore: TrackStore
@@ -57,6 +59,9 @@ export class AppController {
   private state: AppSnapshot
   private preCupTrack: Track | null = null
   private readonly editorSession: EditorSession
+  private beforeNearbyTrack: Track | null | undefined
+  private readonly unsubscribeNearby: (() => void) | undefined
+  private readonly unsubscribeNearbyStart: (() => void) | undefined
   private unsubscribeRace: (() => void) | undefined
 
   constructor(private readonly dependencies: AppControllerDependencies) {
@@ -107,6 +112,28 @@ export class AppController {
       scoresByTrack: this.scoresForTracks(tracks),
       notice: null,
     }
+    this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, startsAt }) => {
+      if (this.state.overlay.type !== 'nearby') return
+      this.beforeNearbyTrack = this.state.currentTrack
+      dependencies.raceSession.start(track, {
+        car, laps, lighting, difficulty: this.state.preferences.difficulty, handling: 'arcade', mode: 'nearby',
+      }, startsAt)
+      this.update({ ...this.state, mode: 'race', currentTrack: track, paused: false, cup: null, overlay: { type: 'none' }, notice: null })
+    })
+    this.unsubscribeNearby = dependencies.nearby?.subscribe(() => {
+      if (this.state.overlay.type === 'nearby') {
+        this.update({ ...this.state })
+        return
+      }
+      const status = dependencies.nearby?.snapshot()
+      if (status?.phase !== 'idle' || !status.error || this.state.mode !== 'race' ||
+          this.beforeNearbyTrack === undefined) return
+      if (this.state.overlay.type === 'results') {
+        this.update({ ...this.state, notice: status.error })
+      } else {
+        this.update({ ...this.state, mode: 'home', paused: false, overlay: { type: 'none' }, notice: status.error })
+      }
+    })
     this.unsubscribeRace = dependencies.raceSession.subscribe((snapshot) => {
       if (!snapshot.result || this.state.mode !== 'race') return
       if (this.state.overlay.type === 'results') {
@@ -117,6 +144,10 @@ export class AppController {
           const { progress, notice } = this.persistCup(updated)
           this.update({ ...this.state, cup: updated, cupProgress: progress, notice })
         }
+        return
+      }
+      if (snapshot.result.mode === 'nearby') {
+        this.update({ ...this.state, paused: true, newTimeMedal: null, overlay: { type: 'results' } })
         return
       }
       const cup = this.state.cup ? recordCupResult(this.state.cup, snapshot.result.standings) : null
@@ -228,9 +259,34 @@ export class AppController {
       case 'start-race':
         this.startRace()
         break
+      case 'open-nearby':
+        if (this.dependencies.nearby) this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        break
+      case 'host-nearby': {
+        const { currentTrack: track, preferences, raceLighting } = this.state
+        const nearby = this.dependencies.nearby
+        if (!nearby || !track || !this.flushPendingEditorSave() ||
+            !validateTrack(track, this.dependencies.geometry.get(track).path.totalLength).ready) break
+        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        nearby.host({
+          track, car: preferences.car, lighting: raceLighting ?? track.lighting,
+          laps: track.routeKind === 'point-to-point' ? 1 : preferences.raceLaps ?? 2,
+        })
+        break
+      }
+      case 'scan-nearby':
+        if (this.state.overlay.type === 'nearby') {
+          this.dependencies.nearby?.scan(this.state.preferences.car)
+        }
+        break
+      case 'leave-nearby':
+        if (this.state.mode === 'race' && this.beforeNearbyTrack !== undefined) {
+          this.dispatch({ type: 'go-home' })
+        }
+        break
       case 'pause-race':
         if (this.state.mode === 'race' && this.state.overlay.type !== 'results') {
-          this.dependencies.raceSession.setPaused(true)
+          if (this.beforeNearbyTrack === undefined) this.dependencies.raceSession.setPaused(true)
           this.update({
             ...this.state,
             paused: true,
@@ -250,7 +306,7 @@ export class AppController {
         break
       case 'race-best-ghost': {
         const { track, setup } = this.dependencies.raceSession.snapshot()
-        if (this.state.mode === 'race' && track && setup &&
+        if (this.state.mode === 'race' && track && setup && setup.mode !== 'nearby' &&
             this.dependencies.raceSession.ghostTime?.(track, setup) != null) {
           this.dependencies.raceSession.start(track, { ...setup, mode: 'ghost' })
           if (!this.state.cup) this.rememberRace()
@@ -259,7 +315,7 @@ export class AppController {
         break
       }
       case 'restart-race':
-        if (this.state.mode === 'race') {
+        if (this.state.mode === 'race' && this.beforeNearbyTrack === undefined) {
           const cup = this.state.cup ? retryCupRace(this.state.cup) : null
           const savedCup = cup ? this.persistCup(cup) : null
           this.dependencies.raceSession.restart()
@@ -483,6 +539,9 @@ export class AppController {
     this.events.clear()
     this.unsubscribeRace?.()
     this.unsubscribeRace = undefined
+    this.unsubscribeNearby?.()
+    this.unsubscribeNearbyStart?.()
+    this.dependencies.nearby?.destroy()
     this.dependencies.raceSession.destroy()
   }
 
@@ -734,6 +793,10 @@ export class AppController {
       })
       return
     }
+    if (overlay.type === 'pause' && this.beforeNearbyTrack !== undefined) {
+      this.dispatch({ type: 'resume-race' })
+      return
+    }
     if (overlay.type === 'race-setup') {
       this.update({
         ...this.state,
@@ -862,10 +925,16 @@ export class AppController {
         sceneryChoice: normalizeEditorSceneryChoice(editorUi.sceneryChoice, state.editor.environmentId),
       }
     }
-    const normalized = editorUi === state.editorUi ? state : { ...state, editorUi }
+    let normalized = editorUi === state.editorUi ? state : { ...state, editorUi }
     const leavingRace = this.state.mode === 'race' && normalized.mode !== 'race'
+    const leavingLobby = this.state.overlay.type === 'nearby' && normalized.overlay.type !== 'nearby' && normalized.mode !== 'race'
+    if (leavingRace && this.beforeNearbyTrack !== undefined) {
+      normalized = { ...normalized, currentTrack: this.beforeNearbyTrack }
+      this.beforeNearbyTrack = undefined
+    }
     this.state = normalized
     if (leavingRace) this.dependencies.raceSession.stop()
+    if (leavingLobby || leavingRace) this.dependencies.nearby?.close()
     this.events.publish({ type: 'state-changed', snapshot: normalized })
   }
 }

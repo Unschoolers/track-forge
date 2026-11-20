@@ -1,3 +1,5 @@
+import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import { createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { exportTrack, shareTrack } from '@/infrastructure/export/trackExport'
 import { formatRaceTime } from '@/ui/format'
 import type { LightingMode, Track, TrackId } from '@/domain/model'
@@ -39,6 +41,7 @@ export interface UiControllerPort {
 }
 
 export interface UiRuntime {
+  readonly nearby?: NearbyRace | undefined
   readonly raceSession: RaceSessionPort
   readonly raceControls: RaceControlsPort
   readonly feedback: FeedbackPort
@@ -174,6 +177,7 @@ export class DomUiHost implements UiHost {
       screen = createHomeScreen(state, {
             edit: () => openLibrary('edit'),
             race: () => openLibrary('race'),
+            nearby: this.runtime.nearby ? () => this.controller.dispatch({ type: 'open-nearby' }) : undefined,
             raceAgain: () => this.controller.dispatch({ type: 'race-again' }),
             cup: () => this.controller.dispatch({ type: 'start-cup' }),
             resumeCup: () => this.controller.dispatch({ type: 'resume-cup' }),
@@ -276,11 +280,27 @@ export class DomUiHost implements UiHost {
     switch (state.overlay.type) {
       case 'none':
         return undefined
+      case 'nearby': {
+        const nearby = this.runtime.nearby
+        if (!nearby) return undefined
+        return createNearbyRaceModal(nearby, state.preferences.car, {
+          close,
+          chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
+          scan: () => this.controller.dispatch({ type: 'scan-nearby' }),
+          selectCar: (car) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, car } }),
+        })
+      }
       case 'cup-final':
         return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' })) : undefined
       case 'results': {
         const result = this.runtime.raceSession.snapshot().result
         if (!result) return undefined
+        if (result.mode === 'nearby' && this.runtime.nearby) {
+          const nearby = createNearbyRaceResults(this.runtime.nearby, result,
+            () => this.controller.dispatch({ type: 'go-home' }))
+          this.overlayCleanup = nearby.cleanup
+          return nearby.element
+        }
         const modal = createResultsModal(result, {
           retry: () => this.controller.dispatch({ type: 'restart-race' }),
           raceBestGhost: (() => {
@@ -377,6 +397,7 @@ export class DomUiHost implements UiHost {
         }
         return createRaceSetupModal(state, {
           close,
+          hostNearby: this.runtime.nearby ? () => this.controller.dispatch({ type: 'host-nearby' }) : undefined,
           lighting: (lighting) => this.controller.dispatch({ type: 'set-race-lighting', lighting }),
           options: () => this.controller.dispatch({ type: 'open-options', returnTo: 'race-setup' }),
           preferences: (preferences) =>
@@ -407,6 +428,12 @@ export class DomUiHost implements UiHost {
             }),
         })
       case 'pause':
+        if (this.runtime.raceSession.snapshot().setup?.mode === 'nearby') {
+          return createNearbyRaceMenu(
+            () => this.controller.dispatch({ type: 'resume-race' }),
+            () => this.controller.dispatch({ type: 'leave-nearby' }),
+          )
+        }
         return createPauseModal({
           resume: () =>
             this.controller.dispatch({ type: 'resume-race' }),
