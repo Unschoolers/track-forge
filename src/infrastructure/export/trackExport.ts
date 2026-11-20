@@ -15,8 +15,11 @@ export function serializeTrack(track: Track): { filename: string; content: strin
   }
 }
 
-export async function exportTrack(track: Track): Promise<boolean> {
-  const file = serializeTrack(track)
+export function exportTrack(track: Track): Promise<boolean> {
+  return saveJsonFile(serializeTrack(track))
+}
+
+export async function saveJsonFile(file: { filename: string; content: string }): Promise<boolean> {
   if (Capacitor.isNativePlatform()) return (await nativeExporter.save(file)).saved
   const url = URL.createObjectURL(new Blob([file.content], { type: 'application/json' }))
   const link = document.createElement('a')

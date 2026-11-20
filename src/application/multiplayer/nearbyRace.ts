@@ -21,6 +21,7 @@ export interface NearbyTransport {
   lock(): Promise<void>
   send(ids: string[], bytes: Uint8Array): Promise<void>
   stop(): Promise<void>
+  diagnostics?(): Promise<Record<string, unknown>>
 }
 
 interface Course {
@@ -91,6 +92,12 @@ export class NearbyRace {
   private readonly starts = new EventBus<NearbyStart>()
   private readonly unsubscribe: () => void
   private phase: Phase = 'idle'
+  private role: 'host' | 'guest' | null = null
+  private readonly timeline: Record<string, unknown>[] = []
+  private diagnosticStart = 0
+  private lastFailure: Record<string, unknown> | null = null
+  private readonly poseCounts = { sent: 0, received: 0, sendFailed: 0, relayed: 0 }
+  private static readonly TIMELINE_LIMIT = 100
   private generation = 0
   private busy: Promise<void> = Promise.resolve()
   private error: string | null = null
@@ -131,24 +138,44 @@ export class NearbyRace {
     }
   }
 
+  async diagnostics(): Promise<Record<string, unknown>> {
+    const report: Record<string, unknown> = {
+      version: 1,
+      role: this.role,
+      phase: this.phase,
+      counts: this.diagnosticCounts(),
+      timeline: this.timeline.map((entry) => ({ ...entry })),
+      poseCounts: { ...this.poseCounts },
+      lastFailure: this.lastFailure && { ...this.lastFailure },
+    }
+    if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
+    try {
+      return { ...report, native: { status: 'available', report: await this.transport.diagnostics() } }
+    } catch (error) {
+      return { ...report, native: { status: 'failed', error: this.errorKind(error) } }
+    }
+  }
+
   subscribe(listener: () => void) { return this.changes.subscribe(listener) }
   onStart(listener: (start: NearbyStart) => void) { return this.starts.subscribe(listener) }
 
   host(course: Course): void {
     if (this.phase !== 'idle') return
+    this.role = 'host'
     this.course = course
     const random = crypto.getRandomValues(new Uint16Array(1))[0] ?? 0
     const room = `Room ${1000 + random % 9000}`
     this.room = room
     const active = this.begin('opening')
-    this.perform(() => this.transport.host(room), active, () => this.setPhase('hosting'))
+    this.perform('host', () => this.transport.host(room), active, () => this.setPhase('hosting'))
   }
 
   scan(car: CarId): void {
     if (this.phase !== 'idle') return
+    this.role = 'guest'
     this.localCar = car
     const active = this.begin('scanning')
-    this.perform(() => this.transport.scan(), active)
+    this.perform('scan', () => this.transport.scan(), active)
   }
 
   connect(id: string): void {
@@ -158,14 +185,15 @@ export class NearbyRace {
     this.room = room
     this.setPhase('connecting')
     this.armTimeout('Could not connect to the nearby room.')
-    this.perform(() => this.transport.connect(id), this.generation)
+    this.perform('connect', () => this.transport.connect(id), this.generation)
   }
 
   respond(id: string, accepted: boolean): void {
     if (!this.pairs.delete(id)) return
     if (accepted) this.pendingPairs.add(id)
     const active = this.generation
-    this.perform(() => this.transport.respond(id, accepted), active, () => {
+    this.record('pairing_response', { accepted })
+    this.perform('respond', () => this.transport.respond(id, accepted), active, () => {
       if (!accepted && id === this.hostId) this.fail('Pairing declined.')
     })
     this.changed()
@@ -178,13 +206,15 @@ export class NearbyRace {
     this.setPhase('preparing')
     this.armTimeout('A player did not load the track in time.')
     void this.prepareGuests(course, active).catch((error: unknown) => {
-      if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not share the track.')
+      if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not share the track.', 'prepare', error)
     })
   }
 
   private async prepareGuests(course: Course, active: number): Promise<void> {
+    this.record('transfer', { stage: 'lock' })
     await this.transport.lock()
     const chunks = await packTrack(course.track)
+    this.record('transfer', { stage: 'packed', chunks: chunks.length, bytes: chunks.reduce((sum, chunk) => sum + chunk.length, 0), recipients: this.guests.size })
     if (active !== this.generation) return
     const guests = [...this.guests]
     await Promise.all(guests.map(([id, slot]) =>
@@ -193,6 +223,7 @@ export class NearbyRace {
       if (active !== this.generation) return
       await this.transport.send(guests.map(([id]) => id), chunk)
     }
+    this.record('transfer', { stage: 'sent', chunks: chunks.length, recipients: guests.length })
   }
 
   update(vehicle: RaceVehicle): void {
@@ -202,9 +233,10 @@ export class NearbyRace {
     if (!ids.length) return
     this.lastSentAt = now
     this.poseSending = true
+    this.poseCounts.sent++
     const active = this.generation
     void this.transport.send(ids, encodePose(this.slot, this.sequence++, this.recovery, vehicle))
-      .catch(() => undefined)
+      .catch(() => { this.poseCounts.sendFailed++ })
       .finally(() => { if (active === this.generation) this.poseSending = false })
   }
 
@@ -246,6 +278,7 @@ export class NearbyRace {
 
   private onEvent(event: NearbyEvent): void {
     if (this.phase === 'idle') return
+    if (event.type !== 'packet') this.record('event', { event: event.type })
     switch (event.type) {
       case 'found':
         if (this.phase === 'scanning' && /^Room \d{4}$/.test(event.name) && this.rooms.size < 32) {
@@ -280,6 +313,8 @@ export class NearbyRace {
       case 'packet': this.receive(event.id, event.bytes); break
       case 'error':
         if (event.id && event.id !== this.hostId) {
+          this.lastFailure = { source: 'peer_event', error: 'flow_error', phase: this.phase, counts: this.diagnosticCounts() }
+          this.record('failure', { source: 'peer_event', error: 'flow_error' })
           this.pairs.delete(event.id)
           this.pendingPairs.delete(event.id)
           this.error = event.message
@@ -294,6 +329,7 @@ export class NearbyRace {
     const guestSlot = this.guests.get(id)
     if (!fromHost && guestSlot === undefined) return
     if (bytes[0] === Packet.Pose && this.phase === 'racing') {
+      this.poseCounts.received++
       const packet = decodePose(bytes)
       const racer = packet && this.racers.get(packet.slot)
       if (!packet || !racer || racer.left || packet.slot === this.slot || (!fromHost && packet.slot !== guestSlot)) return
@@ -312,7 +348,7 @@ export class NearbyRace {
         this.sendControl([id], { type: 'ready', car: this.localCar })
         this.changed()
       }).catch((error: unknown) => {
-        if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not load the nearby track.')
+        if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not load the nearby track.', 'receive_track', error)
       })
       return
     }
@@ -346,6 +382,7 @@ export class NearbyRace {
     if (!recipients.length || this.forwarding.has(id)) return
     const generation = this.generation
     this.forwarding.add(id)
+    this.poseCounts.relayed++
     void this.transport.send(recipients, bytes).catch(() => undefined).finally(() => {
       if (generation === this.generation) this.forwarding.delete(id)
     })
@@ -370,7 +407,7 @@ export class NearbyRace {
   private launch(course: Course, cars: (CarId | null)[], startsAt: number): void {
     this.clearTimeout()
     cars.forEach((car, slot) => { if (car) this.racers.set(slot, { ghost: new RemoteGhost(car) }) })
-    this.phase = 'racing'
+    this.setPhase('racing')
     this.starts.publish({ ...course, startsAt })
   }
 
@@ -422,7 +459,11 @@ export class NearbyRace {
   private sendControl(ids: string[], message: Control): void {
     if (!ids.length) return
     const active = this.generation
-    void this.transport.send(ids, controlBytes(message)).catch(() => {
+    this.record('control', { kind: message.type, result: 'started', recipients: ids.length })
+    void this.transport.send(ids, controlBytes(message)).then(() => {
+      if (active === this.generation) this.record('control', { kind: message.type, result: 'succeeded', recipients: ids.length })
+    }).catch((error: unknown) => {
+      this.record('control', { kind: message.type, result: 'failed', error: this.errorKind(error) })
       if (active !== this.generation) return
       if (message.type === 'finish' || message.type === 'left') {
         this.error = 'A player did not receive the latest race result.'
@@ -432,26 +473,45 @@ export class NearbyRace {
   }
 
   private begin(phase: Phase): number {
+    this.timeline.length = 0
+    this.diagnosticStart = this.now()
+    this.lastFailure = null
+    Object.assign(this.poseCounts, { sent: 0, received: 0, sendFailed: 0, relayed: 0 })
     this.error = null
     this.setPhase(phase)
     return ++this.generation
   }
 
-  private perform(action: () => Promise<void>, active: number, complete?: () => void): void {
+  private perform(operation: string, action: () => Promise<void>, active: number, complete?: () => void): void {
     this.busy = this.busy.then(async () => {
       if (active !== this.generation) return
+      this.record('operation', { operation, result: 'started' })
       await action()
-      if (active === this.generation) complete?.()
+      if (active === this.generation) {
+        this.record('operation', { operation, result: 'succeeded' })
+        complete?.()
+      }
     }).catch((error: unknown) => {
-      if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Nearby connection failed.')
+      if (active === this.generation) {
+        this.record('operation', { operation, result: 'failed', error: this.errorKind(error) })
+        this.fail(error instanceof Error ? error.message : 'Nearby connection failed.', operation, error)
+      }
     })
   }
 
   private queueStop(): void {
-    this.busy = this.busy.then(() => this.transport.stop()).catch(() => undefined)
+    this.busy = this.busy.then(async () => {
+      this.record('operation', { operation: 'stop', result: 'started' })
+      await this.transport.stop()
+      this.record('operation', { operation: 'stop', result: 'succeeded' })
+    }).catch((error: unknown) => {
+      this.record('operation', { operation: 'stop', result: 'failed', error: this.errorKind(error) })
+    })
   }
 
-  private fail(message: string): void {
+  private fail(message: string, source = 'flow', error?: unknown): void {
+    this.lastFailure = { source, error: error === undefined ? 'flow_error' : this.errorKind(error), phase: this.phase, counts: this.diagnosticCounts() }
+    this.record('failure', { source, error: this.lastFailure.error })
     this.reset(message)
     this.queueStop()
   }
@@ -485,5 +545,26 @@ export class NearbyRace {
 
   private clearTimeout(): void { clearTimeout(this.timeout) }
   private changed(): void { this.changes.publish() }
-  private setPhase(phase: Phase): void { this.phase = phase; this.changed() }
+  private diagnosticCounts() {
+    return { rooms: this.rooms.size, pairing: this.pairs.size, pendingPairs: this.pendingPairs.size,
+      guests: this.guests.size, ready: this.ready.size, racers: this.racers.size }
+  }
+
+  private errorKind(error: unknown): string {
+    // Arbitrary exception text can contain endpoint IDs, room names or track data.
+    return error instanceof Error ? 'Error' : 'unknown'
+  }
+
+  private record(event: string, details: Record<string, unknown> = {}): void {
+    this.timeline.push({ atMs: Math.max(0, Math.round(this.now() - this.diagnosticStart)), event,
+      phase: this.phase, counts: this.diagnosticCounts(), ...details })
+    if (this.timeline.length > NearbyRace.TIMELINE_LIMIT) this.timeline.shift()
+  }
+
+  private setPhase(phase: Phase): void {
+    const from = this.phase
+    this.phase = phase
+    this.record('phase', { from, to: phase, role: this.role })
+    this.changed()
+  }
 }
