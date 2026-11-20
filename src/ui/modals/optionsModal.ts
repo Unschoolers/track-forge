@@ -10,7 +10,7 @@ import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
 type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
-const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<void> }>('TrackForgeUpdates')
+const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<{ state: 'permission-required' | 'installer-opened' }> }>('TrackForgeUpdates')
 
 type OptionsTab = 'race' | 'audio' | 'controls' | 'display' | 'updates'
 let selectedOptionsTab: OptionsTab = 'race'
@@ -210,7 +210,12 @@ export function createOptionsModal(
     const progressText = element('p', 'modal-subtitle', '')
     const install = button('INSTALL UPDATE', 'install-update', () => {
       install.disabled = true
-      void updates.install().catch((error: unknown) => {
+      status.textContent = 'Preparing verified Android update…'
+      void updates.install().then((result) => {
+        status.textContent = result.state === 'permission-required'
+          ? 'Allow installs from Track Forge in Android Settings, then return and tap INSTALL UPDATE again.'
+          : 'Android installer requested. Confirm installation in the Android prompt.'
+      }).catch((error: unknown) => {
         status.textContent = error instanceof Error ? error.message : 'Could not open installer.'
       }).finally(() => { install.disabled = false })
     }, 'button button-primary')
