@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
 import type { AppSnapshot } from '@/application/appState'
 import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
@@ -8,6 +8,8 @@ import { createToggleRow } from '@/ui/components/toggleRow'
 import { createVolumeRow } from '@/ui/components/volumeRow'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
+
+const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }> }>('TrackForgeUpdates')
 
 export function createOptionsModal(
   state: AppSnapshot,
@@ -188,13 +190,17 @@ export function createOptionsModal(
           return
         }
         status.textContent = `New version available: ${update.version}`
-        const link = document.createElement('a')
-        link.href = update.url
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        link.textContent = 'OPEN DOWNLOAD PAGE'
-        link.className = 'button'
-        frame.body.append(link)
+        const download = button('DOWNLOAD APK', 'download-update', () => {
+          download.disabled = true
+          status.textContent = 'Starting Android download…'
+          void updates.download({ url: update.apkUrl, version: update.version }).then(() => {
+            status.textContent = 'Download started. Android will notify you when the APK is ready to install.'
+          }).catch((error: unknown) => {
+            status.textContent = error instanceof Error ? error.message : 'Could not start download.'
+            download.disabled = false
+          })
+        }, 'button')
+        frame.body.append(download)
       }).catch((error: unknown) => {
         status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
       }).finally(() => { check.disabled = false })
