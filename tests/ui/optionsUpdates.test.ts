@@ -6,6 +6,7 @@ import type { AppSnapshot } from '@/application/appState'
 const native = vi.hoisted(() => ({
   current: vi.fn(),
   install: vi.fn(),
+  download: vi.fn(),
 }))
 
 vi.mock('@capacitor/core', () => ({
@@ -37,6 +38,62 @@ function showDownloadedUpdate() {
   overlay.querySelector<HTMLButtonElement>('[data-action="options-tab-updates"]')?.click()
   return overlay
 }
+
+describe('home update shortcut', () => {
+  it('opens the Updates tab directly with a verified release ready to download', async () => {
+    native.current.mockReset().mockResolvedValue({ state: 'none' })
+    const update = {
+      version: 'android-build-999-1',
+      url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+      apkUrl: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-999-1/trackforge-debug.apk',
+    }
+    const overlay = createOptionsModal({
+      overlay: { type: 'options', returnTo: 'home', tab: 'updates' },
+      preferences: {
+        difficulty: 'normal',
+        audioEnabled: true,
+        hapticsEnabled: true,
+        dynamicZoomEnabled: true,
+      },
+    } as AppSnapshot, {
+      close: vi.fn(),
+      preferences: vi.fn(),
+      previewVolume: vi.fn(),
+      setVolume: vi.fn(),
+    }, { initialTab: 'updates', availableUpdate: update })
+    document.body.replaceChildren(overlay)
+
+    const tab = overlay.querySelector('[data-action="options-tab-updates"]')
+    expect(tab?.getAttribute('aria-selected')).toBe('true')
+    await vi.waitFor(() => expect(overlay.querySelector('[data-action="download-update"]')).not.toBeNull())
+    expect(overlay.textContent).toContain('New version available: android-build-999-1')
+    expect(overlay.querySelector('[data-options-tab="updates"]')?.getAttribute('hidden')).toBeNull()
+  })
+
+  it('preserves the install action when an APK was already downloaded', async () => {
+    native.current.mockReset().mockResolvedValue({
+      downloadId: 22, version: 'android-build-999-1',
+      downloaded: 42, total: 42, state: 'complete',
+    })
+    const overlay = createOptionsModal({
+      overlay: { type: 'options', returnTo: 'home', tab: 'updates' },
+      preferences: {
+        difficulty: 'normal', audioEnabled: true,
+        hapticsEnabled: true, dynamicZoomEnabled: true,
+      },
+    } as AppSnapshot, {
+      close: vi.fn(), preferences: vi.fn(),
+      previewVolume: vi.fn(), setVolume: vi.fn(),
+    }, { initialTab: 'updates', availableUpdate: {
+      version: 'android-build-999-1',
+      url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+      apkUrl: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-999-1/trackforge-debug.apk',
+    } })
+    document.body.replaceChildren(overlay)
+    await vi.waitFor(() => expect(overlay.querySelector('[data-action="install-update"]')).not.toBeNull())
+    expect(overlay.querySelector('[data-action="download-update"]')).toBeNull()
+  })
+})
 
 describe('native APK installation feedback', () => {
   beforeEach(() => {
