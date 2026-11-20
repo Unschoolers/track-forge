@@ -255,11 +255,40 @@ describe('modal application flows', () => {
     })
   })
 
+  it('keeps one full-height Options shell while switching tab panels', () => {
+    const { root, host } = setup(state({ type: 'options', returnTo: 'home' }))
+    const card = root.querySelector('.options-modal .modal-card')
+    const body = root.querySelector('.options-modal .modal-body')
+    const footer = root.querySelector('.options-modal .modal-footer')
+    const race = root.querySelector<HTMLButtonElement>('[data-action="options-tab-race"]')
+    const controls = root.querySelector<HTMLButtonElement>('[data-action="options-tab-controls"]')
+    const audio = root.querySelector<HTMLButtonElement>('[data-action="options-tab-audio"]')
+    if (!card || !body || !footer || !race || !controls || !audio) {
+      throw new Error('Missing Options modal tabs or shell')
+    }
+
+    race.click()
+    expect(race.getAttribute('aria-selected')).toBe('true')
+    controls.click()
+    expect(controls.getAttribute('aria-selected')).toBe('true')
+    expect(root.querySelector<HTMLElement>('#options-panel-race')?.hidden).toBe(true)
+    expect(root.querySelector<HTMLElement>('#options-panel-controls')?.hidden).toBe(false)
+    audio.click()
+    expect(audio.getAttribute('aria-selected')).toBe('true')
+    expect(root.querySelector<HTMLElement>('#options-panel-controls')?.hidden).toBe(true)
+
+    expect(root.querySelector('.options-modal .modal-card')).toBe(card)
+    expect(root.querySelector('.options-modal .modal-body')).toBe(body)
+    expect(root.querySelector('.options-modal .modal-footer')).toBe(footer)
+    host.destroy()
+  })
+
   it('shows comfort settings but hides race settings during a paused race', () => {
     const { root } = setup({ ...state({ type: 'options', returnTo: 'race' }), mode: 'race', paused: true })
     expect(root.querySelector('input[type="range"][aria-label="Music"]')).not.toBeNull()
     expect(root.querySelector('input[type="range"][aria-label="Sound Effects"]')).not.toBeNull()
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
+    expect(root.querySelector('[data-action="options-tab-race"]')).toBeNull()
     expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
     expect(root.querySelector('[data-action="handling-simulation"]')).toBeNull()
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
