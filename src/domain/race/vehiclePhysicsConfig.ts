@@ -209,8 +209,9 @@ export const CAR_PHYSICS_SPECS = {
     recovery: 1.5,
   },
   red: {
-    max: 310,
-    accel: 205,
+    // High-speed pavement specialist: visibly quicker than Blue on a straight.
+    max: 343,
+    accel: 246,
     steer: 2.28,
     grip: 0.79,
     brake: 0.83,
