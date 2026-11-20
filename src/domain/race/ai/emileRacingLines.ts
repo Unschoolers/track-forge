@@ -23,16 +23,11 @@ const EMILE_RED_LINE = [
   section(15, -18, 1),
 ] as const
 
-// Green can carry more corner speed than the original authored line allowed.
-// This is a racing-line improvement, not a motor/physics multiplier.
-const greenSection = (lookahead: number, lane: number, pace: number) =>
-  section(lookahead, lane, pace * 1.05)
-
 const EMILE_GREEN_LINE = [
-  greenSection(0, 8, 0.9), greenSection(0, 10, 1), greenSection(0, 8, 1), greenSection(10, 28, 1.41),
-  greenSection(12, -8, 1.11), greenSection(0, -26, 0.96), greenSection(0, -16, 1), greenSection(18, -16, 1.4),
-  greenSection(18, 0, 1.68), greenSection(8, 10, 1.22), greenSection(18, 0, 1.384), greenSection(-12, -26, 1.28),
-  greenSection(0, 0, 1),
+  section(0, 8, 0.9), section(0, 10, 1), section(0, 8, 1), section(10, 28, 1.41),
+  section(12, -8, 1.11), section(0, -26, 0.96), section(0, -16, 1), section(18, -16, 1.4),
+  section(18, 0, 1.68), section(8, 10, 1.22), section(18, 0, 1.384), section(-12, -26, 1.28),
+  section(0, 0, 1),
 ] as const
 
 const EMILE_YELLOW_LINE = [
