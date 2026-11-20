@@ -17,7 +17,7 @@ The separate `Mobile gameplay QA` GitHub workflow runs these scenarios on
 gameplay-code and dependency PRs and uploads reports and failure screenshots
 for seven days. The development suite runs in four independent CI shards,
 and the production smoke runs separately. Each shard retains its own report.
-Gameplay and performance sampling run in real time. `npm ci` installs the pinned
+Touch input, ramp rendering and performance sampling run in real time. `npm ci` installs the pinned
 Playwright runner. The production smoke builds the game and starts a race
 through the same UI players use.
 Set `TRACKFORGE_CHROMIUM_EXECUTABLE` to a locally installed Chromium executable
@@ -33,8 +33,11 @@ to use it for either suite.
   timings and attach `gameplay-metrics.json` to the browser report.
 - Observe uncaught browser errors and retain screenshots/traces on failures.
 
-Inspection is read-only via `?qa` on the **Vite development server only**.
-The QA bridge is not present in production APKs.
+The QA bridge is available via `?qa` on the **Vite development server only**.
+Browser tests can advance an unattended race through the normal fixed-step
+simulation. The point-to-point results test uses this for its three straight
+runs. Several other tests use it for the countdown before observing real-time
+input, rendering or recovery. The production smoke checks the actual countdown and game bundle.
 
 ## What this does not prove yet
 

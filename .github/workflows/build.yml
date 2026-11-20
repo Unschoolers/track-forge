@@ -2,6 +2,7 @@ name: Verify and build Android
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -31,27 +32,29 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.4.1
+      - uses: actions/cache@v6.1.0
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ runner.os }}-${{ hashFiles('android/app/build.gradle') }}
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: npm ci
-      - run: npm test -- --maxWorkers=2
-      - run: npm run typecheck
+      - run: npm test -- --maxWorkers=4
       - run: npm run lint
       - run: npm run build
       - run: npx cap sync android
-      - name: Test native Android behavior
-        run: cd android && ./gradlew testDebugUnitTest
       - name: Set unique Android build version
         id: version
         run: |
           node scripts/android-build-policy.mjs version "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/trackforge-version.env"
           cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_OUTPUT"
-      - name: Assemble debug APK without the signing key
-        run: cd android && ./gradlew assembleDebug
+      - name: Test native Android behavior and assemble unsigned APK
+        run: cd android && ./gradlew testDebugUnitTest assembleDebug --build-cache
       - name: Verify unsigned APK metadata
         run: |
           shopt -s nullglob

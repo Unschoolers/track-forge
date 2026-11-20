@@ -41,6 +41,7 @@ test('Simulation starts stationary and keeps steering, gas and brake independent
   const brake = page.getByRole('button', { name: 'Brake', exact: true })
   await expect(gas).toBeVisible()
   await expect(page.getByRole('button', { name: 'Steer left' })).toBeHidden()
+  await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
   await expect.poll(async () => (await telemetry(page)).race?.phase, {
     timeout: 12_000,
   }).toBe('running')

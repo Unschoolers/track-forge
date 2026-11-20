@@ -90,7 +90,7 @@ points to a keystore with alias `androiddebugkey` and store/key passwords
 `android`. Use the original signing key to update an existing installation.
 Never commit or share private keys.
 
-The Android workflow compiles and verifies unsigned APKs on pushes to any branch,
+The Android workflow compiles and verifies unsigned APKs on pushes to main,
 pull requests, and manual dispatch. These artifacts are for QA, not installation.
 Successful main-branch pushes and manual main builds sign and publish the APK
 itself as a versioned [GitHub Release](https://github.com/Unschoolers/track-forge/releases)

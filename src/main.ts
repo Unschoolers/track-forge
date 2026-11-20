@@ -25,7 +25,7 @@ import '@/styles/editor-menus.css'
 import { RaceSession } from '@/application/race/raceSession'
 import { CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { mathRandom } from '@/application/ports/random'
-import { RaceInputController } from '@/phaser/input/raceInput'
+import { inputForHandling, RaceInputController } from '@/phaser/input/raceInput'
 import { FeedbackRouter } from '@/application/feedback/feedbackRouter'
 import {
   BrowserToneSink,
@@ -161,13 +161,22 @@ const stopSceneSync = controller.subscribe((snapshot) => {
   syncAudio(snapshot)
 })
 
-// QA telemetry is read-only and exists only in development builds explicitly
-// opened with ?qa. Production APKs never expose this inspection surface.
+// The QA bridge exists only on the Vite dev server with ?qa.
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
   const qaWindow = window as Window & {
-    __trackForgeQa?: { snapshot: () => unknown }
+    __trackForgeQa?: { snapshot: () => unknown; advanceRace: (seconds: number) => void }
   }
   qaWindow.__trackForgeQa = {
+    advanceRace: (seconds) => {
+      if (!Number.isFinite(seconds) || seconds < 0 || seconds > 20) throw new Error('Invalid QA race interval')
+      const { setup } = raceSession.snapshot()
+      if (!setup || setup.mode === 'nearby') throw new Error('Start a local race before advancing QA time')
+      const input = inputForHandling({ steering: 0, throttle: 0, braking: false }, setup.handling)
+      // RaceSession keeps its normal fixed physics tick and caps frame catch-up at 250 ms.
+      for (let remaining = seconds; remaining > 0 && !raceSession.snapshot().result; remaining -= 0.25) {
+        raceSession.advance(Math.min(0.25, remaining), input)
+      }
+    },
     snapshot: () => {
       const app = controller.snapshot()
       const race = raceSession.snapshot().state

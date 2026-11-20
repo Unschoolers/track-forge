@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest'
 import { getGrassTexture } from '@/presentation/environments/grass'
 import { GROUND_TILE_SIZE, groundViewportBounds, visibleGroundTiles, visibleGroundTilesForViewport } from '@/presentation/environments/groundTexture'

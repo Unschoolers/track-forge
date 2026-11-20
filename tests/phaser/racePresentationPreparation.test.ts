@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'

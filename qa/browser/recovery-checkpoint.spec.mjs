@@ -39,6 +39,7 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
   await page.getByRole('button', { name: 'TIME TRIAL', exact: true }).click()
   await page.getByRole('button', { name: 'START TIME TRIAL' }).click()
   await expect.poll(async () => (await qa()).race?.player?.y).toBe(-24)
+  await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
   await expect.poll(async () => {
     const race = (await qa()).race
     return race?.phase === 'running' && Math.abs(race.player.y) < 1

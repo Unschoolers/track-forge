@@ -24,11 +24,12 @@ async function enterEditor(page) {
   await expect.poll(async () => (await telemetry(page)).camera).not.toBeNull()
 }
 
-async function enterRace(page) {
+async function enterRace(page, { fastCountdown = false } = {}) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
   await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
   await page.getByRole('button', { name: 'START RACE' }).click()
   await expect(page.locator('[data-screen="race"]')).toBeVisible()
+  if (fastCountdown) await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
   await expect.poll(async () => (await telemetry(page)).race?.phase, {
     timeout: 12_000,
   }).toBe('running')
@@ -79,7 +80,7 @@ for (const side of ['left', 'right']) {
   for (const order of ['steer-first', 'brake-first']) {
     test(`steering survives braking, releases and regrabs (${side}, ${order})`, async ({ page, context }) => {
       await launch(page)
-      await enterRace(page)
+      await enterRace(page, { fastCountdown: true })
       const canvas = await page.locator('#game-container canvas').boundingBox()
       const brake = await page.getByRole('button', { name: 'Brake', exact: true }).boundingBox()
       expect(canvas).not.toBeNull()
@@ -146,7 +147,7 @@ test('arcade race advances and produces machine-readable driving metrics', async
   page.on('pageerror', error => browserErrors.push(error.message))
   await launch(page)
   await enterRace(page)
-  await page.waitForTimeout(1_600)
+  await expect.poll(async () => (await telemetry(page)).race.elapsed).toBeGreaterThan(0.5)
   const state = await telemetry(page)
   expect(state.race.handling).toBe('arcade')
   expect(state.race.elapsed).toBeGreaterThan(0.5)

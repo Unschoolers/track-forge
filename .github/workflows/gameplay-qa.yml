@@ -37,8 +37,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install Chromium and OS dependencies
-        run: npx playwright install --with-deps chromium
+      - name: Install pinned Chromium headless shell
+        run: npx playwright install chromium --only-shell
       - name: Simulate mobile gameplay
         run: npm run qa:mobile -- --fully-parallel --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v7.0.2
@@ -61,8 +61,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install Chromium and OS dependencies
-        run: npx playwright install --with-deps chromium
+      - name: Install pinned Chromium headless shell
+        run: npx playwright install chromium --only-shell
       - name: Start a race from the production build
         run: npm run qa:mobile:production
       - uses: actions/upload-artifact@v7.0.2
