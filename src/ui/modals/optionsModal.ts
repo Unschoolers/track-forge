@@ -9,7 +9,11 @@ import { createVolumeRow } from '@/ui/components/volumeRow'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
-const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<{ downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }> }>('TrackForgeUpdates')
+type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
+const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<void> }>('TrackForgeUpdates')
+
+type OptionsTab = 'race' | 'audio' | 'controls' | 'updates'
+let selectedOptionsTab: OptionsTab = 'race'
 
 export function createOptionsModal(
   state: AppSnapshot,
@@ -28,6 +32,14 @@ export function createOptionsModal(
     actions.close,
     'options-modal',
   )
+  const tabSections = new Map<OptionsTab, HTMLElement>()
+  const capture = (tab: OptionsTab, from: number) => {
+    const section = element('section', 'options-tab-panel')
+    section.dataset.optionsTab = tab
+    section.append(...Array.from(frame.body.children).slice(from))
+    tabSections.set(tab, section)
+  }
+  const raceStart = frame.body.children.length
   if (state.overlay.type !== 'options' || state.overlay.returnTo !== 'race') {
     const raceSettings = element('section', 'options-race-settings')
     raceSettings.append(element('h3', 'setup-label', 'Race settings'))
@@ -98,6 +110,8 @@ export function createOptionsModal(
     raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
   }
+  capture('race', raceStart)
+  const audioStart = frame.body.children.length
   const volumes = audioVolumes(state.preferences)
   frame.body.append(element('h3', 'setup-label', 'Audio'))
   for (const [setting, label] of [['musicVolume', 'Music'], ['soundEffectsVolume', 'Sound Effects']] as const) {
@@ -135,6 +149,8 @@ export function createOptionsModal(
         }),
     ),
   )
+  capture('audio', audioStart)
+  const controlsStart = frame.body.children.length
   frame.body.append(element('h3', 'setup-label', 'Controls'))
   const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize'>(
     title: string, key: K, values: readonly NonNullable<AppSnapshot['preferences'][K]>[], fallback: NonNullable<AppSnapshot['preferences'][K]>,
@@ -174,9 +190,78 @@ export function createOptionsModal(
   }
   steering.append(choices)
   if ((state.preferences.steeringLayout ?? 'drag') === 'drag') frame.body.append(steering)
+  capture('controls', controlsStart)
+  const updatesStart = frame.body.children.length
   if (Capacitor.isNativePlatform()) {
     frame.body.append(element('h3', 'setup-label', 'Game updates'))
     const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Android build.')
+    const panel = element('section', 'setup-section')
+    const progress = document.createElement('progress')
+    progress.setAttribute('aria-label', 'APK download progress')
+    progress.style.width = '100%'
+    progress.max = 100
+    const progressText = element('p', 'modal-subtitle', '')
+    const install = button('INSTALL UPDATE', 'install-update', () => {
+      install.disabled = true
+      void updates.install().catch((error: unknown) => {
+        status.textContent = error instanceof Error ? error.message : 'Could not open installer.'
+      }).finally(() => { install.disabled = false })
+    }, 'button button-primary')
+    const cancel = button('REMOVE DOWNLOAD', 'cancel-update', () => {
+      cancel.disabled = true
+      void updates.cancel().then(() => {
+        stop()
+        panel.replaceChildren()
+        status.textContent = 'Download removed.'
+      }).catch((error: unknown) => {
+        status.textContent = error instanceof Error ? error.message : 'Could not remove download.'
+      }).finally(() => { cancel.disabled = false })
+    }, 'button')
+    let timer: number | undefined
+    let polling = false
+    const stop = () => {
+      if (timer !== undefined) window.clearInterval(timer)
+      timer = undefined
+    }
+    const render = (state: DownloadState) => {
+      if (!panel.isConnected) { stop(); return }
+      const { downloaded, total } = state
+      if (total > 0) {
+        const percent = Math.min(100, Math.round(downloaded * 100 / total))
+        progress.value = percent
+        progressText.textContent = `${percent}% · ${(downloaded / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB`
+      } else {
+        progress.removeAttribute('value')
+        progressText.textContent = `${(downloaded / 1048576).toFixed(1)} MB downloaded`
+      }
+      status.textContent = `Update ${state.version}: ${state.state}`
+      panel.replaceChildren(progress, progressText, ...(state.state === 'complete' ? [install] : []), cancel)
+      if (state.state === 'complete') {
+        stop()
+        progress.value = 100
+        progressText.textContent = 'Download complete. Ready to install.'
+      } else if (state.state === 'failed') {
+        stop()
+        progressText.textContent = 'Download failed. Remove it to retry.'
+      }
+    }
+    const refresh = async () => {
+      if (polling || !panel.isConnected) return
+      polling = true
+      try {
+        const state = await updates.current()
+        if (state.state !== 'none') render(state as DownloadState)
+        else { stop(); panel.replaceChildren() }
+      } catch (error) {
+        stop()
+        status.textContent = error instanceof Error ? error.message : 'Could not read download status.'
+      } finally { polling = false }
+    }
+    const monitor = () => {
+      stop()
+      void refresh()
+      timer = window.setInterval(() => { void refresh() }, 1000)
+    }
     const check = button('CHECK FOR UPDATES', 'check-updates', () => {
       check.disabled = true
       status.textContent = 'Checking for updates…'
@@ -193,60 +278,69 @@ export function createOptionsModal(
         const download = button('DOWNLOAD APK', 'download-update', () => {
           download.disabled = true
           status.textContent = 'Starting Android download…'
-          const progress = document.createElement('progress')
-          progress.setAttribute('aria-label', 'APK download progress')
-          progress.style.width = '100%'
-          progress.setAttribute('max', '100')
-          const progressText = element('p', 'modal-subtitle', 'Preparing download…')
-          frame.body.append(progress, progressText)
-          void updates.download({ url: update.apkUrl, version: update.version }).then(({ downloadId }) => {
-            status.textContent = `Downloading ${update.version}`
-            const timer = window.setInterval(() => {
-              if (!progress.isConnected) {
-                window.clearInterval(timer)
-                return
-              }
-              void updates.progress({ downloadId }).then(({ downloaded, total, state }) => {
-                if (total > 0) {
-                  const percent = Math.min(100, Math.round(downloaded * 100 / total))
-                  progress.value = percent
-                  progressText.textContent = `${percent}% · ${(downloaded / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB`
-                } else {
-                  progress.removeAttribute('value')
-                  progressText.textContent = `${(downloaded / 1048576).toFixed(1)} MB downloaded`
-                }
-                if (state === 'complete' || state === 'failed') {
-                  window.clearInterval(timer)
-                  if (state === 'complete') {
-                    progress.value = 100
-                    progressText.textContent = 'Download complete. Open the Android notification to install.'
-                  } else {
-                    progressText.textContent = 'Download failed. Please retry.'
-                    download.disabled = false
-                  }
-                } else if (state === 'paused') {
-                  progressText.textContent += ' · Paused'
-                }
-              }).catch((error: unknown) => {
-                window.clearInterval(timer)
-                progressText.textContent = error instanceof Error ? error.message : 'Could not read download progress.'
-                download.disabled = false
-              })
-            }, 750)
+          void updates.download({ url: update.apkUrl, version: update.version }).then(() => {
+            monitor()
           }).catch((error: unknown) => {
             status.textContent = error instanceof Error ? error.message : 'Could not start download.'
             download.disabled = false
-            progress.remove()
-            progressText.remove()
           })
         }, 'button')
-        frame.body.append(download)
+        panel.replaceChildren(download)
       }).catch((error: unknown) => {
         status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
       }).finally(() => { check.disabled = false })
     }, 'button')
-    frame.body.append(check, status)
+    frame.body.append(check, status, panel)
+    void updates.current().then((state) => {
+      if (state.state !== 'none') {
+        render(state as DownloadState)
+        if (state.state !== 'complete' && state.state !== 'failed') monitor()
+      }
+    }).catch((error: unknown) => {
+      status.textContent = error instanceof Error ? error.message : 'Could not restore download.'
+    })
   }
+  if (Capacitor.isNativePlatform()) capture('updates', updatesStart)
+  const tabs = element('div', 'choice-row options-tab-list')
+  tabs.setAttribute('role', 'tablist')
+  tabs.setAttribute('aria-label', 'Options categories')
+  const available = Array.from(tabSections.keys())
+  if (!available.includes(selectedOptionsTab)) selectedOptionsTab = available[0] ?? 'audio'
+  const buttons = new Map<OptionsTab, HTMLButtonElement>()
+  const selectTab = (tab: OptionsTab) => {
+    selectedOptionsTab = tab
+    for (const [key, panel] of tabSections) {
+      const active = key === tab
+      panel.hidden = !active
+      panel.style.display = active ? '' : 'none'
+      buttons.get(key)?.setAttribute('aria-selected', String(active))
+      buttons.get(key)?.classList.toggle('active', active)
+      buttons.get(key)?.setAttribute('tabindex', active ? '0' : '-1')
+    }
+  }
+  for (const tab of available) {
+    const choice = button(tab.toUpperCase(), `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
+    choice.setAttribute('role', 'tab')
+    choice.setAttribute('aria-controls', `options-panel-${tab}`)
+    choice.id = `options-tab-${tab}`
+    const panel = tabSections.get(tab)!
+    panel.id = `options-panel-${tab}`
+    panel.setAttribute('role', 'tabpanel')
+    panel.setAttribute('aria-labelledby', choice.id)
+    buttons.set(tab, choice)
+    tabs.append(choice)
+  }
+  tabs.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+    const index = available.indexOf(selectedOptionsTab)
+    const next = available[(index + (event.key === 'ArrowRight' ? 1 : -1) + available.length) % available.length]
+    selectTab(next)
+    buttons.get(next)?.focus()
+    event.preventDefault()
+  })
+  frame.body.prepend(tabs)
+  for (const panel of tabSections.values()) frame.body.append(panel)
+  selectTab(selectedOptionsTab)
   frame.footer.append(
     button('DONE', 'options-done', actions.close, 'button button-primary'),
   )
