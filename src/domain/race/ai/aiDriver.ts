@@ -14,7 +14,7 @@ import {
   turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
-import { safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
+import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
 const HARD_LOOKAHEAD_SAMPLES = 4
@@ -35,6 +35,15 @@ const SWEEP_EDGE_MARGIN = 15
 const SWEEP_EDGE_LIMIT = 36
 const SWEEP_HEADING_MARGIN = 0.14
 const SWEEP_HEADING_LIMIT = 0.46
+const RACING_PAVEMENT_LOOKAHEAD_SAMPLES = 20
+const RACING_PAVEMENT_SWEEP_SAMPLES = 2
+const RACING_PAVEMENT_CORNER_PACE = 2.15
+const RACING_PAVEMENT_SWEEP_PACE = 0.32
+const RACING_PAVEMENT_THROTTLE_WINDOW = 5
+const RACING_PAVEMENT_EDGE_MARGIN = 31
+const RACING_PAVEMENT_EDGE_LIMIT = 42
+const RACING_PAVEMENT_HEADING_MARGIN = 0.38
+const RACING_PAVEMENT_HEADING_LIMIT = 0.8
 
 function wrapAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle))
@@ -163,15 +172,21 @@ export function stepAiVehicle(
   const hardPavement = hardArcadeLine && !vehicle.racingLine && context.surface === 'street'
   const direction = reversed ? -1 : 1
   let sweep = hardPavement ? sweepingPavementAllowance(path, context.nearest.index, reversed) : 0
-  if (sweep > 0) {
+  let racingPace = hardPavement ? racingPavementAllowance(path, context.nearest.index, reversed) : 0
+  if (sweep > 0 || racingPace > 0) {
     // Back out smoothly if a rival is running wide or is still turning in.
-    const edge = 1 - clamp((context.nearest.distance - SWEEP_EDGE_MARGIN) /
-      (SWEEP_EDGE_LIMIT - SWEEP_EDGE_MARGIN), 0, 1)
     const roadHeading = Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     const headingError = Math.abs(wrapAngle(roadHeading - vehicle.angle))
+    const edge = 1 - clamp((context.nearest.distance - SWEEP_EDGE_MARGIN) /
+      (SWEEP_EDGE_LIMIT - SWEEP_EDGE_MARGIN), 0, 1)
     const alignment = 1 - clamp((headingError - SWEEP_HEADING_MARGIN) /
       (SWEEP_HEADING_LIMIT - SWEEP_HEADING_MARGIN), 0, 1)
     sweep *= edge * alignment
+    const racingEdge = 1 - clamp((context.nearest.distance - RACING_PAVEMENT_EDGE_MARGIN) /
+      (RACING_PAVEMENT_EDGE_LIMIT - RACING_PAVEMENT_EDGE_MARGIN), 0, 1)
+    const racingAlignment = 1 - clamp((headingError - RACING_PAVEMENT_HEADING_MARGIN) /
+      (RACING_PAVEMENT_HEADING_LIMIT - RACING_PAVEMENT_HEADING_MARGIN), 0, 1)
+    racingPace *= racingEdge * racingAlignment
   }
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
@@ -184,8 +199,11 @@ export function stepAiVehicle(
   )
   const racingLine = context.onRoad ? vehicle.racingLine?.sections : undefined
   const notes = racingLine?.[context.nearest.point.segment]
-  const extraSamples = notes?.extraSamples ?? (hardPavement
-    ? HARD_PAVEMENT_LOOKAHEAD_SAMPLES + Math.round(sweep * SWEEP_LOOKAHEAD_SAMPLES) : 0)
+  const basePace = 1 - racingPace
+  const extraSamples = notes?.extraSamples ?? (hardPavement ? Math.round(
+    (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
+    (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
+  ) : 0)
   const pursuitSamples = Math.max(1, lookAheadSamples + extraSamples)
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
@@ -246,7 +264,8 @@ export function stepAiVehicle(
   }
   const fastCorners = hardArcadeLine && nearbyTurn < 1.15
   const cornerPace = notes?.cornerPace ?? (hardPavement
-    ? HARD_PAVEMENT_CORNER_PACE + sweep * SWEEP_CORNER_PACE : 1)
+    ? (HARD_PAVEMENT_CORNER_PACE + sweep * SWEEP_CORNER_PACE) * basePace +
+      (RACING_PAVEMENT_CORNER_PACE + sweep * RACING_PAVEMENT_SWEEP_PACE) * racingPace : 1)
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const cornerTarget = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
@@ -256,7 +275,9 @@ export function stepAiVehicle(
   const curveSpeed = speedRatio < 1 ? Math.min(cornerTarget, car.max) * speedRatio : cornerTarget
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
-  const throttleWindow = fastCorners ? 5 : hardPavement ? HARD_PAVEMENT_THROTTLE_WINDOW : CORNER_THROTTLE_WINDOW
+  const throttleWindow = fastCorners ? 5 : hardPavement
+    ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
+    : CORNER_THROTTLE_WINDOW
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / throttleWindow, 0, 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && curveThrottle === 1 &&

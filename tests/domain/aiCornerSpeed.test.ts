@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { CAR_SPECS } from '@/domain/config'
-import { safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
+import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 
 const path = buildRoadPath([
   { x: 0, y: 0, surface: 'street', curve: 'corner' },
@@ -19,6 +19,8 @@ describe('AI approach speed planning', () => {
     expect(sweepingPavementAllowance(path, straight, false)).toBe(1)
     expect(sweepingPavementAllowance(path, approach, false)).toBe(0)
     expect(sweepingPavementAllowance(path, straight, true)).toBe(0)
+    expect(racingPavementAllowance(path, straight, false)).toBe(0)
+    expect(racingPavementAllowance(path, approach, false)).toBe(0)
   })
 
   it('backs off at loose-surface transitions in both directions', () => {
@@ -36,6 +38,10 @@ describe('AI approach speed planning', () => {
     expect(sweepingPavementAllowance(straight, index, true)).toBe(1)
     expect(sweepingPavementAllowance(mixed, index, false)).toBe(0)
     expect(sweepingPavementAllowance(mixed, index, true)).toBe(0)
+    expect(racingPavementAllowance(straight, index, false)).toBe(1)
+    expect(racingPavementAllowance(straight, index, true)).toBe(1)
+    expect(racingPavementAllowance(mixed, index, false)).toBe(0)
+    expect(racingPavementAllowance(mixed, index, true)).toBe(0)
   })
 
   it('slows for a bend ahead instead of waiting for the target to enter the corner', () => {

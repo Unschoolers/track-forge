@@ -18,6 +18,13 @@ const PAVEMENT_FULL_PACE_TURN = 0.23
 const PAVEMENT_BASE_PACE_TURN = 0.68
 const PAVEMENT_SWITCHBACK_TURN = 0.32
 const pavementPreviewByPath = new WeakMap<RoadPath, Map<number, number>>()
+const smoothRoadByPath = new WeakMap<RoadPath, boolean>()
+const racingPavementByPath = new WeakMap<RoadPath, Map<number, number>>()
+const SHARP_LOCAL_TURN = 0.2
+const MAX_SHARP_SAMPLE_FRACTION = 0.012
+const MIN_PAVED_SAMPLE_FRACTION = 0.95
+const RACING_PAVEMENT_FULL_PACE_TURN = 0.5
+const RACING_PAVEMENT_BASE_PACE_TURN = 0.57
 
 /** Fraction of extra pavement pace a sweeping approach can support. */
 export function sweepingPavementAllowance(path: RoadPath, index: number, reversed: boolean): number {
@@ -62,6 +69,59 @@ export function sweepingPavementAllowance(path: RoadPath, index: number, reverse
   const allowance = paved ? sweep * (1 - clamp(directionChanges / PAVEMENT_SWITCHBACK_TURN, 0, 1)) : 0
   preview.set(key, allowance)
   return allowance
+}
+
+/** Wider steering targets work best where the road bends and grip stay consistent. */
+export function racingPavementAllowance(path: RoadPath, index: number, reversed: boolean): number {
+  const count = path.points.length
+  if (!count || !supportsWidePursuit(path)) return 0
+
+  let preview = racingPavementByPath.get(path)
+  if (!preview) {
+    preview = new Map()
+    racingPavementByPath.set(path, preview)
+  }
+  const key = reversed ? -index - 1 : index
+  const cached = preview.get(key)
+  if (cached !== undefined) return cached
+
+  const direction = reversed ? -1 : 1
+  let peakTurn = 0
+  let paved = true
+  // Look back through the corner exit and ahead through the braking horizon.
+  for (let offset = -15; offset <= 100; offset += 3) {
+    const raw = index + direction * offset
+    if (!path.closed && (raw < 0 || raw >= count)) continue
+    const sample = ((raw % count) + count) % count
+    if (path.points[sample]?.surface !== 'street') {
+      paved = false
+      break
+    }
+    peakTurn = Math.max(peakTurn, Math.abs(turnAmountAt(path, sample, 6)))
+  }
+  const allowance = paved ? 1 - clamp((peakTurn - RACING_PAVEMENT_FULL_PACE_TURN) /
+    (RACING_PAVEMENT_BASE_PACE_TURN - RACING_PAVEMENT_FULL_PACE_TURN), 0, 1) : 0
+  preview.set(key, allowance)
+  return allowance
+}
+
+function supportsWidePursuit(path: RoadPath): boolean {
+  const cached = smoothRoadByPath.get(path)
+  if (cached !== undefined) return cached
+
+  let pavedSamples = 0
+  let sharpSamples = 0
+  for (const [index, point] of path.points.entries()) {
+    if (point.surface === 'street') pavedSamples++
+    if (Math.abs(turnAmountAt(path, index, 2)) > SHARP_LOCAL_TURN) sharpSamples++
+  }
+  const count = path.points.length
+  // Stay on the shorter steering profile when tight turns or loose surfaces
+  // recur. Frequent transitions can unsettle the car between corners.
+  const supportsWide = pavedSamples / count >= MIN_PAVED_SAMPLE_FRACTION &&
+    sharpSamples / count <= MAX_SHARP_SAMPLE_FRACTION
+  smoothRoadByPath.set(path, supportsWide)
+  return supportsWide
 }
 
 /**
