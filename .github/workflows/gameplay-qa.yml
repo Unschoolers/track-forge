@@ -26,6 +26,10 @@ jobs:
   mobile-chromium:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -33,16 +37,38 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install Chromium and OS dependencies
-        run: npx playwright install --with-deps chromium
+      - name: Install pinned Chromium headless shell
+        run: npx playwright install chromium --only-shell
       - name: Simulate mobile gameplay
-        run: npm run qa:mobile
+        run: npm run qa:mobile -- --fully-parallel --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v7.0.2
+        if: ${{ always() }}
+        with:
+          name: mobile-gameplay-qa-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Chromium headless shell
+        run: npx playwright install chromium --only-shell
       - name: Start a race from the production build
         run: npm run qa:mobile:production
       - uses: actions/upload-artifact@v7.0.2
         if: ${{ always() }}
         with:
-          name: mobile-gameplay-qa-${{ github.run_id }}
+          name: mobile-gameplay-qa-${{ github.run_id }}-production
           path: |
             playwright-report/
             test-results/

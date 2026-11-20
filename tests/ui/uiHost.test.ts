@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest'
 import type { AppCommand, AppSnapshot } from '@/application/appState'
 import type { Preferences } from '@/application/ports/storage'

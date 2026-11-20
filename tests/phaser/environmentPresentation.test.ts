@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it } from 'vitest'
 import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
 

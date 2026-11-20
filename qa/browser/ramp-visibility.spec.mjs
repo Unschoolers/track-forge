@@ -64,6 +64,7 @@ for (const reversed of [false, true]) {
     })
     await page.getByRole('button', { name: 'START RACE' }).click()
     await expect(page.locator('[data-screen="race"]')).toBeVisible()
+    await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
     for (const [stage, threshold] of [
       ['approach', reversed ? 1650 : -50],
       ['deck-entry', reversed ? 1350 : 250],

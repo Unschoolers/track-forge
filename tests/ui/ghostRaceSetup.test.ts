@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
 import { createResultsModal } from '@/ui/modals/resultsModal'

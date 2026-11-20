@@ -39,6 +39,7 @@ test('converts a route in the editor and races it in all three modes', async ({ 
   const results = page.locator('[data-modal="results"]')
   const race = () => page.evaluate(() => window.__trackForgeQa?.snapshot().race)
   const expectSplits = async () => {
+    await page.evaluate(() => window.__trackForgeQa.advanceRace(16))
     await expect(results.getByRole('heading', { name: 'SPLITS', exact: true })).toBeVisible({ timeout: 18_000 })
     for (const gate of ['CHECKPOINT 1', 'CHECKPOINT 2', 'CHECKPOINT 3', 'FINISH']) {
       await expect(results.getByText(new RegExp(`^${gate} · \\d{2}:\\d{2}\\.\\d{3}$`))).toBeVisible()
