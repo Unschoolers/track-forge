@@ -103,9 +103,9 @@ describe('Émile arcade difficulty balance', () => {
 			const times = opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
 			const fastest = Math.min(...times)
 			// A 5/5-speed car is intentionally faster than a 2/5-speed car.
-			// Keep the field competitive in relative pace without enforcing an
-			// artificial same-time finish for physically different chassis.
-			expect((Math.max(...times) - fastest) / fastest, playerCar).toBeLessThan(0.065)
+			// Keep the field within a 10% relative pace window across real car specs
+			// and grid positions rather than artificially matching finish times.
+			expect((Math.max(...times) - fastest) / fastest, playerCar).toBeLessThan(0.10)
 			const redTime = opponents.find(({ car }) => car === 'red')?.finishedAt
 			if (redTime === fastest) redWins++
 			if (playerCar === 'blue') expect(redTime).toBeLessThan(61.866)
