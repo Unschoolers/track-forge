@@ -1,4 +1,4 @@
-import { ROAD_GEOMETRY } from '@/domain/config'
+import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -90,8 +90,8 @@ export function updateOpenRouteProgress(
 /** A forward crossing must stay on the route near this gate, even at crossings. */
 export function crossesRoadGate(
   path: RoadPath,
-  previous: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
-  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'>,
+  previous: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'z'>>,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'z'>>,
   gatePosition: number,
   roadRadius: number,
   reversed = false,
@@ -120,5 +120,15 @@ export function crossesRoadGate(
   const t = -before / (after - before)
   const x = previous.x + (vehicle.x - previous.x) * t - gx
   const y = previous.y + (vehicle.y - previous.y) * t - gy
-  return Math.abs(-x * ty + y * tx) <= roadRadius
+  if (Math.abs(-x * ty + y * tx) > roadRadius) return false
+
+  // Checkpoint ribbons can lie on a bridge. A car crossing beneath that
+  // ribbon must not get credit merely because its 2D projection overlaps it.
+  const road = path.roadSurface.at(lower, { x: gx, y: gy })
+  const chassisHeight = Math.max(previous.z ?? Number.NaN, vehicle.z ?? Number.NaN)
+  const halfLevel = WORLD_ELEVATION.levelHeight / 2
+  if (Number.isFinite(chassisHeight) &&
+      road.structureHeight > halfLevel &&
+      road.height - chassisHeight > halfLevel) return false
+  return true
 }
