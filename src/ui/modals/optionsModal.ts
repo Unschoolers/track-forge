@@ -334,6 +334,7 @@ export function createOptionsModal(
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
     const index = available.indexOf(selectedOptionsTab)
     const next = available[(index + (event.key === 'ArrowRight' ? 1 : -1) + available.length) % available.length]
+    if (!next) return
     selectTab(next)
     buttons.get(next)?.focus()
     event.preventDefault()
