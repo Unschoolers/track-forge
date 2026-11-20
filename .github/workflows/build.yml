@@ -34,7 +34,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/android-ci-native-required.mjs >> "$GITHUB_OUTPUT"
       - run: npm ci
-      - run: npm run build
+      - name: Set web build release identity
+        id: version
+        run: |
+          node scripts/android-build-policy.mjs version "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/trackforge-version.env"
+          cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_OUTPUT"
+      - name: Build web assets with embedded release identity
+        run: npm run build
+        env:
+          VITE_TRACKFORGE_BUILD_RUN: ${{ steps.version.outputs.TRACKFORGE_BUILD_RUN }}
+          VITE_TRACKFORGE_BUILD_ATTEMPT: ${{ steps.version.outputs.TRACKFORGE_BUILD_ATTEMPT }}
       - uses: actions/upload-artifact@v7.0.2
         if: steps.changes.outputs.native != 'false'
         id: web-artifact
