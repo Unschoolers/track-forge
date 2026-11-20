@@ -287,7 +287,7 @@ export function stepAiVehicle(
   // Scale braking anticipation by the actual grip deficit and upcoming bend;
   // full speed is still available on straights and no physics cap is added.
   const gripDeficit = Math.max(0, 1 - car.grip)
-  const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.14)
+  const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.17)
   curveSpeed *= 1 - cornerReserve
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
