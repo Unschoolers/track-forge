@@ -67,7 +67,10 @@ it('requires an on-road physical crossing and allows recovery before a missed ga
   const line = gateLine(1)
   const before = { ...player, ...line.before }
   const after = { ...player, ...line.after }
-  const bypass = updateOpenRouteProgress(before, after, path, after.pathIndex, 1, false, true, 42)
+  // Off-road bypass is a shortcut only when the swept path misses the painted stripe.
+  const grassBefore = { ...before, y: before.y + 80 }
+  const grassAfter = { ...after, y: after.y + 80 }
+  const bypass = updateOpenRouteProgress(grassBefore, grassAfter, path, after.pathIndex, 1, false, true, 42)
   expect(bypass.nextSector).toBe(1)
   expect(bypass.finishedAt).toBeNull()
   const rejoin = updateOpenRouteProgress(bypass, bypass, path, after.pathIndex, 2, true, true, 42)
