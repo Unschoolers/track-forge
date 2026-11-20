@@ -1,10 +1,17 @@
 package io.trackforge.app;
 
 import android.app.DownloadManager;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.ParcelFileDescriptor;
+import android.provider.Settings;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import android.content.pm.PackageInfo;
 import android.os.Build;
 import androidx.core.content.FileProvider;
 import java.io.File;
@@ -23,6 +30,7 @@ public class TrackForgeUpdatesPlugin extends Plugin {
     private static final String PREFS = "trackforge_updates";
     private static final String ID = "downloadId";
     private static final String VERSION = "version";
+    private static final long MAX_APK_BYTES = 256L * 1024 * 1024;
 
     private long savedId() {
         return getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(ID, -1);
@@ -30,6 +38,45 @@ public class TrackForgeUpdatesPlugin extends Plugin {
 
     private void forget() {
         getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
+    }
+
+    /** Download Manager owns the public download; the installer needs a private, readable copy. */
+    static File stagedFile(Context context, long downloadId) {
+        if (downloadId <= 0) throw new IllegalArgumentException("Invalid download ID.");
+        return new File(new File(context.getCacheDir(), "updates"), "trackforge-" + downloadId + ".apk");
+    }
+
+    static File copyApkToPrivateCache(Context context, InputStream source, long downloadId) throws IOException {
+        File destination = stagedFile(context, downloadId);
+        File directory = destination.getParentFile();
+        if (!directory.isDirectory() && !directory.mkdirs()) {
+            throw new IOException("Could not create private APK cache.");
+        }
+        boolean complete = false;
+        try {
+            long copied = 0;
+            try (FileOutputStream target = new FileOutputStream(destination)) {
+                byte[] buffer = new byte[64 * 1024];
+                int count;
+                while ((count = source.read(buffer)) != -1) {
+                    copied += count;
+                    if (copied > MAX_APK_BYTES) throw new IOException("Downloaded APK is too large.");
+                    target.write(buffer, 0, count);
+                }
+            }
+            if (copied == 0) throw new IOException("Downloaded APK is empty.");
+            complete = true;
+            return destination;
+        } finally {
+            if (!complete) destination.delete();
+        }
+    }
+
+    private File stageDownloadedApk(DownloadManager manager, long downloadId) throws IOException {
+        try (ParcelFileDescriptor descriptor = manager.openDownloadedFile(downloadId);
+             InputStream source = new FileInputStream(descriptor.getFileDescriptor())) {
+            return copyApkToPrivateCache(getContext(), source, downloadId);
+        }
     }
 
     private JSObject snapshot(long id) {
@@ -72,6 +119,7 @@ public class TrackForgeUpdatesPlugin extends Plugin {
             DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
             if (manager != null) manager.remove(id);
         }
+        if (id > 0) stagedFile(getContext(), id).delete();
         forget();
         call.resolve();
     }
@@ -85,22 +133,19 @@ public class TrackForgeUpdatesPlugin extends Plugin {
                 && candidate.signatures.length > 0 && Arrays.equals(candidate.signatures, installed.signatures);
     }
 
-    private File downloadedFile() {
-        String version = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(VERSION, "");
-        if (!version.matches("android-build-[0-9]+-[0-9]+")) throw new IllegalStateException("Invalid update version.");
-        return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "trackforge-" + version + ".apk");
-    }
-
     @PluginMethod
     public void install(PluginCall call) {
-        JSObject progress = savedId() < 0 ? null : snapshot(savedId());
+        long id = savedId();
+        JSObject progress = id < 0 ? null : snapshot(id);
         if (progress == null || !"complete".equals(progress.optString("state"))) {
             call.reject("Download is not complete.");
             return;
         }
         try {
-            File apk = downloadedFile();
-            if (!apk.isFile() || apk.length() <= 0) throw new IllegalStateException("Downloaded APK is missing.");
+            DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+            if (manager == null) throw new IllegalStateException("Android Download Manager is unavailable.");
+            // Public Downloads is not directly readable through File on recent Android releases.
+            File apk = stageDownloadedApk(manager, id);
             PackageManager pm = getContext().getPackageManager();
             int signingFlag = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
             PackageInfo candidate = pm.getPackageArchiveInfo(apk.getAbsolutePath(), signingFlag);
@@ -112,12 +157,26 @@ public class TrackForgeUpdatesPlugin extends Plugin {
             long candidateCode = Build.VERSION.SDK_INT >= 28 ? candidate.getLongVersionCode() : candidate.versionCode;
             long installedCode = Build.VERSION.SDK_INT >= 28 ? installed.getLongVersionCode() : installed.versionCode;
             if (candidateCode <= installedCode) throw new SecurityException("Downloaded APK is not a newer version.");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !pm.canRequestPackageInstalls()) {
+                Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getContext().getPackageName()));
+                settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(settings);
+                JSObject result = new JSObject();
+                result.put("state", "permission-required");
+                call.resolve(result);
+                return;
+            }
+
             Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", apk);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
+            intent.setClipData(ClipData.newRawUri("Track Forge update", uri));
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
-            call.resolve();
+            JSObject result = new JSObject();
+            result.put("state", "installer-opened");
+            call.resolve(result);
         } catch (Exception error) {
             call.reject("Could not verify or open the APK installer: " + error.getMessage(), error);
         }
@@ -164,6 +223,7 @@ public class TrackForgeUpdatesPlugin extends Plugin {
                 }
                 DownloadManager existing = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
                 if (existing != null) existing.remove(previous);
+                stagedFile(getContext(), previous).delete();
                 forget();
             }
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
