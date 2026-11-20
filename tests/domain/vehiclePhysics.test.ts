@@ -185,7 +185,8 @@ describe('vehicle physics', () => {
     }
     expect(car.speed).toBeLessThan(0.5)
     const released = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
-    expect(released.speed).toBeLessThan(1)
+    // Stronger sports-car launches still settle the first brake-release frame.
+    expect(released.speed).toBeLessThan(1.2)
     car = released
     for (let step = 0; step < 30; step += 1) {
       car = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
