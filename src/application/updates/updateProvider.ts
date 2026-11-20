@@ -24,7 +24,7 @@ export class GitHubUpdateProvider implements UpdateProvider {
   constructor(
     private readonly run: number,
     private readonly attempt: number,
-    private readonly fetchRelease: typeof fetch = fetch,
+    private readonly fetchRelease: typeof fetch = (...args) => globalThis.fetch(...args),
   ) {}
 
   async check(): Promise<UpdateInfo | null> {
