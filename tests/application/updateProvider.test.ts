@@ -11,11 +11,12 @@ describe('GitHub update checks', () => {
   })
 
   it('returns an update only for a newer release', async () => {
-    const request = vi.fn(async () => new Response(JSON.stringify({ tag_name: 'android-build-534-1' }), { status: 200 }))
+    const request = vi.fn(async () => new Response(JSON.stringify({ tag_name: 'android-build-534-1', assets: [{ name: 'trackforge-debug.apk', browser_download_url: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-534-1/trackforge-debug.apk' }] }), { status: 200 }))
     const provider = new GitHubUpdateProvider(533, 1, request as typeof fetch)
     expect(await provider.check()).toEqual({
       version: 'android-build-534-1',
       url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+      apkUrl: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-534-1/trackforge-debug.apk',
     })
     expect(request).toHaveBeenCalledOnce()
   })
@@ -29,7 +30,7 @@ describe('GitHub update checks', () => {
     const original = globalThis.fetch
     const fetchMock = vi.fn(function (this: typeof globalThis, _input: RequestInfo | URL, _init?: RequestInit) {
       if (this !== globalThis) throw new TypeError('Illegal invocation')
-      return Promise.resolve(new Response(JSON.stringify({ tag_name: 'android-build-535-1' }), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ tag_name: 'android-build-535-1', assets: [{ name: 'trackforge-debug.apk', browser_download_url: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-535-1/trackforge-debug.apk' }] }), { status: 200 }))
     })
     globalThis.fetch = fetchMock as typeof fetch
     try {
@@ -39,6 +40,12 @@ describe('GitHub update checks', () => {
     } finally {
       globalThis.fetch = original
     }
+  })
+
+  it('rejects a release without the expected official APK asset', async () => {
+    const provider = new GitHubUpdateProvider(533, 1, async () =>
+      new Response(JSON.stringify({ tag_name: 'android-build-534-1', assets: [] }), { status: 200 }))
+    await expect(provider.check()).rejects.toThrow('no verified APK')
   })
 
   it('reports server errors', async () => {
