@@ -1,6 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
-import { exportTrack, shareTrack } from '@/infrastructure/export/trackExport'
+import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
 import { formatRaceTime } from '@/ui/format'
 import type { LightingMode, Track, TrackId } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -114,6 +114,13 @@ export class DomUiHost implements UiHost {
       this.root.append(toast)
       setTimeout(() => toast.remove(), 5000)
     }
+  }
+
+  private async downloadNearbyDiagnostics(nearby: NearbyRace): Promise<boolean> {
+    const capturedAt = new Date().toISOString()
+    const report = { capturedAt, ...await nearby.diagnostics() }
+    const timestamp = capturedAt.replace(/[:.]/g, '-')
+    return saveJsonFile({ filename: `trackforge-nearby-${timestamp}.json`, content: JSON.stringify(report, null, 2) })
   }
 
   private async shareTrackChallenge(track: Track): Promise<void> {
@@ -285,6 +292,7 @@ export class DomUiHost implements UiHost {
         if (!nearby) return undefined
         return createNearbyRaceModal(nearby, state.preferences.car, {
           close,
+          downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
           chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           scan: () => this.controller.dispatch({ type: 'scan-nearby' }),
           selectCar: (car) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, car } }),
@@ -295,11 +303,13 @@ export class DomUiHost implements UiHost {
       case 'results': {
         const result = this.runtime.raceSession.snapshot().result
         if (!result) return undefined
-        if (result.mode === 'nearby' && this.runtime.nearby) {
-          const nearby = createNearbyRaceResults(this.runtime.nearby, result,
-            () => this.controller.dispatch({ type: 'go-home' }))
-          this.overlayCleanup = nearby.cleanup
-          return nearby.element
+        const nearby = this.runtime.nearby
+        if (result.mode === 'nearby' && nearby) {
+          const results = createNearbyRaceResults(nearby, result,
+            () => this.controller.dispatch({ type: 'go-home' }),
+            () => this.downloadNearbyDiagnostics(nearby))
+          this.overlayCleanup = results.cleanup
+          return results.element
         }
         const modal = createResultsModal(result, {
           retry: () => this.controller.dispatch({ type: 'restart-race' }),

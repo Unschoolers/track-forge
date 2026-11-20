@@ -272,3 +272,43 @@ describe('Nearby Arcade', () => {
     expect(decodePose(new Uint8Array(18))).toBeNull()
   })
 })
+
+describe('Nearby diagnostics', () => {
+  it('keeps bounded, private context after a hosting failure and a native retrieval failure', async () => {
+    let listener: ((event: NearbyEvent) => void) | undefined
+    const transport: NearbyTransport = {
+      subscribe: (next) => { listener = next; return () => undefined },
+      host: async () => { throw new Error('secret-room endpoint-123') },
+      scan: async () => undefined, connect: async () => undefined, respond: async () => undefined,
+      lock: async () => undefined, send: async () => undefined, stop: async () => undefined,
+      diagnostics: async () => { throw new Error('native-secret') },
+    }
+    const race = new NearbyRace(transport, () => true, () => 100)
+    race.host({ track, laps: 1, lighting: 'day', car: 'blue' })
+    await vi.waitFor(() => expect(race.snapshot().phase).toBe('idle'))
+    const report = await race.diagnostics()
+    expect(report).toMatchObject({ version: 1, role: 'host', phase: 'idle',
+      lastFailure: { source: 'host', phase: 'opening', error: 'Error' }, native: { status: 'failed' } })
+    expect(JSON.stringify(report)).not.toContain('secret')
+    expect(JSON.stringify(report)).not.toContain('endpoint-123')
+    expect(listener).toBeDefined()
+  })
+
+  it('bounds the timeline and does not record pairing codes, room names or endpoint IDs', async () => {
+    let emit: (event: NearbyEvent) => void = () => undefined
+    const transport: NearbyTransport = {
+      subscribe: (next) => { emit = next; return () => undefined },
+      host: async () => undefined, scan: async () => undefined, connect: async () => undefined,
+      respond: async () => undefined, lock: async () => undefined, send: async () => undefined,
+      stop: async () => undefined, diagnostics: async () => ({ platform: 'test' }),
+    }
+    const race = new NearbyRace(transport, () => true)
+    race.host({ track, laps: 1, lighting: 'day', car: 'blue' })
+    await vi.waitFor(() => expect(race.snapshot().phase).toBe('hosting'))
+    for (let i = 0; i < 120; i++) emit({ type: 'pairing', id: 'private-id', code: '987654' })
+    const report = await race.diagnostics()
+    expect((report.timeline as unknown[]).length).toBeLessThanOrEqual(100)
+    expect(report.native).toEqual({ status: 'available', report: { platform: 'test' } })
+    expect(JSON.stringify(report)).not.toMatch(/private-id|987654|Room \d{4}/)
+  })
+})

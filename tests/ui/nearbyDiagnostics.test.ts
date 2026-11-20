@@ -1,0 +1,39 @@
+// @vitest-environment jsdom
+
+import { expect, it, vi } from 'vitest'
+import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import { createNearbyRaceModal } from '@/ui/modals/nearbyRaceModal'
+
+it('offers a diagnostic download after Nearby hosting fails and allows retrying a failed save', async () => {
+  const transport: NearbyTransport = {
+    subscribe: () => () => undefined,
+    host: async () => { throw new Error('Could not host a nearby room.') },
+    scan: vi.fn(),
+    connect: vi.fn(),
+    respond: vi.fn(),
+    lock: vi.fn(),
+    send: vi.fn(),
+    stop: vi.fn(),
+  }
+  const nearby = new NearbyRace(transport, () => true)
+  const track = { name: 'Diagnostic circuit' } as Parameters<NearbyRace['host']>[0]['track']
+  nearby.host({ track, laps: 1, lighting: 'day', car: 'blue' })
+  await vi.waitFor(() => expect(nearby.snapshot().error).toBe('Could not host a nearby room.'))
+
+  const download = vi.fn<() => Promise<boolean>>()
+    .mockRejectedValueOnce(new Error('Storage unavailable'))
+    .mockResolvedValueOnce(true)
+  const view = createNearbyRaceModal(nearby, 'blue', {
+    close: vi.fn(), chooseTrack: vi.fn(), scan: vi.fn(), selectCar: vi.fn(), downloadDiagnostics: download,
+  })
+  const button = view.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')
+  expect(button?.textContent).toBe('DOWNLOAD DIAGNOSTICS')
+  button?.click()
+  expect(button?.disabled).toBe(true)
+  await vi.waitFor(() => expect(view.textContent).toContain('Could not save the diagnostic report'))
+  expect(button?.disabled).toBe(false)
+  button?.click()
+  await vi.waitFor(() => expect(view.textContent).toContain('Diagnostic report saved.'))
+  expect(download).toHaveBeenCalledTimes(2)
+  nearby.destroy()
+})

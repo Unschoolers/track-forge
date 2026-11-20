@@ -10,7 +10,7 @@ import { createModalFrame } from './modalFrame'
 export function createNearbyRaceModal(
   nearby: NearbyRace,
   car: CarId,
-  actions: { close: () => void; chooseTrack: () => void; scan: () => void; selectCar: (car: CarId) => void },
+  actions: { close: () => void; chooseTrack: () => void; scan: () => void; selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean> },
 ): HTMLElement {
   const { phase, room, track, players, canStart, rooms, pairing, error } = nearby.snapshot()
   const frame = createModalFrame('Nearby Race', room ?? 'Arcade · Up to 4 players', actions.close, 'nearby-race-modal')
@@ -64,11 +64,17 @@ export function createNearbyRaceModal(
     pair.append(choices)
     frame.body.append(pair)
   }
+  frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
   frame.footer.append(button('BACK', 'nearby-back', actions.close, 'button'))
   return frame.overlay
 }
 
-export function createNearbyRaceResults(nearby: NearbyRace, result: RaceResult, home: () => void) {
+export function createNearbyRaceResults(
+  nearby: NearbyRace,
+  result: RaceResult,
+  home: () => void,
+  downloadDiagnostics: () => Promise<boolean>,
+) {
   const title = 'NEARBY RACE RESULTS'
   const frame = createModalFrame(title, result.trackName, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
@@ -93,9 +99,28 @@ export function createNearbyRaceResults(nearby: NearbyRace, result: RaceResult, 
     }))
   }
   update()
-  frame.body.append(list, status)
+  frame.body.append(list, status, createDiagnosticsControl(downloadDiagnostics))
   frame.footer.append(button('LEAVE ROOM', 'results-home', home, 'button button-primary'))
   return { element: frame.overlay, cleanup: nearby.subscribe(update) }
+}
+
+function createDiagnosticsControl(save: () => Promise<boolean>): HTMLElement {
+  const section = element('section', 'setup-section')
+  const status = element('p', 'modal-subtitle')
+  status.setAttribute('role', 'status')
+  const download = button('DOWNLOAD DIAGNOSTICS', 'nearby-download-diagnostics', () => {
+    download.disabled = true
+    status.textContent = 'Preparing report…'
+    void save().then((saved) => {
+      status.textContent = saved ? 'Diagnostic report saved.' : ''
+    }).catch(() => {
+      status.textContent = 'Could not save the diagnostic report. Try again.'
+    }).finally(() => {
+      download.disabled = false
+    })
+  }, 'button')
+  section.append(download, status)
+  return section
 }
 
 export function createNearbyRaceMenu(resume: () => void, leave: () => void): HTMLElement {
