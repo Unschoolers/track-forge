@@ -101,7 +101,6 @@ describe('Émile arcade difficulty balance', () => {
 		for (const playerCar of CAR_IDS) {
 			const { opponents } = hardRun(playerCar)
 			const times = opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
-			console.info('FIELD-TUNE-DIAG', JSON.stringify({ playerCar, results: opponents.map(v => ({ car: v.car, time: v.finishedAt })) }))
 			const fastest = Math.min(...times)
 			expect(Math.max(...times) - fastest, playerCar).toBeLessThan(2.5)
 			const redTime = opponents.find(({ car }) => car === 'red')?.finishedAt
