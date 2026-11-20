@@ -25,6 +25,22 @@ describe('GitHub update checks', () => {
     await expect(provider.check()).rejects.toThrow('Installed build version is unavailable')
   })
 
+  it('calls the global fetch as a method to support Android WebView', async () => {
+    const original = globalThis.fetch
+    const fetchMock = vi.fn(function (this: typeof globalThis, _input: RequestInfo | URL, _init?: RequestInit) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation')
+      return Promise.resolve(new Response(JSON.stringify({ tag_name: 'android-build-535-1' }), { status: 200 }))
+    })
+    globalThis.fetch = fetchMock as typeof fetch
+    try {
+      const provider = new GitHubUpdateProvider(534, 1)
+      expect((await provider.check())?.version).toBe('android-build-535-1')
+      expect(fetchMock).toHaveBeenCalledOnce()
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
   it('reports server errors', async () => {
     const provider = new GitHubUpdateProvider(533, 1, async () => new Response('', { status: 503 }))
     await expect(provider.check()).rejects.toThrow('HTTP 503')
