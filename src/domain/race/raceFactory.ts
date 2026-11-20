@@ -115,6 +115,7 @@ function sampleOpenStart(path: RoadPath): StartGridSample {
 
 export function createRace(options: CreateRaceOptions): RaceState {
   const difficulty = DIFFICULTY_SPECS[options.difficulty]
+  const pace = (options.handling ?? 'arcade') === 'arcade' ? DIFFICULTY_SPECS.hard : difficulty
   const aiCars: readonly CarId[] =
     options.difficulty === 'hard'
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
@@ -178,8 +179,8 @@ export function createRace(options: CreateRaceOptions): RaceState {
       aiPace:
         index === 0
           ? 1
-          : (('aiPaces' in difficulty
-              ? difficulty.aiPaces[index - 1]
+          : (('aiPaces' in pace
+              ? pace.aiPaces[index - 1]
               : undefined) ??
             (0.985 - (index - 1) * 0.008)),
       pathIndex: placement.pathIndex,

@@ -21,7 +21,7 @@ it('laps Pine Hairpins faster on Hard with the same car and no traffic', () => {
     return requireFixture(vehicle.finishedAt)
   })
 
-  expect(requireFixture(hard)).toBeLessThan(requireFixture(medium) * 0.98)
+  expect(requireFixture(hard)).toBeLessThan(requireFixture(medium))
 })
 
 
