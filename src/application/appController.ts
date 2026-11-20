@@ -366,6 +366,7 @@ export class AppController {
           overlay: {
             type: 'options',
             returnTo: command.returnTo,
+            ...(command.tab ? { tab: command.tab } : {}),
           },
           notice: null,
         })

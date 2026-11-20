@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AppCommand, AppSnapshot } from '@/application/appState'
 import type { Preferences } from '@/application/ports/storage'
+import type { UpdateProvider } from '@/application/updates/updateProvider'
 import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
@@ -49,6 +50,7 @@ function snapshot(mode: AppSnapshot['mode']): AppSnapshot {
 function setup(
   mode: AppSnapshot['mode'] = 'home',
   prepareRace?: UiRuntime['prepareRace'],
+  updateProvider?: UpdateProvider,
 ) {
   const root = document.createElement('div')
   let listener: ((value: AppSnapshot) => void) | undefined
@@ -62,7 +64,7 @@ function setup(
       }
     }),
   }
-  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}) }
+  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}), ...(updateProvider ? { updateProvider } : {}) }
   const geometry = vi.spyOn(runtime.geometry, 'get')
   const host = new DomUiHost(root, port, runtime)
   host.mount()
@@ -106,6 +108,57 @@ describe('DomUiHost', () => {
       purpose: 'race',
     })
     expect(port.dispatch).toHaveBeenNthCalledWith(3, { type: 'start-cup' })
+  })
+
+  it('checks updates on Home, shows an actionable indicator, and does not check on each render', async () => {
+    const check = vi.fn<UpdateProvider['check']>()
+    let resolveCheck: (value: Awaited<ReturnType<UpdateProvider['check']>>) => void = () => { throw new Error('Update resolver not ready') }
+    check.mockImplementation(() => new Promise((resolve) => { resolveCheck = resolve }))
+    const { root, port, update } = setup('home', undefined, { check })
+    expect(check).toHaveBeenCalledOnce()
+    expect(root.querySelector('[data-action="open-updates"]')).toBeNull()
+
+    resolveCheck({
+      version: 'android-build-999-1',
+      url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+      apkUrl: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-999-1/trackforge-debug.apk',
+    })
+    await vi.waitFor(() => expect(root.querySelector('[data-action="open-updates"]')).not.toBeNull())
+    const indicator = root.querySelector<HTMLButtonElement>('[data-action="open-updates"]')
+    expect(indicator?.textContent).toContain('UPDATE AVAILABLE')
+    indicator?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'open-options',
+      returnTo: 'home',
+      tab: 'updates',
+    })
+
+    update(snapshot('home'))
+    update(snapshot('editor'))
+    update(snapshot('home'))
+    expect(check).toHaveBeenCalledOnce()
+  })
+
+  it('keeps Home clean when no newer release is available', async () => {
+    const check = vi.fn<UpdateProvider['check']>().mockResolvedValue(null)
+    const { root } = setup('home', undefined, { check })
+    await vi.waitFor(() => expect(check).toHaveBeenCalledOnce())
+    await Promise.resolve()
+    expect(root.querySelector('[data-action="open-updates"]')).toBeNull()
+  })
+
+  it('reports update check errors without incorrectly displaying an update', async () => {
+    const error = new Error('Network offline')
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { root } = setup('home', undefined, {
+        check: vi.fn<UpdateProvider['check']>().mockRejectedValue(error),
+      })
+      await vi.waitFor(() => expect(spy).toHaveBeenCalledWith('Track Forge automatic update check failed:', error))
+      expect(root.querySelector('[data-action="open-updates"]')).toBeNull()
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('updates to editor and race layouts without remounting the host', () => {

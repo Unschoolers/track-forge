@@ -242,6 +242,14 @@ describe('AppController', () => {
   })
 
 
+  it('opens the Updates category directly and returns to Home after closing', () => {
+    const { controller } = setup()
+    controller.dispatch({ type: 'open-options', returnTo: 'home', tab: 'updates' })
+    expect(controller.snapshot().overlay).toEqual({ type: 'options', returnTo: 'home', tab: 'updates' })
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot().overlay).toEqual({ type: 'none' })
+  })
+
   it('publishes immutable snapshots and coordinates mode transitions', () => {
     const { controller, raceSession } = setup()
     const listener = vi.fn()

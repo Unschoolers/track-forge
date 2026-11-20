@@ -46,6 +46,7 @@ export type AppOverlay =
   | {
       readonly type: 'options'
       readonly returnTo: 'home' | 'editor' | 'race' | 'race-setup'
+      readonly tab?: 'updates'
     }
   | { readonly type: 'pause' }
   | { readonly type: 'results' }
@@ -127,6 +128,7 @@ export type AppCommand =
   | {
       readonly type: 'open-options'
       readonly returnTo: 'home' | 'editor' | 'race' | 'race-setup'
+      readonly tab?: 'updates'
     }
   | { readonly type: 'open-editor-menu' }
   | { readonly type: 'save-current-track' }

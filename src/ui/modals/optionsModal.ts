@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
+import { GitHubUpdateProvider, type UpdateInfo } from '@/application/updates/updateProvider'
 import type { AppSnapshot } from '@/application/appState'
 import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
 import { DIFFICULTY_IDS } from '@/domain/model'
@@ -15,6 +15,11 @@ const updates = registerPlugin<{ download(options: { url: string; version: strin
 type OptionsTab = 'race' | 'audio' | 'controls' | 'display' | 'updates'
 let selectedOptionsTab: OptionsTab = 'race'
 
+interface OptionsNavigation {
+  readonly initialTab?: 'updates' | undefined
+  readonly availableUpdate?: UpdateInfo | null
+}
+
 export function createOptionsModal(
   state: AppSnapshot,
   actions: {
@@ -23,6 +28,7 @@ export function createOptionsModal(
     readonly previewVolume: (setting: AudioVolumeSetting, volume: number) => void
     readonly setVolume: (setting: AudioVolumeSetting, volume: number) => void
   },
+  navigation: OptionsNavigation = {},
 ): HTMLElement {
   const frame = createModalFrame(
     'Options',
@@ -276,6 +282,24 @@ export function createOptionsModal(
       void refresh()
       timer = window.setInterval(() => { void refresh() }, 1000)
     }
+    const showAvailableUpdate = (update: UpdateInfo) => {
+      if (activeDownload) {
+        status.textContent = `New release: ${update.version}. Remove the existing download before downloading another.`
+        return
+      }
+      status.textContent = `New version available: ${update.version}`
+      const download = button('DOWNLOAD APK', 'download-update', () => {
+        download.disabled = true
+        status.textContent = 'Starting Android download…'
+        void updates.download({ url: update.apkUrl, version: update.version }).then(() => {
+          monitor()
+        }).catch((error: unknown) => {
+          status.textContent = error instanceof Error ? error.message : 'Could not start download.'
+          download.disabled = false
+        })
+      }, 'button')
+      panel.replaceChildren(download)
+    }
     const check = button('CHECK FOR UPDATES', 'check-updates', () => {
       check.disabled = true
       status.textContent = 'Checking for updates…'
@@ -286,24 +310,10 @@ export function createOptionsModal(
       void provider.check().then((update) => {
         if (!update) {
           status.textContent = 'You are running the latest GitHub release.'
+          if (!activeDownload) panel.replaceChildren()
           return
         }
-        if (activeDownload) {
-          status.textContent = `New release: ${update.version}. Remove the existing download before downloading another.`
-          return
-        }
-        status.textContent = `New version available: ${update.version}`
-        const download = button('DOWNLOAD APK', 'download-update', () => {
-          download.disabled = true
-          status.textContent = 'Starting Android download…'
-          void updates.download({ url: update.apkUrl, version: update.version }).then(() => {
-            monitor()
-          }).catch((error: unknown) => {
-            status.textContent = error instanceof Error ? error.message : 'Could not start download.'
-            download.disabled = false
-          })
-        }, 'button')
-        panel.replaceChildren(download)
+        showAvailableUpdate(update)
       }).catch((error: unknown) => {
         status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
       }).finally(() => { check.disabled = false })
@@ -313,6 +323,8 @@ export function createOptionsModal(
       if (state.state !== 'none') {
         render(state as DownloadState)
         if (state.state !== 'complete' && state.state !== 'failed') monitor()
+      } else if (navigation.availableUpdate) {
+        showAvailableUpdate(navigation.availableUpdate)
       }
     }).catch((error: unknown) => {
       status.textContent = error instanceof Error ? error.message : 'Could not restore download.'
@@ -363,7 +375,7 @@ export function createOptionsModal(
   })
   frame.body.before(tabs)
   for (const panel of tabSections.values()) frame.body.append(panel)
-  selectTab(selectedOptionsTab)
+  selectTab(navigation.initialTab && available.includes(navigation.initialTab) ? navigation.initialTab : selectedOptionsTab)
   frame.footer.append(
     button('DONE', 'options-done', actions.close, 'button button-primary'),
   )
