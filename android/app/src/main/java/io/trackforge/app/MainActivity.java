@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         SplashScreen.installSplashScreen(this);
         registerPlugin(TrackExportPlugin.class);
         registerPlugin(NearbyRacePlugin.class);
+        registerPlugin(TrackForgeUpdatesPlugin.class);
         super.onCreate(savedInstanceState);
         enterImmersiveMode();
     }
