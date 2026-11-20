@@ -37,11 +37,11 @@ jobs:
         with:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ runner.os }}-${{ hashFiles('android/app/build.gradle') }}
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-      - name: Install Android SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Ensure Android SDK 36
+        run: |
+          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -x "$ANDROID_HOME/build-tools/36.0.0/aapt" ]]; then
+            sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+          fi
       - run: npm ci
       - run: npm test -- --maxWorkers=4
       - run: npm run lint
@@ -72,6 +72,7 @@ jobs:
         with:
           name: trackforge-unsigned-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}
           path: trackforge-unsigned.apk
+          compression-level: 0
           retention-days: 7
           if-no-files-found: error
       - name: Explain build artifact
@@ -96,11 +97,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-      - name: Install signing tools
-        run: sdkmanager 'build-tools;36.0.0'
+      - name: Ensure Android signing tools
+        run: |
+          if [[ ! -x "$ANDROID_HOME/build-tools/36.0.0/apksigner" ]]; then
+            sdkmanager 'build-tools;36.0.0'
+          fi
       - name: Download verified unsigned APK
         uses: actions/download-artifact@v8.0.2
         with:
