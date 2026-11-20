@@ -244,7 +244,7 @@ describe('modal application flows', () => {
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-options', returnTo: 'race-setup' })
 
     update(state({ type: 'options', returnTo: 'race-setup' }))
-    expect(root.textContent).toContain('Race settings')
+    expect(root.textContent).toContain('AI DIFFICULTY')
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
     for (const action of ['difficulty-hard', 'laps-3', 'handling-simulation']) {
       expect(root.querySelector(`[data-action="${action}"]`)).not.toBeNull()
@@ -260,6 +260,9 @@ describe('modal application flows', () => {
     const card = root.querySelector('.options-modal .modal-card')
     const body = root.querySelector('.options-modal .modal-body')
     const footer = root.querySelector('.options-modal .modal-footer')
+    const tabs = root.querySelector('.options-modal .options-tab-list')
+    expect(tabs?.parentElement).toBe(card)
+    expect(body?.contains(tabs ?? null)).toBe(false)
     const race = root.querySelector<HTMLButtonElement>('[data-action="options-tab-race"]')
     const controls = root.querySelector<HTMLButtonElement>('[data-action="options-tab-controls"]')
     const audio = root.querySelector<HTMLButtonElement>('[data-action="options-tab-audio"]')
@@ -280,6 +283,40 @@ describe('modal application flows', () => {
     expect(root.querySelector('.options-modal .modal-card')).toBe(card)
     expect(root.querySelector('.options-modal .modal-body')).toBe(body)
     expect(root.querySelector('.options-modal .modal-footer')).toBe(footer)
+    host.destroy()
+  })
+
+  it('separates display feedback from audio and remembers each tab scroll position', () => {
+    const { root, host } = setup(state({ type: 'options', returnTo: 'home' }))
+    const body = root.querySelector<HTMLElement>('.options-modal .modal-body')
+    const race = root.querySelector<HTMLElement>('#options-panel-race')
+    const audio = root.querySelector<HTMLElement>('#options-panel-audio')
+    const display = root.querySelector<HTMLElement>('#options-panel-display')
+    const controls = root.querySelector<HTMLElement>('#options-panel-controls')
+    if (!body || !race || !audio || !display || !controls) {
+      throw new Error('Missing Options categories')
+    }
+
+    expect(race.textContent).toContain('AI DIFFICULTY')
+    expect(race.textContent).not.toContain('Race settings')
+    expect(audio.querySelector('input[aria-label="Music"]')).not.toBeNull()
+    expect(audio.querySelector('input[aria-label="Sound Effects"]')).not.toBeNull()
+    expect(audio.textContent).not.toContain('Haptics')
+    expect(display.textContent).toContain('Haptics')
+    expect(display.textContent).toContain('Dynamic zoom')
+    expect(controls.textContent).toContain('Steering layout')
+
+    root.querySelector<HTMLButtonElement>('[data-action="options-tab-audio"]')?.click()
+    body.scrollTop = 123
+    root.querySelector<HTMLButtonElement>('[data-action="options-tab-display"]')?.click()
+    expect(display.hidden).toBe(false)
+    expect(audio.hidden).toBe(true)
+    expect(body.scrollTop).toBe(0)
+    body.scrollTop = 48
+    root.querySelector<HTMLButtonElement>('[data-action="options-tab-audio"]')?.click()
+    expect(body.scrollTop).toBe(123)
+    root.querySelector<HTMLButtonElement>('[data-action="options-tab-display"]')?.click()
+    expect(body.scrollTop).toBe(48)
     host.destroy()
   })
 

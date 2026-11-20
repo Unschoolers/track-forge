@@ -12,7 +12,7 @@ import { createModalFrame } from '@/ui/modals/modalFrame'
 type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
 const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<void> }>('TrackForgeUpdates')
 
-type OptionsTab = 'race' | 'audio' | 'controls' | 'updates'
+type OptionsTab = 'race' | 'audio' | 'controls' | 'display' | 'updates'
 let selectedOptionsTab: OptionsTab = 'race'
 
 export function createOptionsModal(
@@ -42,7 +42,6 @@ export function createOptionsModal(
   const raceStart = frame.body.children.length
   if (state.overlay.type !== 'options' || state.overlay.returnTo !== 'race') {
     const raceSettings = element('section', 'options-race-settings')
-    raceSettings.append(element('h3', 'setup-label', 'Race settings'))
     const difficulty = element('section', 'setup-section')
     difficulty.append(element('h3', 'setup-label', 'AI DIFFICULTY'))
     const difficultyRow = element('div', 'choice-row')
@@ -113,7 +112,6 @@ export function createOptionsModal(
   }
   const audioStart = frame.body.children.length
   const volumes = audioVolumes(state.preferences)
-  frame.body.append(element('h3', 'setup-label', 'Audio'))
   for (const [setting, label] of [['musicVolume', 'Music'], ['soundEffectsVolume', 'Sound Effects']] as const) {
     frame.body.append(createVolumeRow(
       label,
@@ -123,7 +121,8 @@ export function createOptionsModal(
       (volume) => actions.setVolume(setting, volume),
     ))
   }
-  frame.body.append(element('h3', 'setup-label', 'Comfort & feedback'))
+  capture('audio', audioStart)
+  const displayStart = frame.body.children.length
   frame.body.append(
     createToggleRow(
       'Haptics',
@@ -149,9 +148,8 @@ export function createOptionsModal(
         }),
     ),
   )
-  capture('audio', audioStart)
+  capture('display', displayStart)
   const controlsStart = frame.body.children.length
-  frame.body.append(element('h3', 'setup-label', 'Controls'))
   const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize'>(
     title: string, key: K, values: readonly NonNullable<AppSnapshot['preferences'][K]>[], fallback: NonNullable<AppSnapshot['preferences'][K]>,
   ): void => {
@@ -193,9 +191,18 @@ export function createOptionsModal(
   capture('controls', controlsStart)
   const updatesStart = frame.body.children.length
   if (Capacitor.isNativePlatform()) {
-    frame.body.append(element('h3', 'setup-label', 'Game updates'))
+    const currentRun = Number(import.meta.env.VITE_TRACKFORGE_BUILD_RUN)
+    const currentAttempt = Number(import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT)
+    const hasBuildId = Number.isSafeInteger(currentRun) && currentRun > 0 &&
+      Number.isSafeInteger(currentAttempt) && currentAttempt > 0
+    const installed = element(
+      'p',
+      'modal-subtitle options-installed-build',
+      hasBuildId ? `Installed build: ${currentRun}.${currentAttempt}` : 'Installed build: unavailable',
+    )
     const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Android build.')
-    const panel = element('section', 'setup-section')
+    let activeDownload: DownloadState | null = null
+    const panel = element('section', 'setup-section options-download-panel')
     const progress = document.createElement('progress')
     progress.setAttribute('aria-label', 'APK download progress')
     progress.style.width = '100%'
@@ -211,6 +218,7 @@ export function createOptionsModal(
       cancel.disabled = true
       void updates.cancel().then(() => {
         stop()
+        activeDownload = null
         panel.replaceChildren()
         status.textContent = 'Download removed.'
       }).catch((error: unknown) => {
@@ -225,6 +233,7 @@ export function createOptionsModal(
     }
     const render = (state: DownloadState) => {
       if (!panel.isConnected) { stop(); return }
+      activeDownload = state
       const { downloaded, total } = state
       if (total > 0) {
         const percent = Math.min(100, Math.round(downloaded * 100 / total))
@@ -251,7 +260,7 @@ export function createOptionsModal(
       try {
         const state = await updates.current()
         if (state.state !== 'none') render(state as DownloadState)
-        else { stop(); panel.replaceChildren() }
+        else { activeDownload = null; stop(); panel.replaceChildren() }
       } catch (error) {
         stop()
         status.textContent = error instanceof Error ? error.message : 'Could not read download status.'
@@ -266,12 +275,16 @@ export function createOptionsModal(
       check.disabled = true
       status.textContent = 'Checking for updates…'
       const provider = new GitHubUpdateProvider(
-        Number(import.meta.env.VITE_TRACKFORGE_BUILD_RUN),
-        Number(import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT),
+        currentRun,
+        currentAttempt,
       )
       void provider.check().then((update) => {
         if (!update) {
           status.textContent = 'You are running the latest GitHub release.'
+          return
+        }
+        if (activeDownload) {
+          status.textContent = `New release: ${update.version}. Remove the existing download before downloading another.`
           return
         }
         status.textContent = `New version available: ${update.version}`
@@ -290,7 +303,7 @@ export function createOptionsModal(
         status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
       }).finally(() => { check.disabled = false })
     }, 'button')
-    frame.body.append(check, status, panel)
+    frame.body.append(installed, check, status, panel)
     void updates.current().then((state) => {
       if (state.state !== 'none') {
         render(state as DownloadState)
@@ -301,13 +314,15 @@ export function createOptionsModal(
     })
   }
   if (Capacitor.isNativePlatform()) capture('updates', updatesStart)
-  const tabs = element('div', 'choice-row options-tab-list')
+  const tabs = element('nav', 'choice-row options-tab-list')
   tabs.setAttribute('role', 'tablist')
   tabs.setAttribute('aria-label', 'Options categories')
   const available = Array.from(tabSections.keys())
   if (!available.includes(selectedOptionsTab)) selectedOptionsTab = available[0] ?? 'audio'
   const buttons = new Map<OptionsTab, HTMLButtonElement>()
+  const tabScroll = new Map<OptionsTab, number>()
   const selectTab = (tab: OptionsTab) => {
+    if (tabSections.has(selectedOptionsTab)) tabScroll.set(selectedOptionsTab, frame.body.scrollTop)
     selectedOptionsTab = tab
     for (const [key, panel] of tabSections) {
       const active = key === tab
@@ -317,9 +332,11 @@ export function createOptionsModal(
       buttons.get(key)?.classList.toggle('active', active)
       buttons.get(key)?.setAttribute('tabindex', active ? '0' : '-1')
     }
+    frame.body.scrollTop = tabScroll.get(tab) ?? 0
   }
   for (const tab of available) {
     const choice = button(tab.toUpperCase(), `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
+    if (tab === 'display') choice.setAttribute('aria-label', 'Display and feedback')
     choice.setAttribute('role', 'tab')
     choice.setAttribute('aria-controls', `options-panel-${tab}`)
     choice.id = `options-tab-${tab}`
@@ -339,7 +356,7 @@ export function createOptionsModal(
     buttons.get(next)?.focus()
     event.preventDefault()
   })
-  frame.body.prepend(tabs)
+  frame.body.before(tabs)
   for (const panel of tabSections.values()) frame.body.append(panel)
   selectTab(selectedOptionsTab)
   frame.footer.append(
