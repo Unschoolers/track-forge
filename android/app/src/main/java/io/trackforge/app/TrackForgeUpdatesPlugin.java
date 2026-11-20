@@ -76,6 +76,15 @@ public class TrackForgeUpdatesPlugin extends Plugin {
         call.resolve();
     }
 
+    private boolean sameSigner(PackageInfo candidate, PackageInfo installed) {
+        if (Build.VERSION.SDK_INT >= 28) {
+            return candidate.signingInfo != null && installed.signingInfo != null
+                    && Arrays.equals(candidate.signingInfo.getApkContentsSigners(), installed.signingInfo.getApkContentsSigners());
+        }
+        return candidate.signatures != null && installed.signatures != null
+                && candidate.signatures.length > 0 && Arrays.equals(candidate.signatures, installed.signatures);
+    }
+
     private File downloadedFile() {
         String version = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(VERSION, "");
         if (!version.matches("android-build-[0-9]+-[0-9]+")) throw new IllegalStateException("Invalid update version.");
@@ -85,7 +94,7 @@ public class TrackForgeUpdatesPlugin extends Plugin {
     @PluginMethod
     public void install(PluginCall call) {
         JSObject progress = savedId() < 0 ? null : snapshot(savedId());
-        if (progress == null || !"complete".equals(progress.getString("state"))) {
+        if (progress == null || !"complete".equals(progress.optString("state"))) {
             call.reject("Download is not complete.");
             return;
         }
@@ -93,11 +102,11 @@ public class TrackForgeUpdatesPlugin extends Plugin {
             File apk = downloadedFile();
             if (!apk.isFile() || apk.length() <= 0) throw new IllegalStateException("Downloaded APK is missing.");
             PackageManager pm = getContext().getPackageManager();
-            PackageInfo candidate = pm.getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_SIGNING_CERTIFICATES);
-            PackageInfo installed = pm.getPackageInfo(getContext().getPackageName(), PackageManager.GET_SIGNING_CERTIFICATES);
+            int signingFlag = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+            PackageInfo candidate = pm.getPackageArchiveInfo(apk.getAbsolutePath(), signingFlag);
+            PackageInfo installed = pm.getPackageInfo(getContext().getPackageName(), signingFlag);
             if (candidate == null || !getContext().getPackageName().equals(candidate.packageName)
-                    || candidate.signingInfo == null || installed.signingInfo == null
-                    || !Arrays.equals(candidate.signingInfo.getApkContentsSigners(), installed.signingInfo.getApkContentsSigners())) {
+                    || !sameSigner(candidate, installed)) {
                 throw new SecurityException("APK package or signing certificate does not match Track Forge.");
             }
             long candidateCode = Build.VERSION.SDK_INT >= 28 ? candidate.getLongVersionCode() : candidate.versionCode;
@@ -145,8 +154,8 @@ public class TrackForgeUpdatesPlugin extends Plugin {
             long previous = savedId();
             if (previous > 0) {
                 JSObject active = snapshot(previous);
-                if (active != null && !"failed".equals(active.getString("state"))) {
-                    if (version.equals(active.getString("version"))) {
+                if (active != null && !"failed".equals(active.optString("state"))) {
+                    if (version.equals(active.optString("version"))) {
                         call.resolve(active);
                         return;
                     }
