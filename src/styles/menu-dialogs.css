@@ -62,7 +62,13 @@
 }
 .modal-overlay .name-input { border-radius: 0; border-color: #53616c; background: #090f16; }
 
-.options-modal .modal-card { width: min(42rem, 100%); }
+/* Reserve the same available viewport height regardless of tab content.
+   The shared modal grid keeps the header and footer fixed while its body scrolls. */
+.options-modal .modal-card {
+  width: min(42rem, 100%);
+  height: 100%;
+  min-height: 0;
+}
 .options-modal .modal-body > .setup-label { margin: 1.3rem 0 .55rem; color: var(--menu-accent); }
 .options-modal .modal-body > .setup-label:first-child { margin-top: 0; }
 .options-modal .options-race-settings > .setup-label { color: var(--menu-accent); }
