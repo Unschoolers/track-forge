@@ -15,6 +15,7 @@ export function createHomeScreen(
     readonly cup?: () => void
     readonly resumeCup?: () => void
     readonly options: () => void
+    readonly updates?: () => void
   },
 ): HTMLElement {
   const screen = element('section', 'screen home-screen')
@@ -56,6 +57,7 @@ export function createHomeScreen(
     ...(checkpoint && actions.resumeCup ? [button('RESUME CUP', 'resume-cup', actions.resumeCup, 'button button-large')] : []),
     ...(actions.cup && !checkpoint ? [button('ARCADE CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
     button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),
+    ...(actions.updates ? [button('UPDATE AVAILABLE', 'open-updates', actions.updates, 'button home-update-button')] : []),
     button('OPTIONS', 'options', actions.options, 'button button-large'),
   )
   const heading = element('header', 'home-heading')
