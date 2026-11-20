@@ -283,6 +283,12 @@ export function stepAiVehicle(
     const excessTarget = Math.max(0, cornerTarget - roadSpeed)
     curveSpeed -= bendWeight * (gripReserve + excessTarget)
   }
+  // A faster straight-line chassis with weak grip needs extra entry margin.
+  // Scale braking anticipation by the actual grip deficit and upcoming bend;
+  // full speed is still available on straights and no physics cap is added.
+  const gripDeficit = Math.max(0, 1 - car.grip)
+  const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.14)
+  curveSpeed *= 1 - cornerReserve
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
   const throttleWindow = fastCorners ? 5 : arcadePavement
