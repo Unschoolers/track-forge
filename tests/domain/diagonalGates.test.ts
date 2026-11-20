@@ -78,4 +78,34 @@ describe('diagonal checkpoint crossing', () => {
       { ...player, ...outside.after, nextSector: 2 }, false,
     )).toBeNull()
   })
+  it('does not award a painted overpass gate to a car passing beneath it', () => {
+    const base = diagonalPath(1)
+    const road = base.roadSurface
+    const bridge = {
+      ...base,
+      roadSurface: {
+        ...road,
+        at: (index: number, position?: { x: number; y: number }) => ({
+          ...road.at(index, position),
+          height: 24,
+          structureHeight: 24,
+        }),
+      },
+    }
+    const race = createRace({ path: base, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
+    const player = race.vehicles[0]!
+    const gate = (base.points.length - 1) / 4
+    const { before, after } = crossing(base, gate, 0)
+    const under = updateOpenRouteProgress(
+      { ...player, ...before, z: 0 }, { ...player, ...after, z: 0 },
+      bridge, after.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius,
+    )
+    expect(under.nextSector).toBe(1)
+    const over = updateOpenRouteProgress(
+      { ...player, ...before, z: 24 }, { ...player, ...after, z: 24 },
+      bridge, after.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius,
+    )
+    expect(over.nextSector).toBe(2)
+  })
+
 })
