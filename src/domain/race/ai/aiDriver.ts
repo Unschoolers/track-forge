@@ -1,5 +1,5 @@
 import type { RandomSource } from '@/application/ports/random'
-import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
+import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'
 import {
@@ -17,6 +17,7 @@ import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
+const ARCADE_CORNER_MARGIN = { easy: 0.16, normal: 0.10, hard: 0 } as const
 const HARD_LOOKAHEAD_SAMPLES = 4
 const SIDESLIP_CORRECTION_GAIN = 0.65
 const SIDESLIP_MIN_SPEED = 20
@@ -156,9 +157,9 @@ export function stepAiVehicle(
   catchUp?: SpeedAssist,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
-  // Keep the cornering technique on a practiced line at every difficulty.
-  // The selected difficulty still controls traffic decisions and mistakes.
-  const drivingDifficulty = vehicle.racingLine ? 'hard' : difficulty
+  // Arcade shares steering technique across difficulties. Traffic decisions
+  // and driver mistakes still use the selected difficulty.
+  const drivingDifficulty = handling === 'arcade' || vehicle.racingLine ? 'hard' : difficulty
   const tuning = DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
@@ -166,13 +167,13 @@ export function stepAiVehicle(
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
   const context = getVehicleStepContext(path, vehicle)
-  const hardArcadeLine = drivingDifficulty === 'hard' && handling === 'arcade'
+  const arcade = handling === 'arcade'
   // Carry more speed on high-grip roads. Authored lines already account for
   // their own approach, and loose surfaces need the usual braking margin.
-  const hardPavement = hardArcadeLine && !vehicle.racingLine && context.surface === 'street'
+  const arcadePavement = arcade && !vehicle.racingLine && context.surface === 'street'
   const direction = reversed ? -1 : 1
-  let sweep = hardPavement ? sweepingPavementAllowance(path, context.nearest.index, reversed) : 0
-  let racingPace = hardPavement ? racingPavementAllowance(path, context.nearest.index, reversed) : 0
+  let sweep = arcadePavement ? sweepingPavementAllowance(path, context.nearest.index, reversed) : 0
+  let racingPace = arcadePavement ? racingPavementAllowance(path, context.nearest.index, reversed) : 0
   if (sweep > 0 || racingPace > 0) {
     // Back out smoothly if a rival is running wide or is still turning in.
     const roadHeading = Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
@@ -200,7 +201,7 @@ export function stepAiVehicle(
   const racingLine = context.onRoad ? vehicle.racingLine?.sections : undefined
   const notes = racingLine?.[context.nearest.point.segment]
   const basePace = 1 - racingPace
-  const extraSamples = notes?.extraSamples ?? (hardPavement ? Math.round(
+  const extraSamples = notes?.extraSamples ?? (arcadePavement ? Math.round(
     (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
     (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
   ) : 0)
@@ -257,13 +258,13 @@ export function stepAiVehicle(
   // Leave more margin when the road changes direction repeatedly: a car
   // needs time to settle before it can turn in for the next corner.
   let nearbyTurn = 0
-  if (hardArcadeLine) {
+  if (arcade) {
     for (let sample = -30; sample <= 60; sample += 10) {
       nearbyTurn += Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6))
     }
   }
-  const fastCorners = hardArcadeLine && nearbyTurn < 1.15
-  const cornerPace = notes?.cornerPace ?? (hardPavement
+  const fastCorners = arcade && nearbyTurn < 1.15
+  const cornerPace = notes?.cornerPace ?? (arcadePavement
     ? (HARD_PAVEMENT_CORNER_PACE + sweep * SWEEP_CORNER_PACE) * basePace +
       (RACING_PAVEMENT_CORNER_PACE + sweep * RACING_PAVEMENT_SWEEP_PACE) * racingPace : 1)
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
@@ -271,11 +272,20 @@ export function stepAiVehicle(
     path, context.nearest.index, reversed, tuning.cornerSafety,
     car, tuning.pace * vehicle.aiPace, vehicle.car, drivingDifficulty === 'hard', fastCorners,
   ) * cornerPace
-  const speedRatio = vehicle.racingLine?.speedRatio ?? 1
-  const curveSpeed = speedRatio < 1 ? Math.min(cornerTarget, car.max) * speedRatio : cornerTarget
+  const practicedSpeedRatio = vehicle.racingLine?.speedRatio ?? 1
+  let curveSpeed = practicedSpeedRatio < 1 ? Math.min(cornerTarget, car.max) * practicedSpeedRatio : cornerTarget
+  const cornerMargin = arcade && !vehicle.racingLine ? ARCADE_CORNER_MARGIN[difficulty] : 0
+  if (cornerMargin > 0 && context.surface !== 'grass') {
+    // Add grip reserve as a bend approaches while allowing full speed on straights.
+    const bendWeight = clamp((bend - 0.02) / 0.18, 0, 1)
+    const roadSpeed = car.max * SURFACE_SPECS[context.surface].max * VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface].max
+    const gripReserve = Math.min(cornerTarget, roadSpeed) * cornerMargin
+    const excessTarget = Math.max(0, cornerTarget - roadSpeed)
+    curveSpeed -= bendWeight * (gripReserve + excessTarget)
+  }
   const curveBraking = vehicle.speed > curveSpeed + 3
   // Ease off on approach so the tires can turn without repeated hard braking.
-  const throttleWindow = fastCorners ? 5 : hardPavement
+  const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
     : CORNER_THROTTLE_WINDOW
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / throttleWindow, 0, 1)

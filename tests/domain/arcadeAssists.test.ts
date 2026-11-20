@@ -146,8 +146,8 @@ it('keeps slope gravity active while coasting without a service brake', () => {
   expect(required(speeds[1])).toBeGreaterThan(180)
 })
 
-it.each(['arcade', 'simulation'] as const)('preserves AI approach speeds on a straight ramp in %s', (handling) => {
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling })
+it('preserves Simulation AI approach speeds on a straight ramp', () => {
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'simulation' })
   const start = required(nearestPathPoint(path, { x: -200, y: 0 })).index
   for (const source of base.vehicles.filter((vehicle) => !vehicle.player)) {
     let race: RaceState = {
@@ -163,8 +163,8 @@ it.each(['arcade', 'simulation'] as const)('preserves AI approach speeds on a st
   }
 })
 
-it('lets Hard Arcade AI carry speed onto a straight ramp without extra engine power', () => {
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, handling: 'arcade' })
+it.each(['easy', 'normal', 'hard'] as const)('lets %s Arcade AI carry speed onto a straight ramp', (difficulty) => {
+  const base = createRace({ path, playerCar: 'blue', difficulty, laps: 2, handling: 'arcade' })
   const start = required(nearestPathPoint(path, { x: -200, y: 0 })).index
   const rival = required(base.vehicles[1])
   let race: RaceState = {
