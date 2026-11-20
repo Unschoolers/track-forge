@@ -14,6 +14,39 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "TrackForgeUpdates")
 public class TrackForgeUpdatesPlugin extends Plugin {
     @PluginMethod
+    public void progress(PluginCall call) {
+        Long downloadId = call.getLong("downloadId");
+        if (downloadId == null || downloadId <= 0) {
+            call.reject("Invalid download ID.");
+            return;
+        }
+        DownloadManager manager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            call.reject("Android Download Manager is unavailable.");
+            return;
+        }
+        try (android.database.Cursor cursor = manager.query(new DownloadManager.Query().setFilterById(downloadId))) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                call.reject("Download no longer exists.");
+                return;
+            }
+            long downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+            long total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+            int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+            JSObject result = new JSObject();
+            result.put("downloaded", downloaded);
+            result.put("total", total);
+            result.put("state", status == DownloadManager.STATUS_SUCCESSFUL ? "complete"
+                    : status == DownloadManager.STATUS_FAILED ? "failed"
+                    : status == DownloadManager.STATUS_PAUSED ? "paused"
+                    : status == DownloadManager.STATUS_RUNNING ? "downloading" : "pending");
+            call.resolve(result);
+        } catch (RuntimeException error) {
+            call.reject("Could not read download progress.", error);
+        }
+    }
+
+    @PluginMethod
     public void download(PluginCall call) {
         String url = call.getString("url");
         String version = call.getString("version");
