@@ -202,7 +202,7 @@ export function createOptionsModal(
     )
     const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Android build.')
     let activeDownload: DownloadState | null = null
-    const panel = element('section', 'setup-section')
+    const panel = element('section', 'setup-section options-download-panel')
     const progress = document.createElement('progress')
     progress.setAttribute('aria-label', 'APK download progress')
     progress.style.width = '100%'
