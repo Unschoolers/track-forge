@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { SURFACE_SPECS } from '@/domain/config'
+import { ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -45,8 +45,8 @@ export function renderRecoveryCheckpoints(
     if (!point || !after) continue
     const length = Math.hypot(after.x - point.x, after.y - point.y)
     if (length < 0.001) continue
-    const x = -(after.y - point.y) / length * 34
-    const y = (after.x - point.x) / length * 34
+    const x = -(after.y - point.y) / length * ROAD_GEOMETRY.checkpointHalfWidth
+    const y = (after.x - point.x) / length * ROAD_GEOMETRY.checkpointHalfWidth
     graphics.lineStyle(7, 0x66d9ff, 1)
     graphics.beginPath()
     graphics.moveTo(point.x - x, point.y - y)
