@@ -10,6 +10,7 @@ import type {
 } from '@/application/appState'
 import type { Unsubscribe } from '@/application/eventBus'
 import type { AudioVolumeSetting } from '@/application/audioVolume'
+import type { UpdateInfo, UpdateProvider } from '@/application/updates/updateProvider'
 import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
@@ -48,6 +49,7 @@ export interface UiRuntime {
   readonly geometry: TrackGeometryService
   readonly prepareRace?: (track: Track, geometry: TrackGeometry, lighting: LightingMode) => () => void
   readonly previewAudioVolume?: (setting: AudioVolumeSetting, volume: number) => void
+  readonly updateProvider?: UpdateProvider
 }
 
 export class DomUiHost implements UiHost {
@@ -60,6 +62,11 @@ export class DomUiHost implements UiHost {
   private mounted = false
   private readonly dialogs = new DialogController()
   private readonly environment: UiEnvironment
+  private availableUpdate: UpdateInfo | null = null
+  private updateCheckPending = false
+  private lastUpdateCheckAt = Number.NEGATIVE_INFINITY
+  private updateCheckGeneration = 0
+  private previousOverlayType: AppSnapshot['overlay']['type'] = 'none'
 
   constructor(
     private readonly root: HTMLElement,
@@ -94,12 +101,41 @@ export class DomUiHost implements UiHost {
     this.cancelRacePreparation()
     this.flyoverTrackId = undefined
     this.dialogs.destroy()
+    this.updateCheckGeneration++
+    this.updateCheckPending = false
+    this.availableUpdate = null
+    this.lastUpdateCheckAt = Number.NEGATIVE_INFINITY
+    this.previousOverlayType = 'none'
     this.root.replaceChildren()
     if (this.mounted) {
       this.root.removeEventListener('pointerdown', this.onIntent)
       this.root.removeEventListener('click', this.onClickFeedback)
       this.mounted = false
     }
+  }
+
+  private checkForUpdates(): void {
+    if (!this.runtime.updateProvider || this.updateCheckPending) return
+    const now = Date.now()
+    // Visiting Home repeatedly must not issue an update request each render.
+    if (now - this.lastUpdateCheckAt < 30 * 60 * 1000) return
+    this.lastUpdateCheckAt = now
+    this.updateCheckPending = true
+    const generation = this.updateCheckGeneration
+    void this.runtime.updateProvider.check().then((update) => {
+      if (!this.mounted || generation !== this.updateCheckGeneration) return
+      const wasAvailable = this.availableUpdate?.version
+      this.availableUpdate = update
+      if (wasAvailable !== update?.version) {
+        const state = this.controller.snapshot()
+        if (state.mode === 'home' && state.overlay.type === 'none') this.render(state)
+      }
+    }).catch((error: unknown) => {
+      // Never report "up to date" when GitHub cannot be reached.
+      console.error('Track Forge automatic update check failed:', error)
+    }).finally(() => {
+      if (generation === this.updateCheckGeneration) this.updateCheckPending = false
+    })
   }
 
   private async exportTrackFile(track: Track): Promise<void> {
@@ -193,6 +229,12 @@ export class DomUiHost implements UiHost {
                 type: 'open-options',
                 returnTo: 'home',
               }),
+            updates: this.availableUpdate ? () =>
+              this.controller.dispatch({
+                type: 'open-options',
+                returnTo: 'home',
+                tab: 'updates',
+              }) : undefined,
           })
     } else if (state.mode === 'editor') {
       const geometry = this.runtime.geometry.get({
@@ -280,6 +322,8 @@ export class DomUiHost implements UiHost {
     this.dialogs.afterRender(this.root, state.overlay, () =>
       this.controller.dispatch({ type: 'close-overlay' }),
     )
+    this.previousOverlayType = state.overlay.type
+    if (state.mode === 'home' && state.overlay.type === 'none') this.checkForUpdates()
   }
 
   private renderOverlay(state: AppSnapshot): HTMLElement | undefined {
@@ -436,6 +480,9 @@ export class DomUiHost implements UiHost {
               type: 'set-preferences',
               preferences,
             }),
+        }, {
+          initialTab: this.previousOverlayType !== 'options' ? state.overlay.tab : undefined,
+          availableUpdate: this.availableUpdate,
         })
       case 'pause':
         if (this.runtime.raceSession.snapshot().setup?.mode === 'nearby') {
