@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
         registerPlugin(TrackExportPlugin.class);
+        registerPlugin(NearbyRacePlugin.class);
         super.onCreate(savedInstanceState);
         enterImmersiveMode();
     }
