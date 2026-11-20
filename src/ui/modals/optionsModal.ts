@@ -16,7 +16,7 @@ type OptionsTab = 'race' | 'audio' | 'controls' | 'display' | 'updates'
 let selectedOptionsTab: OptionsTab = 'race'
 
 interface OptionsNavigation {
-  readonly initialTab?: 'updates'
+  readonly initialTab?: 'updates' | undefined
   readonly availableUpdate?: UpdateInfo | null
 }
 
