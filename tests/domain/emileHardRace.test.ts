@@ -87,10 +87,19 @@ describe('Émile hard arcade race', () => {
 })
 
 describe('Émile arcade difficulty balance', () => {
+	const hardRuns = new Map<CarId, ReturnType<typeof raceSeed>>()
+	function hardRun(car: CarId) {
+		const existing = hardRuns.get(car)
+		if (existing) return existing
+		const run = raceSeed(4331, 2, 'hard', car)
+		hardRuns.set(car, run)
+		return run
+	}
+
 	it('keeps the Hard field close over two laps in all four starting grids', () => {
 		let redWins = 0
 		for (const playerCar of CAR_IDS) {
-			const { opponents } = raceSeed(4331, 2, 'hard', playerCar)
+			const { opponents } = hardRun(playerCar)
 			const times = opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
 			const fastest = Math.min(...times)
 			expect(Math.max(...times) - fastest, playerCar).toBeLessThan(2.5)
@@ -103,9 +112,10 @@ describe('Émile arcade difficulty balance', () => {
 
 	it('gives Medium and Easy progressively lower race pace', () => {
 		const meanTime = (difficulty: DifficultyId) => {
-			const times = (['blue', 'yellow'] as const).flatMap((playerCar) =>
-				raceSeed(4331, 2, difficulty, playerCar).opponents.map(({ finishedAt }) => finishedAt ?? Infinity),
-			)
+			const times = (['blue', 'yellow'] as const).flatMap((playerCar) => {
+				const run = difficulty === 'hard' ? hardRun(playerCar) : raceSeed(4331, 2, difficulty, playerCar)
+				return run.opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
+			})
 			return times.reduce((sum, time) => sum + time, 0) / times.length
 		}
 		const hard = meanTime('hard')
