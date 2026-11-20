@@ -15,7 +15,7 @@ export function createHomeScreen(
     readonly cup?: () => void
     readonly resumeCup?: () => void
     readonly options: () => void
-    readonly updates?: () => void
+    readonly updates?: (() => void) | undefined
   },
 ): HTMLElement {
   const screen = element('section', 'screen home-screen')
