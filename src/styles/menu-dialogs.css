@@ -107,9 +107,7 @@
   font-family: var(--menu-mono);
   font-size: .8rem;
 }
-.options-modal .modal-body > .setup-label { margin: 1.3rem 0 .55rem; color: var(--menu-accent); }
-.options-modal .modal-body > .setup-label:first-child { margin-top: 0; }
-.options-modal .options-race-settings > .setup-label { color: var(--menu-accent); }
+.options-modal .options-race-settings { margin-bottom: 0; }
 .options-modal .setup-section {
   gap: .65rem;
   border: 1px solid #34414e;
