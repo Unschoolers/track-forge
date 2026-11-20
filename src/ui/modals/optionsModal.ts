@@ -109,8 +109,8 @@ export function createOptionsModal(
     raceLength.append(...(openRoute ? [element('p', 'modal-subtitle', 'Single run · no laps')] : [raceLengthRow]))
     raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
+    capture('race', raceStart)
   }
-  capture('race', raceStart)
   const audioStart = frame.body.children.length
   const volumes = audioVolumes(state.preferences)
   frame.body.append(element('h3', 'setup-label', 'Audio'))
