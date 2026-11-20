@@ -91,14 +91,7 @@ Default directions test both ways. Reports: report.html and report.json.`)
 								)
 								if (options.failOnRegressions) {
 									const failures = laneRegressions(run, options.trackFiles.length ? undefined : track.id)
-									if (failures.length) {
-										console.info('LANE-TUNE-DIAG', JSON.stringify({
-											label,
-											issues: run.issues.filter(issue => issue.severity === 'error'),
-											vehicles: run.vehicles,
-										}))
-										regressions.push(`${label}: ${failures.join(', ')}`)
-									}
+									if (failures.length) regressions.push(`${label}: ${failures.join(', ')}`)
 								}
 							}
 		}
