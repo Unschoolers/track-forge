@@ -16,7 +16,9 @@ npm run qa:mobile:production
 The separate `Mobile gameplay QA` GitHub workflow runs these scenarios on
 gameplay-code and dependency PRs and uploads reports and failure screenshots
 for seven days. The development suite runs in four independent CI shards,
-and the production smoke runs separately. Each shard retains its own report.
+and the production smoke runs separately. Tests are assigned round-robin after
+Playwright discovery to spread neighboring slow tests across shards. New tests
+are included automatically, and each shard retains its own report.
 Touch input, ramp rendering and performance sampling run in real time. `npm ci` installs the pinned
 Playwright runner. The production smoke builds the game and starts a race
 through the same UI players use.

@@ -91,7 +91,9 @@ points to a keystore with alias `androiddebugkey` and store/key passwords
 Never commit or share private keys.
 
 The Android workflow compiles and verifies unsigned APKs on pushes to main,
-pull requests, and manual dispatch. These artifacts are for QA, not installation.
+manual dispatch, and pull requests that may change native build inputs. Web-only
+pull requests still run the full JavaScript checks and production web build.
+Unsigned artifacts are for QA, not installation.
 Successful main-branch pushes and manual main builds sign and publish the APK
 itself as a versioned [GitHub Release](https://github.com/Unschoolers/track-forge/releases)
 asset. [Download the latest APK directly](https://github.com/Unschoolers/track-forge/releases/latest/download/trackforge-debug.apk).

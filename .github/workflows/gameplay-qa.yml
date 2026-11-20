@@ -40,7 +40,9 @@ jobs:
       - name: Install pinned Chromium headless shell
         run: npx playwright install chromium --only-shell
       - name: Simulate mobile gameplay
-        run: npm run qa:mobile -- --fully-parallel --shard=${{ matrix.shard }}/4
+        run: |
+          node qa/browser/shard-list.mjs ${{ matrix.shard }} 4 /tmp/mobile-tests.txt
+          npm run qa:mobile -- --test-list=/tmp/mobile-tests.txt
       - uses: actions/upload-artifact@v7.0.2
         if: ${{ always() }}
         with:

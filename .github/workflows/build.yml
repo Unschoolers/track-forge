@@ -14,7 +14,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.changes.outputs.native }}
+      web_artifact_id: ${{ steps.web-artifact.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Determine whether native verification is required
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/android-ci-native-required.mjs >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - name: Set web build release identity
+        id: version
+        run: |
+          node scripts/android-build-policy.mjs version "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/trackforge-version.env"
+          cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_OUTPUT"
+      - name: Build web assets with embedded release identity
+        run: npm run build
+        env:
+          VITE_TRACKFORGE_BUILD_RUN: ${{ steps.version.outputs.TRACKFORGE_BUILD_RUN }}
+          VITE_TRACKFORGE_BUILD_ATTEMPT: ${{ steps.version.outputs.TRACKFORGE_BUILD_ATTEMPT }}
+      - uses: actions/upload-artifact@v7.0.2
+        if: steps.changes.outputs.native != 'false'
+        id: web-artifact
+        with:
+          name: web-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --maxWorkers=4
+      - run: npm run lint
+
   android:
+    needs: web-build
+    if: needs.web-build.outputs.native != 'false'
     runs-on: ubuntu-latest
     outputs:
       apk_artifact_id: ${{ steps.apk.outputs.artifact-id }}
@@ -43,20 +97,18 @@ jobs:
             sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
           fi
       - run: npm ci
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.web-build.outputs.web_artifact_id }}
+          path: dist
+          merge-multiple: true
+      - run: npx cap sync android
       - name: Set unique Android build version
         id: version
         run: |
           node scripts/android-build-policy.mjs version "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/trackforge-version.env"
           cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/trackforge-version.env" >> "$GITHUB_OUTPUT"
-      - run: npm test -- --maxWorkers=4
-      - run: npm run lint
-      - name: Build web assets with embedded release identity
-        run: npm run build
-        env:
-          VITE_TRACKFORGE_BUILD_RUN: ${{ steps.version.outputs.TRACKFORGE_BUILD_RUN }}
-          VITE_TRACKFORGE_BUILD_ATTEMPT: ${{ steps.version.outputs.TRACKFORGE_BUILD_ATTEMPT }}
-      - run: npx cap sync android
       - name: Test native Android behavior and assemble unsigned APK
         run: cd android && ./gradlew testDebugUnitTest assembleDebug --build-cache
       - name: Verify unsigned APK metadata
@@ -83,7 +135,7 @@ jobs:
         run: printf '## Android build\n\nUnsigned QA artifact verified. Installable APKs are signed and published from main in the protected android-signing environment.\n' >> "$GITHUB_STEP_SUMMARY"
 
   sign-and-release:
-    needs: android
+    needs: [android, verify]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
     runs-on: ubuntu-latest
