@@ -79,6 +79,23 @@
   color: #101017;
   clip-path: polygon(0 0, 100% 0, 100% 75%, calc(100% - .8rem) 100%, 0 100%);
 }
+.home-actions .home-update-button {
+  min-height: 2.75rem;
+  border-color: #ff9b68;
+  background: rgb(67 34 25 / 92%);
+  color: #ffd8bd;
+}
+.home-actions .home-update-button::before {
+  flex: none;
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: #ff9b68;
+  box-shadow: 0 0 .65rem rgb(255 155 104 / 60%);
+  content: '';
+}
+.home-actions .home-update-button { justify-content: flex-start; }
+.home-actions .home-update-button::after { margin-left: auto; }
 .home-actions .button:hover { translate: none; filter: brightness(1.16); }
 .home-actions .button:focus-visible { outline: 2px solid var(--home-ink); outline-offset: 3px; }
 .home-card .current-track {
