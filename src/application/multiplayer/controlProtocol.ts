@@ -59,11 +59,14 @@ function isControl(value: unknown): value is Control {
     case 'ready':
       return isCar(message.car) && isPlayerIdentity(message.identity)
     case 'lineup': {
-      if (!validCars(message.cars) || !Array.isArray(message.identities) ||
-        message.identities.length !== MAX_PLAYERS || !Array.isArray(message.positions)) return false
-      return message.identities.every((identity, index) => message.cars[index] === null
+      const cars = message.cars
+      const identities = message.identities
+      const positions = message.positions
+      if (!validCars(cars) || !Array.isArray(identities) ||
+        identities.length !== MAX_PLAYERS || !Array.isArray(positions)) return false
+      return identities.every((identity, index) => cars[index] === null
         ? identity === null : isPlayerIdentity(identity)) &&
-        validLineupPositions(message.cars, message.positions)
+        validLineupPositions(cars, positions)
     }
     case 'armed': return true
     case 'start':
