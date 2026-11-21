@@ -185,6 +185,28 @@ describe('Nearby Arcade', () => {
       expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
       expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
 
+      // A lightweight progress stream ranks remote laps without changing the pose format.
+      const progressState = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2 })
+      const progressCars = setups.map(({ car }, index) =>
+        ({ ...makeCar(car, index * 10), lap: index === 0 ? 0 : 1 }))
+      time += 200
+      devices.forEach((device, index) => device.update(progressCars[index]!, progressState))
+      await vi.waitFor(() => {
+        expect(host.livePosition(progressCars[0]!, progressState)).toMatchObject({ position: 4, vehicleCount: 4 })
+        expect(red.livePosition(progressCars[1]!, progressState)).toMatchObject({ position: 1, vehicleCount: 4 })
+      }, { interval: 5 })
+      const progressCount = network.packets.filter(({ bytes }) => bytes[0] === Packet.Progress).length
+      expect(progressCount).toBeGreaterThanOrEqual(4)
+      // Taking the lead must propagate to every participant, not just the host.
+      time += 200
+      const leadingHost = { ...progressCars[0]!, lap: 1 }
+      host.update(leadingHost, progressState)
+      await vi.waitFor(() => {
+        expect(red.livePosition(progressCars[1]!, progressState)?.position).toBe(2)
+        expect(host.livePosition(leadingHost, progressState)?.position).toBe(1)
+      }, { interval: 5 })
+
+
       red.finish(40.125)
       host.finish(42)
       time += 50
