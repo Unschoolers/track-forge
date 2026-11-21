@@ -58,7 +58,7 @@ export function createOptionsModal(
   const input = element('input', 'name-input')
   input.id = 'options-player-name'
   input.name = 'player-name'
-  input.autocomplete = 'nickname'
+  input.autocomplete = 'off'
   input.maxLength = 24
   input.value = state.preferences.displayName ?? ''
   const error = element('div', 'name-error', '')
