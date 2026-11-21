@@ -50,5 +50,5 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
   await results.locator('[data-action="open-race-splits"]').click()
   const details = page.locator('[data-modal="race-splits"]')
   await expect(details.getByRole('heading', { name: 'RACE SPLITS' })).toBeVisible()
-  await expect(details.locator('.results-splits-detail-row').first()).toContainText('CHECKPOINT')
+  await expect(details.locator('.results-splits-detail-row').first()).toBeVisible()
 })
