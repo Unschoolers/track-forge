@@ -1,14 +1,14 @@
 import { CAR_SPECS } from '@/domain/config'
 import type { CarId, Vector2 } from '@/domain/model'
 
+/** Purely cosmetic size shared by real races and the setup flyover. */
+export const VEHICLE_VISUAL_SCALE = 0.88
+
 /**
  * Single visual authority for race and setup flyover. Local +X is the nose.
  * These are presentation polygons only: physics, collisions and car ratings
  * remain owned by the race domain.
  */
-/** Purely cosmetic size shared by real races and the setup flyover. */
-export const VEHICLE_VISUAL_SCALE = 0.88
-
 export type VehicleBodyStyle = 'sport' | 'muscle' | 'rally' | 'pickup'
 export type VehiclePaintTone =
   | 'rubber' | 'body' | 'bodyLight' | 'bodyDark' | 'glass'
