@@ -122,7 +122,13 @@ test('can drag the same starter control point twice, then tap for point controls
   await expect.poll(async () => (await read()).camera).not.toBeNull()
   await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Move points', exact: true }).click()
-  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
+  // Editing the built-in starter forks it: inspect the editable copy, not the seed.
+  const saved = () => page.evaluate(() => {
+    const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
+    const edited = tracks.find(track => track.origin === 'local' && track.name.startsWith('Starter Circuit'))
+    if (!edited) throw new Error('Expected an editable fork of the built-in Starter Circuit')
+    return edited.points
+  })
   const originalPoints = await saved()
   const control = originalPoints[2]
   const camera = (await read()).camera

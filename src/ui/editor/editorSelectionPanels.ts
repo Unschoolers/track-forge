@@ -1,5 +1,6 @@
 import type { AppSnapshot } from '@/application/appState'
 import type { EditorCommand } from '@/domain/editor/editorState'
+import { planPointInsertion } from '@/domain/editor/editorGeometry'
 import type { TrackCrossing } from '@/domain/track/crossings'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { button, element } from '@/ui/dom'
@@ -98,27 +99,23 @@ function createPointControl(
     })
   })
   tensionLabel.append(tension)
-  const next = points[(index + 1) % points.length]
-  const insert = button(
-    'Insert after',
-    'insert-point',
-    () => {
-      if (!next) return
-      edit({
-        type: 'insert-point',
-        index: index + 1,
-        point: {
+  const next = points[index + 1]
+  panel.append(choices, tensionLabel)
+  if (next) {
+    const insert = button(
+      'Insert after',
+      'insert-point',
+      () => {
+        const insertion = planPointInsertion(points, index, {
           x: (point.x + next.x) / 2,
           y: (point.y + next.y) / 2,
-          surface: point.surface,
-          curve: 'smooth',
-          tension: 0.5,
-        },
-      })
-    },
-    'point-insert',
-  )
-  panel.append(choices, tensionLabel, insert)
+        })
+        if (insertion) edit({ type: 'insert-point', ...insertion })
+      },
+      'point-insert',
+    )
+    panel.append(insert)
+  }
   return panel
 }
 

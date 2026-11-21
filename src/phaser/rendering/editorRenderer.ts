@@ -71,14 +71,16 @@ export function renderEditorOverlay(
   geometry: TrackGeometry,
   selectedPoint = -1,
   selectedCrossing: string | null = null,
+  zoom = 1,
 ): void {
+  const screenScale = 1 / Math.max(0.01, zoom)
   for (const [index, point] of state.points.entries()) {
     const selected = index === selectedPoint
     graphics.fillStyle(selected ? 0xffd43b : 0xf4f7fb, 1)
-    graphics.fillCircle(point.x, point.y, selected ? 6 : 3.5)
+    graphics.fillCircle(point.x, point.y, (selected ? 8 : 5) * screenScale)
     if (selected) {
-      graphics.lineStyle(2, 0x20242a, 0.9)
-      graphics.strokeCircle(point.x, point.y, 8)
+      graphics.lineStyle(2 * screenScale, 0x20242a, 0.9)
+      graphics.strokeCircle(point.x, point.y, 10 * screenScale)
     }
   }
   const crossing = selectedCrossing
