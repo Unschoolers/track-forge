@@ -11,6 +11,49 @@ import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
 
 describe('EditorInputController', () => {
+  it('adds just one point on a road tap, not on drag or off-road tap; undo restores the road', () => {
+    const points = [
+      { x: 0, y: 0, surface: 'dirt' as const },
+      { x: 200, y: 0, surface: 'street' as const },
+      { x: 200, y: 200, surface: 'street' as const },
+    ]
+    let editor = createEditorState(points, [], undefined, undefined, { routeKind: 'point-to-point' })
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'insert', surface: () => 'street',
+      editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) },
+    })
+    input.pointerDown({ id: 1, x: 70, y: 12 })
+    input.pointerMove({ id: 1, x: 110, y: 12 })
+    input.pointerUp({ id: 1, x: 110, y: 12 })
+    expect(editor.points).toHaveLength(4)
+    expect(editor.points[1]).toMatchObject({ x: 70, y: 0, surface: 'dirt' })
+    expect(editor.history).toHaveLength(1)
+    input.pointerDown({ id: 2, x: 70, y: 120 })
+    input.pointerUp({ id: 2, x: 70, y: 120 })
+    expect(editor.points).toHaveLength(4)
+    editor = reduceEditor(editor, { type: 'undo' })
+    expect(editor.points).toEqual(points)
+  })
+
+  it('cancels a pending insertion when a second finger starts navigation', () => {
+    const points = [
+      { x: 0, y: 0, surface: 'street' as const },
+      { x: 200, y: 0, surface: 'street' as const },
+    ]
+    let editor = createEditorState(points, [], undefined, undefined, { routeKind: 'point-to-point' })
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'insert', surface: () => 'street',
+      editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) },
+    })
+    input.pointerDown({ id: 1, x: 80, y: 0 })
+    expect(editor.points).toHaveLength(3)
+    input.pointerDown({ id: 2, x: 140, y: 0 })
+    input.pointerUp({ id: 1, x: 80, y: 0 })
+    input.pointerUp({ id: 2, x: 140, y: 0 })
+    expect(editor.points).toEqual(points)
+    expect(editor.history).toHaveLength(0)
+  })
+
   it('places and removes a Checkpoint on the road with a tap', () => {
     const points = [{ x: 0, y: 0, surface: 'street' as const }, { x: 1_200, y: 0, surface: 'street' as const }]
     let editor = createEditorState(points, [], undefined, undefined, { routeKind: 'point-to-point' })

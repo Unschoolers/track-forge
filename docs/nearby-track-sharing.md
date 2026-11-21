@@ -10,6 +10,10 @@ From Track Library choose **NEARBY** on a saved track. This advertises `Track ##
 - The sender only reports confirmed saves, with acknowledgement counts deduplicated by peer. Track bytes are bounded by existing transfer limits and malformed imports are rejected before storage.
 - **LEAVE/BACK** ends the sharing session; the host disconnects all peers.
 
+## Hosting a Nearby race
+
+From **Nearby**, choose **CHOOSE TRACK TO HOST** (the primary action), then select a race-ready saved or official circuit. Track selection opens the Nearby room directly: it must not enter the single-player race setup or start a solo session. Closing the picker returns to Nearby without advertising a room. **START RACE** in the host lobby is disabled until at least one guest has connected; only the Nearby session may start the multiplayer race. The chosen circuit's lighting and the saved lap preference apply, with a single run for point-to-point courses. The normal **RACE** flow remains single-player.
+
 ## Nearby rematches
 
 The host and guests remain connected after a race; the results screen stays open. Once all racers finish or leave:

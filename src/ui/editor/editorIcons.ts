@@ -18,6 +18,7 @@ const paths = {
   race: 'M8 4v16l13-8z',
   draw: 'm4 20 4-1 12-12-3-3L5 16z M14 7l3 3',
   select: 'M5 3v16l5-5 3 7 3-2-3-6h7z',
+  insert: 'M3 19 9 13 15 7 M16 3v10 M11 8h10',
   start: 'M5 21V4 M5 5c6-3 9 3 15 0v10c-6 3-9-3-15 0',
   checkpoint: 'M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 1 1 14 0z M12 7v6 M9 10h6',
   paint: 'm12 3 9 9-9 9-9-9z M3 12h18',
