@@ -34,30 +34,38 @@ const track: Track = {
 class Graphics {
 	readonly bodies: { x: number; y: number }[] = []
 	readonly shadows: { x: number; y: number }[] = []
+	readonly outlines: { x: number; y: number }[] = []
+	private position = { x: 0, y: 0 }
+	private strokeWidth = 0
 	strokes = 0
 	clear() {
 		this.bodies.length = 0
 		this.shadows.length = 0
+		this.outlines.length = 0
 		this.strokes = 0
 	}
 	translateCanvas(x: number, y: number) {
-		this.bodies.push({ x, y })
+		this.position = { x, y }
 	}
 	save() {}
 	restore() {}
 	rotateCanvas() {}
-	scaleCanvas() {}
+	// A body scales with suspension; cosmetic antenna translations never do.
+	scaleCanvas() { this.bodies.push({ ...this.position }) }
 	fillStyle() {}
 	beginPath() {}
 	moveTo() {}
 	lineTo() {}
 	closePath() {}
 	fillPath() {}
-	lineStyle() {}
-	strokePath() { this.strokes++ }
+	lineStyle(width: number) { this.strokeWidth = width }
+	strokePath() {
+		this.strokes++
+		if (this.strokeWidth === 4) this.outlines.push({ ...this.position })
+	}
 	fillCircle() {}
 	fillEllipse() {
-		this.shadows.push(required(this.bodies.pop()))
+		this.shadows.push({ ...this.position })
 	}
 }
 
@@ -240,7 +248,8 @@ describe('ramp vehicle rendering', () => {
 		}
 		RaceScene.prototype.update.call(scene as never, 0, 16)
 		expect(lower.bodies).toHaveLength(1)
-		expect(upper.bodies).toEqual(lower.bodies)
+		expect(upper.bodies).toHaveLength(0)
+		expect(upper.outlines).toEqual(lower.bodies)
 		expect(upper.strokes).toBeGreaterThan(0)
 		expect(upper.shadows).toHaveLength(0)
 
