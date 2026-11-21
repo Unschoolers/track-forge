@@ -65,7 +65,9 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await editor.locator('summary.editor-view-summary').click()
     const grid = editor.getByRole('button', { name: 'Toggle grid' })
     await grid.click()
-    await expect(editor.getByRole('button', { name: 'Toggle grid' })).toHaveClass(/active/)
+    // A state update recreates the editor screen and collapses the View menu.
+    // Select by action so the assertion can inspect the now-hidden active control.
+    await expect(editor.locator('[data-action="toggle-grid"]')).toHaveClass(/active/)
     await save.click()
 
     await editor.locator('summary.editor-toolbox-summary').click()
