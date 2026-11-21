@@ -5,7 +5,7 @@ import type {
   TerrainMap,
   Vector2,
 } from '@/domain/model'
-import { terrainCellKey } from '@/domain/terrain/terrainField'
+import { terrainCellKey, terrainKindIndex } from '@/domain/terrain/terrainField'
 
 export type TerrainMaterial = 'grass' | 'water'
 type TerrainSlopeKind = 'natural' | 'road'
@@ -75,6 +75,27 @@ function pointKey(point: Vector2): string {
   return `${point.x}:${point.y}`
 }
 
+/**
+ * Grid contours often repeat hundreds of collinear boundary vertices.
+ * Collapse only straight, forward edges: this preserves the exact water/hill
+ * shape, holes and winding while reducing every downstream scan and fill.
+ */
+function compactClosedContour(points: readonly Vector2[]): readonly Vector2[] {
+  if (points.length <= 4) return points
+  const compact = points.filter((point, index) => {
+    const before = points[(index + points.length - 1) % points.length]
+    const after = points[(index + 1) % points.length]
+    if (!before || !after) return true
+    const incomingX = point.x - before.x
+    const incomingY = point.y - before.y
+    const outgoingX = after.x - point.x
+    const outgoingY = after.y - point.y
+    return incomingX * outgoingY !== incomingY * outgoingX ||
+      incomingX * outgoingX + incomingY * outgoingY <= 0
+  })
+  return compact.length >= 3 ? compact : points
+}
+
 function cellAt(position: Vector2, cellSize: number): {
   readonly column: number
   readonly row: number
@@ -83,12 +104,6 @@ function cellAt(position: Vector2, cellSize: number): {
     column: Math.floor(position.x / cellSize),
     row: Math.floor(position.y / cellSize),
   }
-}
-
-function kindLookup(terrain: TerrainMap): ReadonlyMap<string, TerrainKind> {
-  return new Map(
-    terrain.cells.map((cell) => [terrainCellKey(cell), cell.kind]),
-  )
 }
 
 function maskFor(
@@ -251,7 +266,7 @@ function traceContours(
         last?.x === first.start.x && last.y === first.start.y
       contours.push({
         kind,
-        points: closed ? points.slice(0, -1) : points,
+        points: closed ? compactClosedContour(points.slice(0, -1)) : points,
       })
     }
   }
@@ -483,7 +498,7 @@ function compileRoadDistance(
 function compileTerrainField(terrain: TerrainMap): CompiledTerrainField {
   const cached = terrainFields.get(terrain)?.deref()
   if (cached) return cached
-  const lookup = kindLookup(terrain)
+  const lookup = terrainKindIndex(terrain)
   const hillMask = maskFor(lookup, 'hill')
   const waterMask = maskFor(lookup, 'water')
   const hillEdges = boundaryEdges(terrain, hillMask)

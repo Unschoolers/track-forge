@@ -10,7 +10,6 @@ import { WeightedIdentityCache } from '@/phaser/rendering/terrainPresentationCac
 import {
   buildTerrainComponents,
   mapTerrainComponent,
-  pointInTerrainComponent,
   tileTerrainComponent,
   triangulateTerrainComponent,
   type TerrainComponent,
@@ -174,15 +173,34 @@ function waterTexture(
   for (let y = top + spacing / 2; y < bottom; y += spacing) {
     const row = Math.round((y - top) / spacing)
     const offset = row % 2 === 0 ? 0 : spacing / 2
+    // The point-in-ring ray test only depends on intersections at this y.
+    // Compute them once per ripple row, rather than scanning every coastline
+    // edge twice for each 10-unit stroke (especially costly on large lakes).
+    const intersections: number[] = []
+    for (const ring of [component.outer, ...component.holes]) {
+      for (let index = 0; index < ring.length; index += 1) {
+        const start = ring[index]
+        const end = ring[(index + 1) % ring.length]
+        if (!start || !end || (start.y > y) === (end.y > y)) continue
+        intersections.push(start.x + ((y - start.y) * (end.x - start.x)) / (end.y - start.y))
+      }
+    }
+    intersections.sort((a, b) => a - b)
+    const inside = (x: number): boolean => {
+      // Match the strict x < intersection parity used by pointInRing.
+      let low = 0
+      let high = intersections.length
+      while (low < high) {
+        const middle = (low + high) >>> 1
+        if (x < (intersections[middle] ?? Number.NEGATIVE_INFINITY)) high = middle
+        else low = middle + 1
+      }
+      return (intersections.length - low) % 2 === 1
+    }
     for (let x = left + spacing / 2 + offset; x < right; x += spacing) {
       const start = { x: x - lineLength / 2, y }
       const end = { x: x + lineLength / 2, y }
-      if (
-        pointInTerrainComponent(start, component) &&
-        pointInTerrainComponent(end, component)
-      ) {
-        lines.push({ start, end })
-      }
+      if (inside(start.x) && inside(end.x)) lines.push({ start, end })
     }
   }
   return lines
@@ -204,6 +222,20 @@ function terrainHeightMesh(
   )
   const slopes: HillSlopeFacet[] = []
   const plateau: TerrainTriangle[] = []
+  // Interior plateau tiles share an identical material. In overview mode,
+  // fuse adjacent horizontal quads into one pair of triangles, leaving the
+  // height/gradient samples and finely shaded boundary slopes untouched.
+  let plateauRun: { left: number; right: number; top: number; bottom: number } | undefined
+  const flushPlateau = (): void => {
+    if (!plateauRun) return
+    const { left, right, top, bottom } = plateauRun
+    const topLeft = { x: left, y: top }
+    const topRight = { x: right, y: top }
+    const bottomRight = { x: right, y: bottom }
+    const bottomLeft = { x: left, y: bottom }
+    plateau.push([topLeft, topRight, bottomRight], [topLeft, bottomRight, bottomLeft])
+    plateauRun = undefined
+  }
 
   // tileTerrainComponent emits each quad as two consecutive triangles. Both
   // share one authoritative height/gradient sample and therefore one shade.
@@ -217,9 +249,24 @@ function terrainHeightMesh(
     }
     const sample = surface.heightSampleAt(center)
     if (sample.height >= WORLD_ELEVATION.levelHeight - 0.001) {
-      plateau.push(first, second)
+      if (detail === 'overview') {
+        const top = first[0].y
+        const bottom = first[2].y
+        const left = first[0].x
+        const right = first[1].x
+        if (plateauRun && plateauRun.top === top && plateauRun.bottom === bottom &&
+            plateauRun.right === left) {
+          plateauRun.right = right
+        } else {
+          flushPlateau()
+          plateauRun = { left, right, top, bottom }
+        }
+      } else {
+        plateau.push(first, second)
+      }
       continue
     }
+    flushPlateau()
     const shade = clamp(
       -(
         sample.gradient.x * WORLD_LIGHTING.sunShadowDirection.x +
@@ -233,6 +280,7 @@ function terrainHeightMesh(
       { triangle: second, shade },
     )
   }
+  flushPlateau()
   return { slopes, plateau }
 }
 

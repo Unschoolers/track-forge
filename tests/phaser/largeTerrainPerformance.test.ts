@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { compileTerrainSurface } from '@/domain/terrain/terrainSurface'
+import { WORLD_ELEVATION } from '@/domain/config'
+import { buildTerrainComponents, tileTerrainComponent } from '@/phaser/rendering/terrainTopology'
 import {
   compileTerrainPresentation,
 } from '@/phaser/rendering/terrainMesh'
@@ -36,6 +38,40 @@ describe('large track rendering budgets', () => {
     expect(overview.stats.contourPointCount).toBe(regular.stats.contourPointCount)
     expect(compileTerrainPresentation(surface, 'overview')).toBe(overview)
     expect(compileTerrainPresentation(surface, 'full')).toBe(regular)
+  })
+
+  it('fuses flat overview hill spans without altering their exact coverage', () => {
+    const surface = compileTerrainSurface(landscape(80, 80), [])
+    const full = compileTerrainPresentation(surface, 'full')
+    const overview = compileTerrainPresentation(surface, 'overview')
+    const plateauArea = (presentation: typeof full) =>
+      presentation.primitives
+        .filter((primitive) => primitive.kind === 'hill-plateau')
+        .flatMap((primitive) => primitive.triangles)
+        .reduce((sum, [a, b, c]) => sum +
+          Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2, 0)
+
+    // Full detail intentionally samples half-cells. Compare overview against
+    // its own original per-cell plateau classification, before run merging.
+    const hill = buildTerrainComponents(surface.contours, 'hill')[0]
+    if (!hill) throw new Error('Missing hill component')
+    const quads = tileTerrainComponent(hill, WORLD_ELEVATION.cellSize)
+    let unmergedPlateauArea = 0
+    for (let index = 0; index < quads.length; index += 2) {
+      const first = quads[index]
+      const second = quads[index + 1]
+      if (!first || !second) continue
+      const center = {
+        x: (first[0].x + first[2].x) / 2,
+        y: (first[0].y + first[2].y) / 2,
+      }
+      if (surface.heightSampleAt(center).height >= WORLD_ELEVATION.levelHeight - 0.001) {
+        unmergedPlateauArea += WORLD_ELEVATION.cellSize ** 2
+      }
+    }
+    expect(plateauArea(overview)).toBe(unmergedPlateauArea)
+    expect(overview.stats.triangleCount).toBeLessThan(full.stats.triangleCount / 4)
+    expect(overview.stats.contourPointCount).toBe(4)
   })
 
   it('samples hill elevation once per overview tile instead of four times', () => {

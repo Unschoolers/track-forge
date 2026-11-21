@@ -74,6 +74,23 @@ export function terrainCellKey(cell: TerrainCellCoordinate): string {
   return `${cell.column}:${cell.row}`
 }
 
+/**
+ * Coordinate queries run for every editor prop/tree drag. Keep one sparse
+ * index per immutable terrain revision instead of scanning 14K+ cells on each
+ * pointer update. Weak references permit undo history to retain old terrain
+ * without permanently retaining an additional index for every revision.
+ */
+const terrainIndexes = new WeakMap<TerrainMap, WeakRef<ReadonlyMap<string, TerrainKind>>>()
+
+export function terrainKindIndex(terrain: TerrainMap): ReadonlyMap<string, TerrainKind> {
+  const cached = terrainIndexes.get(terrain)?.deref()
+  if (cached) return cached
+  const index = new Map<string, TerrainKind>()
+  for (const cell of terrain.cells) index.set(terrainCellKey(cell), cell.kind)
+  terrainIndexes.set(terrain, new WeakRef(index))
+  return index
+}
+
 /** Returns the authored kind at one finite world position, if any. */
 export function terrainKindAt(
   terrain: TerrainMap,
@@ -86,8 +103,7 @@ export function terrainKindAt(
     column: Math.floor(position.x / terrain.cellSize),
     row: Math.floor(position.y / terrain.cellSize),
   }
-  const key = terrainCellKey(coordinate)
-  return terrain.cells.find((cell) => terrainCellKey(cell) === key)?.kind
+  return terrainKindIndex(terrain).get(terrainCellKey(coordinate))
 }
 
 /**
