@@ -22,6 +22,8 @@ describe('Cup lineup persistence', () => {
     expect(reloaded.lineup).toEqual(['official-bridge'])
     expect(cupTrackIds(reloaded.checkpoint!)).toEqual(['official-meadow', 'official-frost'])
     expect(reloaded.checkpoint?.index).toBe(0)
+    expect(repo.save({ checkpoint: null, bestPlacement: null, lineup: [] })).toBe(true)
+    expect(repo.load().lineup).toEqual([])
   })
 
   it('migrates the original four-round checkpoint and rejects corrupt lineups', () => {
