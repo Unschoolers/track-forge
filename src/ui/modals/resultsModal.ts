@@ -1,5 +1,5 @@
 import type { TimeMedal } from '@/application/race/raceRecords'
-import { CUP_CIRCUITS, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
+import { cupRoundCount, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
 import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
@@ -125,7 +125,7 @@ export function createResultsModal(
   }
   frame.body.append(createHighScores(result.highScores))
   if (cupAction) {
-    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${CUP_CIRCUITS.length}`))
+    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${cupRoundCount(cupAction.cup)}`))
     for (const [index, driver] of cupStandings(cupAction.cup).entries()) {
       frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
     }
