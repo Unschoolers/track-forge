@@ -193,7 +193,123 @@
 .results-modal .race-diagnostics-panel .modal-subtitle { flex-basis: 100%; margin: 0; }
 .results-modal .race-diagnostics-panel .button { min-height: 2.7rem; }
 
-.results-modal .results-secondary { padding-top: .8rem; border-top: 1px solid #34414e; }
+/* The finish is the hero. The title names the outcome once; the podium owns
+   placement and medal, while standings owns the player's final time. */
+.results-modal .modal-header { padding-block: .95rem .7rem; }
+.results-modal .modal-body { padding-block: .8rem; }
+.results-modal .results-celebration-compact {
+  gap: .12rem;
+  margin: .15rem 0 .6rem;
+  padding: .75rem .6rem .85rem;
+  background: radial-gradient(ellipse at 50% 4%, color-mix(in srgb, var(--podium-color), transparent 80%), transparent 70%), #17212b;
+}
+.results-modal .results-celebration-crest {
+  color: var(--podium-color);
+  font: 900 1.5rem/1 var(--menu-mono);
+  text-shadow: 0 0 1.2rem var(--podium-color);
+}
+.results-modal .results-celebration-compact .results-celebration-place {
+  font-size: clamp(2rem, 9vw, 3rem);
+  line-height: 1.05;
+}
+.results-modal .results-celebration-compact .results-celebration-kicker {
+  font-size: .68rem;
+  letter-spacing: .15em;
+}
+.results-modal .results-celebration-compact .results-celebration-record {
+  margin-top: .35rem;
+  padding: .18rem .55rem;
+  font-size: .59rem;
+}
+.results-modal .results-heading { margin: .75rem 0 .35rem; }
+.results-modal .scoreboard { gap: .25rem; }
+.results-modal .scoreboard-row {
+  align-items: center;
+  min-height: 40px;
+  gap: .4rem;
+  padding: .46rem .65rem;
+  font-size: .83rem;
+}
+.results-modal .scoreboard-row strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results-modal .scoreboard-row span { flex: none; font-size: .8rem; }
+.results-modal .results-details-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem .75rem;
+  margin-top: .55rem;
+}
+.results-modal .results-details-bar .results-splits-action {
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: .5rem .7rem;
+  font-size: .64rem;
+}
+.results-modal .results-details-bar .ghost-save-status,
+.results-modal .results-details-bar .race-diagnostics-label {
+  margin: 0;
+}
+.results-modal .results-details-bar .race-diagnostics-target { display: inline-flex; align-items: center; min-height: 44px; }
+.results-modal .results-details-bar .race-diagnostics-panel { flex: 1 1 100%; margin: 0; }
+.results-modal .results-history { margin-top: .7rem; border-top: 1px solid #344554; }
+.results-modal .results-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .55rem .15rem;
+  color: var(--menu-muted);
+  font: 800 .66rem/1.3 var(--menu-mono);
+  letter-spacing: .08em;
+  cursor: pointer;
+  list-style: none;
+}
+.results-modal .results-history-toggle::after { content: '▾'; color: var(--menu-accent); }
+.results-modal .results-history[open] .results-history-toggle::after { content: '▴'; }
+.results-modal .results-history-toggle::-webkit-details-marker { display: none; }
+.results-modal .results-history .scoreboard { margin-bottom: .4rem; }
+.results-modal .results-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .2rem;
+  padding: .55rem 1rem max(.55rem, env(safe-area-inset-bottom));
+}
+.results-modal .results-primary-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+.results-modal .results-primary-actions .button {
+  min-width: 0;
+  min-height: 46px;
+  padding: .45rem .3rem;
+  font: 800 .72rem/1.15 var(--menu-mono);
+  letter-spacing: .03em;
+}
+.results-modal .results-primary-actions .button:first-child { grid-column: auto; }
+.results-modal .results-secondary {
+  display: flex;
+  justify-content: center;
+  gap: 1.3rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.results-modal .results-secondary .button {
+  min-height: 44px;
+  padding: .35rem .4rem;
+  border: 0;
+  background: transparent;
+  color: var(--menu-muted);
+  font: 800 .68rem/1.1 var(--menu-mono);
+}
+.results-modal .results-secondary .button:hover { color: var(--menu-ink); }
+@media (max-width: 380px) {
+  .results-modal .results-primary-actions { gap: .25rem; }
+  .results-modal .results-primary-actions .button { font-size: .63rem; }
+  .results-modal .results-footer { padding-inline: .65rem; }
+}
+
 @media (max-width: 520px) {
   .track-library-modal .track-preview { height: 4.5rem; }
   .race-setup-modal .car-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
