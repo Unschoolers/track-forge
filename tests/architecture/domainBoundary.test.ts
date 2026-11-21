@@ -1,10 +1,6 @@
 // @vitest-environment node
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
-import {
-  createSourceFile, isExportDeclaration, isImportDeclaration, isStringLiteral,
-  ScriptKind, ScriptTarget,
-} from 'typescript'
 import { expect, it } from 'vitest'
 
 function typescriptFiles(directory: string): string[] {
@@ -25,12 +21,13 @@ it.each(['domain', 'application'] as const)('keeps %s imports within their inten
   expect(files.length).toBeGreaterThan(0)
 
   for (const file of files) {
-    const source = createSourceFile(file, readFileSync(file, 'utf8'), ScriptTarget.Latest, true, ScriptKind.TS)
-    for (const statement of source.statements) {
-      if (!isImportDeclaration(statement) && !isExportDeclaration(statement)) continue
-      const specifier = statement.moduleSpecifier
-      if (!specifier || !isStringLiteral(specifier)) continue
-      const spec = specifier.text
+    const content = readFileSync(file, 'utf8')
+    // TypeScript 7 uses the native compiler and no longer exports the old JS AST API.
+    // Scan static paths in import/export/from and literal dynamic imports.
+    const specifiers = [...content.matchAll(/\b(?:from\s*|import\s*(?:\(\s*)?)['\"]([^'\"]+)['\"]/g)]
+    for (const match of specifiers) {
+      const spec = match[1]
+      if (!spec) continue
       const target = spec.startsWith('@/') ? resolve(sourceRoot, spec.slice(2))
         : spec.startsWith('.') ? resolve(dirname(file), spec) : null
       if (!target || !target.startsWith(sourceRoot + sep)) continue
