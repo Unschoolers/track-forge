@@ -4,9 +4,9 @@ import { decodeTrack } from '@/domain/track/trackCodec'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { CarId } from '@/domain/model'
 import trackExport from './figureEight.trackforge.json'
+import { requireFixture } from './requireFixture'
 
-export const nearbyTrack = decodeTrack(trackExport, 1)
-if (!nearbyTrack) throw new Error('Invalid Figure-eight fixture')
+export const nearbyTrack = requireFixture(decodeTrack(trackExport, 1))
 export const nearbyPath = new TrackGeometryService().get(nearbyTrack).path
 
 /** Valid gameplay vehicle used by orchestration and wire-contract tests. */
