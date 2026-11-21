@@ -24,7 +24,7 @@ it('offers a diagnostic download after Nearby hosting fails and allows retrying 
     .mockRejectedValueOnce(new Error('Storage unavailable'))
     .mockResolvedValueOnce(true)
   const view = createNearbyRaceModal(nearby, 'blue', {
-    close: vi.fn(), chooseTrack: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(),
+    close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(),
     selectCar: vi.fn(), downloadDiagnostics: download,
   })
   const button = view.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')
@@ -49,7 +49,7 @@ it('shows the remembered topper but keeps the picker closed until explicitly req
   const toggleCustomize = vi.fn()
   const selectIdentity = vi.fn()
   const actions = {
-    close: vi.fn(), chooseTrack: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
+    close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
     downloadDiagnostics: vi.fn(async () => true), toggleCustomize, selectIdentity,
   }
   const identity = { icon: 'crown', color: 'gold' } as const

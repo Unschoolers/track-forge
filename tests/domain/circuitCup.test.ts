@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { createCup, recordCupResult, advanceCup, cupStandings, retryCupRace, CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { createCup, recordCupResult, advanceCup, cupStandings, retryCupRace, CUP_CIRCUITS, cupRoundCount, cupTrackIds } from '@/application/race/circuitCup'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { validateTrack } from '@/domain/track/trackValidation'
 
@@ -20,6 +20,22 @@ describe('official circuit cup', () => {
     }
     expect(cup.index).toBe(3)
     expect(cupStandings(cup)[0]?.points).toBe(40)
+  })
+  it('freezes a custom lineup and advances through its exact number of rounds', () => {
+    const tracks = ['official-bridge', 'official-meadow']
+    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
+    let cup = createCup('blue', 'normal', tracks)
+    expect(cupTrackIds(cup)).toEqual(tracks)
+    cup = advanceCup(recordCupResult(cup, standings))
+    expect(cup.index).toBe(1)
+    cup = advanceCup(recordCupResult(cup, standings))
+    expect(cup.index).toBe(1)
+    expect(cupRoundCount(cup)).toBe(2)
+    expect(cupStandings(cup)[0]?.points).toBe(20)
+  })
+  it('rejects an empty or oversized cup sequence', () => {
+    expect(() => createCup('blue', 'normal', [])).toThrow()
+    expect(() => createCup('blue', 'normal', Array(13).fill('official-meadow'))).toThrow()
   })
   it('records each race only once and advances through the fixed order', () => {
     let cup = createCup()

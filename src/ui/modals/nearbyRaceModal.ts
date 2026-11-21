@@ -9,10 +9,14 @@ import { createModalFrame } from './modalFrame'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { createTopperSelector } from '@/ui/components/playerTopperPicker'
 
+function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string | undefined; readonly local: boolean }): string {
+  return racer.name ? `${racer.name}${racer.local ? ' (You)' : ''}` : racer.local ? 'You' : `Player ${racer.slot + 1}`
+}
+
 export function createNearbyRaceModal(
   nearby: NearbyRace,
   car: CarId,
-  actions: { close: () => void; chooseTrack: () => void; scan: () => void; scanTracks: () => void;
+  actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
     saveTrack: () => void; declineTrack: () => void;
     selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
     toggleCustomize?: () => void; selectIdentity?: (identity: PlayerIdentity) => void },
@@ -20,7 +24,10 @@ export function createNearbyRaceModal(
   customizing = false,
 ): HTMLElement {
   const { phase, purpose, room, track, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
-  const frame = createModalFrame('Nearby Race', room ?? 'Arcade · Up to 4 players', actions.close, 'nearby-race-modal')
+  const cup = nearby.snapshot().cup
+  const frame = createModalFrame(cup ? 'Nearby Cup' : 'Nearby Race',
+    room ?? (cup ? `Cup · ${cup.total} tracks · Up to 4 players` : 'Arcade · Up to 4 players'),
+    actions.close, 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
     const message = element('p', 'modal-subtitle', error)
@@ -33,6 +40,7 @@ export function createNearbyRaceModal(
         createCarPicker(car, actions.selectCar),
         createTopperSelector(identity, customizing, actions.toggleCustomize, actions.selectIdentity),
         button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
+        button('HOST CUP', 'nearby-host-cup', actions.configureCup, 'button'),
         button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),
         button('RECEIVE TRACK', 'nearby-receive-track', actions.scanTracks, 'button'),
       )
@@ -42,7 +50,7 @@ export function createNearbyRaceModal(
       break
     case 'hosting': {
       frame.body.append(element('p', 'modal-subtitle',
-        `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/3 nearby friends`))
+        `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/3 nearby friends${cup ? ` · Cup 1/${cup.total}` : ''}`))
       if (purpose === 'share') {
         frame.body.append(element('p', 'modal-subtitle',
           `${sharedCount} friend${sharedCount === 1 ? '' : 's'} saved the track. Keep this screen open to share with more devices.`))
@@ -100,7 +108,9 @@ export function createNearbyRaceResults(
     downloadDiagnostics: () => Promise<boolean>
   },
 ) {
-  const frame = createModalFrame('NEARBY RACE RESULTS', result.trackName, undefined, 'results-modal')
+  const firstSnapshot = nearby.snapshot()
+  const frame = createModalFrame(firstSnapshot.cup ? 'NEARBY CUP RESULTS' : 'NEARBY RACE RESULTS',
+    result.trackName, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
   if (result.playerTime !== null) {
     frame.body.append(element('p', 'modal-subtitle', `Your time · ${formatRaceTime(result.playerTime)}`))
@@ -110,29 +120,42 @@ export function createNearbyRaceResults(
   const status = element('p', 'modal-subtitle')
   status.setAttribute('role', 'status')
   const nextTrack = element('p', 'modal-subtitle')
+  const cupScores = element('div', 'nearby-cup-scores')
   const race = nearby.snapshot().role === 'host'
-    ? button('RACE', 'nearby-race-again', actions.race, 'button button-primary')
+    ? button(firstSnapshot.cup ? 'NEXT CUP RACE' : 'RACE', 'nearby-race-again', actions.race, 'button button-primary')
     : null
   const selectTrack = race
-    ? button('SELECT TRACK', 'nearby-next-track', actions.selectTrack, 'button')
+    && !firstSnapshot.cup ? button('SELECT TRACK', 'nearby-next-track', actions.selectTrack, 'button')
     : null
   function update() {
     const snapshot = nearby.snapshot()
+    if (snapshot.cup) {
+      const { cup } = snapshot
+      cupScores.replaceChildren(
+        element('h3', 'results-heading', `CUP STANDINGS · ROUND ${cup.index + 1}/${cup.total}`),
+        ...cup.standings.map(({ slot, points }, rank) =>
+          element('p', 'modal-subtitle', `${rank + 1}. ${nearbyRacerLabel(nearby.standings().find(racer => racer.slot === slot) ?? { slot, local: slot === nearby.localSlot() })} · ${points} pts`)),
+      )
+    }
     if (snapshot.role === 'host') {
-      nextTrack.textContent = `Next race · ${snapshot.track ?? result.trackName}`
+      nextTrack.textContent = snapshot.cup
+        ? snapshot.cup.nextTrack ? `Next Cup race · ${snapshot.cup.nextTrack}` : 'Cup complete!'
+        : `Next race · ${snapshot.track ?? result.trackName}`
       if (race) race.disabled = !snapshot.canRematch
       if (selectTrack) selectTrack.disabled = !snapshot.canRematch
       status.textContent = snapshot.error ??
         (snapshot.phase === 'preparing' || snapshot.phase === 'staging'
           ? 'Preparing the next race…'
+          : snapshot.cup?.finished && snapshot.cup.index === snapshot.cup.total - 1 ? 'Cup complete! Final scores are ready.'
           : snapshot.canRematch ? 'Everyone finished. Ready for the next race.'
           : 'Waiting for the other racers to finish…')
     } else {
-      status.textContent = snapshot.error ?? 'Waiting for the host to choose the next race…'
+      status.textContent = snapshot.error ?? (snapshot.cup?.finished && snapshot.cup.index === snapshot.cup.total - 1
+        ? 'Cup complete! Final scores are ready.' : 'Waiting for the host to choose the next race…')
     }
     list.replaceChildren(...nearby.standings().map(({ slot, car, identity, name, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
-      const label = name ? `${name}${local ? ' (You)' : ''}` : local ? 'You' : `Player ${slot + 1}`
+      const label = nearbyRacerLabel({ slot, name, local })
       const topper = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
       topper.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
       topper.title = `${identity.color} ${identity.icon} topper`
@@ -145,7 +168,7 @@ export function createNearbyRaceResults(
     }))
   }
   update()
-  frame.body.append(list, status, nextTrack, createDiagnosticsControl(actions.downloadDiagnostics))
+  frame.body.append(list, cupScores, status, nextTrack, createDiagnosticsControl(actions.downloadDiagnostics))
   if (race && selectTrack) frame.footer.append(race, selectTrack)
   frame.footer.append(button('LEAVE', 'nearby-leave-room', actions.leave, 'button button-danger'))
   return { element: frame.overlay, cleanup: nearby.subscribe(update) }

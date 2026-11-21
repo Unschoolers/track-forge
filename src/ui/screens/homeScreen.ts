@@ -1,4 +1,4 @@
-import { CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { cupTrackIds, cupRoundCount } from '@/application/race/circuitCup'
 import { courseIdentity, nextMedalTarget, scoreCategoryLabel, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import type { AppSnapshot } from '@/application/appState'
@@ -13,7 +13,6 @@ export function createHomeScreen(
     readonly raceAgain: () => void
     readonly nearby?: (() => void) | undefined
     readonly cup?: () => void
-    readonly resumeCup?: () => void
     readonly options: () => void
     readonly updates?: (() => void) | undefined
   },
@@ -44,8 +43,10 @@ export function createHomeScreen(
   if (state.cupProgress?.bestPlacement) trackCard.append(element('span', 'track-meta', `Best Cup placement: ${state.cupProgress.bestPlacement}`))
   const checkpoint = state.cupProgress?.checkpoint
   if (checkpoint) {
-    const nextIndex = Math.min(checkpoint.index + (checkpoint.rounds.length > checkpoint.index ? 1 : 0), CUP_CIRCUITS.length - 1)
-    trackCard.append(element('span', 'track-meta', checkpoint.rounds.length === CUP_CIRCUITS.length ? 'Cup standings ready' : `Next Cup round: ${CUP_CIRCUITS[nextIndex]?.track.name}`))
+    const nextIndex = Math.min(checkpoint.index + (checkpoint.rounds.length > checkpoint.index ? 1 : 0), cupRoundCount(checkpoint) - 1)
+    const id = cupTrackIds(checkpoint)[nextIndex]
+    const next = [...state.tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)].find(track => track.id === id)
+    trackCard.append(element('span', 'track-meta', checkpoint.rounds.length === cupRoundCount(checkpoint) ? 'Cup standings ready' : `Next Cup round: ${next?.name ?? 'Track unavailable'}`))
   } else {
     const circuit = OFFICIAL_CIRCUITS.map(({ track }) => ({ track, next: nextMedalTarget(track, timeMedal(track, state.scoresByTrack[track.id] ?? [])) })).find(({ next }) => next)
     if (circuit?.next) trackCard.append(element('span', 'track-meta', `Next target: ${circuit.track.name} · ${circuit.next.tier.toUpperCase()} ${formatRaceTime(circuit.next.time)}`))
@@ -55,8 +56,7 @@ export function createHomeScreen(
     ...(state.raceAgainTrackName ? [button(`RACE AGAIN · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain, 'button button-primary button-large')] : []),
     button('RACE', 'race', actions.race, 'button button-primary button-large'),
     ...(actions.nearby ? [button('NEARBY RACE', 'nearby', actions.nearby, 'button button-large')] : []),
-    ...(checkpoint && actions.resumeCup ? [button('RESUME CUP', 'resume-cup', actions.resumeCup, 'button button-large')] : []),
-    ...(actions.cup && !checkpoint ? [button('ARCADE CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
+    ...(actions.cup ? [button('CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
     button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),
     ...(actions.updates ? [button('UPDATE AVAILABLE', 'open-updates', actions.updates, 'button home-update-button')] : []),
     button('OPTIONS', 'options', actions.options, 'button button-large'),

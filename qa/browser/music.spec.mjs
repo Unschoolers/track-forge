@@ -120,7 +120,8 @@ test('uses the final Cup circuit soundtrack when restoring standings', async ({ 
   await page.reload()
   await enterTrackForge(page)
 
-  await page.getByRole('button', { name: 'RESUME CUP', exact: true }).tap()
+  await page.getByRole('button', { name: 'CUP', exact: true }).tap()
+  await page.getByRole('dialog', { name: 'CUP' }).getByRole('button', { name: 'RESUME CUP', exact: true }).tap()
   await expect(page.getByRole('dialog', { name: 'CUP STANDINGS' })).toBeVisible()
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(raceTrack), paused: false })
 })

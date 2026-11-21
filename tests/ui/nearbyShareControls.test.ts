@@ -28,9 +28,10 @@ describe('Nearby sharing and rematch controls', () => {
     const nearby = new NearbyRace(transport, () => true)
     const scanTracks = vi.fn()
     const chooseTrack = vi.fn()
+    const configureCup = vi.fn()
     try {
       const modal = createNearbyRaceModal(nearby, 'blue', {
-        close: vi.fn(), chooseTrack, scan: vi.fn(), scanTracks,
+        close: vi.fn(), chooseTrack, configureCup, scan: vi.fn(), scanTracks,
         saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
         downloadDiagnostics: vi.fn(async () => true),
       })
@@ -39,6 +40,8 @@ describe('Nearby sharing and rematch controls', () => {
       expect(host?.classList.contains('button-primary')).toBe(true)
       host?.click()
       expect(chooseTrack).toHaveBeenCalledOnce()
+      modal.querySelector<HTMLButtonElement>('[data-action="nearby-host-cup"]')?.click()
+      expect(configureCup).toHaveBeenCalledOnce()
       expect(modal.querySelector('[data-action="nearby-scan"]')).not.toBeNull()
       modal.querySelector<HTMLButtonElement>('[data-action="nearby-receive-track"]')?.click()
       expect(scanTracks).toHaveBeenCalledOnce()
