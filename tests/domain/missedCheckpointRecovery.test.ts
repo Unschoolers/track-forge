@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { asTrackId } from '@/domain/model'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { createRace } from '@/domain/race/raceFactory'
 import { resetMissedCheckpoint } from '@/domain/race/raceRecovery'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
-import { createStarterTrack } from '@/domain/track/starterTrack'
 
 const street = (x: number, y: number) => ({ x, y, surface: 'street' as const })
 
