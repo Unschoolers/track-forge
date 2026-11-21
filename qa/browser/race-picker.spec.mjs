@@ -26,7 +26,8 @@ test('previews every track and shares a saved track without selecting it', async
   expect(await picker.locator('.track-card').count()).toBe(await picker.locator('.track-preview').count())
   await expect(picker.getByRole('button', { name: 'Share Starter Circuit', exact: true })).toHaveCount(0)
   const share = picker.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true })
-  await expect(share).toHaveText('')
+  await expect(share).toHaveText('SHARE')
+  await expect(share.locator('svg path')).toHaveCount(1)
   await share.tap()
   await expect.poll(() => page.evaluate(() => window.sharedTrack)).toMatchObject({
     file: 'QA-Shared-Circuit.trackforge.json',
