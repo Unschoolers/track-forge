@@ -53,6 +53,11 @@ export class NearbyRace {
   private role: 'host' | 'guest' | null = null
   private purpose: Purpose = 'race'
   private round = 0
+  private cupTracks: readonly Track[] = []
+  private cupIndex = 0
+  private cupTotal = 0
+  private scoredCupIndex = -1
+  private readonly cupPoints = new Map<number, number>()
   private incomingShare: Track | null = null
   private readonly sharedPeers = new Set<string>()
   private readonly shareReady = new Set<string>()
@@ -105,6 +110,10 @@ export class NearbyRace {
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
         this.guests.size > 0 && this.pendingPairs.size === 0,
       canRematch: this.canRematch(),
+      cup: this.cupTotal > 0 ? {
+        index: this.cupIndex, total: this.cupTotal, standings: this.cupStandings(),
+        nextTrack: this.cupTracks[this.cupIndex + 1]?.name ?? null,
+      } : null,
     }
   }
 
@@ -137,7 +146,26 @@ export class NearbyRace {
   }
 
   host(course: Course): void {
+    this.cupTracks = []
+    this.cupTotal = 0
+    this.cupIndex = 0
+    this.cupPoints.clear()
+    this.scoredCupIndex = -1
     this.openHost(course, 'race')
+  }
+
+  /** All selected tracks run in order in the same room; no saved multiplayer presets. */
+  hostCup(tracks: readonly Track[], car: CarId, laps: number): void {
+    if (this.phase !== 'idle' || tracks.length < 1 || tracks.length > 12 ||
+        !tracks.every(track => this.validateTrack(track))) return
+    this.cupTracks = [...tracks]
+    this.cupTotal = tracks.length
+    this.cupIndex = 0
+    this.scoredCupIndex = -1
+    this.cupPoints.clear()
+    const first = tracks[0]!
+    this.openHost({ track: first, car, lighting: first.lighting,
+      laps: first.routeKind === 'point-to-point' ? 1 : laps }, 'race')
   }
 
   hostShare(track: Track): void {
@@ -160,6 +188,11 @@ export class NearbyRace {
     if (this.phase !== 'idle') return
     this.purpose = purpose
     this.role = 'guest'
+    this.cupTracks = []
+    this.cupTotal = 0
+    this.cupIndex = 0
+    this.scoredCupIndex = -1
+    this.cupPoints.clear()
     this.localCar = car
     const active = this.begin('scanning')
     this.perform('scan', () => this.transport.scan(), active)
@@ -177,7 +210,7 @@ export class NearbyRace {
 
   /** The host can select the next circuit without releasing any peer connection. */
   selectNextTrack(track: Track): boolean {
-    if (!this.canRematch() || !this.course || !this.validateTrack(track)) return false
+    if (!this.canRematch() || this.cupTotal > 0 || !this.course || !this.validateTrack(track)) return false
     this.course = {
       ...this.course, track, lighting: track.lighting,
       laps: track.routeKind === 'point-to-point' ? 1 : this.course.laps,
@@ -189,7 +222,8 @@ export class NearbyRace {
   private canRematch(): boolean {
     return this.role === 'host' && this.purpose === 'race' && this.phase === 'racing' &&
       this.guests.size > 0 && this.pendingPairs.size === 0 && this.racers.size > 0 &&
-      [...this.racers.values()].every(racer => racer.time !== undefined || racer.left)
+      [...this.racers.values()].every(racer => racer.time !== undefined || racer.left) &&
+      (this.cupTotal === 0 || this.cupIndex < this.cupTotal - 1)
   }
 
   /** All cars are done; keep the room open and stage another round. */
@@ -197,6 +231,13 @@ export class NearbyRace {
     const first = this.snapshot().canStart
     const rematch = this.canRematch()
     if ((!first && !rematch) || !this.course) return
+    if (rematch && this.cupTotal > 0) {
+      const next = this.cupTracks[this.cupIndex + 1]
+      if (!next) return
+      this.cupIndex++
+      this.course = { ...this.course, track: next, lighting: next.lighting,
+        laps: next.routeKind === 'point-to-point' ? 1 : this.course.laps }
+    }
     const course = this.course
     const active = this.generation
     if (rematch) {
@@ -232,7 +273,8 @@ export class NearbyRace {
     if (active !== this.generation) return
     const guests = [...this.guests]
     await Promise.all(guests.map(([id, slot]) =>
-      this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round: this.round }))))
+      this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round: this.round,
+        ...(this.cupTotal ? { cupIndex: this.cupIndex, cupTotal: this.cupTotal } : {}) }))))
     for (const chunk of chunks) {
       if (active !== this.generation) return
       await this.transport.send(guests.map(([id]) => id), chunk)
@@ -308,6 +350,23 @@ export class NearbyRace {
     if (this.phase !== 'racing') return
     this.recordFinish(this.slot, time)
     this.sendControl(this.endpoints(), { type: 'finish', slot: this.slot, time, round: this.round })
+  }
+
+  cupStandings(): { slot: number; points: number }[] {
+    return [...this.racers.keys()].map(slot => ({ slot, points: this.cupPoints.get(slot) ?? 0 }))
+      .sort((a, b) => b.points - a.points || a.slot - b.slot)
+  }
+
+  private scoreCupRound(): void {
+    if (!this.cupTotal || this.scoredCupIndex === this.cupIndex || !this.racers.size ||
+        [...this.racers.values()].some(racer => racer.time === undefined && !racer.left)) return
+    const points = [10, 6, 4, 2]
+    for (const [index, racer] of this.standings().entries()) {
+      if (typeof racer.time === 'number') {
+        this.cupPoints.set(racer.slot, (this.cupPoints.get(racer.slot) ?? 0) + (points[index] ?? 0))
+      }
+    }
+    this.scoredCupIndex = this.cupIndex
   }
 
   standings() {
@@ -450,6 +509,8 @@ export class NearbyRace {
         this.clearRound()
         this.round = incomingRound
       }
+      this.cupIndex = message.cupIndex ?? 0
+      this.cupTotal = message.cupTotal ?? 0
       this.slot = message.slot
       this.prepared = { laps: message.laps, lighting: message.lighting }
       this.receiver = new TrackReceiver()
@@ -550,6 +611,7 @@ export class NearbyRace {
     const racer = this.racers.get(slot)
     if (!racer || racer.time !== undefined || racer.left) return false
     racer.time = time
+    this.scoreCupRound()
     this.changed()
     return true
   }
@@ -585,7 +647,7 @@ export class NearbyRace {
 
   private markLeft(slot: number): void {
     const racer = this.racers.get(slot)
-    if (racer) { racer.left = true; this.changed() }
+    if (racer) { racer.left = true; this.scoreCupRound(); this.changed() }
   }
 
   private endpoints(exclude?: string): string[] {
@@ -663,6 +725,11 @@ export class NearbyRace {
     this.shareStatus = null
     this.sharePacked = null
     this.round = 0
+    this.cupTracks = []
+    this.cupTotal = 0
+    this.cupIndex = 0
+    this.cupPoints.clear()
+    this.scoredCupIndex = -1
     this.purpose = 'race'
     this.room = null
     this.hostId = null
