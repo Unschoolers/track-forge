@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
+import { randomPlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import {
   BrowserPreferencesRepository,
@@ -57,6 +58,12 @@ it('remembers multiplayer topper icon and color without reprompting and validate
   expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'pink' })
   expect(repository.save({ ...repository.load(), car: 'yellow' })).toBe(true)
   expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'pink' })
+})
+
+it('selects icon and color independently from a randomized first-launch seed', () => {
+  const picks = [0.4, 0.8]
+  const selection = randomPlayerIdentity(() => picks.shift() ?? 0)
+  expect(selection).toEqual({ icon: 'bolt', color: 'violet' })
 })
 
 it('randomizes the first topper once, retaining the saved choice on later launches', () => {
