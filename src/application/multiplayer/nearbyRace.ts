@@ -4,8 +4,9 @@ import { CAR_IDS, type CarId, type LightingMode, type Track } from '@/domain/mod
 import type { RaceVehicle } from '@/domain/race/raceState'
 import { decodePose, decodePoseBatch, encodePose, encodePoseBatch, Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, RemoteGhost } from './raceWire'
 import { packTrack, TrackReceiver } from './trackTransfer'
-import { DEFAULT_PLAYER_IDENTITY, isPlayerIdentity, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
+import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
+import { decodeControl, encodeControl, validLineupPositions, MAX_PLAYERS, type Control } from './controlProtocol'
 
 export type NearbyEvent =
   | { type: 'found'; id: string; name: string }
@@ -41,76 +42,11 @@ export interface NearbyStart extends Course {
 }
 
 type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'staging' | 'racing'
-type Control =
-  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode }
-  | { type: 'ready'; car: CarId; identity: PlayerIdentity }
-  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[] }
-  | { type: 'armed' }
-  | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number }
-  | { type: 'finish'; slot: number; time: number | null }
-  | { type: 'left'; slot: number }
-
 interface Racer {
   ghost: RemoteGhost
   identity: PlayerIdentity
   time?: number | null
   left?: boolean
-}
-
-const MAX_PLAYERS = 4
-const encoder = new TextEncoder()
-const decoder = new TextDecoder()
-
-function controlBytes(message: Control): Uint8Array {
-  const json = encoder.encode(JSON.stringify(message))
-  const packet = new Uint8Array(json.length + 1)
-  packet.set(json, 1)
-  return packet
-}
-
-function validLineupPositions(cars: (CarId | null)[], positions: (number | null)[]): boolean {
-  if (!Array.isArray(positions) || positions.length !== MAX_PLAYERS) return false
-  const active = cars.filter((car) => car !== null).length
-  const occupied = positions.filter((slot): slot is number => slot !== null)
-  return occupied.length === active && new Set(occupied).size === active &&
-    positions.every((position, playerSlot) => cars[playerSlot] === null
-      ? position === null : position !== null && Number.isInteger(position) && position >= 0 && position < active)
-}
-
-function readControl(bytes: Uint8Array): Control | null {
-  if (bytes.length > 512) return null
-  try {
-    const value = JSON.parse(decoder.decode(bytes.subarray(1))) as Control | null
-    if (!value) return null
-    switch (value.type) {
-      case 'prepare':
-        return Number.isInteger(value.slot) && value.slot > 0 && value.slot < MAX_PLAYERS &&
-          Number.isInteger(value.laps) && value.laps >= 1 && value.laps <= 5 &&
-          (value.lighting === 'day' || value.lighting === 'night') ? value : null
-      case 'ready':
-        return CAR_IDS.includes(value.car) && isPlayerIdentity(value.identity) ? value : null
-      case 'lineup':
-        return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
-          value.cars.every((car) => car === null || CAR_IDS.includes(car)) &&
-          Array.isArray(value.identities) && value.identities.length === MAX_PLAYERS &&
-          value.identities.every((identity, index) => value.cars[index] === null
-            ? identity === null : isPlayerIdentity(identity)) &&
-          validLineupPositions(value.cars, value.positions) ? value : null
-      case 'armed':
-        return value
-      case 'start':
-        return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
-          value.cars.every((car) => car === null || CAR_IDS.includes(car)) &&
-          Number.isFinite(value.delay) && value.delay >= 0 && value.delay <= 5000 &&
-          Number.isFinite(value.readyAge) && value.readyAge >= 0 && value.readyAge <= 30_000 ? value : null
-      case 'finish':
-        return Number.isInteger(value.slot) && value.slot >= 0 && value.slot < MAX_PLAYERS &&
-          (value.time === null || (Number.isFinite(value.time) && value.time > 0 && value.time < 86_400)) ? value : null
-      case 'left':
-        return Number.isInteger(value.slot) && value.slot > 0 && value.slot < MAX_PLAYERS ? value : null
-      default: return null
-    }
-  } catch { return null }
 }
 
 export class NearbyRace {
@@ -247,7 +183,7 @@ export class NearbyRace {
     if (active !== this.generation) return
     const guests = [...this.guests]
     await Promise.all(guests.map(([id, slot]) =>
-      this.transport.send([id], controlBytes({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting }))))
+      this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting }))))
     for (const chunk of chunks) {
       if (active !== this.generation) return
       await this.transport.send(guests.map(([id]) => id), chunk)
@@ -450,7 +386,7 @@ export class NearbyRace {
       return
     }
     if (bytes[0] !== Packet.Control) return
-    const message = readControl(bytes)
+    const message = decodeControl(bytes)
     if (!message) return
     if (fromHost && this.phase === 'waiting' && message.type === 'prepare') {
       this.slot = message.slot
@@ -593,7 +529,7 @@ export class NearbyRace {
     if (!ids.length) return
     const active = this.generation
     this.record('control', { kind: message.type, result: 'started', recipients: ids.length })
-    void this.transport.send(ids, controlBytes(message)).then(() => {
+    void this.transport.send(ids, encodeControl(message)).then(() => {
       if (active === this.generation) this.record('control', { kind: message.type, result: 'succeeded', recipients: ids.length })
     }).catch((error: unknown) => {
       this.record('control', { kind: message.type, result: 'failed', error: this.errorKind(error) })
