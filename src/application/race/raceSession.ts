@@ -145,6 +145,8 @@ export interface RaceSessionDependencies {
   readonly random: RandomSource
   readonly feedback: FeedbackPort
   readonly now?: () => number
+  /** Shared monotonic clock for Nearby countdown times (independent of wall clock). */
+  readonly monotonicNow?: () => number
   readonly step?: RaceStep
   readonly geometry?: TrackGeometryService
   readonly ghostStore?: GhostStore
@@ -176,6 +178,7 @@ function oneRunForOpenRoute(track: Track, setup: RaceSetup): RaceSetup {
 export class RaceSession implements RaceSessionPort {
   private readonly events = new EventBus<RaceSessionSnapshot>()
   private readonly now: () => number
+  private readonly monotonicNow: () => number
   private readonly step: RaceStep
   private current = EMPTY_RACE
   private remainder = 0
@@ -189,6 +192,7 @@ export class RaceSession implements RaceSessionPort {
 
   constructor(private readonly dependencies: RaceSessionDependencies) {
     this.now = dependencies.now ?? (() => Date.now())
+    this.monotonicNow = dependencies.monotonicNow ?? (() => performance.now())
     this.step = dependencies.step ?? stepRace
     this.geometry = dependencies.geometry ?? new TrackGeometryService()
   }
@@ -222,7 +226,7 @@ export class RaceSession implements RaceSessionPort {
       recoveryScenery: track,
     })
     const state = nearby || resolved.mode === 'ghost' || resolved.mode === 'time-trial'
-      ? { ...created, countdown: this.startsAt === undefined ? created.countdown : Math.max(0, (this.startsAt - performance.now()) / 1000),
+      ? { ...created, countdown: this.startsAt === undefined ? created.countdown : Math.max(0, (this.startsAt - this.monotonicNow()) / 1000),
           vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
       : created
     const player = state.vehicles.find((vehicle) => vehicle.player)
@@ -240,7 +244,7 @@ export class RaceSession implements RaceSessionPort {
         this.current.state?.phase !== 'countdown' || this.startsAt !== undefined) return
     this.startsAt = startsAt
     const { track, setup, state } = this.current
-    const countdown = Math.max(0, (startsAt - performance.now()) / 1000)
+    const countdown = Math.max(0, (startsAt - this.monotonicNow()) / 1000)
     this.publish(this.buildSnapshot(track, setup, { ...state, countdown }, null))
     this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(countdown) })
   }
@@ -331,7 +335,7 @@ export class RaceSession implements RaceSessionPort {
       const previousCue = countdownCue(state.countdown)
       const remaining = this.startsAt === undefined
         ? state.countdown - deltaSeconds
-        : (this.startsAt - performance.now()) / 1000
+        : (this.startsAt - this.monotonicNow()) / 1000
       const countdown = Math.max(0, remaining)
       const cue = countdownCue(countdown)
       if (cue !== previousCue) {
