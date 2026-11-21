@@ -45,5 +45,10 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
     const race = (await qa()).race
     return race?.phase === 'running' && Math.abs(race.player.y) < 1
   }, { timeout: 15_000 }).toBe(true)
-  await expect(page.getByRole('heading', { name: 'SPLITS', exact: true })).toBeVisible({ timeout: 15_000 })
+  const results = page.locator('[data-modal="results"]')
+  await expect(results.locator('[data-action="open-race-splits"]')).toBeVisible({ timeout: 15_000 })
+  await results.locator('[data-action="open-race-splits"]').click()
+  const details = page.locator('[data-modal="race-splits"]')
+  await expect(details.getByRole('heading', { name: 'RACE SPLITS' })).toBeVisible()
+  await expect(details.locator('.results-splits-detail-row').first()).toContainText('CHECKPOINT')
 })
