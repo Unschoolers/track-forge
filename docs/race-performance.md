@@ -76,7 +76,7 @@ names.
 TRACKFORGE_RACE_PERF_TRACKS=/path/to/exports npm run qa:mobile -- race-performance
 ```
 
-Open `race-performance.json` in the default smoke test attachments. The
+This is an **opt-in diagnostic**, excluded from routine CI browser shards. Set `TRACKFORGE_PERFORMANCE_QA=1` when explicitly invoking this test under CI (normal local invocation does not need it).\n\nOpen `race-performance.json` in the benchmark test attachments. The
 export-based scenarios use the first-run and warm-run procedure and attach
 `race-performance-first.json` and `race-performance-warm.json`. Add
 `--repeat-each=3` for three capture pairs per scenario. Use the physical device

@@ -19,10 +19,15 @@ const path = buildRoadPath([
   { x: 2400, y: 0, surface: 'street', curve: 'corner' },
 ], EMPTY_TERRAIN)
 
+// The authored track is immutable. Compile its ramps once; test the actual
+// forward/reverse driving behavior rather than paying for duplicate decoding.
+const figureEightPath = buildTrackGeometry(requireFixture(decodeTrack(
+  JSON.parse(readFileSync('tests/fixtures/figureEight.trackforge.json', 'utf8')), 1,
+))).path
+
 describe('driving onto a raised road', () => {
   it.each([false, true])('stays grounded from the Figure-eight ramp entrance onto the deck (reverse=%s)', (reversed) => {
-    const raw = JSON.parse(readFileSync('tests/fixtures/figureEight.trackforge.json', 'utf8'))
-    const { path } = buildTrackGeometry(requireFixture(decodeTrack(raw, 1)))
+    const path = figureEightPath
     const direction = reversed ? -1 : 1
     const entrance = path.points.findIndex((_, index) =>
       path.roadSurface.at(index).structureRunId !== null &&

@@ -59,3 +59,13 @@ simulation and race entry measurements on Android and Chromium.
 ## Deterministic Arcade sector checks
 
 `npm test -- tests/domain/arcadeSectorComparison.test.ts tests/domain/arcadeAssists.test.ts tests/domain/rampDriving.test.ts` exercises fixed-step player steering and manual braking on street and ice hairpins and straight ramps. Verify the player can approach a bend in both directions with full throttle and only applies the service brake in response to input. Compare entry and exit speed, sector time, off-road incidents, and recoveries. Test Blue and Red on a signed APK with both steering layouts on a physical phone.
+
+## Performance sampling is opt-in on CI
+
+`qa/browser/race-performance.spec.mjs` is a diagnostic benchmark rather than a
+stable pass/fail gameplay contract. Regular CI browser shards exclude it, while
+retaining the gameplay/scene/touch regressions and production startup smoke.
+The test remains available locally as `npm run qa:mobile -- race-performance`.
+To run it in a CI environment, set `TRACKFORGE_PERFORMANCE_QA=1` before the
+same command. Continue recording physical Android results through
+[race-performance.md](race-performance.md); CI host FPS is not an Android target.
