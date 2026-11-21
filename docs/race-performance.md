@@ -117,3 +117,7 @@ The baseline frame p95 ranged from 50.1 to 300 ms, showing substantial host
 and software-rendering variation. These numbers demonstrate the harness and
 an observed reduction in this environment; they do not establish Android GPU
 performance. Repeat the documented physical-device protocol for device targets.
+
+## Race prewarm failure diagnostics
+
+Optional presentation prewarming runs in short deferred slices before the race. If a texture or geometry prewarm fails, it now emits a bounded console error with the original exception and stops that prewarm job. The normal synchronous rendering path remains available; an exception is **not** evidence of a successful prewarm. Record the track, lighting, platform and console error when investigating first-frame stalls. Do not hide the error or reduce rendering quality to make the log disappear.
