@@ -55,7 +55,8 @@ export function advanceArcadeTimingGate(
   // a followed road index after its stripe. Use route progress as a second
   // signal, without letting a nearby crossing arm or the start grid count.
   const passedGate = path.closed
-    ? passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
+    ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
+      passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
     : passedPendingCheckpoint(path, vehicle)
   if (!crossedLine && !passedGate) {
     return { vehicle, missedCheckpoint }
