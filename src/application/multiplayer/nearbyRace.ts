@@ -420,7 +420,7 @@ export class NearbyRace {
       }
       return
     }
-    const incomingRound = message.round ?? 0
+    const incomingRound = 'round' in message ? message.round ?? 0 : 0
     if (fromHost && message.type === 'prepare' &&
         (this.phase === 'waiting' && incomingRound === this.round ||
          this.phase === 'racing' && incomingRound === this.round + 1)) {
