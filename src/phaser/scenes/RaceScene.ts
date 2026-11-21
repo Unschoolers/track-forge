@@ -64,6 +64,7 @@ export class RaceScene extends Phaser.Scene {
   private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
   private terrainVisibilityBounds: WorldBounds | undefined
   private lightVisibilityBounds: WorldBounds | undefined
+  private roadVisibilityBounds: WorldBounds | undefined
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
@@ -365,7 +366,16 @@ export class RaceScene extends Phaser.Scene {
         }
       }
     }
-    this.updateRoadRibbonVisibility?.(view)
+    // Road markings and ribbons are static. Rechecking all their bounds every
+    // animation frame is wasted CPU: a padded visibility window keeps incoming
+    // road geometry visible until the camera moves beyond its coverage.
+    if (this.updateRoadRibbonVisibility) {
+      const nextRoadWindow = terrainVisibilityWindow(viewport, this.roadVisibilityBounds)
+      if (nextRoadWindow) {
+        this.roadVisibilityBounds = nextRoadWindow
+        this.updateRoadRibbonVisibility(view)
+      }
+    }
     this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
   }
 
@@ -406,6 +416,7 @@ export class RaceScene extends Phaser.Scene {
     this.terrainChunks = []
     this.terrainVisibilityBounds = undefined
     this.lightVisibilityBounds = undefined
+    this.roadVisibilityBounds = undefined
     this.groundRenderer = undefined
     this.updateRoadRibbonVisibility = undefined
     this.raceCamera = undefined
