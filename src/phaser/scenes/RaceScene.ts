@@ -73,7 +73,7 @@ export class RaceScene extends Phaser.Scene {
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics?: Phaser.GameObjects.Graphics
-  private nightBeamRenderer?: NightBeamRenderer
+  private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
   private lamps: readonly LampPost[] = []
   private snapshot: AppSnapshot | undefined
