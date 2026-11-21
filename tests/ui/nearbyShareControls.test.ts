@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import type { RaceResult } from '@/application/race/raceSession'
 import { asTrackId } from '@/domain/model'
-import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 import { createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { nearbyTrack } from '../fixtures/nearbyRace'
 
@@ -71,7 +70,7 @@ describe('Nearby sharing and rematch controls', () => {
     expect(rows[2]).toContain('Player 3 · ')
     expect(rows[2]).toContain('LEFT')
     const rivalMarker = view.element.querySelectorAll<HTMLElement>('.scoreboard-row .topper-marker')[2]
-    expect(rivalMarker?.style.color).toBe('#' + TOPPER_COLORS.pink.toString(16))
+    expect(rivalMarker?.style.color).toBe('rgb(255, 103, 159)')
     expect(rivalMarker?.querySelector('svg[fill="currentColor"] path')).not.toBeNull()
     view.cleanup()
   })
