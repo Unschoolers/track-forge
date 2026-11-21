@@ -92,6 +92,7 @@ describe('Nearby Arcade', () => {
       const device = new NearbyRace(network.endpoint(name), (course) => course.points.length === track.points.length,
         () => time + clockOffset)
       device.setIdentity(identity)
+      device.setDisplayName(name === 'host' ? 'JulienQC' : `Racer ${name.slice(-1)}`)
       return { name, car, clockOffset, device }
     })
     const devices = setups.map(({ device }) => device)
@@ -128,6 +129,7 @@ describe('Nearby Arcade', () => {
         expect(start.startsAt).toBeUndefined()
         expect(device.standings()).toHaveLength(4)
         expect(device.standings().map(({ identity }) => identity)).toEqual(players.map(({ identity }) => identity))
+        expect(device.standings().map(({ name }) => name)).toEqual(['JulienQC', 'Racer 1', 'Racer 2', 'Racer 3'])
         expect(device.snapshot().phase).toBe('staging')
       }
 
