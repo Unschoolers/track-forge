@@ -38,9 +38,9 @@ export function updateStandings(list: HTMLElement, standings: readonly RaceStand
   list.replaceChildren(rows)
 }
 
-export function createHighScores(scores: readonly ScoreEntry[]): HTMLElement {
+export function createHighScores(scores: readonly ScoreEntry[], showHeading = true): HTMLElement {
   const section = element('section', 'results-scores')
-  section.append(element('h3', 'results-heading', 'TOP TIMES'))
+  if (showHeading) section.append(element('h3', 'results-heading', 'TOP TIMES'))
   const list = element('ol', 'scoreboard compact')
   for (const score of scores.slice(0, 5)) {
     const item = element('li', 'scoreboard-row')
