@@ -64,6 +64,7 @@ export interface RaceTelemetry {
   readonly latestSplit?: RaceSplit
   readonly missedCheckpoint?: number
   readonly phase: RacePhase
+  readonly waitingForStart?: boolean
   readonly countdown: number
   readonly elapsed: number
   readonly position: number
@@ -225,7 +226,9 @@ export class RaceSession implements RaceSessionPort {
     this.recording = !nearby && player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
     this.publish(this.buildSnapshot(track, resolved, state, null))
-    this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
+    if (!nearby || this.startsAt !== undefined) {
+      this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
+    }
   }
 
   /** Armed by the host only after all peers report their race scenes ready. */
@@ -492,6 +495,7 @@ export class RaceSession implements RaceSessionPort {
           ? { missedCheckpoint: player.nextSector } : {}),
         ...(latestSplit ? { latestSplit } : {}),
         phase: state.phase,
+        waitingForStart: setup?.mode === 'nearby' && state.phase === 'countdown' && this.startsAt === undefined,
         countdown: state.countdown,
         elapsed,
         position: player ? ranked.indexOf(player) + 1 : 1,
