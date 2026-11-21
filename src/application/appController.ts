@@ -270,6 +270,9 @@ export class AppController {
         break
       }
       case 'start-race':
+        // A Nearby lobby must never launch a solo race, even via stale UI commands.
+        if (this.state.overlay.type === 'nearby' ||
+            (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'nearby-host')) break
         this.startRace()
         break
       case 'open-nearby':
@@ -280,18 +283,6 @@ export class AppController {
           this.update({ ...this.state, overlay: { type: 'nearby', customize: !this.state.overlay.customize } })
         }
         break
-      case 'host-nearby': {
-        const { currentTrack: track, preferences, raceLighting } = this.state
-        const nearby = this.dependencies.nearby
-        if (!nearby || !track || !this.flushPendingEditorSave() ||
-            !validateTrack(track, this.dependencies.geometry.get(track).path.totalLength).ready) break
-        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
-        nearby.host({
-          track, car: preferences.car, lighting: raceLighting ?? track.lighting,
-          laps: track.routeKind === 'point-to-point' ? 1 : preferences.raceLaps ?? 2,
-        })
-        break
-      }
       case 'scan-nearby':
         if (this.state.overlay.type === 'nearby') {
           this.dependencies.nearby?.scan(this.state.preferences.car)
@@ -401,7 +392,9 @@ export class AppController {
         this.selectTrack(command.id)
         break
       case 'open-track-library': {
-        this.flushPendingEditorSave()
+        if (command.purpose === 'nearby-host' &&
+            (this.state.overlay.type !== 'nearby' || this.dependencies.nearby?.snapshot().phase !== 'idle')) break
+        if (!this.flushPendingEditorSave()) break
         const library = this.librarySnapshot()
         this.update({
           ...this.state,
@@ -681,6 +674,27 @@ export class AppController {
       }
       return
     }
+    if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'nearby-host') {
+      const nearby = this.dependencies.nearby
+      if (!nearby || nearby.snapshot().phase !== 'idle') {
+        this.update({ ...this.state, notice: 'Nearby hosting is unavailable. Try again.' })
+        return
+      }
+      this.editorSession.discardPendingSave()
+      this.update({
+        ...this.state,
+        currentTrack: track,
+        editor: createEditorState(track.points, track.trees, track.start, track.terrain, track),
+        raceLighting: track.lighting,
+        overlay: { type: 'nearby' },
+        notice: null,
+      })
+      nearby.host({
+        track, car: this.state.preferences.car, lighting: track.lighting,
+        laps: track.routeKind === 'point-to-point' ? 1 : this.state.preferences.raceLaps ?? 2,
+      })
+      return
+    }
     this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
@@ -794,6 +808,10 @@ export class AppController {
     }
     if (overlay.type === 'track-library' && overlay.purpose === 'nearby') {
       this.update({ ...this.state, overlay: { type: 'results' }, notice: null })
+      return
+    }
+    if (overlay.type === 'track-library' && overlay.purpose === 'nearby-host') {
+      this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
       return
     }
     if (overlay.type === 'race-setup') {

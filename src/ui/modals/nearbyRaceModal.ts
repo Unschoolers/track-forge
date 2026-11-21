@@ -32,8 +32,8 @@ export function createNearbyRaceModal(
       frame.body.append(
         createCarPicker(car, actions.selectCar),
         createTopperSelector(identity, customizing, actions.toggleCustomize, actions.selectIdentity),
-        button('HOST A RACE', 'nearby-choose-track', actions.chooseTrack, 'button'),
-        button('FIND A RACE', 'nearby-scan', actions.scan, 'button button-primary'),
+        button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
+        button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),
         button('RECEIVE TRACK', 'nearby-receive-track', actions.scanTracks, 'button'),
       )
       break
