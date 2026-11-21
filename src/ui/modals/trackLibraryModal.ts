@@ -32,10 +32,11 @@ export function createTrackLibraryModal(
   const race = state.overlay.purpose !== 'edit'
   const nearbySelection = state.overlay.purpose === 'nearby'
   const nearbyHosting = state.overlay.purpose === 'nearby-host'
+  const cupSelection = state.overlay.purpose === 'cup'
   const choosingNearby = nearbySelection || nearbyHosting
   const frame = createModalFrame(
-    nearbyHosting ? 'Choose a track to host' : nearbySelection ? 'Choose the next track' : race ? 'Choose a track' : 'Choose a track to edit',
-    nearbyHosting ? 'Select a race-ready circuit to open your nearby room.'
+    cupSelection ? 'Add Cup track' : nearbyHosting ? 'Choose a track to host' : nearbySelection ? 'Choose the next track' : race ? 'Choose a track' : 'Choose a track to edit',
+    cupSelection ? 'Choose a race-ready track to add to the end of your Cup.' : nearbyHosting ? 'Select a race-ready circuit to open your nearby room.'
       : nearbySelection ? 'Pick a track for everyone in the room.'
         : race ? 'Tap a track to choose your car.'
           : 'Select an existing named track or create a new one.',
@@ -67,7 +68,7 @@ export function createTrackLibraryModal(
     )
     if (race) {
       const select = button('', `select-race-${track.id}`, () => actions.selectForRace(track.id), 'track-card-select')
-      select.setAttribute('aria-label', `${nearbyHosting ? 'Host' : 'Race'} ${track.name}`)
+      select.setAttribute('aria-label', `${cupSelection ? 'Add' : nearbyHosting ? 'Host' : 'Race'} ${track.name}`)
       meta.id = `race-track-status-${list.childElementCount}`
       select.setAttribute('aria-describedby', meta.id)
       select.disabled = !validation.ready
@@ -99,7 +100,7 @@ export function createTrackLibraryModal(
     for (const { track } of OFFICIAL_CIRCUITS) {
       const card = element('article', 'track-card')
       const select = button('', `select-race-${track.id}`, () => actions.selectForRace(track.id), 'track-card-select')
-      select.setAttribute('aria-label', `${nearbyHosting ? 'Host' : 'Race'} ${track.name}`)
+      select.setAttribute('aria-label', `${cupSelection ? 'Add' : nearbyHosting ? 'Host' : 'Race'} ${track.name}`)
       const copy = element('span', 'track-card-copy')
       const medal = timeMedal(track, state.scoresByTrack[track.id] ?? [])
       const next = nextMedalTarget(track, medal)
