@@ -368,10 +368,25 @@ describe('race UI flow', () => {
     const { root, updateRace } = setup()
     const banner = requiredElement(root, '.race-event-banner')
     updateRace(raceSnapshot({ lap: 2, position: 1 }))
-    expect(banner.textContent).toBe('FINAL LAP!')
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe('FINAL LAP!')
     updateRace(raceSnapshot({ lap: 2, position: 2 }))
     updateRace(raceSnapshot({ lap: 2, position: 1 }))
-    expect(banner.textContent).toBe('FINAL LAP!')
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe('FINAL LAP!')
+  })
+
+  it('celebrates overtakes and warns about losing a place without announcing the starting grid', () => {
+    const { root, updateRace } = setup()
+    const banner = requiredElement(root, '.race-event-banner')
+    expect(banner.textContent).toBe('')
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.dataset.kind).toBe('lead')
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe('LEAD TAKEN!')
+    expect(banner.textContent).toContain('1 PLACE GAINED')
+    updateRace(raceSnapshot({ position: 3 }))
+    expect(banner.dataset.kind).toBe('loss')
+    expect(banner.textContent).toContain('2 PLACES LOST')
+    updateRace({ ...raceSnapshot({ position: 1 }), setup: { car: 'blue', difficulty: 'normal', laps: 3, mode: 'time-trial' } })
+    expect(banner.dataset.kind).toBe('loss')
   })
 
   it('exposes separate simulation pedals and releases each touch independently', () => {
@@ -694,6 +709,8 @@ describe('race UI flow', () => {
     expect(root.querySelector('[data-modal="results"]')?.textContent).toContain(
       'NEW RECORD',
     )
+    expect(root.querySelector('[data-result-celebration="victory"]')?.textContent).toContain('CHAMPION')
+    expect(root.querySelector('[data-result-celebration="victory"]')?.textContent).toContain('NEW RECORD')
     expect(root.querySelector('[data-results-standings]')?.textContent).toContain(
       '01:02.500',
     )

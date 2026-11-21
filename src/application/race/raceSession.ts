@@ -186,6 +186,7 @@ export class RaceSession implements RaceSessionPort {
   private readonly step: RaceStep
   private current = EMPTY_RACE
   private runId = 0
+  private lastPositionCueAt = Number.NEGATIVE_INFINITY
   private remainder = 0
   private startsAt: number | undefined
   private rivalFinishRemaining = 0
@@ -208,6 +209,7 @@ export class RaceSession implements RaceSessionPort {
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
     this.rivalFinishRemaining = 0
+    this.lastPositionCueAt = Number.NEGATIVE_INFINITY
     const routeKind = normalizeRouteKind(track.routeKind)
     setup = oneRunForOpenRoute(track, setup)
     this.startsAt = setup.mode === 'nearby' ? startsAt : undefined
@@ -441,7 +443,26 @@ export class RaceSession implements RaceSessionPort {
       })
       this.recording = null
     }
-    this.publish(this.buildSnapshot(this.current.track, this.current.setup, resultState, result))
+    const nextSnapshot = this.buildSnapshot(this.current.track, this.current.setup, resultState, result)
+    const previous = this.current.telemetry
+    const current = nextSnapshot.telemetry
+    if (
+      nextSnapshot.setup?.mode === 'normal' &&
+      previous.phase === 'running' &&
+      current.phase === 'running' &&
+      current.elapsed >= 0.7 &&
+      current.vehicleCount > 1 &&
+      previous.position !== current.position &&
+      current.elapsed - this.lastPositionCueAt >= 0.65
+    ) {
+      this.lastPositionCueAt = current.elapsed
+      this.dependencies.feedback.handle({
+        type: 'position-change',
+        direction: current.position < previous.position ? 'gain' : 'loss',
+        place: current.position,
+      })
+    }
+    this.publish(nextSnapshot)
   }
 
   private advanceFinishingRivals(state: RaceState, deltaSeconds: number): void {

@@ -158,25 +158,38 @@
 
 .race-event-banner {
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 4.1rem);
+  top: calc(env(safe-area-inset-top) + 3.95rem);
   left: 50%;
   translate: -50%;
   z-index: 5;
+  display: grid;
+  justify-items: center;
+  min-width: min(15rem, 72vw);
+  max-width: min(23rem, 78vw);
+  padding: .48rem 1.1rem .6rem;
+  border: 1px solid #ffcf72b0;
+  background: linear-gradient(120deg, #0a1829f5, #453322f2 60%, #0a1829f5);
+  box-shadow: 0 .4rem 1.2rem #000a, inset 0 0 1.3rem #ffca7633;
+  color: #fff4d6;
+  text-align: center;
   pointer-events: none;
-  color: #ffe18d;
-  font-size: clamp(.8rem, 3vw, 1.1rem);
-  font-weight: 1000;
-  letter-spacing: .09em;
-  text-shadow: 0 2px 8px #000d;
   opacity: 0;
-  transition: opacity 90ms ease;
+  transition: opacity 110ms ease;
 }
 .race-event-banner.visible { opacity: 1; }
+.race-event-banner[data-kind='loss'] { border-color: #ff7778c0; background: linear-gradient(120deg, #201924f5, #5c2632f2 60%, #201924f5); color: #ffdce0; }
+.race-event-banner[data-kind='lead'] { border-color: #fff5a4; box-shadow: 0 0 1.3rem #ffdb7870, 0 .4rem 1.2rem #000a; }
+.race-event-kicker { color: #ffd990; font-size: .59rem; font-weight: 900; letter-spacing: .22em; }
+.race-event-banner[data-kind='loss'] .race-event-kicker { color: #ff9ca7; }
+.race-event-title { display: block; font-size: clamp(1.2rem, 4vw, 1.8rem); font-weight: 1000; line-height: 1.13; letter-spacing: .045em; text-shadow: 0 2px 10px #000d; }
+.race-event-detail { color: #e3d8c4; font-size: .63rem; font-weight: 850; letter-spacing: .12em; }
+.race-event-banner.visible > * { animation: race-moment-entrance 340ms cubic-bezier(.12, .84, .25, 1.1) both; }
+@keyframes race-moment-entrance { from { opacity: 0; transform: translateY(.45rem) scale(.83); } to { opacity: 1; transform: none; } }
 
 /* Separate from race milestone announcements so a slide never hides a pass. */
 .race-slide-cue {
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 5.5rem);
+  top: calc(env(safe-area-inset-top) + 8.15rem);
   left: 50%;
   translate: -50%;
   z-index: 4;
@@ -228,3 +241,7 @@
 .checkpoint-reset { grid-column: 2; grid-row: 1 / 3; min-height: 44px; padding: .4rem .65rem; white-space: nowrap; background: #b92e40; color: white; touch-action: manipulation; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-height: 320px) { .checkpoint-warning { top: calc(env(safe-area-inset-top) + 3.3rem); padding: .2rem .4rem; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .race-event-banner, .race-event-banner.visible > * { animation: none; transition: none; }
+}

@@ -14,6 +14,7 @@ export interface ToneSink {
     duration: number,
     volume: number,
     type: OscillatorType,
+    delaySeconds?: number,
   ): void
   playLanding(strength: number): void
   setEngine(
@@ -184,6 +185,7 @@ export class BrowserToneSink implements ToneSink {
     duration: number,
     volume: number,
     type: OscillatorType,
+    delaySeconds = 0,
   ): void {
     const context = this.context
     const output = this.output
@@ -192,14 +194,12 @@ export class BrowserToneSink implements ToneSink {
     const gain = context.createGain()
     oscillator.frequency.value = frequency
     oscillator.type = type
-    gain.gain.setValueAtTime(volume, context.currentTime)
-    gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      context.currentTime + duration,
-    )
+    const startsAt = context.currentTime + Math.max(0, delaySeconds)
+    gain.gain.setValueAtTime(volume, startsAt)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + duration)
     oscillator.connect(gain).connect(output)
-    oscillator.start()
-    oscillator.stop(context.currentTime + duration)
+    oscillator.start(startsAt)
+    oscillator.stop(startsAt + duration)
   }
 
   playLanding(strength: number): void {
@@ -433,13 +433,23 @@ export class WebAudioAdapter implements FeedbackPort {
         Math.min(0.12, 0.035 + event.strength / 1600),
         'sawtooth',
       )
+    } else if (event.type === 'position-change') {
+      if (event.direction === 'gain') {
+        this.sink.play(660, 0.13, 0.035, 'triangle')
+        this.sink.play(event.place === 1 ? 1109 : 880, 0.24, 0.058, 'triangle', 0.11)
+      } else {
+        this.sink.play(440, 0.18, 0.035, 'triangle')
+        this.sink.play(330, 0.22, 0.03, 'triangle', 0.09)
+      }
     } else if (event.type === 'finish') {
-      this.sink.play(
-        event.newRecord ? 1040 : event.place === 1 ? 880 : 440,
-        0.3,
-        0.06,
-        'triangle',
-      )
+      if (event.place === 1) {
+        // Rising victory fanfare: short, layered notes scheduled on the audio clock.
+        this.sink.play(659, 0.22, 0.05, 'triangle')
+        this.sink.play(880, 0.28, 0.065, 'triangle', 0.14)
+        this.sink.play(event.newRecord ? 1319 : 1175, 0.43, 0.085, 'triangle', 0.32)
+      } else {
+        this.sink.play(event.newRecord ? 1040 : 440, 0.3, 0.06, 'triangle')
+      }
     } else if (event.type === 'ui') {
       this.sink.play(
         event.emphasis === 'danger'
