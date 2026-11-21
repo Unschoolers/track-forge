@@ -292,6 +292,97 @@ describe('Nearby Arcade', () => {
 
 })
 
+describe('Nearby track sharing and rematches', () => {
+  it('shares a track without starting a race and waits for explicit save confirmation', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('sender'), () => true)
+    // A draft circuit may be shared even when it is not yet race-ready.
+    const recipient = new NearbyRace(network.endpoint('friend'), () => false)
+    const racer = new NearbyRace(network.endpoint('racer'), () => true)
+    try {
+      host.hostShare(track)
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      recipient.scan('blue', 'share')
+      racer.scan('red')
+      await vi.waitFor(() => expect(recipient.snapshot().rooms).toEqual([['sender', host.snapshot().room]]), { interval: 5 })
+      expect(racer.snapshot().rooms).toEqual([])
+      recipient.connect('sender')
+      await vi.waitFor(() => expect(recipient.snapshot().phase).toBe('share-review'), { interval: 5 })
+      expect(recipient.pendingSharedTrack()?.points).toEqual(track.points)
+      expect(recipient.snapshot().incomingTrack).toBe(track.name)
+      expect(host.snapshot().sharedCount).toBe(0)
+      recipient.respondToShare(true)
+      await vi.waitFor(() => expect(host.snapshot().sharedCount).toBe(1), { interval: 5 })
+      expect(recipient.pendingSharedTrack()).toBeNull()
+      expect(recipient.snapshot().phase).toBe('waiting')
+      // Duplicate acknowledgements from a peer must not inflate confirmation counts.
+      await network.endpoint('friend').send(['sender'],
+        new Uint8Array([Packet.Control, ...new TextEncoder().encode(JSON.stringify({ type: 'share-result', status: 'saved' }))]))
+      await vi.waitFor(() => expect(host.snapshot().sharedCount).toBe(1), { interval: 5 })
+      host.close()
+      await vi.waitFor(() => expect(recipient.snapshot().phase).toBe('idle'), { interval: 5 })
+      expect(recipient.snapshot().error).toContain('host left')
+    } finally {
+      host.destroy()
+      recipient.destroy()
+      racer.destroy()
+    }
+  })
+
+  it('lets a host race again with a new circuit without reconnecting, rejecting stale round results', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const hostStarts: NearbyStart[] = []
+    const guestStarts: NearbyStart[] = []
+    host.onStart(start => hostStarts.push(start))
+    guest.onStart(start => guestStarts.push(start))
+    try {
+      host.host({ track, car: 'blue', laps: 2, lighting: 'day' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      host.finish(43)
+      expect(host.snapshot().canRematch).toBe(false)
+      guest.finish(41)
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+
+      const nextTrack = { ...track, name: 'Changed circuit', raceRevision: track.updatedAt + 1 }
+      expect(host.selectNextTrack(nextTrack)).toBe(true)
+      expect(host.snapshot().track).toBe('Changed circuit')
+      host.start()
+      await vi.waitFor(() => {
+        expect(hostStarts).toHaveLength(2)
+        expect(guestStarts).toHaveLength(2)
+      }, { interval: 5 })
+      expect(guestStarts[1]?.track.name).toBe('Changed circuit')
+      expect(host.snapshot().phase).toBe('staging')
+      expect(guest.snapshot().phase).toBe('staging')
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      await network.endpoint('guest').send(['host'],
+        new Uint8Array([Packet.Control, ...new TextEncoder().encode(JSON.stringify({ type: 'finish', slot: 1, time: 1, round: 0 }))]))
+      await vi.waitFor(() => expect(host.standings().find(racer => !racer.local)?.time).toBeUndefined(), { interval: 5 })
+      guest.finish(39)
+      host.finish(40)
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+      guest.close()
+      await vi.waitFor(() => expect(host.snapshot().players).toBe(1), { interval: 5 })
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+})
+
 describe('Nearby diagnostics', () => {
   it('keeps bounded, private context after a hosting failure and a native retrieval failure', async () => {
     let listener: ((event: NearbyEvent) => void) | undefined
