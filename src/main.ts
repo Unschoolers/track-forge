@@ -10,6 +10,8 @@ import { createApplication } from '@/app/createApplication'
 import { AppController, type Scheduler } from '@/application/appController'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
+import { migrateTrackCreatorCredits } from '@/application/library/trackCreatorMigration'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
 import { BrowserPreferencesRepository } from '@/infrastructure/storage/preferencesRepository'
 import { BrowserLastRaceRepository } from '@/infrastructure/storage/lastRaceRepository'
@@ -54,12 +56,13 @@ appRoot.replaceChildren(gameContainer, uiRoot)
 const storage = new BrowserStorage()
 const trackStore = new BrowserTrackRepository(storage)
 if (trackStore.list().length === 0) {
-  trackStore.save(
-    createStarterTrack(
-      asTrackId(`starter-${Date.now().toString(36)}`),
-      Date.now(),
-    ),
-  )
+  if (!trackStore.save({
+    ...createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), Date.now()),
+    creator: TRACK_FORGE_CREATOR,
+    origin: 'seeded',
+  })) {
+    console.error('Could not persist the built-in starter circuit.')
+  }
 }
 
 const scheduler: Scheduler = {
@@ -75,6 +78,8 @@ const nearbyTransport = createAndroidNearby()
 const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
   (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
+const creatorMigration = migrateTrackCreatorCredits(storage, trackStore, initialPreferences)
+if (!creatorMigration.ok) console.error('Track creator migration could not be persisted. It will be retried on the next launch.')
 const toneSink = new BrowserToneSink()
 const music = new BrowserMusicPlayer<'menu' | TrackEnvironmentId>({
   menu: menuMusic,

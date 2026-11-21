@@ -7,7 +7,7 @@ import {
   type TrackNameResult,
 } from '@/application/library/trackName'
 import type { Track, TrackId } from '@/domain/model'
-import type { TrackCreator } from '@/domain/track/trackCreator'
+import { isSeededTrack, type TrackCreator } from '@/domain/track/trackCreator'
 import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
@@ -81,15 +81,10 @@ export class TrackLibraryService {
       : { ok: false, message: 'Shared track could not be saved.' }
   }
 
-  /**
-   * Rename only tracks created by this installation. Uncredited pre-profile
-   * tracks are adopted on first selection; explicitly imported tracks aren't.
-   * No geometry or race revision is changed.
-   */
+  /** Update only tracks with this installation's stable creator ID. */
   recredit(creator: TrackCreator): { readonly ok: boolean; readonly count: number } {
     const updated = this.dependencies.trackStore.list()
-      .filter((track) => track.creator?.id === creator.id ||
-        (!track.creator && track.origin !== 'imported'))
+      .filter((track) => !isSeededTrack(track) && track.creator?.id === creator.id)
       .filter((track) => track.creator?.name !== creator.name || !track.creator)
       .map((track) => ({ ...track, creator }))
     if (updated.length === 0) return { ok: true, count: 0 }
@@ -100,6 +95,34 @@ export class TrackLibraryService {
       if (!this.dependencies.trackStore.save(track)) return { ok: false, count: 0 }
     }
     return { ok: true, count: updated.length }
+  }
+
+  /** Fork built-in geometry to a new personal, shareable track before editing. */
+  forkSeededForEdit(source: Track, creator?: TrackCreator): TrackMutationResult {
+    if (!isSeededTrack(source)) return { ok: false, message: 'Not a built-in track.' }
+    const now = this.dependencies.now()
+    const baseName = source.name.slice(0, 32)
+    let name = baseName
+    let number = 2
+    while (this.dependencies.trackStore.list().some((track) => track.name.toLowerCase() === name.toLowerCase())) {
+      const suffix = ` (${number++})`
+      name = baseName.slice(0, 32 - suffix.length) + suffix
+    }
+    const copy: Track = {
+      ...source,
+      id: this.dependencies.createId(),
+      name,
+      origin: 'local',
+      ...(creator ? { creator } : {}),
+      createdAt: now,
+      updatedAt: now,
+      raceRevision: now,
+    }
+    // Never let an unconfigured profile silently inherit the system creator ID.
+    const personal = { ...copy, creator: creator ?? undefined }
+    return this.dependencies.trackStore.save(personal)
+      ? { ok: true, track: personal }
+      : { ok: false, message: 'Could not copy the built-in track.' }
   }
 
   rename(id: TrackId, value: string): TrackMutationResult {

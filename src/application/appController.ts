@@ -38,7 +38,7 @@ import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { EditorSession, type Scheduler } from '@/application/editor/editorSession'
 import { reduceEditorUi } from '@/application/editor/editorUiReducer'
-import { normalizeDisplayName } from '@/domain/track/trackCreator'
+import { isSeededTrack, normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export type { Scheduler } from '@/application/editor/editorSession'
 
@@ -63,6 +63,7 @@ export class AppController {
   private readonly library: TrackLibraryService
   private state: AppSnapshot
   private preCupTrack: Track | null = null
+  private pendingCreatorId: string | undefined
   private readonly editorSession: EditorSession
   private beforeNearbyTrack: Track | null | undefined
   private readonly unsubscribeNearby: (() => void) | undefined
@@ -205,8 +206,8 @@ export class AppController {
         })
         break
       case 'open-editor':
-        if (this.state.currentTrack && OFFICIAL_CIRCUITS.some(({ track }) => track.id === this.state.currentTrack?.id)) {
-          const copy = this.library.importShared(this.state.currentTrack)
+        if (this.state.currentTrack && isSeededTrack(this.state.currentTrack)) {
+          const copy = this.library.forkSeededForEdit(this.state.currentTrack, this.creator())
           if (!copy.ok) { this.update({ ...this.state, notice: copy.message }); break }
           this.applyTrackMutation(copy, true)
           break
@@ -589,8 +590,13 @@ export class AppController {
 
   private selectTrackForEdit(id: TrackId): void {
     if (!this.flushPendingEditorSave()) return
-    const track = this.library.select(id)
-    if (!track) return
+    const source = this.library.select(id)
+    if (!source) return
+    if (isSeededTrack(source)) {
+      this.applyTrackMutation(this.library.forkSeededForEdit(source, this.creator()), true)
+      return
+    }
+    const track = source
     this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
@@ -785,8 +791,9 @@ export class AppController {
       return
     }
     if (!this.flushPendingEditorSave()) return
-    const id = this.state.preferences.creatorId ??
+    const id = this.state.preferences.creatorId ?? this.pendingCreatorId ??
       (this.dependencies.createCreatorId ?? (() => crypto.randomUUID()))()
+    this.pendingCreatorId = id
     const result = this.library.recredit({ id, name })
     if (!result.ok) {
       this.update({ ...this.state, notice: 'Could not update track credits. Try again.' })

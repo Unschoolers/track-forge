@@ -30,7 +30,7 @@ export function createPlayerNameModal(state: AppSnapshot, submit: (name: string)
   }
   form.addEventListener('submit', (event) => { event.preventDefault(); submitName() })
   form.append(label, input, error)
-  frame.body.append(form, element('p', 'modal-subtitle', 'Existing uncredited tracks on this device will be credited to you. Previously imported uncredited tracks cannot be identified automatically.'))
+  frame.body.append(form, element('p', 'modal-subtitle', 'Your saved tracks have been assigned to your player profile. Built-in tracks remain credited to Track Forge.'))
   frame.footer.append(button('LET\'S RACE', 'confirm-player-name', submitName, 'button button-primary'))
   return frame.overlay
 }

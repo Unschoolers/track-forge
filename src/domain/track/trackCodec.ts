@@ -176,7 +176,7 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
     id: asTrackId(item.id),
     name,
     ...(creator ? { creator } : {}),
-    ...(item.origin === 'imported' ? { origin: 'imported' as const } : {}),
+    ...(item.origin === 'imported' || item.origin === 'seeded' || item.origin === 'local' ? { origin: item.origin } : {}),
     version: 8,
     points: migratedPoints,
     routeKind: normalizeRouteKind(item.routeKind),

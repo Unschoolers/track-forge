@@ -73,7 +73,7 @@ export function createOptionsModal(
   const save = button('SAVE NAME', 'save-player-name', submitName, 'button button-primary')
   form.addEventListener('submit', (event) => { event.preventDefault(); submitName() })
   form.append(label, input, save, error)
-  profile.append(form, element('p', 'modal-subtitle', 'Renaming updates your own tracks, including older uncredited tracks on this device. Imported tracks with credits keep their creator.'))
+  profile.append(form, element('p', 'modal-subtitle', 'Renaming updates your tracks. Built-in tracks belong to Track Forge; future imports retain their original creator.'))
   frame.body.append(profile)
   capture('profile', profileStart)
   const raceStart = frame.body.children.length

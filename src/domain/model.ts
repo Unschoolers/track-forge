@@ -65,8 +65,8 @@ export interface Track {
   readonly name: string
   /** Creator credit is independent of the editable track name and racing identity. */
   readonly creator?: TrackCreator
-  /** Imported tracks without creator credit must not be claimed by local name migration. */
-  readonly origin?: 'imported'
+  /** Explicit provenance; old saved tracks may be unclassified until first startup migration. */
+  readonly origin?: 'imported' | 'seeded' | 'local'
   readonly version: 8
   readonly points: readonly TrackPoint[]
   readonly routeKind?: RouteKind
