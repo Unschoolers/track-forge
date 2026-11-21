@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { enterTrackForge } from '../enter-game.mjs'
+import { createShareableQaTrack, enterTrackForge } from '../enter-game.mjs'
 import { seedPersonalCircuit } from './fixtures/personal-circuit.mjs'
 
 async function openPicker(page) {
@@ -17,7 +17,11 @@ test('previews every track and shares a saved personal track without selecting i
       window.sharedTrack = { file: files[0].name, track: JSON.parse(await files[0].text()).track.name, text }
     } })
   })
-  const picker = await openPicker(page)
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  await createShareableQaTrack(page)
+  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: 'Choose a track' })
   const saved = picker.getByRole('button', { name: 'Race QA Circuit', exact: true })
   const official = picker.getByRole('button', { name: 'Race Meadow Loop', exact: true })
   await expect(picker.getByRole('button', { name: 'SELECT', exact: true })).toHaveCount(0)
