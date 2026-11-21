@@ -96,6 +96,20 @@ function setup(
 }
 
 describe('modal application flows', () => {
+  it('offers hosting track selection without solo start or unrelated sharing actions', () => {
+    const { root, port, update } = setup(state({ type: 'track-library', purpose: 'nearby-host' }))
+    expect(root.textContent).toContain('Choose a track to host')
+    expect(root.querySelector('[data-action="share-ready"]')).toBeNull()
+    expect(root.querySelector('[data-action="send-nearby-ready"]')).toBeNull()
+    expect(root.querySelector('[data-action="setup-start"]')).toBeNull()
+    expect(root.querySelector('[data-action="select-race-ready"]')?.getAttribute('aria-label')).toBe('Host Starter Circuit')
+    root.querySelector<HTMLButtonElement>('[data-action="select-race-ready"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-race', id: ready.id })
+    update(state({ type: 'race-setup' }))
+    expect(root.querySelector('[data-action="setup-start"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="host-nearby"]')).toBeNull()
+  })
+
   it('chooses the track environment and shows its scenery in the editor', () => {
     const initial: AppSnapshot = { ...state({ type: 'editor-menu' }), mode: 'editor' }
     const { root, port, update, host } = setup(initial)

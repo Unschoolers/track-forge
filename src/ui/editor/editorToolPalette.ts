@@ -11,6 +11,7 @@ const tools: readonly {
 }[] = [
   { id: 'draw', icon: 'draw', label: 'Draw road', shortLabel: 'Road' },
   { id: 'select', icon: 'select', label: 'Move points', shortLabel: 'Select' },
+  { id: 'insert', icon: 'insert', label: 'Add point on road', shortLabel: 'Add point' },
   { id: 'start', icon: 'start', label: 'Place start line', shortLabel: 'Start' },
   { id: 'checkpoint', icon: 'checkpoint', label: 'Place checkpoint', shortLabel: 'Checkpoint' },
   { id: 'paint', icon: 'paint', label: 'Paint surface', shortLabel: 'Surface' },

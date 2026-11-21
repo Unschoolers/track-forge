@@ -20,6 +20,7 @@ import {
   appendDrawPoint,
   nearestControlPoint,
   nearestSegmentIndex,
+  planPointInsertion,
   nearestTree,
   surfaceForIndex,
   type EditorSurface,
@@ -626,6 +627,15 @@ export class EditorInputController {
       case 'draw':
         this.drawRoadAt(world)
         break
+      case 'insert': {
+        if (phase !== 'down') break
+        const editor = this.dependencies.editor()
+        const segment = nearestSegmentIndex(editor.points, world, this.dependencies.camera.zoom)
+        if (segment < 0) break
+        const insertion = planPointInsertion(editor.points, segment, world)
+        if (insertion) this.dependencies.dispatch({ type: 'insert-point', ...insertion })
+        break
+      }
       case 'tree':
         if (this.dependencies.sceneryChoice) {
           if (phase === 'down') this.beginSceneryGesture(pointer, world)

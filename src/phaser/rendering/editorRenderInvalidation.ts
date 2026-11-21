@@ -78,6 +78,7 @@ export function editorSnapshotRenderChanges(
       previous.grid !== current.grid ||
       previous.night !== current.night,
     overlay:
+      cameraChanged ||
       geometryChanged ||
       previous.recoveryCheckpoints !== current.recoveryCheckpoints ||
       previous.selectedPoint !== current.selectedPoint ||

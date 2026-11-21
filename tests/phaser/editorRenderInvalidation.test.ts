@@ -68,7 +68,7 @@ describe('editor render invalidation', () => {
       world: false,
       appearance: false,
       grid: true,
-      overlay: false,
+      overlay: true,
       preview: false,
     })
     expect(editorPointerRenderChanges('terrain')).toEqual({

@@ -369,7 +369,7 @@ export class DomUiHost implements UiHost {
         return createNearbyRaceModal(nearby, state.preferences.car, {
           close,
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
-          chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
+          chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' }),
           scan: () => this.controller.dispatch({ type: 'scan-nearby' }),
           scanTracks: () => this.controller.dispatch({ type: 'scan-nearby-track' }),
           saveTrack: () => this.controller.dispatch({ type: 'save-nearby-track' }),
@@ -438,7 +438,7 @@ export class DomUiHost implements UiHost {
               id,
             }),
           share: (track) => { void this.shareTrackChallenge(track) },
-          ...(this.runtime.nearby && state.overlay.purpose !== 'nearby'
+          ...(this.runtime.nearby && (state.overlay.purpose === 'edit' || state.overlay.purpose === 'race')
             ? { sendNearby: (track: Track) => this.controller.dispatch({ type: 'send-nearby-track', track }) }
             : {}),
           importFile: (content) => this.controller.dispatch({ type: 'import-track', content }),
@@ -499,7 +499,6 @@ export class DomUiHost implements UiHost {
         }
         return createRaceSetupModal(state, {
           close,
-          hostNearby: this.runtime.nearby ? () => this.controller.dispatch({ type: 'host-nearby' }) : undefined,
           lighting: (lighting) => this.controller.dispatch({ type: 'set-race-lighting', lighting }),
           options: () => this.controller.dispatch({ type: 'open-options', returnTo: 'race-setup' }),
           preferences: (preferences) =>
