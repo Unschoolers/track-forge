@@ -124,16 +124,10 @@ describe('Nearby Arcade', () => {
         await vi.waitFor(() => expect(guest.snapshot().rooms).toEqual([['host', host.snapshot().room]]), { interval: 5 })
         guest.connect('host')
         await vi.waitFor(() => {
-          expect(guest.snapshot().pairing).toEqual([['host', '1234']])
-          expect(host.snapshot().pairing).toEqual([[id, '1234']])
-          expect(host.snapshot().canStart).toBe(false)
-        }, { interval: 5 })
-        host.respond(id, true)
-        guest.respond('host', true)
-        await vi.waitFor(() => {
           expect(guest.snapshot().phase).toBe('waiting')
           expect(host.snapshot().players).toBe(index + 2)
         }, { interval: 5 })
+        expect(guest.snapshot()).not.toHaveProperty('pairing')
       }
 
       host.start()
@@ -325,7 +319,7 @@ describe('Nearby diagnostics', () => {
     const race = new NearbyRace(transport, () => true)
     race.host({ track, laps: 1, lighting: 'day', car: 'blue' })
     await vi.waitFor(() => expect(race.snapshot().phase).toBe('hosting'))
-    for (let i = 0; i < 120; i++) emit({ type: 'pairing', id: 'private-id', code: '987654' })
+    for (let i = 0; i < 120; i++) emit({ type: 'pairing', id: 'private-id' })
     const report = await race.diagnostics()
     expect((report.timeline as unknown[]).length).toBeLessThanOrEqual(100)
     expect(report.native).toEqual({ status: 'available', report: { platform: 'test' } })
