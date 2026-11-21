@@ -139,6 +139,7 @@ export class NearbyRace {
   subscribe(listener: () => void) { return this.changes.subscribe(listener) }
   onStart(listener: (start: NearbyStart) => void) { return this.starts.subscribe(listener) }
   onCountdown(listener: (startsAt: number) => void) { return this.countdownStarts.subscribe(listener) }
+  localSlot(): number { return this.slot }
 
   /** Updated from the saved preference; sent only with reliable lobby setup. */
   setIdentity(identity: unknown): void {
