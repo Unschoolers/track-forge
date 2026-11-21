@@ -523,10 +523,10 @@ export class NearbyRace {
     }
     this.lineup = cars
     cars.forEach((car, slot) => {
+      const name = names?.[slot] ?? (slot === this.slot ? this.localDisplayName : undefined)
       if (car) this.racers.set(slot, {
         ghost: new RemoteGhost(car), identity: identities[slot] ?? DEFAULT_PLAYER_IDENTITY,
-        ...(names?.[slot] || (slot === this.slot && this.localDisplayName)
-          ? { name: names?.[slot] ?? this.localDisplayName } : {}),
+        ...(name ? { name } : {}),
       })
     })
     this.setPhase('staging')
