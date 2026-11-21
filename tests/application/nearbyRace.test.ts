@@ -40,8 +40,8 @@ class NearbyNetwork {
       connect: async (host) => {
         const pairing = this.key(id, host)
         this.pairs.set(pairing, new Set())
-        this.emit(id, { type: 'pairing', id: host, code: '1234' })
-        this.emit(host, { type: 'pairing', id, code: '1234' })
+        this.emit(id, { type: 'pairing', id: host })
+        this.emit(host, { type: 'pairing', id })
       },
       respond: async (remote, yes) => {
         const key = this.key(id, remote)
@@ -119,7 +119,7 @@ describe('Nearby Arcade', () => {
       host.host({ track, laps: 2, lighting: 'night', car: 'blue' })
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
 
-      for (const [index, { name: id, car, device: guest }] of setups.slice(1).entries()) {
+      for (const [index, { car, device: guest }] of setups.slice(1).entries()) {
         guest.scan(car)
         await vi.waitFor(() => expect(guest.snapshot().rooms).toEqual([['host', host.snapshot().room]]), { interval: 5 })
         guest.connect('host')
