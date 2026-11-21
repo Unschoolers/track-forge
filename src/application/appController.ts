@@ -2,7 +2,7 @@ import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { CUP_CIRCUITS, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
+import { CUP_CIRCUITS, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 import type {
   CupStore,
   LastRace,
@@ -588,7 +588,7 @@ export class AppController {
       laps: 1,
       handling: 'arcade',
       mode: 'normal',
-      gridPositions: randomGridPositions(4),
+      gridPositions: cupGridPositions(cup),
     })
     const { progress, notice } = this.persistCup(cup)
     this.update({ ...this.state, cup, cupProgress: progress, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice })
