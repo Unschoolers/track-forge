@@ -49,6 +49,8 @@ export function createNearbyRaceModal(
       } else {
         const start = button('START RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
         start.disabled = !canStart
+        if (!canStart) frame.body.append(element('p', 'modal-subtitle',
+          players > 1 ? 'Connecting players…' : 'Waiting for at least one nearby player to join.'))
         frame.footer.append(start)
       }
       break

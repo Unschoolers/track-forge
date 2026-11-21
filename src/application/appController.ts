@@ -394,7 +394,8 @@ export class AppController {
       case 'open-track-library': {
         if (command.purpose === 'nearby-host' &&
             (this.state.overlay.type !== 'nearby' || this.dependencies.nearby?.snapshot().phase !== 'idle')) break
-        if (!this.flushPendingEditorSave()) break
+        // Preserve existing picker behavior on save failure; only hosting requires a clean save.
+        if (!this.flushPendingEditorSave() && command.purpose === 'nearby-host') break
         const library = this.librarySnapshot()
         this.update({
           ...this.state,

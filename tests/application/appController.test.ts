@@ -107,7 +107,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
-  it('hosts only after selecting a race-ready track, never starts a solo race', () => {
+  it('hosts only after selecting a race-ready track, never starts a solo race', async () => {
     const advertise = vi.fn(async (_room: string) => undefined)
     const transport: NearbyTransport = {
       subscribe: () => () => undefined, host: advertise,
@@ -129,7 +129,8 @@ describe('AppController', () => {
       controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' })
       controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
       expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'nearby' } })
-      expect(advertise).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(advertise).toHaveBeenCalledOnce())
+      await vi.waitFor(() => expect(nearby.snapshot().phase).toBe('hosting'))
       expect(nearby.snapshot().track).toBe('Starter Circuit')
       expect(nearby.snapshot().canStart).toBe(false)
       nearby.start()
