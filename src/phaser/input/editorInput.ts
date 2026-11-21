@@ -341,6 +341,10 @@ export class EditorInputController {
       })
       this.dependencies.dispatch({ type: 'normalize-loop' })
     }
+    if (tool === 'select' && this.selectedPoint >= 0 && this.dependencies.editor().gestureChanged) {
+      // Clearing after a drag prevents the context panel from covering the next touch.
+      this.dependencies.onPointSelected?.(null)
+    }
     if (commitTerrain) {
       this.commitTerrainStroke()
     } else {
