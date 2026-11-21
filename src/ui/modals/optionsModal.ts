@@ -10,6 +10,7 @@ import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 import { DEFAULT_PLAYER_IDENTITY } from '@/application/multiplayer/playerIdentity'
 import { createTopperSelector } from '@/ui/components/playerTopperPicker'
+import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
 type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
 const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<{ state: 'permission-required' | 'installer-opened' }> }>('TrackForgeUpdates')
@@ -60,9 +61,18 @@ export function createOptionsModal(
   input.autocomplete = 'nickname'
   input.maxLength = 24
   input.value = state.preferences.displayName ?? ''
-  const save = button('SAVE NAME', 'save-player-name', () => actions.playerName(input.value), 'button button-primary')
-  form.addEventListener('submit', (event) => { event.preventDefault(); actions.playerName(input.value) })
-  form.append(label, input, save)
+  const error = element('div', 'name-error', '')
+  error.setAttribute('role', 'alert')
+  const submitName = () => {
+    if (!normalizeDisplayName(input.value)) {
+      error.textContent = 'Use 2–24 letters, numbers or simple punctuation.'
+      return
+    }
+    actions.playerName(input.value)
+  }
+  const save = button('SAVE NAME', 'save-player-name', submitName, 'button button-primary')
+  form.addEventListener('submit', (event) => { event.preventDefault(); submitName() })
+  form.append(label, input, save, error)
   profile.append(form, element('p', 'modal-subtitle', 'Renaming updates your own tracks, including older uncredited tracks on this device. Imported tracks with credits keep their creator.'))
   frame.body.append(profile)
   capture('profile', profileStart)

@@ -171,10 +171,11 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
           : 'overpass',
     }),
   )
+  const creator = normalizeTrackCreator(item.creator)
   return {
     id: asTrackId(item.id),
     name,
-    ...(normalizeTrackCreator(item.creator) ? { creator: normalizeTrackCreator(item.creator) } : {}),
+    ...(creator ? { creator } : {}),
     ...(item.origin === 'imported' ? { origin: 'imported' as const } : {}),
     version: 8,
     points: migratedPoints,
