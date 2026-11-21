@@ -9,9 +9,9 @@ type Racer = ReturnType<NearbyRace['standings']>[number]
 
 function setup(outcome: RaceResult['outcome'] = 'finished') {
   const local: Racer = { slot: 0, car: 'blue', identity: DEFAULT_PLAYER_IDENTITY,
-    local: true, time: outcome === 'finished' ? 42 : null, left: false }
+    name: undefined, local: true, time: outcome === 'finished' ? 42 : null, left: false }
   const rival: Racer = { slot: 1, car: 'red', identity: DEFAULT_PLAYER_IDENTITY,
-    local: false, time: undefined, left: false }
+    name: undefined, local: false, time: undefined, left: false }
   let changed: () => void = () => undefined
   const nearby = {
     snapshot: () => ({ role: 'host', track: 'Test Rally', phase: 'racing',
