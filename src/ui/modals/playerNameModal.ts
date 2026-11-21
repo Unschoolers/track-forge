@@ -17,7 +17,7 @@ export function createPlayerNameModal(state: AppSnapshot, submit: (name: string)
   input.id = 'player-name-input'
   input.name = 'player-name'
   input.maxLength = 24
-  input.autocomplete = 'nickname'
+  input.autocomplete = 'off'
   input.placeholder = 'Example: JulienQC'
   const error = element('div', 'name-error', state.notice ?? '')
   error.setAttribute('role', 'alert')
