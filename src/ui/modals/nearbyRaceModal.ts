@@ -144,7 +144,7 @@ export function createNearbyRaceResults(
           : snapshot.canRematch ? 'Everyone finished. Ready for the next race.'
           : 'Waiting for the other racers to finish…')
     } else {
-      status.textContent = snapshot.error ?? (snapshot.cup?.index === snapshot.cup?.total - 1
+      status.textContent = snapshot.error ?? (snapshot.cup && snapshot.cup.index === snapshot.cup.total - 1
         ? 'Cup complete!' : 'Waiting for the host to choose the next race…')
     }
     list.replaceChildren(...nearby.standings().map(({ slot, car, identity, local, time, left }, index) => {
