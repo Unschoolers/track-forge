@@ -36,7 +36,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 **Editor:** pointer input (`phaser/input/editorInput.ts`) → controller/editor session → `domain/editor/editorState.ts` command/history → geometry through `TrackGeometryService` → invalidation-aware render. Command rejection must remain visible; undo/redo must restore geometry and terrain correctly. Camera view should not jump after unrelated editor changes.
 
-**Race:** controller prepares setup → `application/race/raceSession.ts` → `domain/race/raceEngine.ts` fixed-step simulation (`RACE_TICK_SECONDS = 1/60`) → typed events/telemetry → Phaser renders state and UI shows race outcomes. AI, player and recovery must share consistent geometry and surface authority. Avoid changing simulation step size just to accelerate tests; drive more ticks without changing the simulated contract.
+**Race:** controller obtains mode/lap/lighting/grid policy from `application/race/raceSetup.ts` → `application/race/raceSession.ts` → `domain/race/raceEngine.ts` fixed-step simulation (`RACE_TICK_SECONDS = 1/60`) → typed events/telemetry → Phaser renders state and UI shows race outcomes. AI, player and recovery must share consistent geometry and surface authority. Avoid changing simulation step size just to accelerate tests; drive more ticks without changing the simulated contract.
 
 **Track import/save:** untrusted JSON → `domain/track/trackCodec.ts` normalization → validation → `infrastructure/storage/*Repository.ts` → application. The codec handles legacy track representations; do not bypass it with direct casts of incoming JSON. Exports must remain importable.
 

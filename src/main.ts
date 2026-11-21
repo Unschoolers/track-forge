@@ -26,7 +26,7 @@ import '@/styles/race-menus.css'
 import '@/styles/editor-menus.css'
 import { RaceSession } from '@/application/race/raceSession'
 import { CUP_CIRCUITS } from '@/application/race/circuitCup'
-import { mathRandom } from '@/application/ports/random'
+import { mathRandom } from '@/infrastructure/random/mathRandom'
 import { inputForHandling, RaceInputController } from '@/phaser/input/raceInput'
 import { FeedbackRouter } from '@/application/feedback/feedbackRouter'
 import {

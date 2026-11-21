@@ -1,4 +1,4 @@
-import type { RandomSource } from '@/application/ports/random'
+import type { RandomSource } from '@/domain/race/randomSource'
 import type { Vector2 } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
