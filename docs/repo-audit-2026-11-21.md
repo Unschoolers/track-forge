@@ -51,3 +51,11 @@ The fourth scenario in `tests/domain/aiRaceIntegration.test.ts` was named *recov
 The actual off-road recovery contract remains in `tests/domain/aiRecoveryEvents.test.ts`: it explicitly teleports an AI rival to (4000,4000), steps real physics, asserts an `off-road` recovery event at the pre-reset position, and checks the recovered car returns near the track. Water and bridge recovery have their own independent edge cases.
 
 Baseline CI (`main` run 44876316014) reported `aiRaceIntegration.test.ts` **4 tests, 331 ms**. Follow-up PR #125 CI (same GitHub workflow class, run 44876916175) reported **3 tests, 21 ms**, with **112/112 test files passing**. The prior main-branch run 44876316014 reported **4 tests, 331 ms**. These are runner observations rather than a controlled same-host benchmark. This removal is based on redundant behavior, not a test-count target.
+
+## Implemented responsibility slices (2026-11-21)
+
+- **PR #131 / RaceEngine:** 708 → 490 lines; per-vehicle integration, arcade checkpoint gates and authored/fallback recovery now have distinct domain owners. Existing recovery exports remain compatible. Full test/build, deterministic AI lane QA and mobile QA passed.
+- **PR #132 / RaceSession:** 683 → 544 lines; score/result recording and sound/haptic feedback policies extracted while the session retains lifecycle and fixed-tick scheduling. Focused score-failure, nearby/water and feedback tests; full CI and mobile QA passed.
+- **PR #133 / NearbyRace:** 647 → 565 lines; adaptive pose transmission, relay and late-send cancellation extracted from the multiplayer lobby; unchanged 19-byte pose format. Targeted 30/60 Hz, spoof, stale-packet and reset tests; full CI and mobile QA passed.
+
+These fix the specifically observed *mixed responsibility* findings. **File size alone is not a residual defect**; orchestration is a legitimate reason for remaining lines. Further splitting needs a concrete independent change reason, an invariant to protect, and before/after evidence; do not invent abstractions just to shrink files.
