@@ -49,7 +49,14 @@ export function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): Ra
     : progress
   const candidate = { ...vehicle, pathIndex: target, recoveryAnchorIndex: target }
   const safe = safeFallbackRecoveryTarget(race, candidate)
-  return safe === undefined ? vehicle : resetVehicleToTrack(candidate, race.path, { pathIndex: safe, reversed: race.reversed })
+  // A badly authored course can have no dry road before the pending gate.
+  // Still complete the countdown: restore the pre-gate road centre and
+  // suppress water-reset loops until the driver reaches dry support.
+  return resetVehicleToTrack(
+    { ...candidate, waterRecoveryProtected: safe === undefined },
+    race.path,
+    { pathIndex: safe ?? target, reversed: race.reversed },
+  )
 }
 
 function resetAtAuthoredCheckpoint(vehicle: RaceVehicle, race: RecoveryCourse): RaceVehicle | undefined {

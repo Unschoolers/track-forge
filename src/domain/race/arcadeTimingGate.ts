@@ -4,6 +4,48 @@ import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 
 const MISSED_GATE_GRACE_SECONDS = 5
 
+/** A sustained position beyond a circuit gate also counts as a miss.
+ * The small direction-aware window avoids mistaking a crossing-road index
+ * jump or the starting grid just behind Start for skipped progress.
+ */
+function passedCircuitGateByProgress(
+  count: number,
+  startIndex: number,
+  reversed: boolean,
+  gate: RaceVehicle['nextSector'],
+  previousIndex: number,
+  currentIndex: number,
+): boolean {
+  const wrap = (value: number): number => ((value % count) + count) % count
+  const direction = reversed ? -1 : 1
+  const before = wrap(direction * (previousIndex - startIndex))
+  const after = wrap(direction * (currentIndex - startIndex))
+  const window = Math.max(2, Math.min(12, Math.floor(count / 16)))
+  const progress = wrap(after - before)
+  const startApproach = Math.max(window, Math.floor(count / 8))
+  if (progress > window) return false
+  const tolerance = Math.min(2, window / 2)
+  if (gate === 4) {
+    return before > count - window && after > tolerance && after < window
+  }
+  return after > count * gate / 4 + tolerance && after < count - startApproach
+}
+
+/** Open routes cannot advance to a road sample *after* Finish.
+ * Detect a car that has gone beyond the finish plane without crossing
+ * its painted stripe; the driver still has time to turn back and retry.
+ */
+function passedStageFinish(path: RaceState['path'], vehicle: RaceVehicle): boolean {
+  const last = path.points.length - 1
+  const a = path.points[last - 1]
+  const b = path.points[last]
+  if (!a || !b || vehicle.pathIndex < last - 12) return false
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  if (Math.hypot(dx, dy) < 0.001) return false
+  return (vehicle.x - b.x) * dx + (vehicle.y - b.y) * dy > 0
+}
+
 export function advanceArcadeTimingGate(
   race: RaceState,
   previous: RaceVehicle,
@@ -24,9 +66,14 @@ export function advanceArcadeTimingGate(
     return { vehicle, missedCheckpoint }
   }
   const crossedLine = crossesRoadGate(path, previous, vehicle, position, Infinity, reversed)
-  // On a stage the route runs in one direction, so rejoining well past
-  // the pending gate is also a miss even if the car went around its line.
-  if (!crossedLine && (path.closed || !onRoad || !passedPendingCheckpoint(path, vehicle))) {
+  // The line check alone misses cars that go around a gate and only regain
+  // a followed road index after its stripe. Use route progress as a second
+  // signal, without letting a nearby crossing arm or the start grid count.
+  const passedGate = path.closed
+    ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
+      passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
+    : gate === 4 ? passedStageFinish(path, vehicle) : passedPendingCheckpoint(path, vehicle)
+  if (!crossedLine && !passedGate) {
     return { vehicle, missedCheckpoint }
   }
   // Road classification at a diagonal gate can change on the crossing frame.
