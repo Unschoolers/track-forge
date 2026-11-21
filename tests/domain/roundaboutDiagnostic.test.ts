@@ -19,11 +19,14 @@ function expand(kind: 'hill' | 'water', spans: string): TerrainCell[] {
   })
 }
 
+// All seeds drive the exact same authored geometry. Compiling its thousands of
+// terrain cells once keeps the regression about driving, not fixture setup.
+const path = buildRoadPath(points.map(([x, y], i) => ({
+  x: x!, y: y!, surface: 'street' as const, curve: 'smooth' as const, tension: 0.5,
+  structure: 'surface' as const, id: 'point-' + i,
+})), { cellSize: 32, cells: [...expand('hill', hill), ...expand('water', water)] })
+
 it.each([1, 4331, 98765])('keeps Green on the Roundabout course through both laps (seed %i)', (seed) => {
-  const path = buildRoadPath(points.map(([x, y], i) => ({
-    x: x!, y: y!, surface: 'street' as const, curve: 'smooth' as const, tension: 0.5,
-    structure: 'surface' as const, id: 'point-' + i,
-  })), { cellSize: 32, cells: [...expand('hill', hill), ...expand('water', water)] })
   const run = runLaneCheck({
     path, trackName: 'Roundabout', seed, difficulty: 'hard',
     mode: 'traffic', car: 'red', handling: 'arcade',
