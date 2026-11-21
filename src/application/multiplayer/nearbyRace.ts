@@ -111,7 +111,8 @@ export class NearbyRace {
         this.guests.size > 0 && this.pendingPairs.size === 0,
       canRematch: this.canRematch(),
       cup: this.cupTotal > 0 ? {
-        index: this.cupIndex, total: this.cupTotal, standings: this.cupStandings(),
+        index: this.cupIndex, total: this.cupTotal, finished: this.scoredCupIndex === this.cupIndex,
+        standings: this.cupStandings(),
         nextTrack: this.cupTracks[this.cupIndex + 1]?.name ?? null,
       } : null,
     }
