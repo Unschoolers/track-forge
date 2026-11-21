@@ -44,7 +44,7 @@ export function createResultsModal(
   // The player's name and finish time are already visible in the standings.
   if (playerName && !hasStandings) frame.body.append(element('p', 'modal-subtitle', `DRIVER · ${playerName}`))
   const medal = result.ghostTime === undefined && !timeTrial ? medalForFinish(result.outcome, result.playerPlace) : null
-  if (medal) frame.body.append(createFinishCelebration(medal, result.newRecord))
+  if (medal) frame.body.append(createFinishCelebration(medal, result.newRecord, true))
   if (result.playerTime !== null && result.previousBestTime !== undefined) {
     const delta = result.playerTime - result.previousBestTime
     const copy = delta < 0
