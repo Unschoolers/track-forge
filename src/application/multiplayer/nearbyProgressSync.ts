@@ -1,0 +1,46 @@
+import { decodeProgress, encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
+
+/** A low-rate optional stream; old peers ignore these packets and still render poses. */
+export class NearbyProgressSync {
+  private readonly remote = new Map<number, { sequence: number; value: number; at: number }>()
+  private nextSequence = 0
+  private lastSentAt = Number.NEGATIVE_INFINITY
+
+  constructor(
+    private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
+    private readonly now: () => number,
+  ) {}
+
+  reset(): void {
+    this.remote.clear()
+    this.nextSequence = 0
+    this.lastSentAt = Number.NEGATIVE_INFINITY
+  }
+
+  update(slot: number, value: number, recipients: string[]): void {
+    const now = this.now()
+    if (!recipients.length || now - this.lastSentAt < PROGRESS_PERIOD_MS) return
+    const packet = encodeProgress(slot, this.nextSequence, value)
+    this.nextSequence = (this.nextSequence + 1) & 0xffff
+    this.lastSentAt = now
+    // Progress is optional; failed samples expire instead of interrupting the race.
+    void this.send(recipients, packet).catch(() => {
+      // The next sample retries. No standing is shown while telemetry is stale.
+    })
+  }
+
+  receive(packet: ProgressPacket): boolean {
+    const previous = this.remote.get(packet.slot)
+    if (previous) {
+      const advance = (packet.sequence - previous.sequence) & 0xffff
+      if (advance === 0 || advance >= 0x8000) return false
+    }
+    this.remote.set(packet.slot, { sequence: packet.sequence, value: packet.progress, at: this.now() })
+    return true
+  }
+
+  latest(slot: number): number | null {
+    const sample = this.remote.get(slot)
+    return sample && this.now() - sample.at <= 1500 ? sample.value : null
+  }
+}

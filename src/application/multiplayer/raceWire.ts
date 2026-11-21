@@ -3,6 +3,8 @@ import type { CarId } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
 export const POSE_BYTES = 19
+export const PROGRESS_BYTES = 8
+export const PROGRESS_PERIOD_MS = 150
 export const POSE_SEQUENCE_MASK = 0xffff
 export const POSE_RECOVERY_MASK = 0xff
 export const POSE_PERIOD_MS = 1000 / 30
@@ -10,7 +12,38 @@ export const POSE_FAST_PERIOD_MS = 1000 / 60
 const SCALE = 32
 const TURN = 2 * Math.PI
 
-export const Packet = { Control: 0, Pose: 1, Track: 2, PoseBatch: 3 } as const
+export const Packet = { Control: 0, Pose: 1, Track: 2, PoseBatch: 3, Progress: 4 } as const
+
+/** Separate, optional telemetry keeps legacy 19-byte car poses compatible. */
+export interface ProgressPacket {
+  readonly slot: number
+  readonly sequence: number
+  /** Same path-index based measure used by single-player ranking. */
+  readonly progress: number
+}
+
+export function encodeProgress(slot: number, sequence: number, progress: number): Uint8Array {
+  if (!Number.isInteger(slot) || slot < 0 || slot > 3 ||
+      !Number.isInteger(sequence) || sequence < 0 || sequence > POSE_SEQUENCE_MASK ||
+      !Number.isFinite(progress) || Math.abs(progress) > 10_000_000) {
+    throw new RangeError('Invalid nearby race progress.')
+  }
+  const bytes = new Uint8Array(PROGRESS_BYTES)
+  const view = new DataView(bytes.buffer)
+  bytes[0] = Packet.Progress
+  bytes[1] = slot
+  view.setUint16(2, sequence, true)
+  view.setFloat32(4, progress, true)
+  return bytes
+}
+
+export function decodeProgress(bytes: Uint8Array): ProgressPacket | null {
+  if (bytes.length !== PROGRESS_BYTES || bytes[0] !== Packet.Progress || bytes[1]! > 3) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const progress = view.getFloat32(4, true)
+  if (!Number.isFinite(progress) || Math.abs(progress) > 10_000_000) return null
+  return { slot: bytes[1]!, sequence: view.getUint16(2, true), progress }
+}
 
 export interface PosePacket {
   readonly slot: number

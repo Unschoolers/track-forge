@@ -291,7 +291,8 @@ export function createRaceHud(
     } else if (
       lastPosition !== null &&
       telemetry.position !== lastPosition &&
-      (snapshot.setup?.mode ?? 'normal') === 'normal' &&
+      ((snapshot.setup?.mode ?? 'normal') === 'normal' ||
+        (snapshot.setup?.mode === 'nearby' && telemetry.positionKnown)) &&
       telemetry.vehicleCount > 1 &&
       (!finalLapNotice || now >= bannerUntil)
     ) {
@@ -309,13 +310,13 @@ export function createRaceHud(
     const showBanner = racing && now < bannerUntil
     raceBanner.classList.toggle('visible', showBanner)
     if (!showBanner && raceBanner.textContent) raceBanner.replaceChildren()
-    lastPosition = telemetry.position
+    const nearby = snapshot.setup?.mode === 'nearby'
+    lastPosition = nearby && !telemetry.positionKnown ? null : telemetry.position
     lastLap = telemetry.lap
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
     const openRoute = telemetry.routeKind === 'point-to-point'
     const timeTrial = snapshot.setup?.mode === 'time-trial'
-    const nearby = snapshot.setup?.mode === 'nearby'
-    positionValue.textContent = nearby ? 'LIVE' : timeTrial ? 'SOLO' : ghostRace
+    positionValue.textContent = nearby && !telemetry.positionKnown ? 'LIVE' : timeTrial ? 'SOLO' : ghostRace
       ? formatRaceTime(snapshot.ghostTime ?? 0)
       : `${telemetry.position}/${Math.max(telemetry.position, telemetry.vehicleCount)}`
     positionLabel.textContent = nearby ? 'NEARBY' : timeTrial ? 'TIME TRIAL' : ghostRace ? 'GHOST TARGET' : 'POSITION'
