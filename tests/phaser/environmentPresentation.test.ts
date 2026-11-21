@@ -69,6 +69,7 @@ import { SCENERY_KINDS_BY_ENVIRONMENT } from '@/domain/track/trackEnvironment'
 import { visibleGroundTilesForViewport } from '@/presentation/environments/groundTexture'
 
 it('provides day and night artwork for every selectable prop', () => {
+  expect(SCENERY_KINDS_BY_ENVIRONMENT.grass).toHaveLength(4)
   for (const id of ['grass', 'cityscape', 'desert'] as const) {
     const environment = getTrackEnvironment(id)
     for (const kind of SCENERY_KINDS_BY_ENVIRONMENT[id]) {
@@ -77,6 +78,19 @@ it('provides day and night artwork for every selectable prop', () => {
       expect(art?.day.length).toBeGreaterThan(0)
       expect(art?.night.length).toBe(art?.day.length)
     }
+  }
+})
+
+it('places grass props with the standard day/night scenery rendering and viewport culling', () => {
+  const bounds = { left: 0, top: 0, right: 200, bottom: 200 }
+  for (const kind of SCENERY_KINDS_BY_ENVIRONMENT.grass) {
+    const props = [{ kind, x: 60, y: 60 }, { kind, x: 1200, y: 1200 }]
+    const day = buildSceneryPresentation('grass', props, 'day', bounds)
+    const night = buildSceneryPresentation('grass', props, 'night', bounds)
+    expect(day.length).toBeGreaterThan(1)
+    expect(night.length).toBe(day.length)
+    expect(day).toEqual(buildSceneryPresentation('grass', props.slice(0, 1), 'day', bounds))
+    expect(night).not.toEqual(day)
   }
 })
 

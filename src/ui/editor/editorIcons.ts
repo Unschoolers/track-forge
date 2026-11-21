@@ -40,6 +40,12 @@ export function editorIconButton(
   const control = button('', action, onClick, className)
   control.setAttribute('aria-label', label)
   control.title = label
+  control.append(editorIcon(icon))
+  return control
+}
+
+/** SVG for non-button surfaces, such as the native toolbox disclosure. */
+export function editorIcon(icon: EditorIcon): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('viewBox', '0 0 24 24')
   svg.setAttribute('fill', 'none')
@@ -52,6 +58,5 @@ export function editorIconButton(
   const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   shape.setAttribute('d', paths[icon])
   svg.append(shape)
-  control.append(svg)
-  return control
+  return svg
 }

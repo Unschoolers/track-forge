@@ -4,7 +4,7 @@ export type TrackEnvironmentId = 'grass' | 'cityscape' | 'desert'
 export const DEFAULT_TRACK_ENVIRONMENT_ID: TrackEnvironmentId = 'grass'
 
 export const SCENERY_KINDS_BY_ENVIRONMENT = {
-  grass: [],
+  grass: ['grass-shrub', 'grass-wildflowers', 'grass-boulder', 'grass-log'],
   cityscape: ['city-trash-bin', 'city-bus-stop', 'city-house', 'city-building'],
   desert: ['desert-cactus', 'desert-boulder', 'desert-rock-cluster', 'desert-rock-spire'],
 } as const satisfies Record<TrackEnvironmentId, readonly string[]>

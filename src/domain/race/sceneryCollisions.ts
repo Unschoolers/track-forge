@@ -7,6 +7,10 @@ import { normalizeTrackEnvironmentId, sceneryKindBelongsToEnvironment, type Scen
 const CELL_SIZE = 64
 const CAR_RADIUS = 6
 const PROP_RADIUS: Record<SceneryPropKind, number> = {
+  'grass-shrub': 12,
+  'grass-wildflowers': 4,
+  'grass-boulder': 20,
+  'grass-log': 18,
   'city-trash-bin': 10,
   'city-bus-stop': 15,
   'city-house': 26,
