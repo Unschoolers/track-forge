@@ -1,6 +1,6 @@
 # Testing guidelines — value over volume
 
-**Goal:** detect consequential regressions quickly with the smallest maintainable suite that still covers important *distinct* behaviors. Do not set a fixed target for number of tests or percentage of deleted tests.
+**Goal:** detect consequential regressions with high-signal tests while keeping feedback fast and maintenance reasonable. **Unit tests > integration tests > UI/browser tests**, both as the default choice for a new regression and as the relative share of the suite. Hundreds or thousands of inexpensive, independently valuable unit tests are welcome. Do not chase a smaller test count or a coverage percentage.
 
 ## Keep/add a test only when it has a job
 
@@ -12,7 +12,17 @@ Before keeping or writing a test, answer:
 4. **Uniqueness:** Is the same regression caught better by a faster or more direct test?
 5. **Cost:** Is its execution/setup/flakiness proportionate to the risk?
 
-If the answer is unclear, improve the assertion or remove/consolidate the test. A high-value test may be long or slow; justify why.
+If the answer is unclear, improve the assertion, or consolidate/remove the test only after checking that its distinct regression remains protected. A high-value test may be long or slow; justify why.
+
+## Testing proportions and cost
+
+**Target shape (guideline, not quota): roughly 80% unit/component contracts, 15% integration/scenario tests, and 5% UI/end-to-end smoke tests.** Actual proportions follow risk and capability boundaries; do not delete a useful integration or browser test to hit the ratio.
+
+- **Unit tests (largest share):** small, deterministic domain functions, application state transitions, validation, codecs, policies, UI/Phaser components via narrow fakes. Cheap enough to run frequently and in large numbers. Hundreds+ are fine, provided each distinct test checks meaningful behavior or an edge.
+- **Integration tests (smaller share):** several real modules collaborating, e.g. race session + engine + storage, export/import migrations, seeded AI runs on representative tracks. Assert outcomes across boundaries; avoid repeatedly recreating the same expensive world.
+- **UI/browser tests (smallest share):** a handful of true user-journey checks for native touch concurrency, canvas interactions, load/scene transitions, visual layering, focus, and production startup. Prefer component-level DOM tests for ordinary labels, buttons, and state wiring.
+
+The levels describe **scope**, not just folders: `tests/ui` can contain cheap component tests, while a full race simulation under `tests/domain` may be an integration test. Track **wall-clock runtime and flakiness** separately from test count. Unit tests are very cheap, not literally free; pathological fixture setup or simulation loops can still dominate CI.
 
 ## Preferred test pyramid for this repo
 
@@ -25,7 +35,7 @@ If the answer is unclear, improve the assertion or remove/consolidate the test. 
 | Production/native smoke | Release loading, native API/signature/update/install boundaries | `qa/production`, Android tests, release verification |
 | Device performance/feel | Android GPU, steering feel, haptics and real touch ergonomics | Manual/profiled device protocol |
 
-**Prefer component/contract tests over Playwright.** Use Playwright only for browser-level interactions impossible to prove at the narrower boundary, or one representative end-to-end journey. A browser test is not a replacement for failing fast on a domain invariant.
+**Prefer unit/component tests over integration tests, and integration tests over Playwright.** Use Playwright only for browser-level interactions impossible to prove at the narrower boundary, or one representative end-to-end journey. A browser test is not a replacement for failing fast on a domain invariant.
 
 ## Build tests around risk and edges
 
@@ -64,9 +74,9 @@ This is better than a browser race proving merely that a nearby UI opened. Add v
 
 ## Consolidation and deletion rules
 
-1. Inventory current tests by **feature contract**, not filename. Mark each **unique**, **overlapping**, **implementation-coupled**, **flaky**, or **obsolete**.
-2. Map each proposed deletion to the remaining assertion that catches the same regression. **Never delete a unique edge case just to improve totals.**
-3. Combine overlapping setup/simulations, use focused matrix cases and keep readable assertions. One giant “does everything” test has poor diagnostics and should not replace several distinct behaviors.
+1. Inventory current tests by **feature contract and scope** (unit / integration / UI), not filename. Mark each **unique**, **overlapping**, **implementation-coupled**, **flaky**, or **obsolete**.
+2. Preserve numerous cheap unit tests when their cases are independently useful. Map each proposed deletion to the remaining assertion that catches the same regression. **Never delete a unique edge case just to improve totals.**
+3. Prioritize consolidating expensive integration/browser setups over shaving tiny unit tests. Combine overlapping setup/simulations, use focused matrix cases and keep readable assertions. One giant “does everything” test has poor diagnostics and should not replace several distinct behaviors.
 4. Remove tests of internal tuning values only if the meaningful boundary behavior is covered elsewhere. Config validation can be valuable when it prevents a real build/runtime failure.
 5. Record what was removed, why, what now protects it, and before/after duration. Keep changes isolated from production refactors where possible.
 6. Introduce a deliberate defect (or mutation) for risky consolidated cases when feasible; if no test fails, its oracle is too weak.
@@ -91,4 +101,4 @@ If a check fails, reproduce, diagnose, and fix its **cause**. Never use `skip`, 
 
 ## PR proof for a test refactor
 
-Include: affected contracts; removed/consolidated tests and preserved edge cases; exact commands and results; suite runtime comparison (same machine/runner); and remaining verification gaps. The unit of success is **regressions caught per maintenance minute**, not a smaller green number.
+Include: affected contracts; removed/consolidated tests and preserved edge cases; exact commands and results; suite runtime comparison (same machine/runner); and remaining verification gaps. The unit of success is **regressions caught per maintenance minute and CI minute**, not a smaller green number. A refactor that retains or grows the unit suite while reducing expensive browser/integration runs can be an improvement.
