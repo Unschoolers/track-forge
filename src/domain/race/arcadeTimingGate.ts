@@ -31,6 +31,21 @@ function passedCircuitGateByProgress(
   return after > count * gate / 4 + tolerance && after < count - startApproach
 }
 
+/** Open routes cannot advance to a road sample *after* Finish.
+ * Detect a car that has gone beyond the finish plane without crossing
+ * its painted stripe; the driver still has time to turn back and retry.
+ */
+function passedStageFinish(path: RaceState['path'], vehicle: RaceVehicle): boolean {
+  const last = path.points.length - 1
+  const a = path.points[last - 1]
+  const b = path.points[last]
+  if (!a || !b || vehicle.pathIndex < last - 12) return false
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  if (Math.hypot(dx, dy) < 0.001) return false
+  return (vehicle.x - b.x) * dx + (vehicle.y - b.y) * dy > 0
+}
+
 export function advanceArcadeTimingGate(
   race: RaceState,
   previous: RaceVehicle,
@@ -57,7 +72,7 @@ export function advanceArcadeTimingGate(
   const passedGate = path.closed
     ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
       passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
-    : passedPendingCheckpoint(path, vehicle)
+    : gate === 4 ? passedStageFinish(path, vehicle) : passedPendingCheckpoint(path, vehicle)
   if (!crossedLine && !passedGate) {
     return { vehicle, missedCheckpoint }
   }
