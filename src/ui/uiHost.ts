@@ -158,7 +158,7 @@ export class DomUiHost implements UiHost {
       this.showRaceExportNotice('Race replay is no longer available.')
       return
     }
-    const trackName = report.track.name.replace(/[^\\p{L}\\p{N}_-]+/gu, '-').slice(0, 48) || 'track'
+    const trackName = report.track.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 48) || 'track'
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     try {
       const saved = await saveJsonFile({
