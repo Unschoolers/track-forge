@@ -95,15 +95,16 @@ describe('Nearby Arcade', () => {
   it('shares a track and countdown with three paired guests, and relays ghosts and finishing times', async () => {
     const network = new NearbyNetwork()
     const players = [
-      { name: 'host', car: 'blue', clockOffset: 40 },
-      { name: 'guest-1', car: 'red', clockOffset: 1500 },
-      { name: 'guest-2', car: 'green', clockOffset: 700 },
-      { name: 'guest-3', car: 'yellow', clockOffset: 3 },
+      { name: 'host', car: 'blue', clockOffset: 40, identity: { icon: 'crown', color: 'gold' } },
+      { name: 'guest-1', car: 'red', clockOffset: 1500, identity: { icon: 'star', color: 'pink' } },
+      { name: 'guest-2', car: 'green', clockOffset: 700, identity: { icon: 'bolt', color: 'violet' } },
+      { name: 'guest-3', car: 'yellow', clockOffset: 3, identity: { icon: 'diamond', color: 'lime' } },
     ] as const
     let time = 300
-    const setups = players.map(({ name, car, clockOffset }) => {
+    const setups = players.map(({ name, car, clockOffset, identity }) => {
       const device = new NearbyRace(network.endpoint(name), (course) => course.points.length === track.points.length,
         () => time + clockOffset)
+      device.setIdentity(identity)
       return { name, car, clockOffset, device }
     })
     const devices = setups.map(({ device }) => device)
@@ -139,6 +140,7 @@ describe('Nearby Arcade', () => {
         expect(start.track.points).toEqual(track.points)
         expect(start.startsAt).toBeUndefined()
         expect(device.standings()).toHaveLength(4)
+        expect(device.standings().map(({ identity }) => identity)).toEqual(players.map(({ identity }) => identity))
         expect(device.snapshot().phase).toBe('staging')
       }
 
@@ -169,7 +171,7 @@ describe('Nearby Arcade', () => {
       await vi.waitFor(() => {
         expect(devices.map((device) => device.remotePoses().length)).toEqual([3, 3, 3, 3])
       }, { interval: 5 })
-      expect(yellow.remotePoses()).toContainEqual(expect.objectContaining({ car: 'red', x: 10, z: 5, structureRunId: 'elevated' }))
+      expect(yellow.remotePoses()).toContainEqual(expect.objectContaining({ car: 'red', x: 10, z: 5, structureRunId: 'elevated', identity: players[1].identity }))
       const posePackets = network.packets.filter(({ bytes }) => bytes[0] === Packet.Pose)
       const hostBatches = network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)
       expect(posePackets).toHaveLength(3)
