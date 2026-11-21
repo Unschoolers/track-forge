@@ -2,8 +2,8 @@ import { inputForHandling } from '@/phaser/input/raceInput'
 import Phaser from 'phaser'
 import type { AppSnapshot } from '@/application/appState'
 import {
+  NightBeamRenderer,
   renderNightLights,
-  renderNightShade,
 } from '@/phaser/rendering/nightRenderer'
 import {
   renderRaceTrackGeometryBase,
@@ -73,7 +73,7 @@ export class RaceScene extends Phaser.Scene {
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics?: Phaser.GameObjects.Graphics
-  private nightShadeGraphics?: Phaser.GameObjects.Graphics
+  private nightBeamRenderer?: NightBeamRenderer
   private nightLightGraphics?: Phaser.GameObjects.Graphics
   private lamps: readonly LampPost[] = []
   private snapshot: AppSnapshot | undefined
@@ -139,9 +139,7 @@ export class RaceScene extends Phaser.Scene {
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
-    this.nightShadeGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.nightShade)
+    if (night) this.nightBeamRenderer = new NightBeamRenderer(this)
     this.nightLightGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.nightLight)
@@ -304,32 +302,15 @@ export class RaceScene extends Phaser.Scene {
     if (player && !upperVehicles.has(player.id) && this.isCoveredByBridgeDeck?.(player)) {
       renderCoveredPlayerOutline(this.upperVehicleGraphics, player)
     }
-    this.nightShadeGraphics?.clear()
     this.nightLightGraphics?.clear()
-    if (
-      this.raceSession.snapshot().setup?.lighting === 'night' &&
-      this.nightShadeGraphics &&
-      this.nightLightGraphics
-    ) {
-      const cameraCenter = {
-        x: (this.raceCamera?.x ?? 0) + (this.raceCamera?.shake.x ?? 0),
-        y: (this.raceCamera?.y ?? 0) + (this.raceCamera?.shake.y ?? 0),
-      }
-      renderNightShade(this.nightShadeGraphics, {
-        width: this.scale.width,
-        height: this.scale.height,
-        cameraCenter,
-        cameraZoom: this.raceCamera?.zoom ?? 1,
-      })
+    if (this.raceSession.snapshot().setup?.lighting === 'night' && this.nightLightGraphics) {
+      const lights = visibleVehicles.map((vehicle) =>
+        transformVehicleLights(vehicle.car, vehicle, vehicle.braking),
+      )
+      this.nightBeamRenderer?.render(lights)
       renderNightLights(
         this.nightLightGraphics,
-        visibleVehicles.map((vehicle) =>
-          transformVehicleLights(
-            vehicle.car,
-            vehicle,
-            vehicle.braking,
-          ),
-        ),
+        lights,
         this.lamps,
         this.lightVisibilityBounds,
       )
@@ -412,6 +393,8 @@ export class RaceScene extends Phaser.Scene {
     window.removeEventListener('keyup', this.onKeyUp)
     window.removeEventListener('blur', this.onBlur)
     document.removeEventListener('visibilitychange', this.onVisibility)
+    this.nightBeamRenderer?.destroy()
+    this.nightBeamRenderer = undefined
     this.lamps = []
     this.terrainChunks = []
     this.terrainVisibilityBounds = undefined
