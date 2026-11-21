@@ -222,7 +222,7 @@ export function stepAiVehicle(
       ? clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
       : 1
     : 0
-  const pursuitSamples = Math.max(3, Math.round(
+  const pursuitSamples = Math.max(1, Math.round(
     (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
   ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
