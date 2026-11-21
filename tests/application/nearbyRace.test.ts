@@ -192,7 +192,9 @@ describe('Nearby Arcade', () => {
       const progressCars = setups.map(({ car }, index) =>
         ({ ...makeCar(car, index * 10), lap: index === 0 ? 0 : 1 }))
       time += 200
-      devices.forEach((device, index) => device.update(progressCars[index]!, progressState))
+      devices.forEach((device, index) => {
+        device.update(progressCars[index]!, progressState)
+      })
       await vi.waitFor(() => {
         expect(host.livePosition(progressCars[0]!, progressState)).toMatchObject({ position: 4, vehicleCount: 4 })
         expect(red.livePosition(progressCars[1]!, progressState)).toMatchObject({ position: 1, vehicleCount: 4 })
