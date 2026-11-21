@@ -7,6 +7,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { createRaceFlyoverRenderer } from '@/ui/components/raceFlyoverRenderer'
+import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 
 function canvas() {
   const colors: string[] = []
@@ -84,10 +85,16 @@ describe('race flyover renderer', () => {
     expect(normal.colors).toContain('#3a8cff')
     expect(normal.colors).toContain('#ff4f4f')
     expect(normal.colors).toContain('#49d66f')
+    expect(normal.methods.get('scale')?.mock.calls.filter(
+      ([x, y]) => x === VEHICLE_VISUAL_SCALE && y === VEHICLE_VISUAL_SCALE,
+    )).toHaveLength(3)
     const ghost = canvas()
     createRaceFlyoverRenderer(geometry, track, 'blue', 'night', true)(ghost.ctx, 320, 150, 1)
     expect(ghost.colors).toContain('#3a8cff')
     expect(ghost.colors).not.toContain('#ff4f4f')
     expect(ghost.colors).toContain('#182d2b')
+    expect(ghost.methods.get('scale')?.mock.calls.filter(
+      ([x, y]) => x === VEHICLE_VISUAL_SCALE && y === VEHICLE_VISUAL_SCALE,
+    )).toHaveLength(1)
   })
 })
