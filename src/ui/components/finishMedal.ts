@@ -12,7 +12,7 @@ export function medalForFinish(outcome: RaceOutcome, position: number): RaceMeda
 }
 
 /** Shared single-player / nearby podium visual, without coupling either race mode to the other. */
-export function createFinishCelebration(medal: RaceMedal, newRecord = false): HTMLElement {
+export function createFinishCelebration(medal: RaceMedal, newRecord = false, compact = false): HTMLElement {
   const podium = element('section', 'results-celebration')
   podium.dataset.medal = medal
   podium.dataset.resultCelebration = medal === 'GOLD' ? 'victory' : 'podium'
@@ -22,14 +22,20 @@ export function createFinishCelebration(medal: RaceMedal, newRecord = false): HT
     for (let i = 0; i < 8; i += 1) sparkles.append(element('i'))
   }
   const placement = medal === 'GOLD' ? '1ST PLACE' : medal === 'SILVER' ? '2ND PLACE' : '3RD PLACE'
-  const crest = element('span', 'results-celebration-crest', '✦')
-  crest.setAttribute('aria-hidden', 'true')
-  podium.append(
-    sparkles,
-    crest,
-    element('strong', 'results-celebration-place', placement),
-    element('span', 'results-celebration-kicker', `${medal} MEDAL`),
-  )
+  if (compact) {
+    const crest = element('span', 'results-celebration-crest', '✦')
+    crest.setAttribute('aria-hidden', 'true')
+    podium.classList.add('results-celebration-compact')
+    podium.append(sparkles, crest, element('strong', 'results-celebration-place', placement), element('span', 'results-celebration-kicker', `${medal} MEDAL`))
+  } else {
+    const accolade = medal === 'GOLD' ? 'CHAMPION' : medal === 'SILVER' ? 'BRILLIANT DRIVE' : 'ON THE PODIUM'
+    podium.append(
+      sparkles,
+      element('span', 'results-celebration-kicker', accolade),
+      element('strong', 'results-celebration-place', placement),
+      element('span', 'results-celebration-detail', medal === 'GOLD' ? 'YOU WON THE RACE' : 'YOU EARNED YOUR MEDAL'),
+    )
+  }
   if (newRecord) podium.append(element('span', 'results-celebration-record', '★ NEW RECORD'))
   return podium
 }
