@@ -124,6 +124,7 @@ export interface RaceSessionPort {
   ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
   start(track: Track, setup: RaceSetup, startsAt?: number): void
+  scheduleNearbyStart?(startsAt: number): void
   restart(): void
   stop(): void
   resetPlayer(): void
@@ -227,6 +228,17 @@ export class RaceSession implements RaceSessionPort {
     this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
   }
 
+  /** Armed by the host only after all peers report their race scenes ready. */
+  scheduleNearbyStart(startsAt: number): void {
+    if (!Number.isFinite(startsAt) || this.current.setup?.mode !== 'nearby' ||
+        this.current.state?.phase !== 'countdown' || this.startsAt !== undefined) return
+    this.startsAt = startsAt
+    const { track, setup, state } = this.current
+    const countdown = Math.max(0, (startsAt - performance.now()) / 1000)
+    this.publish(this.buildSnapshot(track, setup, { ...state, countdown }, null))
+    this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(countdown) })
+  }
+
   ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
     setup = oneRunForOpenRoute(track, setup)
     const store = this.dependencies.ghostStore
@@ -302,6 +314,9 @@ export class RaceSession implements RaceSessionPort {
       return
     }
     const nearby = this.current.setup?.mode === 'nearby' ? this.dependencies.nearby : undefined
+    // A staged online race must never tick forward before the shared GO arrives.
+    if (this.current.setup?.mode === 'nearby' && state.phase === 'countdown' &&
+        this.startsAt === undefined) return
     const previouslyMissedGate = state.missedCheckpoint?.gate
 
     let runningTime = deltaSeconds
