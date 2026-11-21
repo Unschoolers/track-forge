@@ -139,7 +139,7 @@ describe('native APK installation feedback', () => {
 
 
 describe('single-player topper customization', () => {
-  it('edits the same remembered topper in Options > Race without a multiplayer lobby', () => {
+  it('edits the same remembered topper in Profile without a multiplayer lobby', () => {
     const save = vi.fn()
     const modal = createOptionsModal({
       overlay: { type: 'options', returnTo: 'home' },
@@ -157,6 +157,9 @@ describe('single-player topper customization', () => {
     })
     document.body.replaceChildren(modal)
     modal.querySelector<HTMLButtonElement>('[data-action="options-tab-race"]')?.click()
+    expect(modal.querySelector('#options-panel-race .topper-section')).toBeNull()
+    modal.querySelector<HTMLButtonElement>('[data-action="options-tab-profile"]')?.click()
+    expect(modal.querySelector('#options-panel-profile .topper-section')).not.toBeNull()
     expect(modal.textContent).toContain('Your topper · crown / gold')
     expect(modal.querySelectorAll('[data-action^="options-topper-icon-"]')).toHaveLength(6)
     expect(modal.querySelectorAll('[data-action^="options-topper-color-"]')).toHaveLength(6)
