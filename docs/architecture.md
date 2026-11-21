@@ -36,7 +36,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 **Editor:** pointer input (`phaser/input/editorInput.ts`) → controller/editor session; editor toolbox chrome is reduced in `application/editor/editorUiReducer.ts` → `domain/editor/editorState.ts` command/history → geometry through `TrackGeometryService` → invalidation-aware render. Command rejection must remain visible; undo/redo must restore geometry and terrain correctly. Camera view should not jump after unrelated editor changes.
 
-**Race:** controller obtains mode/lap/lighting/grid policy from `application/race/raceSetup.ts` → `application/race/raceSession.ts` (clock, fixed-tick scheduling, session lifecycle) → `domain/race/raceEngine.ts` fixed-step simulation (`RACE_TICK_SECONDS = 1/60`). `application/race/raceResultRecorder.ts` owns result/scoring persistence; `raceFeedback.ts` maps simulation events to sound/haptic commands → typed events/telemetry → Phaser renders state and UI shows race outcomes. AI, player and recovery must share consistent geometry and surface authority. Avoid changing simulation step size just to accelerate tests; drive more ticks without changing the simulated contract. Nearby countdown timing uses an injectable monotonic clock sharing a time base with the Nearby transport; wall-clock timestamps are deliberately separate.
+**Race:** controller obtains mode/lap/lighting/grid policy from `application/race/raceSetup.ts` → `application/race/raceSession.ts` → `domain/race/raceEngine.ts` fixed-step simulation (`RACE_TICK_SECONDS = 1/60`) → typed events/telemetry → Phaser renders state and UI shows race outcomes. AI, player and recovery must share consistent geometry and surface authority. Avoid changing simulation step size just to accelerate tests; drive more ticks without changing the simulated contract. Nearby countdown timing uses an injectable monotonic clock sharing a time base with the Nearby transport; wall-clock timestamps are deliberately separate.
 
 **Track import/save:** untrusted JSON → `domain/track/trackCodec.ts` normalization → validation → `infrastructure/storage/*Repository.ts` → application. The codec handles legacy track representations; do not bypass it with direct casts of incoming JSON. Exports must remain importable.
 
@@ -57,3 +57,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 ## When adding a feature
 
 Identify the **owner of the rule**, the **authoritative data structure**, the **ports**, and the **consumer(s)**. Prefer introducing one clear operation at the right level over adding conditionals to `AppController`, `RaceScene`, and the UI simultaneously. If multiple consumers need the same derived geometry, compute it once at the geometry boundary and reuse it.
+
+## Race session subcomponents
+
+`application/race/raceSession.ts` owns monotonic countdown, 60 Hz fixed-step scheduling, ghost lifecycle and snapshot publishing. `application/race/raceResultRecorder.ts` owns category-aware score writing and result/standing construction; `application/race/raceFeedback.ts` owns sound/haptic decisions derived from simulation events. Score writes remain observable, done once per finish, and excluded from Nearby and non-finishing outcomes. No physics or wire changes accompany this extraction.
