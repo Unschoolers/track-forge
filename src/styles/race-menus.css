@@ -45,7 +45,23 @@
   font: 800 .7rem/1.2 var(--menu-mono);
   letter-spacing: .035em;
 }
-.race-setup-modal .car-choice { border-bottom: .25rem solid var(--car-color); }
+.race-setup-modal .car-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  min-height: 4.4rem;
+  border-bottom: .25rem solid var(--car-color);
+}
+.race-setup-modal .car-silhouette {
+  display: block;
+  width: min(100%, 6.4rem);
+  height: 2.4rem;
+  flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 2px 1px #050a12a8);
+}
 .race-setup-modal :is(.car-choice, .setup-choice).active {
   border-color: var(--menu-accent);
   background: #563025;
@@ -119,7 +135,7 @@
 @media (max-width: 520px) {
   .track-library-modal .track-preview { height: 4.5rem; }
   .race-setup-modal .car-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .race-setup-modal .car-choice { min-height: 2.75rem; }
+  .race-setup-modal .car-choice { min-height: 4.3rem; }
   .race-setup-modal .car-stat .label { font-size: .52rem; }
 }
 @media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
