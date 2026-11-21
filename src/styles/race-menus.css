@@ -58,6 +58,48 @@
 .race-setup-modal .car-stat strong { color: #f2f5f8; font: 800 .85rem/1.2 var(--menu-mono); }
 .race-setup-modal .car-stat .label { color: #aab9c8; font: 700 .58rem/1.2 var(--menu-mono); letter-spacing: .04em; }
 
+.results-modal .modal-title { font-size: clamp(1.5rem, 5vw, 2.3rem); letter-spacing: .06em; }
+.results-celebration {
+  --podium-color: #ffc96f;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  isolation: isolate;
+  overflow: hidden;
+  gap: .28rem;
+  margin: -.1rem 0 .8rem;
+  padding: 1.1rem .5rem 1.25rem;
+  border: 1px solid var(--podium-color);
+  color: var(--podium-color);
+  background: radial-gradient(ellipse at 50% -12%, #f8cb7054, transparent 65%), #1b222a;
+  box-shadow: inset 0 0 1.8rem #f8bf4425, 0 .4rem 1rem #0005;
+  text-align: center;
+}
+.results-celebration[data-medal='SILVER'] { --podium-color: #dceaf5; background: radial-gradient(ellipse at 50% -12%, #b3ccdd3c, transparent 65%), #1b222a; }
+.results-celebration[data-medal='BRONZE'] { --podium-color: #e9a279; background: radial-gradient(ellipse at 50% -12%, #d48a593c, transparent 65%), #1b222a; }
+.results-celebration-kicker { font: 900 .7rem/1.2 var(--menu-mono); letter-spacing: .24em; }
+.results-celebration-place { color: #fff8eb; font: 1000 clamp(2rem, 8vw, 3.5rem)/1.05 var(--menu-mono); letter-spacing: -.045em; text-shadow: 0 .1rem .8rem #000a; }
+.results-celebration-detail { color: var(--podium-color); font: 850 .72rem/1.4 var(--menu-mono); letter-spacing: .14em; }
+.results-celebration-record { margin-top: .4rem; padding: .24rem .75rem; border: 1px solid #ffd577; color: #ffde9e; background: #8f62292c; font: 900 .67rem/1.2 var(--menu-mono); letter-spacing: .13em; }
+.results-celebration-sparks { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.results-celebration-sparks i { position: absolute; top: 50%; left: 50%; width: .42rem; height: .68rem; background: #ffde92; transform-origin: center; opacity: 0; animation: winner-spark 1100ms ease-out both; }
+.results-celebration-sparks i:nth-child(1) { --x: -8rem; --y: -3rem; --rot: -45deg; animation-delay: 0ms; }
+.results-celebration-sparks i:nth-child(2) { --x: 8rem; --y: -3.5rem; --rot: 35deg; animation-delay: 50ms; }
+.results-celebration-sparks i:nth-child(3) { --x: -5.5rem; --y: 3.8rem; --rot: 85deg; animation-delay: 80ms; }
+.results-celebration-sparks i:nth-child(4) { --x: 5.5rem; --y: 4rem; --rot: -65deg; animation-delay: 30ms; }
+.results-celebration-sparks i:nth-child(5) { --x: -11rem; --y: 1rem; --rot: 20deg; animation-delay: 100ms; }
+.results-celebration-sparks i:nth-child(6) { --x: 11rem; --y: 1rem; --rot: 75deg; animation-delay: 120ms; }
+.results-celebration-sparks i:nth-child(7) { --x: -2rem; --y: -4rem; --rot: 12deg; animation-delay: 50ms; }
+.results-celebration-sparks i:nth-child(8) { --x: 2rem; --y: 4rem; --rot: -15deg; animation-delay: 130ms; }
+@keyframes winner-spark {
+  0% { opacity: 0; transform: translate(0,0) rotate(0) scale(.35); }
+  24% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x),var(--y)) rotate(var(--rot)) scale(.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .results-celebration-sparks i { animation: none; }
+}
+
 .results-modal .results-heading { color: var(--menu-accent); }
 .results-modal .scoreboard { gap: .35rem; }
 .results-modal .scoreboard-row { border-color: #344554; border-radius: 0; background: #121d27; }
