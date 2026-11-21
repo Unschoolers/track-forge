@@ -1,4 +1,4 @@
-import type { RandomSource } from '@/application/ports/random'
+import type { RandomSource } from '@/domain/race/randomSource'
 import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { getTrafficState } from '@/domain/race/ai/traffic'

@@ -1,4 +1,4 @@
-import type { RandomSource } from '@/application/ports/random'
+import type { RandomSource } from '@/domain/race/randomSource'
 import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS, ROAD_GEOMETRY, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'

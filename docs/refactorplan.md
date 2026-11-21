@@ -106,3 +106,11 @@
 - Additional terrain heights, arbitrary structure levels, tunnels, and
   water-specific bridge supports remain future product work rather than hidden
   version-8 capabilities.
+
+## 2026-11-21 — Dependency-boundary cleanup
+
+- Moved the race random-source **contract** into `domain/race/randomSource.ts` and the production `Math.random` implementation into `infrastructure/random/mathRandom.ts`.
+- `raceEngine`, AI driving and effects now depend only on the domain contract. Existing application imports retain a compatible type-only re-export.
+- Moved the `AppMode` navigation contract into `application/appState.ts`; the outer `app/createApplication.ts` host retains its compatible type-only re-export.
+- Added a fast import-path architecture regression test: neither domain nor application may import outward-facing host, UI, Phaser or infrastructure code, including through relative imports.
+- No saved-track format, gameplay tuning, race random sequence or Android protocol changes. Follow the current [engineering standards](engineering-guidelines.md) and [test rules](testing-guidelines.md) after PR #122 is merged.
