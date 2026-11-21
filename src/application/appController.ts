@@ -596,7 +596,7 @@ export class AppController {
   }
 
   private validateCupTracks(ids: readonly string[]): boolean {
-    if (!validCupLineup(ids) || !ids.every(id => {
+    if (!validCupLineup(ids) || !ids.length || !ids.every(id => {
       const track = this.cupTrack(id)
       return track && validateTrack(track, this.dependencies.geometry.get(track).path.totalLength).ready
     })) {
