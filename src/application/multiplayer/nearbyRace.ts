@@ -32,13 +32,16 @@ interface Course {
 }
 
 export interface NearbyStart extends Course {
-  readonly startsAt: number
+  /** The race scene is staged first; GO is scheduled after every scene is ready. */
+  readonly startsAt?: number
 }
 
-type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'racing'
+type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'staging' | 'racing'
 type Control =
   | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode }
   | { type: 'ready'; car: CarId }
+  | { type: 'lineup'; cars: (CarId | null)[] }
+  | { type: 'armed' }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number }
   | { type: 'finish'; slot: number; time: number | null }
   | { type: 'left'; slot: number }
@@ -72,6 +75,11 @@ function readControl(bytes: Uint8Array): Control | null {
           (value.lighting === 'day' || value.lighting === 'night') ? value : null
       case 'ready':
         return CAR_IDS.includes(value.car) ? value : null
+      case 'lineup':
+        return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
+          value.cars.every((car) => car === null || CAR_IDS.includes(car)) ? value : null
+      case 'armed':
+        return value
       case 'start':
         return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
           value.cars.every((car) => car === null || CAR_IDS.includes(car)) &&
@@ -90,6 +98,7 @@ function readControl(bytes: Uint8Array): Control | null {
 export class NearbyRace {
   private readonly changes = new EventBus<void>()
   private readonly starts = new EventBus<NearbyStart>()
+  private readonly countdownStarts = new EventBus<number>()
   private readonly unsubscribe: () => void
   private phase: Phase = 'idle'
   private role: 'host' | 'guest' | null = null
@@ -110,6 +119,9 @@ export class NearbyRace {
   private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
   private readonly ready = new Map<string, { car: CarId; receivedAt: number }>()
+  private readonly armed = new Map<string, number>()
+  private localSceneReady = false
+  private lineup: (CarId | null)[] | null = null
   private readonly racers = new Map<number, Racer>()
   private readonly forwarding = new Set<string>()
   private receiver: TrackReceiver | null = null
@@ -158,6 +170,7 @@ export class NearbyRace {
 
   subscribe(listener: () => void) { return this.changes.subscribe(listener) }
   onStart(listener: (start: NearbyStart) => void) { return this.starts.subscribe(listener) }
+  onCountdown(listener: (startsAt: number) => void) { return this.countdownStarts.subscribe(listener) }
 
   host(course: Course): void {
     if (this.phase !== 'idle') return
@@ -242,6 +255,19 @@ export class NearbyRace {
 
   recovered(): void { this.recovery++ }
 
+  /** Called only when Phaser has created the race scene and bound its controls. */
+  sceneReady(): void {
+    if (this.phase !== 'staging' || this.localSceneReady) return
+    this.localSceneReady = true
+    this.record('scene_ready')
+    if (this.role === 'guest' && this.hostId) {
+      this.readySentAt = this.now()
+      this.sendControl([this.hostId], { type: 'armed' })
+    } else if (this.role === 'host') {
+      this.scheduleHostCountdown()
+    }
+  }
+
   remotePoses(): GhostPose[] {
     const time = this.now()
     return [...this.racers].flatMap(([slot, racer]) => {
@@ -274,6 +300,7 @@ export class NearbyRace {
     this.unsubscribe()
     this.changes.clear()
     this.starts.clear()
+    this.countdownStarts.clear()
   }
 
   private onEvent(event: NearbyEvent): void {
@@ -362,13 +389,21 @@ export class NearbyRace {
       this.setPhase('preparing')
       this.armTimeout('The host did not start the race in time.')
     } else if (guestSlot !== undefined && this.phase === 'preparing' && message.type === 'ready') {
-      this.ready.set(id, { car: message.car, receivedAt: this.now() })
+      if (!this.ready.has(id)) this.ready.set(id, { car: message.car, receivedAt: this.now() })
       if (this.ready.size === this.guests.size) this.startHost()
-    } else if (fromHost && this.phase === 'preparing' && message.type === 'start' && this.course &&
+    } else if (fromHost && this.phase === 'preparing' && message.type === 'lineup' && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar) {
+      this.stage(this.course, message.cars)
+    } else if (guestSlot !== undefined && this.phase === 'staging' && message.type === 'armed') {
+      if (!this.armed.has(id)) this.armed.set(id, this.now())
+      this.scheduleHostCountdown()
+    } else if (fromHost && this.phase === 'staging' && message.type === 'start' && this.course &&
+        message.cars[0] && message.cars[this.slot] === this.localCar && this.localSceneReady) {
       const now = this.now()
+      // Estimate one-way transit after the scene-ready packet, excluding time
+      // spent at the host. Device clocks may have arbitrary independent origins.
       const halfRoundTrip = Math.max(0, now - this.readySentAt - message.readyAge) / 2
-      this.launch(this.course, message.cars, now + Math.max(0, message.delay - halfRoundTrip))
+      this.beginCountdown(now + message.delay - halfRoundTrip)
     } else if (this.phase === 'racing' && message.type === 'finish' &&
         message.slot !== this.slot && (fromHost || message.slot === guestSlot)) {
       if (this.recordFinish(message.slot, message.time) && !fromHost) this.sendControl(this.endpoints(id), message)
@@ -389,26 +424,48 @@ export class NearbyRace {
   }
 
   private startHost(): void {
-    if (!this.course) return
+    if (!this.course || this.phase !== 'preparing') return
     const cars: (CarId | null)[] = [this.course.car, null, null, null]
     for (const [id, slot] of this.guests) {
       const guest = this.ready.get(id)
       if (!guest) return
       cars[slot] = guest.car
     }
-    const startsAt = this.now() + 4000
-    for (const [id, guest] of this.ready) {
-      const now = this.now()
-      this.sendControl([id], { type: 'start', cars, delay: startsAt - now, readyAge: now - guest.receivedAt })
-    }
-    this.launch(this.course, cars, startsAt)
+    this.stage(this.course, cars)
+    this.sendControl([...this.guests.keys()], { type: 'lineup', cars })
   }
 
-  private launch(course: Course, cars: (CarId | null)[], startsAt: number): void {
-    this.clearTimeout()
+  private stage(course: Course, cars: (CarId | null)[]): void {
+    this.lineup = cars
     cars.forEach((car, slot) => { if (car) this.racers.set(slot, { ghost: new RemoteGhost(car) }) })
+    this.setPhase('staging')
+    this.armTimeout('A player did not finish loading the race scene.')
+    this.starts.publish({ ...course })
+  }
+
+  private scheduleHostCountdown(): void {
+    if (this.role !== 'host' || this.phase !== 'staging' || !this.localSceneReady ||
+        this.armed.size !== this.guests.size || !this.lineup) return
+    const startsAt = this.now() + 4000
+    for (const [id, receivedAt] of this.armed) {
+      const now = this.now()
+      this.sendControl([id], {
+        type: 'start', cars: this.lineup, delay: startsAt - now, readyAge: now - receivedAt,
+      })
+    }
+    this.beginCountdown(startsAt)
+  }
+
+  private beginCountdown(startsAt: number): void {
+    if (this.phase !== 'staging') return
+    if (startsAt < this.now() + 250) {
+      this.fail('Race countdown arrived too late to synchronize.')
+      return
+    }
+    this.clearTimeout()
     this.setPhase('racing')
-    this.starts.publish({ ...course, startsAt })
+    this.record('countdown_scheduled', { remainingMs: Math.round(startsAt - this.now()) })
+    this.countdownStarts.publish(startsAt)
   }
 
   private recordFinish(slot: number, time: number | null): boolean {
@@ -527,6 +584,10 @@ export class NearbyRace {
     this.pendingPairs.clear()
     this.guests.clear()
     this.ready.clear()
+    this.armed.clear()
+    this.localSceneReady = false
+    this.lineup = null
+    this.readySentAt = 0
     this.racers.clear()
     this.forwarding.clear()
     this.receiver = null
