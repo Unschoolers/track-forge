@@ -114,6 +114,8 @@ export interface RaceResult {
 }
 
 export interface RaceSessionSnapshot {
+  /** Changes for every new race, including a rematch on the same circuit. */
+  readonly runId?: number
   readonly track: Track | null
   readonly setup: RaceSetup | null
   readonly state: RaceState | null
@@ -183,6 +185,7 @@ export class RaceSession implements RaceSessionPort {
   private readonly monotonicNow: () => number
   private readonly step: RaceStep
   private current = EMPTY_RACE
+  private runId = 0
   private remainder = 0
   private startsAt: number | undefined
   private rivalFinishRemaining = 0
@@ -236,6 +239,7 @@ export class RaceSession implements RaceSessionPort {
     this.recording = !nearby && player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
     this.diagnostics = nearby ? null : new RaceDiagnosticsRecording(state)
+    this.runId += 1
     this.publish(this.buildSnapshot(track, resolved, state, null))
     if (!nearby || this.startsAt !== undefined) {
       this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
@@ -509,6 +513,7 @@ export class RaceSession implements RaceSessionPort {
     const latestSplit = this.timing.accepted.at(-1)
     const elapsed = result?.playerTime ?? state.elapsed
     return {
+      runId: this.runId,
       track,
       setup,
       state,

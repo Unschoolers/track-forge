@@ -40,6 +40,30 @@ function createScoreStore() {
 
 describe('RaceSession', () => {
 
+  it('gives each rematch a fresh run identity without changing it during Nearby staging', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({
+      scoreStore: store,
+      random: { next: () => 0.5 },
+      feedback: createFeedback(),
+      monotonicNow: () => 1_000,
+    })
+    const nearbySetup = { ...setup, mode: 'nearby' as const }
+    session.start(track, nearbySetup)
+    const firstRunId = session.snapshot().runId
+    expect(firstRunId).toBeGreaterThan(0)
+
+    session.advance(1, noInput)
+    session.scheduleNearbyStart(5_000)
+    expect(session.snapshot().runId).toBe(firstRunId)
+    expect(session.snapshot().telemetry.waitingForStart).toBe(false)
+
+    // Same track, same setup, same scene mode, but a new countdown handshake.
+    session.start(track, nearbySetup)
+    expect(session.snapshot().runId).toBe((firstRunId ?? 0) + 1)
+    expect(session.snapshot().telemetry.waitingForStart).toBe(true)
+  })
+
   it('sounds each displayed countdown cue once, including after pause and restart', () => {
     const { store } = createScoreStore()
     const feedback = createFeedback()
