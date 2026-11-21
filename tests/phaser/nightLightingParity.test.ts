@@ -65,7 +65,7 @@ describe('night preview / gameplay lighting parity', () => {
       }) },
     } as unknown as Phaser.Scene
     const renderer = new NightBeamRenderer(scene, 1)
-    renderer.render([vehicle(20), vehicle(40)])
+    renderer.render([vehicle(20), { ...vehicle(40), angle: Math.PI / 2 }])
     expect(scene.textures.addCanvas).toHaveBeenCalledTimes(1)
     expect(scene.add.image).toHaveBeenCalledTimes(2)
     const alpha = images[0]?.setAlpha.mock.calls[0]?.[0] as number | undefined
@@ -76,7 +76,7 @@ describe('night preview / gameplay lighting parity', () => {
     expect(scale).toBeLessThan(0.95)
     if (scale === undefined) throw new Error('Expected headlight beam scale')
     expect(images[0]?.setPosition).toHaveBeenCalledWith(20 - NIGHT_HEADLIGHT.sourceX * scale, 0)
-    expect(images[1]?.setPosition).toHaveBeenCalledWith(40 - NIGHT_HEADLIGHT.sourceX * scale, 0)
+    expect(images[1]?.setPosition).toHaveBeenCalledWith(40, -NIGHT_HEADLIGHT.sourceX * scale)
 
     renderer.render([vehicle(22)])
     expect(scene.add.image).toHaveBeenCalledTimes(2)
