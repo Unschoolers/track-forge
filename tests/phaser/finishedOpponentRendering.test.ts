@@ -75,13 +75,14 @@ function createRenderingScenario() {
   const upperVehicleGraphics = new RecordingGraphics()
   const shadowGraphics = new RecordingGraphics()
   const nightLightGraphics = new RecordingGraphics()
+  const beamRenderer = { render: vi.fn() }
   const scene = {
     renderGroundPresentation() {},
     vehicleGraphics,
     upperVehicleGraphics,
     shadowGraphics,
     nightLightGraphics,
-    nightShadeGraphics: new RecordingGraphics(),
+    nightBeamRenderer: beamRenderer,
     effectGraphics: new RecordingGraphics(),
     snapshot: {},
     controller: { snapshot: () => ({ preferences: { lighting } }) },
@@ -99,6 +100,7 @@ function createRenderingScenario() {
     upperVehicleGraphics,
     shadowGraphics,
     nightLightGraphics,
+    beamRenderer,
     state: () => state,
     draw: () => RaceScene.prototype.update.call(scene as never, 0, 16),
     setNight: () => {
@@ -164,11 +166,14 @@ it('clears shadows of finished opponents while retaining active shadows', () => 
   ])
 })
 
-it('clears finished opponent headlights and taillights while retaining active and player lights', () => {
+it('removes finished rivals from both the beam pass and fixture pass', () => {
   const scene = createRenderingScenario()
   scene.setNight()
   scene.draw()
-  expect(scene.nightLightGraphics.lightOrigins).toHaveLength(16)
+  expect(scene.beamRenderer.render).toHaveBeenLastCalledWith(
+    scene.state().vehicles.map((v) => transformVehicleLights(v.car, v, v.braking)),
+  )
+  expect(scene.nightLightGraphics.lightCircles).toHaveLength(16)
 
   scene.finishOpponents()
   scene.draw()
@@ -176,36 +181,23 @@ it('clears finished opponent headlights and taillights while retaining active an
   const player = vehicles[0]
   const active = vehicles[2]
   if (!player || !active) throw new Error('Missing race fixtures')
-  const expectedLights = [player, active].flatMap((vehicle) =>
-    transformVehicleLights(
-      vehicle.car,
-      vehicle,
-      vehicle.braking,
-    ).headlights.flatMap((light) => [light, light]),
+  const expectedLights = [player, active].map((v) =>
+    transformVehicleLights(v.car, v, v.braking),
   )
-  const expectedTaillights = [player, active].flatMap((vehicle) =>
-    transformVehicleLights(
-      vehicle.car,
-      vehicle,
-      vehicle.braking,
-    ).taillights.map((light) => ({
+  const expectedFixtures = expectedLights.flatMap((lights) => [
+    ...lights.headlights.map((light) => ({ ...light, radius: 4 })),
+    ...lights.taillights.map((light) => ({
       ...light,
-      radius: vehicle.braking ? 9 : 5,
+      radius: lights.braking ? 9 : 5,
     })),
-  )
-  expect(scene.nightLightGraphics.lightOrigins).toEqual(expectedLights)
-  expect(
-    scene.nightLightGraphics.lightCircles.filter(
-      ({ radius }) => radius !== 5.5,
-    ),
-  ).toEqual(expectedTaillights)
+  ])
+  expect(scene.beamRenderer.render).toHaveBeenLastCalledWith(expectedLights)
+  expect(scene.nightLightGraphics.lightOrigins).toEqual([])
+  expect(scene.nightLightGraphics.lightCircles).toEqual(expectedFixtures)
 
+  // The player's car remains drawn on the medal screen after finishing.
   scene.finishPlayer()
   scene.draw()
-  expect(scene.nightLightGraphics.lightOrigins).toEqual(expectedLights)
-  expect(
-    scene.nightLightGraphics.lightCircles.filter(
-      ({ radius }) => radius !== 5.5,
-    ),
-  ).toEqual(expectedTaillights)
+  expect(scene.beamRenderer.render).toHaveBeenLastCalledWith(expectedLights)
+  expect(scene.nightLightGraphics.lightCircles).toEqual(expectedFixtures)
 })
