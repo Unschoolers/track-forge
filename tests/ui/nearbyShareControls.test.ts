@@ -47,6 +47,24 @@ describe('Nearby sharing and rematch controls', () => {
     }
   })
 
+  it('displays received participant names while retaining slot fallbacks', async () => {
+    const race = new NearbyRace(transport, () => true)
+    try {
+      race.setDisplayName('JulienQC')
+      race.host({ track: nearbyTrack, car: 'blue', laps: 2, lighting: 'day' })
+      await vi.waitFor(() => expect(race.snapshot().phase).toBe('hosting'))
+      const results = createNearbyRaceResults(race, result, {
+        race: vi.fn(), selectTrack: vi.fn(), leave: vi.fn(),
+        downloadDiagnostics: vi.fn(async () => true),
+      })
+      // A standalone host lobby has no staged players yet.
+      expect(results.element.querySelectorAll('.scoreboard-row')).toHaveLength(0)
+      results.cleanup()
+    } finally {
+      race.destroy()
+    }
+  })
+
   it('gives the host race/select track/leave, but guests only leave', async () => {
     const host = new NearbyRace(transport, () => true)
     const guest = new NearbyRace(transport, () => true)
