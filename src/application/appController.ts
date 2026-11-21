@@ -216,7 +216,12 @@ export class AppController {
         this.update({ ...this.state, cup: null, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
         break
       case 'open-cup':
-        if (this.state.mode === 'home') this.update({ ...this.state, overlay: { type: 'cup' }, notice: null })
+        if (this.state.mode === 'home' &&
+            (this.state.overlay.type === 'none' ||
+              (this.state.overlay.type === 'nearby' && this.dependencies.nearby?.snapshot().phase === 'idle'))) {
+          this.update({ ...this.state, overlay: { type: 'cup',
+            ...(this.state.overlay.type === 'nearby' ? { returnTo: 'nearby' as const } : {}) }, notice: null })
+        }
         break
       case 'cup-add-track':
         if (this.state.overlay.type === 'cup' &&
@@ -873,6 +878,10 @@ export class AppController {
     const overlay = this.state.overlay
     if (overlay.type === 'cup-final' || overlay.type === 'results') {
       this.dispatch({ type: 'go-home' })
+      return
+    }
+    if (overlay.type === 'cup') {
+      this.update({ ...this.state, overlay: overlay.returnTo === 'nearby' ? { type: 'nearby' } : { type: 'none' }, notice: null })
       return
     }
     if (overlay.type === 'player-name' && !this.state.preferences.displayName) return
