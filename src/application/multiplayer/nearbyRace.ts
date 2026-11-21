@@ -7,6 +7,7 @@ import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
+import { normalizeDisplayName } from '@/domain/track/trackCreator'
 import { decodeControl, encodeControl, validLineupPositions, MAX_PLAYERS, type Control } from './controlProtocol'
 
 export type NearbyEvent =
@@ -71,10 +72,11 @@ export class NearbyRace {
   private course: Course | null = null
   private localCar: CarId = CAR_IDS[0]
   private localIdentity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY
+  private localDisplayName: string | undefined
   private readonly rooms = new Map<string, string>()
   private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
-  private readonly ready = new Map<string, { car: CarId; identity: PlayerIdentity; receivedAt: number }>()
+  private readonly ready = new Map<string, { car: CarId; identity: PlayerIdentity; name?: string; receivedAt: number }>()
   private readonly armed = new Map<string, number>()
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
@@ -134,6 +136,10 @@ export class NearbyRace {
   /** Updated from the saved preference; sent only with reliable lobby setup. */
   setIdentity(identity: unknown): void {
     this.localIdentity = normalizePlayerIdentity(identity)
+  }
+
+  setDisplayName(name: unknown): void {
+    this.localDisplayName = normalizeDisplayName(name)
   }
 
   host(course: Course): void {
@@ -312,7 +318,7 @@ export class NearbyRace {
 
   standings() {
     return [...this.racers].map(([slot, racer]) => ({
-      slot, car: racer.ghost.car, identity: racer.identity, local: slot === this.slot,
+      slot, car: racer.ghost.car, identity: racer.identity, name: racer.name, local: slot === this.slot,
       time: racer.time, left: racer.left ?? false,
     })).sort((a, b) => (a.time ?? Infinity) - (b.time ?? Infinity) || a.slot - b.slot)
   }
@@ -417,7 +423,8 @@ export class NearbyRace {
         if (!this.validateTrack(track)) throw new Error('The nearby track is not ready to race.')
         this.course = { ...this.prepared, track, car: this.localCar }
         this.readySentAt = this.now()
-        this.sendControl([id], { type: 'ready', car: this.localCar, identity: this.localIdentity, round: this.round })
+        this.sendControl([id], { type: 'ready', car: this.localCar, identity: this.localIdentity, round: this.round,
+          ...(this.localDisplayName ? { name: this.localDisplayName } : {}) })
         this.changed()
       }).catch((error: unknown) => {
         if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not load the nearby track.', 'receive_track', error)
@@ -457,12 +464,13 @@ export class NearbyRace {
       this.armTimeout('The host did not start the race in time.')
     } else if (guestSlot !== undefined && this.phase === 'preparing' &&
         message.type === 'ready' && incomingRound === this.round) {
-      if (!this.ready.has(id)) this.ready.set(id, { car: message.car, identity: message.identity, receivedAt: this.now() })
+      if (!this.ready.has(id)) this.ready.set(id, { car: message.car, identity: message.identity,
+        ...(message.name ? { name: message.name } : {}), receivedAt: this.now() })
       if (this.ready.size === this.guests.size) this.startHost()
     } else if (fromHost && this.phase === 'preparing' && message.type === 'lineup' &&
         incomingRound === this.round && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar) {
-      this.stage(this.course, message.cars, message.identities, message.positions)
+      this.stage(this.course, message.cars, message.identities, message.positions, message.names)
     } else if (guestSlot !== undefined && this.phase === 'staging' &&
         message.type === 'armed' && incomingRound === this.round) {
       if (!this.armed.has(id)) this.armed.set(id, this.now())
@@ -487,11 +495,13 @@ export class NearbyRace {
     if (!this.course || this.phase !== 'preparing') return
     const cars: (CarId | null)[] = [this.course.car, null, null, null]
     const identities: (PlayerIdentity | null)[] = [this.localIdentity, null, null, null]
+    const names: (string | null)[] = [this.localDisplayName ?? null, null, null, null]
     for (const [id, slot] of this.guests) {
       const guest = this.ready.get(id)
       if (!guest) return
       cars[slot] = guest.car
       identities[slot] = guest.identity
+      names[slot] = guest.name ?? null
     }
     // Assign one unique spawn pad per connected racer, including the host.
     // This order is chosen once and sent unchanged to every Android device.
@@ -500,11 +510,12 @@ export class NearbyRace {
       (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32)
     const positions: (number | null)[] = [null, null, null, null]
     occupied.forEach((slot, index) => { positions[slot] = shuffled[index]! })
-    this.stage(this.course, cars, identities, positions)
-    this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions, round: this.round })
+    this.stage(this.course, cars, identities, positions, names)
+    this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions, round: this.round,
+      ...(names.some(name => name !== null) ? { names } : {}) })
   }
 
-  private stage(course: Course, cars: (CarId | null)[], identities: (PlayerIdentity | null)[], positions: (number | null)[]): void {
+  private stage(course: Course, cars: (CarId | null)[], identities: (PlayerIdentity | null)[], positions: (number | null)[], names?: (string | null)[]): void {
     const gridSlot = positions[this.slot]
     if (gridSlot === null || gridSlot === undefined || !validLineupPositions(cars, positions)) {
       this.fail('The multiplayer starting grid is invalid.')
@@ -514,6 +525,8 @@ export class NearbyRace {
     cars.forEach((car, slot) => {
       if (car) this.racers.set(slot, {
         ghost: new RemoteGhost(car), identity: identities[slot] ?? DEFAULT_PLAYER_IDENTITY,
+        ...(names?.[slot] || (slot === this.slot && this.localDisplayName)
+          ? { name: names?.[slot] ?? this.localDisplayName } : {}),
       })
     })
     this.setPhase('staging')
