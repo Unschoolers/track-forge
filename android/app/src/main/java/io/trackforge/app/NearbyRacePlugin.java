@@ -55,7 +55,7 @@ import java.util.Set;
     @Permission(alias = "coarseLocation", strings = {Manifest.permission.ACCESS_COARSE_LOCATION})
 })
 public class NearbyRacePlugin extends Plugin {
-    private static final String SERVICE_ID = "io.trackforge.app.arcade.v1";
+    private static final String SERVICE_ID = "io.trackforge.app.arcade.v2";
     private static final Strategy STRATEGY = Strategy.P2P_STAR;
     private static final int MAX_BYTES = 16_003;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -274,7 +274,7 @@ public class NearbyRacePlugin extends Plugin {
             sentPackets++; sentBytes += bytes.length;
             Payload payload = Payload.fromBytes(bytes);
             long id = payload.getId();
-            boolean pose = bytes[0] == 1;
+            boolean pose = bytes[0] == 1 || bytes[0] == 3;
             // Task success means the transfer was queued. Keep control and track
             // packets pending until each endpoint reports successful delivery.
             pendingSends.put(id, new PendingSend(call, recipients));
