@@ -7,6 +7,7 @@ import { buildSceneryColliders, type RecoveryScenery } from '@/domain/race/scene
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRaceEffectsState } from '@/domain/race/effects'
+import { validGridPositions } from '@/domain/race/startGrid'
 import type { Vector2 } from '@/domain/model'
 
 export interface CreateRaceOptions {
@@ -21,6 +22,8 @@ export interface CreateRaceOptions {
   readonly handling?: 'arcade' | 'simulation' | undefined
   readonly startRatio?: number | undefined
   readonly reversed?: boolean | undefined
+  /** Vehicle index -> physical start slot, validated independently from vehicle IDs. */
+  readonly gridPositions?: readonly number[] | undefined
 }
 
 export interface StartGridSample extends Vector2 {
@@ -136,14 +139,18 @@ export function createRace(options: CreateRaceOptions): RaceState {
   const sceneryColliders = recoveryCheckpoints.length && options.recoveryScenery
     ? buildSceneryColliders(options.recoveryScenery, options.path.terrainSurface) : undefined
   const openPlacement = open ? sampleOpenStart(options.path) : undefined
-  const vehicles: RaceVehicle[] = ROAD_GEOMETRY.startGrid.map((grid, index) => {
+  const slots = validGridPositions(options.gridPositions) ? options.gridPositions : [0, 1, 2, 3]
+  const vehicles: RaceVehicle[] = ROAD_GEOMETRY.startGrid.map((_, index) => {
+    const gridSlot = slots[index] ?? index
+    const grid = ROAD_GEOMETRY.startGrid[gridSlot]!
+
     const placement = openPlacement ?? samplePathBehindStart(
       options.path,
       grid.back,
       resolvedStartIndex,
       options.reversed,
     )
-    const lane = open ? ROAD_GEOMETRY.lanes[index] ?? grid.lane : grid.lane
+    const lane = open ? ROAD_GEOMETRY.lanes[gridSlot] ?? grid.lane : grid.lane
     const position = {
       x: placement.x + placement.normal.x * lane,
       y: placement.y + placement.normal.y * lane,
@@ -174,7 +181,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
       ai:
         index === 0
           ? null
-          : createAiDriverState(ROAD_GEOMETRY.aiBaseLanes[index] ?? 0,
+          : createAiDriverState(ROAD_GEOMETRY.aiBaseLanes[gridSlot] ?? 0,
               (['cautious', 'steady', 'opportunist'] as const)[index - 1]),
       aiPace:
         index === 0
