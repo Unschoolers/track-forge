@@ -152,6 +152,32 @@ export class DomUiHost implements UiHost {
     }
   }
 
+  private async exportRaceDiagnostics(): Promise<void> {
+    const report = this.runtime.raceSession.diagnosticsReport?.()
+    if (!report) {
+      this.showRaceExportNotice('Race replay is no longer available.')
+      return
+    }
+    const trackName = report.track.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 48) || 'track'
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    try {
+      const saved = await saveJsonFile({
+        filename: `trackforge-race-${trackName}-${timestamp}.json`,
+        content: JSON.stringify(report),
+      })
+      this.showRaceExportNotice(saved ? 'Race replay file saved.' : 'Race replay was not saved.')
+    } catch (error) {
+      console.error('Track Forge race replay export failed:', error)
+      this.showRaceExportNotice('Race export failed. Please try another save location.')
+    }
+  }
+
+  private showRaceExportNotice(message: string): void {
+    const toast = createToast(message)
+    this.root.append(toast)
+    setTimeout(() => toast.remove(), 5000)
+  }
+
   private async downloadNearbyDiagnostics(nearby: NearbyRace): Promise<boolean> {
     const capturedAt = new Date().toISOString()
     const report = { capturedAt, ...await nearby.diagnostics() }
@@ -359,6 +385,8 @@ export class DomUiHost implements UiHost {
         }
         const modal = createResultsModal(result, {
           retry: () => this.controller.dispatch({ type: 'restart-race' }),
+          exportRace: this.runtime.raceSession.diagnosticsReport ? () => { void this.exportRaceDiagnostics() } : undefined,
+          diagnosticsOpened: () => this.runtime.feedback.handle({ type: 'ui', emphasis: 'confirm' }),
           raceBestGhost: (() => {
             const { track, setup } = this.runtime.raceSession.snapshot()
             return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null

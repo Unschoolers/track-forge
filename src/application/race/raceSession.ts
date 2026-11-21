@@ -42,6 +42,7 @@ import {
 } from '@/application/race/ghostReplay'
 import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
+import { RaceDiagnosticsRecording, type RaceDiagnosticsReport } from '@/application/race/raceDiagnostics'
 import { createRaceResult, toRaceStanding } from '@/application/race/raceResultRecorder'
 import { routeRaceFeedback } from '@/application/race/raceFeedback'
 
@@ -126,6 +127,7 @@ export interface RaceSessionSnapshot {
 export interface RaceSessionPort {
   ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
+  diagnosticsReport?(): RaceDiagnosticsReport | null
   start(track: Track, setup: RaceSetup, startsAt?: number): void
   scheduleNearbyStart?(startsAt: number): void
   restart(): void
@@ -188,6 +190,7 @@ export class RaceSession implements RaceSessionPort {
   private readonly geometry: TrackGeometryService
   private bestGhost: GhostRun | null = null
   private recording: GhostRecording | null = null
+  private diagnostics: RaceDiagnosticsRecording | null = null
   private timing = new LapTiming()
 
   constructor(private readonly dependencies: RaceSessionDependencies) {
@@ -232,6 +235,7 @@ export class RaceSession implements RaceSessionPort {
     const player = state.vehicles.find((vehicle) => vehicle.player)
     this.recording = !nearby && player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
+    this.diagnostics = nearby ? null : new RaceDiagnosticsRecording(state)
     this.publish(this.buildSnapshot(track, resolved, state, null))
     if (!nearby || this.startsAt !== undefined) {
       this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
@@ -274,6 +278,7 @@ export class RaceSession implements RaceSessionPort {
     this.rivalFinishRemaining = 0
     this.bestGhost = null
     this.recording = null
+    this.diagnostics = null
     this.timing = new LapTiming()
     this.publish(EMPTY_RACE)
   }
@@ -287,6 +292,7 @@ export class RaceSession implements RaceSessionPort {
     const after = recovered.vehicles.find((vehicle) => vehicle.player)
     if (!before || !after) return
     this.recording?.recover(before, after, state.elapsed)
+    this.diagnostics?.manualReset(recovered, after.id)
     if (this.current.setup?.mode === 'nearby') this.dependencies.nearby?.recovered()
     this.timing.recover()
     this.publish(
@@ -370,6 +376,7 @@ export class RaceSession implements RaceSessionPort {
           this.timing.accept(event.lap, event.gate, event.time)
         }
       }
+      this.diagnostics?.record(state, next.events, input)
       if (player && state.phase !== 'finished') this.recording?.sample(player, state.elapsed)
       if (before && player && !before.grounded && player.grounded) {
         peakLanding = Math.max(peakLanding, player.landingIntensity)
@@ -443,6 +450,7 @@ export class RaceSession implements RaceSessionPort {
     if (this.remainder + 1e-10 < RACE_TICK_SECONDS && this.rivalFinishRemaining > 0) return
     while (this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       state = stepFinishingRivals(state, this.dependencies.random)
+      this.diagnostics?.record(state, [])
       this.remainder = Math.max(0, this.remainder - RACE_TICK_SECONDS)
       if (!state.vehicles.some(isRivalRacing)) {
         this.rivalFinishRemaining = 0
@@ -468,6 +476,12 @@ export class RaceSession implements RaceSessionPort {
     return this.current
   }
 
+  diagnosticsReport(): RaceDiagnosticsReport | null {
+    const { track, setup, result } = this.current
+    return track && setup && result && this.diagnostics
+      ? this.diagnostics.report(track, setup, result) : null
+  }
+
   subscribe(listener: (snapshot: RaceSessionSnapshot) => void): Unsubscribe {
     if (this.destroyed) return () => undefined
     return this.events.subscribe(listener)
@@ -477,6 +491,7 @@ export class RaceSession implements RaceSessionPort {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.destroyed = true
+    this.diagnostics = null
     this.events.clear()
   }
 
