@@ -1,11 +1,9 @@
 import type { RandomSource } from '@/domain/race/randomSource'
 import { rivalCatchUp } from '@/domain/race/ai/catchUp'
-import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
-import { getTrafficState } from '@/domain/race/ai/traffic'
 import { solveCollisionFrame } from '@/domain/race/collisions'
-import { authoredRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
+import { reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
 import { hitScenery } from '@/domain/race/sceneryCollisions'
-import { crossesRoadGate, lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
+import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
 import type {
   DriverInput,
   RaceOutcome,
@@ -15,18 +13,19 @@ import type {
 import {
   buildRaceCameraHints,
   findNearestSafeTrackIndex,
-  gradeForTravel,
-  getVehicleStepContext,
   reconcileSupportAfterCollision,
   resetVehicleToTrack,
-  type VehicleStepContext,
 } from '@/domain/race/trackContext'
-import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { advanceRaceEffects } from '@/domain/race/effects'
 import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
-import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
 import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
+import { resetRaceVehicle, recoverRacePlayer, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
+import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
+import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
+
+// Preserve existing engine imports after moving recovery rules to their owner.
+export { resetRaceVehicle, recoverRacePlayer } from '@/domain/race/raceRecovery'
 
 export type RaceEvent =
   | { readonly type: 'gate-crossed'; readonly vehicleId: string; readonly gate: 1 | 2 | 3 | 4; readonly lap: number; readonly time: number }
@@ -97,228 +96,11 @@ export type RaceStep = (
   random: RandomSource,
 ) => RaceStepResult
 
-const PLAYER_ROUTE_WINDOW = 12
-
-function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previous?: VehicleStepContext) {
-  // A car moves only a few samples per step. Keep the player on its current
-  // road when a nearby return arm is closer; off-road reacquisition remains
-  // available for closed circuits in getVehicleStepContext.
-  const radius = race.routeKind === 'point-to-point' || vehicle.player ? PLAYER_ROUTE_WINDOW : undefined
-  return getVehicleStepContext(race.path, vehicle, previous, radius)
-}
-
-export function resetRaceVehicle(
-  vehicle: RaceVehicle,
-  race: RecoveryCourse,
-): RaceVehicle {
-  const checkpoint = resetAtAuthoredCheckpoint(vehicle, race)
-  if (checkpoint) return checkpoint
-  if (vehicle.player) {
-    const pathIndex = safeFallbackRecoveryTarget(race, vehicle)
-    return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex, reversed: race.reversed })
-  }
-  if (race.routeKind !== 'point-to-point') {
-    return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
-  }
-  const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector)
-  const pathIndex = findNearestSafeTrackIndex(race.path, vehicle, false, limit)
-  return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex })
-}
-
-export function recoverRacePlayer(state: RaceState): RaceState {
-  if (state.phase !== 'running' || state.paused) return state
-  const index = state.vehicles.findIndex((vehicle) => vehicle.player)
-  const player = state.vehicles[index]
-  if (!player) return state
-  const recovered = state.missedCheckpoint ? resetMissedCheckpoint(player, state) : resetRaceVehicle(player, state)
-  if (recovered === player) return state
-  const vehicles = [...state.vehicles]
-  vehicles[index] = recovered
-  return {
-    ...state,
-    vehicles,
-    missedCheckpoint: undefined,
-    cameraHints: buildRaceCameraHints(state.path, recovered, state.reversed),
-  }
-}
-
-const MISSED_GATE_GRACE_SECONDS = 5
-
-function advanceArcadeTimingGate(
-  race: RaceState,
-  previous: RaceVehicle,
-  vehicle: RaceVehicle,
-  elapsed: number,
-  onRoad: boolean,
-  wasOnRoad: () => boolean,
-): { vehicle: RaceVehicle; missedCheckpoint: RaceState['missedCheckpoint'] } {
-  const { path, startPathIndex, reversed, missedCheckpoint } = race
-  const count = path.points.length
-  const gate = previous.nextSector
-  const direction = reversed ? -1 : 1
-  // Award timing at the gate line, since path sampling alone can round ahead.
-  const position = path.closed
-    ? ((startPathIndex + direction * count * gate / 4) % count + count) % count
-    : (count - 1) * gate / 4
-  if (count < 2 || previous.finishedAt !== null) {
-    return { vehicle, missedCheckpoint }
-  }
-  const crossedLine = crossesRoadGate(path, previous, vehicle, position, Infinity, reversed)
-  // On a stage the route runs in one direction, so rejoining well past
-  // the pending gate is also a miss even if the car went around its line.
-  if (!crossedLine && (path.closed || !onRoad || !passedPendingCheckpoint(path, vehicle))) {
-    return { vehicle, missedCheckpoint }
-  }
-  // Road classification at a diagonal gate can change on the crossing frame.
-  // If either endpoint falls off the road, require the actual swept crossing
-  // to intersect the painted stripe rather than granting a grass shortcut.
-  const crossingRadius = onRoad && wasOnRoad()
-    ? ROAD_GEOMETRY.onRoadRadius
-    : ROAD_GEOMETRY.checkpointHalfWidth
-  if (crossedLine &&
-      crossesRoadGate(path, previous, vehicle, position, crossingRadius, reversed)) {
-    if (gate === 4) {
-      const lap = previous.lap + 1
-      return {
-        vehicle: { ...vehicle, lap, nextSector: 1, finishedAt: lap >= race.totalLaps ? elapsed : null },
-        missedCheckpoint: undefined,
-      }
-    }
-    return { vehicle: { ...vehicle, nextSector: (gate + 1) as 2 | 3 | 4 }, missedCheckpoint: undefined }
-  }
-  if (missedCheckpoint) return { vehicle, missedCheckpoint }
-
-  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(position))
-  const a = path.points[lower]
-  const b = path.points[(lower + 1) % count]
-  if (!a || !b) return { vehicle, missedCheckpoint: undefined }
-  const fraction = position - lower
-  return {
-    vehicle,
-    missedCheckpoint: {
-      gate,
-      remainingSeconds: MISSED_GATE_GRACE_SECONDS,
-      position: { x: a.x + (b.x - a.x) * fraction, y: a.y + (b.y - a.y) * fraction },
-    },
-  }
-}
-
-function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): RaceVehicle {
-  const authored = vehicle.recoveryCheckpoint == null ? undefined : resetAtAuthoredCheckpoint(vehicle, race)
-  if (authored) return authored
-  const count = race.path.points.length
-  const previousGate = vehicle.nextSector - 1
-  const progress = Math.floor((race.path.closed ? count : count - 1) * previousGate / 4)
-  const target = race.path.closed
-    ? ((race.startPathIndex + (race.reversed ? -1 : 1) * progress) % count + count) % count
-    : progress
-  const candidate = { ...vehicle, pathIndex: target, recoveryAnchorIndex: target }
-  const safe = safeFallbackRecoveryTarget(race, candidate)
-  return safe === undefined ? vehicle : resetVehicleToTrack(candidate, race.path, { pathIndex: safe, reversed: race.reversed })
-}
-
-function resetAtAuthoredCheckpoint(vehicle: RaceVehicle, race: RecoveryCourse): RaceVehicle | undefined {
-  const pathIndex = authoredRecoveryTarget(race, vehicle)
-  if (pathIndex === undefined) return undefined
-  return resetVehicleToTrack({
-    ...vehicle,
-    waterRecoveryProtected: false,
-    ...(vehicle.wrecked ? { wrecked: false, damage: 0, damageCooldown: 0.55 } : {}),
-  }, race.path, { pathIndex, reversed: race.reversed })
-}
-
-function restoreFrameProgress(vehicle: RaceVehicle, previous: RaceVehicle): RaceVehicle {
-  return {
-    ...vehicle,
-    nextSector: previous.nextSector,
-    lap: previous.lap,
-    finishedAt: previous.finishedAt,
-    ...(vehicle.recoveryCheckpoint === undefined && previous.recoveryCheckpoint === undefined
-      ? {} : { recoveryCheckpoint: previous.recoveryCheckpoint ?? null }),
-  }
-}
-
-function aiRampSpeedLimit(
-  race: RaceState,
-  vehicle: RaceVehicle,
-  startIndex: number,
-): number {
-  // Arcade rivals carry their pace over climbs just like the player.
-  if (vehicle.racingLine || (race.handling ?? 'arcade') === 'arcade') {
-    return Number.POSITIVE_INFINITY
-  }
-  // Anticipate climbs in the travel direction; descents keep their speed.
-  const lookAhead = Math.min(40, Math.max(12, Math.ceil(vehicle.speed / 6)))
-  if (gradeForTravel(race.path.roadSurface.gradeAt(startIndex), race.reversed) < -0.025) {
-    return Number.POSITIVE_INFINITY
-  }
-  for (let offset = 0; offset <= lookAhead; offset++) {
-    const index = startIndex + offset * (race.reversed ? -1 : 1)
-    if (!race.path.closed && (index < 0 || index >= race.path.points.length)) continue
-    if (gradeForTravel(race.path.roadSurface.gradeAt(index), race.reversed) > 0.025) {
-      return 110
-    }
-  }
-  return Number.POSITIVE_INFINITY
-}
-
 function controlsForVehicle(
   controls: RaceTickInput['controls'],
   id: string,
 ): DriverInput | undefined {
   return Object.hasOwn(controls, id) ? controls[id] : undefined
-}
-
-function advanceVehicle(
-  vehicle: RaceVehicle,
-  race: RaceState,
-  input: DriverInput | undefined,
-  deltaSeconds: number,
-  random: RandomSource,
-  catchUp: SpeedAssist | undefined,
-): RaceVehicle {
-  const previousContext = raceVehicleContext(race, vehicle)
-  let moved: RaceVehicle
-  if (input) {
-    moved = stepVehicle(
-      vehicle,
-      input,
-      previousContext,
-      deltaSeconds,
-      race.handling ?? 'arcade',
-    )
-  } else {
-    moved = stepAiVehicle(
-      vehicle,
-      race.path,
-      getTrafficState(vehicle, race.vehicles, race.path, race.reversed),
-      race.difficulty,
-      deltaSeconds,
-      random,
-      race.reversed,
-      aiRampSpeedLimit(race, vehicle, previousContext.nearest.index),
-      race.handling ?? 'arcade',
-      catchUp,
-    )
-  }
-  const nextContext = raceVehicleContext(race, moved, previousContext)
-  const longitudinalSpeed = Math.abs(
-    moved.vx * nextContext.tangent.x +
-      moved.vy * nextContext.tangent.y,
-  )
-  const vertical = stepVehicleVerticalDynamics(
-    vehicle,
-    {
-      previousSurfaceHeight: previousContext.surfaceHeight,
-      surfaceHeight: nextContext.surfaceHeight,
-      grade: gradeForTravel(nextContext.grade, race.reversed),
-      longitudinalSpeed,
-      previousOverRoad: previousContext.onRoad,
-      overRoad: nextContext.onRoad,
-    },
-    deltaSeconds,
-  )
-  return { ...moved, ...vertical }
 }
 
 export const stepRace: RaceStep = advanceRace
