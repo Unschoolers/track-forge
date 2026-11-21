@@ -57,6 +57,7 @@ export function createRaceHud(
   damage.append(damageFill, damageText)
 
   const raceBanner = element('div', 'race-event-banner')
+  raceBanner.setAttribute('role', 'status')
   raceBanner.setAttribute('aria-live', 'polite')
   const slide = element('div', 'race-slide-cue')
   slide.dataset.raceDrift = ''
@@ -207,13 +208,38 @@ export function createRaceHud(
   document.addEventListener('visibilitychange', onVisibility)
 
   let lastPosition: number | null = null
+  let lastRunId = raceSession.snapshot().runId
   let lastLap: number | null = null
   let bannerUntil = 0
   let finalLapNotice = false
   let previousHandling: string | undefined
   let previousPaused: boolean | undefined
   let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
+  const announce = (
+    label: string,
+    title: string,
+    detail: string,
+    kind: 'gain' | 'lead' | 'loss' | 'lap',
+    now: number,
+    duration: number,
+  ): void => {
+    raceBanner.dataset.kind = kind
+    // Fresh children restart the one-shot motion even for quick consecutive passes.
+    raceBanner.replaceChildren(
+      element('span', 'race-event-kicker', label),
+      element('strong', 'race-event-title', title),
+      element('span', 'race-event-detail', detail),
+    )
+    bannerUntil = now + duration
+  }
   const update = (snapshot: RaceSessionSnapshot): void => {
+    if (snapshot.runId !== lastRunId) {
+      lastRunId = snapshot.runId
+      lastPosition = null
+      lastLap = null
+      bannerUntil = 0
+      finalLapNotice = false
+    }
     const handling = snapshot.setup?.handling ?? 'arcade'
     const paused = snapshot.state?.paused ?? false
     const phase = snapshot.telemetry.phase
@@ -261,17 +287,28 @@ export function createRaceHud(
     } else if (telemetry.routeKind !== 'point-to-point' && lastLap !== null && telemetry.lap > lastLap &&
       telemetry.lap + 1 === telemetry.totalLaps) {
       finalLapNotice = true
-      raceBanner.textContent = 'FINAL LAP!'
-      bannerUntil = now + 1300
-    } else if (lastPosition !== null && telemetry.position < lastPosition &&
-      (!finalLapNotice || now >= bannerUntil)) {
+      announce('THE DECIDING LAP', 'FINAL LAP!', 'EVERY SECOND COUNTS', 'lap', now, 1450)
+    } else if (
+      lastPosition !== null &&
+      telemetry.position !== lastPosition &&
+      (snapshot.setup?.mode ?? 'normal') === 'normal' &&
+      telemetry.vehicleCount > 1 &&
+      (!finalLapNotice || now >= bannerUntil)
+    ) {
       finalLapNotice = false
-      raceBanner.textContent = 'OVERTAKE!'
-      bannerUntil = now + 1100
+      const gained = lastPosition - telemetry.position
+      const count = Math.abs(gained)
+      const detail = `${count} PLACE${count === 1 ? '' : 'S'} ${gained > 0 ? 'GAINED' : 'LOST'} · P${telemetry.position}/${telemetry.vehicleCount}`
+      if (gained > 0) {
+        const lead = telemetry.position === 1
+        announce(lead ? 'YOU OWN THE FRONT' : 'NICE MOVE', lead ? 'LEAD TAKEN!' : 'OVERTAKE!', detail, lead ? 'lead' : 'gain', now, 1650)
+      } else {
+        announce('FIGHT BACK', 'YOU GOT PASSED!', detail, 'loss', now, 1400)
+      }
     }
     const showBanner = racing && now < bannerUntil
     raceBanner.classList.toggle('visible', showBanner)
-    if (!showBanner) raceBanner.textContent = ''
+    if (!showBanner && raceBanner.textContent) raceBanner.replaceChildren()
     lastPosition = telemetry.position
     lastLap = telemetry.lap
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
