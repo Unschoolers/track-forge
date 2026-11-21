@@ -33,7 +33,8 @@ export class TrackReceiver {
   async receive(packet: Uint8Array<ArrayBuffer>): Promise<Track | null> {
     const index = packet[1]
     const count = packet[2]
-    if (index === undefined || count === undefined || count > MAX_TRACK_CHUNKS || index >= count ||
+    if (packet[0] !== Packet.Track ||
+        index === undefined || count === undefined || count > MAX_TRACK_CHUNKS || index >= count ||
         packet.length <= 3 || packet.length > 3 + CHUNK_BYTES ||
         (this.count !== undefined && this.count !== count)) throw new Error('Invalid nearby track transfer.')
     this.count = count

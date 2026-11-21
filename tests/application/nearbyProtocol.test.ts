@@ -89,4 +89,37 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(ghost.pose(1850)).toBeNull()
     expect(decodePose(new Uint8Array(18))).toBeNull()
   })
+  it.each([
+    ['negative slot', -1, 1, 0],
+    ['fifth player slot', 4, 1, 0],
+    ['fractional slot', 0.5, 1, 0],
+    ['negative sequence', 0, -1, 0],
+    ['overflow sequence', 0, 65_536, 0],
+    ['negative recovery counter', 0, 1, -1],
+    ['overflow recovery counter', 0, 1, 256],
+  ] as const)('rejects %s instead of silently truncating the pose header', (_name, slot, sequence, recovery) => {
+    expect(() => encodePose(slot, sequence, recovery, makeCar('blue', 10))).toThrow(RangeError)
+  })
+
+  it.each([
+    ['nonfinite X', { x: Number.NaN }],
+    ['nonfinite Y', { y: Number.POSITIVE_INFINITY }],
+    ['nonfinite Z', { z: Number.NEGATIVE_INFINITY }],
+    ['nonfinite heading', { angle: Number.NaN }],
+    ['overflowing coordinates', { x: 100_000_000 }],
+  ])('rejects %s instead of teleporting the remote car to a wrapped coordinate', (_name, changes) => {
+    expect(() => encodePose(1, 1, 0, { ...makeCar('blue', 10), ...changes })).toThrow(RangeError)
+  })
+
+  it.each([
+    ['wrong packet type', new Uint8Array([Packet.Control, 0, 1, 1])],
+    ['missing envelope', new Uint8Array([Packet.Track, 0])],
+    ['zero chunk count', new Uint8Array([Packet.Track, 0, 0, 1])],
+    ['index outside chunk count', new Uint8Array([Packet.Track, 1, 1, 1])],
+    ['unbounded chunk count', new Uint8Array([Packet.Track, 0, 255, 1])],
+  ])('rejects %s before allocating or decompressing untrusted bytes', async (_name, packet) => {
+    await expect(new TrackReceiver().receive(packet)).rejects.toThrow('Invalid nearby track transfer.')
+  })
+
+
 })

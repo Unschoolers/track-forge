@@ -21,6 +21,20 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
   const bytes = new Uint8Array(POSE_BYTES)
   const view = new DataView(bytes.buffer)
   const pose = captureGhost(vehicle, 0)
+  // Avoid silent Uint8Array/DataView coercion: an invalid local vehicle must
+  // never become a plausible remote pose (for example NaN x becomes 0).
+  const signedMin = -0x80000000
+  const signedMax = 0x7fffffff
+  if (!Number.isInteger(slot) || slot < 0 || slot > 3 ||
+      !Number.isInteger(sequence) || sequence < 0 || sequence > 0xffff ||
+      !Number.isInteger(recovery) || recovery < 0 || recovery > 0xff ||
+      !Number.isFinite(pose.angle) ||
+      ![pose.x, pose.y, pose.z].every((coordinate) => {
+        const quantized = Math.round(coordinate * SCALE)
+        return Number.isFinite(coordinate) && quantized >= signedMin && quantized <= signedMax
+      })) {
+    throw new RangeError('Invalid nearby pose values.')
+  }
   bytes[0] = Packet.Pose
   bytes[1] = slot | (pose.structureRunId === null ? 0 : 4)
   bytes[2] = recovery
