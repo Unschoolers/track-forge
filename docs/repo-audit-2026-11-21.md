@@ -10,7 +10,7 @@
 - Tooling: strict TypeScript, Vitest, Playwright, Biome, Vite, Phaser, Capacitor, native Android Gradle.
 - CI has web build and JavaScript verification jobs; Android build is conditional; signing/release is protected and main-only.
 
-**These counts are inventory, not evidence of overtesting or poor quality.** Count and file length alone should never trigger deletion.
+**These counts are inventory, not evidence of overtesting or poor quality.** Hundreds of valuable unit tests are welcome. The audit should prioritize expensive integration/browser duplication, fixture maintenance and weak assertions—not unit-test count. Count and file length alone should never trigger deletion.
 
 ## Risk-ranked opportunities (proposals, not completed fixes)
 
@@ -38,7 +38,7 @@
 
 ## Recommended sequence
 
-**A.** Adopt the new docs as a change-review checklist. **B.** Inventory high-maintenance tests by *distinct contract*. **C.** Remove one proven duplication or refactor one shared fixture per PR; retain strong negative/edge cases. **D.** Simplify orchestration at stable boundaries only after test coverage demonstrates its contract. **E.** Measure CI duration and runtime/performance before claiming savings.
+**A.** Adopt the new docs as a change-review checklist. **B.** Classify suites by unit/integration/UI scope and inventory high-maintenance cases by *distinct contract*. **C.** Retain or expand cheap edge-case unit tests; consolidate one proven expensive integration/UI duplication or one shared fixture per PR, while preserving strong negative/edge cases. **D.** Simplify orchestration at stable boundaries only after test coverage demonstrates its contract. **E.** Measure CI duration and runtime/performance before claiming savings.
 
 ## Verification gap
 
