@@ -32,3 +32,11 @@ The first round uses the existing room lock; rematches reuse established peer co
 The local race engine and ghost/score storage are unchanged. The sharing mode permits unready draft tracks, whereas rematch track selection requires race-ready validation. The UI and session use explicit phase guards and retain the current player identity, peers and car configuration.
 
 Verification should include two Android devices (advertise/discover, permissions, save picker/storage errors, host and guest Leave), with targeted component tests and in-memory Nearby integration tests before browser smoke checks. No Android native code or packet pose format is modified.
+
+## Nearby race position and results (optional telemetry)
+
+Race standings for active cars use the same checkpoint-aware path-progress calculation as the local single-player race. An **optional 8-byte progress packet** (type 4, slot/sequence/float32 progress) is sent at most every 150 ms alongside the unchanged 19-byte pose stream. The host relays valid guest samples, rejecting stale sequence numbers and unauthorized slots. Progress packets are scoped to the current round and cleared on rematch/leave.
+
+Older clients simply ignore progress packets: they continue displaying remote cars, but the HUD falls back to **LIVE** instead of fabricating a position. New clients also fall back if an active peer's sample becomes stale (more than 1.5 seconds). These samples affect only UI ranks and overtake feedback: local physics, checkpoint validation and the existing finish-time order remain authoritative. Multiplayer has no solo time-medal or score category.
+
+The podium only settles once every participant has a finish, DNF or departure state. This avoids announcing a premature victory while someone else is still racing.

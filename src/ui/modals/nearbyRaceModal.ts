@@ -1,5 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import type { RaceResult } from '@/application/race/raceSession'
+import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 import { CAR_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
 import { createCarPicker } from '@/ui/components/carPicker'
@@ -102,6 +103,10 @@ export function createNearbyRaceResults(
 ) {
   const frame = createModalFrame('NEARBY RACE RESULTS', result.trackName, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
+  const title = frame.overlay.querySelector<HTMLElement>('.modal-title')
+  const dialog = frame.overlay.querySelector<HTMLElement>('[role="dialog"]')
+  const celebration = element('div', 'nearby-celebration')
+  let celebrationKey = ''
   if (result.playerTime !== null) {
     frame.body.append(element('p', 'modal-subtitle', `Your time · ${formatRaceTime(result.playerTime)}`))
   }
@@ -111,12 +116,40 @@ export function createNearbyRaceResults(
   status.setAttribute('role', 'status')
   const nextTrack = element('p', 'modal-subtitle')
   const race = nearby.snapshot().role === 'host'
-    ? button('RACE', 'nearby-race-again', actions.race, 'button button-primary')
+    ? button('RACE AGAIN', 'nearby-race-again', actions.race, 'button button-primary')
     : null
   const selectTrack = race
     ? button('SELECT TRACK', 'nearby-next-track', actions.selectTrack, 'button')
     : null
   function update() {
+    const standings = nearby.standings()
+    const complete = standings.length > 0 && standings.every(({ time, left }) => time !== undefined || left)
+    const localIndex = standings.findIndex(({ local }) => local)
+    const localTime = standings[localIndex]?.time
+    const winnerTime = standings.find(({ time }) => typeof time === 'number')?.time
+    const place = localIndex + 1
+    const medal = complete && typeof localTime === 'number' && result.outcome === 'finished'
+      ? medalForFinish('finished', place) : null
+    const headline = complete
+      ? typeof localTime !== 'number'
+        ? result.outcome === 'water' ? 'SUNK' : result.outcome === 'wrecked' ? 'WRECKED' : 'DID NOT FINISH'
+        : place === 1 ? 'VICTORY!' : `FINISHED ${place}${place % 100 >= 11 && place % 100 <= 13 ? 'TH' : place % 10 === 2 ? 'ND' : place % 10 === 3 ? 'RD' : place % 10 === 1 ? 'ST' : 'TH'}`
+      : 'NEARBY RACE RESULTS'
+    if (title && title.textContent !== headline) {
+      title.textContent = headline
+      dialog?.setAttribute('aria-label', headline)
+    }
+    const key = complete ? `${place}:${medal ?? 'none'}:${localTime}` : 'waiting'
+    if (key !== celebrationKey) {
+      celebrationKey = key
+      const nodes: HTMLElement[] = []
+      if (medal) nodes.push(createFinishCelebration(medal))
+      if (complete && typeof localTime === 'number' && place > 1 &&
+          typeof winnerTime === 'number') {
+        nodes.push(element('p', 'modal-subtitle', `Behind winner · +${formatRaceTime(Math.max(0, localTime - winnerTime))}`))
+      }
+      celebration.replaceChildren(...nodes)
+    }
     const snapshot = nearby.snapshot()
     if (snapshot.role === 'host') {
       nextTrack.textContent = `Next race · ${snapshot.track ?? result.trackName}`
@@ -130,7 +163,7 @@ export function createNearbyRaceResults(
     } else {
       status.textContent = snapshot.error ?? 'Waiting for the host to choose the next race…'
     }
-    list.replaceChildren(...nearby.standings().map(({ slot, car, identity, local, time, left }, index) => {
+    list.replaceChildren(...standings.map(({ slot, car, identity, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
       const label = local ? 'You' : `Player ${slot + 1}`
       const topper = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
@@ -145,7 +178,7 @@ export function createNearbyRaceResults(
     }))
   }
   update()
-  frame.body.append(list, status, nextTrack, createDiagnosticsControl(actions.downloadDiagnostics))
+  frame.body.append(celebration, list, status, nextTrack, createDiagnosticsControl(actions.downloadDiagnostics))
   if (race && selectTrack) frame.footer.append(race, selectTrack)
   frame.footer.append(button('LEAVE', 'nearby-leave-room', actions.leave, 'button button-danger'))
   return { element: frame.overlay, cleanup: nearby.subscribe(update) }

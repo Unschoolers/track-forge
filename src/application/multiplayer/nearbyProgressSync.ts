@@ -1,17 +1,21 @@
-import { decodeProgress, encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
+import { encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
 
 /** A low-rate optional stream; old peers ignore these packets and still render poses. */
 export class NearbyProgressSync {
   private readonly remote = new Map<number, { sequence: number; value: number; at: number }>()
   private nextSequence = 0
   private lastSentAt = Number.NEGATIVE_INFINITY
+  private sendFailures = 0
 
   constructor(
     private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
     private readonly now: () => number,
   ) {}
 
+  get failedSends(): number { return this.sendFailures }
+
   reset(): void {
+    this.sendFailures = 0
     this.remote.clear()
     this.nextSequence = 0
     this.lastSentAt = Number.NEGATIVE_INFINITY
@@ -25,7 +29,8 @@ export class NearbyProgressSync {
     this.lastSentAt = now
     // Progress is optional; failed samples expire instead of interrupting the race.
     void this.send(recipients, packet).catch(() => {
-      // The next sample retries. No standing is shown while telemetry is stale.
+      // Explicit diagnostic count; this optional stream never aborts an active race.
+      this.sendFailures++
     })
   }
 

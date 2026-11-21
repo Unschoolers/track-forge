@@ -5,7 +5,7 @@ import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { createHighScores, createStandings } from '@/ui/components/scoreboard'
 import { createModalFrame } from '@/ui/modals/modalFrame'
-import { medalForFinish } from '@/ui/components/finishMedal'
+import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 
 export function createResultsModal(
   result: RaceResult,
@@ -41,26 +41,7 @@ export function createResultsModal(
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
   const medal = result.ghostTime === undefined && !timeTrial ? medalForFinish(result.outcome, result.playerPlace) : null
-  if (medal) {
-    const podium = element('section', 'results-celebration')
-    podium.dataset.medal = medal
-    podium.dataset.resultCelebration = medal === 'GOLD' ? 'victory' : 'podium'
-    const sparkles = element('div', 'results-celebration-sparks')
-    sparkles.setAttribute('aria-hidden', 'true')
-    if (medal === 'GOLD') {
-      for (let i = 0; i < 8; i += 1) sparkles.append(element('i'))
-    }
-    const accolade = medal === 'GOLD' ? 'CHAMPION' : medal === 'SILVER' ? 'BRILLIANT DRIVE' : 'ON THE PODIUM'
-    const placement = medal === 'GOLD' ? '1ST PLACE' : medal === 'SILVER' ? '2ND PLACE' : '3RD PLACE'
-    podium.append(
-      sparkles,
-      element('span', 'results-celebration-kicker', accolade),
-      element('strong', 'results-celebration-place', placement),
-      element('span', 'results-celebration-detail', medal === 'GOLD' ? 'YOU WON THE RACE' : 'YOU EARNED YOUR MEDAL'),
-    )
-    if (result.newRecord) podium.append(element('span', 'results-celebration-record', '★ NEW RECORD'))
-    frame.body.append(podium)
-  }
+  if (medal) frame.body.append(createFinishCelebration(medal, result.newRecord))
   if (result.playerTime !== null && result.previousBestTime !== undefined) {
     const delta = result.playerTime - result.previousBestTime
     const copy = delta < 0

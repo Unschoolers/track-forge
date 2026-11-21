@@ -1,9 +1,8 @@
 import { EventBus } from '@/application/eventBus'
 import type { GhostPose } from '@/application/race/ghostReplay'
-import { CAR_IDS, type CarId, type LightingMode, type Track } from '@/domain/model'
+import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track } from '@/domain/model'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { raceProgress } from '@/domain/race/ranking'
-import { normalizeRouteKind } from '@/domain/model'
 import { decodeProgress, Packet, RemoteGhost } from './raceWire'
 import { NearbyProgressSync } from './nearbyProgressSync'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
@@ -121,6 +120,7 @@ export class NearbyRace {
       counts: this.diagnosticCounts(),
       timeline: this.timeline.map((entry) => ({ ...entry })),
       poseCounts: this.poseSync.counts,
+      progressSendFailures: this.progressSync.failedSends,
       targetPoseHz: this.poseSync.targetPoseHz,
       lastFailure: this.lastFailure && { ...this.lastFailure },
     }
