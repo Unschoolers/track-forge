@@ -41,6 +41,7 @@ export type AppOverlay =
       readonly purpose: 'create' | 'rename'
       readonly returnTo: OverlayReturn
     }
+  | { readonly type: 'player-name' }
   | { readonly type: 'race-setup' }
   | { readonly type: 'nearby'; readonly customize?: boolean }
   | { readonly type: 'editor-menu' }
@@ -124,6 +125,8 @@ export type AppCommand =
       readonly purpose: 'edit' | 'race'
     }
   | { readonly type: 'close-overlay' }
+  | { readonly type: 'open-player-name' }
+  | { readonly type: 'set-player-name'; readonly name: string }
   | {
       readonly type: 'open-track-name'
       readonly purpose: 'create' | 'rename'

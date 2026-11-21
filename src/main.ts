@@ -160,6 +160,11 @@ sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
 application.start()
+// No online account exists yet: the first local launch establishes a persistent
+// player display name, reused when creating or crediting tracks.
+if (!controller.snapshot().preferences.displayName) {
+  controller.dispatch({ type: 'open-player-name' })
+}
 export const gameReady = sceneHost.whenReady()
 // Render the controls before a scene uses their bounds to fit the camera.
 const stopSceneSync = controller.subscribe((snapshot) => {

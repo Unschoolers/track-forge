@@ -14,7 +14,7 @@ import { createTopperSelector } from '@/ui/components/playerTopperPicker'
 type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
 const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<{ state: 'permission-required' | 'installer-opened' }> }>('TrackForgeUpdates')
 
-type OptionsTab = 'race' | 'audio' | 'controls' | 'display' | 'updates'
+type OptionsTab = 'profile' | 'race' | 'audio' | 'controls' | 'display' | 'updates'
 let selectedOptionsTab: OptionsTab = 'race'
 
 interface OptionsNavigation {
@@ -26,6 +26,7 @@ export function createOptionsModal(
   state: AppSnapshot,
   actions: {
     readonly close: () => void
+    readonly playerName: (name: string) => void
     readonly preferences: (preferences: AppSnapshot['preferences']) => void
     readonly previewVolume: (setting: AudioVolumeSetting, volume: number) => void
     readonly setVolume: (setting: AudioVolumeSetting, volume: number) => void
@@ -47,6 +48,24 @@ export function createOptionsModal(
     section.append(...Array.from(frame.body.children).slice(from))
     tabSections.set(tab, section)
   }
+  const profileStart = frame.body.children.length
+  const profile = element('section', 'setup-section')
+  profile.append(element('h3', 'setup-label', 'PLAYER NAME'))
+  const form = element('form', 'name-form')
+  const label = element('label', 'name-label', 'DISPLAY NAME')
+  label.htmlFor = 'options-player-name'
+  const input = element('input', 'name-input')
+  input.id = 'options-player-name'
+  input.name = 'player-name'
+  input.autocomplete = 'nickname'
+  input.maxLength = 24
+  input.value = state.preferences.displayName ?? ''
+  const save = button('SAVE NAME', 'save-player-name', () => actions.playerName(input.value), 'button button-primary')
+  form.addEventListener('submit', (event) => { event.preventDefault(); actions.playerName(input.value) })
+  form.append(label, input, save)
+  profile.append(form, element('p', 'modal-subtitle', 'Renaming updates your own tracks, including older uncredited tracks on this device. Imported tracks with credits keep their creator.'))
+  frame.body.append(profile)
+  capture('profile', profileStart)
   const raceStart = frame.body.children.length
   if (state.overlay.type !== 'options' || state.overlay.returnTo !== 'race') {
     const raceSettings = element('section', 'options-race-settings')

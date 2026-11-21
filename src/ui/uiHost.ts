@@ -19,6 +19,7 @@ import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/rac
 import { DialogController } from '@/ui/dialogController'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createNameModal } from '@/ui/modals/nameModal'
+import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
 import { createOptionsModal } from '@/ui/modals/optionsModal'
 import { createPauseModal } from '@/ui/modals/pauseModal'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
@@ -436,6 +437,9 @@ export class DomUiHost implements UiHost {
             }
           },
         }, this.runtime.geometry)
+      case 'player-name':
+        return createPlayerNameModal(state, (name) =>
+          this.controller.dispatch({ type: 'set-player-name', name }))
       case 'track-name':
         return createNameModal(state, {
           close,
@@ -497,6 +501,7 @@ export class DomUiHost implements UiHost {
         return createOptionsModal(state, {
           close,
           previewVolume: (setting, volume) => this.runtime.previewAudioVolume?.(setting, volume),
+          playerName: (name) => this.controller.dispatch({ type: 'set-player-name', name }),
           setVolume: (setting, volume) => this.controller.dispatch({
             type: 'set-preferences',
             preferences: {

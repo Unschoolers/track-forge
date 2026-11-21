@@ -19,6 +19,8 @@ export interface TrackStore {
   list(): readonly Track[]
   find(id: TrackId): Track | undefined
   save(track: Track): boolean
+  /** Optional optimized atomic batch for attribution changes. */
+  saveMany?(tracks: readonly Track[]): boolean
   remove(id: TrackId): boolean
 }
 
@@ -65,6 +67,8 @@ export interface Preferences {
   readonly raceLaps?: 1 | 2 | 3
   readonly raceMode?: 'normal' | 'ghost' | 'time-trial'
   readonly playerIdentity?: PlayerIdentity
+  readonly displayName?: string
+  readonly creatorId?: string
 }
 
 export interface PreferencesStore {

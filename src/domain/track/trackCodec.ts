@@ -1,4 +1,5 @@
 import { normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { normalizeTrackCreator } from '@/domain/track/trackCreator'
 import { normalizeRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import {
   asTrackId,
@@ -173,6 +174,8 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
   return {
     id: asTrackId(item.id),
     name,
+    ...(normalizeTrackCreator(item.creator) ? { creator: normalizeTrackCreator(item.creator) } : {}),
+    ...(item.origin === 'imported' ? { origin: 'imported' as const } : {}),
     version: 8,
     points: migratedPoints,
     routeKind: normalizeRouteKind(item.routeKind),

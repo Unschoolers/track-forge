@@ -7,6 +7,7 @@ import {
   type TrackNameResult,
 } from '@/application/library/trackName'
 import type { Track, TrackId } from '@/domain/model'
+import type { TrackCreator } from '@/domain/track/trackCreator'
 import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
@@ -34,13 +35,14 @@ export class TrackLibraryService {
     return this.dependencies.trackStore.find(id)
   }
 
-  create(value: string): TrackMutationResult {
+  create(value: string, creator?: TrackCreator): TrackMutationResult {
     const validated = this.validateName(value)
     if (!validated.ok) return validated
     const now = this.dependencies.now()
     const track: Track = {
       id: this.dependencies.createId(),
       name: validated.name,
+      ...(creator ? { creator } : {}),
       version: 8,
       points: [],
       trees: [],
@@ -71,12 +73,33 @@ export class TrackLibraryService {
       name = source.name.slice(0, 32 - suffix.length) + suffix
     }
     const track: Track = {
-      ...source, id: this.dependencies.createId(), name,
+      ...source, id: this.dependencies.createId(), name, origin: 'imported',
       createdAt: now, updatedAt: now, raceRevision: now,
     }
     return this.dependencies.trackStore.save(track)
       ? { ok: true, track }
       : { ok: false, message: 'Shared track could not be saved.' }
+  }
+
+  /**
+   * Rename only tracks created by this installation. Uncredited pre-profile
+   * tracks are adopted on first selection; explicitly imported tracks aren't.
+   * No geometry or race revision is changed.
+   */
+  recredit(creator: TrackCreator): { readonly ok: boolean; readonly count: number } {
+    const updated = this.dependencies.trackStore.list()
+      .filter((track) => track.creator?.id === creator.id ||
+        (!track.creator && track.origin !== 'imported'))
+      .filter((track) => track.creator?.name !== creator.name || !track.creator)
+      .map((track) => ({ ...track, creator }))
+    if (updated.length === 0) return { ok: true, count: 0 }
+    if (this.dependencies.trackStore.saveMany) {
+      return { ok: this.dependencies.trackStore.saveMany(updated), count: updated.length }
+    }
+    for (const track of updated) {
+      if (!this.dependencies.trackStore.save(track)) return { ok: false, count: 0 }
+    }
+    return { ok: true, count: updated.length }
   }
 
   rename(id: TrackId, value: string): TrackMutationResult {
