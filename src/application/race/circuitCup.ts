@@ -15,12 +15,34 @@ export const CUP_CIRCUITS = [
 })
 
 export interface CupDriver { readonly id: string; readonly label: string; readonly points: number }
-export interface CircuitCup { readonly car: CarId; readonly difficulty: DifficultyId; readonly index: number; readonly rounds: readonly (readonly CupDriver[])[] }
+export interface CircuitCup {
+  readonly car: CarId
+  readonly difficulty: DifficultyId
+  readonly index: number
+  readonly rounds: readonly (readonly CupDriver[])[]
+  /** Frozen on starting a cup; legacy four-round cups omit this field. */
+  readonly trackIds?: readonly string[]
+}
+export const MAX_CUP_ROUNDS = 12
+export const DEFAULT_CUP_TRACK_IDS = CUP_CIRCUITS.map(({ track }) => track.id)
+export function validCupLineup(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length >= 1 && value.length <= MAX_CUP_ROUNDS &&
+    value.every(id => typeof id === 'string' && id.length > 0 && id.length <= 120)
+}
+export function cupTrackIds(cup: CircuitCup): readonly string[] {
+  return cup.trackIds ?? DEFAULT_CUP_TRACK_IDS
+}
+export function cupRoundCount(cup: CircuitCup): number { return cupTrackIds(cup).length }
 export interface CupProgress {
   readonly checkpoint: CircuitCup | null
   readonly bestPlacement: number | null
+  /** The single most recently built lineup, not a library of saved cups. */
+  readonly lineup?: readonly string[]
 }
-export function createCup(car: CarId = 'blue', difficulty: DifficultyId = 'normal'): CircuitCup { return { car, difficulty, index: 0, rounds: [] } }
+export function createCup(car: CarId = 'blue', difficulty: DifficultyId = 'normal', trackIds: readonly string[] = DEFAULT_CUP_TRACK_IDS): CircuitCup {
+  if (!validCupLineup(trackIds)) throw new Error('A cup needs 1–12 tracks.')
+  return { car, difficulty, index: 0, rounds: [], trackIds: [...trackIds] }
+}
 export function recordCupResult(cup: CircuitCup, standings: readonly RaceStanding[]): CircuitCup {
   if (cup.rounds.length > cup.index) return cup
   const points = [10, 6, 4, 2]
@@ -49,6 +71,6 @@ export function cupGridPositions(cup: CircuitCup, random: () => number = Math.ra
 }
 
 export function advanceCup(cup: CircuitCup): CircuitCup {
-  return cup.rounds.length > cup.index && cup.index < CUP_CIRCUITS.length - 1
+  return cup.rounds.length > cup.index && cup.index < cupRoundCount(cup) - 1
     ? { ...cup, index: cup.index + 1 } : cup
 }
