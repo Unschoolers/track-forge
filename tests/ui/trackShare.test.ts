@@ -20,3 +20,12 @@ it('returns false when sharing fails and true when the user cancels', async () =
   vi.stubGlobal('navigator', { canShare: () => true, share: async () => { throw new DOMException('Canceled', 'AbortError') } })
   expect(await shareTrack(track)).toBe(true)
 })
+
+it('rejects sharing a system-owned seeded circuit before opening the platform share sheet', async () => {
+  const openShare = vi.fn()
+  vi.stubGlobal('navigator', { canShare: () => true, share: openShare })
+  const seeded = { ...track, origin: 'seeded' as const,
+    creator: { id: 'trackforge-system', name: 'Track Forge' } }
+  await expect(shareTrack(seeded)).rejects.toThrow('Built-in tracks cannot be shared.')
+  expect(openShare).not.toHaveBeenCalled()
+})

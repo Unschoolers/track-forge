@@ -10,6 +10,9 @@ import { createApplication } from '@/app/createApplication'
 import { AppController, type Scheduler } from '@/application/appController'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
+// TEMPORARY one-time release migration: delete this import and startup call together.
+import { migrateTrackCreatorCredits } from '@/migrations/migration_track_creator_v1'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
 import { BrowserPreferencesRepository } from '@/infrastructure/storage/preferencesRepository'
 import { BrowserLastRaceRepository } from '@/infrastructure/storage/lastRaceRepository'
@@ -54,12 +57,13 @@ appRoot.replaceChildren(gameContainer, uiRoot)
 const storage = new BrowserStorage()
 const trackStore = new BrowserTrackRepository(storage)
 if (trackStore.list().length === 0) {
-  trackStore.save(
-    createStarterTrack(
-      asTrackId(`starter-${Date.now().toString(36)}`),
-      Date.now(),
-    ),
-  )
+  if (!trackStore.save({
+    ...createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), Date.now()),
+    creator: TRACK_FORGE_CREATOR,
+    origin: 'seeded',
+  })) {
+    console.error('Could not persist the built-in starter circuit.')
+  }
 }
 
 const scheduler: Scheduler = {
@@ -75,6 +79,10 @@ const nearbyTransport = createAndroidNearby()
 const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
   (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
+// TEMPORARY one-time migration: safe to remove with its isolated module.
+if (!migrateTrackCreatorCredits(storage, trackStore, initialPreferences).ok) {
+  console.error('Track creator migration could not be persisted. It will be retried on the next launch.')
+}
 const toneSink = new BrowserToneSink()
 const music = new BrowserMusicPlayer<'menu' | TrackEnvironmentId>({
   menu: menuMusic,
@@ -160,6 +168,11 @@ sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
 application.start()
+// No online account exists yet: the first local launch establishes a persistent
+// player display name, reused when creating or crediting tracks.
+if (!controller.snapshot().preferences.displayName) {
+  controller.dispatch({ type: 'open-player-name' })
+}
 export const gameReady = sceneHost.whenReady()
 // Render the controls before a scene uses their bounds to fit the camera.
 const stopSceneSync = controller.subscribe((snapshot) => {

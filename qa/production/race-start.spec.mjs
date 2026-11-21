@@ -27,6 +27,12 @@ test('shows the title during startup and starts a mobile race in the production 
   await expect(page.locator('#game-container canvas')).toBeAttached()
   await startButton(page).tap()
   await expect(page.locator('#title-screen')).toHaveCount(0)
+  // A new installation must complete player-name onboarding before racing.
+  const playerName = page.getByRole('dialog', { name: 'Choose your player name' })
+  await expect(playerName).toBeVisible()
+  await playerName.getByRole('textbox', { name: 'PLAYER NAME' }).fill('Production QA')
+  await playerName.getByRole('button', { name: "LET'S RACE" }).tap()
+  await expect(playerName).toHaveCount(0)
   await page.getByRole('button', { name: 'RACE', exact: true }).tap()
   await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).tap()
   await page.getByRole('dialog', { name: 'Race setup' })

@@ -105,6 +105,31 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('asks for a player name and migrates tracks while preserving results and stable creator identity', () => {
+    const seeded = createStarterTrack(asTrackId('local-legacy'), 1)
+    const { controller, trackStore, preferencesStore } = setup({ ...seeded, creator: { id: 'local-user-123', name: 'Player' } })
+    const starter = controller.snapshot().currentTrack
+    const id = starter?.id
+    const previousRevision = starter?.raceRevision
+    controller.dispatch({ type: 'open-player-name' })
+    expect(controller.snapshot().overlay.type).toBe('player-name')
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot().overlay.type).toBe('player-name')
+    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, creatorId: 'local-user-123' } })
+    controller.dispatch({ type: 'set-player-name', name: ' A ' })
+    expect(controller.snapshot().overlay.type).toBe('player-name')
+    controller.dispatch({ type: 'set-player-name', name: 'Julien QC' })
+    expect(controller.snapshot().overlay.type).toBe('none')
+    expect(controller.snapshot().preferences.displayName).toBe('Julien QC')
+    expect(controller.snapshot().currentTrack?.creator).toEqual({ id: 'local-user-123', name: 'Julien QC' })
+    expect(trackStore.find(id!)?.raceRevision).toBe(previousRevision)
+    controller.dispatch({ type: 'open-options', returnTo: 'home' })
+    controller.dispatch({ type: 'set-player-name', name: 'Racer QC' })
+    expect(controller.snapshot().overlay.type).toBe('options')
+    expect(trackStore.find(id!)?.creator).toEqual({ id: 'local-user-123', name: 'Racer QC' })
+    expect(preferencesStore.save).toHaveBeenCalledWith(expect.objectContaining({ displayName: 'Racer QC', creatorId: 'local-user-123' }))
+  })
+
   it('saves the new route kind and launches a one-run Time Trial', () => {
     const starter = createStarterTrack(asTrackId('new-route'), 1)
     const track: Track = {

@@ -7,6 +7,7 @@ import {
   type TrackNameResult,
 } from '@/application/library/trackName'
 import type { Track, TrackId } from '@/domain/model'
+import { isSeededTrack, type TrackCreator } from '@/domain/track/trackCreator'
 import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
@@ -34,13 +35,14 @@ export class TrackLibraryService {
     return this.dependencies.trackStore.find(id)
   }
 
-  create(value: string): TrackMutationResult {
+  create(value: string, creator?: TrackCreator): TrackMutationResult {
     const validated = this.validateName(value)
     if (!validated.ok) return validated
     const now = this.dependencies.now()
     const track: Track = {
       id: this.dependencies.createId(),
       name: validated.name,
+      ...(creator ? { creator } : {}),
       version: 8,
       points: [],
       trees: [],
@@ -71,12 +73,57 @@ export class TrackLibraryService {
       name = source.name.slice(0, 32 - suffix.length) + suffix
     }
     const track: Track = {
-      ...source, id: this.dependencies.createId(), name,
+      ...source, id: this.dependencies.createId(), name, origin: 'imported',
       createdAt: now, updatedAt: now, raceRevision: now,
     }
     return this.dependencies.trackStore.save(track)
       ? { ok: true, track }
       : { ok: false, message: 'Shared track could not be saved.' }
+  }
+
+  /** Update only tracks with this installation's stable creator ID. */
+  recredit(creator: TrackCreator): { readonly ok: boolean; readonly count: number } {
+    const updated = this.dependencies.trackStore.list()
+      .filter((track) => !isSeededTrack(track) && track.creator?.id === creator.id)
+      .filter((track) => track.creator?.name !== creator.name || !track.creator)
+      .map((track) => ({ ...track, creator }))
+    if (updated.length === 0) return { ok: true, count: 0 }
+    if (this.dependencies.trackStore.saveMany) {
+      return { ok: this.dependencies.trackStore.saveMany(updated), count: updated.length }
+    }
+    for (const track of updated) {
+      if (!this.dependencies.trackStore.save(track)) return { ok: false, count: 0 }
+    }
+    return { ok: true, count: updated.length }
+  }
+
+  /** Fork built-in geometry to a new personal, shareable track before editing. */
+  forkSeededForEdit(source: Track, creator?: TrackCreator): TrackMutationResult {
+    if (!isSeededTrack(source)) return { ok: false, message: 'Not a built-in track.' }
+    const now = this.dependencies.now()
+    const baseName = source.name.slice(0, 32)
+    let name = baseName
+    let number = 2
+    while (this.dependencies.trackStore.list().some((track) => track.name.toLowerCase() === name.toLowerCase())) {
+      const suffix = ` (${number++})`
+      name = baseName.slice(0, 32 - suffix.length) + suffix
+    }
+    // Omit the seeded creator instead of accidentally inheriting system credit.
+    const { creator: systemCreator, ...sourceWithoutCreator } = source
+    void systemCreator
+    const copy: Track = {
+      ...sourceWithoutCreator,
+      id: this.dependencies.createId(),
+      name,
+      origin: 'local',
+      ...(creator ? { creator } : {}),
+      createdAt: now,
+      updatedAt: now,
+      raceRevision: now,
+    }
+    return this.dependencies.trackStore.save(copy)
+      ? { ok: true, track: copy }
+      : { ok: false, message: 'Could not copy the built-in track.' }
   }
 
   rename(id: TrackId, value: string): TrackMutationResult {

@@ -28,7 +28,7 @@ function showDownloadedUpdate() {
       },
     } as AppSnapshot,
     {
-      close: vi.fn(),
+      close: vi.fn(), playerName: vi.fn(),
       preferences: vi.fn(),
       previewVolume: vi.fn(),
       setVolume: vi.fn(),
@@ -56,7 +56,7 @@ describe('home update shortcut', () => {
         dynamicZoomEnabled: true,
       },
     } as AppSnapshot, {
-      close: vi.fn(),
+      close: vi.fn(), playerName: vi.fn(),
       preferences: vi.fn(),
       previewVolume: vi.fn(),
       setVolume: vi.fn(),
@@ -82,7 +82,7 @@ describe('home update shortcut', () => {
         hapticsEnabled: true, dynamicZoomEnabled: true,
       },
     } as AppSnapshot, {
-      close: vi.fn(), preferences: vi.fn(),
+      close: vi.fn(), playerName: vi.fn(), preferences: vi.fn(),
       previewVolume: vi.fn(), setVolume: vi.fn(),
     }, { initialTab: 'updates', availableUpdate: {
       version: 'android-build-999-1',
@@ -152,7 +152,7 @@ describe('single-player topper customization', () => {
         playerIdentity: { icon: 'crown', color: 'gold' },
       },
     } as AppSnapshot, {
-      close: vi.fn(), preferences: save,
+      close: vi.fn(), playerName: vi.fn(), preferences: save,
       previewVolume: vi.fn(), setVolume: vi.fn(),
     })
     document.body.replaceChildren(modal)

@@ -32,6 +32,7 @@ export function createHomeScreen(
   trackCard.append(
     element('span', 'label', 'CURRENT TRACK'),
     element('strong', 'track-name', state.currentTrack?.name ?? 'No track'),
+    ...(state.currentTrack ? [element('span', 'track-meta', `Made by ${state.currentTrack.creator?.name ?? (state.currentTrack.id.startsWith('official-') ? 'Track Forge' : 'Unknown')}`)] : []),
     element(
       'span',
       'track-meta',

@@ -124,7 +124,40 @@ it('keeps existing muted installs quiet and saves the two volumes independently'
   })
 })
 
+it('round-trips a validated display name and stable creator ID', () => {
+  const store = new MemoryStore()
+  const preferences = new BrowserPreferencesRepository(store)
+  const profile = { ...preferences.load(), displayName: "  Émile  QC  ", creatorId: 'local-creator-123' }
+  expect(preferences.save(profile)).toBe(true)
+  expect(new BrowserPreferencesRepository(store).load()).toMatchObject({
+    displayName: 'Émile QC', creatorId: 'local-creator-123',
+  })
+  store.values.set('trackforge-player-name-v1', '<script>')
+  expect(preferences.load().displayName).toBeUndefined()
+  store.values.set('trackforge-creator-id-v1', 'bad')
+  expect(preferences.load().creatorId).toBeUndefined()
+})
+
 describe('BrowserTrackRepository', () => {
+  it('saves attribution updates in one batch, validates imported metadata and leaves geometry unchanged', () => {
+    const storage = new MemoryStore()
+    const repository = new BrowserTrackRepository(storage)
+    const first = createStarterTrack(asTrackId('one'), 12)
+    const second = createStarterTrack(asTrackId('two'), 15)
+    repository.save(first)
+    repository.save(second)
+    const creator = { id: 'local-creator-123', name: 'Julien QC' }
+    expect(repository.saveMany([{ ...first, creator }])).toBe(true)
+    expect(repository.list()).toHaveLength(2)
+    expect(repository.find(first.id)).toMatchObject({ creator, createdAt: 12, updatedAt: 12 })
+    expect(repository.find(second.id)?.creator).toBeUndefined()
+    expect(repository.saveMany([{ ...first, creator: { id: '', name: 'Invalid' } }])).toBe(true)
+    expect(repository.find(first.id)?.creator).toBeUndefined()
+    storage.failedKeys.add('trackforge-library-v2')
+    expect(repository.saveMany([{ ...first, creator }])).toBe(false)
+    expect(repository.find(first.id)?.creator).toBeUndefined()
+  })
+
   it('round-trips normalized tracks and ignores malformed records', () => {
     const storage = new MemoryStore()
     const repository = new BrowserTrackRepository(storage)

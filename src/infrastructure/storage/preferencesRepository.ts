@@ -10,6 +10,7 @@ import {
 } from '@/domain/model'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, randomPlayerIdentity, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
+import { normalizeCreatorId, normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export const DEFAULT_PREFERENCES: Preferences = {
   car: 'blue',
@@ -67,6 +68,8 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       }
     }
     const steeringSensitivity = this.storage.get(STORAGE_KEYS.steeringSensitivity)
+    const displayName = normalizeDisplayName(this.storage.get(STORAGE_KEYS.displayName))
+    const creatorId = normalizeCreatorId(this.storage.get(STORAGE_KEYS.creatorId))
     const legacyAudio = boolean(this.storage.get(STORAGE_KEYS.audio), DEFAULT_PREFERENCES.audioEnabled)
     const musicVolume = volume(this.storage.get(STORAGE_KEYS.musicVolume), legacyAudio ? DEFAULT_MUSIC_VOLUME : 0)
     const soundEffectsVolume = volume(this.storage.get(STORAGE_KEYS.soundEffectsVolume), legacyAudio ? DEFAULT_SOUND_EFFECTS_VOLUME : 0)
@@ -83,6 +86,8 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       raceMode: raceMode === 'ghost' || raceMode === 'time-trial' ? raceMode : 'normal',
       playerIdentity,
+      ...(displayName ? { displayName } : {}),
+      ...(creatorId ? { creatorId } : {}),
       audioEnabled: soundEffectsVolume > 0,
       musicVolume,
       soundEffectsVolume,
@@ -110,6 +115,8 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       this.storage.set(STORAGE_KEYS.raceLaps, String(preferences.raceLaps === 1 || preferences.raceLaps === 3 ? preferences.raceLaps : 2)),
       this.storage.set(STORAGE_KEYS.raceMode, preferences.raceMode ?? 'normal'),
       this.storage.set(STORAGE_KEYS.playerIdentity, JSON.stringify(normalizePlayerIdentity(preferences.playerIdentity))),
+      this.storage.set(STORAGE_KEYS.displayName, normalizeDisplayName(preferences.displayName) ?? ''),
+      this.storage.set(STORAGE_KEYS.creatorId, normalizeCreatorId(preferences.creatorId) ?? ''),
       this.storage.set(STORAGE_KEYS.audio, soundEffectsVolume > 0 ? '1' : '0'),
       this.storage.set(STORAGE_KEYS.musicVolume, String(musicVolume)),
       this.storage.set(STORAGE_KEYS.soundEffectsVolume, String(soundEffectsVolume)),

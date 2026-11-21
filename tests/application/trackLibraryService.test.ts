@@ -99,4 +99,39 @@ describe('TrackLibraryService', () => {
     expect(trackStore.find(second.id)).toBeUndefined()
     expect(scoreStore.removeTrack).toHaveBeenCalledWith(second.id)
   })
+  it('attributes old local tracks, but preserves imported credits across renames and share copies', () => {
+    const legacy = createStarterTrack(asTrackId('legacy-local'), 42)
+    const imported = { ...createStarterTrack(asTrackId('imported'), 30), origin: 'imported' as const }
+    const other = {
+      ...createStarterTrack(asTrackId('other'), 20),
+      creator: { id: 'different-user-id', name: 'Another Racer' },
+      origin: 'imported' as const,
+    }
+    const { service, trackStore } = setup([{ ...legacy, creator: { id: 'local-user-123', name: 'Old Name' } }, imported, other])
+    const creator = { id: 'local-user-123', name: 'First Name' }
+    expect(service.recredit(creator)).toEqual({ ok: true, count: 1 })
+    const first = trackStore.find(legacy.id)
+    expect(first?.creator).toEqual(creator)
+    expect(first?.updatedAt).toBe(42)
+    expect(first?.raceRevision).toBe(legacy.raceRevision)
+    expect(trackStore.find(imported.id)?.creator).toBeUndefined()
+    expect(trackStore.find(other.id)?.creator?.name).toBe('Another Racer')
+    expect(service.recredit({ ...creator, name: 'New Name' })).toEqual({ ok: true, count: 1 })
+    expect(trackStore.find(legacy.id)?.creator?.name).toBe('New Name')
+    expect(service.recredit({ ...creator, name: 'New Name' })).toEqual({ ok: true, count: 0 })
+    const shared = service.importShared(other)
+    expect(shared.ok).toBe(true)
+    if (shared.ok) {
+      expect(shared.track.creator).toEqual(other.creator)
+      expect(shared.track.origin).toBe('imported')
+    }
+  })
+
+  it('credits new tracks immediately when a profile exists', () => {
+    const { service } = setup()
+    const creator = { id: 'local-user-123', name: 'Julien QC' }
+    const result = service.create('Morning Rally', creator)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.track.creator).toEqual(creator)
+  })
 })

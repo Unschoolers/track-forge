@@ -78,6 +78,17 @@ export class BrowserTrackRepository implements TrackStore {
     return this.storage.set(STORAGE_KEYS.tracks, JSON.stringify(tracks))
   }
 
+  saveMany(updated: readonly Track[]): boolean {
+    const now = this.dependencies.now()
+    const decoded = updated.map((track) => decodeTrack(track, now))
+    if (decoded.some((track) => !track)) return false
+    const tracks = new Map(this.list().map((track) => [track.id, track]))
+    for (const track of decoded) {
+      if (track) tracks.set(track.id, track)
+    }
+    return this.storage.set(STORAGE_KEYS.tracks, JSON.stringify([...tracks.values()]))
+  }
+
   remove(id: TrackId): boolean {
     return this.storage.set(
       STORAGE_KEYS.tracks,

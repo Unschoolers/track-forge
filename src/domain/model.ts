@@ -1,4 +1,5 @@
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import type { TrackCreator } from '@/domain/track/trackCreator'
 
 export const SURFACE_IDS = ['street', 'dirt', 'ice'] as const
 export const CAR_IDS = ['blue', 'red', 'green', 'yellow'] as const
@@ -62,6 +63,10 @@ export interface TrackStart {
 export interface Track {
   readonly id: TrackId
   readonly name: string
+  /** Creator credit is independent of the editable track name and racing identity. */
+  readonly creator?: TrackCreator
+  /** Explicit provenance; old saved tracks may be unclassified until first startup migration. */
+  readonly origin?: 'imported' | 'seeded' | 'local'
   readonly version: 8
   readonly points: readonly TrackPoint[]
   readonly routeKind?: RouteKind

@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { Track } from '@/domain/model'
+import { isSeededTrack } from '@/domain/track/trackCreator'
 import { TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
 
 const nativeExporter = registerPlugin<{
@@ -34,6 +35,7 @@ export async function saveJsonFile(file: { filename: string; content: string }):
 
 /** Returns false when sharing is unavailable so the caller can offer a file export. */
 export async function shareTrack(track: Track, text?: string): Promise<boolean> {
+  if (isSeededTrack(track)) throw new Error('Built-in tracks cannot be shared.')
   const file = serializeTrack(track)
   if (Capacitor.isNativePlatform()) return (await nativeExporter.share({ ...file, ...(text === undefined ? {} : { text }) })).shared
   const attachment = new File([file.content], file.filename, { type: 'application/json' })

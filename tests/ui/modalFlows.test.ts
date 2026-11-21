@@ -6,6 +6,8 @@ import type { Preferences } from '@/application/ports/storage'
 import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
 import {
   DomUiHost,
   type UiControllerPort,
@@ -380,4 +382,36 @@ describe('modal application flows', () => {
       'options',
     )
   })
+})
+
+// System tracks are available to everyone and therefore have no share action.
+it('hides share on built-in tracks but keeps it for player tracks', () => {
+  const builtIn = { ...ready, id: asTrackId('system-starter-circuit'), origin: 'seeded' as const,
+    creator: { id: 'trackforge-system', name: 'Track Forge' } }
+  const own = { ...ready, id: asTrackId('my-track'), origin: 'local' as const,
+    creator: { id: 'my-user-id-123', name: 'Me' } }
+  const library = { ...state({ type: 'track-library', purpose: 'race' }),
+    tracks: [builtIn, own], currentTrack: builtIn }
+  const { root } = setup(library)
+  expect(root.querySelector('[data-action="share-system-starter-circuit"]')).toBeNull()
+  expect(root.querySelector('[data-action="share-my-track"]')).not.toBeNull()
+  expect(root.textContent).toContain('MADE BY Track Forge')
+})
+
+it('does not expose Nearby sharing for system-owned tracks', () => {
+  const seeded = {
+    ...ready, id: asTrackId('system-starter-circuit'), origin: 'seeded' as const,
+    creator: { id: 'trackforge-system', name: 'Track Forge' },
+  }
+  const personal = { ...ready, id: asTrackId('my-track'), origin: 'local' as const }
+  const sendNearby = vi.fn()
+  const modal = createTrackLibraryModal({
+    ...state({ type: 'track-library', purpose: 'edit' }), tracks: [seeded, personal],
+  }, {
+    share: vi.fn(), sendNearby, importFile: vi.fn(), close: vi.fn(), create: vi.fn(),
+    selectForEdit: vi.fn(), selectForRace: vi.fn(), delete: vi.fn(),
+  }, new TrackGeometryService())
+  expect(modal.querySelector('[data-action="send-nearby-system-starter-circuit"]')).toBeNull()
+  modal.querySelector<HTMLButtonElement>('[data-action="send-nearby-my-track"]')?.click()
+  expect(sendNearby).toHaveBeenCalledWith(personal)
 })

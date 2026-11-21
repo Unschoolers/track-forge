@@ -19,10 +19,12 @@ import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/rac
 import { DialogController } from '@/ui/dialogController'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createNameModal } from '@/ui/modals/nameModal'
+import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
 import { createOptionsModal } from '@/ui/modals/optionsModal'
 import { createPauseModal } from '@/ui/modals/pauseModal'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
 import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
+import { isSeededTrack } from '@/domain/track/trackCreator'
 import { createToast } from '@/ui/toast'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
@@ -186,6 +188,10 @@ export class DomUiHost implements UiHost {
   }
 
   private async shareTrackChallenge(track: Track): Promise<void> {
+    if (isSeededTrack(track)) {
+      this.showRaceExportNotice('Built-in tracks are already available to every player.')
+      return
+    }
     const best = this.controller.snapshot().scoresByTrack[track.id]?.[0]
     const challenge = `Race "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win?'} Import the attached track file to play.`
     try {
@@ -445,6 +451,9 @@ export class DomUiHost implements UiHost {
             }
           },
         }, this.runtime.geometry)
+      case 'player-name':
+        return createPlayerNameModal(state, (name) =>
+          this.controller.dispatch({ type: 'set-player-name', name }))
       case 'track-name':
         return createNameModal(state, {
           close,
@@ -506,6 +515,7 @@ export class DomUiHost implements UiHost {
         return createOptionsModal(state, {
           close,
           previewVolume: (setting, volume) => this.runtime.previewAudioVolume?.(setting, volume),
+          playerName: (name) => this.controller.dispatch({ type: 'set-player-name', name }),
           setVolume: (setting, volume) => this.controller.dispatch({
             type: 'set-preferences',
             preferences: {

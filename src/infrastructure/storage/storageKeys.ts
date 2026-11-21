@@ -26,4 +26,6 @@ export const STORAGE_KEYS = {
   raceLaps: 'trackforge-race-laps',
   raceMode: 'trackforge-race-mode',
   playerIdentity: 'trackforge-player-topper-v1',
+  displayName: 'trackforge-player-name-v1',
+  creatorId: 'trackforge-creator-id-v1',
 } as const

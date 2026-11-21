@@ -38,6 +38,7 @@ import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { EditorSession, type Scheduler } from '@/application/editor/editorSession'
 import { reduceEditorUi } from '@/application/editor/editorUiReducer'
+import { isSeededTrack, normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export type { Scheduler } from '@/application/editor/editorSession'
 
@@ -53,6 +54,7 @@ export interface AppControllerDependencies {
   readonly geometry: TrackGeometryService
   readonly now?: () => number
   readonly createTrackId?: () => TrackId
+  readonly createCreatorId?: () => string
 }
 
 export class AppController {
@@ -61,6 +63,7 @@ export class AppController {
   private readonly library: TrackLibraryService
   private state: AppSnapshot
   private preCupTrack: Track | null = null
+  private pendingCreatorId: string | undefined
   private readonly editorSession: EditorSession
   private beforeNearbyTrack: Track | null | undefined
   private readonly unsubscribeNearby: (() => void) | undefined
@@ -204,8 +207,8 @@ export class AppController {
         })
         break
       case 'open-editor':
-        if (this.state.currentTrack && OFFICIAL_CIRCUITS.some(({ track }) => track.id === this.state.currentTrack?.id)) {
-          const copy = this.library.importShared(this.state.currentTrack)
+        if (this.state.currentTrack && isSeededTrack(this.state.currentTrack)) {
+          const copy = this.library.forkSeededForEdit(this.state.currentTrack, this.creator())
           if (!copy.ok) { this.update({ ...this.state, notice: copy.message }); break }
           this.applyTrackMutation(copy, true)
           break
@@ -304,6 +307,10 @@ export class AppController {
         if (!nearby) break
         if (nearby.snapshot().phase !== 'idle' || !this.flushPendingEditorSave()) break
         const track = this.state.tracks.find(entry => entry.id === command.track.id) ?? command.track
+        if (isSeededTrack(track)) {
+          this.update({ ...this.state, notice: 'Built-in tracks cannot be shared.' })
+          break
+        }
         nearby.hostShare(track)
         this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
         break
@@ -421,6 +428,14 @@ export class AppController {
           notice: null,
         })
         break
+      case 'open-player-name':
+        if (this.state.mode === 'home' && !this.state.preferences.displayName) {
+          this.update({ ...this.state, overlay: { type: 'player-name' }, notice: null })
+        }
+        break
+      case 'set-player-name':
+        this.setPlayerName(command.name)
+        break
       case 'open-options':
         this.update({
           ...this.state,
@@ -461,7 +476,7 @@ export class AppController {
         break
       case 'create-track':
         if (!this.flushPendingEditorSave()) break
-        this.applyTrackMutation(this.library.create(command.name), true)
+        this.applyTrackMutation(this.library.create(command.name, this.creator()), true)
         break
       case 'rename-track':
         if (!this.flushPendingEditorSave()) break
@@ -621,8 +636,13 @@ export class AppController {
 
   private selectTrackForEdit(id: TrackId): void {
     if (!this.flushPendingEditorSave()) return
-    const track = this.library.select(id)
-    if (!track) return
+    const source = this.library.select(id)
+    if (!source) return
+    if (isSeededTrack(source)) {
+      this.applyTrackMutation(this.library.forkSeededForEdit(source, this.creator()), true)
+      return
+    }
+    const track = source
     this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
@@ -759,6 +779,7 @@ export class AppController {
       this.dispatch({ type: 'go-home' })
       return
     }
+    if (overlay.type === 'player-name' && !this.state.preferences.displayName) return
     if (overlay.type === 'track-name') {
       this.update({
         ...this.state,
@@ -812,6 +833,44 @@ export class AppController {
     if (overlay.type === 'track-library') return overlay
     if (overlay.type === 'editor-menu') return overlay
     return { type: 'none' }
+  }
+
+  private creator(): { readonly id: string; readonly name: string } | undefined {
+    const { creatorId, displayName } = this.state.preferences
+    return creatorId && displayName ? { id: creatorId, name: displayName } : undefined
+  }
+
+  private setPlayerName(value: string): void {
+    const name = normalizeDisplayName(value)
+    if (!name) {
+      this.update({ ...this.state, notice: 'Choose a name of 2–24 letters, numbers or simple punctuation.' })
+      return
+    }
+    if (!this.flushPendingEditorSave()) return
+    const id = this.state.preferences.creatorId ?? this.pendingCreatorId ??
+      (this.dependencies.createCreatorId ?? (() => crypto.randomUUID()))()
+    this.pendingCreatorId = id
+    const result = this.library.recredit({ id, name })
+    if (!result.ok) {
+      this.update({ ...this.state, notice: 'Could not update track credits. Try again.' })
+      return
+    }
+    const preferences = { ...this.state.preferences, displayName: name, creatorId: id }
+    if (!this.dependencies.preferencesStore.save(preferences)) {
+      this.update({ ...this.state, notice: 'Could not save your player name. Try again.' })
+      return
+    }
+    const tracks = this.library.list()
+    const currentTrack = tracks.find((track) => track.id === this.state.currentTrack?.id) ??
+      this.state.currentTrack
+    this.update({
+      ...this.state,
+      preferences,
+      tracks,
+      currentTrack,
+      overlay: this.state.overlay.type === 'player-name' ? { type: 'none' } : this.state.overlay,
+      notice: result.count > 0 ? `Player name saved · ${result.count} track credit${result.count === 1 ? '' : 's'} updated.` : 'Player name saved.',
+    })
   }
 
   private setPreferences(

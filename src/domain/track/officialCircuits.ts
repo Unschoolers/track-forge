@@ -1,5 +1,6 @@
 import { asTrackId, type SurfaceId, type Track, type TrackPoint } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
 
 function circuit(id: string, name: string, coordinates: readonly (readonly [number, number])[], surfaces: readonly SurfaceId[] = [], bridge = -1): Track {
   const points: TrackPoint[] = coordinates.map(([x, y], index) => ({
@@ -15,7 +16,7 @@ function circuit(id: string, name: string, coordinates: readonly (readonly [numb
     'official-quarry': [{ x: 540, y: -100 }, { x: 590, y: -40 }, { x: -290, y: 183 }, { x: -560, y: -160 }],
     'official-switchback': [{ x: 600, y: 155 }, { x: 650, y: 250 }, { x: -485, y: 115 }, { x: -590, y: -245 }],
   }
-  return { ...createStarterTrack(asTrackId(id), 0), name, points, trees: treesByCircuit[id] ?? [] }
+  return { ...createStarterTrack(asTrackId(id), 0), name, points, creator: TRACK_FORGE_CREATOR, origin: 'seeded', trees: treesByCircuit[id] ?? [] }
 }
 
 export const OFFICIAL_CIRCUITS = [
