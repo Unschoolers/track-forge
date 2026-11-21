@@ -318,6 +318,17 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     await page.setViewportSize({ width, height })
     await page.goto('/?qa')
     await enterTrackForge(page)
+    // This pixel test isolates the asphalt from its editor handles. At a very
+    // small fit zoom the enlarged fixed-size controls can cover the thin road.
+    // Keep testing the unmodified road/terrain rendering and strict edge bounds.
+    await page.evaluate(async () => {
+      const { EditorScene } = await import('/src/phaser/scenes/EditorScene.ts')
+      const renderOverlay = EditorScene.prototype.renderOverlayPresentation
+      EditorScene.prototype.renderOverlayPresentation = function (...args) {
+        renderOverlay.apply(this, args)
+        this.overlayGraphics?.setVisible(false)
+      }
+    })
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
     await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
     await expect(page.locator('[data-screen="editor"]')).toBeVisible()
