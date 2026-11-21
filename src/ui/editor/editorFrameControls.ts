@@ -5,7 +5,7 @@ import { analyzeTrack } from '@/domain/track/trackDiagnostics'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { button, element } from '@/ui/dom'
-import { editorIconButton } from '@/ui/editor/editorIcons'
+import { editorIcon, editorIconButton } from '@/ui/editor/editorIcons'
 
 export interface EditorFrameActions {
   readonly home: () => void
