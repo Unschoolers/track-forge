@@ -26,7 +26,7 @@ export interface CircuitCup {
 export const MAX_CUP_ROUNDS = 12
 export const DEFAULT_CUP_TRACK_IDS = CUP_CIRCUITS.map(({ track }) => track.id)
 export function validCupLineup(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.length >= 1 && value.length <= MAX_CUP_ROUNDS &&
+  return Array.isArray(value) && value.length <= MAX_CUP_ROUNDS &&
     value.every(id => typeof id === 'string' && id.length > 0 && id.length <= 120)
 }
 export function cupTrackIds(cup: CircuitCup): readonly string[] {
@@ -40,7 +40,7 @@ export interface CupProgress {
   readonly lineup?: readonly string[]
 }
 export function createCup(car: CarId = 'blue', difficulty: DifficultyId = 'normal', trackIds: readonly string[] = DEFAULT_CUP_TRACK_IDS): CircuitCup {
-  if (!validCupLineup(trackIds)) throw new Error('A cup needs 1–12 tracks.')
+  if (!validCupLineup(trackIds) || !trackIds.length) throw new Error('A cup needs 1–12 tracks.')
   return { car, difficulty, index: 0, rounds: [], trackIds: [...trackIds] }
 }
 export function recordCupResult(cup: CircuitCup, standings: readonly RaceStanding[]): CircuitCup {
