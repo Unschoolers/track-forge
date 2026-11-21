@@ -102,20 +102,18 @@ describe('rival catch-up', () => {
     }
   }
 
-  it.each([false, true])('helps distant trailing rivals by up to 5%% in reverse=%s',
+  it.each([false, true])('helps distant trailing rivals with the same 12%% cap in reverse=%s',
     (reversed) => {
       const [player, rival] = run(arranged(reversed), 90)
       expect(requireFixture(rival).speed).toBeGreaterThan(requireFixture(player).speed + 3)
-      expect(requireFixture(rival).speed).toBeLessThanOrEqual(requireFixture(player).speed * 1.05)
+      expect(requireFixture(rival).speed).toBeLessThanOrEqual(requireFixture(player).speed * 1.12)
     },
   )
 
-  it('fades before a challenge for first place', () => {
+  it('boosts each trailing rival independently of the other rivals', () => {
     const farBehind = arranged()
-    const closing = arranged(false, 1_166)
-    const competing = arranged(false, 1_270)
-    const secondPlace = arranged(false, 1_600)
-    const slowerLeader = arranged(false, 700, 220)
+    const withOtherCloser = arranged(false, 1_166)
+    const withOtherAhead = arranged(false, 1_600)
     const priorFinisher = {
       ...farBehind,
       vehicles: farBehind.vehicles.map((vehicle) =>
@@ -124,11 +122,16 @@ describe('rival catch-up', () => {
     const ordinary = { ...farBehind, vehicles: farBehind.vehicles.slice(1) }
     const stockSpeed = requireFixture(run(ordinary, 1)[0]).speed
     const assistedSpeed = requireFixture(run(farBehind, 1)[1]).speed
-    const reducedSpeed = requireFixture(run(closing, 1)[1]).speed
-    expect(reducedSpeed).toBeGreaterThan(stockSpeed)
-    expect(reducedSpeed).toBeLessThan(assistedSpeed)
-    for (const race of [competing, secondPlace, slowerLeader, priorFinisher]) {
-      expect(requireFixture(run(race, 1)[1]).speed).toBeCloseTo(stockSpeed, 5)
+    expect(assistedSpeed).toBeGreaterThan(stockSpeed)
+    // An opponent no longer cancels or changes another opponent's boost.
+    for (const race of [withOtherCloser, withOtherAhead, priorFinisher]) {
+      expect(requireFixture(run(race, 1)[1]).speed).toBeCloseTo(assistedSpeed, 5)
     }
+    const almostCaught = {
+      ...farBehind,
+      vehicles: farBehind.vehicles.map((vehicle) =>
+        vehicle.id === 'ai-1' ? onStraight(farBehind, vehicle, 1_270, 20, 300) : vehicle),
+    }
+    expect(requireFixture(run(almostCaught, 1)[1]).speed).toBeCloseTo(stockSpeed, 5)
   })
 })
