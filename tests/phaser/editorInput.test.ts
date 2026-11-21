@@ -334,7 +334,7 @@ describe('EditorInputController', () => {
     })
   })
 
-  it('selects through finger jitter without moving a point, then keeps it selected after a deliberate drag', () => {
+  it('selects through finger jitter without moving a point, and allows selection after a deliberate drag', () => {
     let editor = createEditorState([
       { x: 0, y: 0, surface: 'street' },
       { x: 120, y: 0, surface: 'street' },
@@ -366,7 +366,12 @@ describe('EditorInputController', () => {
     input.pointerUp({ id: 2, x: 20, y: 4 })
     expect(editor.points[0]).toMatchObject({ x: 20, y: 4 })
     expect(editor.history).toHaveLength(1)
+    expect(onPointSelected).toHaveBeenLastCalledWith(null)
+
+    input.pointerDown({ id: 3, x: 20, y: 4 })
+    input.pointerUp({ id: 3, x: 20, y: 4 })
     expect(onPointSelected).toHaveBeenLastCalledWith(0)
+    expect(editor.history).toHaveLength(1)
   })
 
   it('selects a crossing context instead of an unrelated control point', () => {
