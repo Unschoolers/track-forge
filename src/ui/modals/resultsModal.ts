@@ -201,7 +201,7 @@ function ordinalSuffix(place: number): string {
 export function createCupFinalModal(cup: CircuitCup, finish: () => void, playerName?: string): HTMLElement {
   const frame = createModalFrame('CUP STANDINGS', 'Final results', undefined, 'results-modal')
   frame.overlay.dataset.modal = 'cup-final'
-  for (const [index, driver] of cupStandings(cup).entries()) frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
+  for (const [index, driver] of cupStandings(cup).entries()) frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.id === 'player' ? playerName ?? driver.label : driver.label} · ${driver.points} points`))
   frame.footer.append(button('FINISH CUP', 'next-cup-race', finish, 'button button-primary'))
   return frame.overlay
 }
