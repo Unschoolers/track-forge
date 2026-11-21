@@ -17,7 +17,9 @@ import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
-const ARCADE_CORNER_MARGIN = { easy: 0.16, normal: 0.10, hard: 0 } as const
+// Even Hard needs a small road-edge reserve through tight bends. Leaving it
+// at zero makes high-grip cars overrun some corners repeatedly at full pace.
+const ARCADE_CORNER_MARGIN = { easy: 0.16, normal: 0.10, hard: 0.075 } as const
 const HARD_LOOKAHEAD_SAMPLES = 4
 const SIDESLIP_CORRECTION_GAIN = 0.65
 const SIDESLIP_MIN_SPEED = 20
