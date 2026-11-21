@@ -213,8 +213,8 @@ function advanceRace(
       pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance,
     }
     let updated: RaceVehicle
-    if (arcade && vehicle.player && previous &&
-        (state.path.closed || state.routeKind === 'point-to-point')) {
+    if (vehicle.player && previous &&
+        (state.routeKind === 'point-to-point' || (arcade && state.path.closed))) {
       const progress = advanceArcadeTimingGate(
         state,
         previous,
