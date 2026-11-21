@@ -2,16 +2,17 @@ import { CAR_IDS, type CarId, type LightingMode } from '@/domain/model'
 import { START_GRID_SIZE } from '@/domain/race/startGrid'
 import { isPlayerIdentity, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { Packet } from '@/application/multiplayer/raceWire'
+import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export const MAX_PLAYERS = START_GRID_SIZE
-const MAX_CONTROL_BYTES = 512
+const MAX_CONTROL_BYTES = 1024
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 export type Control =
-  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number }
-  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number }
-  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number }
+  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number; cupIndex?: number; cupTotal?: number }
+  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number; name?: string }
+  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number; names?: (string | null)[] }
   | { type: 'armed'; round?: number }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number; round?: number }
   | { type: 'finish'; slot: number; time: number | null; round?: number }
@@ -49,9 +50,21 @@ export function validLineupPositions(
       ? position === null : position !== null && Number.isInteger(position) && position >= 0 && position < active)
 }
 
+function validLineupNames(names: unknown, cars: readonly (CarId | null)[]): boolean {
+  return names === undefined || Array.isArray(names) && names.length === MAX_PLAYERS &&
+    names.every((name, index) => cars[index] === null
+      ? name === null : name === null || normalizeDisplayName(name) === name)
+}
+
 function validRound(value: unknown): boolean {
   return value === undefined || (typeof value === 'number' && Number.isInteger(value) &&
     value >= 0 && value <= 65_535)
+}
+
+function validCupMetadata(index: unknown, total: unknown): boolean {
+  return (index === undefined && total === undefined) ||
+    (Number.isInteger(total) && (total as number) >= 1 && (total as number) <= 12 &&
+      Number.isInteger(index) && (index as number) >= 0 && (index as number) < (total as number))
 }
 
 function isControl(value: unknown): value is Control {
@@ -67,9 +80,11 @@ function isControl(value: unknown): value is Control {
         message.slot > 0 && message.slot < MAX_PLAYERS &&
         typeof message.laps === 'number' && Number.isInteger(message.laps) &&
         message.laps >= 1 && message.laps <= 5 &&
-        (message.lighting === 'day' || message.lighting === 'night')
+        (message.lighting === 'day' || message.lighting === 'night') &&
+        validCupMetadata(message.cupIndex, message.cupTotal)
     case 'ready':
-      return isCar(message.car) && isPlayerIdentity(message.identity)
+      return isCar(message.car) && isPlayerIdentity(message.identity) &&
+        (message.name === undefined || normalizeDisplayName(message.name) === message.name)
     case 'lineup': {
       const cars = message.cars
       const identities = message.identities
@@ -78,7 +93,7 @@ function isControl(value: unknown): value is Control {
         identities.length !== MAX_PLAYERS || !Array.isArray(positions)) return false
       return identities.every((identity, index) => cars[index] === null
         ? identity === null : isPlayerIdentity(identity)) &&
-        validLineupPositions(cars, positions)
+        validLineupPositions(cars, positions) && validLineupNames(message.names, cars)
     }
     case 'armed': return true
     case 'start':

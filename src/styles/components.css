@@ -111,6 +111,16 @@
 .track-share-button { display: grid; place-items: center; width: 44px; height: 44px; padding: .65rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-panel-raised); cursor: pointer; }
 .track-share-button svg { width: 100%; height: 100%; }
 .track-mini-button { min-height: 2.4rem; padding: .4rem .65rem; font-size: .7rem; }
+
+.cup-track-list { display: grid; gap: .5rem; margin: 0 0 .8rem; padding: 0; list-style: none; }
+.cup-track-row { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: .6rem; padding: .5rem .6rem; border: 1px solid var(--color-line); background: var(--color-panel-raised); }
+.cup-track-name { min-width: 0; overflow-wrap: anywhere; font-size: .9rem; font-weight: 800; }
+.cup-track-missing { color: var(--color-danger); }
+.cup-track-actions { display: flex; flex-shrink: 0; gap: .25rem; }
+.cup-track-actions .track-mini-button { min-width: 44px; min-height: 44px; padding: 0; font-size: 1.1rem; touch-action: manipulation; }
+.cup-modal .modal-footer .button { flex: 1 1 44%; }
+.nearby-cup-scores:empty { display: none; }
+
 .empty-state { margin: 1rem; color: var(--color-muted); text-align: center; }
 .name-form { display: grid; gap: .5rem; }
 .name-label, .setup-label { margin: 0; color: var(--color-muted); font-size: .72rem; font-weight: 850; letter-spacing: .12em; }

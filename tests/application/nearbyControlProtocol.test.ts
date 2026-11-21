@@ -46,6 +46,45 @@ describe('nearby reliable control protocol', () => {
     expect(decodeControl(packet({ type: 'unknown' }))).toBeNull()
   })
 
+  it('bounds optional Nearby Cup metadata without changing legacy race prepares', () => {
+    const base = { type: 'prepare', slot: 1, laps: 2, lighting: 'day' }
+    expect(decodeControl(packet(base))).toEqual(base)
+    const valid = { ...base, cupIndex: 1, cupTotal: 3 }
+    expect(decodeControl(encodeControl(valid as Control))).toEqual(valid)
+    for (const invalid of [
+      { ...base, cupIndex: -1, cupTotal: 3 },
+      { ...base, cupIndex: 3, cupTotal: 3 },
+      { ...base, cupIndex: 0, cupTotal: 0 },
+      { ...base, cupIndex: 0, cupTotal: 13 },
+      { ...base, cupIndex: 0 },
+      { ...base, cupTotal: 4 },
+      { ...base, cupIndex: '1', cupTotal: 4 },
+    ]) expect(decodeControl(packet(invalid))).toBeNull()
+  })
+
+  it('exchanges bounded profile names in reliable lobby messages and supports older peers', () => {
+    const ready: Control = { type: 'ready', car: 'green', identity, name: "Émile QC" }
+    const lineup: Control = {
+      type: 'lineup', cars: ['blue', 'green', null, null],
+      identities: [identity, identity, null, null], positions: [1, 0, null, null],
+      names: ['JulienQC', 'Émile QC', null, null],
+    }
+    expect(decodeControl(encodeControl(ready))).toEqual(ready)
+    expect(decodeControl(encodeControl(lineup))).toEqual(lineup)
+    // Legacy frames without names still decode for mixed-version rooms.
+    expect(decodeControl(packet({ type: 'ready', car: 'green', identity })))
+      .toEqual({ type: 'ready', car: 'green', identity })
+    for (const name of ['', 'A', 'a'.repeat(25), '<img onerror=alert(1)>', 12]) {
+      expect(decodeControl(packet({ ...ready, name })), JSON.stringify(name)).toBeNull()
+    }
+    for (const names of [
+      ['JulienQC'], ['JulienQC', 'Buddy', 'Injected', null],
+      ['JulienQC', null, 'Other', null], ['JulienQC', 'a'.repeat(25), null, null],
+      ['JulienQC', {}, null, null],
+    ]) expect(decodeControl(packet({ ...lineup, names })), JSON.stringify(names)).toBeNull()
+    expect(decodeControl(new Uint8Array(1025).fill(0))).toBeNull()
+  })
+
   it('rejects duplicate, missing or out-of-range multiplayer spawn assignments', () => {
     const base = { type: 'lineup', cars: ['red', 'green', null, null],
       identities: [identity, identity, null, null], positions: [1, 0, null, null] }

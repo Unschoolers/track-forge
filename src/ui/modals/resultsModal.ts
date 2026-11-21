@@ -1,5 +1,5 @@
 import type { TimeMedal } from '@/application/race/raceRecords'
-import { CUP_CIRCUITS, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
+import { cupRoundCount, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
 import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
@@ -20,6 +20,7 @@ export function createResultsModal(
   },
   cupAction?: { readonly cup: CircuitCup; readonly next: () => void },
   newTimeMedal?: TimeMedal | null,
+  playerName?: string,
 ): HTMLElement {
   const timeTrial = result.mode === 'time-trial'
   const headline = result.outcome === 'water'
@@ -40,6 +41,7 @@ export function createResultsModal(
       : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
+  if (playerName) frame.body.append(element('p', 'modal-subtitle', `DRIVER · ${playerName}`))
   const medal = result.ghostTime === undefined && !timeTrial ? medalForFinish(result.outcome, result.playerPlace) : null
   if (medal) frame.body.append(createFinishCelebration(medal, result.newRecord))
   if (result.playerTime !== null && result.previousBestTime !== undefined) {
@@ -56,7 +58,7 @@ export function createResultsModal(
   if (result.ghostTime !== undefined) {
     frame.body.append(element('p', 'modal-subtitle', `Ghost target: ${formatRaceTime(result.ghostTime)}`))
   } else if (!timeTrial) {
-    frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings, result.rivalsFinishing))
+    frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings, result.rivalsFinishing, playerName))
   }
   if (result.splits?.length) {
     frame.body.append(element('h3', 'results-heading', 'SPLITS'))
@@ -106,14 +108,14 @@ export function createResultsModal(
   }
   frame.body.append(createHighScores(result.highScores))
   if (cupAction) {
-    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${CUP_CIRCUITS.length}`))
+    frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${cupRoundCount(cupAction.cup)}`))
     for (const [index, driver] of cupStandings(cupAction.cup).entries()) {
-      frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
+      frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.id === 'player' ? playerName ?? driver.label : driver.label} · ${driver.points} points`))
     }
     frame.footer.append(
       button('LEAVE CUP', 'results-home', actions.home, 'button'),
       button('RETRY', 'retry-race', actions.retry, 'button'),
-      button(cupAction.cup.index === CUP_CIRCUITS.length - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
+      button(cupAction.cup.index === cupRoundCount(cupAction.cup) - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
     )
     return frame.overlay
   }
@@ -169,10 +171,10 @@ function bindDiagnosticsHold(target: HTMLElement, open: () => void): void {
   })
 }
 
-export function createCupFinalModal(cup: CircuitCup, finish: () => void): HTMLElement {
+export function createCupFinalModal(cup: CircuitCup, finish: () => void, playerName?: string): HTMLElement {
   const frame = createModalFrame('CUP STANDINGS', 'Final results', undefined, 'results-modal')
   frame.overlay.dataset.modal = 'cup-final'
-  for (const [index, driver] of cupStandings(cup).entries()) frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.label} · ${driver.points} points`))
+  for (const [index, driver] of cupStandings(cup).entries()) frame.body.append(element('p', 'modal-subtitle', `${index + 1}. ${driver.id === 'player' ? playerName ?? driver.label : driver.label} · ${driver.points} points`))
   frame.footer.append(button('FINISH CUP', 'next-cup-race', finish, 'button button-primary'))
   return frame.overlay
 }

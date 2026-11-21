@@ -107,7 +107,7 @@ describe('DomUiHost', () => {
       type: 'open-track-library',
       purpose: 'race',
     })
-    expect(port.dispatch).toHaveBeenNthCalledWith(3, { type: 'start-cup' })
+    expect(port.dispatch).toHaveBeenNthCalledWith(3, { type: 'open-cup' })
   })
 
   it('checks updates on Home, shows an actionable indicator, and does not check on each render', async () => {

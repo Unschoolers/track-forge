@@ -10,15 +10,16 @@ import { formatRaceTime } from '@/ui/format'
 export function createStandings(
   standings: readonly RaceStanding[],
   rivalsFinishing = false,
+  playerName?: string,
 ): HTMLElement {
   const list = element('ol', 'scoreboard')
   list.dataset.resultsStandings = ''
   list.setAttribute('aria-live', 'polite')
-  updateStandings(list, standings, rivalsFinishing)
+  updateStandings(list, standings, rivalsFinishing, playerName)
   return list
 }
 
-export function updateStandings(list: HTMLElement, standings: readonly RaceStanding[], rivalsFinishing = false): void {
+export function updateStandings(list: HTMLElement, standings: readonly RaceStanding[], rivalsFinishing = false, playerName?: string): void {
   const rows = document.createDocumentFragment()
   for (const standing of standings) {
     const item = element('li', 'scoreboard-row')
@@ -29,7 +30,7 @@ export function updateStandings(list: HTMLElement, standings: readonly RaceStand
         ? rivalsFinishing && !standing.player ? 'RACING…' : 'UNFINISHED'
         : formatRaceTime(standing.finishTime)
     item.append(
-      element('strong', undefined, `${standing.place}. ${CAR_SPECS[standing.car].name}`),
+      element('strong', undefined, `${standing.place}. ${standing.player ? `${playerName ?? 'You'} · ` : ''}${CAR_SPECS[standing.car].name}`),
       element('span', undefined, outcome),
     )
     rows.append(item)

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { courseIdentity, medalTargets, timeMedal } from '@/application/race/raceRecords'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
-import { createCup, recordCupResult, retryCupRace, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { DEFAULT_CUP_TRACK_IDS, createCup, recordCupResult, retryCupRace, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
 import type { KeyValueStore, ScoreEntry } from '@/application/ports/storage'
 import { requireFixture } from '../fixtures/requireFixture'
 
@@ -15,7 +15,7 @@ describe('persistent Cup progress', () => {
   it('keeps the best placement when a stored checkpoint is invalid', () => {
     const storage = memory()
     storage.set('trackforge-cup-v1', JSON.stringify({ version: 1, checkpoint: { index: 99 }, bestPlacement: 2 }))
-    expect(new BrowserCupRepository(storage).load()).toEqual({ checkpoint: null, bestPlacement: 2 })
+    expect(new BrowserCupRepository(storage).load()).toEqual({ checkpoint: null, bestPlacement: 2, lineup: DEFAULT_CUP_TRACK_IDS })
   })
   it('reloads checkpoints, ignores duplicate results, retries and completes atomically', () => {
     const storage = memory()
@@ -33,7 +33,7 @@ describe('persistent Cup progress', () => {
     cup = recordCupResult(cup, standings)
     for (let i = 1; i < CUP_CIRCUITS.length; i++) cup = recordCupResult(advanceCup(cup), standings)
     repository.save({ checkpoint: null, bestPlacement: 1 })
-    expect(new BrowserCupRepository(storage).load()).toEqual({ checkpoint: null, bestPlacement: 1 })
+    expect(new BrowserCupRepository(storage).load()).toEqual({ checkpoint: null, bestPlacement: 1, lineup: DEFAULT_CUP_TRACK_IDS })
   })
 })
 describe('time medals', () => {

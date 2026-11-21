@@ -9,6 +9,7 @@ import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
+import { normalizeDisplayName } from '@/domain/track/trackCreator'
 import { decodeControl, encodeControl, validLineupPositions, MAX_PLAYERS, type Control } from './controlProtocol'
 
 export type NearbyEvent =
@@ -55,6 +56,12 @@ export class NearbyRace {
   private role: 'host' | 'guest' | null = null
   private purpose: Purpose = 'race'
   private round = 0
+  private cupTracks: readonly Track[] = []
+  private cupIndex = 0
+  private cupTotal = 0
+  private cupLaps = 2
+  private scoredCupIndex = -1
+  private readonly cupPoints = new Map<number, number>()
   private incomingShare: Track | null = null
   private readonly sharedPeers = new Set<string>()
   private readonly shareReady = new Set<string>()
@@ -73,10 +80,11 @@ export class NearbyRace {
   private course: Course | null = null
   private localCar: CarId = CAR_IDS[0]
   private localIdentity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY
+  private localDisplayName: string | undefined
   private readonly rooms = new Map<string, string>()
   private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
-  private readonly ready = new Map<string, { car: CarId; identity: PlayerIdentity; receivedAt: number }>()
+  private readonly ready = new Map<string, { car: CarId; identity: PlayerIdentity; name?: string; receivedAt: number }>()
   private readonly armed = new Map<string, number>()
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
@@ -109,6 +117,11 @@ export class NearbyRace {
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
         this.guests.size > 0 && this.pendingPairs.size === 0,
       canRematch: this.canRematch(),
+      cup: this.cupTotal > 0 ? {
+        index: this.cupIndex, total: this.cupTotal, finished: this.scoredCupIndex === this.cupIndex,
+        standings: this.cupStandings(),
+        nextTrack: this.cupTracks[this.cupIndex + 1]?.name ?? null,
+      } : null,
     }
   }
 
@@ -135,14 +148,39 @@ export class NearbyRace {
   subscribe(listener: () => void) { return this.changes.subscribe(listener) }
   onStart(listener: (start: NearbyStart) => void) { return this.starts.subscribe(listener) }
   onCountdown(listener: (startsAt: number) => void) { return this.countdownStarts.subscribe(listener) }
+  localSlot(): number { return this.slot }
 
   /** Updated from the saved preference; sent only with reliable lobby setup. */
   setIdentity(identity: unknown): void {
     this.localIdentity = normalizePlayerIdentity(identity)
   }
 
+  setDisplayName(name: unknown): void {
+    this.localDisplayName = normalizeDisplayName(name)
+  }
+
   host(course: Course): void {
+    this.cupTracks = []
+    this.cupTotal = 0
+    this.cupIndex = 0
+    this.cupPoints.clear()
+    this.scoredCupIndex = -1
     this.openHost(course, 'race')
+  }
+
+  /** All selected tracks run in order in the same room; no saved multiplayer presets. */
+  hostCup(tracks: readonly Track[], car: CarId, laps: number): void {
+    if (this.phase !== 'idle' || tracks.length < 1 || tracks.length > 12 ||
+        !tracks.every(track => this.validateTrack(track))) return
+    this.cupTracks = [...tracks]
+    this.cupTotal = tracks.length
+    this.cupLaps = laps
+    this.cupIndex = 0
+    this.scoredCupIndex = -1
+    this.cupPoints.clear()
+    const first = tracks[0]!
+    this.openHost({ track: first, car, lighting: first.lighting,
+      laps: first.routeKind === 'point-to-point' ? 1 : laps }, 'race')
   }
 
   hostShare(track: Track): void {
@@ -165,6 +203,11 @@ export class NearbyRace {
     if (this.phase !== 'idle') return
     this.purpose = purpose
     this.role = 'guest'
+    this.cupTracks = []
+    this.cupTotal = 0
+    this.cupIndex = 0
+    this.scoredCupIndex = -1
+    this.cupPoints.clear()
     this.localCar = car
     const active = this.begin('scanning')
     this.perform('scan', () => this.transport.scan(), active)
@@ -182,7 +225,7 @@ export class NearbyRace {
 
   /** The host can select the next circuit without releasing any peer connection. */
   selectNextTrack(track: Track): boolean {
-    if (!this.canRematch() || !this.course || !this.validateTrack(track)) return false
+    if (!this.canRematch() || this.cupTotal > 0 || !this.course || !this.validateTrack(track)) return false
     this.course = {
       ...this.course, track, lighting: track.lighting,
       laps: track.routeKind === 'point-to-point' ? 1 : this.course.laps,
@@ -194,7 +237,8 @@ export class NearbyRace {
   private canRematch(): boolean {
     return this.role === 'host' && this.purpose === 'race' && this.phase === 'racing' &&
       this.guests.size > 0 && this.pendingPairs.size === 0 && this.racers.size > 0 &&
-      [...this.racers.values()].every(racer => racer.time !== undefined || racer.left)
+      [...this.racers.values()].every(racer => racer.time !== undefined || racer.left) &&
+      (this.cupTotal === 0 || this.cupIndex < this.cupTotal - 1)
   }
 
   /** All cars are done; keep the room open and stage another round. */
@@ -202,6 +246,13 @@ export class NearbyRace {
     const first = this.snapshot().canStart
     const rematch = this.canRematch()
     if ((!first && !rematch) || !this.course) return
+    if (rematch && this.cupTotal > 0) {
+      const next = this.cupTracks[this.cupIndex + 1]
+      if (!next) return
+      this.cupIndex++
+      this.course = { ...this.course, track: next, lighting: next.lighting,
+        laps: next.routeKind === 'point-to-point' ? 1 : this.cupLaps }
+    }
     const course = this.course
     const active = this.generation
     if (rematch) {
@@ -238,7 +289,8 @@ export class NearbyRace {
     if (active !== this.generation) return
     const guests = [...this.guests]
     await Promise.all(guests.map(([id, slot]) =>
-      this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round: this.round }))))
+      this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round: this.round,
+        ...(this.cupTotal ? { cupIndex: this.cupIndex, cupTotal: this.cupTotal } : {}) }))))
     for (const chunk of chunks) {
       if (active !== this.generation) return
       await this.transport.send(guests.map(([id]) => id), chunk)
@@ -256,7 +308,7 @@ export class NearbyRace {
     ), recipients)
   }
 
-  /** null means at least one active peer has no recent telemetry (e.g. an older app). */
+  /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
   livePosition(vehicle: RaceVehicle, state: RaceState): { position: number; vehicleCount: number } | null {
     if (this.phase !== 'racing' || !this.racers.has(this.slot)) return null
     const local = raceProgress(vehicle, state.path.points.length, state.startPathIndex,
@@ -337,9 +389,26 @@ export class NearbyRace {
     this.sendControl(this.endpoints(), { type: 'finish', slot: this.slot, time, round: this.round })
   }
 
+  cupStandings(): { slot: number; points: number }[] {
+    return [...this.racers.keys()].map(slot => ({ slot, points: this.cupPoints.get(slot) ?? 0 }))
+      .sort((a, b) => b.points - a.points || a.slot - b.slot)
+  }
+
+  private scoreCupRound(): void {
+    if (!this.cupTotal || this.scoredCupIndex === this.cupIndex || !this.racers.size ||
+        [...this.racers.values()].some(racer => racer.time === undefined && !racer.left)) return
+    const points = [10, 6, 4, 2]
+    for (const [index, racer] of this.standings().entries()) {
+      if (typeof racer.time === 'number') {
+        this.cupPoints.set(racer.slot, (this.cupPoints.get(racer.slot) ?? 0) + (points[index] ?? 0))
+      }
+    }
+    this.scoredCupIndex = this.cupIndex
+  }
+
   standings() {
     return [...this.racers].map(([slot, racer]) => ({
-      slot, car: racer.ghost.car, identity: racer.identity, local: slot === this.slot,
+      slot, car: racer.ghost.car, identity: racer.identity, name: racer.name, local: slot === this.slot,
       time: racer.time, left: racer.left ?? false,
     })).sort((a, b) => (a.time ?? Infinity) - (b.time ?? Infinity) || a.slot - b.slot)
   }
@@ -457,7 +526,8 @@ export class NearbyRace {
         if (!this.validateTrack(track)) throw new Error('The nearby track is not ready to race.')
         this.course = { ...this.prepared, track, car: this.localCar }
         this.readySentAt = this.now()
-        this.sendControl([id], { type: 'ready', car: this.localCar, identity: this.localIdentity, round: this.round })
+        this.sendControl([id], { type: 'ready', car: this.localCar, identity: this.localIdentity, round: this.round,
+          ...(this.localDisplayName ? { name: this.localDisplayName } : {}) })
         this.changed()
       }).catch((error: unknown) => {
         if (active === this.generation) this.fail(error instanceof Error ? error.message : 'Could not load the nearby track.', 'receive_track', error)
@@ -490,6 +560,8 @@ export class NearbyRace {
         this.clearRound()
         this.round = incomingRound
       }
+      this.cupIndex = message.cupIndex ?? 0
+      this.cupTotal = message.cupTotal ?? 0
       this.slot = message.slot
       this.prepared = { laps: message.laps, lighting: message.lighting }
       this.receiver = new TrackReceiver()
@@ -497,12 +569,13 @@ export class NearbyRace {
       this.armTimeout('The host did not start the race in time.')
     } else if (guestSlot !== undefined && this.phase === 'preparing' &&
         message.type === 'ready' && incomingRound === this.round) {
-      if (!this.ready.has(id)) this.ready.set(id, { car: message.car, identity: message.identity, receivedAt: this.now() })
+      if (!this.ready.has(id)) this.ready.set(id, { car: message.car, identity: message.identity,
+        ...(message.name ? { name: message.name } : {}), receivedAt: this.now() })
       if (this.ready.size === this.guests.size) this.startHost()
     } else if (fromHost && this.phase === 'preparing' && message.type === 'lineup' &&
         incomingRound === this.round && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar) {
-      this.stage(this.course, message.cars, message.identities, message.positions)
+      this.stage(this.course, message.cars, message.identities, message.positions, message.names)
     } else if (guestSlot !== undefined && this.phase === 'staging' &&
         message.type === 'armed' && incomingRound === this.round) {
       if (!this.armed.has(id)) this.armed.set(id, this.now())
@@ -527,11 +600,13 @@ export class NearbyRace {
     if (!this.course || this.phase !== 'preparing') return
     const cars: (CarId | null)[] = [this.course.car, null, null, null]
     const identities: (PlayerIdentity | null)[] = [this.localIdentity, null, null, null]
+    const names: (string | null)[] = [this.localDisplayName ?? null, null, null, null]
     for (const [id, slot] of this.guests) {
       const guest = this.ready.get(id)
       if (!guest) return
       cars[slot] = guest.car
       identities[slot] = guest.identity
+      names[slot] = guest.name ?? null
     }
     // Assign one unique spawn pad per connected racer, including the host.
     // This order is chosen once and sent unchanged to every Android device.
@@ -540,11 +615,12 @@ export class NearbyRace {
       (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32)
     const positions: (number | null)[] = [null, null, null, null]
     occupied.forEach((slot, index) => { positions[slot] = shuffled[index]! })
-    this.stage(this.course, cars, identities, positions)
-    this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions, round: this.round })
+    this.stage(this.course, cars, identities, positions, names)
+    this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions, round: this.round,
+      ...(names.some(name => name !== null) ? { names } : {}) })
   }
 
-  private stage(course: Course, cars: (CarId | null)[], identities: (PlayerIdentity | null)[], positions: (number | null)[]): void {
+  private stage(course: Course, cars: (CarId | null)[], identities: (PlayerIdentity | null)[], positions: (number | null)[], names?: (string | null)[]): void {
     const gridSlot = positions[this.slot]
     if (gridSlot === null || gridSlot === undefined || !validLineupPositions(cars, positions)) {
       this.fail('The multiplayer starting grid is invalid.')
@@ -552,8 +628,10 @@ export class NearbyRace {
     }
     this.lineup = cars
     cars.forEach((car, slot) => {
+      const name = names?.[slot] ?? (slot === this.slot ? this.localDisplayName : undefined)
       if (car) this.racers.set(slot, {
         ghost: new RemoteGhost(car), identity: identities[slot] ?? DEFAULT_PLAYER_IDENTITY,
+        ...(name ? { name } : {}),
       })
     })
     this.setPhase('staging')
@@ -590,6 +668,7 @@ export class NearbyRace {
     const racer = this.racers.get(slot)
     if (!racer || racer.time !== undefined || racer.left) return false
     racer.time = time
+    this.scoreCupRound()
     this.changed()
     return true
   }
@@ -625,7 +704,7 @@ export class NearbyRace {
 
   private markLeft(slot: number): void {
     const racer = this.racers.get(slot)
-    if (racer) { racer.left = true; this.changed() }
+    if (racer) { racer.left = true; this.scoreCupRound(); this.changed() }
   }
 
   private endpoints(exclude?: string): string[] {
@@ -703,6 +782,11 @@ export class NearbyRace {
     this.shareStatus = null
     this.sharePacked = null
     this.round = 0
+    this.cupTracks = []
+    this.cupTotal = 0
+    this.cupIndex = 0
+    this.cupPoints.clear()
+    this.scoredCupIndex = -1
     this.purpose = 'race'
     this.room = null
     this.hostId = null

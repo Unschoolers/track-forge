@@ -92,6 +92,7 @@ describe('Nearby Arcade', () => {
       const device = new NearbyRace(network.endpoint(name), (course) => course.points.length === track.points.length,
         () => time + clockOffset)
       device.setIdentity(identity)
+      device.setDisplayName(name === 'host' ? 'JulienQC' : `Racer ${name.slice(-1)}`)
       return { name, car, clockOffset, device }
     })
     const devices = setups.map(({ device }) => device)
@@ -128,6 +129,7 @@ describe('Nearby Arcade', () => {
         expect(start.startsAt).toBeUndefined()
         expect(device.standings()).toHaveLength(4)
         expect(device.standings().map(({ identity }) => identity)).toEqual(players.map(({ identity }) => identity))
+        expect(device.standings().map(({ name }) => name)).toEqual(['JulienQC', 'Racer 1', 'Racer 2', 'Racer 3'])
         expect(device.snapshot().phase).toBe('staging')
       }
 
@@ -185,7 +187,7 @@ describe('Nearby Arcade', () => {
       expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
       expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
 
-      // A lightweight progress stream ranks remote laps without changing the pose format.
+      // Optional progress telemetry distinguishes race progress from pose position.
       const progressState = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2 })
       const progressCars = setups.map(({ car }, index) =>
         ({ ...makeCar(car, index * 10), lap: index === 0 ? 0 : 1 }))
@@ -197,7 +199,6 @@ describe('Nearby Arcade', () => {
       }, { interval: 5 })
       const progressCount = network.packets.filter(({ bytes }) => bytes[0] === Packet.Progress).length
       expect(progressCount).toBeGreaterThanOrEqual(4)
-      // Taking the lead must propagate to every participant, not just the host.
       time += 200
       const leadingHost = { ...progressCars[0]!, lap: 1 }
       host.update(leadingHost, progressState)
@@ -348,6 +349,61 @@ describe('Nearby track sharing and rematches', () => {
       host.destroy()
       recipient.destroy()
       racer.destroy()
+    }
+  })
+
+  it('hosts a configured Nearby Cup, scores every round once and ends after its last track', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const nextTrack = { ...track, name: 'Final track' }
+    const hostStarts: NearbyStart[] = []
+    const guestStarts: NearbyStart[] = []
+    host.onStart(start => hostStarts.push(start))
+    guest.onStart(start => guestStarts.push(start))
+    try {
+      host.hostCup([track, nextTrack], 'blue', 2)
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      expect(host.snapshot().cup).toMatchObject({ index: 0, total: 2, nextTrack: 'Final track' })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
+      expect(guest.snapshot().cup).toMatchObject({ index: 0, total: 2 })
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      guest.finish(35)
+      host.finish(40)
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+      expect(host.cupStandings()).toEqual([{ slot: 1, points: 10 }, { slot: 0, points: 6 }])
+      expect(guest.cupStandings()).toEqual(host.cupStandings())
+      expect(host.selectNextTrack(nextTrack)).toBe(false) // Host cannot override the Cup schedule.
+      host.start()
+      await vi.waitFor(() => {
+        expect(hostStarts).toHaveLength(2)
+        expect(guestStarts).toHaveLength(2)
+      }, { interval: 5 })
+      expect(hostStarts[1]?.track.name).toBe('Final track')
+      expect(guestStarts[1]?.track.name).toBe('Final track')
+      expect(guest.snapshot().cup).toMatchObject({ index: 1, total: 2 })
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      host.finish(32)
+      guest.finish(38)
+      await vi.waitFor(() => expect(host.cupStandings()).toEqual([
+        { slot: 0, points: 16 }, { slot: 1, points: 16 },
+      ]), { interval: 5 })
+      expect(guest.cupStandings()).toEqual(host.cupStandings())
+      expect(host.snapshot().canRematch).toBe(false)
+      host.start()
+      expect(hostStarts).toHaveLength(2)
+    } finally {
+      host.destroy()
+      guest.destroy()
     }
   })
 
