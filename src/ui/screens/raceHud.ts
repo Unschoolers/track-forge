@@ -308,8 +308,10 @@ export function createRaceHud(
     damage.setAttribute('aria-valuemax', String(telemetry.damageLimit))
     damage.setAttribute('aria-valuenow', String(telemetry.damage))
     const countdownText =
-      telemetry.phase === 'countdown'
-        ? String(countdownCue(telemetry.countdown)).toUpperCase()
+      telemetry.waitingForStart
+        ? 'WAIT'
+        : telemetry.phase === 'countdown'
+          ? String(countdownCue(telemetry.countdown)).toUpperCase()
         : telemetry.phase === 'running' && telemetry.elapsed < 0.7
           ? 'GO'
           : ''
