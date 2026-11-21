@@ -23,11 +23,8 @@ const racingPavementByPath = new WeakMap<RoadPath, Map<number, number>>()
 const SHARP_LOCAL_TURN = 0.2
 const MAX_SHARP_SAMPLE_FRACTION = 0.012
 const MIN_PAVED_SAMPLE_FRACTION = 0.95
-// Sustained bends with 0.3-0.4 radians over the six-sample window are not
-// straight-line pavement. The old 0.5/0.57 band marked them full-pace,
-// encouraging overlong pursuit targets and repeated road-edge recoveries.
-const RACING_PAVEMENT_FULL_PACE_TURN = 0.16
-const RACING_PAVEMENT_BASE_PACE_TURN = 0.42
+const RACING_PAVEMENT_FULL_PACE_TURN = 0.5
+const RACING_PAVEMENT_BASE_PACE_TURN = 0.57
 
 /** Fraction of extra pavement pace a sweeping approach can support. */
 export function sweepingPavementAllowance(path: RoadPath, index: number, reversed: boolean): number {
