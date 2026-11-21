@@ -9,6 +9,7 @@ import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
 import { isVehicleAboveStructures, renderVehicles } from '@/phaser/rendering/vehicleRenderer'
+import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
 
@@ -33,6 +34,7 @@ const track: Track = {
 
 class Graphics {
 	readonly bodies: { x: number; y: number }[] = []
+	readonly scales: { x: number; y: number }[] = []
 	readonly shadows: { x: number; y: number }[] = []
 	readonly outlines: { x: number; y: number }[] = []
 	private position = { x: 0, y: 0 }
@@ -40,6 +42,7 @@ class Graphics {
 	strokes = 0
 	clear() {
 		this.bodies.length = 0
+		this.scales.length = 0
 		this.shadows.length = 0
 		this.outlines.length = 0
 		this.strokes = 0
@@ -51,7 +54,10 @@ class Graphics {
 	restore() {}
 	rotateCanvas() {}
 	// A body scales with suspension; cosmetic antenna translations never do.
-	scaleCanvas() { this.bodies.push({ ...this.position }) }
+	scaleCanvas(x: number, y: number) {
+    this.bodies.push({ ...this.position })
+    this.scales.push({ x, y })
+  }
 	fillStyle() {}
 	beginPath() {}
 	moveTo() {}
@@ -139,6 +145,9 @@ describe('ramp vehicle rendering', () => {
     const graphics = new Graphics()
     renderVehicles(graphics as never, [car], path)
     expect(graphics.bodies).toEqual([{ x: car.x, y: car.y }])
+    expect(graphics.scales).toEqual([
+      { x: VEHICLE_VISUAL_SCALE, y: VEHICLE_VISUAL_SCALE },
+    ])
   })
 
 	it.each([false, true])(
