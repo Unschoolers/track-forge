@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { compileTerrainSurface } from '@/domain/terrain/terrainSurface'
+import { WORLD_ELEVATION } from '@/domain/config'
+import { buildTerrainComponents, tileTerrainComponent } from '@/phaser/rendering/terrainTopology'
 import {
   compileTerrainPresentation,
 } from '@/phaser/rendering/terrainMesh'
@@ -49,7 +51,25 @@ describe('large track rendering budgets', () => {
         .reduce((sum, [a, b, c]) => sum +
           Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2, 0)
 
-    expect(plateauArea(overview)).toBe(plateauArea(full))
+    // Full detail intentionally samples half-cells. Compare overview against
+    // its own original per-cell plateau classification, before run merging.
+    const hill = buildTerrainComponents(surface.contours, 'hill')[0]
+    if (!hill) throw new Error('Missing hill component')
+    const quads = tileTerrainComponent(hill, WORLD_ELEVATION.cellSize)
+    let unmergedPlateauArea = 0
+    for (let index = 0; index < quads.length; index += 2) {
+      const first = quads[index]
+      const second = quads[index + 1]
+      if (!first || !second) continue
+      const center = {
+        x: (first[0].x + first[2].x) / 2,
+        y: (first[0].y + first[2].y) / 2,
+      }
+      if (surface.heightSampleAt(center).height >= WORLD_ELEVATION.levelHeight - 0.001) {
+        unmergedPlateauArea += WORLD_ELEVATION.cellSize ** 2
+      }
+    }
+    expect(plateauArea(overview)).toBe(unmergedPlateauArea)
     expect(overview.stats.triangleCount).toBeLessThan(full.stats.triangleCount / 4)
     expect(overview.stats.contourPointCount).toBe(4)
   })
