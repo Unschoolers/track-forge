@@ -54,6 +54,7 @@ describe('large track rendering budgets', () => {
     expect(overview.stats.contourPointCount).toBe(4)
   })
 
+  it('samples hill elevation once per overview tile instead of four times', () => {
     const terrain = landscape(16, 16)
     const base = compileTerrainSurface(terrain, [])
     const fullSample = vi.fn(base.heightSampleAt)
