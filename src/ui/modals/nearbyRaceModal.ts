@@ -12,7 +12,7 @@ import { createTopperSelector } from '@/ui/components/playerTopperPicker'
 export function createNearbyRaceModal(
   nearby: NearbyRace,
   car: CarId,
-  actions: { close: () => void; chooseTrack: () => void; scan: () => void; scanTracks: () => void;
+  actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
     saveTrack: () => void; declineTrack: () => void;
     selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
     toggleCustomize?: () => void; selectIdentity?: (identity: PlayerIdentity) => void },
@@ -36,6 +36,7 @@ export function createNearbyRaceModal(
         createCarPicker(car, actions.selectCar),
         createTopperSelector(identity, customizing, actions.toggleCustomize, actions.selectIdentity),
         button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
+        button('HOST CUP', 'nearby-host-cup', actions.configureCup, 'button'),
         button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),
         button('RECEIVE TRACK', 'nearby-receive-track', actions.scanTracks, 'button'),
       )
