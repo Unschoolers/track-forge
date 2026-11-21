@@ -58,6 +58,15 @@ describe('missed timing gate recovery', () => {
     const missed = advanceArcadeTimingGate(race, afterGate, later, 6, false, () => false)
     expect(missed.vehicle.nextSector).toBe(1)
     expect(missed.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+
+    // Brief reacquisition of the wrong road arm must not fabricate a miss.
+    const changingArms = advanceArcadeTimingGate(
+      race,
+      { ...afterGate, recoveryAnchorIndex: race.startPathIndex },
+      { ...later, recoveryAnchorIndex: race.startPathIndex },
+      6, false, () => false,
+    )
+    expect(changingArms.missedCheckpoint).toBeUndefined()
   })
 
   it('finishes a timed reset even if every pre-gate road sample is flooded', () => {
