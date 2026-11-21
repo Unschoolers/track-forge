@@ -46,6 +46,29 @@ describe('nearby reliable control protocol', () => {
     expect(decodeControl(packet({ type: 'unknown' }))).toBeNull()
   })
 
+  it('exchanges bounded profile names in reliable lobby messages and supports older peers', () => {
+    const ready: Control = { type: 'ready', car: 'green', identity, name: "Émile QC" }
+    const lineup: Control = {
+      type: 'lineup', cars: ['blue', 'green', null, null],
+      identities: [identity, identity, null, null], positions: [1, 0, null, null],
+      names: ['JulienQC', 'Émile QC', null, null],
+    }
+    expect(decodeControl(encodeControl(ready))).toEqual(ready)
+    expect(decodeControl(encodeControl(lineup))).toEqual(lineup)
+    // Legacy frames without names still decode for mixed-version rooms.
+    expect(decodeControl(packet({ type: 'ready', car: 'green', identity })))
+      .toEqual({ type: 'ready', car: 'green', identity })
+    for (const name of ['', 'A', 'a'.repeat(25), '<img onerror=alert(1)>', 12]) {
+      expect(decodeControl(packet({ ...ready, name })), JSON.stringify(name)).toBeNull()
+    }
+    for (const names of [
+      ['JulienQC'], ['JulienQC', 'Buddy', 'Injected', null],
+      ['JulienQC', null, 'Other', null], ['JulienQC', 'a'.repeat(25), null, null],
+      ['JulienQC', {}, null, null],
+    ]) expect(decodeControl(packet({ ...lineup, names })), JSON.stringify(names)).toBeNull()
+    expect(decodeControl(new Uint8Array(1025).fill(0))).toBeNull()
+  })
+
   it('rejects duplicate, missing or out-of-range multiplayer spawn assignments', () => {
     const base = { type: 'lineup', cars: ['red', 'green', null, null],
       identities: [identity, identity, null, null], positions: [1, 0, null, null] }
