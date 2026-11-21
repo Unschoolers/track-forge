@@ -200,7 +200,7 @@ export class NearbyRace {
     const course = this.course
     const active = this.generation
     if (rematch) {
-      this.round++
+      this.round = (this.round + 1) & 0xffff
       this.clearRound()
     }
     this.setPhase('preparing')
@@ -444,7 +444,7 @@ export class NearbyRace {
     const incomingRound = 'round' in message ? message.round ?? 0 : 0
     if (fromHost && message.type === 'prepare' &&
         (this.phase === 'waiting' && incomingRound === this.round ||
-         this.phase === 'racing' && incomingRound === this.round + 1)) {
+         this.phase === 'racing' && incomingRound === ((this.round + 1) & 0xffff))) {
       if (this.phase === 'racing') {
         this.clearRound()
         this.round = incomingRound
