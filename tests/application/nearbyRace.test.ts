@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { assert, describe, expect, it, vi } from 'vitest'
 import { NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
-import { decodePose, encodePose, Packet, POSE_BYTES, RemoteGhost } from '@/application/multiplayer/raceWire'
+import { decodePose, decodePoseBatch, encodePose, encodePoseBatch, Packet, POSE_BYTES, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, RemoteGhost } from '@/application/multiplayer/raceWire'
 import { packTrack, TrackReceiver } from '@/application/multiplayer/trackTransfer'
 import { RaceSession } from '@/application/race/raceSession'
 import { decodeTrack } from '@/domain/track/trackCodec'
@@ -159,13 +159,25 @@ describe('Nearby Arcade', () => {
       for (const [index, { device, car }] of setups.entries()) {
         device.update(makeCar(car, index * 10, index * 5, index === 1 ? 'bridge' : null))
       }
+      // Host waits for its next tick, then broadcasts all four cars once.
+      await vi.waitFor(() => expect(host.remotePoses()).toHaveLength(3), { interval: 5 })
+      time += 1000 / 60
+      host.update(makeCar('blue', 0))
+      expect(network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)).toHaveLength(1)
+      time += 1000 / 60
+      host.update(makeCar('blue', 0))
       await vi.waitFor(() => {
         expect(devices.map((device) => device.remotePoses().length)).toEqual([3, 3, 3, 3])
       }, { interval: 5 })
       expect(yellow.remotePoses()).toContainEqual(expect.objectContaining({ car: 'red', x: 10, z: 5, structureRunId: 'elevated' }))
       const posePackets = network.packets.filter(({ bytes }) => bytes[0] === Packet.Pose)
-      expect(posePackets).toHaveLength(7)
+      const hostBatches = network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)
+      expect(posePackets).toHaveLength(3)
       expect(posePackets.every(({ bytes }) => bytes.byteLength === POSE_BYTES)).toBe(true)
+      expect(hostBatches).toHaveLength(2)
+      expect(hostBatches.map(({ bytes }) => bytes.byteLength)).toEqual([1 + POSE_BYTES, 1 + 4 * POSE_BYTES])
+      expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
+      expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
 
       red.finish(40.125)
       host.finish(42)
@@ -261,6 +273,42 @@ describe('Nearby Arcade', () => {
     expect(received?.name).toBe(scenicTrack.name)
     expect(received?.trees).toEqual(scenicTrack.trees)
     expect(received?.points).toEqual(scenicTrack.points)
+  })
+
+  it('round-trips and validates four-player batches without duplicate or malformed slots', () => {
+    expect(POSE_PERIOD_MS).toBeCloseTo(1000 / 30)
+    expect(POSE_FAST_PERIOD_MS).toBeCloseTo(1000 / 60)
+    const blue = encodePose(0, 1, 0, makeCar('blue', 12))
+    const red = encodePose(1, 2, 0, makeCar('red', 24))
+    const batch = encodePoseBatch([blue, red])
+    expect(batch.byteLength).toBe(1 + 2 * POSE_BYTES)
+    expect(decodePoseBatch(batch)?.map(({ slot, pose }) => [slot, pose.x])).toEqual([[0, 12], [1, 24]])
+    expect(decodePoseBatch(batch.subarray(0, batch.length - 1))).toBeNull()
+    expect(decodePoseBatch(new Uint8Array([Packet.PoseBatch]))).toBeNull()
+    expect(decodePoseBatch(encodePoseBatch([blue]))).toHaveLength(1)
+    expect(() => encodePoseBatch([blue, blue])).toThrow(RangeError)
+    expect(() => encodePoseBatch([])).toThrow(RangeError)
+    const duplicate = new Uint8Array(batch)
+    duplicate.set(blue, 1 + POSE_BYTES)
+    expect(decodePoseBatch(duplicate)).toBeNull()
+    expect(decodePoseBatch(new Uint8Array(1 + 5 * POSE_BYTES).fill(Packet.PoseBatch))).toBeNull()
+  })
+
+  it('interpolates at 30-60 Hz and briefly predicts movement without crossing recoveries', () => {
+    const ghost = new RemoteGhost('red')
+    const pose = (sequence: number, recovery: number, x: number) =>
+      decodePose(encodePose(1, sequence, recovery, makeCar('red', x)))
+    const first = pose(1, 0, 0)
+    const second = pose(2, 0, 10)
+    assert(first && second)
+    expect(ghost.receive(first, 1000)).toBe(true)
+    expect(ghost.receive(second, 1033)).toBe(true)
+    expect(ghost.pose(1150)?.x).toBeGreaterThan(10)
+    const recovered = pose(3, 1, 500)
+    assert(recovered)
+    expect(ghost.receive(recovered, 1160)).toBe(true)
+    expect(ghost.pose(1270)?.x).toBe(500)
+    expect(ghost.pose(1950)).toBeNull()
   })
 
   it('round-trips a 19-byte pose and cuts interpolation on a recovery', () => {

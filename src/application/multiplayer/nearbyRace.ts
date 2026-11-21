@@ -2,7 +2,7 @@ import { EventBus } from '@/application/eventBus'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { CAR_IDS, type CarId, type LightingMode, type Track } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
-import { decodePose, encodePose, Packet, POSE_PERIOD_MS, RemoteGhost } from './raceWire'
+import { decodePose, decodePoseBatch, encodePose, encodePoseBatch, Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, RemoteGhost } from './raceWire'
 import { packTrack, TrackReceiver } from './trackTransfer'
 
 export type NearbyEvent =
@@ -122,7 +122,7 @@ export class NearbyRace {
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
   private readonly racers = new Map<number, Racer>()
-  private readonly forwarding = new Set<string>()
+  private readonly latestPoses = new Map<number, { bytes: Uint8Array; receivedAt: number }>()
   private receiver: TrackReceiver | null = null
   private prepared: Pick<Course, 'laps' | 'lighting'> | null = null
   private readySentAt = 0
@@ -131,6 +131,9 @@ export class NearbyRace {
   private recovery = 0
   private lastSentAt = -Infinity
   private poseSending = false
+  private posePeriodMs = POSE_PERIOD_MS
+  private healthySends = 0
+  private fastRetryAfter = 0
   private timeout: ReturnType<typeof setTimeout> | undefined
 
   constructor(
@@ -157,6 +160,7 @@ export class NearbyRace {
       counts: this.diagnosticCounts(),
       timeline: this.timeline.map((entry) => ({ ...entry })),
       poseCounts: { ...this.poseCounts },
+      targetPoseHz: Math.round(1000 / this.posePeriodMs),
       lastFailure: this.lastFailure && { ...this.lastFailure },
     }
     if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
@@ -229,16 +233,45 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle): void {
     const now = this.now()
-    if (this.phase !== 'racing' || this.poseSending || now - this.lastSentAt < POSE_PERIOD_MS) return
+    // Leave two milliseconds of tolerance for a 60 FPS frame clock so the
+    // 30 Hz cadence does not slip to one update every three frames.
+    if (this.phase !== 'racing' || this.poseSending ||
+      now - this.lastSentAt < this.posePeriodMs - 2) return
     const ids = this.endpoints()
     if (!ids.length) return
+    const pose = encodePose(this.slot, this.sequence++, this.recovery, vehicle)
+    // Guests upload one pose. Host broadcasts one shared snapshot to all
+    // guests instead of relaying every guest's packet individually.
+    if (!this.hostId) this.latestPoses.set(this.slot, { bytes: pose, receivedAt: now })
+    const bytes = this.hostId ? pose : encodePoseBatch(
+      [...this.latestPoses].filter(([slot, value]) =>
+        now - value.receivedAt <= 300 && !this.racers.get(slot)?.left &&
+        this.racers.get(slot)?.time === undefined).map(([, value]) => value.bytes))
     this.lastSentAt = now
     this.poseSending = true
     this.poseCounts.sent++
     const active = this.generation
-    void this.transport.send(ids, encodePose(this.slot, this.sequence++, this.recovery, vehicle))
-      .catch(() => { this.poseCounts.sendFailed++ })
+    void this.transport.send(ids, bytes)
+      .then(() => { if (active === this.generation) this.updatePoseRate(now, true) })
+      .catch(() => {
+        if (active !== this.generation) return
+        this.poseCounts.sendFailed++
+        this.updatePoseRate(now, false)
+      })
       .finally(() => { if (active === this.generation) this.poseSending = false })
+  }
+
+  private updatePoseRate(startedAt: number, success: boolean): void {
+    const now = this.now()
+    const duration = Math.max(0, now - startedAt)
+    if (!success || duration > 25) {
+      this.posePeriodMs = POSE_PERIOD_MS
+      this.healthySends = 0
+      this.fastRetryAfter = now + 5000
+    } else if (now >= this.fastRetryAfter) {
+      this.healthySends = duration <= 12 ? this.healthySends + 1 : 0
+      if (this.healthySends >= 30) this.posePeriodMs = POSE_FAST_PERIOD_MS
+    }
   }
 
   recovered(): void { this.recovery++ }
@@ -352,12 +385,27 @@ export class NearbyRace {
     const fromHost = this.hostId === id
     const guestSlot = this.guests.get(id)
     if (!fromHost && guestSlot === undefined) return
+    if (bytes[0] === Packet.PoseBatch && fromHost && this.phase === 'racing') {
+      const packets = decodePoseBatch(bytes)
+      if (!packets) return
+      const now = this.now()
+      for (const packet of packets) {
+        const racer = this.racers.get(packet.slot)
+        if (!racer || racer.left || packet.slot === this.slot) continue
+        this.poseCounts.received++
+        racer.ghost.receive(packet, now)
+      }
+      return
+    }
     if (bytes[0] === Packet.Pose && this.phase === 'racing') {
-      this.poseCounts.received++
       const packet = decodePose(bytes)
       const racer = packet && this.racers.get(packet.slot)
       if (!packet || !racer || racer.left || packet.slot === this.slot || (!fromHost && packet.slot !== guestSlot)) return
-      if (racer.ghost.receive(packet, this.now()) && !fromHost) this.relayPose(id, bytes)
+      this.poseCounts.received++
+      if (racer.ghost.receive(packet, this.now()) && !fromHost) {
+        this.latestPoses.set(packet.slot, { bytes: new Uint8Array(bytes), receivedAt: this.now() })
+        this.poseCounts.relayed++
+      }
       return
     }
     if (bytes[0] === Packet.Track && fromHost && this.phase === 'preparing' && this.receiver) {
@@ -407,17 +455,6 @@ export class NearbyRace {
     } else if (this.phase === 'racing' && fromHost && message.type === 'left' && message.slot !== this.slot) {
       this.markLeft(message.slot)
     }
-  }
-
-  private relayPose(id: string, bytes: Uint8Array): void {
-    const recipients = this.endpoints(id)
-    if (!recipients.length || this.forwarding.has(id)) return
-    const generation = this.generation
-    this.forwarding.add(id)
-    this.poseCounts.relayed++
-    void this.transport.send(recipients, bytes).catch(() => undefined).finally(() => {
-      if (generation === this.generation) this.forwarding.delete(id)
-    })
   }
 
   private startHost(): void {
@@ -584,12 +621,15 @@ export class NearbyRace {
     this.lineup = null
     this.readySentAt = 0
     this.racers.clear()
-    this.forwarding.clear()
+    this.latestPoses.clear()
     this.receiver = null
     this.prepared = null
     this.slot = this.sequence = this.recovery = 0
     this.lastSentAt = -Infinity
     this.poseSending = false
+    this.posePeriodMs = POSE_PERIOD_MS
+    this.healthySends = 0
+    this.fastRetryAfter = 0
     this.error = error
     this.setPhase('idle')
   }
