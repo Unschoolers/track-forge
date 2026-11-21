@@ -38,7 +38,22 @@ describe('large track rendering budgets', () => {
     expect(compileTerrainPresentation(surface, 'full')).toBe(regular)
   })
 
-  it('samples hill elevation once per overview tile instead of four times', () => {
+  it('fuses flat overview hill spans without altering their exact coverage', () => {
+    const surface = compileTerrainSurface(landscape(80, 80), [])
+    const full = compileTerrainPresentation(surface, 'full')
+    const overview = compileTerrainPresentation(surface, 'overview')
+    const plateauArea = (presentation: typeof full) =>
+      presentation.primitives
+        .filter((primitive) => primitive.kind === 'hill-plateau')
+        .flatMap((primitive) => primitive.triangles)
+        .reduce((sum, [a, b, c]) => sum +
+          Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2, 0)
+
+    expect(plateauArea(overview)).toBe(plateauArea(full))
+    expect(overview.stats.triangleCount).toBeLessThan(full.stats.triangleCount / 4)
+    expect(overview.stats.contourPointCount).toBe(4)
+  })
+
     const terrain = landscape(16, 16)
     const base = compileTerrainSurface(terrain, [])
     const fullSample = vi.fn(base.heightSampleAt)
