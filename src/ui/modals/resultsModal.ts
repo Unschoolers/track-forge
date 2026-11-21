@@ -35,13 +35,14 @@ export function createResultsModal(
       : result.newRecord
       ? 'NEW RECORD'
       : timeTrial ? 'TIME TRIAL COMPLETE' : `FINISHED ${result.playerPlace}${ordinalSuffix(result.playerPlace)}`
-  const subtitle =
-    result.playerTime === null
-      ? result.trackName
-      : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
+  const hasStandings = result.ghostTime === undefined && !timeTrial && result.standings.length > 0
+  const subtitle = result.playerTime === null || hasStandings
+    ? result.trackName
+    : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
-  if (playerName) frame.body.append(element('p', 'modal-subtitle', `DRIVER · ${playerName}`))
+  // The player's name and finish time are already visible in the standings.
+  if (playerName && !hasStandings) frame.body.append(element('p', 'modal-subtitle', `DRIVER · ${playerName}`))
   const medal = result.ghostTime === undefined && !timeTrial ? medalForFinish(result.outcome, result.playerPlace) : null
   if (medal) frame.body.append(createFinishCelebration(medal, result.newRecord))
   if (result.playerTime !== null && result.previousBestTime !== undefined) {
@@ -51,16 +52,14 @@ export function createResultsModal(
       : delta === 0 ? 'Personal best matched' : `Gap to best: ${formatRaceTime(delta)}`
     frame.body.append(element('p', 'modal-subtitle', copy))
   }
-  if (medal) {
-    frame.body.append(element('p', 'race-finish-medal', `${medal} MEDAL`))
-  }
   if (newTimeMedal) frame.body.append(element('p', 'race-finish-medal', `NEW ${newTimeMedal.toUpperCase()} TIME MEDAL`))
   if (result.ghostTime !== undefined) {
     frame.body.append(element('p', 'modal-subtitle', `Ghost target: ${formatRaceTime(result.ghostTime)}`))
   } else if (!timeTrial) {
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings, result.rivalsFinishing, playerName))
   }
-  addSplitsDetails(frame, result)
+  const detailsBar = element('div', 'results-details-bar')
+  addSplitsDetails(frame, result, detailsBar)
   if (result.scoreSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))
   }
@@ -96,11 +95,21 @@ export function createResultsModal(
       actions.diagnosticsOpened?.()
     }
     bindDiagnosticsHold(target, open)
-    frame.body.append(target, panel)
+    detailsBar.append(target, panel)
   } else {
-    frame.body.append(replayStatus)
+    detailsBar.append(replayStatus)
   }
-  frame.body.append(createHighScores(result.highScores))
+  frame.body.append(detailsBar)
+  // A single freshly recorded time repeats the finish/standings. Keep history
+  // available only when there is another run worth comparing.
+  if (result.highScores.some(score => result.playerTime === null || Math.abs(score.time - result.playerTime) > 0.0005)) {
+    const history = element('details', 'results-history')
+    history.append(
+      element('summary', 'results-history-toggle', `TOP TIMES · ${result.highScores.length}`),
+      createHighScores(result.highScores, false),
+    )
+    frame.body.append(history)
+  }
   if (cupAction) {
     frame.body.append(element('h3', 'results-heading', `CUP STANDINGS · RACE ${cupAction.cup.index + 1}/${cupRoundCount(cupAction.cup)}`))
     for (const [index, driver] of cupStandings(cupAction.cup).entries()) {
@@ -113,17 +122,20 @@ export function createResultsModal(
     )
     return frame.overlay
   }
-  frame.footer.append(button('RETRY', 'retry-race', actions.retry, 'button button-primary'))
-  if (actions.raceBestGhost) frame.footer.append(
+  frame.footer.classList.add('results-footer')
+  const primary = element('div', 'results-primary-actions')
+  primary.append(button('RETRY', 'retry-race', actions.retry, 'button button-primary'))
+  if (actions.raceBestGhost) primary.append(
     button('RACE GHOST', 'race-best-ghost', actions.raceBestGhost, 'button'),
   )
+  primary.append(button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'))
   const secondary = element('div', 'results-secondary')
   secondary.append(
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),
   )
-  frame.body.append(secondary)
-  frame.footer.append(button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'))
+  // All navigation stays fixed even when the results body needs to scroll.
+  frame.footer.append(primary, secondary)
   return frame.overlay
 }
 
@@ -131,7 +143,7 @@ export function createResultsModal(
  * Advanced timing stays out of the results summary. Swap the single dialog's
  * card instead of stacking dialogs, so focus and Escape remain predictable.
  */
-function addSplitsDetails(frame: ModalFrame, result: RaceResult): void {
+function addSplitsDetails(frame: ModalFrame, result: RaceResult, container: HTMLElement): void {
   const splits = result.splits
   if (!splits?.length) return
 
@@ -237,7 +249,7 @@ function addSplitsDetails(frame: ModalFrame, result: RaceResult): void {
       close()
     }
   })
-  frame.body.append(openButton)
+  container.append(openButton)
 }
 
 /** Hidden on mobile (800 ms hold); right-click and keyboard remain accessible on desktop. */
