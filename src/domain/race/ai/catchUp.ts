@@ -1,36 +1,39 @@
+import { CAR_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import { raceProgress } from '@/domain/race/ranking'
-import type { RaceState } from '@/domain/race/raceState'
+import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import type { SpeedAssist } from '@/domain/race/vehiclePhysics'
 
-const MAX_SPEED_BONUS = 0.05
-const MINIMUM_LEAD = 48
-const LEAD_FOR_FULL_BONUS = 180
+const BOOST_START_SECONDS = 0.5
+const FULL_BOOST_SECONDS = 5
+const INITIAL_BONUS = 0.01
+const MAX_SPEED_BONUS = 0.12
 
-export function rivalCatchUp(race: RaceState): SpeedAssist | undefined {
+/** Every difficulty uses the same quadratic catch-up curve. */
+export function catchUpBonus(gapSeconds: number): number {
+  if (!Number.isFinite(gapSeconds) || gapSeconds < BOOST_START_SECONDS) return 0
+  const t = clamp((gapSeconds - BOOST_START_SECONDS) / (FULL_BOOST_SECONDS - BOOST_START_SECONDS), 0, 1)
+  return INITIAL_BONUS + (MAX_SPEED_BONUS - INITIAL_BONUS) * t * t
+}
+
+/** The assist belongs to each trailing car, not the closest rival as a group. */
+export function rivalCatchUp(race: RaceState, rival: RaceVehicle): SpeedAssist | undefined {
   const player = race.vehicles.find((vehicle) => vehicle.player)
-  if (!player || player.wrecked || player.finishedAt !== null ||
+  if (!player || !rival || rival.player || player.wrecked || rival.wrecked ||
+    player.finishedAt !== null || rival.finishedAt !== null ||
     !player.grounded || player.currentSurface === 'grass') return undefined
 
   const pointCount = race.path.points.length
   if (pointCount < 2) return undefined
-  const playerProgress = raceProgress(player, pointCount, race.startPathIndex, race.reversed, race.routeKind)
-  let closestRival = Number.NEGATIVE_INFINITY
-  for (const rival of race.vehicles) {
-    if (rival.player) continue
-    if (rival.finishedAt !== null) return undefined
-    if (rival.wrecked) continue
-    closestRival = Math.max(closestRival,
-      raceProgress(rival, pointCount, race.startPathIndex, race.reversed, race.routeKind))
-  }
-  if (closestRival === Number.NEGATIVE_INFINITY) return undefined
 
-  // Road samples are evenly spaced. Fade the assist before the closest rival
-  // gets near enough to challenge the leader.
+  const playerProgress = raceProgress(player, pointCount, race.startPathIndex, race.reversed, race.routeKind)
+  const rivalProgress = raceProgress(rival, pointCount, race.startPathIndex, race.reversed, race.routeKind)
   const sampleSpacing = race.path.totalLength / (race.path.closed ? pointCount : pointCount - 1)
-  const lead = (playerProgress - closestRival) * sampleSpacing
-  if (lead <= MINIMUM_LEAD) return undefined
-  const strength = clamp((lead - MINIMUM_LEAD) / (LEAD_FOR_FULL_BONUS - MINIMUM_LEAD), 0, 1)
-  const multiplier = 1 + MAX_SPEED_BONUS * strength
-  return { multiplier, ceiling: player.speed * multiplier }
+  const distanceBehind = (playerProgress - rivalProgress) * sampleSpacing
+
+  // Convert progress into time gap using road speed. A speed floor avoids
+  // artificial boost spikes when either car brakes or recovers.
+  const referenceSpeed = Math.max(player.speed, rival.speed, CAR_SPECS[player.car].max * 0.5)
+  const bonus = catchUpBonus(distanceBehind / referenceSpeed)
+  return bonus > 0 ? { multiplier: 1 + bonus, ceiling: Number.POSITIVE_INFINITY } : undefined
 }

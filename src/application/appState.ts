@@ -106,6 +106,7 @@ export type AppCommand =
   | { readonly type: 'host-nearby' }
   | { readonly type: 'scan-nearby' }
   | { readonly type: 'leave-nearby' }
+  | { readonly type: 'nearby-scene-ready' }
   | { readonly type: 'set-race-lighting'; readonly lighting: LightingMode }
   | { readonly type: 'race-again' }
   | { readonly type: 'start-cup' }

@@ -40,8 +40,8 @@ class NearbyNetwork {
       connect: async (host) => {
         const pairing = this.key(id, host)
         this.pairs.set(pairing, new Set())
-        this.emit(id, { type: 'pairing', id: host, code: '1234' })
-        this.emit(host, { type: 'pairing', id, code: '1234' })
+        this.emit(id, { type: 'pairing', id: host })
+        this.emit(host, { type: 'pairing', id })
       },
       respond: async (remote, yes) => {
         const key = this.key(id, remote)
@@ -108,8 +108,10 @@ describe('Nearby Arcade', () => {
     })
     const devices = setups.map(({ device }) => device)
     const starts = new Map<string, NearbyStart>()
+    const countdowns = new Map<string, number>()
     for (const { name, device } of setups) {
       device.onStart((start) => { starts.set(name, start) })
+      device.onCountdown((startsAt) => { countdowns.set(name, startsAt) })
     }
     const [host, red, green, yellow] = devices
     assert(host && red && green && yellow)
@@ -117,34 +119,41 @@ describe('Nearby Arcade', () => {
       host.host({ track, laps: 2, lighting: 'night', car: 'blue' })
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
 
-      for (const [index, { name: id, car, device: guest }] of setups.slice(1).entries()) {
+      for (const [index, { car, device: guest }] of setups.slice(1).entries()) {
         guest.scan(car)
         await vi.waitFor(() => expect(guest.snapshot().rooms).toEqual([['host', host.snapshot().room]]), { interval: 5 })
         guest.connect('host')
         await vi.waitFor(() => {
-          expect(guest.snapshot().pairing).toEqual([['host', '1234']])
-          expect(host.snapshot().pairing).toEqual([[id, '1234']])
-          expect(host.snapshot().canStart).toBe(false)
-        }, { interval: 5 })
-        host.respond(id, true)
-        guest.respond('host', true)
-        await vi.waitFor(() => {
           expect(guest.snapshot().phase).toBe('waiting')
           expect(host.snapshot().players).toBe(index + 2)
         }, { interval: 5 })
+        expect(guest.snapshot()).not.toHaveProperty('pairing')
       }
 
       host.start()
       await vi.waitFor(() => expect(starts.size).toBe(4), { interval: 5 })
-      const hostStart = starts.get('host')
-      assert(hostStart)
-      for (const { name, device, clockOffset, car } of setups) {
+      for (const { name, device, car } of setups) {
         const start = starts.get(name)
         assert(start)
         expect(start).toMatchObject({ laps: 2, lighting: 'night', car })
         expect(start.track.points).toEqual(track.points)
-        expect(start.startsAt - clockOffset).toBe(hostStart.startsAt - players[0].clockOffset)
+        expect(start.startsAt).toBeUndefined()
         expect(device.standings()).toHaveLength(4)
+        expect(device.snapshot().phase).toBe('staging')
+      }
+
+      // All cars are staged before GO, including the slowest scene.
+      for (const { device } of setups.slice(0, 3)) device.sceneReady()
+      await vi.waitFor(() => expect(countdowns.size).toBe(0), { interval: 5 })
+      yellow.sceneReady()
+      await vi.waitFor(() => expect(countdowns.size).toBe(4), { interval: 5 })
+      const hostStart = countdowns.get('host')
+      assert(hostStart)
+      for (const { name, device, clockOffset } of setups) {
+        const startsAt = countdowns.get(name)
+        assert(startsAt)
+        expect(startsAt - clockOffset).toBe(hostStart - players[0].clockOffset)
+        expect(device.snapshot().phase).toBe('racing')
       }
 
       for (const [index, { device, car }] of setups.entries()) {
@@ -204,10 +213,15 @@ describe('Nearby Arcade', () => {
     })
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100)
     try {
-      race.start(track, { car: 'blue', laps: 1, difficulty: 'hard', mode: 'nearby', handling: 'arcade' }, 4100)
+      race.start(track, { car: 'blue', laps: 1, difficulty: 'hard', mode: 'nearby', handling: 'arcade' })
       expect(race.snapshot().state?.vehicles.map((vehicle) => vehicle.car)).toEqual(['blue'])
-      expect(race.nearbyGhosts().map(({ car }) => car)).toEqual(['red'])
       const input = { throttle: 1, braking: false, steering: 0 }
+      clock.mockReturnValue(1000)
+      race.advance(10, input)
+      expect(race.snapshot().state?.phase).toBe('countdown')
+      expect(race.snapshot().state?.elapsed).toBe(0)
+      race.scheduleNearbyStart(4100)
+      expect(race.nearbyGhosts().map(({ car }) => car)).toEqual(['red'])
       clock.mockReturnValue(4050)
       race.advance(0.05, input)
       expect(race.snapshot().state?.phase).toBe('countdown')
@@ -305,7 +319,7 @@ describe('Nearby diagnostics', () => {
     const race = new NearbyRace(transport, () => true)
     race.host({ track, laps: 1, lighting: 'day', car: 'blue' })
     await vi.waitFor(() => expect(race.snapshot().phase).toBe('hosting'))
-    for (let i = 0; i < 120; i++) emit({ type: 'pairing', id: 'private-id', code: '987654' })
+    for (let i = 0; i < 120; i++) emit({ type: 'pairing', id: 'private-id' })
     const report = await race.diagnostics()
     expect((report.timeline as unknown[]).length).toBeLessThanOrEqual(100)
     expect(report.native).toEqual({ status: 'available', report: { platform: 'test' } })

@@ -369,12 +369,12 @@ function advanceRace(
   const events: RaceEvent[] = []
   const arcade = !('handling' in state) || state.handling !== 'simulation'
   let missedCheckpoint = state.missedCheckpoint
-  const catchUp = rivalCatchUp(state)
   const moved = state.vehicles.map((vehicle) => {
     if (vehicle.finishedAt !== null) return vehicle
     const directInput = controls && controlsForVehicle(controls, vehicle.id)
     const input = directInput ?? (vehicle.player ? playerInput : undefined)
-    return advanceVehicle(vehicle, state, input, dt, random, catchUp)
+    return advanceVehicle(vehicle, state, input, dt, random,
+      input ? undefined : rivalCatchUp(state, vehicle))
   })
   const barrierFrame = arcade
     ? { vehicles: moved, activeContacts: [], events: [] }

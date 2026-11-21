@@ -8,7 +8,7 @@ import { packTrack, TrackReceiver } from './trackTransfer'
 export type NearbyEvent =
   | { type: 'found'; id: string; name: string }
   | { type: 'lost' | 'connected' | 'disconnected'; id: string }
-  | { type: 'pairing'; id: string; code: string }
+  | { type: 'pairing'; id: string }
   | { type: 'packet'; id: string; bytes: Uint8Array<ArrayBuffer> }
   | { type: 'error'; message: string; id?: string }
 
@@ -32,13 +32,16 @@ interface Course {
 }
 
 export interface NearbyStart extends Course {
-  readonly startsAt: number
+  /** The race scene is staged first; GO is scheduled after every scene is ready. */
+  readonly startsAt?: number
 }
 
-type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'racing'
+type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'staging' | 'racing'
 type Control =
   | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode }
   | { type: 'ready'; car: CarId }
+  | { type: 'lineup'; cars: (CarId | null)[] }
+  | { type: 'armed' }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number }
   | { type: 'finish'; slot: number; time: number | null }
   | { type: 'left'; slot: number }
@@ -72,6 +75,11 @@ function readControl(bytes: Uint8Array): Control | null {
           (value.lighting === 'day' || value.lighting === 'night') ? value : null
       case 'ready':
         return CAR_IDS.includes(value.car) ? value : null
+      case 'lineup':
+        return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
+          value.cars.every((car) => car === null || CAR_IDS.includes(car)) ? value : null
+      case 'armed':
+        return value
       case 'start':
         return Array.isArray(value.cars) && value.cars.length === MAX_PLAYERS &&
           value.cars.every((car) => car === null || CAR_IDS.includes(car)) &&
@@ -90,6 +98,7 @@ function readControl(bytes: Uint8Array): Control | null {
 export class NearbyRace {
   private readonly changes = new EventBus<void>()
   private readonly starts = new EventBus<NearbyStart>()
+  private readonly countdownStarts = new EventBus<number>()
   private readonly unsubscribe: () => void
   private phase: Phase = 'idle'
   private role: 'host' | 'guest' | null = null
@@ -106,10 +115,12 @@ export class NearbyRace {
   private course: Course | null = null
   private localCar: CarId = CAR_IDS[0]
   private readonly rooms = new Map<string, string>()
-  private readonly pairs = new Map<string, string>()
   private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
   private readonly ready = new Map<string, { car: CarId; receivedAt: number }>()
+  private readonly armed = new Map<string, number>()
+  private localSceneReady = false
+  private lineup: (CarId | null)[] | null = null
   private readonly racers = new Map<number, Racer>()
   private readonly forwarding = new Set<string>()
   private receiver: TrackReceiver | null = null
@@ -133,8 +144,8 @@ export class NearbyRace {
   snapshot() {
     return {
       phase: this.phase, error: this.error, room: this.room, track: this.course?.track.name,
-      rooms: [...this.rooms], pairing: [...this.pairs], players: 1 + this.guests.size,
-      canStart: this.phase === 'hosting' && this.guests.size > 0 && this.pairs.size === 0 && this.pendingPairs.size === 0,
+      rooms: [...this.rooms], players: 1 + this.guests.size,
+      canStart: this.phase === 'hosting' && this.guests.size > 0 && this.pendingPairs.size === 0,
     }
   }
 
@@ -158,6 +169,7 @@ export class NearbyRace {
 
   subscribe(listener: () => void) { return this.changes.subscribe(listener) }
   onStart(listener: (start: NearbyStart) => void) { return this.starts.subscribe(listener) }
+  onCountdown(listener: (startsAt: number) => void) { return this.countdownStarts.subscribe(listener) }
 
   host(course: Course): void {
     if (this.phase !== 'idle') return
@@ -186,17 +198,6 @@ export class NearbyRace {
     this.setPhase('connecting')
     this.armTimeout('Could not connect to the nearby room.')
     this.perform('connect', () => this.transport.connect(id), this.generation)
-  }
-
-  respond(id: string, accepted: boolean): void {
-    if (!this.pairs.delete(id)) return
-    if (accepted) this.pendingPairs.add(id)
-    const active = this.generation
-    this.record('pairing_response', { accepted })
-    this.perform('respond', () => this.transport.respond(id, accepted), active, () => {
-      if (!accepted && id === this.hostId) this.fail('Pairing declined.')
-    })
-    this.changed()
   }
 
   start(): void {
@@ -242,6 +243,19 @@ export class NearbyRace {
 
   recovered(): void { this.recovery++ }
 
+  /** Called only when Phaser has created the race scene and bound its controls. */
+  sceneReady(): void {
+    if (this.phase !== 'staging' || this.localSceneReady) return
+    this.localSceneReady = true
+    this.record('scene_ready')
+    if (this.role === 'guest' && this.hostId) {
+      this.readySentAt = this.now()
+      this.sendControl([this.hostId], { type: 'armed' })
+    } else if (this.role === 'host') {
+      this.scheduleHostCountdown()
+    }
+  }
+
   remotePoses(): GhostPose[] {
     const time = this.now()
     return [...this.racers].flatMap(([slot, racer]) => {
@@ -274,6 +288,7 @@ export class NearbyRace {
     this.unsubscribe()
     this.changes.clear()
     this.starts.clear()
+    this.countdownStarts.clear()
   }
 
   private onEvent(event: NearbyEvent): void {
@@ -289,15 +304,25 @@ export class NearbyRace {
       case 'lost':
         if (this.rooms.delete(event.id)) this.changed()
         break
-      case 'pairing':
-        if (event.id === this.hostId || (this.phase === 'hosting' &&
-            this.guests.size + this.pairs.size + this.pendingPairs.size < MAX_PLAYERS - 1)) {
-          this.pairs.set(event.id, event.code)
+      case 'pairing': {
+        // Guests explicitly select the room; the host admits up to three peers
+        // without an extra per-device match-code prompt.
+        const incomingGuest = this.phase === 'hosting' &&
+          !this.pendingPairs.has(event.id) && !this.guests.has(event.id) &&
+          this.guests.size + this.pendingPairs.size < MAX_PLAYERS - 1
+        const invitedHost = this.phase === 'connecting' && event.id === this.hostId
+        if (incomingGuest || invitedHost) {
+          this.pendingPairs.add(event.id)
+          this.record('pairing_auto_accept')
+          this.perform('respond', () => this.transport.respond(event.id, true), this.generation)
           this.changed()
         } else {
-          void this.transport.respond(event.id, false).catch(() => undefined)
+          void this.transport.respond(event.id, false).catch((error: unknown) => {
+            this.record('pairing_reject_failed', { error: this.errorKind(error) })
+          })
         }
         break
+      }
       case 'connected':
         if (!this.pendingPairs.delete(event.id)) break
         if (event.id === this.hostId) {
@@ -315,7 +340,6 @@ export class NearbyRace {
         if (event.id && event.id !== this.hostId) {
           this.lastFailure = { source: 'peer_event', error: 'flow_error', phase: this.phase, counts: this.diagnosticCounts() }
           this.record('failure', { source: 'peer_event', error: 'flow_error' })
-          this.pairs.delete(event.id)
           this.pendingPairs.delete(event.id)
           this.error = event.message
           this.changed()
@@ -362,13 +386,21 @@ export class NearbyRace {
       this.setPhase('preparing')
       this.armTimeout('The host did not start the race in time.')
     } else if (guestSlot !== undefined && this.phase === 'preparing' && message.type === 'ready') {
-      this.ready.set(id, { car: message.car, receivedAt: this.now() })
+      if (!this.ready.has(id)) this.ready.set(id, { car: message.car, receivedAt: this.now() })
       if (this.ready.size === this.guests.size) this.startHost()
-    } else if (fromHost && this.phase === 'preparing' && message.type === 'start' && this.course &&
+    } else if (fromHost && this.phase === 'preparing' && message.type === 'lineup' && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar) {
+      this.stage(this.course, message.cars)
+    } else if (guestSlot !== undefined && this.phase === 'staging' && message.type === 'armed') {
+      if (!this.armed.has(id)) this.armed.set(id, this.now())
+      this.scheduleHostCountdown()
+    } else if (fromHost && this.phase === 'staging' && message.type === 'start' && this.course &&
+        message.cars[0] && message.cars[this.slot] === this.localCar && this.localSceneReady) {
       const now = this.now()
+      // Estimate one-way transit after the scene-ready packet, excluding time
+      // spent at the host. Device clocks may have arbitrary independent origins.
       const halfRoundTrip = Math.max(0, now - this.readySentAt - message.readyAge) / 2
-      this.launch(this.course, message.cars, now + Math.max(0, message.delay - halfRoundTrip))
+      this.beginCountdown(now + message.delay - halfRoundTrip)
     } else if (this.phase === 'racing' && message.type === 'finish' &&
         message.slot !== this.slot && (fromHost || message.slot === guestSlot)) {
       if (this.recordFinish(message.slot, message.time) && !fromHost) this.sendControl(this.endpoints(id), message)
@@ -389,26 +421,48 @@ export class NearbyRace {
   }
 
   private startHost(): void {
-    if (!this.course) return
+    if (!this.course || this.phase !== 'preparing') return
     const cars: (CarId | null)[] = [this.course.car, null, null, null]
     for (const [id, slot] of this.guests) {
       const guest = this.ready.get(id)
       if (!guest) return
       cars[slot] = guest.car
     }
-    const startsAt = this.now() + 4000
-    for (const [id, guest] of this.ready) {
-      const now = this.now()
-      this.sendControl([id], { type: 'start', cars, delay: startsAt - now, readyAge: now - guest.receivedAt })
-    }
-    this.launch(this.course, cars, startsAt)
+    this.stage(this.course, cars)
+    this.sendControl([...this.guests.keys()], { type: 'lineup', cars })
   }
 
-  private launch(course: Course, cars: (CarId | null)[], startsAt: number): void {
-    this.clearTimeout()
+  private stage(course: Course, cars: (CarId | null)[]): void {
+    this.lineup = cars
     cars.forEach((car, slot) => { if (car) this.racers.set(slot, { ghost: new RemoteGhost(car) }) })
+    this.setPhase('staging')
+    this.armTimeout('A player did not finish loading the race scene.')
+    this.starts.publish({ ...course })
+  }
+
+  private scheduleHostCountdown(): void {
+    if (this.role !== 'host' || this.phase !== 'staging' || !this.localSceneReady ||
+        this.armed.size !== this.guests.size || !this.lineup) return
+    const startsAt = this.now() + 4000
+    for (const [id, receivedAt] of this.armed) {
+      const now = this.now()
+      this.sendControl([id], {
+        type: 'start', cars: this.lineup, delay: startsAt - now, readyAge: now - receivedAt,
+      })
+    }
+    this.beginCountdown(startsAt)
+  }
+
+  private beginCountdown(startsAt: number): void {
+    if (this.phase !== 'staging') return
+    if (startsAt < this.now() + 250) {
+      this.fail('Race countdown arrived too late to synchronize.')
+      return
+    }
+    this.clearTimeout()
     this.setPhase('racing')
-    this.starts.publish({ ...course, startsAt })
+    this.record('countdown_scheduled', { remainingMs: Math.round(startsAt - this.now()) })
+    this.countdownStarts.publish(startsAt)
   }
 
   private recordFinish(slot: number, time: number | null): boolean {
@@ -420,7 +474,6 @@ export class NearbyRace {
   }
 
   private disconnected(id: string): void {
-    this.pairs.delete(id)
     this.pendingPairs.delete(id)
     if (id === this.hostId) {
       if (this.phase !== 'racing') {
@@ -523,10 +576,13 @@ export class NearbyRace {
     this.room = null
     this.hostId = null
     this.rooms.clear()
-    this.pairs.clear()
     this.pendingPairs.clear()
     this.guests.clear()
     this.ready.clear()
+    this.armed.clear()
+    this.localSceneReady = false
+    this.lineup = null
+    this.readySentAt = 0
     this.racers.clear()
     this.forwarding.clear()
     this.receiver = null
@@ -546,7 +602,7 @@ export class NearbyRace {
   private clearTimeout(): void { clearTimeout(this.timeout) }
   private changed(): void { this.changes.publish() }
   private diagnosticCounts() {
-    return { rooms: this.rooms.size, pairing: this.pairs.size, pendingPairs: this.pendingPairs.size,
+    return { rooms: this.rooms.size, pendingPairs: this.pendingPairs.size,
       guests: this.guests.size, ready: this.ready.size, racers: this.racers.size }
   }
 

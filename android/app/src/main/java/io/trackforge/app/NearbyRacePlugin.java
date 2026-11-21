@@ -316,7 +316,7 @@ public class NearbyRacePlugin extends Plugin {
         return new ConnectionLifecycleCallback() {
             @Override public void onConnectionInitiated(String id, ConnectionInfo info) {
                 if (active == generation) record("connection", "initiated", null);
-                emit(active, "pairing", id, "code", info.getAuthenticationDigits());
+                emit(active, "pairing", id, null, null);
             }
 
             @Override public void onConnectionResult(String id, ConnectionResolution resolution) {

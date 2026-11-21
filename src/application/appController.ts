@@ -62,6 +62,7 @@ export class AppController {
   private beforeNearbyTrack: Track | null | undefined
   private readonly unsubscribeNearby: (() => void) | undefined
   private readonly unsubscribeNearbyStart: (() => void) | undefined
+  private readonly unsubscribeNearbyCountdown: (() => void) | undefined
   private unsubscribeRace: (() => void) | undefined
 
   constructor(private readonly dependencies: AppControllerDependencies) {
@@ -119,6 +120,9 @@ export class AppController {
         car, laps, lighting, difficulty: this.state.preferences.difficulty, handling: 'arcade', mode: 'nearby',
       }, startsAt)
       this.update({ ...this.state, mode: 'race', currentTrack: track, paused: false, cup: null, overlay: { type: 'none' }, notice: null })
+    })
+    this.unsubscribeNearbyCountdown = dependencies.nearby?.onCountdown((startsAt) => {
+      dependencies.raceSession.scheduleNearbyStart?.(startsAt)
     })
     this.unsubscribeNearby = dependencies.nearby?.subscribe(() => {
       if (this.state.overlay.type === 'nearby') {
@@ -277,6 +281,11 @@ export class AppController {
       case 'scan-nearby':
         if (this.state.overlay.type === 'nearby') {
           this.dependencies.nearby?.scan(this.state.preferences.car)
+        }
+        break
+      case 'nearby-scene-ready':
+        if (this.state.mode === 'race' && this.beforeNearbyTrack !== undefined) {
+          this.dependencies.nearby?.sceneReady()
         }
         break
       case 'leave-nearby':
@@ -542,6 +551,7 @@ export class AppController {
     this.unsubscribeRace = undefined
     this.unsubscribeNearby?.()
     this.unsubscribeNearbyStart?.()
+    this.unsubscribeNearbyCountdown?.()
     this.dependencies.nearby?.destroy()
     this.dependencies.raceSession.destroy()
   }
