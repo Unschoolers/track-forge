@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { buildTerrainComponents, pointInTerrainComponent } from '@/phaser/rendering/terrainTopology'
 import type { TerrainCell, Vector2 } from '@/domain/model'
 import {
   EMPTY_TERRAIN,
@@ -131,6 +132,35 @@ describe('terrain presentation topology', () => {
     expect(waterTriangles.length).toBeGreaterThan(0)
     expect(covered(lakeCenter, waterTriangles)).toBe(true)
     expect(covered(lakeCenter, hillTriangles)).toBe(false)
+  })
+
+  it('keeps the exact authored water ripple pattern across concave shorelines and islands', () => {
+    const water = paintTerrain(EMPTY_TERRAIN, rectangle(0, 19, 0, 19), 'water')
+    const island = paintTerrain(water, rectangle(5, 11, 6, 12), 'ground')
+    const terrain = paintTerrain(island, rectangle(17, 19, 17, 19), 'ground')
+    const surface = compileTerrainSurface(terrain, [])
+    const component = buildTerrainComponents(surface.contours, 'water')[0]
+    if (!component) throw new Error('Missing water component')
+
+    const ripples = buildTerrainPresentation(surface)
+      .filter((primitive) => primitive.kind === 'water')
+      .flatMap((primitive) => primitive.texture)
+    const minX = Math.min(...component.outer.map(p => p.x))
+    const maxX = Math.max(...component.outer.map(p => p.x))
+    const minY = Math.min(...component.outer.map(p => p.y))
+    const maxY = Math.max(...component.outer.map(p => p.y))
+    const expected: typeof ripples[number][] = []
+    for (let y = minY + 11; y < maxY; y += 22) {
+      const row = Math.round((y - minY) / 22)
+      for (let x = minX + 11 + (row % 2 === 0 ? 0 : 11); x < maxX; x += 22) {
+        const start = { x: x - 5, y }
+        const end = { x: x + 5, y }
+        if (pointInTerrainComponent(start, component) && pointInTerrainComponent(end, component)) {
+          expected.push({ start, end })
+        }
+      }
+    }
+    expect(ripples).toEqual(expected)
   })
 
   it('triangulates a concave hill without self-crossing fill geometry', () => {
