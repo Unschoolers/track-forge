@@ -18,7 +18,8 @@ import {
   type EditorCommand,
 } from '@/domain/editor/editorState'
 import { DEFAULT_TERRAIN_BRUSH_RADIUS } from '@/domain/config'
-import { gridPositionsForPlayer, randomGridPositions } from '@/domain/race/startGrid'
+import { gridPositionsForPlayer } from '@/domain/race/startGrid'
+import { raceSetupFromPreferences, withFreshStartGrid } from '@/application/race/raceSetup'
 import {
   TrackLibraryService,
   type TrackMutationResult,
@@ -249,11 +250,7 @@ export class AppController {
           this.update({ ...this.state, mode: 'home', raceAgainTrackName: undefined, overlay: { type: 'track-library', purpose: 'race' }, ...this.librarySnapshot(), notice: 'Last race is no longer available. Choose a track.' })
           break
         }
-        this.dependencies.raceSession.start(saved.track, {
-          ...saved.race.setup,
-          ...(saved.race.setup.mode === 'normal' || !saved.race.setup.mode
-            ? { gridPositions: randomGridPositions(4) } : {}),
-        })
+        this.dependencies.raceSession.start(saved.track, withFreshStartGrid(saved.race.setup, Math.random))
         this.rememberRace()
         this.update({
           ...this.state,
@@ -626,18 +623,14 @@ export class AppController {
       this.dependencies.geometry.get(track).path.totalLength,
     )
     if (validation.ready) {
-      const pointToPoint = track.routeKind === 'point-to-point'
-      const preferredMode = this.state.preferences.raceMode ?? 'normal'
-      this.dependencies.raceSession.start(track, {
-        car: this.state.preferences.car,
-        difficulty: this.state.preferences.difficulty,
-        laps: pointToPoint ? 1 : this.state.preferences.raceLaps ?? 2,
-        handling: this.state.preferences.handling ?? 'arcade',
-        mode: !pointToPoint && preferredMode === 'time-trial' ? 'normal' : preferredMode,
-        ...(preferredMode === 'normal' || (!pointToPoint && preferredMode === 'time-trial')
-          ? { gridPositions: randomGridPositions(4) } : {}),
-        lighting: this.state.overlay.type === 'race-setup' ? this.state.raceLighting ?? track.lighting : track.lighting,
-      })
+      this.dependencies.raceSession.start(track, raceSetupFromPreferences(
+        track,
+        this.state.preferences,
+        this.state.overlay.type === 'race-setup'
+          ? this.state.raceLighting ?? track.lighting
+          : track.lighting,
+        Math.random,
+      ))
       this.rememberRace()
     }
     this.update(
