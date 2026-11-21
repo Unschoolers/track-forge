@@ -117,6 +117,36 @@
 }
 
 .results-modal .results-heading { color: var(--menu-accent); }
+.results-modal .results-splits-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .5rem;
+  margin: 1rem 0 .4rem;
+}
+.results-modal .results-splits-heading .results-heading { margin: 0; }
+.results-modal .results-splits-hint {
+  color: var(--menu-muted);
+  font: 700 .6rem/1.3 var(--menu-mono);
+  letter-spacing: .04em;
+  text-align: right;
+}
+.results-modal .results-splits-viewport {
+  max-height: 3.5rem;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.results-modal .results-splits-viewport[role='button'] { cursor: pointer; touch-action: manipulation; }
+.results-modal .results-splits-viewport:focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 2px; }
+.results-modal .results-splits-row {
+  display: flex;
+  align-items: center;
+  height: 1.75rem;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .results-modal .scoreboard { gap: .35rem; }
 .results-modal .scoreboard-row { border-color: #344554; border-radius: 0; background: #121d27; }
 .results-modal .scoreboard-row.player { border-color: var(--menu-accent); box-shadow: inset .2rem 0 var(--menu-accent); }
