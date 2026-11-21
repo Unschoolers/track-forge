@@ -11,6 +11,7 @@ import { createTrackPreview } from '@/ui/modals/trackPreview'
 
 export interface TrackLibraryActions {
   readonly share: (track: Track) => void
+  readonly sendNearby?: (track: Track) => void
   readonly importFile: (content: string) => void
   readonly close: () => void
   readonly create: () => void
@@ -27,11 +28,12 @@ export function createTrackLibraryModal(
   if (state.overlay.type !== 'track-library') {
     throw new Error('Track library requires a track-library overlay')
   }
-  const race = state.overlay.purpose === 'race'
+  const race = state.overlay.purpose !== 'edit'
+  const nearbySelection = state.overlay.purpose === 'nearby'
   const frame = createModalFrame(
-    race ? 'Choose a track' : 'Choose a track to edit',
+    nearbySelection ? 'Choose the next track' : race ? 'Choose a track' : 'Choose a track to edit',
     race
-      ? 'Tap a track to choose your car.'
+      ? nearbySelection ? 'Pick a track for everyone in the room.' : 'Tap a track to choose your car.'
       : 'Select an existing named track or create a new one.',
     actions.close,
     'track-library-modal',
@@ -71,6 +73,8 @@ export function createTrackLibraryModal(
     }
     const controls = element('div', 'track-card-actions')
     controls.append(shareButton(track, actions))
+    if (actions.sendNearby) controls.append(button('NEARBY', `send-nearby-${track.id}`,
+      () => actions.sendNearby?.(track), 'track-mini-button'))
     if (!race) {
       controls.append(
         button('EDIT', `select-edit-${track.id}`, () => actions.selectForEdit(track.id), 'track-mini-button'),
