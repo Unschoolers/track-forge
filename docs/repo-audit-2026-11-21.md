@@ -43,3 +43,11 @@
 ## Verification gap
 
 No source tests, browser runs, Android builds or runtime profiling were executed for this static audit. The audit does not declare any particular test redundant or production file defective solely from size. The next implementation PR should record baseline command durations and actual failures.
+
+## Implementation follow-up: AI integration test consolidation
+
+The fourth scenario in `tests/domain/aiRaceIntegration.test.ts` was named *recovers opponents pushed beyond the drivable verge*, but neither vehicle was displaced before 600 simulated frames. It only rechecked normal AI distance-to-road, already exercised more strongly by the neighboring long-run stability scenario. Deleted that redundant 600-frame loop **without weakening any assertion**.
+
+The actual off-road recovery contract remains in `tests/domain/aiRecoveryEvents.test.ts`: it explicitly teleports an AI rival to (4000,4000), steps real physics, asserts an `off-road` recovery event at the pre-reset position, and checks the recovered car returns near the track. Water and bridge recovery have their own independent edge cases.
+
+Baseline CI (`main` run 44876316014) reported `aiRaceIntegration.test.ts` **4 tests, 331 ms**. The follow-up PR must record its comparable CI runtime and complete test results. This removal is based on redundant behavior, not a test-count target.
