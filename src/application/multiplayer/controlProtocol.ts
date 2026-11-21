@@ -9,7 +9,7 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 export type Control =
-  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number }
+  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number; cupIndex?: number; cupTotal?: number }
   | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number }
   | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number }
   | { type: 'armed'; round?: number }
@@ -54,6 +54,12 @@ function validRound(value: unknown): boolean {
     value >= 0 && value <= 65_535)
 }
 
+function validCupMetadata(index: unknown, total: unknown): boolean {
+  return (index === undefined && total === undefined) ||
+    (Number.isInteger(total) && (total as number) >= 1 && (total as number) <= 12 &&
+      Number.isInteger(index) && (index as number) >= 0 && (index as number) < (total as number))
+}
+
 function isControl(value: unknown): value is Control {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const message = value as Record<string, unknown>
@@ -67,7 +73,8 @@ function isControl(value: unknown): value is Control {
         message.slot > 0 && message.slot < MAX_PLAYERS &&
         typeof message.laps === 'number' && Number.isInteger(message.laps) &&
         message.laps >= 1 && message.laps <= 5 &&
-        (message.lighting === 'day' || message.lighting === 'night')
+        (message.lighting === 'day' || message.lighting === 'night') &&
+        validCupMetadata(message.cupIndex, message.cupTotal)
     case 'ready':
       return isCar(message.car) && isPlayerIdentity(message.identity)
     case 'lineup': {
