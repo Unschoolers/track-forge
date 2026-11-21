@@ -5,6 +5,11 @@ import { buildLampLights, type LampPost } from '@/phaser/rendering/lampPostRende
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 
+// Race uses additive blending; keep its exposure below the flyover's normal
+// alpha compositing without changing the shared headlight texture.
+const RACE_BEAM_ALPHA = 0.62
+const RACE_BEAM_SCALE = 0.88
+
 const NIGHT_BEAM_KEY = 'trackforge-headlight-beam-v2'
 
 /**
@@ -29,13 +34,15 @@ export class NightBeamRenderer {
           .setOrigin(0, 0.5)
           .setDepth(WORLD_RENDER_DEPTH.nightBeam)
           .setBlendMode(this.beamBlendMode)
+          .setAlpha(RACE_BEAM_ALPHA)
+          .setScale(RACE_BEAM_SCALE)
         this.beams.push(beam)
       }
       const frontX = (vehicle.headlights[0].x + vehicle.headlights[1].x) / 2
       const frontY = (vehicle.headlights[0].y + vehicle.headlights[1].y) / 2
       beam.setPosition(
-        frontX - Math.cos(vehicle.angle) * NIGHT_HEADLIGHT.sourceX,
-        frontY - Math.sin(vehicle.angle) * NIGHT_HEADLIGHT.sourceX,
+        frontX - Math.cos(vehicle.angle) * NIGHT_HEADLIGHT.sourceX * RACE_BEAM_SCALE,
+        frontY - Math.sin(vehicle.angle) * NIGHT_HEADLIGHT.sourceX * RACE_BEAM_SCALE,
       )
       beam.setRotation(vehicle.angle)
       beam.setVisible(true)
@@ -79,8 +86,8 @@ export function renderNightLights(
 
   for (const vehicle of lights) {
     for (const headlight of vehicle.headlights) {
-      graphics.fillStyle(0xfff2b2, 0.22)
-      graphics.fillCircle(headlight.x, headlight.y, 4)
+      graphics.fillStyle(0xfff2b2, 0.12)
+      graphics.fillCircle(headlight.x, headlight.y, 3.2)
     }
     for (const taillight of vehicle.taillights) {
       graphics.fillStyle(0xff2438, vehicle.braking ? 0.42 : 0.2)
