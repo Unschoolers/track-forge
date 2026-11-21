@@ -55,6 +55,9 @@ export class NearbyRace {
   private round = 0
   private incomingShare: Track | null = null
   private readonly sharedPeers = new Set<string>()
+  private readonly shareReady = new Set<string>()
+  private readonly sentShares = new Set<string>()
+  private shareStatus: 'saved' | 'declined' | null = null
   private sharePacked: Promise<Uint8Array[]> | null = null
   private readonly timeline: Record<string, unknown>[] = []
   private diagnosticStart = 0
@@ -97,6 +100,7 @@ export class NearbyRace {
       phase: this.phase, purpose: this.purpose, role: this.role,
       error: this.error, room: this.room, track: this.course?.track.name,
       incomingTrack: this.incomingShare?.name ?? null, sharedCount: this.sharedPeers.size,
+      shareStatus: this.shareStatus,
       rooms: [...this.rooms], players: 1 + this.guests.size,
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
         this.guests.size > 0 && this.pendingPairs.size === 0,
@@ -249,21 +253,37 @@ export class NearbyRace {
     if (this.purpose !== 'share' || this.phase !== 'share-review' ||
         !this.incomingShare || !this.hostId) return
     this.incomingShare = null
-    this.sendControl([this.hostId], { type: 'share-result', status: saved ? 'saved' : 'declined' })
+    this.shareStatus = saved ? 'saved' : 'declined'
+    this.sendControl([this.hostId], { type: 'share-result', status: this.shareStatus })
     this.setPhase('waiting')
   }
 
   private async sendSharedTrack(id: string, active: number): Promise<void> {
     const track = this.course?.track
-    if (!track) return
-    const chunks = await (this.sharePacked ??= packTrack(track))
-    if (active !== this.generation || !this.guests.has(id)) return
-    await this.transport.send([id], encodeControl({ type: 'share-offer' }))
-    for (const chunk of chunks) {
+    if (!track || this.sentShares.has(id)) return
+    this.sentShares.add(id)
+    try {
+      const chunks = await (this.sharePacked ??= packTrack(track))
       if (active !== this.generation || !this.guests.has(id)) return
-      await this.transport.send([id], chunk)
+      await this.transport.send([id], encodeControl({ type: 'share-offer' }))
+      for (const chunk of chunks) {
+        if (active !== this.generation || !this.guests.has(id)) return
+        await this.transport.send([id], chunk)
+      }
+      this.record('track_shared', { chunks: chunks.length })
+    } catch (error) {
+      this.sentShares.delete(id)
+      throw error
     }
-    this.record('track_shared', { chunks: chunks.length })
+  }
+
+  private sendShareToReadyPeer(id: string): void {
+    if (!this.guests.has(id) || !this.shareReady.has(id)) return
+    const active = this.generation
+    void this.sendSharedTrack(id, active).catch((error: unknown) => {
+      if (active === this.generation) this.fail(
+        error instanceof Error ? error.message : 'Could not send the nearby track.', 'send_track', error)
+    })
   }
 
   /** Called only when Phaser has created the race scene and bound its controls. */
@@ -354,6 +374,7 @@ export class NearbyRace {
         } else if (this.phase === 'hosting') {
           const slot = [1, 2, 3].find((candidate) => ![...this.guests.values()].includes(candidate))
           if (slot !== undefined) this.guests.set(event.id, slot)
+          this.sendShareToReadyPeer(event.id)
           this.changed()
         }
         break
@@ -374,7 +395,8 @@ export class NearbyRace {
   private receive(id: string, bytes: Uint8Array<ArrayBuffer>): void {
     const fromHost = this.hostId === id
     const guestSlot = this.guests.get(id)
-    if (!fromHost && guestSlot === undefined) return
+    if (!fromHost && guestSlot === undefined &&
+        !(this.purpose === 'share' && this.role === 'host' && this.pendingPairs.has(id))) return
     if (this.phase === 'racing' &&
         this.poseSync.receive(bytes, fromHost, guestSlot, this.slot, this.racers)) return
     if (bytes[0] === Packet.Track && fromHost && this.phase === 'preparing' && this.receiver) {
@@ -385,6 +407,7 @@ export class NearbyRace {
         this.receiver = null
         if (this.purpose === 'share') {
           this.incomingShare = track
+          this.shareStatus = null
           this.clearTimeout()
           this.setPhase('share-review')
           return
@@ -408,12 +431,10 @@ export class NearbyRace {
         this.receiver = new TrackReceiver()
         this.setPhase('preparing')
         this.armTimeout('The nearby track was not received in time.')
-      } else if (guestSlot !== undefined && this.phase === 'hosting' && message.type === 'share-ready') {
-        const active = this.generation
-        void this.sendSharedTrack(id, active).catch((error: unknown) => {
-          if (active === this.generation) this.fail(
-            error instanceof Error ? error.message : 'Could not send the nearby track.', 'send_track', error)
-        })
+      } else if (this.role === 'host' && this.phase === 'hosting' && message.type === 'share-ready' &&
+          (guestSlot !== undefined || this.pendingPairs.has(id))) {
+        this.shareReady.add(id)
+        this.sendShareToReadyPeer(id)
       } else if (guestSlot !== undefined && this.phase === 'hosting' && message.type === 'share-result') {
         if (message.status === 'saved') this.sharedPeers.add(id)
         this.changed()
@@ -534,6 +555,8 @@ export class NearbyRace {
 
   private disconnected(id: string): void {
     this.pendingPairs.delete(id)
+    this.shareReady.delete(id)
+    this.sentShares.delete(id)
     if (id === this.hostId) {
       if (this.phase !== 'racing') {
         this.fail('The host left the nearby room.')
@@ -634,6 +657,9 @@ export class NearbyRace {
     this.course = null
     this.incomingShare = null
     this.sharedPeers.clear()
+    this.shareReady.clear()
+    this.sentShares.clear()
+    this.shareStatus = null
     this.sharePacked = null
     this.round = 0
     this.purpose = 'race'
