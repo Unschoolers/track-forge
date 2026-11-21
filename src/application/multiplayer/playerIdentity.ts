@@ -27,6 +27,16 @@ export interface PlayerIdentity {
 
 export const DEFAULT_PLAYER_IDENTITY: PlayerIdentity = { icon: 'star', color: 'cyan' }
 
+/** Assign independent cosmetic attributes once for a new installation. */
+export function randomPlayerIdentity(random: () => number = Math.random): PlayerIdentity {
+  const icons = Object.keys(TOPPER_ICONS) as TopperIcon[]
+  const colors = Object.keys(TOPPER_COLORS) as TopperColor[]
+  return {
+    icon: icons[Math.floor(random() * icons.length)] ?? DEFAULT_PLAYER_IDENTITY.icon,
+    color: colors[Math.floor(random() * colors.length)] ?? DEFAULT_PLAYER_IDENTITY.color,
+  }
+}
+
 export function normalizePlayerIdentity(value: unknown): PlayerIdentity {
   if (typeof value !== 'object' || value === null) return { ...DEFAULT_PLAYER_IDENTITY }
   const candidate = value as Record<string, unknown>
