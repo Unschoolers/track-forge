@@ -9,6 +9,7 @@ import {
   isDifficultyId,
 } from '@/domain/model'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
+import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity } from '@/application/multiplayer/playerIdentity'
 
 export const DEFAULT_PREFERENCES: Preferences = {
   car: 'blue',
@@ -25,6 +26,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   handling: 'arcade',
   raceLaps: 2,
   raceMode: 'normal',
+  playerIdentity: DEFAULT_PLAYER_IDENTITY,
 }
 
 function boolean(value: string | null, fallback: boolean): boolean {
@@ -45,6 +47,13 @@ export class BrowserPreferencesRepository implements PreferencesStore {
     const handling = this.storage.get(STORAGE_KEYS.handling)
     const raceLaps = this.storage.get(STORAGE_KEYS.raceLaps)
     const raceMode = this.storage.get(STORAGE_KEYS.raceMode)
+    let playerIdentity: unknown
+    try {
+      const stored = this.storage.get(STORAGE_KEYS.playerIdentity)
+      playerIdentity = stored === null ? null : JSON.parse(stored)
+    } catch {
+      playerIdentity = null
+    }
     const steeringSensitivity = this.storage.get(STORAGE_KEYS.steeringSensitivity)
     const legacyAudio = boolean(this.storage.get(STORAGE_KEYS.audio), DEFAULT_PREFERENCES.audioEnabled)
     const musicVolume = volume(this.storage.get(STORAGE_KEYS.musicVolume), legacyAudio ? DEFAULT_MUSIC_VOLUME : 0)
@@ -61,6 +70,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       handling: handling === 'simulation' ? 'simulation' : 'arcade',
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       raceMode: raceMode === 'ghost' || raceMode === 'time-trial' ? raceMode : 'normal',
+      playerIdentity: normalizePlayerIdentity(playerIdentity),
       audioEnabled: soundEffectsVolume > 0,
       musicVolume,
       soundEffectsVolume,
@@ -87,6 +97,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       this.storage.set(STORAGE_KEYS.handling, preferences.handling === 'simulation' ? 'simulation' : 'arcade'),
       this.storage.set(STORAGE_KEYS.raceLaps, String(preferences.raceLaps === 1 || preferences.raceLaps === 3 ? preferences.raceLaps : 2)),
       this.storage.set(STORAGE_KEYS.raceMode, preferences.raceMode ?? 'normal'),
+      this.storage.set(STORAGE_KEYS.playerIdentity, JSON.stringify(normalizePlayerIdentity(preferences.playerIdentity))),
       this.storage.set(STORAGE_KEYS.audio, soundEffectsVolume > 0 ? '1' : '0'),
       this.storage.set(STORAGE_KEYS.musicVolume, String(musicVolume)),
       this.storage.set(STORAGE_KEYS.soundEffectsVolume, String(soundEffectsVolume)),
