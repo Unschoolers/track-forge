@@ -185,7 +185,7 @@ it('removes finished rivals from both the beam pass and fixture pass', () => {
     transformVehicleLights(v.car, v, v.braking),
   )
   const expectedFixtures = expectedLights.flatMap((lights) => [
-    ...lights.headlights.map((light) => ({ ...light, radius: 4 })),
+    ...lights.headlights.map((light) => ({ ...light, radius: 3.2 })),
     ...lights.taillights.map((light) => ({
       ...light,
       radius: lights.braking ? 9 : 5,
