@@ -389,6 +389,26 @@ describe('race UI flow', () => {
     expect(banner.dataset.kind).toBe('loss')
   })
 
+  it('shows reliable nearby rank and overtake cues without fabricating a starting-grid pass', () => {
+    const { root, updateRace } = setup()
+    const nearbyAt = (position: number, positionKnown: boolean): RaceSessionSnapshot => ({
+      ...raceSnapshot({ position, positionKnown, vehicleCount: 2 }),
+      setup: { car: 'blue', difficulty: 'normal', laps: 3, mode: 'nearby' },
+    })
+    const position = requiredElement(root, '[data-race-position]')
+    const banner = requiredElement(root, '.race-event-banner')
+    updateRace(nearbyAt(2, false))
+    expect(position.textContent).toBe('LIVE')
+    updateRace(nearbyAt(2, true))
+    expect(position.textContent).toBe('2/2')
+    expect(banner.querySelector('.race-event-title')?.textContent).not.toBe('OVERTAKE!')
+    updateRace(nearbyAt(1, true))
+    expect(position.textContent).toBe('1/2')
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe('LEAD TAKEN!')
+    updateRace(nearbyAt(1, false))
+    expect(position.textContent).toBe('LIVE')
+  })
+
   it('exposes separate simulation pedals and releases each touch independently', () => {
     const controls = new RaceInputController()
     const { root, updateRace } = setup(controls)

@@ -1,8 +1,10 @@
 import { EventBus } from '@/application/eventBus'
 import type { GhostPose } from '@/application/race/ghostReplay'
-import { CAR_IDS, type CarId, type LightingMode, type Track } from '@/domain/model'
-import type { RaceVehicle } from '@/domain/race/raceState'
-import { Packet, RemoteGhost } from './raceWire'
+import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track } from '@/domain/model'
+import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
+import { raceProgress } from '@/domain/race/ranking'
+import { decodeProgress, Packet, RemoteGhost } from './raceWire'
+import { NearbyProgressSync } from './nearbyProgressSync'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
@@ -92,6 +94,7 @@ export class NearbyRace {
   private readySentAt = 0
   private slot = 0
   private readonly poseSync: NearbyPoseSync
+  private readonly progressSync: NearbyProgressSync
   private timeout: ReturnType<typeof setTimeout> | undefined
 
   constructor(
@@ -100,6 +103,7 @@ export class NearbyRace {
     private readonly now = () => performance.now(),
   ) {
     this.poseSync = new NearbyPoseSync((ids, bytes) => transport.send(ids, bytes), this.now)
+    this.progressSync = new NearbyProgressSync((ids, bytes) => transport.send(ids, bytes), this.now)
     this.unsubscribe = transport.subscribe((event) => this.onEvent(event))
   }
 
@@ -129,6 +133,7 @@ export class NearbyRace {
       counts: this.diagnosticCounts(),
       timeline: this.timeline.map((entry) => ({ ...entry })),
       poseCounts: this.poseSync.counts,
+      progressSendFailures: this.progressSync.failedSends,
       targetPoseHz: this.poseSync.targetPoseHz,
       lastFailure: this.lastFailure && { ...this.lastFailure },
     }
@@ -271,6 +276,7 @@ export class NearbyRace {
     this.receiver = null
     this.prepared = null
     this.poseSync.reset()
+    this.progressSync.reset()
   }
 
   private async prepareGuests(course: Course, active: number, lock: boolean): Promise<void> {
@@ -292,9 +298,30 @@ export class NearbyRace {
     this.record('transfer', { stage: 'sent', chunks: chunks.length, recipients: guests.length })
   }
 
-  update(vehicle: RaceVehicle): void {
+  update(vehicle: RaceVehicle, state?: RaceState): void {
     if (this.phase !== 'racing') return
-    this.poseSync.update(vehicle, this.slot, this.hostId, this.endpoints(), this.racers)
+    const recipients = this.endpoints()
+    this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
+    if (state) this.progressSync.update(this.slot, raceProgress(
+      vehicle, state.path.points.length, state.startPathIndex, state.reversed,
+      normalizeRouteKind(state.routeKind),
+    ), recipients)
+  }
+
+  /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
+  livePosition(vehicle: RaceVehicle, state: RaceState): { position: number; vehicleCount: number } | null {
+    if (this.phase !== 'racing' || !this.racers.has(this.slot)) return null
+    const local = raceProgress(vehicle, state.path.points.length, state.startPathIndex,
+      state.reversed, normalizeRouteKind(state.routeKind))
+    let ahead = 0
+    for (const [slot, racer] of this.racers) {
+      if (slot === this.slot || racer.left || racer.time === null) continue
+      if (typeof racer.time === 'number') { ahead++; continue }
+      const remote = this.progressSync.latest(slot)
+      if (remote === null) return null
+      if (remote > local + 0.25 || (Math.abs(remote - local) <= 0.25 && slot < this.slot)) ahead++
+    }
+    return { position: ahead + 1, vehicleCount: this.racers.size }
   }
 
   recovered(): void { this.poseSync.recovered() }
@@ -467,6 +494,19 @@ export class NearbyRace {
     const guestSlot = this.guests.get(id)
     if (!fromHost && guestSlot === undefined &&
         !(this.purpose === 'share' && this.role === 'host' && this.pendingPairs.has(id))) return
+    if (this.phase === 'racing' && bytes[0] === Packet.Progress) {
+      const packet = decodeProgress(bytes)
+      const racer = packet && this.racers.get(packet.slot)
+      if (packet && racer && packet.slot !== this.slot && !racer.left &&
+          racer.time === undefined && (fromHost || guestSlot === packet.slot) &&
+          this.progressSync.receive(packet) && !fromHost) {
+        const recipients = this.endpoints(id)
+        if (recipients.length) void this.transport.send(recipients, bytes).catch((error: unknown) => {
+          this.record('progress_relay_failed', { error: this.errorKind(error) })
+        })
+      }
+      return
+    }
     if (this.phase === 'racing' &&
         this.poseSync.receive(bytes, fromHost, guestSlot, this.slot, this.racers)) return
     if (bytes[0] === Packet.Track && fromHost && this.phase === 'preparing' && this.receiver) {
@@ -763,6 +803,7 @@ export class NearbyRace {
     this.prepared = null
     this.slot = 0
     this.poseSync.reset()
+    this.progressSync.reset()
     this.error = error
     this.setPhase('idle')
   }

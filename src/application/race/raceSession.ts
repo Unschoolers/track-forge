@@ -71,6 +71,7 @@ export interface RaceTelemetry {
   readonly countdown: number
   readonly elapsed: number
   readonly position: number
+  readonly positionKnown?: boolean
   readonly vehicleCount: number
   readonly lap: number
   readonly totalLaps: number
@@ -144,7 +145,7 @@ export interface RaceSessionPort {
 }
 
 export interface RaceSessionDependencies {
-  readonly nearby?: Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish'> | undefined
+  readonly nearby?: (Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish'> & Partial<Pick<NearbyRace, 'livePosition'>>) | undefined
   readonly scoreStore: ScoreStore
   readonly random: RandomSource
   readonly feedback: FeedbackPort
@@ -411,7 +412,7 @@ export class RaceSession implements RaceSessionPort {
       : null
     if (nearby) {
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
-      if (player && !result) nearby.update(player)
+      if (player && !result) nearby.update(player, resultState)
       if (result && !this.current.result) nearby.finish(result.playerTime)
     }
     if (stepped) routeRaceFeedback(this.dependencies.feedback, resultState, events, input, peakLanding)
@@ -447,7 +448,8 @@ export class RaceSession implements RaceSessionPort {
     const previous = this.current.telemetry
     const current = nextSnapshot.telemetry
     if (
-      nextSnapshot.setup?.mode === 'normal' &&
+      (nextSnapshot.setup?.mode === 'normal' ||
+        (nextSnapshot.setup?.mode === 'nearby' && previous.positionKnown && current.positionKnown)) &&
       previous.phase === 'running' &&
       current.phase === 'running' &&
       current.elapsed >= 0.7 &&
@@ -531,6 +533,8 @@ export class RaceSession implements RaceSessionPort {
       toRaceStanding(vehicle, index),
     )
     const player = ranked.find((vehicle) => vehicle.player)
+    const nearbyPosition = setup?.mode === 'nearby' && player
+      ? this.dependencies.nearby?.livePosition?.(player, state) : null
     const latestSplit = this.timing.accepted.at(-1)
     const elapsed = result?.playerTime ?? state.elapsed
     return {
@@ -553,8 +557,9 @@ export class RaceSession implements RaceSessionPort {
         waitingForStart: setup?.mode === 'nearby' && state.phase === 'countdown' && this.startsAt === undefined,
         countdown: state.countdown,
         elapsed,
-        position: player ? ranked.indexOf(player) + 1 : 1,
-        vehicleCount: state.vehicles.length,
+        position: nearbyPosition?.position ?? (player ? ranked.indexOf(player) + 1 : 1),
+        positionKnown: setup?.mode !== 'nearby' || nearbyPosition != null,
+        vehicleCount: nearbyPosition?.vehicleCount ?? state.vehicles.length,
         lap: player?.lap ?? 0,
         totalLaps: state.totalLaps,
         damage: player?.damage ?? 0,
