@@ -132,7 +132,7 @@ export function createResultsModal(
     frame.footer.append(
       button('LEAVE CUP', 'results-home', actions.home, 'button'),
       button('RETRY', 'retry-race', actions.retry, 'button'),
-      button(cupAction.cup.index === CUP_CIRCUITS.length - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
+      button(cupAction.cup.index === cupRoundCount(cupAction.cup) - 1 ? 'FINISH CUP' : 'NEXT RACE', 'next-cup-race', cupAction.next, 'button button-primary'),
     )
     return frame.overlay
   }
