@@ -61,11 +61,65 @@ export function createResultsModal(
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings, result.rivalsFinishing, playerName))
   }
   if (result.splits?.length) {
-    frame.body.append(element('h3', 'results-heading', 'SPLITS'))
-    for (const split of result.splits) {
+    const heading = element('div', 'results-splits-heading')
+    heading.append(element('h3', 'results-heading', 'SPLITS'))
+    const viewport = element('div', 'results-splits-viewport')
+    viewport.setAttribute('aria-label', 'Race splits')
+    const rows = result.splits.map(split => {
       const label = result.routeKind === 'point-to-point' ? (split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`) : `LAP ${split.lap + 1} · ${split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`}`
-      frame.body.append(element('p', 'modal-subtitle', `${label} · ${formatRaceTime(split.time)}`))
+      return element('p', 'modal-subtitle results-splits-row', `${label} · ${formatRaceTime(split.time)}`)
+    })
+    viewport.append(...rows)
+    if (rows.length > 2) {
+      const hint = element('span', 'results-splits-hint')
+      heading.append(hint)
+      const reducedMotion = typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      let paused = reducedMotion
+      let rowIndex = 0
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const schedule = (): void => {
+        if (paused) return
+        timer = setTimeout(() => {
+          timer = undefined
+          if (!frame.overlay.isConnected || paused) return
+          rowIndex = (rowIndex + 1) % (rows.length - 1)
+          const firstRow = rows[0]
+          const nextRow = rows[rowIndex]
+          if (firstRow && nextRow) {
+            viewport.style.scrollBehavior = rowIndex === 0 || reducedMotion ? 'auto' : 'smooth'
+            viewport.scrollTop = nextRow.offsetTop - firstRow.offsetTop
+          }
+          schedule()
+        }, 3000)
+      }
+      const updatePauseLabel = (): void => {
+        viewport.setAttribute('aria-pressed', String(paused))
+        viewport.setAttribute('aria-label', paused
+          ? 'Race splits paused. Tap to resume auto-scroll.'
+          : 'Race splits auto-scrolling. Tap to pause.')
+        hint.textContent = paused ? 'PAUSED · TAP TO RESUME' : 'TAP TO PAUSE'
+      }
+      const togglePause = (): void => {
+        paused = !paused
+        if (paused) clearTimeout(timer)
+        else schedule()
+        updatePauseLabel()
+      }
+      viewport.setAttribute('role', 'button')
+      viewport.tabIndex = 0
+      viewport.addEventListener('click', togglePause)
+      viewport.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          togglePause()
+        }
+      })
+      updatePauseLabel()
+      // The modal is attached synchronously after creation. Avoid timers for detached previews.
+      setTimeout(() => { if (frame.overlay.isConnected) schedule() }, 0)
     }
+    frame.body.append(heading, viewport)
   }
   if (result.scoreSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))
