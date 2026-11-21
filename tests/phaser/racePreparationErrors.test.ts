@@ -33,7 +33,8 @@ it('reports deferred prewarm failure while allowing a later normal preparation',
 
   expect(report).not.toHaveBeenCalled()
   pending.shift()?.()
-  expect(report).toHaveBeenCalledExactlyOnceWith(failure)
+  expect(report).toHaveBeenCalledTimes(1)
+  expect(report).toHaveBeenCalledWith(failure)
 
   // An optional prewarm failure must not poison subsequent race loading.
   preparation.prepare(geometry, 'grass', false)
