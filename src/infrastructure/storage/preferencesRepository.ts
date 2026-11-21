@@ -9,7 +9,7 @@ import {
   isDifficultyId,
 } from '@/domain/model'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
-import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity } from '@/application/multiplayer/playerIdentity'
+import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, randomPlayerIdentity, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 
 export const DEFAULT_PREFERENCES: Preferences = {
   car: 'blue',
@@ -39,7 +39,12 @@ function volume(value: string | null, fallback: number): number {
 }
 
 export class BrowserPreferencesRepository implements PreferencesStore {
-  constructor(private readonly storage: KeyValueStore) {}
+  private firstIdentity: PlayerIdentity | undefined
+
+  constructor(
+    private readonly storage: KeyValueStore,
+    private readonly createIdentity: () => PlayerIdentity = randomPlayerIdentity,
+  ) {}
 
   load(): Preferences {
     const car = this.storage.get(STORAGE_KEYS.car)
@@ -47,12 +52,19 @@ export class BrowserPreferencesRepository implements PreferencesStore {
     const handling = this.storage.get(STORAGE_KEYS.handling)
     const raceLaps = this.storage.get(STORAGE_KEYS.raceLaps)
     const raceMode = this.storage.get(STORAGE_KEYS.raceMode)
-    let playerIdentity: unknown
-    try {
-      const stored = this.storage.get(STORAGE_KEYS.playerIdentity)
-      playerIdentity = stored === null ? null : JSON.parse(stored)
-    } catch {
-      playerIdentity = null
+    const storedIdentity = this.storage.get(STORAGE_KEYS.playerIdentity)
+    let playerIdentity: PlayerIdentity
+    if (storedIdentity === null) {
+      // Assign once, persist immediately, and keep the same choice this session
+      // even if the storage write fails. Existing selections are never rerolled.
+      playerIdentity = this.firstIdentity ??= normalizePlayerIdentity(this.createIdentity())
+      this.storage.set(STORAGE_KEYS.playerIdentity, JSON.stringify(playerIdentity))
+    } else {
+      try {
+        playerIdentity = normalizePlayerIdentity(JSON.parse(storedIdentity))
+      } catch {
+        playerIdentity = DEFAULT_PLAYER_IDENTITY
+      }
     }
     const steeringSensitivity = this.storage.get(STORAGE_KEYS.steeringSensitivity)
     const legacyAudio = boolean(this.storage.get(STORAGE_KEYS.audio), DEFAULT_PREFERENCES.audioEnabled)
@@ -70,7 +82,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       handling: handling === 'simulation' ? 'simulation' : 'arcade',
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       raceMode: raceMode === 'ghost' || raceMode === 'time-trial' ? raceMode : 'normal',
-      playerIdentity: normalizePlayerIdentity(playerIdentity),
+      playerIdentity,
       audioEnabled: soundEffectsVolume > 0,
       musicVolume,
       soundEffectsVolume,
