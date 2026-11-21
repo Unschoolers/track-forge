@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import { CAR_SPECS, ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
+import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { CarId, Vector2 } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
@@ -8,15 +8,9 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
+import { getVehicleArtwork, vehiclePaintColor, type VehicleArtwork } from '@/presentation/vehicleArtwork'
 
-export interface VehicleGeometry {
-  readonly id: CarId
-  readonly body: readonly Vector2[]
-  readonly cabin: readonly Vector2[]
-  readonly headlights: readonly [Vector2, Vector2]
-  readonly taillights: readonly [Vector2, Vector2]
-  readonly wheelbase: number
-}
+export type VehicleGeometry = VehicleArtwork
 
 export interface VehicleLightTransform {
   readonly headlights: readonly [Vector2, Vector2]
@@ -36,91 +30,8 @@ export interface VehicleShadow {
 
 type VehicleShadowPose = Pick<RaceVehicle, 'car' | 'x' | 'y' | 'z' | 'angle'>
 
-const GEOMETRIES: Record<CarId, VehicleGeometry> = {
-  blue: {
-    id: 'blue',
-    body: [
-      { x: -17, y: -8 },
-      { x: 14, y: -8 },
-      { x: 19, y: -5 },
-      { x: 19, y: 5 },
-      { x: 14, y: 8 },
-      { x: -17, y: 8 },
-    ],
-    cabin: [
-      { x: -7, y: -6 },
-      { x: 8, y: -6 },
-      { x: 10, y: 6 },
-      { x: -7, y: 6 },
-    ],
-    headlights: [{ x: 17, y: -5 }, { x: 17, y: 5 }],
-    taillights: [{ x: -16, y: -5 }, { x: -16, y: 5 }],
-    wheelbase: 11,
-  },
-  red: {
-    id: 'red',
-    body: [
-      { x: -19, y: -7 },
-      { x: 12, y: -7 },
-      { x: 21, y: -4 },
-      { x: 21, y: 4 },
-      { x: 12, y: 7 },
-      { x: -19, y: 7 },
-    ],
-    cabin: [
-      { x: -8, y: -5 },
-      { x: 7, y: -5 },
-      { x: 11, y: 5 },
-      { x: -8, y: 5 },
-    ],
-    headlights: [{ x: 19.5, y: -5.15 }, { x: 19.5, y: 5.15 }],
-    taillights: [{ x: -17.5, y: -5.15 }, { x: -17.5, y: 5.15 }],
-    wheelbase: 12,
-  },
-  green: {
-    id: 'green',
-    body: [
-      { x: -15, y: -9 },
-      { x: 13, y: -9 },
-      { x: 17, y: -6 },
-      { x: 17, y: 6 },
-      { x: 13, y: 9 },
-      { x: -15, y: 9 },
-    ],
-    cabin: [
-      { x: -6, y: -7 },
-      { x: 7, y: -7 },
-      { x: 9, y: 7 },
-      { x: -6, y: 7 },
-    ],
-    headlights: [{ x: 15.5, y: -6.55 }, { x: 15.5, y: 6.55 }],
-    taillights: [{ x: -15.5, y: -6.55 }, { x: -15.5, y: 6.55 }],
-    wheelbase: 10,
-  },
-  yellow: {
-    id: 'yellow',
-    body: [
-      { x: -20, y: -10 },
-      { x: 15, y: -10 },
-      { x: 23, y: -7 },
-      { x: 23, y: 7 },
-      { x: 15, y: 10 },
-      { x: -20, y: 10 },
-    ],
-    cabin: [
-      { x: -5, y: -8 },
-      { x: 10, y: -8 },
-      { x: 12, y: 8 },
-      { x: -5, y: 8 },
-    ],
-    headlights: [{ x: 20.5, y: -7.25 }, { x: 20.5, y: 7.25 }],
-    taillights: [{ x: -20.5, y: -7.25 }, { x: -20.5, y: 7.25 }],
-    wheelbase: 13,
-  },
-}
-
 export function getVehicleGeometry(car: CarId): VehicleGeometry {
-  return GEOMETRIES[car]
+  return getVehicleArtwork(car)
 }
 
 /** Supported ramps share the deck's draw layer even near ground level. */
@@ -228,8 +139,26 @@ function fillPolygon(
   graphics.fillPath()
 }
 
-function hexColor(value: string): number {
-  return Number.parseInt(value.slice(1), 16)
+/** Draw the shared vector layers, including windows, fenders and pickup bed. */
+function drawVehicleBody(
+  graphics: Phaser.GameObjects.Graphics,
+  car: CarId,
+  braking: boolean,
+  alpha = 1,
+): void {
+  const artwork = getVehicleArtwork(car)
+  for (const layer of artwork.layers) {
+    graphics.fillStyle(vehiclePaintColor(car, layer.tone), (layer.alpha ?? 1) * alpha)
+    fillPolygon(graphics, layer.points)
+    if (layer.outline) {
+      graphics.lineStyle(1.4, 0x101923, alpha)
+      graphics.strokePath()
+    }
+  }
+  graphics.fillStyle(0xeaf7ff, 0.95 * alpha)
+  for (const lamp of artwork.headlights) graphics.fillCircle(lamp.x, lamp.y, 1.7)
+  graphics.fillStyle(braking ? 0xff3038 : 0x5b1620, alpha)
+  for (const lamp of artwork.taillights) graphics.fillCircle(lamp.x, lamp.y, braking ? 2.1 : 1.5)
 }
 
 export function renderVehicles(
@@ -238,7 +167,6 @@ export function renderVehicles(
   path: RoadPath,
 ): void {
   for (const vehicle of vehicles) {
-    const geometry = getVehicleGeometry(vehicle.car)
     const compression = Math.max(0, vehicle.suspensionCompression)
     const impact = vehicle.landingIntensity
     const clearance = vehicle.grounded ? 0 : Math.max(
@@ -255,21 +183,7 @@ export function renderVehicles(
       1 + lift - 0.12 * Math.abs(pitch),
       1 + lift + 0.1 * Math.max(impact * 0.55, compression),
     )
-    graphics.fillStyle(
-      hexColor(CAR_SPECS[vehicle.car].color),
-      vehicle.wrecked ? 0.55 : 1,
-    )
-    fillPolygon(graphics, geometry.body)
-    graphics.fillStyle(0x18212c, 0.9)
-    fillPolygon(graphics, geometry.cabin, pitch * 3.5)
-    graphics.fillStyle(0xeaf7ff, 0.95)
-    for (const lamp of geometry.headlights) {
-      graphics.fillCircle(lamp.x, lamp.y, 1.7)
-    }
-    graphics.fillStyle(vehicle.braking ? 0xff3038 : 0x5b1620, 1)
-    for (const lamp of geometry.taillights) {
-      graphics.fillCircle(lamp.x, lamp.y, vehicle.braking ? 2.1 : 1.5)
-    }
+    drawVehicleBody(graphics, vehicle.car, vehicle.braking, vehicle.wrecked ? 0.55 : 1)
     graphics.restore()
   }
 }
@@ -295,20 +209,12 @@ export function renderNearbyVehicle(
   graphics: Phaser.GameObjects.Graphics,
   pose: GhostPose,
 ): void {
-  const geometry = getVehicleGeometry(pose.car)
   graphics.save()
   graphics.translateCanvas(pose.x, pose.y)
   graphics.rotateCanvas(pose.angle)
   graphics.fillStyle(0x050b11, 0.2)
   graphics.fillEllipse(2, 3, 34, 17)
-  graphics.fillStyle(hexColor(CAR_SPECS[pose.car].color), 1)
-  fillPolygon(graphics, geometry.body)
-  graphics.fillStyle(0x18212c, 0.9)
-  fillPolygon(graphics, geometry.cabin)
-  graphics.fillStyle(0xeaf7ff, 0.95)
-  for (const lamp of geometry.headlights) graphics.fillCircle(lamp.x, lamp.y, 1.7)
-  graphics.fillStyle(0x5b1620, 1)
-  for (const lamp of geometry.taillights) graphics.fillCircle(lamp.x, lamp.y, 1.5)
+  drawVehicleBody(graphics, pose.car, false)
   drawTopper(graphics, pose.identity ?? DEFAULT_PLAYER_IDENTITY)
   graphics.restore()
 }
