@@ -7,6 +7,7 @@ import { projectSunShadow } from '@/phaser/rendering/lighting'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import type { GhostPose } from '@/application/race/ghostReplay'
+import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 
 export interface VehicleGeometry {
   readonly id: CarId
@@ -286,6 +287,83 @@ export function renderGhostVehicle(
   fillPolygon(graphics, geometry.body)
   graphics.fillStyle(0xe8fbff, 0.16)
   fillPolygon(graphics, geometry.cabin)
+  graphics.restore()
+}
+
+/** Render a human opponent as a solid car. Nearby racing is non-colliding, not translucent. */
+export function renderNearbyVehicle(
+  graphics: Phaser.GameObjects.Graphics,
+  pose: GhostPose,
+): void {
+  const geometry = getVehicleGeometry(pose.car)
+  graphics.save()
+  graphics.translateCanvas(pose.x, pose.y)
+  graphics.rotateCanvas(pose.angle)
+  graphics.fillStyle(0x050b11, 0.2)
+  graphics.fillEllipse(2, 3, 34, 17)
+  graphics.fillStyle(hexColor(CAR_SPECS[pose.car].color), 1)
+  fillPolygon(graphics, geometry.body)
+  graphics.fillStyle(0x18212c, 0.9)
+  fillPolygon(graphics, geometry.cabin)
+  graphics.fillStyle(0xeaf7ff, 0.95)
+  for (const lamp of geometry.headlights) graphics.fillCircle(lamp.x, lamp.y, 1.7)
+  graphics.fillStyle(0x5b1620, 1)
+  for (const lamp of geometry.taillights) graphics.fillCircle(lamp.x, lamp.y, 1.5)
+  drawTopper(graphics, pose.identity ?? DEFAULT_PLAYER_IDENTITY)
+  graphics.restore()
+}
+
+/** Draw above the roof in car-local coordinates; no physics or network updates. */
+function drawTopper(graphics: Phaser.GameObjects.Graphics, identity: PlayerIdentity): void {
+  graphics.lineStyle(2, 0x121923, 0.95)
+  graphics.beginPath()
+  graphics.moveTo(-3, -1)
+  graphics.lineTo(-3, -14)
+  graphics.strokePath()
+  graphics.translateCanvas(-3, -15)
+  graphics.fillStyle(0x101821, 1)
+  graphics.fillCircle(0, 0, 7)
+  graphics.fillStyle(TOPPER_COLORS[identity.color], 1)
+  switch (identity.icon) {
+    case 'star': {
+      const points = Array.from({ length: 10 }, (_, index) => {
+        const angle = index * Math.PI / 5 - Math.PI / 2
+        const radius = index % 2 ? 2.7 : 6
+        return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
+      })
+      fillPolygon(graphics, points)
+      break
+    }
+    case 'flag':
+      fillPolygon(graphics, [{ x: -4, y: -5 }, { x: 5, y: -3 }, { x: -4, y: 1 }])
+      graphics.fillRect(-4, -5, 1.5, 11)
+      break
+    case 'bolt':
+      fillPolygon(graphics, [{ x: 0, y: -6 }, { x: -4, y: 0 }, { x: -1, y: 0 },
+        { x: -3, y: 6 }, { x: 5, y: -1 }, { x: 1, y: -1 }, { x: 4, y: -6 }])
+      break
+    case 'crown':
+      fillPolygon(graphics, [{ x: -5, y: -3 }, { x: -3, y: 1 }, { x: 0, y: -5 },
+        { x: 3, y: 1 }, { x: 5, y: -3 }, { x: 4, y: 5 }, { x: -4, y: 5 }])
+      break
+    case 'diamond':
+      fillPolygon(graphics, [{ x: 0, y: -6 }, { x: 6, y: 0 }, { x: 0, y: 6 }, { x: -6, y: 0 }])
+      break
+    case 'ball':
+      graphics.fillCircle(0, 0, 5)
+      break
+  }
+}
+
+export function renderPlayerTopper(
+  graphics: Phaser.GameObjects.Graphics,
+  pose: Pick<RaceVehicle, 'x' | 'y' | 'angle'>,
+  identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
+): void {
+  graphics.save()
+  graphics.translateCanvas(pose.x, pose.y)
+  graphics.rotateCanvas(pose.angle)
+  drawTopper(graphics, identity)
   graphics.restore()
 }
 

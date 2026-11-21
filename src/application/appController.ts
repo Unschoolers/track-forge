@@ -113,6 +113,7 @@ export class AppController {
       scoresByTrack: this.scoresForTracks(tracks),
       notice: null,
     }
+    dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
     this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, startsAt }) => {
       if (this.state.overlay.type !== 'nearby') return
       this.beforeNearbyTrack = this.state.currentTrack
@@ -265,6 +266,11 @@ export class AppController {
         break
       case 'open-nearby':
         if (this.dependencies.nearby) this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        break
+      case 'toggle-nearby-customize':
+        if (this.state.overlay.type === 'nearby' && this.dependencies.nearby?.snapshot().phase === 'idle') {
+          this.update({ ...this.state, overlay: { type: 'nearby', customize: !this.state.overlay.customize } })
+        }
         break
       case 'host-nearby': {
         const { currentTrack: track, preferences, raceLighting } = this.state
@@ -850,8 +856,9 @@ export class AppController {
   private setPreferences(
     preferences: Preferences,
   ): void {
-    this.dependencies.preferencesStore.save(preferences)
-    this.update({ ...this.state, preferences })
+    const saved = this.dependencies.preferencesStore.save(preferences)
+    this.dependencies.nearby?.setIdentity(preferences.playerIdentity)
+    this.update({ ...this.state, preferences, notice: saved ? this.state.notice : 'Preferences could not be saved on this device.' })
   }
 
   private saveCurrentTrack(): void {

@@ -6,11 +6,15 @@ import { createCarPicker } from '@/ui/components/carPicker'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
+import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity, type TopperColor, type TopperIcon } from '@/application/multiplayer/playerIdentity'
 
 export function createNearbyRaceModal(
   nearby: NearbyRace,
   car: CarId,
-  actions: { close: () => void; chooseTrack: () => void; scan: () => void; selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean> },
+  actions: { close: () => void; chooseTrack: () => void; scan: () => void; selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
+    toggleCustomize?: () => void; selectIdentity?: (identity: PlayerIdentity) => void },
+  identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
+  customizing = false,
 ): HTMLElement {
   const { phase, room, track, players, canStart, rooms, error } = nearby.snapshot()
   const frame = createModalFrame('Nearby Race', room ?? 'Arcade · Up to 4 players', actions.close, 'nearby-race-modal')
@@ -24,6 +28,7 @@ export function createNearbyRaceModal(
     case 'idle':
       frame.body.append(
         createCarPicker(car, actions.selectCar),
+        createTopperSelector(identity, customizing, actions.toggleCustomize, actions.selectIdentity),
         button('HOST A RACE', 'nearby-choose-track', actions.chooseTrack, 'button'),
         button('FIND A ROOM', 'nearby-scan', actions.scan, 'button button-primary'),
       )
@@ -79,10 +84,14 @@ export function createNearbyRaceResults(
   function update() {
     status.textContent = nearby.snapshot().error ?? ''
     status.hidden = !status.textContent
-    list.replaceChildren(...nearby.standings().map(({ slot, car, local, time, left }, index) => {
+    list.replaceChildren(...nearby.standings().map(({ slot, car, identity, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
       const label = local ? 'You' : `Player ${slot + 1}`
+      const topper = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
+      topper.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
+      topper.title = `${identity.color} ${identity.icon} topper`
       row.append(
+        topper,
         element('strong', undefined, `${typeof time === 'number' ? `${index + 1}. ` : ''}${label} · ${CAR_SPECS[car].name}`),
         element('span', undefined, typeof time === 'number' ? formatRaceTime(time) : left ? 'LEFT' : time === null ? 'UNFINISHED' : 'RACING…'),
       )
@@ -93,6 +102,45 @@ export function createNearbyRaceResults(
   frame.body.append(list, status, createDiagnosticsControl(downloadDiagnostics))
   frame.footer.append(button('LEAVE ROOM', 'results-home', home, 'button button-primary'))
   return { element: frame.overlay, cleanup: nearby.subscribe(update) }
+}
+
+function createTopperSelector(
+  identity: PlayerIdentity,
+  customizing: boolean,
+  toggle?: () => void,
+  change?: (identity: PlayerIdentity) => void,
+): HTMLElement {
+  const section = element('section', 'setup-section topper-section')
+  const current = element('div', 'topper-current')
+  const marker = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
+  marker.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
+  current.append(marker, element('span', 'modal-subtitle', `Your topper · ${identity.icon} / ${identity.color}`))
+  if (toggle) current.append(button(customizing ? 'DONE' : 'CHANGE', 'nearby-customize-topper', toggle, 'button'))
+  section.append(current)
+  if (!customizing || !change) return section
+
+  const icons = element('div', 'topper-options')
+  for (const icon of Object.keys(TOPPER_ICONS) as TopperIcon[]) {
+    const choice = button(TOPPER_ICONS[icon], `nearby-topper-icon-${icon}`,
+      () => change({ ...identity, icon }), 'button topper-choice')
+    choice.title = `${icon} topper`
+    choice.setAttribute('aria-label', `${icon} topper`)
+    choice.setAttribute('aria-pressed', String(icon === identity.icon))
+    icons.append(choice)
+  }
+  section.append(element('p', 'setup-label', 'TOPPER ICON'), icons)
+
+  const colors = element('div', 'topper-options')
+  for (const color of Object.keys(TOPPER_COLORS) as TopperColor[]) {
+    const choice = button(color, `nearby-topper-color-${color}`,
+      () => change({ ...identity, color }), 'button topper-choice topper-color-choice')
+    choice.style.setProperty('--topper-choice-color', '#' + TOPPER_COLORS[color].toString(16).padStart(6, '0'))
+    choice.setAttribute('aria-label', `${color} topper color`)
+    choice.setAttribute('aria-pressed', String(color === identity.color))
+    colors.append(choice)
+  }
+  section.append(element('p', 'setup-label', 'TOPPER COLOR'), colors)
+  return section
 }
 
 function createDiagnosticsControl(save: () => Promise<boolean>): HTMLElement {

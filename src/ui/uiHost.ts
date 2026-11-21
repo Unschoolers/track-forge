@@ -340,7 +340,9 @@ export class DomUiHost implements UiHost {
           chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           scan: () => this.controller.dispatch({ type: 'scan-nearby' }),
           selectCar: (car) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, car } }),
-        })
+          toggleCustomize: () => this.controller.dispatch({ type: 'toggle-nearby-customize' }),
+          selectIdentity: (playerIdentity) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, playerIdentity } }),
+        }, state.preferences.playerIdentity, state.overlay.customize)
       }
       case 'cup-final':
         return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' })) : undefined

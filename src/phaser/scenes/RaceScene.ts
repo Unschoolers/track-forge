@@ -14,6 +14,8 @@ import {
   renderVehicleShadows,
   renderVehicles,
   renderGhostVehicle,
+  renderNearbyVehicle,
+  renderPlayerTopper,
   renderCoveredPlayerOutline,
   isVehicleAboveStructures,
   transformVehicleLights,
@@ -277,15 +279,23 @@ export class RaceScene extends Phaser.Scene {
         x + Math.cos(angle - 2.4) * 10, y + Math.sin(angle - 2.4) * 10,
       )
     }
-    const replayGhost = this.raceSession.snapshot().ghost
-    const liveGhosts = this.raceSession.nearbyGhosts?.() ?? []
-    for (const ghost of replayGhost ? [replayGhost, ...liveGhosts] : liveGhosts) {
-      const raised = ghost.structureRunId !== null ||
-        ghost.z - race.path.terrainSurface.heightAt(ghost) > 10
-      renderGhostVehicle(
-        raised ? this.upperVehicleGraphics : this.vehicleGraphics,
-        ghost,
+    if (player && this.raceSession.snapshot().setup?.mode === 'nearby') {
+      renderPlayerTopper(
+        upperVehicles.has(player.id) ? this.upperVehicleGraphics : this.vehicleGraphics,
+        player,
+        this.snapshot.preferences.playerIdentity,
       )
+    }
+    const replayGhost = this.raceSession.snapshot().ghost
+    if (replayGhost) {
+      const raised = replayGhost.structureRunId !== null ||
+        replayGhost.z - race.path.terrainSurface.heightAt(replayGhost) > 10
+      renderGhostVehicle(raised ? this.upperVehicleGraphics : this.vehicleGraphics, replayGhost)
+    }
+    for (const rival of this.raceSession.nearbyGhosts?.() ?? []) {
+      const raised = rival.structureRunId !== null ||
+        rival.z - race.path.terrainSurface.heightAt(rival) > 10
+      renderNearbyVehicle(raised ? this.upperVehicleGraphics : this.vehicleGraphics, rival)
     }
     if (player && !upperVehicles.has(player.id) && this.isCoveredByBridgeDeck?.(player)) {
       renderCoveredPlayerOutline(this.upperVehicleGraphics, player)
