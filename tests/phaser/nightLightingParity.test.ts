@@ -62,7 +62,7 @@ describe('night preview / gameplay lighting parity', () => {
         return image
       }) },
     } as unknown as Phaser.Scene
-    const renderer = new NightBeamRenderer(scene)
+    const renderer = new NightBeamRenderer(scene, 1)
     renderer.render([vehicle(20), vehicle(40)])
     expect(scene.textures.addCanvas).toHaveBeenCalledTimes(1)
     expect(scene.add.image).toHaveBeenCalledTimes(2)
