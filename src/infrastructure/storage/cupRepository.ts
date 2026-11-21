@@ -7,7 +7,7 @@ function validCup(value: unknown): value is CircuitCup {
   if (!value || typeof value !== 'object') return false
   const cup = value as CircuitCup
   return isCarId(cup.car) && isDifficultyId(cup.difficulty) &&
-    (cup.trackIds === undefined || validCupLineup(cup.trackIds)) &&
+    (cup.trackIds === undefined || (validCupLineup(cup.trackIds) && cup.trackIds.length > 0)) &&
     Number.isInteger(cup.index) && cup.index >= 0 && cup.index < cupRoundCount(cup) &&
     Array.isArray(cup.rounds) &&
     (cup.rounds.length === cup.index || cup.rounds.length === cup.index + 1) &&
