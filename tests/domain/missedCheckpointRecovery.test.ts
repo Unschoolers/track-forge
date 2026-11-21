@@ -28,6 +28,25 @@ describe('missed timing gate recovery', () => {
     expect(result.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
   })
 
+  it('starts recovery when the stage finish is bypassed beyond the painted line', () => {
+    const path = buildRoadPath([street(0, 16), street(1_000, 16)], EMPTY_TERRAIN, undefined, 'point-to-point')
+    const race = createRace({
+      path, routeKind: 'point-to-point', handling: 'arcade',
+      playerCar: 'blue', difficulty: 'normal', laps: 1,
+    })
+    const last = path.points.length - 1
+    const finish = path.points[last]
+    const player = race.vehicles[0]
+    if (!player || !finish) throw new Error('Missing finish fixture')
+    const before = { ...player, nextSector: 4 as const, x: finish.x + 10, y: finish.y + 90, pathIndex: last - 1 }
+    const after = { ...before, x: before.x + 2, pathIndex: last }
+    expect(crossesRoadGate(path, before, after, last, Infinity)).toBe(false)
+
+    const result = advanceArcadeTimingGate(race, before, after, 6, false, () => false)
+    expect(result.vehicle.finishedAt).toBeNull()
+    expect(result.missedCheckpoint).toMatchObject({ gate: 4, remainingSeconds: 5 })
+  })
+
   it.each([false, true])('detects a bypass on a circuit in both directions (reversed=%s)', reversed => {
     const path = buildRoadPath([
       street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
