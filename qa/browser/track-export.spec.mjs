@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { OWNED_TRACK_NAME, seedOwnedTrack } from './owned-track.mjs'
 
 test('downloads the shared track when file sharing is unavailable', async ({ page }) => {
+  await seedOwnedTrack(page)
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'canShare', { value: () => false })
   })
@@ -10,12 +12,13 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Share Starter Circuit', exact: true }).click()
+  await page.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/\.trackforge\.json$/)
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'))
   expect(exported.format).toBe('trackforge-track')
   expect(exported.formatVersion).toBe(1)
+  expect(exported.track.name).toBe(OWNED_TRACK_NAME)
   expect(exported.track.points.length).toBeGreaterThan(8)
   expect(exported.track.terrain).toBeDefined()
   await expect(page.getByRole('dialog', { name: 'Choose a track to edit' })).toBeVisible()
