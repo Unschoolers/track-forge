@@ -108,8 +108,11 @@ export class TrackLibraryService {
       const suffix = ` (${number++})`
       name = baseName.slice(0, 32 - suffix.length) + suffix
     }
+    // Omit the seeded creator instead of accidentally inheriting system credit.
+    const { creator: systemCreator, ...sourceWithoutCreator } = source
+    void systemCreator
     const copy: Track = {
-      ...source,
+      ...sourceWithoutCreator,
       id: this.dependencies.createId(),
       name,
       origin: 'local',
@@ -118,10 +121,8 @@ export class TrackLibraryService {
       updatedAt: now,
       raceRevision: now,
     }
-    // Never let an unconfigured profile silently inherit the system creator ID.
-    const personal = { ...copy, creator: creator ?? undefined }
-    return this.dependencies.trackStore.save(personal)
-      ? { ok: true, track: personal }
+    return this.dependencies.trackStore.save(copy)
+      ? { ok: true, track: copy }
       : { ok: false, message: 'Could not copy the built-in track.' }
   }
 

@@ -24,6 +24,7 @@ import { createOptionsModal } from '@/ui/modals/optionsModal'
 import { createPauseModal } from '@/ui/modals/pauseModal'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
 import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
+import { isSeededTrack } from '@/domain/track/trackCreator'
 import { createToast } from '@/ui/toast'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
@@ -187,6 +188,10 @@ export class DomUiHost implements UiHost {
   }
 
   private async shareTrackChallenge(track: Track): Promise<void> {
+    if (isSeededTrack(track)) {
+      this.showRaceExportNotice('Built-in tracks are already available to every player.')
+      return
+    }
     const best = this.controller.snapshot().scoresByTrack[track.id]?.[0]
     const challenge = `Race "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win?'} Import the attached track file to play.`
     try {

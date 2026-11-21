@@ -11,16 +11,14 @@ export interface TrackCreator {
 export const TRACK_FORGE_CREATOR = { id: 'trackforge-system', name: 'Track Forge' } as const
 export const SYSTEM_STARTER_TRACK_ID = 'system-starter-circuit'
 
-/** A historical ID prefix is recognized until it is explicitly classified on migration. */
+/** Permanent system ownership rules. Legacy classification is in the removable migration. */
 export function isSeededTrack(track: {
   readonly id: string
   readonly origin?: 'imported' | 'seeded' | 'local'
   readonly creator?: TrackCreator
 }): boolean {
-  if (track.origin === 'seeded' || track.creator?.id === TRACK_FORGE_CREATOR.id) return true
-  if (track.origin === 'local' || track.origin === 'imported') return false
-  return track.id === SYSTEM_STARTER_TRACK_ID ||
-    track.id.startsWith('starter-') || track.id.startsWith('official-')
+  return track.origin === 'seeded' || track.creator?.id === TRACK_FORGE_CREATOR.id ||
+    track.id === SYSTEM_STARTER_TRACK_ID || track.id.startsWith('official-')
 }
 
 export function normalizeDisplayName(value: unknown): string | undefined {

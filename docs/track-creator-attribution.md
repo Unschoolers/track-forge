@@ -1,29 +1,42 @@
 # Track creator attribution
 
-Local-first Track Forge currently has **no account authentication**. A player chooses a
-display name (2–24 characters) on first launch and can change it in Options → Profile.
-The profile uses a stable installation-scoped creator ID, not a remote username. No
-global uniqueness or verified ownership is implied.
+Track Forge remains local-first. The display name is an editable profile label,
+not an authenticated account. Each installation gets a stable creator ID.
 
-A track carries optional \`creator: { id, name }\` and optional \`origin: "imported"\`.
-The existing v8 track and export v1 formats remain compatible: normalization accepts
-these two additions and leaves older tracks valid. Imported tracks retain any credited
-creator and are explicitly marked imported even if uncredited; future local nickname
-changes must not claim them. Official tracks use the Track Forge credit.
+## Permanent contracts
 
-On the first nickname selection, old **uncredited, unmarked** library tracks are claimed
-by the local profile. Historical imports were not marked before this release and thus
-cannot be distinguished from local creations. The first-launch dialog explains this
-limitation instead of falsely promising perfect migration. From then on, only tracks
-credited to this installation are renamed.
+- System creator: `{ id: 'trackforge-system', name: 'Track Forge' }`.
+- Built-in starter track: stable ID `system-starter-circuit` on every installation.
+- Official circuits retain their stable `official-*` IDs.
+- Built-in tracks have `origin: 'seeded'` and cannot be shared; editing them
+  forks a new personal copy.
+- Player tracks use `origin: 'local'` and their installation-scoped creator ID.
+- Imported tracks retain their credited author and use `origin: 'imported'`.
+- Editable names change the credits on matching player tracks only. No geometry,
+  timestamps or race revisions change, preserving score/ghost identity.
+- Import/export format versions stay compatible with older files.
 
-The migration does not touch geometry, updatedAt or raceRevision, so score and ghost
-category identity remains stable. The browser repository uses one atomic library write
-for attribution when supported; failed writes do not update the display-name
-preference and are reported so the operation can be retried. A failed preference write
-may leave track credits updated; retries are idempotent.
+## Temporary release migration — intentionally removable
 
-Exports carry creator attribution. A creator ID is **not** proof of ownership and must
-never be used for authorization when online accounts or community uploads are added.
-A future authenticated identity should keep the stable author key server-side and
-resolve display names dynamically rather than trusting imported author IDs.
+**All one-time conversion code lives in**
+`src/migrations/migration_track_creator_v1.ts`.
+`src/main.ts` has one startup import and one invocation. The one-time marker
+`trackforge-creator-migration-v1` is defined **inside that module only**.
+
+On the first load of the upgraded release, the migration:
+1. Assigns a stable local creator ID before asking for a display name.
+2. Identifies original, unchanged legacy starter tracks by their geometry,
+   preserving their existing IDs and crediting them to Track Forge.
+3. Assigns every other uncredited saved track to the local player, including
+   old imports predating attribution.
+4. Writes the library as a single batch and marks migration complete only if
+   it succeeds. Failed writes leave the marker unset so startup retries.
+5. Never runs again after the marker has been written. The subsequent name
+   selection updates the provisional credit of that same ID.
+
+**Removal after the migration window:** delete the migration module, its
+dedicated tests, and the one import plus call in `main.ts`. No permanent model,
+ownership policy, or storage key relies on migration code. Old installed clients
+that skipped the migration window would require a separate compatibility plan.
+
+Creator IDs in track files are attribution, not authenticated ownership.

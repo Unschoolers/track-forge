@@ -28,5 +28,4 @@ export const STORAGE_KEYS = {
   playerIdentity: 'trackforge-player-topper-v1',
   displayName: 'trackforge-player-name-v1',
   creatorId: 'trackforge-creator-id-v1',
-  creatorMigration: 'trackforge-creator-migration-v1',
 } as const

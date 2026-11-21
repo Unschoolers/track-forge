@@ -11,7 +11,8 @@ import { AppController, type Scheduler } from '@/application/appController'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
-import { migrateTrackCreatorCredits } from '@/application/library/trackCreatorMigration'
+// TEMPORARY one-time release migration: delete this import and startup call together.
+import { migrateTrackCreatorCredits } from '@/migrations/migration_track_creator_v1'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
 import { BrowserPreferencesRepository } from '@/infrastructure/storage/preferencesRepository'
 import { BrowserLastRaceRepository } from '@/infrastructure/storage/lastRaceRepository'
@@ -78,8 +79,10 @@ const nearbyTransport = createAndroidNearby()
 const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
   (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
-const creatorMigration = migrateTrackCreatorCredits(storage, trackStore, initialPreferences)
-if (!creatorMigration.ok) console.error('Track creator migration could not be persisted. It will be retried on the next launch.')
+// TEMPORARY one-time migration: safe to remove with its isolated module.
+if (!migrateTrackCreatorCredits(storage, trackStore, initialPreferences).ok) {
+  console.error('Track creator migration could not be persisted. It will be retried on the next launch.')
+}
 const toneSink = new BrowserToneSink()
 const music = new BrowserMusicPlayer<'menu' | TrackEnvironmentId>({
   menu: menuMusic,

@@ -107,7 +107,7 @@ describe('TrackLibraryService', () => {
       creator: { id: 'different-user-id', name: 'Another Racer' },
       origin: 'imported' as const,
     }
-    const { service, trackStore } = setup([legacy, imported, other])
+    const { service, trackStore } = setup([{ ...legacy, creator: { id: 'local-user-123', name: 'Old Name' } }, imported, other])
     const creator = { id: 'local-user-123', name: 'First Name' }
     expect(service.recredit(creator)).toEqual({ ok: true, count: 1 })
     const first = trackStore.find(legacy.id)

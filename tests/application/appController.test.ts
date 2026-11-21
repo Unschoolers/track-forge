@@ -106,7 +106,8 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 
 describe('AppController', () => {
   it('asks for a player name and migrates tracks while preserving results and stable creator identity', () => {
-    const { controller, trackStore, preferencesStore } = setup()
+    const seeded = createStarterTrack(asTrackId('local-legacy'), 1)
+    const { controller, trackStore, preferencesStore } = setup({ ...seeded, creator: { id: 'local-user-123', name: 'Player' } })
     const starter = controller.snapshot().currentTrack
     const id = starter?.id
     const previousRevision = starter?.raceRevision

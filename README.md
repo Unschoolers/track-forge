@@ -25,7 +25,7 @@ Open the URL printed by Vite, normally <http://localhost:5173>.
 
 ## Controls
 
-- First launch: choose a local player display name (2–24 characters); edit it in **Options → Profile**. Your track credits update when the name changes, without changing race records. Uncredited legacy tracks saved on this device are claimed; older imports without provenance cannot be distinguished automatically. New imports retain their original creator credit.
+- First launch: choose a local player display name (2–24 characters); edit it in **Options → Profile**. A one-time startup migration credits existing user tracks to your profile while built-in starter and official tracks remain system-owned and unshareable. Name changes preserve track geometry and race records.
 - Home: choose **Track Editor** or **Race**.
 - Editor: use the tool rail, mouse/touch canvas, undo/redo, and surface buttons.
 - Tap a circuit preview to open Race Setup, then choose a car and race mode.

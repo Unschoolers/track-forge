@@ -1,4 +1,5 @@
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { isSeededTrack } from '@/domain/track/trackCreator'
 import type { AppSnapshot } from '@/application/appState'
 import { courseIdentity, scoreCategoryLabel, timeMedal, nextMedalTarget } from '@/application/race/raceRecords'
 import type { Track, TrackId } from '@/domain/model'
@@ -71,7 +72,7 @@ export function createTrackLibraryModal(
       card.append(copy)
     }
     const controls = element('div', 'track-card-actions')
-    controls.append(shareButton(track, actions))
+    if (!isSeededTrack(track)) controls.append(shareButton(track, actions))
     if (!race) {
       controls.append(
         button('EDIT', `select-edit-${track.id}`, () => actions.selectForEdit(track.id), 'track-mini-button'),
