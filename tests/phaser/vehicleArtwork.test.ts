@@ -5,9 +5,15 @@ import {
   drawVehicleArtworkOnCanvas,
   getVehicleArtwork,
   vehiclePaintColor,
+  VEHICLE_VISUAL_SCALE,
 } from '@/presentation/vehicleArtwork'
 
 describe('distinct car artwork', () => {
+  it('applies a purely visual scale without modifying source geometry', () => {
+    expect(VEHICLE_VISUAL_SCALE).toBe(0.88)
+    expect(getVehicleArtwork('red').body.some(({ x }) => x === 23)).toBe(true)
+  })
+
   it('gives each existing car a unique silhouette without changing its gameplay identity', () => {
     expect(CAR_IDS.map((id) => getVehicleArtwork(id).style))
       .toEqual(['sport', 'muscle', 'rally', 'pickup'])
@@ -17,7 +23,8 @@ describe('distinct car artwork', () => {
       const art = getVehicleArtwork(id)
       expect(art.id).toBe(id)
       expect(art.layers.length).toBeGreaterThan(10)
-      expect(art.layers.filter(({ tone }) => tone === 'rubber')).toHaveLength(4)
+      expect(art.layers.filter(({ tone }) => tone === 'rubber'))
+        .toHaveLength(id === 'yellow' ? 4 : 0)
       expect(art.body.length).toBeGreaterThan(6) // avoid a plain rectangular soapbox
       expect(vehiclePaintColor(id, 'body')).toBe(Number.parseInt(CAR_SPECS[id].color.slice(1), 16))
       expect(getVehicleArtwork(id)).toBe(art) // geometry is never regenerated per frame
