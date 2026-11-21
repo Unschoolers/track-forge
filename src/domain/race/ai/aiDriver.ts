@@ -1,5 +1,5 @@
 import type { RandomSource } from '@/application/ports/random'
-import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
+import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS, ROAD_GEOMETRY, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'
 import {
@@ -205,7 +205,21 @@ export function stepAiVehicle(
     (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
     (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
   ) : 0)
-  const pursuitSamples = Math.max(1, lookAheadSamples + extraSamples)
+  // Predict lateral drift before reaching a road edge. A long lookahead
+  // can steer through the opposite verge while the car is still on asphalt,
+  // especially after a tight corner when its yaw has not settled.
+  const lateralOffset =
+    (vehicle.x - context.nearest.point.x) * context.normal.x +
+    (vehicle.y - context.nearest.point.y) * context.normal.y
+  const lateralVelocity = vehicle.vx * context.normal.x + vehicle.vy * context.normal.y
+  const outwardVelocity = Math.max(0, Math.sign(lateralOffset) * lateralVelocity)
+  const projectedEdge = Math.abs(lateralOffset) + outwardVelocity * 0.24
+  const edgeRisk = context.onRoad
+    ? clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
+    : 1
+  const pursuitSamples = Math.max(3, Math.round(
+    (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
+  ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
     ? ((rawTargetIndex % path.points.length) + path.points.length) % path.points.length
