@@ -83,15 +83,40 @@ export function chunkRaceTerrain(
 	return result
 }
 
+/** A safety gutter lets the camera move between visibility updates without
+ * hiding incoming geometry or recreating thousands of draw commands each frame. */
+export function terrainVisibilityWindow(
+  viewport: WorldBounds,
+  previous?: WorldBounds,
+  margin = 64,
+): WorldBounds | null {
+  if (![viewport.left, viewport.top, viewport.right, viewport.bottom].every(Number.isFinite)) {
+    return viewport
+  }
+  if (previous &&
+      viewport.left >= previous.left && viewport.right <= previous.right &&
+      viewport.top >= previous.top && viewport.bottom <= previous.bottom) {
+    return null
+  }
+  return {
+    left: viewport.left - margin,
+    top: viewport.top - margin,
+    right: viewport.right + margin,
+    bottom: viewport.bottom + margin,
+  }
+}
+
 export function terrainChunkVisible(
-	bounds: WorldBounds,
-	viewport: WorldBounds,
+  bounds: WorldBounds,
+  viewport: WorldBounds,
 ): boolean {
-	return (
-		!Object.values(viewport).every(Number.isFinite) ||
-		(bounds.left <= viewport.right &&
-			bounds.right >= viewport.left &&
-			bounds.top <= viewport.bottom &&
-			bounds.bottom >= viewport.top)
-	)
+  // Avoid a temporary Object.values array for every chunk on every update.
+  return !Number.isFinite(viewport.left) ||
+    !Number.isFinite(viewport.top) ||
+    !Number.isFinite(viewport.right) ||
+    !Number.isFinite(viewport.bottom) ||
+    (bounds.left <= viewport.right &&
+      bounds.right >= viewport.left &&
+      bounds.top <= viewport.bottom &&
+      bounds.bottom >= viewport.top)
 }
