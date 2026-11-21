@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import type { RaceResult } from '@/application/race/raceSession'
 import { asTrackId } from '@/domain/model'
+import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 import { createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { nearbyTrack } from '../fixtures/nearbyRace'
 
@@ -56,7 +57,7 @@ describe('Nearby sharing and rematch controls', () => {
       standings: () => [
         { slot: 0, car: 'blue', identity: { icon: 'star', color: 'cyan' }, name: 'JulienQC', local: false, time: 40, left: false },
         { slot: 1, car: 'red', identity: { icon: 'crown', color: 'gold' }, name: 'Émile', local: true, time: 41, left: false },
-        { slot: 2, car: 'green', identity: { icon: 'flag', color: 'pink' }, local: false, time: null, left: true },
+        { slot: 2, car: 'green', identity: { icon: 'bolt', color: 'pink' }, local: false, time: null, left: true },
       ],
       subscribe: () => () => undefined,
     } as unknown as NearbyRace
@@ -69,6 +70,9 @@ describe('Nearby sharing and rematch controls', () => {
     expect(rows[1]).toContain('Émile (You) · ')
     expect(rows[2]).toContain('Player 3 · ')
     expect(rows[2]).toContain('LEFT')
+    const rivalMarker = view.element.querySelectorAll<HTMLElement>('.scoreboard-row .topper-marker')[2]
+    expect(rivalMarker?.style.color).toBe('#' + TOPPER_COLORS.pink.toString(16))
+    expect(rivalMarker?.querySelector('svg[fill="currentColor"] path')).not.toBeNull()
     view.cleanup()
   })
 
