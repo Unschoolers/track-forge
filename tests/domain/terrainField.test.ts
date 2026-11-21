@@ -8,9 +8,31 @@ import {
   planTerrainPaint,
   planTerrainCellsInBrush,
   terrainCellKey,
+  terrainKindIndex,
+  terrainKindAt,
 } from '@/domain/terrain/terrainField'
 
 describe('terrain field', () => {
+  it('indexes 14K-cell terrain lookups and invalidates the index on a brush edit', () => {
+    const terrain = normalizeTerrain({
+      cells: Array.from({ length: 14_000 }, (_, index) => ({
+        column: (index % 140) - 70,
+        row: Math.floor(index / 140) - 50,
+        kind: index % 2 === 0 ? 'hill' : 'water',
+      })),
+    })
+    const firstIndex = terrainKindIndex(terrain)
+    expect(terrainKindIndex(terrain)).toBe(firstIndex)
+    expect(firstIndex.size).toBe(14_000)
+    expect(terrainKindAt(terrain, { x: -70 * 32 + 16, y: -50 * 32 + 16 })).toBe('hill')
+    expect(terrainKindAt(terrain, { x: -69 * 32 + 16, y: -50 * 32 + 16 })).toBe('water')
+    expect(terrainKindAt(terrain, { x: 50_000, y: 50_000 })).toBeUndefined()
+    const edited = paintTerrain(terrain, [{ column: -70, row: -50 }], 'water')
+    expect(edited).not.toBe(terrain)
+    expect(terrainKindAt(edited, { x: -70 * 32 + 16, y: -50 * 32 + 16 })).toBe('water')
+    expect(terrainKindAt(terrain, { x: -70 * 32 + 16, y: -50 * 32 + 16 })).toBe('hill')
+  })
+
   it('centralizes the fixed grid, elevation, brush, and authored-cell limits', () => {
     expect(WORLD_ELEVATION).toEqual({
       cellSize: 32,
