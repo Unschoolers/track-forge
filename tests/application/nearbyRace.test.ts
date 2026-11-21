@@ -152,7 +152,10 @@ describe('Nearby Arcade', () => {
       }
       // Host waits for its next tick, then broadcasts all four cars once.
       await vi.waitFor(() => expect(host.remotePoses()).toHaveLength(3), { interval: 5 })
-      time += 40
+      time += 1000 / 60
+      host.update(makeCar('blue', 0))
+      expect(network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)).toHaveLength(1)
+      time += 1000 / 60
       host.update(makeCar('blue', 0))
       await vi.waitFor(() => {
         expect(devices.map((device) => device.remotePoses().length)).toEqual([3, 3, 3, 3])
