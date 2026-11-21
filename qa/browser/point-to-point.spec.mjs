@@ -40,10 +40,18 @@ test('persists an open route and displays its ordered finish splits', async ({ p
   const race = () => page.evaluate(() => window.__trackForgeQa?.snapshot().race)
   const expectSplits = async () => {
     await page.evaluate(() => window.__trackForgeQa.advanceRace(16))
-    await expect(results.getByRole('heading', { name: 'SPLITS', exact: true })).toBeVisible({ timeout: 18_000 })
-    for (const gate of ['CHECKPOINT 1', 'CHECKPOINT 2', 'CHECKPOINT 3', 'FINISH']) {
-      await expect(results.getByText(new RegExp(`^${gate} · \\d{2}:\\d{2}\\.\\d{3}$`))).toBeVisible()
+    const openSplits = results.locator('[data-action="open-race-splits"]')
+    await expect(openSplits).toBeVisible({ timeout: 18_000 })
+    await openSplits.click()
+    const details = page.locator('[data-modal="race-splits"]')
+    await expect(details.getByRole('heading', { name: 'RACE SPLITS' })).toBeVisible()
+    const rows = details.locator('.results-splits-detail-row')
+    await expect(rows).toHaveCount(4)
+    for (const [index, gate] of ['CHECKPOINT 1', 'CHECKPOINT 2', 'CHECKPOINT 3', 'FINISH'].entries()) {
+      await expect(rows.nth(index).locator('strong')).toHaveText(gate)
+      await expect(rows.nth(index).locator('span').last()).toHaveText(/^\\d{2}:\\d{2}\\.\\d{3}$/)
     }
+    await details.locator('[data-action="close-race-splits"]').click()
   }
 
   await expect(setup.getByRole('button', { name: 'GHOST RACE', exact: true })).toBeDisabled()
