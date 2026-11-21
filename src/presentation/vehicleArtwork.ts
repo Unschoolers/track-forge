@@ -6,6 +6,9 @@ import type { CarId, Vector2 } from '@/domain/model'
  * These are presentation polygons only: physics, collisions and car ratings
  * remain owned by the race domain.
  */
+/** Purely cosmetic size shared by real races and the setup flyover. */
+export const VEHICLE_VISUAL_SCALE = 0.88
+
 export type VehicleBodyStyle = 'sport' | 'muscle' | 'rally' | 'pickup'
 export type VehiclePaintTone =
   | 'rubber' | 'body' | 'bodyLight' | 'bodyDark' | 'glass'
@@ -149,6 +152,13 @@ function makeArtwork(id: CarId): VehicleArtwork {
   const design = BLUEPRINTS[id]
   const wheel = (x: number, y: number) => part('rubber', rect(x - 3.5, y - 3, x + 3.5, y + 3))
   const [rearWheel, frontWheel] = design.wheelX
+  // Only the pickup has exposed tires; car silhouettes stay clean at mobile zoom.
+  const wheels = id === 'yellow'
+    ? [
+        wheel(rearWheel, -design.wheelY), wheel(rearWheel, design.wheelY),
+        wheel(frontWheel, -design.wheelY), wheel(frontWheel, design.wheelY),
+      ]
+    : []
   return {
     id,
     style: design.style,
@@ -158,8 +168,7 @@ function makeArtwork(id: CarId): VehicleArtwork {
     taillights: design.taillights,
     wheelbase: design.wheelbase,
     layers: [
-      wheel(rearWheel, -design.wheelY), wheel(rearWheel, design.wheelY),
-      wheel(frontWheel, -design.wheelY), wheel(frontWheel, design.wheelY),
+      ...wheels,
       part('bodyDark', design.body, true),
       part('body', design.body),
       ...design.details,
