@@ -4,7 +4,7 @@ import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createHighScores, createStandings } from '@/ui/components/scoreboard'
-import { createModalFrame } from '@/ui/modals/modalFrame'
+import { createModalFrame, type ModalFrame } from '@/ui/modals/modalFrame'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 
 export function createResultsModal(
@@ -60,67 +60,7 @@ export function createResultsModal(
   } else if (!timeTrial) {
     frame.body.append(element('h3', 'results-heading', 'STANDINGS'), createStandings(result.standings, result.rivalsFinishing, playerName))
   }
-  if (result.splits?.length) {
-    const heading = element('div', 'results-splits-heading')
-    heading.append(element('h3', 'results-heading', 'SPLITS'))
-    const viewport = element('div', 'results-splits-viewport')
-    viewport.setAttribute('aria-label', 'Race splits')
-    const rows = result.splits.map(split => {
-      const label = result.routeKind === 'point-to-point' ? (split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`) : `LAP ${split.lap + 1} · ${split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`}`
-      return element('p', 'modal-subtitle results-splits-row', `${label} · ${formatRaceTime(split.time)}`)
-    })
-    viewport.append(...rows)
-    if (rows.length > 2) {
-      const hint = element('span', 'results-splits-hint')
-      heading.append(hint)
-      const reducedMotion = typeof window.matchMedia === 'function' &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      let paused = reducedMotion
-      let rowIndex = 0
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const schedule = (): void => {
-        if (paused) return
-        timer = setTimeout(() => {
-          timer = undefined
-          if (!frame.overlay.isConnected || paused) return
-          rowIndex = (rowIndex + 1) % (rows.length - 1)
-          const firstRow = rows[0]
-          const nextRow = rows[rowIndex]
-          if (firstRow && nextRow) {
-            viewport.style.scrollBehavior = rowIndex === 0 || reducedMotion ? 'auto' : 'smooth'
-            viewport.scrollTop = nextRow.offsetTop - firstRow.offsetTop
-          }
-          schedule()
-        }, 3000)
-      }
-      const updatePauseLabel = (): void => {
-        viewport.setAttribute('aria-pressed', String(paused))
-        viewport.setAttribute('aria-label', paused
-          ? 'Race splits paused. Tap to resume auto-scroll.'
-          : 'Race splits auto-scrolling. Tap to pause.')
-        hint.textContent = paused ? 'PAUSED · TAP TO RESUME' : 'TAP TO PAUSE'
-      }
-      const togglePause = (): void => {
-        paused = !paused
-        if (paused) clearTimeout(timer)
-        else schedule()
-        updatePauseLabel()
-      }
-      viewport.setAttribute('role', 'button')
-      viewport.tabIndex = 0
-      viewport.addEventListener('click', togglePause)
-      viewport.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          togglePause()
-        }
-      })
-      updatePauseLabel()
-      // The modal is attached synchronously after creation. Avoid timers for detached previews.
-      setTimeout(() => { if (frame.overlay.isConnected) schedule() }, 0)
-    }
-    frame.body.append(heading, viewport)
-  }
+  addSplitsDetails(frame, result)
   if (result.scoreSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Race time could not be saved on this device.'))
   }
@@ -185,6 +125,119 @@ export function createResultsModal(
   frame.body.append(secondary)
   frame.footer.append(button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'))
   return frame.overlay
+}
+
+/**
+ * Advanced timing stays out of the results summary. Swap the single dialog's
+ * card instead of stacking dialogs, so focus and Escape remain predictable.
+ */
+function addSplitsDetails(frame: ModalFrame, result: RaceResult): void {
+  const splits = result.splits
+  if (!splits?.length) return
+
+  const summaryCard = frame.overlay.querySelector<HTMLElement>('.modal-card')
+  const details = createModalFrame('RACE SPLITS', result.trackName, undefined, 'results-splits-modal')
+  const detailsCard = details.overlay.querySelector<HTMLElement>('.modal-card')
+  if (!summaryCard || !detailsCard) throw new Error('Race results modal is missing its dialog card')
+
+  const header = element('div', 'results-splits-columns')
+  header.append(
+    element('span', undefined, 'CHECKPOINT'),
+    element('span', undefined, 'SEGMENT'),
+    element('span', undefined, 'ELAPSED'),
+  )
+  const list = element('div', 'results-splits-list')
+  const hint = element('p', 'results-splits-instruction')
+  list.append(...splits.map((split, index) => {
+    const label = result.routeKind === 'point-to-point'
+      ? (split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`)
+      : `LAP ${split.lap + 1} · ${split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`}`
+    const segment = split.time - (splits[index - 1]?.time ?? 0)
+    const row = element('div', 'results-splits-detail-row')
+    row.append(
+      element('strong', undefined, label),
+      element('span', undefined, formatRaceTime(segment)),
+      element('span', undefined, formatRaceTime(split.time)),
+    )
+    return row
+  }))
+  details.body.append(hint, header, list)
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let paused = false
+  let overflowing = false
+  const stop = (): void => { clearTimeout(timer); timer = undefined }
+  const updateHint = (): void => {
+    hint.textContent = !overflowing ? `${splits.length} splits recorded`
+      : paused ? 'PAUSED · TAP TO RESUME' : 'AUTO-SCROLL · TAP TO PAUSE'
+    if (overflowing) {
+      list.setAttribute('role', 'button')
+      list.setAttribute('tabindex', '0')
+      list.setAttribute('aria-pressed', String(paused))
+      list.setAttribute('aria-label', paused ? 'Splits paused. Tap to resume.' : 'Splits auto-scrolling. Tap to pause.')
+    } else {
+      list.removeAttribute('role')
+      list.removeAttribute('tabindex')
+      list.removeAttribute('aria-pressed')
+      list.removeAttribute('aria-label')
+    }
+  }
+  const schedule = (): void => {
+    if (paused || !overflowing) return
+    timer = setTimeout(() => {
+      timer = undefined
+      if (!frame.overlay.isConnected || frame.overlay.firstElementChild !== detailsCard || paused) return
+      const bottom = list.scrollHeight - list.clientHeight
+      const step = list.firstElementChild?.getBoundingClientRect().height || 42
+      list.style.scrollBehavior = list.scrollTop >= bottom - 1 ? 'auto' : 'smooth'
+      list.scrollTop = list.scrollTop >= bottom - 1 ? 0 : Math.min(bottom, list.scrollTop + step)
+      schedule()
+    }, 2700)
+  }
+  const toggle = (): void => {
+    if (!overflowing) return
+    paused = !paused
+    stop()
+    updateHint()
+    schedule()
+  }
+  list.addEventListener('click', toggle)
+  list.addEventListener('keydown', event => {
+    if ((event.key === 'Enter' || event.key === ' ') && overflowing) {
+      event.preventDefault()
+      toggle()
+    }
+  })
+
+  const openButton = button(`VIEW SPLITS · ${splits.length}`, 'open-race-splits', () => {
+    frame.overlay.replaceChildren(detailsCard)
+    frame.overlay.classList.add('results-splits-open')
+    frame.overlay.dataset.modal = 'race-splits'
+    list.scrollTop = 0
+    overflowing = list.scrollHeight > list.clientHeight + 1
+    paused = typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    updateHint()
+    schedule()
+    closeButton.focus()
+  }, 'button results-splits-action')
+  const close = (): void => {
+    stop()
+    frame.overlay.replaceChildren(summaryCard)
+    frame.overlay.classList.remove('results-splits-open')
+    frame.overlay.dataset.modal = 'results'
+    openButton.focus()
+  }
+  const closeButton = button('BACK TO RESULTS', 'close-race-splits', close, 'button button-primary')
+  details.footer.append(closeButton)
+  detailsCard.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    }
+  })
+  frame.body.append(openButton)
 }
 
 /** Hidden on mobile (800 ms hold); right-click and keyboard remain accessible on desktop. */
