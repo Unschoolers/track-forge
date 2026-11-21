@@ -65,6 +65,14 @@
 .results-modal .scoreboard-row span { color: var(--menu-muted); font-variant-numeric: tabular-nums; }
 .results-modal .race-finish-medal { color: #ffc66d; font-family: var(--menu-mono); }
 .results-modal .ghost-save-status { color: #a6e4c7; font: 800 .7rem/1.4 var(--menu-mono); letter-spacing: .08em; }
+.results-modal .race-diagnostics-target { user-select: none; -webkit-user-select: none; touch-action: pan-y; cursor: default; border-radius: .15rem; }
+.results-modal .race-diagnostics-target:focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 3px; }
+.results-modal .race-diagnostics-label { color: var(--menu-muted); font: 700 .66rem/1.4 var(--menu-mono); letter-spacing: .08em; }
+.results-modal .race-diagnostics-panel { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: .3rem 0 1rem; padding: .8rem; border: 1px solid #344554; background: #121d27; }
+.results-modal .race-diagnostics-panel[hidden] { display: none; }
+.results-modal .race-diagnostics-panel .modal-subtitle { flex-basis: 100%; margin: 0; }
+.results-modal .race-diagnostics-panel .button { min-height: 2.7rem; }
+
 .results-modal .results-secondary { padding-top: .8rem; border-top: 1px solid #34414e; }
 @media (max-width: 520px) {
   .track-library-modal .track-preview { height: 4.5rem; }
