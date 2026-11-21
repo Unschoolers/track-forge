@@ -3,11 +3,12 @@ import type { CarId } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
 export const POSE_BYTES = 19
-export const POSE_PERIOD_MS = 50
+export const POSE_PERIOD_MS = 1000 / 30
+export const POSE_FAST_PERIOD_MS = 1000 / 60
 const SCALE = 32
 const TURN = 2 * Math.PI
 
-export const Packet = { Control: 0, Pose: 1, Track: 2 } as const
+export const Packet = { Control: 0, Pose: 1, Track: 2, PoseBatch: 3 } as const
 
 export interface PosePacket {
   readonly slot: number
@@ -50,11 +51,41 @@ export function decodePose(bytes: Uint8Array): PosePacket | null {
   }
 }
 
+/** One host broadcast containing the latest unique slot positions. */
+export function encodePoseBatch(packets: readonly Uint8Array[]): Uint8Array {
+  if (!packets.length || packets.length > 4) throw new RangeError('Invalid nearby pose batch size.')
+  const bytes = new Uint8Array(1 + packets.length * POSE_BYTES)
+  const slots = new Set<number>()
+  bytes[0] = Packet.PoseBatch
+  packets.forEach((packet, index) => {
+    const pose = decodePose(packet)
+    if (!pose || slots.has(pose.slot)) throw new RangeError('Invalid or duplicate nearby pose.')
+    slots.add(pose.slot)
+    bytes.set(packet, 1 + index * POSE_BYTES)
+  })
+  return bytes
+}
+
+export function decodePoseBatch(bytes: Uint8Array): PosePacket[] | null {
+  if (bytes[0] !== Packet.PoseBatch || bytes.length < POSE_BYTES + 1 ||
+      bytes.length > 1 + 4 * POSE_BYTES || (bytes.length - 1) % POSE_BYTES !== 0) return null
+  const packets: PosePacket[] = []
+  const slots = new Set<number>()
+  for (let offset = 1; offset < bytes.length; offset += POSE_BYTES) {
+    const packet = decodePose(bytes.subarray(offset, offset + POSE_BYTES))
+    if (!packet || slots.has(packet.slot)) return null
+    slots.add(packet.slot)
+    packets.push(packet)
+  }
+  return packets
+}
+
 export class RemoteGhost {
   private frames: GhostPose[] = []
   private sequence: number | undefined
   private recovery: number | undefined
   private arrival = 0
+  private estimatedPeriodMs = POSE_PERIOD_MS
 
   constructor(readonly car: CarId) {}
 
@@ -62,10 +93,19 @@ export class RemoteGhost {
     const advance = this.sequence === undefined ? 1 : (packet.sequence - this.sequence) & 0xffff
     if (advance === 0 || advance >= 0x8000) return false
     const last = this.frames.at(-1)
-    // Follow the sender's cadence while allowing slow clock drift. Rebase after stalls.
-    if (!last || now - this.arrival > 500) this.frames = []
+    // Accept 30-60 Hz and packet losses without assuming a fixed send cadence.
+    if (!last || now - this.arrival > 500) {
+      this.frames = []
+      this.estimatedPeriodMs = POSE_PERIOD_MS
+    } else {
+      const observedPeriod = (now - this.arrival) / advance
+      if (observedPeriod >= POSE_FAST_PERIOD_MS * 0.5 && observedPeriod <= 200) {
+        this.estimatedPeriodMs = Math.max(POSE_FAST_PERIOD_MS, Math.min(100,
+          this.estimatedPeriodMs * 0.8 + observedPeriod * 0.2))
+      }
+    }
     const time = this.frames.length && last
-      ? Math.max(now - 75, Math.min(now + 75, last.t + advance * POSE_PERIOD_MS))
+      ? Math.max(now - 75, Math.min(now + 75, last.t + advance * this.estimatedPeriodMs))
       : now
     this.frames.push({
       ...packet.pose, car: this.car, t: last && this.frames.length ? Math.max(last.t + 1, time) : time,
@@ -82,7 +122,28 @@ export class RemoteGhost {
     const last = this.frames.at(-1)
     const first = this.frames[0]
     if (!first || !last || now - this.arrival > 750) return null
-    const target = Math.min(last.t, Math.max(first.t, now - 100))
-    return ghostPoseAt({ car: this.car, frames: this.frames, time: last.t }, target)
+    const target = Math.max(first.t, now - 100)
+    if (target <= last.t) return ghostPoseAt({ car: this.car, frames: this.frames, time: last.t }, target)
+
+    // Brief dead reckoning hides intermittent radio gaps. Never predict across
+    // a recovery/teleport or a road elevation change; cap displacement and time.
+    const previous = this.frames.at(-2)
+    const deltaTime = previous ? last.t - previous.t : 0
+    if (!previous || last.cut || previous.structureRunId !== last.structureRunId || deltaTime < 12) {
+      return { ...last, car: this.car }
+    }
+    const dx = last.x - previous.x
+    const dy = last.y - previous.y
+    const distance = Math.hypot(dx, dy)
+    const fraction = Math.min(120, target - last.t) / deltaTime
+    const bounded = Math.min(fraction, 75 / Math.max(0.001, distance))
+    const turn = Math.atan2(Math.sin(last.angle - previous.angle), Math.cos(last.angle - previous.angle))
+    return {
+      ...last, car: this.car, t: target,
+      x: last.x + dx * bounded,
+      y: last.y + dy * bounded,
+      z: last.z + (last.z - previous.z) * bounded,
+      angle: last.angle + turn * bounded,
+    }
   }
 }
