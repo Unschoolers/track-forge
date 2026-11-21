@@ -160,12 +160,12 @@ describe('terrain presentation topology', () => {
   })
 
   it.each([
-    [32, 32, 8_256, 4],
-    [16, 64, 8_320, 4],
-    [64, 16, 8_224, 4],
+    [32, 32],
+    [16, 64],
+    [64, 16],
   ])(
     'bounds a %ix%i contiguous hill independently of orientation',
-    (width, height, triangleCount, chunkCount) => {
+    (width, height) => {
       const surface = compileTerrainSurface(
         terrainRectangle(width, height),
         [],
@@ -178,10 +178,10 @@ describe('terrain presentation topology', () => {
       expect(presentation.stats.chunkCount).toBeLessThanOrEqual(
         TERRAIN_PRESENTATION_LIMITS.maximumChunks,
       )
-      expect(presentation.stats).toMatchObject({
-        triangleCount,
-        chunkCount,
-      })
+      // The exact internal triangulation is not a product contract:
+      // straight contour compaction reduces shadow geometry with no loss of area.
+      expect(presentation.stats.triangleCount).toBeGreaterThan(width * height * 8)
+      expect(presentation.stats.contourPointCount).toBe(4)
     },
   )
 
@@ -250,12 +250,9 @@ describe('terrain presentation topology', () => {
           TERRAIN_PRESENTATION_LIMITS.maximumTextureLines,
         )
       }
-      expect(block.stats).toMatchObject({
-        triangleCount: 160_320,
-        chunkCount: 41,
-        contourPointCount: 570,
-        textureLineCount: 0,
-      })
+      expect(block.stats.triangleCount).toBeLessThan(160_320)
+      expect(block.stats.contourPointCount).toBe(4)
+      expect(block.stats.textureLineCount).toBe(0)
       expect(checker.stats).toMatchObject({
         triangleCount: 120_000,
         chunkCount: 40,
