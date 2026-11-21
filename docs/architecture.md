@@ -40,7 +40,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 **Track import/save:** untrusted JSON → `domain/track/trackCodec.ts` normalization → validation → `infrastructure/storage/*Repository.ts` → application. The codec handles legacy track representations; do not bypass it with direct casts of incoming JSON. Exports must remain importable.
 
-**Nearby race:** `application/multiplayer/nearbyRace.ts` owns lobby/game protocol; `raceWire.ts` encodes binary pose packets (currently 19 bytes per pose) and `trackTransfer.ts` bounds/chunks gzip track payloads; `infrastructure/multiplayer/androidNearby.ts` adapts Capacitor/native events. Cosmetics are validated separately in `playerIdentity.ts`, not sent on each pose. Any wire change needs compatibility, malformed-packet, out-of-order, disconnect and size-limit tests.
+**Nearby race:** `application/multiplayer/nearbyRace.ts` owns lobby and race state; `controlProtocol.ts` validates bounded reliable JSON messages and spawn assignments; `raceWire.ts` encodes binary pose packets (currently 19 bytes per pose) and `trackTransfer.ts` bounds/chunks gzip track payloads; `infrastructure/multiplayer/androidNearby.ts` adapts Capacitor/native events. Cosmetics are validated separately in `playerIdentity.ts`, not sent on each pose. Any wire change needs compatibility, malformed-packet, out-of-order, disconnect and size-limit tests.
 
 **Startup/Android:** `boot.ts` loads `main.ts` lazily; native Android integrates Capacitor and plugins. Android signing/version identity is a deployment contract; see the repository README and workflow before touching it.
 
