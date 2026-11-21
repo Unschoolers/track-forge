@@ -57,7 +57,3 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 ## When adding a feature
 
 Identify the **owner of the rule**, the **authoritative data structure**, the **ports**, and the **consumer(s)**. Prefer introducing one clear operation at the right level over adding conditionals to `AppController`, `RaceScene`, and the UI simultaneously. If multiple consumers need the same derived geometry, compute it once at the geometry boundary and reuse it.
-
-## Race session subcomponents
-
-`application/race/raceSession.ts` owns monotonic countdown, 60 Hz fixed-step scheduling, ghost lifecycle and snapshot publishing. `application/race/raceResultRecorder.ts` owns category-aware score writing and result/standing construction; `application/race/raceFeedback.ts` owns sound/haptic decisions derived from simulation events. Score writes remain observable, done once per finish, and excluded from Nearby and non-finishing outcomes. No physics or wire changes accompany this extraction.
