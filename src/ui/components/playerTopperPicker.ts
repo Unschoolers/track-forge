@@ -1,6 +1,28 @@
 import { TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity, type TopperColor, type TopperIcon } from '@/application/multiplayer/playerIdentity'
 import { button, element } from '@/ui/dom'
 
+/** Emoji renderers ignore CSS color on Android. Draw the bolt as a tintable icon. */
+function createTopperGlyph(icon: TopperIcon): HTMLElement | SVGSVGElement {
+  if (icon !== 'bolt') return element('span', undefined, TOPPER_ICONS[icon])
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.classList.add('topper-glyph')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('fill', 'currentColor')
+  svg.setAttribute('aria-hidden', 'true')
+  svg.setAttribute('focusable', 'false')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', 'M13.5 1.5 4.5 13h6.5l-1 9.5L20 9h-6.5V1.5z')
+  svg.append(path)
+  return svg
+}
+
+export function createTopperMarker(identity: PlayerIdentity): HTMLSpanElement {
+  const marker = element('span', 'topper-marker')
+  marker.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
+  marker.append(createTopperGlyph(identity.icon))
+  return marker
+}
+
 export function createTopperSelector(
   identity: PlayerIdentity,
   customizing: boolean,
@@ -10,8 +32,7 @@ export function createTopperSelector(
 ): HTMLElement {
   const section = element('section', 'setup-section topper-section')
   const current = element('div', 'topper-current')
-  const marker = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
-  marker.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
+  const marker = createTopperMarker(identity)
   current.append(marker, element('span', 'modal-subtitle', `Your topper · ${identity.icon} / ${identity.color}`))
   if (toggle) current.append(button(customizing ? 'DONE' : 'CHANGE', `${actionPrefix}-customize-topper`, toggle, 'button'))
   section.append(current)
@@ -19,8 +40,9 @@ export function createTopperSelector(
 
   const icons = element('div', 'topper-options')
   for (const icon of Object.keys(TOPPER_ICONS) as TopperIcon[]) {
-    const choice = button(TOPPER_ICONS[icon], `${actionPrefix}-topper-icon-${icon}`,
+    const choice = button('', `${actionPrefix}-topper-icon-${icon}`,
       () => change({ ...identity, icon }), 'button topper-choice')
+    choice.append(createTopperGlyph(icon))
     choice.title = `${icon} topper`
     choice.setAttribute('aria-label', `${icon} topper`)
     choice.setAttribute('aria-pressed', String(icon === identity.icon))
