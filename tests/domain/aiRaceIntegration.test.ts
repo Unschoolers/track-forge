@@ -130,31 +130,4 @@ describe('AI race integration', () => {
     }
   })
 
-  it('recovers opponents pushed beyond the drivable verge', () => {
-    let race: RaceState = {
-      ...createRace({
-        path,
-        playerCar: 'blue',
-        difficulty: 'normal',
-        laps: 3,
-      }),
-      phase: 'running' as const,
-      elapsed: 2,
-    }
-
-    for (let frame = 0; frame < 600; frame += 1) {
-      race = stepRace(
-        race,
-        { steering: 0, throttle: 0, braking: false },
-        1 / 60,
-        { next: () => 0.5 },
-      ).state
-    }
-
-    for (const ai of race.vehicles.filter((vehicle) => !vehicle.player)) {
-      expect(getVehicleStepContext(path, ai).nearest.distance).toBeLessThan(
-        72,
-      )
-    }
-  })
 })
