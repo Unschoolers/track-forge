@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { asTrackId, type Track, type Vector2 } from '@/domain/model'
+import { CAR_IDS, asTrackId, type Track, type Vector2 } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
 import { buildBridgePresentation, getBridgeDeckOcclusion, renderBridgeDeck, type BridgePolygonPrimitive } from '@/phaser/rendering/bridgeRenderer'
@@ -9,7 +9,7 @@ import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
 import { isVehicleAboveStructures, renderVehicles } from '@/phaser/rendering/vehicleRenderer'
-import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
+import { VEHICLE_VISUAL_SCALE, vehiclePaintColor } from '@/presentation/vehicleArtwork'
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
 
@@ -32,6 +32,9 @@ const track: Track = {
 	updatedAt: 1,
 }
 
+// The player's cosmetic topper has its own scale transform; record car paint separately.
+const BODY_PAINT_COLORS = new Set(CAR_IDS.map(car => vehiclePaintColor(car, 'body')))
+
 class Graphics {
 	readonly bodies: { x: number; y: number }[] = []
 	readonly scales: { x: number; y: number }[] = []
@@ -53,12 +56,13 @@ class Graphics {
 	save() {}
 	restore() {}
 	rotateCanvas() {}
-	// A body scales with suspension; cosmetic antenna translations never do.
+	// Scaling is not evidence of a vehicle: the topper scales independently.
 	scaleCanvas(x: number, y: number) {
-    this.bodies.push({ ...this.position })
-    this.scales.push({ x, y })
-  }
-	fillStyle() {}
+		this.scales.push({ x, y })
+	}
+	fillStyle(color: number) {
+		if (BODY_PAINT_COLORS.has(color)) this.bodies.push({ ...this.position })
+	}
 	beginPath() {}
 	moveTo() {}
 	lineTo() {}
