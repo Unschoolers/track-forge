@@ -153,7 +153,7 @@ export function buildLampLights(
     center: post.roadAnchor,
     fixture: post.position,
     radius: post.bridge ? 54 : 46,
-    intensity: post.bridge ? 0.2 : 0.17,
+    intensity: post.bridge ? 0.14 : 0.12,
     bridge: post.bridge,
   }))
   lightCache.set(posts, lights)
