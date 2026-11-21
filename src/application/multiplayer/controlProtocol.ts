@@ -9,13 +9,15 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 export type Control =
-  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode }
-  | { type: 'ready'; car: CarId; identity: PlayerIdentity }
-  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[] }
-  | { type: 'armed' }
-  | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number }
-  | { type: 'finish'; slot: number; time: number | null }
-  | { type: 'left'; slot: number }
+  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number }
+  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number }
+  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number }
+  | { type: 'armed'; round?: number }
+  | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number; round?: number }
+  | { type: 'finish'; slot: number; time: number | null; round?: number }
+  | { type: 'left'; slot: number; round?: number }
+  | { type: 'share-offer' }
+  | { type: 'share-result'; status: 'saved' | 'declined' }
 
 export function encodeControl(message: Control): Uint8Array {
   const payload = encoder.encode(JSON.stringify(message))
@@ -46,10 +48,18 @@ export function validLineupPositions(
       ? position === null : position !== null && Number.isInteger(position) && position >= 0 && position < active)
 }
 
+function validRound(value: unknown): boolean {
+  return value === undefined || (typeof value === 'number' && Number.isInteger(value) &&
+    value >= 0 && value <= 65_535)
+}
+
 function isControl(value: unknown): value is Control {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const message = value as Record<string, unknown>
+  if (!validRound(message.round)) return false
   switch (message.type) {
+    case 'share-offer': return true
+    case 'share-result': return message.status === 'saved' || message.status === 'declined'
     case 'prepare':
       return typeof message.slot === 'number' && Number.isInteger(message.slot) &&
         message.slot > 0 && message.slot < MAX_PLAYERS &&
