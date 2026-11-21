@@ -1,4 +1,7 @@
-export type AppMode = 'home' | 'editor' | 'race'
+import type { AppMode } from '@/application/appState'
+
+// Keep external type-only consumers source-compatible during the migration.
+export type { AppMode } from '@/application/appState'
 
 export interface SceneHost {
   start(mode: AppMode): void
