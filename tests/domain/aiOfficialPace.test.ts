@@ -1,32 +1,50 @@
+// @vitest-environment node
 import { expect, it } from 'vitest'
-import { CAR_IDS, DIFFICULTY_IDS } from '@/domain/model'
+import { CAR_IDS, type CarId, type DifficultyId } from '@/domain/model'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 
-it('orders comparable official-circuit solo finishes by difficulty', () => {
-  const finishes: Record<string, number[]> = { easy: [], normal: [], hard: [] }
-  for (const { track } of OFFICIAL_CIRCUITS) {
-    const path = prepareLanePath(track)
-    for (const car of CAR_IDS) {
-      for (const difficulty of DIFFICULTY_IDS) {
-        const result = runLaneCheck({ path, trackName: track.name, seed: 1,
-          difficulty, car, mode: 'solo', reversed: false, seconds: 120, laps: 1 })
-        const finish = result.vehicles[0]?.finishedAt
-        expect(finish).not.toBeNull()
-        expect(finish).not.toBeUndefined()
-        if (finish != null) finishes[difficulty]?.push(finish)
-      }
-    }
+// Cover every car on every official course at Hard pace. Exercise all three
+// difficulties on a balanced pair of car specs per course instead of running
+// the entire 6 x 4 x 3 integration matrix for a single global median.
+const courses = OFFICIAL_CIRCUITS.map(({ track }, index) => ({
+  name: track.name,
+  path: prepareLanePath(track),
+  representativeCars: CAR_IDS.filter((_, carIndex) => carIndex % 2 === index % 2),
+}))
+
+function finishTime(
+  course: (typeof courses)[number],
+  car: CarId,
+  difficulty: DifficultyId,
+): number {
+  const run = runLaneCheck({
+    path: course.path,
+    trackName: course.name,
+    seed: 1,
+    difficulty,
+    car,
+    mode: 'solo',
+    reversed: false,
+    seconds: 120,
+    laps: 1,
+  })
+  expect(run.stoppedReason, `${course.name} / ${car} / ${difficulty}`).toBe('finished')
+  const finish = run.vehicles[0]?.finishedAt
+  expect(finish, `${course.name} / ${car} / ${difficulty}`).toBeTypeOf('number')
+  if (finish === null || finish === undefined) throw new Error('Finished race has no finish time')
+  return finish
+}
+
+it.each(courses)('$name: every car finishes at Hard, representative cars keep difficulty order', (course) => {
+  for (const car of CAR_IDS) {
+    const hard = finishTime(course, car, 'hard')
+    if (!course.representativeCars.includes(car)) continue
+
+    const normal = finishTime(course, car, 'normal')
+    const easy = finishTime(course, car, 'easy')
+    expect(normal, `${course.name} / ${car}: Normal should trail Hard`).toBeGreaterThan(hard)
+    expect(easy, `${course.name} / ${car}: Easy should trail Normal`).toBeGreaterThan(normal)
   }
-  const median = (values: number[]) => {
-    const sorted = [...values].sort((a, b) => a - b)
-    const middle = sorted.length / 2
-    return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
-  }
-  expect(finishes.easy).toHaveLength(24)
-  expect(finishes.normal).toHaveLength(24)
-  expect(finishes.hard).toHaveLength(24)
-  expect(median(finishes.easy ?? [])).toBeGreaterThan(median(finishes.normal ?? []))
-  expect(median(finishes.normal ?? [])).toBeGreaterThan(median(finishes.hard ?? []))
 }, 120_000)
