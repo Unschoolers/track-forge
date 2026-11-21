@@ -19,6 +19,8 @@ The host and guests remain connected after a race; the results screen stays open
 3. Guests remain in the results screen until the host prepares the next track. New race scenes and synchronized countdowns replace old results automatically.
 4. **LEAVE** explicitly disconnects: host closes the room for all; a guest disconnects only themselves.
 
+Every new race run (including **RACE AGAIN** on the same track with unchanged lighting) must recreate the Phaser race scene. The scene's create hook reports readiness again, allowing the host to schedule GO only after all rematch participants are armed. Countdown/pose snapshot updates within a run must not recreate the scene.
+
 The first round uses the existing room lock; rematches reuse established peer connections without locking a second time. Each round increments a bounded, validated identifier carried on control messages. Previous-round finishes/ready messages are rejected while preparing or racing again. Existing untagged controls are treated as round zero for compatibility with the first round.
 
 ## Behavior and testing boundaries

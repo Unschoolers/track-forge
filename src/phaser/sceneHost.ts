@@ -19,6 +19,7 @@ export class PhaserSceneHost implements SceneHost {
   private game: Phaser.Game | undefined
   private mode: AppMode = 'home'
   private raceTrackId: string | undefined
+  private raceRunId: number | undefined
   private raceLighting: string | undefined
   private readonly racePreparation = new RacePresentationPreparation()
 
@@ -69,12 +70,16 @@ export class PhaserSceneHost implements SceneHost {
       return
     }
     const trackId = mode === 'race' ? this.controller.snapshot().currentTrack?.id : undefined
-    const lighting = mode === 'race' ? this.raceSession.snapshot().setup?.lighting : undefined
-    const trackChanged = mode === 'race' && (trackId !== this.raceTrackId || lighting !== this.raceLighting)
+    const race = mode === 'race' ? this.raceSession.snapshot() : undefined
+    const lighting = race?.setup?.lighting
+    // A new run of the same circuit needs a fresh scene so Nearby can arm its countdown.
+    const sceneChanged = mode === 'race' && (trackId !== this.raceTrackId ||
+      lighting !== this.raceLighting || race?.runId !== this.raceRunId)
     this.raceLighting = lighting
     this.raceTrackId = trackId
+    this.raceRunId = race?.runId
     if (modeChanged) this.syncScene()
-    else if (trackChanged) {
+    else if (sceneChanged) {
       this.game.scene.stop('RaceScene')
       this.game.scene.start('RaceScene')
     }
