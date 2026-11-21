@@ -18,6 +18,7 @@ import {
   type EditorCommand,
 } from '@/domain/editor/editorState'
 import { DEFAULT_TERRAIN_BRUSH_RADIUS } from '@/domain/config'
+import { gridPositionsForPlayer, randomGridPositions } from '@/domain/race/startGrid'
 import {
   TrackLibraryService,
   type TrackMutationResult,
@@ -114,11 +115,12 @@ export class AppController {
       notice: null,
     }
     dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
-    this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, startsAt }) => {
+    this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, gridSlot, startsAt }) => {
       if (this.state.overlay.type !== 'nearby') return
       this.beforeNearbyTrack = this.state.currentTrack
       dependencies.raceSession.start(track, {
         car, laps, lighting, difficulty: this.state.preferences.difficulty, handling: 'arcade', mode: 'nearby',
+        gridPositions: gridPositionsForPlayer(gridSlot),
       }, startsAt)
       this.update({ ...this.state, mode: 'race', currentTrack: track, paused: false, cup: null, overlay: { type: 'none' }, notice: null })
     })
@@ -582,6 +584,7 @@ export class AppController {
       laps: 1,
       handling: 'arcade',
       mode: 'normal',
+      gridPositions: randomGridPositions(4),
     })
     const { progress, notice } = this.persistCup(cup)
     this.update({ ...this.state, cup, cupProgress: progress, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice })
@@ -627,6 +630,7 @@ export class AppController {
         laps: pointToPoint ? 1 : this.state.preferences.raceLaps ?? 2,
         handling: this.state.preferences.handling ?? 'arcade',
         mode: !pointToPoint && preferredMode === 'time-trial' ? 'normal' : preferredMode,
+        ...(!pointToPoint && preferredMode === 'normal' ? { gridPositions: randomGridPositions(4) } : {}),
         lighting: this.state.overlay.type === 'race-setup' ? this.state.raceLighting ?? track.lighting : track.lighting,
       })
       this.rememberRace()
