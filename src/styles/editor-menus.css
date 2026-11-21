@@ -87,6 +87,9 @@
 .editor-screen .editor-toolbox-summary { width: 9.6rem; }
 .editor-screen .editor-toolbox-summary-copy { color: #b5c3d0; font-size: .58rem; }
 .editor-screen .editor-toolbox-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Author styles must not override the browser's closed-details visibility. */
+.editor-screen .editor-toolbox-drawer:not([open]) > .editor-toolbox-items,
+.editor-screen .editor-view-drawer:not([open]) > .editor-view-items { display: none; }
 .editor-screen .editor-toolbox-items,
 .editor-screen .editor-view-items {
   position: absolute;
