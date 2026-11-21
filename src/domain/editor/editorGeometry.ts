@@ -14,6 +14,7 @@ export const EDITOR_SURFACES = ['street', 'dirt', 'ice', 'mixed'] as const
 export const EDITOR_TOOLS = [
   'draw',
   'select',
+  'insert',
   'start',
   'checkpoint',
   'paint',
@@ -246,6 +247,35 @@ export function nearestSegmentIndex(
     }
   }
   return nearest
+}
+
+/** Insert a control point onto an authored segment without copying its stable ID. */
+export function planPointInsertion(
+  points: readonly TrackPoint[],
+  segmentIndex: number,
+  target: Vector2,
+): { readonly index: number; readonly point: TrackPoint } | null {
+  const start = points[segmentIndex]
+  const end = points[segmentIndex + 1]
+  if (!start || !end) return null
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
+  if (!Number.isFinite(lengthSquared) || lengthSquared <= 1) return null
+  const projection = ((target.x - start.x) * dx + (target.y - start.y) * dy) / lengthSquared
+  // Keep inserted handles away from existing endpoints.
+  const ratio = Math.max(0.1, Math.min(0.9, projection))
+  return {
+    index: segmentIndex + 1,
+    point: {
+      x: start.x + ratio * dx,
+      y: start.y + ratio * dy,
+      surface: start.surface,
+      curve: 'smooth',
+      tension: 0.5,
+      ...(start.structure ? { structure: start.structure } : {}),
+    },
+  }
 }
 
 export function normalizeClosedLoop(

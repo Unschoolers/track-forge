@@ -95,6 +95,7 @@ export class EditorScene extends Phaser.Scene {
   private lastCameraRequest = -1
   private worldRenderPending = false
   private overlayRenderPending = false
+  private lastOverlayZoom = 0
   private previewRenderPending = false
   private compiledTerrainPreviewRevision: number | undefined
   private terrainPreviewImpacts: readonly TerrainPreviewImpact[] = []
@@ -181,6 +182,7 @@ export class EditorScene extends Phaser.Scene {
       viewport: () => this.viewport(),
       onCameraChanged: () => {
         this.applyCamera()
+        if (this.lastOverlayZoom !== this.editorCamera.zoom) this.overlayRenderPending = true
         this.refreshTerrainForCamera()
         this.renderGridPresentation()
       },
@@ -590,7 +592,9 @@ export class EditorScene extends Phaser.Scene {
       geometry,
       snapshot.editorUi.selectedPoint ?? undefined,
       snapshot.editorUi.selectedCrossing,
+      this.editorCamera.zoom,
     )
+    this.lastOverlayZoom = this.editorCamera.zoom
     renderRecoveryCheckpoints(
       this.overlayGraphics, geometry.path,
       resolveRecoveryCheckpoints(geometry.path, snapshot.editor.recoveryCheckpoints),
