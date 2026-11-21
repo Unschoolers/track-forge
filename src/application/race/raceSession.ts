@@ -54,6 +54,8 @@ export interface RaceSetup {
   readonly laps: number
   readonly handling?: 'arcade' | 'simulation'
   readonly mode?: RaceMode
+  /** Fixed for retry. New quick races get a fresh order from the controller. */
+  readonly gridPositions?: readonly number[]
 }
 
 export interface RaceSplit { readonly lap: number; readonly gate: 1 | 2 | 3 | 4; readonly time: number }
@@ -215,6 +217,7 @@ export class RaceSession implements RaceSessionPort {
       startRatio: track.start?.ratio,
       reversed: routeKind === 'point-to-point' ? false : track.start?.reversed,
       routeKind,
+      gridPositions: setup.gridPositions,
       recoveryCheckpoints: track.recoveryCheckpoints,
       recoveryScenery: track,
     })

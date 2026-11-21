@@ -55,7 +55,7 @@ import java.util.Set;
     @Permission(alias = "coarseLocation", strings = {Manifest.permission.ACCESS_COARSE_LOCATION})
 })
 public class NearbyRacePlugin extends Plugin {
-    private static final String SERVICE_ID = "io.trackforge.app.arcade.v3";
+    private static final String SERVICE_ID = "io.trackforge.app.arcade.v4";
     private static final Strategy STRATEGY = Strategy.P2P_STAR;
     private static final int MAX_BYTES = 16_003;
     private final Handler main = new Handler(Looper.getMainLooper());

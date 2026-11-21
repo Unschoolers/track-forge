@@ -1,6 +1,7 @@
 import type { CarId, DifficultyId } from '@/domain/model'
 import type { RaceStanding } from '@/application/race/raceSession'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { randomGridPositions } from '@/domain/race/startGrid'
 
 export const CUP_CIRCUITS = [
   'official-meadow',
@@ -36,6 +37,17 @@ export function cupStandings(cup: CircuitCup): CupDriver[] {
   }
   return [...totals.values()].sort((a, b) => b.points - a.points || a.id.localeCompare(b.id))
 }
+/** A series rewards trailing drivers with front slots; its first grid is random. */
+export function cupGridPositions(cup: CircuitCup, random: () => number = Math.random): number[] {
+  if (!cup.rounds.length) return randomGridPositions(4, random)
+  // Vehicle array order and cup IDs remain stable even as their start pads move.
+  const ids = ['player', 'ai-1', 'ai-2', 'ai-3']
+  const ranked = cupStandings(cup).map((driver) => driver.id)
+  const slowestFirst = [...ranked].reverse()
+  const ordered = [...slowestFirst, ...ids.filter((id) => !ranked.includes(id))]
+  return ids.map((id) => ordered.indexOf(id))
+}
+
 export function advanceCup(cup: CircuitCup): CircuitCup {
   return cup.rounds.length > cup.index && cup.index < CUP_CIRCUITS.length - 1
     ? { ...cup, index: cup.index + 1 } : cup

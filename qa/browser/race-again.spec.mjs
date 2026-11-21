@@ -17,5 +17,14 @@ test('Race Again restores the original night race setup after reload', async ({ 
   await page.reload()
   await enterTrackForge(page)
   await page.getByRole('button', { name: /RACE AGAIN.*Starter Circuit/i }).click()
-  await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup)).toEqual(original)
+  await expect.poll(async () =>
+    page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup),
+  ).toMatchObject({
+    car: original.car, lighting: original.lighting,
+    difficulty: original.difficulty, handling: original.handling,
+    laps: original.laps, mode: original.mode,
+  })
+  // Race Again is a new race (not Retry), so its grid can be reshuffled.
+  const grid = await page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup?.gridPositions)
+  expect([...grid].sort()).toEqual([0, 1, 2, 3])
 })

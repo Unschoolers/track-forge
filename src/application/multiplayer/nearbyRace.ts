@@ -5,6 +5,7 @@ import type { RaceVehicle } from '@/domain/race/raceState'
 import { decodePose, decodePoseBatch, encodePose, encodePoseBatch, Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, RemoteGhost } from './raceWire'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, isPlayerIdentity, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
+import { randomGridPositions } from '@/domain/race/startGrid'
 
 export type NearbyEvent =
   | { type: 'found'; id: string; name: string }
@@ -33,6 +34,8 @@ interface Course {
 }
 
 export interface NearbyStart extends Course {
+  /** Unique physical start pad assigned by the host. */
+  readonly gridSlot: number
   /** The race scene is staged first; GO is scheduled after every scene is ready. */
   readonly startsAt?: number
 }
@@ -41,7 +44,7 @@ type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiti
 type Control =
   | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode }
   | { type: 'ready'; car: CarId; identity: PlayerIdentity }
-  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[] }
+  | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[] }
   | { type: 'armed' }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number }
   | { type: 'finish'; slot: number; time: number | null }
@@ -65,6 +68,15 @@ function controlBytes(message: Control): Uint8Array {
   return packet
 }
 
+function validLineupPositions(cars: (CarId | null)[], positions: (number | null)[]): boolean {
+  if (!Array.isArray(positions) || positions.length !== MAX_PLAYERS) return false
+  const active = cars.filter((car) => car !== null).length
+  const occupied = positions.filter((slot): slot is number => slot !== null)
+  return occupied.length === active && new Set(occupied).size === active &&
+    positions.every((position, playerSlot) => cars[playerSlot] === null
+      ? position === null : position !== null && Number.isInteger(position) && position >= 0 && position < active)
+}
+
 function readControl(bytes: Uint8Array): Control | null {
   if (bytes.length > 512) return null
   try {
@@ -82,7 +94,8 @@ function readControl(bytes: Uint8Array): Control | null {
           value.cars.every((car) => car === null || CAR_IDS.includes(car)) &&
           Array.isArray(value.identities) && value.identities.length === MAX_PLAYERS &&
           value.identities.every((identity, index) => value.cars[index] === null
-            ? identity === null : isPlayerIdentity(identity)) ? value : null
+            ? identity === null : isPlayerIdentity(identity)) &&
+          validLineupPositions(value.cars, value.positions) ? value : null
       case 'armed':
         return value
       case 'start':
@@ -450,7 +463,7 @@ export class NearbyRace {
       if (this.ready.size === this.guests.size) this.startHost()
     } else if (fromHost && this.phase === 'preparing' && message.type === 'lineup' && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar) {
-      this.stage(this.course, message.cars, message.identities)
+      this.stage(this.course, message.cars, message.identities, message.positions)
     } else if (guestSlot !== undefined && this.phase === 'staging' && message.type === 'armed') {
       if (!this.armed.has(id)) this.armed.set(id, this.now())
       this.scheduleHostCountdown()
@@ -479,11 +492,23 @@ export class NearbyRace {
       cars[slot] = guest.car
       identities[slot] = guest.identity
     }
-    this.stage(this.course, cars, identities)
-    this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities })
+    // Assign one unique spawn pad per connected racer, including the host.
+    // This order is chosen once and sent unchanged to every Android device.
+    const occupied = [0, ...this.guests.values()].sort((a, b) => a - b)
+    const shuffled = randomGridPositions(occupied.length, () =>
+      (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32)
+    const positions: (number | null)[] = [null, null, null, null]
+    occupied.forEach((slot, index) => { positions[slot] = shuffled[index]! })
+    this.stage(this.course, cars, identities, positions)
+    this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions })
   }
 
-  private stage(course: Course, cars: (CarId | null)[], identities: (PlayerIdentity | null)[]): void {
+  private stage(course: Course, cars: (CarId | null)[], identities: (PlayerIdentity | null)[], positions: (number | null)[]): void {
+    const gridSlot = positions[this.slot]
+    if (gridSlot === null || gridSlot === undefined || !validLineupPositions(cars, positions)) {
+      this.fail('The multiplayer starting grid is invalid.')
+      return
+    }
     this.lineup = cars
     cars.forEach((car, slot) => {
       if (car) this.racers.set(slot, {
@@ -492,7 +517,7 @@ export class NearbyRace {
     })
     this.setPhase('staging')
     this.armTimeout('A player did not finish loading the race scene.')
-    this.starts.publish({ ...course })
+    this.starts.publish({ ...course, gridSlot })
   }
 
   private scheduleHostCountdown(): void {
