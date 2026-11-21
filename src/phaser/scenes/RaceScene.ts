@@ -62,8 +62,8 @@ export class RaceScene extends Phaser.Scene {
   private groundRenderer: GroundTextureRenderer | undefined
   private environmentSceneryRenderer: SceneryRenderer | undefined
   private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
-  private terrainVisibilityBounds?: WorldBounds
-  private lightVisibilityBounds?: WorldBounds
+  private terrainVisibilityBounds: WorldBounds | undefined
+  private lightVisibilityBounds: WorldBounds | undefined
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
