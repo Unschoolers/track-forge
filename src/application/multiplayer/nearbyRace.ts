@@ -637,7 +637,6 @@ export class NearbyRace {
     this.sharePacked = null
     this.round = 0
     this.purpose = 'race'
-    this.role = null
     this.room = null
     this.hostId = null
     this.rooms.clear()
