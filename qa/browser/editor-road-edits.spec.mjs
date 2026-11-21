@@ -147,6 +147,16 @@ test('can drag the same starter control point twice, then tap for point controls
     await touch(pointer, 'touchMove', [contact(1, x + 52, y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
+    const afterFirstDrag = await saved()
+    if (afterFirstDrag[2].x <= control.x + 50) {
+      const original = await page.evaluate(() => window.__trackForgeQa.snapshot().editor.points)
+      const changed = afterFirstDrag.map((point, index) => ({ index, x: point.x, y: point.y }))
+        .filter((point, index) => point.x !== original?.[index]?.x || point.y !== original?.[index]?.y)
+      console.info('Control point drag diagnostics:', JSON.stringify({
+        target: control, observed: afterFirstDrag[2], changed,
+        camera: (await read()).camera,
+      }))
+    }
     await expect.poll(async () => (await saved())[2].x).toBeGreaterThan(control.x + 50)
 
     await touch(pointer, 'touchStart', [contact(1, x + 52, y)])
