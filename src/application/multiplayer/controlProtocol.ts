@@ -17,6 +17,7 @@ export type Control =
   | { type: 'finish'; slot: number; time: number | null; round?: number }
   | { type: 'left'; slot: number; round?: number }
   | { type: 'share-offer' }
+  | { type: 'share-ready' }
   | { type: 'share-result'; status: 'saved' | 'declined' }
 
 export function encodeControl(message: Control): Uint8Array {
@@ -58,7 +59,8 @@ function isControl(value: unknown): value is Control {
   const message = value as Record<string, unknown>
   if (!validRound(message.round)) return false
   switch (message.type) {
-    case 'share-offer': return true
+    case 'share-offer':
+    case 'share-ready': return true
     case 'share-result': return message.status === 'saved' || message.status === 'declined'
     case 'prepare':
       return typeof message.slot === 'number' && Number.isInteger(message.slot) &&
