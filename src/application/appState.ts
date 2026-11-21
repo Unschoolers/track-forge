@@ -9,7 +9,8 @@ import type {
   EditorCommand,
   EditorState,
 } from '@/domain/editor/editorState'
-import type { AppMode } from '@/app/createApplication'
+/** Application navigation state; host adapters consume this instead of owning it. */
+export type AppMode = 'home' | 'editor' | 'race'
 import type { LightingMode, RoadStructure, Track, TrackId } from '@/domain/model'
 import type {
   EditorCommandRejection,
