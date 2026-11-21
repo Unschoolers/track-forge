@@ -23,12 +23,12 @@ export class BrowserCupRepository implements CupStore {
   load(): CupProgress {
     try {
       const data = JSON.parse(this.storage.get(KEY) ?? 'null')
-      if (data?.version !== 1) return { checkpoint: null, bestPlacement: null }
+      if (data?.version !== 1) return { checkpoint: null, bestPlacement: null, lineup: [...DEFAULT_CUP_TRACK_IDS] }
       const bestPlacement = Number.isInteger(data.bestPlacement) &&
         data.bestPlacement >= 1 && data.bestPlacement <= 4 ? data.bestPlacement : null
       return { checkpoint: validCup(data.checkpoint) ? data.checkpoint : null, bestPlacement,
         lineup: validCupLineup(data.lineup) ? [...data.lineup] : [...DEFAULT_CUP_TRACK_IDS] }
-    } catch { return { checkpoint: null, bestPlacement: null } }
+    } catch { return { checkpoint: null, bestPlacement: null, lineup: [...DEFAULT_CUP_TRACK_IDS] } }
   }
   save(progress: CupProgress): boolean { return this.storage.set(KEY, JSON.stringify({ version: 1, ...progress })) }
 }
