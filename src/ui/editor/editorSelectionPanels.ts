@@ -91,7 +91,8 @@ function createPointControl(
   tension.step = '0.05'
   tension.value = String(point.tension ?? 0.5)
   tension.dataset.action = 'point-tension'
-  tension.addEventListener('input', () => {
+  // Commit after the thumb is released: dispatching on input rebuilds the panel mid-drag.
+  tension.addEventListener('change', () => {
     edit({
       type: 'set-point-tension',
       index,
