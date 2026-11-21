@@ -139,7 +139,7 @@ export class RaceScene extends Phaser.Scene {
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
-    if (night) this.nightBeamRenderer = new NightBeamRenderer(this)
+    if (night) this.nightBeamRenderer = new NightBeamRenderer(this, Phaser.BlendModes.ADD)
     this.nightLightGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.nightLight)
