@@ -63,6 +63,8 @@ export class RacePresentationPreparation {
   constructor(
     private readonly schedule = scheduleAfterFrame,
     private readonly now = () => performance.now(),
+    private readonly reportFailure: (error: unknown) => void =
+      error => console.error('Race presentation prewarm failed; normal rendering will continue.', error),
   ) {}
 
   prepare(
@@ -111,9 +113,11 @@ export class RacePresentationPreparation {
             return
           }
         } while (this.now() < deadline)
-      } catch {
-        // A race can still use the regular synchronous preparation path.
+      } catch (error) {
+        // A race can still use regular synchronous rendering, but prewarm
+        // failures must remain visible rather than disappearing silently.
         this.work = undefined
+        this.reportFailure(error)
         return
       }
       this.scheduleSlice()
