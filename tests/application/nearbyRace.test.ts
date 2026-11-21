@@ -216,6 +216,36 @@ describe('Nearby Arcade', () => {
     }
   })
 
+  it.each([2, 3])('assigns distinct contiguous start pads with %i nearby players', async (count) => {
+    const network = new NearbyNetwork()
+    const participants = Array.from({ length: count }, (_, index) => ({
+      name: index ? `guest-${index}` : 'host',
+      device: new NearbyRace(network.endpoint(index ? `guest-${index}` : 'host'), () => true),
+    }))
+    const starts = new Map<string, NearbyStart>()
+    for (const { name, device } of participants) {
+      device.onStart((start) => { starts.set(name, start) })
+    }
+    const host = participants[0]!.device
+    try {
+      host.host({ track, laps: 1, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const { device } of participants.slice(1)) {
+        device.scan('red')
+        await vi.waitFor(() => expect(device.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        device.connect('host')
+        await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
+      }
+      host.start()
+      await vi.waitFor(() => expect(starts.size).toBe(count), { interval: 5 })
+      expect([...starts.values()].map(({ gridSlot }) => gridSlot).sort()).toEqual(
+        Array.from({ length: count }, (_, index) => index),
+      )
+    } finally {
+      for (const { device } of participants) device.destroy()
+    }
+  })
+
   it('runs only local physics and reports results to the room without writing a solo score', () => {
     const nearby = {
       update: vi.fn(),
