@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
