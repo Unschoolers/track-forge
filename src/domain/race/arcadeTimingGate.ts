@@ -22,12 +22,13 @@ function passedCircuitGateByProgress(
   const after = wrap(direction * (currentIndex - startIndex))
   const window = Math.max(2, Math.min(12, Math.floor(count / 16)))
   const progress = wrap(after - before)
+  const startApproach = Math.max(window, Math.floor(count / 8))
   if (progress > window) return false
   const tolerance = Math.min(2, window / 2)
   if (gate === 4) {
     return before > count - window && after > tolerance && after < window
   }
-  return after > count * gate / 4 + tolerance && after < count - window
+  return after > count * gate / 4 + tolerance && after < count - startApproach
 }
 
 export function advanceArcadeTimingGate(
