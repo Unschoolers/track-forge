@@ -151,9 +151,9 @@ export function renderRaceTrackGeometryBase(
   }
   const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
   renderTrackMarkers(graphics, geometry, night)
-  return view => {
-    updateVisibility(view)
-    const viewport = groundViewportBounds(view)
+  return (view, paddedViewport) => {
+    updateVisibility(view, paddedViewport)
+    const viewport = paddedViewport ?? groundViewportBounds(view)
     for (const { graphics, bounds } of batches) {
       const visible = boundsVisible(bounds, viewport)
       if (graphics.visible !== visible) graphics.setVisible(visible)
