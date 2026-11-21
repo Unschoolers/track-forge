@@ -81,7 +81,7 @@ describe('hidden race diagnostics entry', () => {
   })
 
   it('keeps export available for non-record races and via keyboard', () => {
-    const modal = createResultsModal({ ...result, ghostSaved: false, savedGhostTime: undefined }, {
+    const modal = createResultsModal({ ...result, ghostSaved: false }, {
       retry: vi.fn(), edit: vi.fn(), home: vi.fn(), exportRace: vi.fn(),
     })
     document.body.append(modal)
