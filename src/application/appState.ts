@@ -43,7 +43,7 @@ export type AppOverlay =
     }
   | { readonly type: 'player-name' }
   | { readonly type: 'race-setup' }
-  | { readonly type: 'cup' }
+  | { readonly type: 'cup'; readonly returnTo?: 'nearby' }
   | { readonly type: 'nearby'; readonly customize?: boolean }
   | { readonly type: 'editor-menu' }
   | {
