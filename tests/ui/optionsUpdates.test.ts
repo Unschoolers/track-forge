@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppSnapshot } from '@/application/appState'
+import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 
 const native = vi.hoisted(() => ({
   current: vi.fn(),
@@ -139,6 +140,29 @@ describe('native APK installation feedback', () => {
 
 
 describe('single-player topper customization', () => {
+  it('keeps Profile compact and renders a pink bolt rather than a fixed yellow emoji', () => {
+    const modal = createOptionsModal({
+      overlay: { type: 'options', returnTo: 'home' },
+      preferences: {
+        difficulty: 'normal', audioEnabled: true,
+        hapticsEnabled: true, dynamicZoomEnabled: true,
+        playerIdentity: { icon: 'bolt', color: 'pink' },
+      },
+    } as AppSnapshot, {
+      close: vi.fn(), playerName: vi.fn(), preferences: vi.fn(),
+      previewVolume: vi.fn(), setVolume: vi.fn(),
+    })
+    document.body.replaceChildren(modal)
+    modal.querySelector<HTMLButtonElement>('[data-action="options-tab-profile"]')?.click()
+    expect(modal.textContent).not.toContain('Renaming updates your tracks.')
+    const marker = modal.querySelector<HTMLElement>('#options-panel-profile .topper-marker')
+    expect(marker?.style.color).toBe('#' + TOPPER_COLORS.pink.toString(16))
+    expect(marker?.textContent).not.toContain('⚡')
+    expect(marker?.querySelector('svg[fill="currentColor"] path')).not.toBeNull()
+    expect(modal.querySelector('[data-action="options-topper-icon-bolt"] svg[fill="currentColor"] path')).not.toBeNull()
+    expect(modal.querySelector('[data-action="options-topper-icon-bolt"]')?.getAttribute('aria-pressed')).toBe('true')
+  })
+
   it('edits the same remembered topper in Profile without a multiplayer lobby', () => {
     const save = vi.fn()
     const modal = createOptionsModal({
