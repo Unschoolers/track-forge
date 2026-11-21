@@ -232,10 +232,10 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle): void {
     const now = this.now()
+    // Leave two milliseconds of tolerance for a 60 FPS frame clock so the
+    // 30 Hz cadence does not slip to one update every three frames.
     if (this.phase !== 'racing' || this.poseSending ||
-      // A 60 FPS frame clock can land a fraction below the exact 30 Hz boundary.
-    // Leave a small tolerance so two render frames still produce one update.
-    now - this.lastSentAt < this.posePeriodMs - 2) return
+      now - this.lastSentAt < this.posePeriodMs - 2) return
     const ids = this.endpoints()
     if (!ids.length) return
     const pose = encodePose(this.slot, this.sequence++, this.recovery, vehicle)
