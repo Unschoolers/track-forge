@@ -14,7 +14,7 @@ import {
 const RIBBON_QUADS_PER_CHUNK = 128
 const MAX_RIBBON_CHUNKS = 64
 
-export type UpdateRoadRibbonVisibility = (view: GroundViewport) => void
+export type UpdateRoadRibbonVisibility = (view: GroundViewport, paddedViewport?: WorldBounds) => void
 
 export interface RoadRibbonQuad {
   readonly surface: SurfaceId
@@ -149,8 +149,8 @@ export function renderRaceRoadRibbon(
     return { bounds, edge, road }
   })
 
-  return (view) => {
-    const viewport = groundViewportBounds(view)
+  return (view, paddedViewport) => {
+    const viewport = paddedViewport ?? groundViewportBounds(view)
     for (const { bounds, edge, road } of chunks) {
       const visible = boundsVisible(bounds, viewport)
       if (edge.visible === visible) continue
