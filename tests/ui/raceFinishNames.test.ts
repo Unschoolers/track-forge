@@ -102,8 +102,10 @@ describe('player names on finish screens', () => {
       list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
       expect(screen.querySelector('.results-splits-list')).toBeNull()
       expect(screen.querySelector('[data-action="open-race-splits"]')).not.toBeNull()
+      const positionAtClose = list.scrollTop
       screen.remove()
-      expect(vi.getTimerCount()).toBe(0)
+      vi.advanceTimersByTime(8100)
+      expect(list.scrollTop).toBe(positionAtClose)
     } finally {
       vi.useRealTimers()
     }
