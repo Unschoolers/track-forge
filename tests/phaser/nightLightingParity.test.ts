@@ -19,6 +19,8 @@ function graphicsImage() {
     setOrigin: vi.fn().mockReturnThis(),
     setDepth: vi.fn().mockReturnThis(),
     setBlendMode: vi.fn().mockReturnThis(),
+    setAlpha: vi.fn().mockReturnThis(),
+    setScale: vi.fn().mockReturnThis(),
     setPosition: vi.fn().mockReturnThis(),
     setRotation: vi.fn().mockReturnThis(),
     setVisible: vi.fn().mockReturnThis(),
@@ -63,16 +65,26 @@ describe('night preview / gameplay lighting parity', () => {
       }) },
     } as unknown as Phaser.Scene
     const renderer = new NightBeamRenderer(scene, 1)
-    renderer.render([vehicle(20), vehicle(40)])
+    renderer.render([vehicle(20), { ...vehicle(40), angle: Math.PI / 2 }])
     expect(scene.textures.addCanvas).toHaveBeenCalledTimes(1)
     expect(scene.add.image).toHaveBeenCalledTimes(2)
-    expect(images[0]?.setPosition).toHaveBeenCalledWith(20 - NIGHT_HEADLIGHT.sourceX, 0)
-    expect(images[1]?.setPosition).toHaveBeenCalledWith(40 - NIGHT_HEADLIGHT.sourceX, 0)
+    const alpha = images[0]?.setAlpha.mock.calls[0]?.[0] as number | undefined
+    const scale = images[0]?.setScale.mock.calls[0]?.[0] as number | undefined
+    expect(alpha).toBeGreaterThan(0.5)
+    expect(alpha).toBeLessThan(0.75) // prevent additive hotspots without going dark again
+    expect(scale).toBeGreaterThan(0.8)
+    expect(scale).toBeLessThan(0.95)
+    if (scale === undefined) throw new Error('Expected headlight beam scale')
+    expect(images[0]?.setPosition).toHaveBeenCalledWith(20 - NIGHT_HEADLIGHT.sourceX * scale, 0)
+    expect(images[1]?.setPosition).toHaveBeenCalledWith(40, -NIGHT_HEADLIGHT.sourceX * scale)
 
     renderer.render([vehicle(22)])
     expect(scene.add.image).toHaveBeenCalledTimes(2)
-    expect(images[0]?.setPosition).toHaveBeenLastCalledWith(22 - NIGHT_HEADLIGHT.sourceX, 0)
+    expect(images[0]?.setPosition).toHaveBeenLastCalledWith(22 - NIGHT_HEADLIGHT.sourceX * scale, 0)
     expect(images[1]?.setVisible).toHaveBeenLastCalledWith(false)
+    // Tuning is applied when pooled sprites are created, not every frame.
+    expect(images[0]?.setAlpha).toHaveBeenCalledTimes(1)
+    expect(images[0]?.setScale).toHaveBeenCalledTimes(1)
     renderer.destroy()
     expect(images[0]?.destroy).toHaveBeenCalledTimes(1)
     expect(images[1]?.destroy).toHaveBeenCalledTimes(1)

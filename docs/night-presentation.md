@@ -15,6 +15,10 @@ shade darkened these assets **again**, including cars and checkpoints.
 - **No new per-frame gradient, mesh, canvas or texture creation.** Phaser images
   are reused across frames and hidden when a car leaves the visible set. The
   existing lamp culling and path geometry cache remain in place.
+- **Race exposure tuning only.** The flyover's shared headlight bitmap is left
+  unchanged; the race's additive sprites receive reduced alpha and scale once
+  when created, with a scaled source offset to keep the lamps aligned through
+  turns. Small car-fixture and roadside halos are subdued separately.
 - **Physics and data stay unchanged.** No track schema changes or changes to
   AI, collision, controls, multiplayer wire protocol or race timing.
 
