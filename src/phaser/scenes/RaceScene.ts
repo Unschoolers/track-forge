@@ -39,8 +39,8 @@ import {
 } from '@/phaser/rendering/lampPostRenderer'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { buildTerrainPresentation, renderTerrainPrimitives } from '@/phaser/rendering/terrainRenderer'
-import { chunkRaceTerrain, terrainChunkVisible } from '@/phaser/rendering/raceTerrainChunks'
-import { groundViewportBounds } from '@/presentation/environments/groundTexture'
+import { chunkRaceTerrain, terrainChunkVisible, terrainVisibilityWindow } from '@/phaser/rendering/raceTerrainChunks'
+import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
@@ -61,7 +61,9 @@ const EMPTY_SCENERY = [] as const
 export class RaceScene extends Phaser.Scene {
   private groundRenderer: GroundTextureRenderer | undefined
   private environmentSceneryRenderer: SceneryRenderer | undefined
-  private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: ReturnType<typeof groundViewportBounds> }[] = []
+  private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  private terrainVisibilityBounds: WorldBounds | undefined
+  private lightVisibilityBounds: WorldBounds | undefined
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
@@ -328,6 +330,7 @@ export class RaceScene extends Phaser.Scene {
           ),
         ),
         this.lamps,
+        this.lightVisibilityBounds,
       )
     }
     benchmark?.endUpdate()
@@ -349,8 +352,18 @@ export class RaceScene extends Phaser.Scene {
     const environmentId = normalizeTrackEnvironmentId(track.environmentId)
     this.groundRenderer?.render(view, night, environmentId)
     const viewport = groundViewportBounds(view)
-    for (const { graphics, bounds } of this.terrainChunks) {
-      graphics.setVisible(terrainChunkVisible(bounds, viewport))
+    this.lightVisibilityBounds = viewport
+    // Chunk visibility only needs updating when the viewport exits a padded
+    // coverage window; all geometry entering the camera is already visible.
+    if (this.terrainChunks.length) {
+      const next = terrainVisibilityWindow(viewport, this.terrainVisibilityBounds)
+      if (next) {
+        this.terrainVisibilityBounds = next
+        for (const { graphics, bounds } of this.terrainChunks) {
+          const visible = terrainChunkVisible(bounds, next)
+          if (graphics.visible !== visible) graphics.setVisible(visible)
+        }
+      }
     }
     this.updateRoadRibbonVisibility?.(view)
     this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
@@ -391,6 +404,8 @@ export class RaceScene extends Phaser.Scene {
     document.removeEventListener('visibilitychange', this.onVisibility)
     this.lamps = []
     this.terrainChunks = []
+    this.terrainVisibilityBounds = undefined
+    this.lightVisibilityBounds = undefined
     this.groundRenderer = undefined
     this.updateRoadRibbonVisibility = undefined
     this.raceCamera = undefined

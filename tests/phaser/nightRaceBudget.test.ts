@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildLampLights, type LampPost } from '@/phaser/rendering/lampPostRenderer'
+import { renderNightLights } from '@/phaser/rendering/nightRenderer'
+import type Phaser from 'phaser'
 
 function post(bridge: boolean): LampPost {
   return {
@@ -25,4 +27,28 @@ describe('night race lamp caching', () => {
     expect(next).not.toBe(first)
     expect(next[0]?.radius).toBe(54)
   })
+})
+
+it('does not submit night lamp glows that cannot intersect the camera view', () => {
+  const lamps: readonly LampPost[] = [
+    post(false),
+    { ...post(false), position: { x: 9000, y: 9000 }, roadAnchor: { x: 9000, y: 9000 } },
+    { ...post(true), position: { x: 97, y: 40 }, roadAnchor: { x: 97, y: 40 } },
+  ]
+  let circles = 0
+  const graphics = {
+    fillStyle: () => undefined,
+    fillCircle: () => { circles++ },
+  } as unknown as Phaser.GameObjects.Graphics
+  renderNightLights(graphics, [], lamps, { left: -70, top: -60, right: 100, bottom: 120 })
+  expect(circles).toBe(10)
+  circles = 0
+  renderNightLights(graphics, [], lamps, { left: 150, top: -60, right: 200, bottom: 120 })
+  expect(circles).toBe(5)
+  circles = 0
+  renderNightLights(graphics, [], lamps, { left: 300, top: -60, right: 400, bottom: 120 })
+  expect(circles).toBe(0)
+  circles = 0
+  renderNightLights(graphics, [], lamps) // Optional viewport retains previous rendering API.
+  expect(circles).toBe(15)
 })

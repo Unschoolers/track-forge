@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { chunkRaceTerrain } from '@/phaser/rendering/raceTerrainChunks'
+import { chunkRaceTerrain, terrainChunkVisible, terrainVisibilityWindow } from '@/phaser/rendering/raceTerrainChunks'
 
 it('preserves terrain draw order and computes conservative chunk bounds', () => {
 	const triangle = (x: number) =>
@@ -74,4 +74,20 @@ it('keeps chunks visible at the edge of rotated and zoomed camera bounds', async
 			).toBe(false)
 		}
 	}
+})
+
+it('skips culling scans while a moving or rotating camera stays inside its safe window', () => {
+  const visible = { left: -100, top: -100, right: 100, bottom: 100 }
+  const window = terrainVisibilityWindow(visible)
+  expect(window).toEqual({ left: -164, top: -164, right: 164, bottom: 164 })
+  expect(terrainVisibilityWindow({ left: -150, top: -120, right: 110, bottom: 125 }, window!)).toBeNull()
+  const entering = { left: 119, right: 130, top: 30, bottom: 60 }
+  expect(terrainChunkVisible(entering, window!)).toBe(true)
+  const shifted = { left: -90, top: -120, right: 200, bottom: 150 }
+  const expanded = terrainVisibilityWindow(shifted, window!)
+  expect(expanded).toEqual({ left: -154, top: -184, right: 264, bottom: 214 })
+  expect(terrainChunkVisible({ left: 199, right: 208, top: 10, bottom: 20 }, expanded!)).toBe(true)
+  // Invalid viewport bounds preserve the old conservative render-all behavior.
+  expect(terrainChunkVisible({ left: 1000, right: 1010, top: 1000, bottom: 1010 },
+    { left: Number.NaN, top: 0, right: 10, bottom: 10 })).toBe(true)
 })
