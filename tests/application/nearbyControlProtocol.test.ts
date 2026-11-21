@@ -46,6 +46,22 @@ describe('nearby reliable control protocol', () => {
     expect(decodeControl(packet({ type: 'unknown' }))).toBeNull()
   })
 
+  it('bounds optional Nearby Cup metadata without changing legacy race prepares', () => {
+    const base = { type: 'prepare', slot: 1, laps: 2, lighting: 'day' }
+    expect(decodeControl(packet(base))).toEqual(base)
+    const valid = { ...base, cupIndex: 1, cupTotal: 3 }
+    expect(decodeControl(encodeControl(valid as Control))).toEqual(valid)
+    for (const invalid of [
+      { ...base, cupIndex: -1, cupTotal: 3 },
+      { ...base, cupIndex: 3, cupTotal: 3 },
+      { ...base, cupIndex: 0, cupTotal: 0 },
+      { ...base, cupIndex: 0, cupTotal: 13 },
+      { ...base, cupIndex: 0 },
+      { ...base, cupTotal: 4 },
+      { ...base, cupIndex: '1', cupTotal: 4 },
+    ]) expect(decodeControl(packet(invalid))).toBeNull()
+  })
+
   it('rejects duplicate, missing or out-of-range multiplayer spawn assignments', () => {
     const base = { type: 'lineup', cars: ['red', 'green', null, null],
       identities: [identity, identity, null, null], positions: [1, 0, null, null] }
