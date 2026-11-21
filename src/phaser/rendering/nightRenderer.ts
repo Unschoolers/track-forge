@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import type { Vector2 } from '@/domain/model'
+import type { WorldBounds } from '@/presentation/environments/groundTexture'
 import type { VehicleLightTransform } from '@/phaser/rendering/vehicleRenderer'
 import {
   buildLampLights,
@@ -35,8 +36,16 @@ export function renderNightLights(
   graphics: Phaser.GameObjects.Graphics,
   lights: readonly VehicleLightTransform[],
   lamps: readonly LampPost[],
+  visibleBounds?: WorldBounds,
 ): void {
   for (const lamp of buildLampLights(lamps)) {
+    // Lamp glows are static and only need draw commands while near the camera.
+    // The ground viewport already includes an overscan margin for rotation.
+    if (visibleBounds &&
+        (lamp.center.x + lamp.radius < visibleBounds.left ||
+          lamp.center.x - lamp.radius > visibleBounds.right ||
+          lamp.center.y + lamp.radius < visibleBounds.top ||
+          lamp.center.y - lamp.radius > visibleBounds.bottom)) continue
     graphics.fillStyle(0xffd88a, lamp.intensity * 0.14)
     graphics.fillCircle(
       lamp.center.x,
