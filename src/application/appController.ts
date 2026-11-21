@@ -249,7 +249,11 @@ export class AppController {
           this.update({ ...this.state, mode: 'home', raceAgainTrackName: undefined, overlay: { type: 'track-library', purpose: 'race' }, ...this.librarySnapshot(), notice: 'Last race is no longer available. Choose a track.' })
           break
         }
-        this.dependencies.raceSession.start(saved.track, saved.race.setup)
+        this.dependencies.raceSession.start(saved.track, {
+          ...saved.race.setup,
+          ...(saved.race.setup.mode === 'normal' || !saved.race.setup.mode
+            ? { gridPositions: randomGridPositions(4) } : {}),
+        })
         this.rememberRace()
         this.update({
           ...this.state,
