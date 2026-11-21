@@ -138,6 +138,7 @@ test('can drag the same starter control point twice, then tap for point controls
     expect((await read()).camera.zoom).toBeCloseTo(camera.zoom, 4)
     await expect(panel).toHaveCount(0)
     await releaseTouches(pointer)
+    await page.locator('summary.editor-view-summary').click()
     await page.getByRole('button', { name: 'Fit track', exact: true }).click()
     await expect.poll(async () => (await read()).camera).toEqual(camera)
 

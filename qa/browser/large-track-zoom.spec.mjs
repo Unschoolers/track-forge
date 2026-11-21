@@ -132,9 +132,9 @@ test.describe('Rally editor zoom', () => {
   })
 
   test('keeps a pinch active over the editor controls and holds the zoom on release', async ({ page, context }) => {
-    await page.locator('summary.editor-view-summary').click()
-    const fitButton = page.getByRole('button', { name: 'Fit track', exact: true })
-    const bounds = await fitButton.boundingBox()
+    // With the View drawer collapsed, both initial touch points land on the
+    // canvas. The second finger then crosses the visible View control.
+    const bounds = await page.locator('summary.editor-view-summary').boundingBox()
     const x = Math.round(bounds.x + bounds.width / 2)
     const y = Math.round(bounds.y + bounds.height / 2)
     const first = contact(1, x - 190, y)
