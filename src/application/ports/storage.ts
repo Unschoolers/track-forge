@@ -7,6 +7,7 @@ import type {
 } from '@/domain/model'
 import type { CupProgress } from '@/application/race/circuitCup'
 import type { RaceSetup } from '@/application/race/raceSession'
+import type { PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 
 export interface KeyValueStore {
   get(key: string): string | null
@@ -63,6 +64,7 @@ export interface Preferences {
   readonly handling?: HandlingMode
   readonly raceLaps?: 1 | 2 | 3
   readonly raceMode?: 'normal' | 'ghost' | 'time-trial'
+  readonly playerIdentity?: PlayerIdentity
 }
 
 export interface PreferencesStore {
