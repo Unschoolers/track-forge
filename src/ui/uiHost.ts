@@ -17,6 +17,7 @@ import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
 import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
+import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createNameModal } from '@/ui/modals/nameModal'
 import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
@@ -254,8 +255,7 @@ export class DomUiHost implements UiHost {
             race: () => openLibrary('race'),
             nearby: this.runtime.nearby ? () => this.controller.dispatch({ type: 'open-nearby' }) : undefined,
             raceAgain: () => this.controller.dispatch({ type: 'race-again' }),
-            cup: () => this.controller.dispatch({ type: 'start-cup' }),
-            resumeCup: () => this.controller.dispatch({ type: 'resume-cup' }),
+            cup: () => this.controller.dispatch({ type: 'open-cup' }),
             options: () =>
               this.controller.dispatch({
                 type: 'open-options',
@@ -379,6 +379,16 @@ export class DomUiHost implements UiHost {
           selectIdentity: (playerIdentity) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, playerIdentity } }),
         }, state.preferences.playerIdentity, state.overlay.customize)
       }
+      case 'cup':
+        return createCupModal(state, {
+          close,
+          addTrack: () => this.controller.dispatch({ type: 'cup-add-track' }),
+          removeTrack: (index) => this.controller.dispatch({ type: 'cup-remove-track', index }),
+          moveTrack: (index, direction) => this.controller.dispatch({ type: 'cup-move-track', index, direction }),
+          start: () => this.controller.dispatch({ type: 'start-cup' }),
+          resume: () => this.controller.dispatch({ type: 'resume-cup' }),
+          ...(this.runtime.nearby ? { hostNearby: () => this.controller.dispatch({ type: 'host-nearby-cup' }) } : {}),
+        })
       case 'cup-final':
         return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' })) : undefined
       case 'results': {
