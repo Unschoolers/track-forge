@@ -12,6 +12,8 @@ export function createResultsModal(
   actions: {
     readonly retry: () => void
     readonly raceBestGhost?: (() => void) | undefined
+    readonly exportRace?: (() => void) | undefined
+    readonly diagnosticsOpened?: (() => void) | undefined
     readonly changeTrack?: () => void
     readonly edit: () => void
     readonly home: () => void
@@ -66,12 +68,38 @@ export function createResultsModal(
   if (result.ghostSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Replay could not be saved on this device.'))
   }
-  if (result.ghostSaved) {
-    frame.body.append(element('p', 'modal-subtitle ghost-save-status', 'BEST GHOST SAVED'))
-  } else if (result.savedGhostTime !== undefined) {
-    frame.body.append(element('p', 'modal-subtitle', `Best ghost ready: ${formatRaceTime(result.savedGhostTime)}`))
-  } else if (result.ghostSaved === false && !result.ghostSaveFailed) {
-    frame.body.append(element('p', 'modal-subtitle', 'Replay could not be saved on this device.'))
+  const replayStatus = result.ghostSaved
+    ? element('p', 'modal-subtitle ghost-save-status', 'BEST GHOST SAVED')
+    : result.savedGhostTime !== undefined
+      ? element('p', 'modal-subtitle', `Best ghost ready: ${formatRaceTime(result.savedGhostTime)}`)
+      : element('p', 'modal-subtitle race-diagnostics-label', 'RACE DATA READY')
+  if (result.ghostSaved === false && !result.ghostSaveFailed) {
+    frame.body.append(element('p', 'modal-subtitle', 'Best ghost could not be saved on this device.'))
+  }
+  if (actions.exportRace) {
+    const target = element('div', 'race-diagnostics-target')
+    target.dataset.action = 'race-diagnostics'
+    target.setAttribute('role', 'button')
+    target.setAttribute('tabindex', '0')
+    target.setAttribute('aria-label', 'Race diagnostics. Press and hold to open.')
+    target.append(replayStatus)
+    const panel = element('div', 'race-diagnostics-panel')
+    panel.hidden = true
+    panel.append(
+      element('p', 'modal-subtitle', 'ADVANCED · ALL-CAR RACE REPLAY'),
+      element('p', 'modal-subtitle', 'Includes the track, player, rivals and AI telemetry.'),
+      button('EXPORT RACE FILE', 'export-race-diagnostics', actions.exportRace, 'button button-primary'),
+      button('CLOSE', 'close-race-diagnostics', () => { panel.hidden = true }),
+    )
+    const open = (): void => {
+      if (!target.isConnected || !panel.hidden) return
+      panel.hidden = false
+      actions.diagnosticsOpened?.()
+    }
+    bindDiagnosticsHold(target, open)
+    frame.body.append(target, panel)
+  } else {
+    frame.body.append(replayStatus)
   }
   frame.body.append(createHighScores(result.highScores))
   if (cupAction) {
@@ -98,6 +126,44 @@ export function createResultsModal(
   frame.body.append(secondary)
   frame.footer.append(button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'))
   return frame.overlay
+}
+
+/** Hidden on mobile (800 ms hold); right-click and keyboard remain accessible on desktop. */
+function bindDiagnosticsHold(target: HTMLElement, open: () => void): void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let pointerId: number | undefined
+  let startX = 0
+  let startY = 0
+  const cancel = (): void => {
+    clearTimeout(timer)
+    timer = undefined
+    pointerId = undefined
+  }
+  target.addEventListener('pointerdown', event => {
+    if (pointerId !== undefined || event.button !== 0) { cancel(); return }
+    pointerId = event.pointerId
+    startX = event.clientX
+    startY = event.clientY
+    timer = setTimeout(() => {
+      timer = undefined
+      pointerId = undefined
+      open()
+    }, 800)
+  })
+  target.addEventListener('pointermove', event => {
+    if (event.pointerId !== pointerId) return
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > 12) cancel()
+  })
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
+    target.addEventListener(type, cancel)
+  }
+  target.addEventListener('contextmenu', event => { event.preventDefault(); cancel(); open() })
+  target.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      open()
+    }
+  })
 }
 
 function ordinalSuffix(place: number): string {
