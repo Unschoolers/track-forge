@@ -96,8 +96,14 @@ describe('Ghost Race setup', () => {
       playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false, standings: [], highScores: [],
       routeKind: 'point-to-point', splits: [{ lap: 0, gate: 1, time: 15 }, { lap: 0, gate: 4, time: 61 }] }
     const modal = createResultsModal(result, { retry() {}, edit() {}, home() {} })
-    expect(modal.textContent).toContain('CHECKPOINT 1 · 00:15.000')
-    expect(modal.textContent).toContain('FINISH · 01:01.000')
+    document.body.append(modal)
+    expect(modal.querySelectorAll('.results-splits-detail-row')).toHaveLength(0)
+    modal.querySelector<HTMLButtonElement>('[data-action="open-race-splits"]')?.click()
+    const rows = modal.querySelectorAll('.results-splits-detail-row')
+    expect(rows).toHaveLength(2)
+    expect(Array.from(rows.item(0)?.children ?? [], cell => cell.textContent)).toEqual(['CHECKPOINT 1', '00:15.000', '00:15.000'])
+    expect(Array.from(rows.item(1)?.children ?? [], cell => cell.textContent)).toEqual(['FINISH', '00:46.000', '01:01.000'])
+    modal.remove()
   })
 
 })

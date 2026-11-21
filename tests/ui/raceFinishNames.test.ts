@@ -44,4 +44,71 @@ describe('player names on finish screens', () => {
     expect(final.textContent).toContain('1. JulienQC · 10 points')
     expect(final.textContent).not.toContain('You · 10 points')
   })
+  it('keeps advanced splits out of the summary and opens a single full-screen details dialog', () => {
+    const splits = [
+      { lap: 0, gate: 1 as const, time: 8 },
+      { lap: 0, gate: 2 as const, time: 17 },
+      { lap: 0, gate: 3 as const, time: 26 },
+      { lap: 0, gate: 4 as const, time: 42 },
+    ]
+    const screen = createResultsModal({ ...result, splits }, actions)
+    document.body.append(screen)
+    expect(screen.querySelector('.results-splits-detail-row')).toBeNull()
+    const open = screen.querySelector<HTMLButtonElement>('[data-action="open-race-splits"]')
+    expect(open?.textContent).toContain('VIEW SPLITS · 4')
+    open?.click()
+    expect(screen.classList.contains('results-splits-open')).toBe(true)
+    expect(screen.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    expect(screen.querySelectorAll('.results-splits-detail-row')).toHaveLength(4)
+    expect(screen.textContent).toContain('LAP 1 · FINISH')
+    expect(screen.querySelectorAll('.results-splits-detail-row')[1]?.textContent).toContain('00:09.000')
+    screen.querySelector<HTMLButtonElement>('[data-action="close-race-splits"]')?.click()
+    expect(screen.classList.contains('results-splits-open')).toBe(false)
+    expect(screen.querySelector('.results-splits-detail-row')).toBeNull()
+    expect(screen.querySelector('[data-action="retry-race"]')).not.toBeNull()
+    screen.remove()
+  })
+
+  it('auto-scrolls only overflowing splits; tapping pauses and resumes while Escape returns to results', () => {
+    vi.useFakeTimers()
+    try {
+      const splits = Array.from({ length: 12 }, (_, index) => ({
+        lap: Math.floor(index / 4),
+        gate: ((index % 4) + 1) as 1 | 2 | 3 | 4,
+        time: 10 * (index + 1),
+      }))
+      const screen = createResultsModal({ ...result, splits }, actions)
+      document.body.append(screen)
+      screen.querySelector<HTMLButtonElement>('[data-action="open-race-splits"]')?.click()
+      const list = screen.querySelector<HTMLElement>('.results-splits-list')
+      if (!list) throw new Error('Missing splits details list')
+      Object.defineProperties(list, {
+        scrollHeight: { configurable: true, value: 800 },
+        clientHeight: { configurable: true, value: 200 },
+      })
+      screen.querySelector<HTMLButtonElement>('[data-action="close-race-splits"]')?.click()
+      screen.querySelector<HTMLButtonElement>('[data-action="open-race-splits"]')?.click()
+      expect(list.getAttribute('aria-pressed')).toBe('false')
+      vi.advanceTimersByTime(2700)
+      expect(list.scrollTop).toBeGreaterThan(0)
+      list.click()
+      expect(list.getAttribute('aria-pressed')).toBe('true')
+      const frozen = list.scrollTop
+      vi.advanceTimersByTime(8100)
+      expect(list.scrollTop).toBe(frozen)
+      list.click()
+      vi.advanceTimersByTime(2700)
+      expect(list.scrollTop).toBeGreaterThan(frozen)
+      list.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      expect(screen.querySelector('.results-splits-list')).toBeNull()
+      expect(screen.querySelector('[data-action="open-race-splits"]')).not.toBeNull()
+      const positionAtClose = list.scrollTop
+      screen.remove()
+      vi.advanceTimersByTime(8100)
+      expect(list.scrollTop).toBe(positionAtClose)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
 })
