@@ -285,7 +285,8 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
     street: DEFAULT_TERRAIN,
     dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.8, drag: 1.55 },
     ice: { max: 0.95, accel: 0.84, grip: 0.76, brake: 0.78, drag: 1.2 },
-    grass: { max: 0.56, accel: 0.45, grip: 0.62, brake: 0.72, drag: 2.15 },
+    // The pavement specialist pays extra for grass shortcuts; street is unchanged.
+    grass: { max: 0.51, accel: 0.40, grip: 0.57, brake: 0.72, drag: 2.35 },
   },
   green: {
     street: DEFAULT_TERRAIN,
