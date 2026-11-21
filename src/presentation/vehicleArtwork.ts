@@ -34,7 +34,10 @@ function poly(...values: number[]): readonly Vector2[] {
   if (values.length % 2 !== 0) throw new Error('Vehicle polygon requires coordinate pairs')
   const points: Vector2[] = []
   for (let i = 0; i < values.length; i += 2) {
-    points.push({ x: values[i]!, y: values[i + 1]! })
+    const x = values[i]
+    const y = values[i + 1]
+    if (x === undefined || y === undefined) throw new Error('Invalid vehicle polygon coordinate')
+    points.push({ x, y })
   }
   return points
 }
