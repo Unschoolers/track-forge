@@ -14,11 +14,14 @@ function typescriptFiles(directory: string): string[] {
   })
 }
 
-it('keeps race and track domain imports independent of application, UI and adapters', () => {
+/** The application may use domain; domain must depend on neither host nor adapters. */
+it.each(['domain', 'application'] as const)('keeps %s imports within their intended layers', layer => {
   const sourceRoot = resolve('src')
-  const domainRoot = resolve('src/domain')
+  const layerRoot = resolve(sourceRoot, layer)
+  const domainRoot = resolve(sourceRoot, 'domain')
+  const allowedRoots = layer === 'domain' ? [domainRoot] : [domainRoot, layerRoot]
   const violations: string[] = []
-  const files = typescriptFiles(domainRoot)
+  const files = typescriptFiles(layerRoot)
   expect(files.length).toBeGreaterThan(0)
 
   for (const file of files) {
@@ -30,8 +33,8 @@ it('keeps race and track domain imports independent of application, UI and adapt
       const spec = specifier.text
       const target = spec.startsWith('@/') ? resolve(sourceRoot, spec.slice(2))
         : spec.startsWith('.') ? resolve(dirname(file), spec) : null
-      if (target && target.startsWith(sourceRoot + sep) &&
-        target !== domainRoot && !target.startsWith(domainRoot + sep)) {
+      if (!target || !target.startsWith(sourceRoot + sep)) continue
+      if (!allowedRoots.some(root => target === root || target.startsWith(root + sep))) {
         violations.push(`${relative(sourceRoot, file)} imports ${spec}`)
       }
     }
