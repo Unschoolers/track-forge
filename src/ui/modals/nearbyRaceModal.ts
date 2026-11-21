@@ -12,7 +12,7 @@ export function createNearbyRaceModal(
   car: CarId,
   actions: { close: () => void; chooseTrack: () => void; scan: () => void; selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean> },
 ): HTMLElement {
-  const { phase, room, track, players, canStart, rooms, pairing, error } = nearby.snapshot()
+  const { phase, room, track, players, canStart, rooms, error } = nearby.snapshot()
   const frame = createModalFrame('Nearby Race', room ?? 'Arcade · Up to 4 players', actions.close, 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
@@ -49,20 +49,11 @@ export function createNearbyRaceModal(
       frame.body.append(element('p', 'modal-subtitle', 'Waiting for the host to start the race.'))
       break
     case 'preparing':
-      frame.body.append(element('p', 'modal-subtitle', 'Getting the track ready…'))
+      frame.body.append(element('p', 'modal-subtitle', 'Sharing the track with all players…'))
       break
-  }
-  for (const [id, code] of pairing) {
-    const pair = element('section', 'setup-section')
-    pair.append(element('p', 'modal-subtitle', 'Confirm this code matches the other phone.'),
-      element('strong', 'setup-label', code))
-    const choices = element('div', 'choice-row')
-    choices.append(
-      button('MATCHES', `nearby-accept-${id}`, () => nearby.respond(id, true), 'button button-primary'),
-      button('DECLINE', `nearby-decline-${id}`, () => nearby.respond(id, false), 'button'),
-    )
-    pair.append(choices)
-    frame.body.append(pair)
+    case 'staging':
+      frame.body.append(element('p', 'modal-subtitle', 'Loading everyone into the race…'))
+      break
   }
   frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
   frame.footer.append(button('BACK', 'nearby-back', actions.close, 'button'))
