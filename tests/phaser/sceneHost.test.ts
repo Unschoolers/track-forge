@@ -23,7 +23,7 @@ vi.mock('@/phaser/scenes/BootScene', () => ({ BootScene: class {} }))
 vi.mock('@/phaser/scenes/EditorScene', () => ({ EditorScene: class {} }))
 vi.mock('@/phaser/scenes/RaceScene', () => ({ RaceScene: class {} }))
 vi.mock('@/phaser/rendering/racePresentationPreparation', () => ({
-  RacePresentationPreparation: class { cancel() {} },
+  RacePresentationPreparation: class { cancel = vi.fn() },
 }))
 
 import { PhaserSceneHost } from '@/phaser/sceneHost'
