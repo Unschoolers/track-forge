@@ -4,13 +4,14 @@ import type Phaser from 'phaser'
 import { renderGhostVehicle, renderNearbyVehicle, renderPlayerTopper } from '@/phaser/rendering/vehicleRenderer'
 import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 import { CAR_SPECS } from '@/domain/config'
+import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { GhostPose } from '@/application/race/ghostReplay'
 
 function recordingGraphics() {
   const calls: { name: string; args: unknown[] }[] = []
   const graphics: Record<string, (...args: unknown[]) => void> = {}
   for (const name of ['save', 'restore', 'translateCanvas', 'rotateCanvas', 'fillStyle', 'fillEllipse',
-    'fillCircle', 'fillRect', 'lineStyle', 'beginPath', 'moveTo', 'lineTo', 'closePath', 'fillPath', 'strokePath']) {
+    'fillCircle', 'fillRect', 'scaleCanvas', 'lineStyle', 'beginPath', 'moveTo', 'lineTo', 'closePath', 'fillPath', 'strokePath']) {
     graphics[name] = (...args: unknown[]) => { calls.push({ name, args }) }
   }
   return { graphics: graphics as unknown as Phaser.GameObjects.Graphics, calls }
@@ -30,6 +31,9 @@ describe('nearby player topper rendering', () => {
     expect(colors).toContainEqual([Number.parseInt(CAR_SPECS.red.color.slice(1), 16), 1])
     expect(colors).toContainEqual([TOPPER_COLORS.violet, 1])
     expect(calls.some(({ name }) => name === 'lineStyle')).toBe(true)
+    expect(calls).toContainEqual({
+      name: 'scaleCanvas', args: [VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE],
+    })
   })
 
   it('keeps recorded solo ghosts translucent and without a topper', () => {
@@ -39,6 +43,9 @@ describe('nearby player topper rendering', () => {
     expect(colors).toContainEqual([0x99ecff, 0.28])
     expect(colors).not.toContainEqual([TOPPER_COLORS.violet, 1])
     expect(calls.some(({ name }) => name === 'lineStyle')).toBe(false)
+    expect(calls).toContainEqual({
+      name: 'scaleCanvas', args: [VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE],
+    })
   })
 
   it('draws the remembered local topper independently from the car', () => {
@@ -46,5 +53,8 @@ describe('nearby player topper rendering', () => {
     renderPlayerTopper(graphics, pose, { icon: 'ball', color: 'pink' })
     expect(calls.filter(({ name }) => name === 'fillStyle').map(({ args }) => args))
       .toContainEqual([TOPPER_COLORS.pink, 1])
+    expect(calls).toContainEqual({
+      name: 'scaleCanvas', args: [VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE],
+    })
   })
 })
