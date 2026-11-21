@@ -2,7 +2,11 @@
 
 The four vehicles are the same gameplay cars. This is strictly a visual redesign:
 no physics, collision bounds, car ratings, AI, replay format or multiplayer
-protocol changes.
+protocol changes. The shared race and flyover artwork renders at 88% of its
+authored size; lighting anchors, day shadows, toppers, ghosts and deck outlines
+follow that scale, with no changes to camera zoom or collision envelopes.
+Blue, red and green have clean body silhouettes without exposed tires; only
+the yellow pickup exposes its tires.
 
 - `src/presentation/vehicleArtwork.ts` owns the four silhouette and paint-layer
   definitions, palettes and fixture locations. Blue is a low sports coupe, red

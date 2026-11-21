@@ -1,6 +1,6 @@
 import { ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
-import { drawVehicleArtworkOnCanvas } from '@/presentation/vehicleArtwork'
+import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
 import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -114,6 +114,7 @@ export function createRaceFlyoverRenderer(
     ctx.save()
     ctx.translate(position.x - Math.sin(position.angle) * lane, position.y + Math.cos(position.angle) * lane)
     ctx.rotate(position.angle)
+    ctx.scale(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
     if (night) {
       ctx.drawImage(
         getNightHeadlightBeam(),

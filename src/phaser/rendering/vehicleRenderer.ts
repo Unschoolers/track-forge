@@ -8,7 +8,7 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
-import { getVehicleArtwork, vehiclePaintColor, type VehicleArtwork } from '@/presentation/vehicleArtwork'
+import { getVehicleArtwork, vehiclePaintColor, VEHICLE_VISUAL_SCALE, type VehicleArtwork } from '@/presentation/vehicleArtwork'
 
 export type VehicleGeometry = VehicleArtwork
 
@@ -65,8 +65,8 @@ function transform(point: Vector2, pose: Vector2 & { readonly angle: number }): 
   const cosine = Math.cos(pose.angle)
   const sine = Math.sin(pose.angle)
   return {
-    x: pose.x + point.x * cosine - point.y * sine,
-    y: pose.y + point.x * sine + point.y * cosine,
+    x: pose.x + (point.x * cosine - point.y * sine) * VEHICLE_VISUAL_SCALE,
+    y: pose.y + (point.x * sine + point.y * cosine) * VEHICLE_VISUAL_SCALE,
   }
 }
 
@@ -108,8 +108,8 @@ export function projectVehicleShadow(
   return {
     center: projectSunShadow(vehicle, height + 0.8),
     angle: vehicle.angle,
-    width: 15 + geometry.wheelbase * 0.24 + separation * 5,
-    length: geometry.wheelbase * 2 + 13 + separation * 6,
+    width: (15 + geometry.wheelbase * 0.24 + separation * 5) * VEHICLE_VISUAL_SCALE,
+    length: (geometry.wheelbase * 2 + 13 + separation * 6) * VEHICLE_VISUAL_SCALE,
     alpha: Math.max(0.1, 0.34 - separation * 0.19),
   }
 }
@@ -180,8 +180,8 @@ export function renderVehicles(
     graphics.translateCanvas(vehicle.x, vehicle.y)
     graphics.rotateCanvas(vehicle.angle)
     graphics.scaleCanvas(
-      1 + lift - 0.12 * Math.abs(pitch),
-      1 + lift + 0.1 * Math.max(impact * 0.55, compression),
+      (1 + lift - 0.12 * Math.abs(pitch)) * VEHICLE_VISUAL_SCALE,
+      (1 + lift + 0.1 * Math.max(impact * 0.55, compression)) * VEHICLE_VISUAL_SCALE,
     )
     drawVehicleBody(graphics, vehicle.car, vehicle.braking, vehicle.wrecked ? 0.55 : 1)
     graphics.restore()
@@ -197,6 +197,7 @@ export function renderGhostVehicle(
   graphics.save()
   graphics.translateCanvas(ghost.x, ghost.y)
   graphics.rotateCanvas(ghost.angle)
+  graphics.scaleCanvas(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
   graphics.fillStyle(0x99ecff, 0.28)
   fillPolygon(graphics, geometry.body)
   graphics.fillStyle(0xe8fbff, 0.16)
@@ -212,6 +213,7 @@ export function renderNearbyVehicle(
   graphics.save()
   graphics.translateCanvas(pose.x, pose.y)
   graphics.rotateCanvas(pose.angle)
+  graphics.scaleCanvas(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
   graphics.fillStyle(0x050b11, 0.2)
   graphics.fillEllipse(2, 3, 34, 17)
   drawVehicleBody(graphics, pose.car, false)
@@ -269,6 +271,7 @@ export function renderPlayerTopper(
   graphics.save()
   graphics.translateCanvas(pose.x, pose.y)
   graphics.rotateCanvas(pose.angle)
+  graphics.scaleCanvas(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
   drawTopper(graphics, identity)
   graphics.restore()
 }
@@ -281,6 +284,7 @@ export function renderCoveredPlayerOutline(
   graphics.save()
   graphics.translateCanvas(player.x, player.y)
   graphics.rotateCanvas(player.angle)
+  graphics.scaleCanvas(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
   tracePolygon(graphics, getVehicleGeometry(player.car).body)
   graphics.lineStyle(4, 0x101820, 0.85)
   graphics.strokePath()

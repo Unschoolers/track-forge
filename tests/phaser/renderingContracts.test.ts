@@ -18,6 +18,7 @@ import {
 } from '@/domain/terrain/terrainField'
 import { compileTerrainSurface } from '@/domain/terrain/terrainSurface'
 import { WORLD_ELEVATION } from '@/domain/config'
+import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import {
   projectSunShadowOntoTerrain,
   WORLD_LIGHTING,
@@ -67,10 +68,10 @@ describe('race rendering contracts', () => {
     const geometry = getVehicleGeometry('red')
 
     expect(transformed.headlights[0]?.x).toBeCloseTo(
-      100 - (geometry.headlights[0]?.y ?? 0),
+      100 - (geometry.headlights[0]?.y ?? 0) * VEHICLE_VISUAL_SCALE,
     )
     expect(transformed.headlights[0]?.y).toBeCloseTo(
-      50 + (geometry.headlights[0]?.x ?? 0),
+      50 + (geometry.headlights[0]?.x ?? 0) * VEHICLE_VISUAL_SCALE,
     )
     expect(transformed.braking).toBe(true)
   })
@@ -122,6 +123,7 @@ describe('race rendering contracts', () => {
     expect(distance(airborne)).toBeGreaterThan(distance(bridge))
     expect(airborne.alpha).toBeLessThan(ground.alpha)
     expect(airborne.width).toBeGreaterThan(ground.width)
+    expect(ground.width).toBeCloseTo((15 + getVehicleGeometry('blue').wheelbase * 0.24) * VEHICLE_VISUAL_SCALE)
     expect(projectVehicleShadow(vehicle, terrainSurface, true)).toBeNull()
   })
 

@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
-import { asTrackId } from '@/domain/model'
+import { CAR_IDS, asTrackId } from '@/domain/model'
+import { vehiclePaintColor } from '@/presentation/vehicleArtwork'
 import { createRace } from '@/domain/race/raceFactory'
 import type { RaceState } from '@/domain/race/raceState'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -11,6 +12,9 @@ import {
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
 import { RaceScene } from '@/phaser/scenes/RaceScene'
+
+// Only a main body paint pass represents a car; toppers also use scaling transforms.
+const BODY_PAINT_COLORS = new Set(CAR_IDS.map(car => vehiclePaintColor(car, 'body')))
 
 // The real scene and renderers draw into this recording graphics surface.
 class RecordingGraphics {
@@ -36,9 +40,11 @@ class RecordingGraphics {
   save() {}
   restore() {}
   rotateCanvas() {}
-  // Record actual car silhouettes, not additional cosmetic translations.
-  scaleCanvas() { this.positions.push({ ...this.translated }) }
-  fillStyle() {}
+  // A cosmetic topper transform must not count as another vehicle silhouette.
+  scaleCanvas() {}
+  fillStyle(color: number) {
+    if (BODY_PAINT_COLORS.has(color)) this.positions.push({ ...this.translated })
+  }
   beginPath() {}
   moveTo() {}
   lineTo() {}
