@@ -20,7 +20,7 @@ const actions = { retry: vi.fn(), edit: vi.fn(), home: vi.fn() }
 describe('player names on finish screens', () => {
   it('shows the saved name with the player car and keeps live standings named', () => {
     const screen = createResultsModal(result, actions, undefined, null, 'JulienQC')
-    expect(screen.textContent).toContain('DRIVER · JulienQC')
+    expect(screen.textContent).not.toContain('DRIVER · JulienQC')
     const list = screen.querySelector<HTMLElement>('[data-results-standings]')
     expect(list?.querySelector('.scoreboard-row.player strong')?.textContent).toMatch(/^1\. JulienQC · /)
     expect(list?.querySelectorAll('.scoreboard-row')).toHaveLength(2)
@@ -44,6 +44,52 @@ describe('player names on finish screens', () => {
     expect(final.textContent).toContain('1. JulienQC · 10 points')
     expect(final.textContent).not.toContain('You · 10 points')
   })
+  it('celebrates a win once while preserving scores and all navigation without hiding actions in the scroll body', () => {
+    const winning = {
+      ...result,
+      newRecord: true,
+      playerTime: 40.016,
+      standings: [
+        { ...result.standings[0]!, finishTime: 40.016 },
+        { ...result.standings[1]!, finishTime: 41.783 },
+      ],
+      highScores: [{ time: 40.016, car: 'blue' as const, difficulty: 'hard' as const, recordedAt: 10 }],
+    }
+    const screen = createResultsModal(winning, actions, undefined, null, 'JulienQC')
+    const body = screen.querySelector('.modal-body')
+    const footer = screen.querySelector('.modal-footer')
+    const victory = screen.querySelector('.results-celebration')
+    expect(screen.querySelector('.modal-title')?.textContent).toBe('VICTORY!')
+    expect(screen.querySelector('.modal-header .modal-subtitle')?.textContent).toBe('Figure eight')
+    expect(victory?.textContent).toContain('1ST PLACE')
+    expect(victory?.textContent).toContain('GOLD MEDAL')
+    expect(victory?.textContent).toContain('NEW RECORD')
+    expect(screen.querySelector('.race-finish-medal')).toBeNull()
+    expect(screen.querySelector('.results-history')).toBeNull()
+    expect(body?.querySelector('[data-action="results-home"]')).toBeNull()
+    expect(footer?.querySelector('[data-action="results-home"]')).not.toBeNull()
+    expect(footer?.querySelector('[data-action="edit-race-track"]')).not.toBeNull()
+    expect(footer?.querySelector('[data-action="retry-race"]')).not.toBeNull()
+    expect(footer?.querySelector('[data-action="change-track"]')).not.toBeNull()
+  })
+
+  it('keeps additional historical times available in a collapsed disclosure', () => {
+    const screen = createResultsModal({
+      ...result,
+      playerTime: 40,
+      highScores: [
+        { time: 40, car: 'blue', difficulty: 'hard', recordedAt: 10 },
+        { time: 42, car: 'red', difficulty: 'normal', recordedAt: 9 },
+      ],
+    }, actions)
+    const history = screen.querySelector<HTMLDetailsElement>('.results-history')
+    expect(history).not.toBeNull()
+    expect(history?.open).toBe(false)
+    expect(history?.querySelectorAll('.scoreboard-row')).toHaveLength(2)
+    history?.querySelector<HTMLElement>('summary')?.click()
+    expect(history?.open).toBe(true)
+  })
+
   it('keeps advanced splits out of the summary and opens a single full-screen details dialog', () => {
     const splits = [
       { lap: 0, gate: 1 as const, time: 8 },

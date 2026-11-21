@@ -729,7 +729,7 @@ describe('race UI flow', () => {
     expect(root.querySelector('[data-modal="results"]')?.textContent).toContain(
       'NEW RECORD',
     )
-    expect(root.querySelector('[data-result-celebration="victory"]')?.textContent).toContain('CHAMPION')
+    expect(root.querySelector('[data-result-celebration="victory"]')?.textContent).toContain('GOLD MEDAL')
     expect(root.querySelector('[data-result-celebration="victory"]')?.textContent).toContain('NEW RECORD')
     expect(root.querySelector('[data-results-standings]')?.textContent).toContain(
       '01:02.500',
