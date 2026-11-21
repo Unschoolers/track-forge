@@ -92,7 +92,7 @@ export class RaceDiagnosticsRecording {
       if (event.type === 'vehicle-recovered') this.pendingCuts.add(event.vehicleId)
       this.recordEvent(state, event)
     }
-    this.capture(state, input, state.phase === 'finished' || events.some(event => event.type === 'vehicle-recovered'))
+    this.capture(state, input, events.some(event => event.type === 'race-finished' || event.type === 'vehicle-recovered'))
   }
 
   manualReset(state: RaceState, vehicleId: string): void {
