@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import type Phaser from 'phaser'
 import type { WorldBounds } from '@/presentation/environments/groundTexture'
 import type { VehicleLightTransform } from '@/phaser/rendering/vehicleRenderer'
 import { buildLampLights, type LampPost } from '@/phaser/rendering/lampPostRenderer'
@@ -15,7 +15,7 @@ const NIGHT_BEAM_KEY = 'trackforge-headlight-beam-v2'
 export class NightBeamRenderer {
   private readonly beams: Phaser.GameObjects.Image[] = []
 
-  constructor(private readonly scene: Phaser.Scene) {}
+  constructor(private readonly scene: Phaser.Scene, private readonly beamBlendMode: number) {}
 
   render(vehicles: readonly VehicleLightTransform[]): void {
     if (vehicles.length > 0 && !this.scene.textures.exists(NIGHT_BEAM_KEY)) {
@@ -28,7 +28,7 @@ export class NightBeamRenderer {
         beam = this.scene.add.image(0, 0, NIGHT_BEAM_KEY)
           .setOrigin(0, 0.5)
           .setDepth(WORLD_RENDER_DEPTH.nightBeam)
-          .setBlendMode(Phaser.BlendModes.ADD)
+          .setBlendMode(this.beamBlendMode)
         this.beams.push(beam)
       }
       const frontX = (vehicle.headlights[0].x + vehicle.headlights[1].x) / 2
