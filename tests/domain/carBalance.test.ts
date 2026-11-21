@@ -6,6 +6,7 @@ import { createRace } from '@/domain/race/raceFactory'
 import { stepPlayer, stepVehicle } from '@/domain/race/vehiclePhysics'
 import { VEHICLE_TERRAIN_PHYSICS_SPECS } from '@/domain/race/vehiclePhysicsConfig'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
+import type { RaceVehicle } from '@/domain/race/raceState'
 
 const track = createStarterTrack(asTrackId('balance'), 1)
 const path = buildRoadPath(track.points, track.terrain)
@@ -56,7 +57,7 @@ describe('Red grass handling', () => {
   function leavingRoad(car: CarId, handling: 'arcade' | 'simulation'): number {
     const base = createRace({ path, playerCar: car, difficulty: 'normal', laps: 1 }).vehicles[0]
     if (!base) throw new Error('Missing player')
-    let vehicle = {
+    let vehicle: RaceVehicle = {
       ...base, angle: 0, vx: 170, vy: 0, speed: 170,
       currentSurface: 'street' as const, surfaceGrip: 1,
     }
