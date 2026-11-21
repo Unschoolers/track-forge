@@ -17,7 +17,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
                src/domain/ (track, terrain, race, AI, physics, validation)
 ```
 
-**Intended dependency direction:** domain rules should be independent of browser/Phaser/DOM/Android; application orchestrates domain behavior through narrow ports; infrastructure and UI/Phaser implement/adapt ports; `main.ts` wires them together. An observed exception: `src/domain/race/raceEngine.ts` imports `RandomSource` from `src/application/ports/random.ts`. If adjusting this boundary, relocate the abstraction deliberately without changing gameplay behavior.
+**Intended dependency direction:** domain rules are independent of browser/Phaser/DOM/Android; application orchestrates domain behavior through narrow ports; infrastructure and UI/Phaser implement/adapt ports; `main.ts` wires them together. The former `domain/race/raceEngine.ts` → `application/ports/random.ts` inversion was resolved in PR #123: the contract now lives in `domain/race/randomSource.ts` and the production adapter in `infrastructure/random/mathRandom.ts`. The architecture regression test guards against new outward imports.
 
 ## Source ownership
 
@@ -36,7 +36,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 **Editor:** pointer input (`phaser/input/editorInput.ts`) → controller/editor session; editor toolbox chrome is reduced in `application/editor/editorUiReducer.ts` → `domain/editor/editorState.ts` command/history → geometry through `TrackGeometryService` → invalidation-aware render. Command rejection must remain visible; undo/redo must restore geometry and terrain correctly. Camera view should not jump after unrelated editor changes.
 
-**Race:** controller obtains mode/lap/lighting/grid policy from `application/race/raceSetup.ts` → `application/race/raceSession.ts` → `domain/race/raceEngine.ts` fixed-step simulation (`RACE_TICK_SECONDS = 1/60`). The engine coordinates ticks and event ordering; `domain/race/raceVehicleStepper.ts` integrates player and AI movement, `arcadeTimingGate.ts` owns gate crossings and missed-gate grace, and `raceRecovery.ts` owns recovery destinations and manual resets. → typed events/telemetry → Phaser renders state and UI shows race outcomes. AI, player and recovery must share consistent geometry and surface authority. Avoid changing simulation step size just to accelerate tests; drive more ticks without changing the simulated contract. Nearby countdown timing uses an injectable monotonic clock sharing a time base with the Nearby transport; wall-clock timestamps are deliberately separate.
+**Race:** controller obtains mode/lap/lighting/grid policy from `application/race/raceSetup.ts` → `application/race/raceSession.ts` (clock, 60 Hz tick scheduling, ghost lifecycle and snapshot publishing) → `domain/race/raceEngine.ts` (tick orchestration, collision ordering and typed events). The engine delegates vehicle integration to `raceVehicleStepper.ts`, gate crossing/grace to `arcadeTimingGate.ts`, and recovery destinations to `raceRecovery.ts`. Application-level `raceResultRecorder.ts` handles category-aware score writes and standings; `raceFeedback.ts` maps race events to sound/haptic decisions. Phaser renders the snapshot and the UI presents outcomes. All modules share the same geometry authority and preserve the fixed 1/60 s physics step regardless of draw or QA speed. Nearby countdowns use an injectable monotonic clock, separate from wall time.
 
 **Track import/save:** untrusted JSON → `domain/track/trackCodec.ts` normalization → validation → `infrastructure/storage/*Repository.ts` → application. The codec handles legacy track representations; do not bypass it with direct casts of incoming JSON. Exports must remain importable.
 
@@ -57,7 +57,3 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 ## When adding a feature
 
 Identify the **owner of the rule**, the **authoritative data structure**, the **ports**, and the **consumer(s)**. Prefer introducing one clear operation at the right level over adding conditionals to `AppController`, `RaceScene`, and the UI simultaneously. If multiple consumers need the same derived geometry, compute it once at the geometry boundary and reuse it.
-
-## Race session subcomponents
-
-`application/race/raceSession.ts` owns monotonic countdown, 60 Hz fixed-step scheduling, ghost lifecycle and snapshot publishing. `application/race/raceResultRecorder.ts` owns category-aware score writing and result/standing construction; `application/race/raceFeedback.ts` owns sound/haptic decisions derived from simulation events. Score writes remain observable, done once per finish, and excluded from Nearby and non-finishing outcomes. No physics or wire changes accompany this extraction.
