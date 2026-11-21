@@ -1,6 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
-import { courseIdentity, raceCategory, sameCategory } from '@/application/race/raceRecords'
+import { courseIdentity } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
 import type {
@@ -30,10 +30,8 @@ import type {
   RaceOutcome,
   RacePhase,
   RaceState,
-  RaceVehicle,
 } from '@/domain/race/raceState'
 import type { FeedbackPort } from '@/application/ports/feedback'
-import { CAR_SPECS } from '@/domain/config'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import {
   ghostPoseAt,
@@ -44,6 +42,8 @@ import {
 } from '@/application/race/ghostReplay'
 import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
+import { createRaceResult, toRaceStanding } from '@/application/race/raceResultRecorder'
+import { routeRaceFeedback } from '@/application/race/raceFeedback'
 
 export type RaceMode = 'normal' | 'ghost' | 'time-trial' | 'nearby'
 
@@ -387,14 +387,21 @@ export class RaceSession implements RaceSessionPort {
     const terminalEvent = events.find((event) => event.type === 'race-finished')
     const resultState = terminalEvent?.reason === 'water' ? this.withoutPlayerFinish(state) : state
     let result = resultState.phase === 'finished'
-      ? (this.current.result ?? this.createResult(resultState, terminalEvent?.reason))
+      ? (this.current.result ?? createRaceResult({
+        track: this.current.track, setup: this.current.setup, state: resultState,
+        terminalReason: terminalEvent?.reason,
+        scoreStore: this.dependencies.scoreStore,
+        now: this.now,
+        splits: this.timing.accepted,
+        bestGhostTime: this.bestGhost?.time,
+      }))
       : null
     if (nearby) {
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
       if (player && !result) nearby.update(player)
       if (result && !this.current.result) nearby.finish(result.playerTime)
     }
-    if (stepped) this.routeFeedback(resultState, events, input, peakLanding)
+    if (stepped) routeRaceFeedback(this.dependencies.feedback, resultState, events, input, peakLanding)
     if (result && !this.current.result) {
       if (result.outcome === 'finished' && resultState.vehicles.some(isRivalRacing)) {
         this.rivalFinishRemaining = RIVAL_FINISH_SECONDS
@@ -481,7 +488,7 @@ export class RaceSession implements RaceSessionPort {
   ): RaceSessionSnapshot {
     const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind))
     const standings = ranked.map((vehicle, index) =>
-      this.toStanding(vehicle, index),
+      toRaceStanding(vehicle, index),
     )
     const player = ranked.find((vehicle) => vehicle.player)
     const latestSplit = this.timing.accepted.at(-1)
@@ -518,71 +525,6 @@ export class RaceSession implements RaceSessionPort {
     }
   }
 
-  private createResult(
-    state: RaceState,
-    terminalReason?: RaceOutcome,
-  ): RaceResult | null {
-    const track = this.current.track
-    const setup = this.current.setup
-    if (!track || !setup) return null
-    const ranked = rankVehicles(state.vehicles, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind))
-    const player = ranked.find((vehicle) => vehicle.player)
-    if (!player) return null
-    const outcome =
-      terminalReason ??
-      (player.wrecked
-        ? 'wrecked'
-        : player.finishedAt !== null
-          ? 'finished'
-          : null)
-    if (!outcome) return null
-    if (setup.mode === 'nearby') {
-      return {
-        mode: 'nearby', outcome, trackId: track.id, trackName: track.name,
-        playerPlace: 1, playerTime: outcome === 'finished' ? player.finishedAt : null,
-        playerWrecked: player.wrecked, newRecord: false, standings: [], highScores: [],
-      }
-    }
-    const category = raceCategory(track, setup)
-    const comparable = (score: ScoreEntry) => sameCategory(score, category, setup)
-    const oldScores = this.dependencies.scoreStore.forTrack(track.id).filter(comparable)
-    const previousBestTime = oldScores.length ? Math.min(...oldScores.map((score) => score.time)) : undefined
-    const playerTime =
-      outcome === 'finished' ? player.finishedAt : null
-    const recordCandidate =
-      playerTime !== null &&
-      (previousBestTime === undefined || playerTime < previousBestTime)
-    let scoreSaved = true
-    if (playerTime !== null) {
-      scoreSaved = this.dependencies.scoreStore.record(track.id, {
-        time: playerTime,
-        category,
-        car: setup.car,
-        difficulty: setup.difficulty,
-        recordedAt: this.now(),
-      })
-    }
-    return {
-      outcome,
-      mode: setup.mode ?? 'normal',
-      routeKind: normalizeRouteKind(track.routeKind),
-      splits: [...this.timing.accepted],
-      trackId: track.id,
-      trackName: track.name,
-      playerPlace: ranked.indexOf(player) + 1,
-      playerTime,
-      playerWrecked: player.wrecked,
-      newRecord: recordCandidate && scoreSaved,
-      ...(previousBestTime !== undefined ? { previousBestTime } : {}),
-      ...(playerTime !== null && !scoreSaved ? { scoreSaveFailed: true } : {}),
-      standings: ranked.map((vehicle, index) =>
-        this.toStanding(vehicle, index),
-      ),
-      highScores: this.dependencies.scoreStore.forTrack(track.id).filter(comparable),
-      ...(setup.mode === 'ghost' && this.bestGhost ? { ghostTime: this.bestGhost.time } : {}),
-    }
-  }
-
   private withoutPlayerFinish(state: RaceState): RaceState {
     const player = state.vehicles.find((vehicle) => vehicle.player)
     if (player?.finishedAt === null || !player) return state
@@ -591,87 +533,6 @@ export class RaceSession implements RaceSessionPort {
       vehicles: state.vehicles.map((vehicle) =>
         vehicle.player ? { ...vehicle, finishedAt: null } : vehicle,
       ),
-    }
-  }
-
-  private routeFeedback(
-    state: RaceState,
-    events: ReturnType<RaceStep>['events'],
-    input: DriverInput,
-    peakLanding: number,
-  ): void {
-    const player = state.vehicles.find((vehicle) => vehicle.player)
-    if (player) {
-      const speedRatio = Math.min(
-        1,
-        player.speed / CAR_SPECS[player.car].max,
-      )
-      this.dependencies.feedback.handle({
-        type: 'engine',
-        car: player.car,
-        speedRatio,
-        throttle: player.braking ? 0 : input.throttle,
-        cornering: Math.min(1, Math.abs(input.steering)),
-      })
-      this.dependencies.feedback.handle({
-        type: 'surface',
-        surface: player.currentSurface,
-        speedRatio,
-      })
-      this.dependencies.feedback.handle({
-        type: 'tire-slip',
-        strength: player.slip > 8 ? Math.min(1, player.slip / 80) : 0,
-        speedRatio,
-        surface: player.currentSurface,
-      })
-      if (peakLanding > 0.1) {
-        this.dependencies.feedback.handle({ type: 'landing', strength: peakLanding })
-      }
-      const rival = state.vehicles
-        .filter((vehicle) => !vehicle.player && !vehicle.wrecked && vehicle.finishedAt === null)
-        .map((vehicle) => ({ vehicle, distance: Math.hypot(vehicle.x - player.x, vehicle.y - player.y) }))
-        .sort((a, b) => a.distance - b.distance)[0]
-      const dx = (rival?.vehicle.x ?? player.x) - player.x
-      const dy = (rival?.vehicle.y ?? player.y) - player.y
-      this.dependencies.feedback.handle({
-        type: 'rival',
-        proximity: rival ? Math.max(0, 1 - rival.distance / 250) : 0,
-        pan: rival && rival.distance > 0 ? Math.max(-1, Math.min(1, (-Math.sin(player.angle) * dx + Math.cos(player.angle) * dy) / rival.distance)) : 0,
-        speedRatio: rival ? Math.min(1, rival.vehicle.speed / CAR_SPECS[rival.vehicle.car].max) : 0,
-      })
-    }
-    for (const event of events) {
-      if (event.type === 'curb-hit' && event.vehicleId === 'player') {
-        this.dependencies.feedback.handle({
-          type: 'curb',
-          speed: event.speed,
-        })
-      } else if (
-        (event.type === 'collision' &&
-          (event.leftId === 'player' || event.rightId === 'player')) ||
-        (event.type === 'barrier-collision' &&
-          event.vehicleId === 'player')
-      ) {
-        this.dependencies.feedback.handle({
-          type: 'collision',
-          strength: event.strength,
-        })
-      }
-    }
-  }
-
-  private toStanding(
-    vehicle: RaceVehicle,
-    index: number,
-  ): RaceStanding {
-    return {
-      id: vehicle.id,
-      car: vehicle.car,
-      player: vehicle.player,
-      place: index + 1,
-      finishTime: vehicle.finishedAt,
-      wrecked: vehicle.wrecked,
-      lap: vehicle.lap,
     }
   }
 
