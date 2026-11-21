@@ -52,6 +52,10 @@ it('diagnoses Green on the uploaded Roundabout 2-lap Hard arcade race', () => {
       safeEntry: +safeEntrySpeedAhead(path, sample.pathIndex, false, 0.51,
         CAR_SPECS.green, 1.37, 'green', true, true).toFixed(1),
     }))))
+  console.info('ROUNDABOUT_RECOVERIES', JSON.stringify(run.issues
+    .filter(issue => issue.code === 'recovery' || issue.code === 'off-road')
+    .map(issue => ({ car: run.vehicles.find(v => v.vehicleId === issue.vehicleId)?.car,
+      id: issue.vehicleId, t: +issue.time.toFixed(2), section: issue.sectionId, code: issue.code }))))
   console.info('ROUNDABOUT_RESULT', JSON.stringify({
     pathLength: path.totalLength, stoppedReason: run.stoppedReason,
     vehicles: run.vehicles,
