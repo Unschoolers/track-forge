@@ -8,6 +8,8 @@ import { createToggleRow } from '@/ui/components/toggleRow'
 import { createVolumeRow } from '@/ui/components/volumeRow'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
+import { DEFAULT_PLAYER_IDENTITY } from '@/application/multiplayer/playerIdentity'
+import { createTopperSelector } from '@/ui/components/playerTopperPicker'
 
 type DownloadState = { downloadId: number; version: string; downloaded: number; total: number; state: 'pending' | 'downloading' | 'paused' | 'complete' | 'failed' }
 const updates = registerPlugin<{ download(options: { url: string; version: string }): Promise<{ downloadId: number }>; progress(options: { downloadId: number }): Promise<DownloadState>; current(): Promise<DownloadState | { state: 'none' }>; cancel(): Promise<void>; install(): Promise<{ state: 'permission-required' | 'installer-opened' }> }>('TrackForgeUpdates')
@@ -112,7 +114,14 @@ export function createOptionsModal(
       raceLengthRow.append(choice)
     }
     raceLength.append(...(openRoute ? [element('p', 'modal-subtitle', 'Single run · no laps')] : [raceLengthRow]))
-    raceSettings.append(difficulty, raceLength, handling)
+    const topper = createTopperSelector(
+      state.preferences.playerIdentity ?? DEFAULT_PLAYER_IDENTITY,
+      true,
+      undefined,
+      (playerIdentity) => actions.preferences({ ...state.preferences, playerIdentity }),
+      'options',
+    )
+    raceSettings.append(difficulty, raceLength, handling, topper)
     frame.body.append(raceSettings)
     capture('race', raceStart)
   }
