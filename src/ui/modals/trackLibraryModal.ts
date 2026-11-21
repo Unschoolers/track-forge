@@ -61,10 +61,10 @@ export function createTrackLibraryModal(
       `${track.routeKind === 'point-to-point' ? 'POINT TO POINT' : 'CIRCUIT'} · ${validation.ready ? 'RACE READY' : 'NEEDS EDITING'} · BEST ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(track) ? ' · past layout' : ''})` : 'NO TIME'}`,
     )
     copy.append(
+      createTrackPreview(path, track.points[0], track.environmentId),
       element('strong', 'track-card-name', track.name),
       meta,
-      element('span', 'track-card-meta', `MADE BY ${track.creator?.name ?? 'UNKNOWN'}`),
-      createTrackPreview(path, track.points[0], track.environmentId),
+      element('span', 'track-card-meta track-card-creator', `MADE BY ${track.creator?.name ?? 'UNKNOWN'}`),
     )
     if (race) {
       const select = button('', `select-race-${track.id}`, () => actions.selectForRace(track.id), 'track-card-select')
@@ -79,12 +79,12 @@ export function createTrackLibraryModal(
     }
     const controls = element('div', 'track-card-actions')
     if (!choosingNearby && !isSeededTrack(track)) controls.append(shareButton(track, actions))
-    if (!choosingNearby && actions.sendNearby && !isSeededTrack(track)) controls.append(button('NEARBY', `send-nearby-${track.id}`,
-      () => actions.sendNearby?.(track), 'track-mini-button'))
+    if (!choosingNearby && actions.sendNearby && !isSeededTrack(track)) controls.append(iconAction('NEARBY', 'nearby', `send-nearby-${track.id}`,
+      () => actions.sendNearby?.(track)))
     if (!race) {
       controls.append(
-        button('EDIT', `select-edit-${track.id}`, () => actions.selectForEdit(track.id), 'track-mini-button'),
-        button('DELETE', `delete-${track.id}`, () => actions.delete(track), 'track-mini-button danger'),
+        iconAction('EDIT', 'edit', `select-edit-${track.id}`, () => actions.selectForEdit(track.id)),
+        iconAction('DELETE', 'delete', `delete-${track.id}`, () => actions.delete(track), 'danger'),
       )
     }
     card.append(controls)
@@ -107,7 +107,7 @@ export function createTrackLibraryModal(
       const meta = element('span', 'track-card-meta', `${medal ? `${medal.toUpperCase()} MEDAL` : 'NO TIME MEDAL'}${next ? ` · NEXT ${next.tier.toUpperCase()} ${formatRaceTime(next.time)}` : ' · ALL MEDALS EARNED'}`)
       meta.id = `race-track-status-${list.childElementCount}`
       select.setAttribute('aria-describedby', meta.id)
-      copy.append(element('strong', 'track-card-name', track.name), meta, element('span', 'track-card-meta', 'MADE BY TRACK FORGE'), createTrackPreview(geometry.get(track).path, track.points[0], track.environmentId))
+      copy.append(createTrackPreview(geometry.get(track).path, track.points[0], track.environmentId), element('strong', 'track-card-name', track.name), meta, element('span', 'track-card-meta track-card-creator', 'MADE BY TRACK FORGE'))
       select.append(copy)
       card.append(select)
       list.append(card)
@@ -145,9 +145,24 @@ export function createTrackLibraryModal(
 }
 
 function shareButton(track: Track, actions: TrackLibraryActions): HTMLButtonElement {
-  const control = button('', `share-${track.id}`, () => actions.share(track), 'track-share-button')
+  const control = iconAction('SHARE', 'share', `share-${track.id}`, () => actions.share(track))
   control.setAttribute('aria-label', `Share ${track.name}`)
   control.title = `Share ${track.name}`
+  return control
+}
+
+type TrackActionIcon = 'share' | 'nearby' | 'edit' | 'delete'
+const actionPaths: Record<TrackActionIcon, string> = {
+  share: 'M12 16V3 M7 8l5-5 5 5 M5 13v7h14v-7',
+  nearby: 'M5 18v-4 M10 18v-7 M15 18V8 M20 18V5',
+  edit: 'M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7 M16 4l4 4 M9 15l-1 4 4-1 9-9a3 3 0 0 0-4-4l-8 10',
+  delete: 'M4 7h16 M10 4h4 M6 7l1 14h10l1-14 M10 11v6 M14 11v6',
+}
+
+function iconAction(label: string, icon: TrackActionIcon, action: string, invoke: () => void, variant = ''): HTMLButtonElement {
+  const control = button('', action, invoke, `track-mini-button track-icon-action ${variant}`.trim())
+  control.setAttribute('aria-label', label)
+  control.title = label
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('viewBox', '0 0 24 24')
   svg.setAttribute('fill', 'none')
@@ -157,8 +172,8 @@ function shareButton(track: Track, actions: TrackLibraryActions): HTMLButtonElem
   svg.setAttribute('stroke-linejoin', 'round')
   svg.setAttribute('aria-hidden', 'true')
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-  path.setAttribute('d', 'M12 16V3 M7 8l5-5 5 5 M5 13v7h14v-7')
+  path.setAttribute('d', actionPaths[icon])
   svg.append(path)
-  control.append(svg)
+  control.append(svg, element('span', undefined, label))
   return control
 }

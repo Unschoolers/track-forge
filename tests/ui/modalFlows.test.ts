@@ -173,7 +173,10 @@ describe('modal application flows', () => {
     expect(root.querySelectorAll('.track-card svg.track-preview').length).toBeGreaterThan(2)
     const share = root.querySelector<HTMLButtonElement>('[data-action="share-ready"]')
     expect(share?.getAttribute('aria-label')).toBe('Share Starter Circuit')
-    expect(share?.textContent).toBe('')
+    expect(share?.textContent).toBe('SHARE')
+    expect(share?.querySelector('svg path')).not.toBeNull()
+    expect(raceTile?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
+    expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(2)
     expect(raceTile?.contains(share ?? null)).toBe(false)
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')?.getAttribute('data-action')).toBe('select-race-ready')
@@ -192,6 +195,21 @@ describe('modal application flows', () => {
       type: 'select-track-for-race',
       id: ready.id,
     })
+  })
+
+  it('keeps edit, share and delete as distinct labelled icon controls in compact track cards', () => {
+    const { root, port } = setup(state({ type: 'track-library', purpose: 'edit' }))
+    const card = root.querySelector('.track-card')
+    const actions = card?.querySelectorAll<HTMLButtonElement>('.track-icon-action')
+    expect(actions).toHaveLength(3)
+    expect([...actions ?? []].map(action => action.textContent)).toEqual(['SHARE', 'EDIT', 'DELETE'])
+    for (const action of actions ?? []) {
+      expect(action.querySelector('svg path')).not.toBeNull()
+      expect(action.getAttribute('aria-label')).toBeTruthy()
+    }
+    expect(card?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
+    root.querySelector<HTMLButtonElement>('[data-action="select-edit-ready"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: ready.id })
   })
 
   it('shows the selected car and lighting in the race setup flyover', () => {
