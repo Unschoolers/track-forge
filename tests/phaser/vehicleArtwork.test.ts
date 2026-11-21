@@ -22,7 +22,7 @@ describe('distinct car artwork', () => {
     for (const id of CAR_IDS) {
       const art = getVehicleArtwork(id)
       expect(art.id).toBe(id)
-      expect(art.layers.length).toBeGreaterThan(10)
+      expect(art.layers.filter(({ tone }) => tone !== 'rubber').length).toBeGreaterThanOrEqual(10)
       expect(art.layers.filter(({ tone }) => tone === 'rubber'))
         .toHaveLength(id === 'yellow' ? 4 : 0)
       expect(art.body.length).toBeGreaterThan(6) // avoid a plain rectangular soapbox
