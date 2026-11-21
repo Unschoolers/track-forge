@@ -26,7 +26,7 @@ export type OverlayReturn =
   | { readonly type: 'none' }
   | {
       readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
+      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup' | 'cup'
     }
   | { readonly type: 'editor-menu' }
 
@@ -34,7 +34,7 @@ export type AppOverlay =
   | { readonly type: 'none' }
   | {
       readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host'
+      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
     }
   | {
       readonly type: 'track-name'
@@ -133,7 +133,7 @@ export type AppCommand =
   | { readonly type: 'select-track'; readonly id: TrackId }
   | {
       readonly type: 'open-track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host'
+      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
     }
   | { readonly type: 'close-overlay' }
   | { readonly type: 'open-player-name' }
