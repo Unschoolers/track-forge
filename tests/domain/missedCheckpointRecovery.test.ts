@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { createRace } from '@/domain/race/raceFactory'
 import { resetMissedCheckpoint } from '@/domain/race/raceRecovery'
-import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
+import { crossesRoadGate, lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 
@@ -21,6 +21,7 @@ describe('missed timing gate recovery', () => {
     if (!point || !player) throw new Error('Missing checkpoint fixture')
     const before = { ...player, x: point.x, y: point.y + 90, pathIndex: index }
     const after = { ...before, x: before.x + 2 }
+    expect(crossesRoadGate(path, before, after, (path.points.length - 1) / 4, Infinity)).toBe(false)
     const result = advanceArcadeTimingGate(race, before, after, 6, false, () => false)
 
     expect(result.vehicle.nextSector).toBe(1)
@@ -52,6 +53,8 @@ describe('missed timing gate recovery', () => {
 
     const afterGate = atProgress(Math.floor(count / 4) + 5)
     const later = atProgress(Math.floor(count / 4) + 6)
+    const gatePosition = ((race.startPathIndex + (reversed ? -1 : 1) * count / 4) % count + count) % count
+    expect(crossesRoadGate(path, afterGate, later, gatePosition, Infinity, reversed)).toBe(false)
     const missed = advanceArcadeTimingGate(race, afterGate, later, 6, false, () => false)
     expect(missed.vehicle.nextSector).toBe(1)
     expect(missed.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
