@@ -32,8 +32,8 @@ export function createNearbyRaceModal(
       frame.body.append(
         createCarPicker(car, actions.selectCar),
         createTopperSelector(identity, customizing, actions.toggleCustomize, actions.selectIdentity),
-        button('HOST A RACE', 'nearby-choose-track', actions.chooseTrack, 'button'),
-        button('FIND A RACE', 'nearby-scan', actions.scan, 'button button-primary'),
+        button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
+        button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),
         button('RECEIVE TRACK', 'nearby-receive-track', actions.scanTracks, 'button'),
       )
       break
@@ -49,6 +49,8 @@ export function createNearbyRaceModal(
       } else {
         const start = button('START RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
         start.disabled = !canStart
+        if (!canStart) frame.body.append(element('p', 'modal-subtitle',
+          players > 1 ? 'Connecting players…' : 'Waiting for at least one nearby player to join.'))
         frame.footer.append(start)
       }
       break

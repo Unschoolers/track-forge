@@ -21,6 +21,7 @@ import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 import { TERRAIN_LIMITS } from '@/domain/config'
+import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 
 class TrackMemory implements TrackStore {
   readonly tracks = new Map<TrackId, Track>()
@@ -41,7 +42,7 @@ const preferences: Preferences = {
   dynamicZoomEnabled: true,
 }
 
-function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false, cupStore?: CupStore) {
+function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false, cupStore?: CupStore, nearby?: NearbyRace) {
   const trackStore = new TrackMemory()
   trackStore.tracks.set(track.id, track)
   const preferencesStore: PreferencesStore = {
@@ -83,6 +84,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
   }) : raceSession
   const controller = new AppController({
     ...(cupStore ? { cupStore } : {}),
+    ...(nearby ? { nearby } : {}),
     trackStore,
     preferencesStore,
     scoreStore,
@@ -105,6 +107,66 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('hosts only after selecting a race-ready track, never starts a solo race', async () => {
+    const advertise = vi.fn(async (_room: string) => undefined)
+    const transport: NearbyTransport = {
+      subscribe: () => () => undefined, host: advertise,
+      scan: async () => undefined, connect: async () => undefined,
+      respond: async () => undefined, lock: async () => undefined,
+      send: async () => undefined, stop: async () => undefined,
+    }
+    const nearby = new NearbyRace(transport, () => true)
+    const { controller, raceSession } = setup(undefined, false, undefined, nearby)
+    try {
+      controller.dispatch({ type: 'open-nearby' })
+      controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' })
+      expect(controller.snapshot().overlay).toEqual({ type: 'track-library', purpose: 'nearby-host' })
+      controller.dispatch({ type: 'start-race' })
+      expect(raceSession.start).not.toHaveBeenCalled()
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay.type).toBe('nearby')
+
+      controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' })
+      controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
+      expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'nearby' } })
+      await vi.waitFor(() => expect(advertise).toHaveBeenCalledOnce())
+      await vi.waitFor(() => expect(nearby.snapshot().phase).toBe('hosting'))
+      expect(nearby.snapshot().track).toBe('Starter Circuit')
+      expect(nearby.snapshot().canStart).toBe(false)
+      nearby.start()
+      controller.dispatch({ type: 'start-race' })
+      expect(raceSession.start).not.toHaveBeenCalled()
+    } finally {
+      controller.destroy()
+    }
+  })
+
+  it('rejects a non-race-ready circuit before opening a Nearby room', () => {
+    const advertise = vi.fn(async (_room: string) => undefined)
+    const transport: NearbyTransport = {
+      subscribe: () => () => undefined, host: advertise,
+      scan: async () => undefined, connect: async () => undefined,
+      respond: async () => undefined, lock: async () => undefined,
+      send: async () => undefined, stop: async () => undefined,
+    }
+    const nearby = new NearbyRace(transport, () => true)
+    const incomplete = {
+      ...createStarterTrack(asTrackId('incomplete-host'), 1),
+      points: createStarterTrack(asTrackId('shape'), 1).points.slice(0, 3),
+    }
+    const { controller, raceSession } = setup(incomplete, false, undefined, nearby)
+    try {
+      controller.dispatch({ type: 'open-nearby' })
+      controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' })
+      controller.dispatch({ type: 'select-track-for-race', id: incomplete.id })
+      expect(controller.snapshot().overlay).toEqual({ type: 'track-library', purpose: 'nearby-host' })
+      expect(advertise).not.toHaveBeenCalled()
+      expect(raceSession.start).not.toHaveBeenCalled()
+    } finally {
+      controller.destroy()
+    }
+  })
+
   it('asks for a player name and migrates tracks while preserving results and stable creator identity', () => {
     const seeded = createStarterTrack(asTrackId('local-legacy'), 1)
     const { controller, trackStore, preferencesStore } = setup({ ...seeded, creator: { id: 'local-user-123', name: 'Player' } })
