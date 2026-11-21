@@ -634,7 +634,8 @@ export class AppController {
         laps: pointToPoint ? 1 : this.state.preferences.raceLaps ?? 2,
         handling: this.state.preferences.handling ?? 'arcade',
         mode: !pointToPoint && preferredMode === 'time-trial' ? 'normal' : preferredMode,
-        ...(!pointToPoint && preferredMode === 'normal' ? { gridPositions: randomGridPositions(4) } : {}),
+        ...(preferredMode === 'normal' || (!pointToPoint && preferredMode === 'time-trial')
+          ? { gridPositions: randomGridPositions(4) } : {}),
         lighting: this.state.overlay.type === 'race-setup' ? this.state.raceLighting ?? track.lighting : track.lighting,
       })
       this.rememberRace()
