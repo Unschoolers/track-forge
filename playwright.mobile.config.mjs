@@ -3,6 +3,10 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './qa/browser',
   testMatch: '**/*.spec.mjs',
+  // Frame-budget captures are diagnostics, not a CI browser regression gate.
+  // Still runnable on demand; don't spend every PR shard on a 5s sample.
+  testIgnore: process.env.CI && process.env.TRACKFORGE_PERFORMANCE_QA !== '1'
+    ? '**/race-performance.spec.mjs' : undefined,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
