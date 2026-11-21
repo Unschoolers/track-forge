@@ -167,7 +167,6 @@ export function renderVehicles(
   path: RoadPath,
 ): void {
   for (const vehicle of vehicles) {
-    const geometry = getVehicleGeometry(vehicle.car)
     const compression = Math.max(0, vehicle.suspensionCompression)
     const impact = vehicle.landingIntensity
     const clearance = vehicle.grounded ? 0 : Math.max(
@@ -210,7 +209,6 @@ export function renderNearbyVehicle(
   graphics: Phaser.GameObjects.Graphics,
   pose: GhostPose,
 ): void {
-  const geometry = getVehicleGeometry(pose.car)
   graphics.save()
   graphics.translateCanvas(pose.x, pose.y)
   graphics.rotateCanvas(pose.angle)
