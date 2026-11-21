@@ -72,6 +72,34 @@ describe('feedback adapters', () => {
     expect(sink.destroy).toHaveBeenCalledOnce()
   })
 
+  it('rewards a lead and first-place finish with ascending audio and distinct haptics', () => {
+    const sink: ToneSink = {
+      unlock: vi.fn(), play: vi.fn(), playLanding: vi.fn(),
+      setEngine: vi.fn(), setSurface: vi.fn(), setSlip: vi.fn(),
+      silenceContinuous: vi.fn(), destroy: vi.fn(),
+    }
+    const audio = new WebAudioAdapter(() => sink, true)
+    const vibrate = vi.fn(() => true)
+    const haptics = new HapticsAdapter(vibrate, true)
+    audio.unlock()
+    audio.handle({ type: 'position-change', direction: 'gain', place: 1 })
+    haptics.handle({ type: 'position-change', direction: 'gain', place: 1 })
+    expect(sink.play).toHaveBeenCalledWith(1109, 0.24, 0.058, 'triangle', 0.11)
+    expect(vibrate).toHaveBeenCalledWith([18, 25, 40, 30, 48])
+    vi.mocked(sink.play).mockClear()
+    audio.handle({ type: 'finish', place: 1, newRecord: true })
+    haptics.handle({ type: 'finish', place: 1, newRecord: true })
+    expect(sink.play).toHaveBeenCalledTimes(3)
+    expect(sink.play).toHaveBeenLastCalledWith(1319, 0.43, 0.085, 'triangle', 0.32)
+    expect(vibrate).toHaveBeenLastCalledWith([35, 45, 45, 45, 95])
+
+    vi.mocked(sink.play).mockClear()
+    audio.handle({ type: 'position-change', direction: 'loss', place: 2 })
+    haptics.handle({ type: 'position-change', direction: 'loss', place: 2 })
+    expect(sink.play).toHaveBeenCalledWith(330, 0.22, 0.03, 'triangle', 0.09)
+    expect(vibrate).toHaveBeenLastCalledWith([42])
+  })
+
   it('degrades safely when vibration is unavailable or disabled', () => {
     const vibrate = vi.fn(() => true)
     const haptics = new HapticsAdapter(vibrate, true)
