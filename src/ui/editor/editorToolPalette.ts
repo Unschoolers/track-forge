@@ -1,23 +1,24 @@
 import type { AppSnapshot } from '@/application/appState'
 import type { EditorTool } from '@/domain/editor/editorGeometry'
 import { element } from '@/ui/dom'
-import { editorIconButton, type EditorIcon } from '@/ui/editor/editorIcons'
+import { editorIcon, editorIconButton, type EditorIcon } from '@/ui/editor/editorIcons'
 
 const tools: readonly {
   readonly id: EditorTool
   readonly icon: EditorIcon
   readonly label: string
+  readonly shortLabel: string
 }[] = [
-  { id: 'draw', icon: 'draw', label: 'Draw road' },
-  { id: 'select', icon: 'select', label: 'Move points' },
-  { id: 'start', icon: 'start', label: 'Place start line' },
-  { id: 'checkpoint', icon: 'checkpoint', label: 'Place checkpoint' },
-  { id: 'paint', icon: 'paint', label: 'Paint surface' },
-  { id: 'structure', icon: 'structure', label: 'Paint structure' },
-  { id: 'terrain', icon: 'terrain', label: 'Paint terrain' },
-  { id: 'pan', icon: 'pan', label: 'Pan map' },
-  { id: 'tree', icon: 'tree', label: 'Scenery' },
-  { id: 'erase', icon: 'erase', label: 'Erase' },
+  { id: 'draw', icon: 'draw', label: 'Draw road', shortLabel: 'Road' },
+  { id: 'select', icon: 'select', label: 'Move points', shortLabel: 'Select' },
+  { id: 'start', icon: 'start', label: 'Place start line', shortLabel: 'Start' },
+  { id: 'checkpoint', icon: 'checkpoint', label: 'Place checkpoint', shortLabel: 'Checkpoint' },
+  { id: 'paint', icon: 'paint', label: 'Paint surface', shortLabel: 'Surface' },
+  { id: 'structure', icon: 'structure', label: 'Paint structure', shortLabel: 'Bridge' },
+  { id: 'terrain', icon: 'terrain', label: 'Paint terrain', shortLabel: 'Terrain' },
+  { id: 'pan', icon: 'pan', label: 'Pan map', shortLabel: 'Pan' },
+  { id: 'tree', icon: 'tree', label: 'Scenery', shortLabel: 'Props' },
+  { id: 'erase', icon: 'erase', label: 'Erase', shortLabel: 'Erase' },
 ]
 
 export function createEditorToolPalette(
@@ -26,7 +27,16 @@ export function createEditorToolPalette(
 ): HTMLElement {
   const palette = element('nav', 'tool-rail')
   palette.setAttribute('aria-label', 'Editor tools')
-
+  const drawer = element('details', 'editor-toolbox-drawer')
+  const summary = element('summary', 'editor-toolbox-summary')
+  const active = tools.find((definition) => definition.id === state.editorUi.tool) ?? tools[0]
+  if (!active) throw new Error('Editor tool palette is empty')
+  summary.append(
+    editorIcon(active.icon),
+    element('span', 'editor-toolbox-summary-copy', 'TOOLS'),
+    element('strong', 'editor-toolbox-current', active.shortLabel),
+  )
+  const choices = element('div', 'editor-toolbox-items')
   for (const definition of tools) {
     if (definition.id === 'start' && state.editor.routeKind === 'point-to-point') continue
     const tool = editorIconButton(
@@ -37,11 +47,11 @@ export function createEditorToolPalette(
       `tool-button${state.editorUi.tool === definition.id ? ' active' : ''}`,
     )
     tool.dataset.tool = definition.id
-    if (definition.id === 'pan') tool.classList.add('desktop-pan-tool')
-    tool.title = definition.label
-    tool.setAttribute('aria-label', definition.label)
-    palette.append(tool)
+    tool.setAttribute('aria-pressed', String(state.editorUi.tool === definition.id))
+    tool.append(element('span', 'editor-control-label', definition.shortLabel))
+    choices.append(tool)
   }
-
+  drawer.append(summary, choices)
+  palette.append(drawer)
   return palette
 }

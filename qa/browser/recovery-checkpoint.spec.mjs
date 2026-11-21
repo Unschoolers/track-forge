@@ -18,6 +18,7 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+  await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Place checkpoint' }).click()
   const camera = (await qa()).camera
   const canvas = await page.locator('#game-container canvas').boundingBox()

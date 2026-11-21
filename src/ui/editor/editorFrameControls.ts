@@ -5,7 +5,7 @@ import { analyzeTrack } from '@/domain/track/trackDiagnostics'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { button, element } from '@/ui/dom'
-import { editorIconButton } from '@/ui/editor/editorIcons'
+import { editorIcon, editorIconButton } from '@/ui/editor/editorIcons'
 
 export interface EditorFrameActions {
   readonly home: () => void
@@ -42,26 +42,31 @@ export function createEditorHistoryActions(
   actions: Pick<EditorFrameActions, 'camera' | 'edit' | 'toggleGrid'>,
 ): HTMLElement {
   const history = element('div', 'history-actions')
-  history.append(
-    editorIconButton('undo', 'undo', 'Undo', () => actions.edit({ type: 'undo' })),
-    editorIconButton('redo', 'redo', 'Redo', () => actions.edit({ type: 'redo' })),
+  history.setAttribute('aria-label', 'History and view tools')
+  const undo = editorIconButton('undo', 'undo', 'Undo', () => actions.edit({ type: 'undo' }))
+  const redo = editorIconButton('redo', 'redo', 'Redo', () => actions.edit({ type: 'redo' }))
+  undo.append(element('span', 'editor-action-label', 'Undo'))
+  redo.append(element('span', 'editor-action-label', 'Redo'))
+
+  const drawer = element('details', 'editor-view-drawer')
+  const summary = element('summary', 'editor-view-summary')
+  summary.append(editorIcon('fit'), element('span', '', 'VIEW'))
+  const choices = element('div', 'editor-view-items')
+  const viewActions = [
     editorIconButton('zoom-in', 'zoom-in', 'Zoom in', () => actions.camera('zoom-in')),
     editorIconButton('zoom-out', 'zoom-out', 'Zoom out', () => actions.camera('zoom-out')),
     editorIconButton('fit', 'fit-track', 'Fit track', () => actions.camera('fit')),
-    editorIconButton(
-      'expand',
-      'expand-track',
-      'Expand track 2×',
-      () => actions.edit({ type: 'expand', factor: 2 }),
-    ),
-    editorIconButton(
-      'grid',
-      'toggle-grid',
-      'Toggle grid',
-      actions.toggleGrid,
-      `icon-button${state.editorUi.grid ? ' active' : ''}`,
-    ),
-  )
+    editorIconButton('expand', 'expand-track', 'Expand track 2×', () => actions.edit({ type: 'expand', factor: 2 })),
+    editorIconButton('grid', 'toggle-grid', 'Toggle grid', actions.toggleGrid,
+      `icon-button${state.editorUi.grid ? ' active' : ''}`),
+  ]
+  const labels = ['Zoom +', 'Zoom −', 'Fit track', 'Expand 2×', 'Grid']
+  viewActions.forEach((control, index) => {
+    control.append(element('span', 'editor-action-label', labels[index] ?? 'View'))
+    choices.append(control)
+  })
+  drawer.append(summary, choices)
+  history.append(undo, redo, drawer)
   return history
 }
 
@@ -93,18 +98,18 @@ export function createEditorTrackActions(
   actions: Pick<EditorFrameActions, 'save' | 'load' | 'race' | 'edit'>,
 ): HTMLElement {
   const editorActions = element('div', 'editor-actions')
-  editorActions.append(
+  const controls = [
     editorIconButton('save', 'save-track', 'Save track', actions.save),
-    editorIconButton(
-      'clear',
-      'clear-track',
-      'Clear track',
-      () => actions.edit({ type: 'clear' }),
-      'icon-button danger',
-    ),
+    editorIconButton('clear', 'clear-track', 'Clear track',
+      () => actions.edit({ type: 'clear' }), 'icon-button danger'),
     editorIconButton('load', 'load-track', 'Load track', actions.load),
     editorIconButton('race', 'editor-race', 'Race', actions.race, 'icon-button accent'),
-  )
+  ]
+  const labels = ['Save', 'Clear', 'Open', 'Race']
+  controls.forEach((control, index) => {
+    control.append(element('span', 'editor-action-label', labels[index] ?? ''))
+    editorActions.append(control)
+  })
   return editorActions
 }
 
