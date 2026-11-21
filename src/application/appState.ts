@@ -41,7 +41,7 @@ export type AppOverlay =
       readonly returnTo: OverlayReturn
     }
   | { readonly type: 'race-setup' }
-  | { readonly type: 'nearby' }
+  | { readonly type: 'nearby'; readonly customize?: boolean }
   | { readonly type: 'editor-menu' }
   | {
       readonly type: 'options'
@@ -103,6 +103,7 @@ export type AppCommand =
   | { readonly type: 'open-editor' }
   | { readonly type: 'start-race' }
   | { readonly type: 'open-nearby' }
+  | { readonly type: 'toggle-nearby-customize' }
   | { readonly type: 'host-nearby' }
   | { readonly type: 'scan-nearby' }
   | { readonly type: 'leave-nearby' }
