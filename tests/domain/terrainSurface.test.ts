@@ -44,6 +44,24 @@ function signedArea(points: readonly Vector2[]): number {
 }
 
 describe('compiled terrain surface', () => {
+  it('compacts long hill and water contours without changing holes or authored cells', () => {
+    const hill = paintTerrain(EMPTY_TERRAIN, rectangle(0, 79, 0, 59), 'hill')
+    const terrain = paintTerrain(hill, rectangle(20, 29, 20, 29), 'water')
+    const surface = compile(terrain)
+    const hills = surface.contours.filter(contour => contour.kind === 'hill')
+    const lakes = surface.contours.filter(contour => contour.kind === 'water')
+
+    expect(terrain.cells).toHaveLength(80 * 60)
+    expect(hills).toHaveLength(2)
+    expect(lakes).toHaveLength(1)
+    expect(hills.map(contour => contour.points.length)).toEqual([4, 4])
+    expect(lakes[0]?.points).toHaveLength(4)
+    expect(hills.reduce((area, contour) => area + signedArea(contour.points), 0))
+      .toBe(80 * 60 * 32 ** 2 - 10 * 10 * 32 ** 2)
+    expect(surface.materialAt({ x: 25 * 32, y: 25 * 32 })).toBe('water')
+    expect(surface.heightAt({ x: 25 * 32, y: 25 * 32 })).toBe(0)
+  })
+
   it('samples natural boundary slopes and a merged hill plateau', () => {
     const terrain = paintTerrain(
       EMPTY_TERRAIN,
