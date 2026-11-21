@@ -56,6 +56,7 @@ export class NearbyRace {
   private cupTracks: readonly Track[] = []
   private cupIndex = 0
   private cupTotal = 0
+  private cupLaps = 2
   private scoredCupIndex = -1
   private readonly cupPoints = new Map<number, number>()
   private incomingShare: Track | null = null
@@ -162,6 +163,7 @@ export class NearbyRace {
         !tracks.every(track => this.validateTrack(track))) return
     this.cupTracks = [...tracks]
     this.cupTotal = tracks.length
+    this.cupLaps = laps
     this.cupIndex = 0
     this.scoredCupIndex = -1
     this.cupPoints.clear()
@@ -238,7 +240,7 @@ export class NearbyRace {
       if (!next) return
       this.cupIndex++
       this.course = { ...this.course, track: next, lighting: next.lighting,
-        laps: next.routeKind === 'point-to-point' ? 1 : this.course.laps }
+        laps: next.routeKind === 'point-to-point' ? 1 : this.cupLaps }
     }
     const course = this.course
     const active = this.generation
