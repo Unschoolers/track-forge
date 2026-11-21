@@ -47,7 +47,7 @@ describe('missed timing gate recovery', () => {
       return { ...player, pathIndex: index, x: point.x + 90, y: point.y + 90 }
     }
     // The grid behind Start must never be mistaken for a skipped first sector.
-    const behindStart = atProgress(count - 3)
+    const behindStart = atProgress(count - Math.min(20, Math.floor(count / 16)))
     expect(advanceArcadeTimingGate(race, behindStart, behindStart, 1, false, () => false)
       .missedCheckpoint).toBeUndefined()
 
