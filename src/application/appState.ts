@@ -44,7 +44,7 @@ export type AppOverlay =
   | { readonly type: 'player-name' }
   | { readonly type: 'race-setup' }
   | { readonly type: 'cup'; readonly returnTo?: 'nearby' }
-  | { readonly type: 'nearby'; readonly customize?: boolean }
+  | { readonly type: 'nearby' }
   | { readonly type: 'editor-menu' }
   | {
       readonly type: 'options'
@@ -106,7 +106,6 @@ export type AppCommand =
   | { readonly type: 'open-editor' }
   | { readonly type: 'start-race' }
   | { readonly type: 'open-nearby' }
-  | { readonly type: 'toggle-nearby-customize' }
   | { readonly type: 'send-nearby-track'; readonly track: Track }
   | { readonly type: 'scan-nearby-track' }
   | { readonly type: 'save-nearby-track' }

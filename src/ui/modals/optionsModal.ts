@@ -101,6 +101,15 @@ export function createOptionsModal(
   form.append(label, input, save, error)
   profile.append(form, element('p', 'modal-subtitle', 'Renaming updates your tracks. Built-in tracks belong to Track Forge; future imports retain their original creator.'))
   frame.body.append(profile)
+  const topper = createTopperSelector(
+    state.preferences.playerIdentity ?? DEFAULT_PLAYER_IDENTITY,
+    true,
+    undefined,
+    (playerIdentity) => actions.preferences({ ...state.preferences, playerIdentity }),
+    'options',
+  )
+  topper.prepend(element('h3', 'setup-label', 'YOUR TOPPER'))
+  frame.body.append(topper)
   capture('profile', profileStart)
   const raceStart = frame.body.children.length
   if (state.overlay.type !== 'options' || state.overlay.returnTo !== 'race') {
@@ -169,14 +178,7 @@ export function createOptionsModal(
       raceLengthRow.append(choice)
     }
     raceLength.append(...(openRoute ? [element('p', 'modal-subtitle', 'Single run · no laps')] : [raceLengthRow]))
-    const topper = createTopperSelector(
-      state.preferences.playerIdentity ?? DEFAULT_PLAYER_IDENTITY,
-      true,
-      undefined,
-      (playerIdentity) => actions.preferences({ ...state.preferences, playerIdentity }),
-      'options',
-    )
-    raceSettings.append(difficulty, raceLength, handling, topper)
+    raceSettings.append(difficulty, raceLength, handling)
     frame.body.append(raceSettings)
     capture('race', raceStart)
   }

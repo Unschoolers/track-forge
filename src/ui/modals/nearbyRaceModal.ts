@@ -20,9 +20,8 @@ export function createNearbyRaceModal(
   actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
     saveTrack: () => void; declineTrack: () => void;
     selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
-    toggleCustomize?: () => void; selectIdentity?: (identity: PlayerIdentity) => void },
+  },
   identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
-  customizing = false,
 ): HTMLElement {
   const { phase, purpose, room, track, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const cup = nearby.snapshot().cup
@@ -39,7 +38,8 @@ export function createNearbyRaceModal(
     case 'idle':
       frame.body.append(
         createCarPicker(car, actions.selectCar),
-        createTopperSelector(identity, customizing, actions.toggleCustomize, actions.selectIdentity),
+        createTopperSelector(identity, false),
+        element('p', 'modal-subtitle', 'Change your topper in Options → Profile.'),
         button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
         button('HOST CUP', 'nearby-host-cup', actions.configureCup, 'button'),
         button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),

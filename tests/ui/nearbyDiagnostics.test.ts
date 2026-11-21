@@ -39,35 +39,25 @@ it('offers a diagnostic download after Nearby hosting fails and allows retrying 
   nearby.destroy()
 })
 
-it('shows the remembered topper but keeps the picker closed until explicitly requested', () => {
+it('shows the saved topper in Nearby without duplicate customization controls', () => {
   const transport: NearbyTransport = {
     subscribe: () => () => undefined,
     host: vi.fn(), scan: vi.fn(), connect: vi.fn(), respond: vi.fn(),
     lock: vi.fn(), send: vi.fn(), stop: vi.fn(),
   }
   const nearby = new NearbyRace(transport, () => true)
-  const toggleCustomize = vi.fn()
-  const selectIdentity = vi.fn()
   const actions = {
     close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
-    downloadDiagnostics: vi.fn(async () => true), toggleCustomize, selectIdentity,
+    downloadDiagnostics: vi.fn(async () => true),
   }
   const identity = { icon: 'crown', color: 'gold' } as const
-  const collapsed = createNearbyRaceModal(nearby, 'blue', actions, identity, false)
-  expect(collapsed.textContent).toContain('Your topper')
-  expect(collapsed.textContent).toContain('crown / gold')
-  expect(collapsed.querySelector('[data-action="nearby-topper-icon-star"]')).toBeNull()
-  collapsed.querySelector<HTMLButtonElement>('[data-action="nearby-customize-topper"]')?.click()
-  expect(toggleCustomize).toHaveBeenCalledOnce()
-
-  const expanded = createNearbyRaceModal(nearby, 'blue', actions, identity, true)
-  expect(expanded.querySelectorAll('[data-action^="nearby-topper-icon-"]')).toHaveLength(6)
-  expect(expanded.querySelectorAll('[data-action^="nearby-topper-color-"]')).toHaveLength(6)
-  expect(expanded.querySelector('[data-action="nearby-topper-icon-crown"]')?.getAttribute('aria-pressed')).toBe('true')
-  expanded.querySelector<HTMLButtonElement>('[data-action="nearby-topper-icon-flag"]')?.click()
-  expanded.querySelector<HTMLButtonElement>('[data-action="nearby-topper-color-pink"]')?.click()
-  expect(selectIdentity).toHaveBeenNthCalledWith(1, { icon: 'flag', color: 'gold' })
-  expect(selectIdentity).toHaveBeenNthCalledWith(2, { icon: 'crown', color: 'pink' })
+  const modal = createNearbyRaceModal(nearby, 'blue', actions, identity)
+  expect(modal.textContent).toContain('Your topper')
+  expect(modal.textContent).toContain('crown / gold')
+  expect(modal.textContent).toContain('Options → Profile')
+  expect(modal.querySelector('[data-action="nearby-customize-topper"]')).toBeNull()
+  expect(modal.querySelector('[data-action^="nearby-topper-icon-"]')).toBeNull()
+  expect(modal.querySelector('[data-action^="nearby-topper-color-"]')).toBeNull()
   nearby.destroy()
 })
 

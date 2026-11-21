@@ -327,11 +327,6 @@ export class AppController {
       case 'open-nearby':
         if (this.dependencies.nearby) this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
         break
-      case 'toggle-nearby-customize':
-        if (this.state.overlay.type === 'nearby' && this.dependencies.nearby?.snapshot().phase === 'idle') {
-          this.update({ ...this.state, overlay: { type: 'nearby', customize: !this.state.overlay.customize } })
-        }
-        break
       case 'scan-nearby':
         if (this.state.overlay.type === 'nearby') {
           this.dependencies.nearby?.scan(this.state.preferences.car)
