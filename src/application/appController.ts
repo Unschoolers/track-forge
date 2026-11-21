@@ -37,6 +37,7 @@ import type {
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { EditorSession, type Scheduler } from '@/application/editor/editorSession'
+import { reduceEditorUi } from '@/application/editor/editorUiReducer'
 
 export type { Scheduler } from '@/application/editor/editorSession'
 
@@ -402,112 +403,18 @@ export class AppController {
         this.saveCurrentTrack()
         break
       case 'set-editor-scenery':
-        this.update({ ...this.state, editorUi: { ...this.state.editorUi, sceneryChoice: normalizeEditorSceneryChoice(command.choice, this.state.editor.environmentId) } })
-        break
       case 'set-editor-tool':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            tool: command.tool,
-            selectedCrossing:
-              command.tool === 'select'
-                ? this.state.editorUi.selectedCrossing
-                : null,
-            selectedPoint:
-              command.tool === 'select'
-                ? this.state.editorUi.selectedPoint
-                : null,
-          },
-        })
-        break
       case 'select-editor-crossing':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            selectedCrossing: command.key,
-            selectedPoint: command.key === null
-              ? this.state.editorUi.selectedPoint
-              : null,
-          },
-        })
-        break
       case 'select-editor-point':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            selectedPoint: command.index,
-            selectedCrossing:
-              command.index === null
-                ? this.state.editorUi.selectedCrossing
-                : null,
-          },
-        })
-        break
       case 'set-editor-surface':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            surface: command.surface,
-          },
-        })
-        break
       case 'set-editor-structure':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            structure: command.structure,
-          },
-        })
-        break
       case 'set-editor-terrain-mode':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            terrainBrush: {
-              ...this.state.editorUi.terrainBrush,
-              mode: command.mode,
-            },
-          },
-        })
-        break
       case 'set-editor-terrain-radius':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            terrainBrush: {
-              ...this.state.editorUi.terrainBrush,
-              radius: command.radius,
-            },
-          },
-        })
-        break
       case 'toggle-editor-grid':
-        this.update({
-          ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            grid: !this.state.editorUi.grid,
-          },
-        })
-        break
       case 'request-editor-camera':
         this.update({
           ...this.state,
-          editorUi: {
-            ...this.state.editorUi,
-            cameraRequest: {
-              sequence:
-                (this.state.editorUi.cameraRequest?.sequence ?? 0) + 1,
-              action: command.action,
-            },
-          },
+          editorUi: reduceEditorUi(this.state.editorUi, command, this.state.editor.environmentId),
         })
         break
       case 'create-track':

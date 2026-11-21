@@ -34,7 +34,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 ## Important flows
 
-**Editor:** pointer input (`phaser/input/editorInput.ts`) → controller/editor session → `domain/editor/editorState.ts` command/history → geometry through `TrackGeometryService` → invalidation-aware render. Command rejection must remain visible; undo/redo must restore geometry and terrain correctly. Camera view should not jump after unrelated editor changes.
+**Editor:** pointer input (`phaser/input/editorInput.ts`) → controller/editor session; editor toolbox chrome is reduced in `application/editor/editorUiReducer.ts` → `domain/editor/editorState.ts` command/history → geometry through `TrackGeometryService` → invalidation-aware render. Command rejection must remain visible; undo/redo must restore geometry and terrain correctly. Camera view should not jump after unrelated editor changes.
 
 **Race:** controller obtains mode/lap/lighting/grid policy from `application/race/raceSetup.ts` → `application/race/raceSession.ts` → `domain/race/raceEngine.ts` fixed-step simulation (`RACE_TICK_SECONDS = 1/60`) → typed events/telemetry → Phaser renders state and UI shows race outcomes. AI, player and recovery must share consistent geometry and surface authority. Avoid changing simulation step size just to accelerate tests; drive more ticks without changing the simulated contract. Nearby countdown timing uses an injectable monotonic clock sharing a time base with the Nearby transport; wall-clock timestamps are deliberately separate.
 
