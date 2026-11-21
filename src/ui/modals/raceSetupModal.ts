@@ -14,7 +14,6 @@ export function createRaceSetupModal(
     readonly preferences: (preferences: AppSnapshot['preferences']) => void
     readonly lighting: (lighting: LightingMode) => void
     readonly start: () => void
-    readonly hostNearby?: (() => void) | undefined
     readonly options: () => void
   },
   availability: GhostAvailability | number | null = null,
@@ -89,6 +88,5 @@ export function createRaceSetupModal(
       'button button-primary',
     ),
   )
-  if (actions.hostNearby) frame.footer.append(button('HOST NEARBY', 'host-nearby', actions.hostNearby, 'button'))
   return frame.overlay
 }

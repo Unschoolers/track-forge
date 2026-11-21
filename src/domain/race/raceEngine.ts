@@ -213,8 +213,8 @@ function advanceRace(
       pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance,
     }
     let updated: RaceVehicle
-    if (arcade && vehicle.player && previous &&
-        (state.path.closed || state.routeKind === 'point-to-point')) {
+    if (vehicle.player && previous &&
+        (state.routeKind === 'point-to-point' || (arcade && state.path.closed))) {
       const progress = advanceArcadeTimingGate(
         state,
         previous,
@@ -306,7 +306,7 @@ function advanceRace(
     const sceneryHit = usesCheckpoints && previous && state.sceneryColliders &&
       !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
       hitScenery(state.sceneryColliders, previous, vehicle)
-    if (usesCheckpoints && (waterContact || vehicle.wrecked || sceneryHit)) {
+    if (usesCheckpoints && ((waterContact && !vehicle.waterRecoveryProtected) || vehicle.wrecked || sceneryHit)) {
       const candidate = previous
         ? restoreFrameProgress({ ...vehicle, pathIndex: previous.pathIndex }, previous)
         : vehicle

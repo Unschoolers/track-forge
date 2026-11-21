@@ -122,14 +122,15 @@ test('can drag the same starter control point twice, then tap for point controls
   await expect.poll(async () => (await read()).camera).not.toBeNull()
   await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Move points', exact: true }).click()
-  // Editing the built-in starter circuit forks it; inspect the active local copy.
+  // Editing the built-in starter forks it: inspect the editable copy, not the seed.
   const saved = () => page.evaluate(() => {
     const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
     const edited = tracks.find(track => track.origin === 'local' && track.name.startsWith('Starter Circuit'))
     if (!edited) throw new Error('Expected an editable fork of the built-in Starter Circuit')
     return edited.points
   })
-  const control = (await saved())[2]
+  const originalPoints = await saved()
+  const control = originalPoints[2]
   const camera = (await read()).camera
   const canvas = await page.locator('#game-container canvas').boundingBox()
   const x = canvas.x + canvas.width / 2 + (control.x - camera.x) * camera.zoom
@@ -153,6 +154,15 @@ test('can drag the same starter control point twice, then tap for point controls
     await touch(pointer, 'touchMove', [contact(1, x + 52, y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
+    const afterFirstDrag = await saved()
+    if (afterFirstDrag[2].x <= control.x + 50) {
+      const changed = afterFirstDrag.map((point, index) => ({ index, x: point.x, y: point.y }))
+        .filter((point, index) => point.x !== originalPoints[index]?.x || point.y !== originalPoints[index]?.y)
+      console.info('Control point drag diagnostics:', JSON.stringify({
+        target: control, observed: afterFirstDrag[2], changed,
+        camera: (await read()).camera,
+      }))
+    }
     await expect.poll(async () => (await saved())[2].x).toBeGreaterThan(control.x + 50)
 
     await touch(pointer, 'touchStart', [contact(1, x + 52, y)])

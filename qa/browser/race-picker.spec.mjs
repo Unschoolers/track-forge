@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
-import { seedPersonalCircuit } from './fixtures/personal-circuit.mjs'
+import { OWNED_TRACK_NAME, seedOwnedTrack } from './owned-track.mjs'
 
 async function openPicker(page) {
   await page.goto('/?qa')
@@ -9,8 +9,8 @@ async function openPicker(page) {
   return page.getByRole('dialog', { name: 'Choose a track' })
 }
 
-test('previews every track and shares a saved personal track without selecting it', async ({ page }) => {
-  await seedPersonalCircuit(page)
+test('previews every track and shares a saved track without selecting it', async ({ page }) => {
+  await seedOwnedTrack(page)
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'canShare', { value: () => true })
     Object.defineProperty(navigator, 'share', { value: async ({ files, text }) => {
@@ -18,22 +18,23 @@ test('previews every track and shares a saved personal track without selecting i
     } })
   })
   const picker = await openPicker(page)
-  const saved = picker.getByRole('button', { name: 'Race QA Circuit', exact: true })
+  const saved = picker.getByRole('button', { name: `Race ${OWNED_TRACK_NAME}`, exact: true })
   const official = picker.getByRole('button', { name: 'Race Meadow Loop', exact: true })
   await expect(picker.getByRole('button', { name: 'SELECT', exact: true })).toHaveCount(0)
   await expect(saved.locator('.track-preview path')).toBeVisible()
   await expect(official.locator('.track-preview path')).toBeAttached()
   expect(await picker.locator('.track-card').count()).toBe(await picker.locator('.track-preview').count())
-  const share = picker.getByRole('button', { name: 'Share QA Circuit', exact: true })
+  await expect(picker.getByRole('button', { name: 'Share Starter Circuit', exact: true })).toHaveCount(0)
+  const share = picker.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true })
   await expect(share).toHaveText('')
   await share.tap()
   await expect.poll(() => page.evaluate(() => window.sharedTrack)).toMatchObject({
-    file: 'QA-Circuit.trackforge.json',
-    track: 'QA Circuit',
+    file: 'QA-Shared-Circuit.trackforge.json',
+    track: OWNED_TRACK_NAME,
   })
   await expect(picker).toBeVisible()
   await saved.locator('.track-preview').tap()
-  await expect(page.getByRole('dialog', { name: 'Race setup' })).toContainText('QA Circuit')
+  await expect(page.getByRole('dialog', { name: 'Race setup' })).toContainText(OWNED_TRACK_NAME)
 })
 
 test('the race flyover follows the selected track, car, lighting and motion preference', async ({ page }, testInfo) => {
