@@ -88,6 +88,8 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     await expect.poll(async () => (await saved()).length).toBe(points.length)
     await expectEditWork(before)
 
+    await page.locator('summary.editor-toolbox-summary').click()
+
     await page.getByRole('button', { name: 'Move points', exact: true }).click()
     const moveCamera = (await read()).camera
     const control = points[4]
@@ -118,6 +120,7 @@ test('can drag the same starter control point twice, then tap for point controls
   await page.getByRole('button', { name: 'EDIT', exact: true }).click()
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
   await expect.poll(async () => (await read()).camera).not.toBeNull()
+  await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Move points', exact: true }).click()
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
   const control = (await saved())[2]

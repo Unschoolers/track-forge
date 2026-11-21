@@ -138,10 +138,10 @@
 }
 @media (max-width: 520px) {
   .editor-screen .status-pill {
-    top: calc(11rem + env(safe-area-inset-top));
+    top: calc(12rem + env(safe-area-inset-top));
     max-width: min(16rem, calc(100% - 2rem));
   }
-  .editor-screen { --editor-diagnostic-top: calc(13.7rem + env(safe-area-inset-top)); }
+  .editor-screen { --editor-diagnostic-top: calc(14.8rem + env(safe-area-inset-top)); }
 }
 @media (max-height: 700px) {
   .editor-screen .tool-rail, .editor-screen .history-actions { top: calc(4.25rem + env(safe-area-inset-top)); }

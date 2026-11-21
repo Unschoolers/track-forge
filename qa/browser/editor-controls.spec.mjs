@@ -62,11 +62,13 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await assertClearEditorControls(page, 'road')
 
     // The toolbar must remain clickable, not just visually present.
+    await editor.locator('summary.editor-view-summary').click()
     const grid = editor.getByRole('button', { name: 'Toggle grid' })
     await grid.click()
     await expect(editor.getByRole('button', { name: 'Toggle grid' })).toHaveClass(/active/)
     await save.click()
 
+    await editor.locator('summary.editor-toolbox-summary').click()
     await editor.getByRole('button', { name: 'Paint terrain' }).click()
     await expect(editor.locator('.editor-context-dock')).toHaveAttribute('data-layout', 'two-row')
     await assertClearEditorControls(page, 'terrain')
@@ -74,6 +76,7 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await editor.getByRole('button', { name: 'Editor menu' }).click()
     await page.getByRole('button', { name: 'Cityscape', exact: true }).click()
     await page.getByRole('button', { name: 'Close', exact: true }).click()
+    await editor.locator('summary.editor-toolbox-summary').click()
     await editor.getByRole('button', { name: 'Scenery', exact: true }).click()
     await expect(editor.locator('.editor-context-dock')).toHaveAttribute('data-layout', 'two-row')
     await assertClearEditorControls(page, 'cityscape scenery')
@@ -116,6 +119,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
 
   await enterEditor()
   await setEnvironment('Cityscape')
+  await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Scenery', exact: true }).click()
   await page.locator('[data-scenery-kind="city-bus-stop"]').click()
   const viewport = await page.locator('#game-container canvas').boundingBox()

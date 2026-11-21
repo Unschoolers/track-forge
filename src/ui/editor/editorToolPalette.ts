@@ -17,7 +17,7 @@ const tools: readonly {
   { id: 'structure', icon: 'structure', label: 'Paint structure', shortLabel: 'Bridge' },
   { id: 'terrain', icon: 'terrain', label: 'Paint terrain', shortLabel: 'Terrain' },
   { id: 'pan', icon: 'pan', label: 'Pan map', shortLabel: 'Pan' },
-  { id: 'tree', icon: 'tree', label: 'Place scenery props', shortLabel: 'Props' },
+  { id: 'tree', icon: 'tree', label: 'Scenery', shortLabel: 'Props' },
   { id: 'erase', icon: 'erase', label: 'Erase', shortLabel: 'Erase' },
 ]
 

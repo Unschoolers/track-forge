@@ -30,6 +30,13 @@ const rallyTrack = {
   lighting: 'day', createdAt: 1, updatedAt: 1,
 }
 
+async function useViewAction(page, label, method = 'click') {
+  const control = page.getByRole('button', { name: label, exact: true })
+  if (!await control.isVisible()) await page.locator('summary.editor-view-summary').click()
+  if (method === 'tap') await control.tap()
+  else await control.click()
+}
+
 function readCamera(page) {
   return page.evaluate(() => window.__trackForgeQa?.snapshot().camera ?? null)
 }
@@ -88,7 +95,7 @@ test.describe('Rally editor zoom', () => {
   })
 
   test('fits the actual course in landscape and can zoom out from that view', async ({ page, context }) => {
-    await page.getByRole('button', { name: 'Fit track', exact: true }).click()
+    await useViewAction(page, 'Fit track')
     const fit = await readCamera(page)
     const canvas = page.locator('#game-container canvas')
     const { x, y, width, height } = await canvas.boundingBox()
@@ -101,11 +108,10 @@ test.describe('Rally editor zoom', () => {
       expect(screenY).toBeLessThan(dock.y)
     }
     await expectClearRoad(page, road)
-    const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true })
-    await zoomOut.click()
+    await useViewAction(page, 'Zoom out')
     const first = await readCamera(page)
     expect(first.zoom).toBeLessThan(fit.zoom)
-    await zoomOut.click()
+    await useViewAction(page, 'Zoom out')
     const second = await readCamera(page)
     expect(second.zoom).toBeLessThan(first.zoom)
     expect(second).toMatchObject({ x: fit.x, y: fit.y })
@@ -126,6 +132,7 @@ test.describe('Rally editor zoom', () => {
   })
 
   test('keeps a pinch active over the editor controls and holds the zoom on release', async ({ page, context }) => {
+    await page.locator('summary.editor-view-summary').click()
     const fitButton = page.getByRole('button', { name: 'Fit track', exact: true })
     const bounds = await fitButton.boundingBox()
     const x = Math.round(bounds.x + bounds.width / 2)
@@ -159,13 +166,13 @@ test.describe('Rally editor zoom', () => {
 
     expect(await readCamera(page)).toEqual(chosen)
     expect(await readEditor()).toEqual(editor)
-    await fitButton.tap()
+    await useViewAction(page, 'Fit track', 'tap')
     expect(await readCamera(page)).toEqual(initial)
     expect(await readEditor()).toEqual(editor)
   })
 
   test('restores the chosen zoom and center when the same course is reopened', async ({ page }) => {
-    await page.getByRole('button', { name: 'Zoom in', exact: true }).click()
+    await useViewAction(page, 'Zoom in')
     const chosen = await readCamera(page)
     await page.getByRole('button', { name: 'Home', exact: true }).click()
     await expect.poll(() => readCamera(page)).toBeNull()
@@ -197,16 +204,15 @@ test.describe('Rally editor zoom', () => {
     }
     expect(bottomOfRoad(await readCamera(page))).toBeGreaterThan(dock.y)
 
-    const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true })
-    await zoomOut.tap()
+    await useViewAction(page, 'Zoom out', 'tap')
     const overview = await readCamera(page)
     expect(overview.zoom).toBeLessThan(fit.zoom)
     expect(bottomOfRoad(overview)).toBeLessThan(dock.y)
     await expectClearRoad(page, road)
 
-    await zoomOut.tap()
+    await useViewAction(page, 'Zoom out', 'tap')
     expect((await readCamera(page)).zoom).toBeLessThan(overview.zoom)
-    await page.getByRole('button', { name: 'Fit track', exact: true }).tap()
+    await useViewAction(page, 'Fit track', 'tap')
     expect(await readCamera(page)).toEqual(fit)
   })
 })
@@ -352,8 +358,8 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     expect(initialRoad.count, 'Road is rendered at fit zoom').toBeGreaterThan(40)
     expectRenderedBounds(initialRoad, camera)
 
-    await page.getByRole('button', { name: 'Zoom out' }).click()
-    await page.getByRole('button', { name: 'Zoom out' }).click()
+    await useViewAction(page, 'Zoom out')
+    await useViewAction(page, 'Zoom out')
     const zoomed = await readCamera(page)
     expect(zoomed.zoom).toBeLessThan(camera.zoom)
     await expectClearRoad(page, outline)
