@@ -370,6 +370,7 @@ export class DomUiHost implements UiHost {
           close,
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
           chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' }),
+          configureCup: () => this.controller.dispatch({ type: 'open-cup' }),
           scan: () => this.controller.dispatch({ type: 'scan-nearby' }),
           scanTracks: () => this.controller.dispatch({ type: 'scan-nearby-track' }),
           saveTrack: () => this.controller.dispatch({ type: 'save-nearby-track' }),
