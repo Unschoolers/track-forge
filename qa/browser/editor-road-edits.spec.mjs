@@ -123,7 +123,8 @@ test('can drag the same starter control point twice, then tap for point controls
   await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Move points', exact: true }).click()
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
-  const control = (await saved())[2]
+  const originalPoints = await saved()
+  const control = originalPoints[2]
   const camera = (await read()).camera
   const canvas = await page.locator('#game-container canvas').boundingBox()
   const x = canvas.x + canvas.width / 2 + (control.x - camera.x) * camera.zoom
@@ -149,9 +150,8 @@ test('can drag the same starter control point twice, then tap for point controls
     await expect.poll(async () => (await read()).editor.history).toBe(1)
     const afterFirstDrag = await saved()
     if (afterFirstDrag[2].x <= control.x + 50) {
-      const original = await page.evaluate(() => window.__trackForgeQa.snapshot().editor.points)
       const changed = afterFirstDrag.map((point, index) => ({ index, x: point.x, y: point.y }))
-        .filter((point, index) => point.x !== original?.[index]?.x || point.y !== original?.[index]?.y)
+        .filter((point, index) => point.x !== originalPoints[index]?.x || point.y !== originalPoints[index]?.y)
       console.info('Control point drag diagnostics:', JSON.stringify({
         target: control, observed: afterFirstDrag[2], changed,
         camera: (await read()).camera,
