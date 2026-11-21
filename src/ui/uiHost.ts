@@ -365,6 +365,9 @@ export class DomUiHost implements UiHost {
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
           chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           scan: () => this.controller.dispatch({ type: 'scan-nearby' }),
+          scanTracks: () => this.controller.dispatch({ type: 'scan-nearby-track' }),
+          saveTrack: () => this.controller.dispatch({ type: 'save-nearby-track' }),
+          declineTrack: () => this.controller.dispatch({ type: 'decline-nearby-track' }),
           selectCar: (car) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, car } }),
           toggleCustomize: () => this.controller.dispatch({ type: 'toggle-nearby-customize' }),
           selectIdentity: (playerIdentity) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, playerIdentity } }),
@@ -377,9 +380,12 @@ export class DomUiHost implements UiHost {
         if (!result) return undefined
         const nearby = this.runtime.nearby
         if (result.mode === 'nearby' && nearby) {
-          const results = createNearbyRaceResults(nearby, result,
-            () => this.controller.dispatch({ type: 'go-home' }),
-            () => this.downloadNearbyDiagnostics(nearby))
+          const results = createNearbyRaceResults(nearby, result, {
+            leave: () => this.controller.dispatch({ type: 'leave-nearby' }),
+            race: () => this.controller.dispatch({ type: 'nearby-race-again' }),
+            selectTrack: () => this.controller.dispatch({ type: 'nearby-select-next-track' }),
+            downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
+          })
           this.overlayCleanup = results.cleanup
           return results.element
         }
@@ -426,6 +432,9 @@ export class DomUiHost implements UiHost {
               id,
             }),
           share: (track) => { void this.shareTrackChallenge(track) },
+          sendNearby: this.runtime.nearby && state.overlay.purpose !== 'nearby'
+            ? (track) => this.controller.dispatch({ type: 'send-nearby-track', track })
+            : undefined,
           importFile: (content) => this.controller.dispatch({ type: 'import-track', content }),
           delete: (track) => {
             if (this.environment.confirm(`Delete "${track.name}"?`)) {
