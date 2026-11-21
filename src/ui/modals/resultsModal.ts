@@ -2,7 +2,7 @@ import type { TimeMedal } from '@/application/race/raceRecords'
 import { CUP_CIRCUITS, cupStandings, type CircuitCup } from '@/application/race/circuitCup'
 import type { RaceResult } from '@/application/race/raceSession'
 import { button, element } from '@/ui/dom'
-import { formatRaceTime } from '@/ui/format'
+import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createHighScores, createStandings } from '@/ui/components/scoreboard'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
@@ -167,14 +167,6 @@ function bindDiagnosticsHold(target: HTMLElement, open: () => void): void {
       open()
     }
   })
-}
-
-function ordinalSuffix(place: number): string {
-  if (place % 100 >= 11 && place % 100 <= 13) return 'TH'
-  if (place % 10 === 1) return 'ST'
-  if (place % 10 === 2) return 'ND'
-  if (place % 10 === 3) return 'RD'
-  return 'TH'
 }
 
 export function createCupFinalModal(cup: CircuitCup, finish: () => void): HTMLElement {

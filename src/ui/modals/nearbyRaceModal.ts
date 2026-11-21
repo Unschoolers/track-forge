@@ -5,7 +5,7 @@ import { CAR_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
 import { createCarPicker } from '@/ui/components/carPicker'
 import { button, element } from '@/ui/dom'
-import { formatRaceTime } from '@/ui/format'
+import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { createTopperSelector } from '@/ui/components/playerTopperPicker'
@@ -133,7 +133,7 @@ export function createNearbyRaceResults(
     const headline = complete
       ? typeof localTime !== 'number'
         ? result.outcome === 'water' ? 'SUNK' : result.outcome === 'wrecked' ? 'WRECKED' : 'DID NOT FINISH'
-        : place === 1 ? 'VICTORY!' : `FINISHED ${place}${place % 100 >= 11 && place % 100 <= 13 ? 'TH' : place % 10 === 2 ? 'ND' : place % 10 === 3 ? 'RD' : place % 10 === 1 ? 'ST' : 'TH'}`
+        : place === 1 ? 'VICTORY!' : `FINISHED ${place}${ordinalSuffix(place)}`
       : 'NEARBY RACE RESULTS'
     if (title && title.textContent !== headline) {
       title.textContent = headline
