@@ -109,6 +109,8 @@ describe('editor geometry', () => {
     const trees = [{ x: 40, y: 40 }]
 
     expect(nearestControlPoint(points, { x: 8, y: 3 }, 1)).toBe(0)
+    expect(nearestControlPoint(points, { x: 35, y: 0 }, 1)).toBe(0)
+    expect(nearestControlPoint(points, { x: 45, y: 0 }, 1)).toBe(-1)
     expect(nearestSegmentIndex(points, { x: 55, y: 5 }, 1)).toBe(0)
     expect(nearestTree(trees, { x: 42, y: 44 }, 1)).toBe(0)
     expect(nearestControlPoint(points, { x: 40, y: 40 }, 2)).toBe(-1)

@@ -34,7 +34,7 @@ export const EDITOR_LIMITS = {
   minimumTrackLength: 900,
   historyLimit: 50,
   drawGapScreenPixels: 27,
-  pointHitScreenPixels: 30,
+  pointHitScreenPixels: 40,
   segmentHitScreenPixels: 44,
   treeHitScreenPixels: 24,
   strokeSimplifyScreenPixels: 9,

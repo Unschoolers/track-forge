@@ -195,6 +195,29 @@ describe('terrain editor chrome', () => {
     host.destroy()
   })
 
+  it('keeps the tension slider mounted during adjustment and commits one final value', () => {
+    const snapshot = terrainSnapshot()
+    const { root, port, host } = setup({
+      ...snapshot,
+      editorUi: { ...snapshot.editorUi, tool: 'select', selectedPoint: 0 },
+    })
+    const slider = root.querySelector<HTMLInputElement>('[data-action="point-tension"]')
+    expect(slider).not.toBeNull()
+    if (!slider) throw new Error('Point tension slider missing')
+    slider.value = '0.85'
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(root.contains(slider)).toBe(true)
+    expect(port.dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'editor' }),
+    )
+    slider.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'editor',
+      command: { type: 'set-point-tension', index: 0, tension: 0.85 },
+    })
+    host.destroy()
+  })
+
   it('keeps editor targets at the mobile accessibility minimum', () => {
     const css = readFileSync('src/styles/components.css', 'utf8')
     const layoutCss = readFileSync('src/styles/layout.css', 'utf8')

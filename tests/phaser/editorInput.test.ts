@@ -334,6 +334,46 @@ describe('EditorInputController', () => {
     })
   })
 
+  it('selects through finger jitter without moving a point, and allows selection after a deliberate drag', () => {
+    let editor = createEditorState([
+      { x: 0, y: 0, surface: 'street' },
+      { x: 120, y: 0, surface: 'street' },
+      { x: 120, y: 120, surface: 'street' },
+    ])
+    const onPointSelected = vi.fn()
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 },
+      tool: () => 'select',
+      surface: () => 'street',
+      editor: () => editor,
+      dispatch: command => { editor = reduceEditor(editor, command) },
+      onPointSelected,
+    })
+
+    // A tap near the control point can wobble without starting a move.
+    input.pointerDown({ id: 1, x: 35, y: 0 })
+    input.pointerMove({ id: 1, x: 39, y: 2 })
+    input.pointerUp({ id: 1, x: 39, y: 2 })
+    expect(editor.points[0]).toMatchObject({ x: 0, y: 0 })
+    expect(editor.history).toHaveLength(0)
+    expect(onPointSelected).toHaveBeenLastCalledWith(0)
+
+    // Intentional movement still edits exactly once in the undo history.
+    input.pointerDown({ id: 2, x: 0, y: 0 })
+    input.pointerMove({ id: 2, x: 5, y: 2 })
+    expect(editor.points[0]).toMatchObject({ x: 0, y: 0 })
+    input.pointerMove({ id: 2, x: 20, y: 4 })
+    input.pointerUp({ id: 2, x: 20, y: 4 })
+    expect(editor.points[0]).toMatchObject({ x: 20, y: 4 })
+    expect(editor.history).toHaveLength(1)
+    expect(onPointSelected).toHaveBeenLastCalledWith(null)
+
+    input.pointerDown({ id: 3, x: 20, y: 4 })
+    input.pointerUp({ id: 3, x: 20, y: 4 })
+    expect(onPointSelected).toHaveBeenLastCalledWith(0)
+    expect(editor.history).toHaveLength(1)
+  })
+
   it('selects a crossing context instead of an unrelated control point', () => {
     const dispatch = vi.fn()
     const onCrossingSelected = vi.fn()

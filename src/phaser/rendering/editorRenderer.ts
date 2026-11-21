@@ -77,7 +77,7 @@ export function renderEditorOverlay(
   for (const [index, point] of state.points.entries()) {
     const selected = index === selectedPoint
     graphics.fillStyle(selected ? 0xffd43b : 0xf4f7fb, 1)
-    graphics.fillCircle(point.x, point.y, (selected ? 8 : 5) * screenScale)
+    graphics.fillCircle(point.x, point.y, (selected ? 9 : 6.5) * screenScale)
     if (selected) {
       graphics.lineStyle(2 * screenScale, 0x20242a, 0.9)
       graphics.strokeCircle(point.x, point.y, 10 * screenScale)
