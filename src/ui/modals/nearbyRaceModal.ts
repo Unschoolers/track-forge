@@ -130,9 +130,9 @@ export function createNearbyRaceResults(
     } else {
       status.textContent = snapshot.error ?? 'Waiting for the host to choose the next race…'
     }
-    list.replaceChildren(...nearby.standings().map(({ slot, car, identity, local, time, left }, index) => {
+    list.replaceChildren(...nearby.standings().map(({ slot, car, identity, name, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
-      const label = local ? 'You' : `Player ${slot + 1}`
+      const label = name ? `${name}${local ? ' (You)' : ''}` : local ? 'You' : `Player ${slot + 1}`
       const topper = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
       topper.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
       topper.title = `${identity.color} ${identity.icon} topper`
