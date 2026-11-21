@@ -50,4 +50,4 @@ The fourth scenario in `tests/domain/aiRaceIntegration.test.ts` was named *recov
 
 The actual off-road recovery contract remains in `tests/domain/aiRecoveryEvents.test.ts`: it explicitly teleports an AI rival to (4000,4000), steps real physics, asserts an `off-road` recovery event at the pre-reset position, and checks the recovered car returns near the track. Water and bridge recovery have their own independent edge cases.
 
-Baseline CI (`main` run 44876316014) reported `aiRaceIntegration.test.ts` **4 tests, 331 ms**. The follow-up PR must record its comparable CI runtime and complete test results. This removal is based on redundant behavior, not a test-count target.
+Baseline CI (`main` run 44876316014) reported `aiRaceIntegration.test.ts` **4 tests, 331 ms**. Follow-up PR #125 CI (same GitHub workflow class, run 44876916175) reported **3 tests, 21 ms**, with **112/112 test files passing**. The prior main-branch run 44876316014 reported **4 tests, 331 ms**. These are runner observations rather than a controlled same-host benchmark. This removal is based on redundant behavior, not a test-count target.
