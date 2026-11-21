@@ -27,13 +27,18 @@ describe('Nearby sharing and rematch controls', () => {
   it('offers track receiving without hiding the existing race actions', () => {
     const nearby = new NearbyRace(transport, () => true)
     const scanTracks = vi.fn()
+    const chooseTrack = vi.fn()
     try {
       const modal = createNearbyRaceModal(nearby, 'blue', {
-        close: vi.fn(), chooseTrack: vi.fn(), scan: vi.fn(), scanTracks,
+        close: vi.fn(), chooseTrack, scan: vi.fn(), scanTracks,
         saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
         downloadDiagnostics: vi.fn(async () => true),
       })
-      expect(modal.querySelector('[data-action="nearby-choose-track"]')).not.toBeNull()
+      const host = modal.querySelector<HTMLButtonElement>('[data-action="nearby-choose-track"]')
+      expect(host?.textContent).toBe('CHOOSE TRACK TO HOST')
+      expect(host?.classList.contains('button-primary')).toBe(true)
+      host?.click()
+      expect(chooseTrack).toHaveBeenCalledOnce()
       expect(modal.querySelector('[data-action="nearby-scan"]')).not.toBeNull()
       modal.querySelector<HTMLButtonElement>('[data-action="nearby-receive-track"]')?.click()
       expect(scanTracks).toHaveBeenCalledOnce()
