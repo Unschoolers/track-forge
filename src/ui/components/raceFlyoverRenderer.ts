@@ -1,5 +1,6 @@
-import { CAR_SPECS, ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
+import { ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
+import { drawVehicleArtworkOnCanvas } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
 import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -109,7 +110,7 @@ export function createRaceFlyoverRenderer(
     for (let at = 0; at < path.totalLength; at += lampSpacing) lamps.push(pointAt(at))
   }
 
-  function drawCar(ctx: CanvasRenderingContext2D, position: RoutePosition, color: string, lane: number): void {
+  function drawCar(ctx: CanvasRenderingContext2D, position: RoutePosition, carId: CarId, lane: number): void {
     ctx.save()
     ctx.translate(position.x - Math.sin(position.angle) * lane, position.y + Math.cos(position.angle) * lane)
     ctx.rotate(position.angle)
@@ -120,19 +121,14 @@ export function createRaceFlyoverRenderer(
         -NIGHT_HEADLIGHT.height / 2,
       )
     }
-    ctx.fillStyle = 'rgba(0, 0, 0, .34)'
-    ctx.fillRect(-14, -7, 31, 18)
-    ctx.fillStyle = color
-    ctx.beginPath()
-    ctx.roundRect(-16, -9, 32, 18, 5)
-    ctx.fill()
-    ctx.fillStyle = night ? '#a9d0d6' : '#d7eff3'
-    ctx.fillRect(3, -6, 5, 12)
-    ctx.fillStyle = '#26313a'
-    ctx.fillRect(-9, -6, 5, 12)
-    ctx.fillStyle = night ? '#fff3b0' : '#f6f2d6'
-    ctx.fillRect(13, -7, 3, 4)
-    ctx.fillRect(13, 3, 3, 4)
+    // The same body, roof, windows, wheels, bed and fixtures as the real race.
+    if (!night) {
+      ctx.fillStyle = 'rgba(0, 0, 0, .24)'
+      ctx.beginPath()
+      ctx.ellipse(2, 3, 24, 12, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    drawVehicleArtworkOnCanvas(ctx, carId)
     ctx.restore()
   }
 
@@ -280,10 +276,10 @@ export function createRaceFlyoverRenderer(
       ctx.restore()
     }
     if (!ghost) {
-      drawCar(ctx, position(distance + direction * 100), CAR_SPECS[car === 'red' ? 'yellow' : 'red'].color, -14)
-      drawCar(ctx, position(distance - direction * 95), CAR_SPECS[car === 'green' ? 'blue' : 'green'].color, 14)
+      drawCar(ctx, position(distance + direction * 100), car === 'red' ? 'yellow' : 'red', -14)
+      drawCar(ctx, position(distance - direction * 95), car === 'green' ? 'blue' : 'green', 14)
     }
-    drawCar(ctx, player, CAR_SPECS[car].color, 0)
+    drawCar(ctx, player, car, 0)
     ctx.restore()
   }
 }
