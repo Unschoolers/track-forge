@@ -136,3 +136,38 @@ describe('native APK installation feedback', () => {
     await vi.waitFor(() => expect(overlay.textContent).toContain('Confirm installation in the Android prompt.'))
   })
 })
+
+
+describe('single-player topper customization', () => {
+  it('edits the same remembered topper in Options > Race without a multiplayer lobby', () => {
+    const save = vi.fn()
+    const modal = createOptionsModal({
+      overlay: { type: 'options', returnTo: 'home' },
+      preferences: {
+        car: 'green',
+        difficulty: 'normal',
+        audioEnabled: true,
+        hapticsEnabled: true,
+        dynamicZoomEnabled: true,
+        playerIdentity: { icon: 'crown', color: 'gold' },
+      },
+    } as AppSnapshot, {
+      close: vi.fn(), preferences: save,
+      previewVolume: vi.fn(), setVolume: vi.fn(),
+    })
+    document.body.replaceChildren(modal)
+    modal.querySelector<HTMLButtonElement>('[data-action="options-tab-race"]')?.click()
+    expect(modal.textContent).toContain('Your topper · crown / gold')
+    expect(modal.querySelectorAll('[data-action^="options-topper-icon-"]')).toHaveLength(6)
+    expect(modal.querySelectorAll('[data-action^="options-topper-color-"]')).toHaveLength(6)
+    expect(modal.querySelector('[data-action="options-topper-icon-crown"]')?.getAttribute('aria-pressed')).toBe('true')
+    modal.querySelector<HTMLButtonElement>('[data-action="options-topper-icon-star"]')?.click()
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      car: 'green', playerIdentity: { icon: 'star', color: 'gold' },
+    }))
+    modal.querySelector<HTMLButtonElement>('[data-action="options-topper-color-pink"]')?.click()
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      car: 'green', playerIdentity: { icon: 'crown', color: 'pink' },
+    }))
+  })
+})

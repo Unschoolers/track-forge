@@ -279,7 +279,8 @@ export class RaceScene extends Phaser.Scene {
         x + Math.cos(angle - 2.4) * 10, y + Math.sin(angle - 2.4) * 10,
       )
     }
-    if (player && this.raceSession.snapshot().setup?.mode === 'nearby') {
+    // The player's remembered topper is a car cosmetic in every race mode.
+    if (player) {
       renderPlayerTopper(
         upperVehicles.has(player.id) ? this.upperVehicleGraphics : this.vehicleGraphics,
         player,

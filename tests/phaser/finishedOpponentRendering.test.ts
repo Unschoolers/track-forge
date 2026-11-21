@@ -17,6 +17,7 @@ class RecordingGraphics {
   positions: { x: number; y: number }[] = []
   lightOrigins: { x: number; y: number }[] = []
   lightCircles: { x: number; y: number; radius: number }[] = []
+  private translated = { x: 0, y: 0 }
 
   clear() {
     this.positions = []
@@ -24,7 +25,7 @@ class RecordingGraphics {
     this.lightCircles = []
   }
   translateCanvas(x: number, y: number) {
-    this.positions.push({ x, y })
+    this.translated = { x, y }
   }
   fillTriangle(x: number, y: number) {
     this.lightOrigins.push({ x, y })
@@ -35,15 +36,18 @@ class RecordingGraphics {
   save() {}
   restore() {}
   rotateCanvas() {}
-  scaleCanvas() {}
+  // Record actual car silhouettes, not additional cosmetic translations.
+  scaleCanvas() { this.positions.push({ ...this.translated }) }
   fillStyle() {}
   beginPath() {}
   moveTo() {}
   lineTo() {}
   closePath() {}
   fillPath() {}
-  fillEllipse() {}
+  fillEllipse() { this.positions.push({ ...this.translated }) }
   fillRect() {}
+  lineStyle() {}
+  strokePath() {}
 }
 
 function createRenderingScenario() {

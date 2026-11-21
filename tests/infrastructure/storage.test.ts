@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
+import { randomPlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import {
   BrowserPreferencesRepository,
@@ -46,8 +47,9 @@ it('does not read or write the obsolete lighting preference', () => {
 
 it('remembers multiplayer topper icon and color without reprompting and validates corrupt storage', () => {
   const memory = new MemoryStore()
-  const repository = new BrowserPreferencesRepository(memory)
-  expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'cyan' })
+  const repository = new BrowserPreferencesRepository(memory, () => ({ icon: 'flag', color: 'orange' }))
+  expect(repository.load().playerIdentity).toEqual({ icon: 'flag', color: 'orange' })
+  expect(JSON.parse(memory.values.get('trackforge-player-topper-v1') ?? 'null')).toEqual({ icon: 'flag', color: 'orange' })
   expect(repository.save({ ...repository.load(), playerIdentity: { icon: 'crown', color: 'violet' } })).toBe(true)
   expect(new BrowserPreferencesRepository(memory).load().playerIdentity).toEqual({ icon: 'crown', color: 'violet' })
   memory.values.set('trackforge-player-topper-v1', '{broken JSON')
@@ -56,6 +58,46 @@ it('remembers multiplayer topper icon and color without reprompting and validate
   expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'pink' })
   expect(repository.save({ ...repository.load(), car: 'yellow' })).toBe(true)
   expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'pink' })
+})
+
+it('selects icon and color independently from a randomized first-launch seed', () => {
+  const picks = [0.4, 0.8]
+  const selection = randomPlayerIdentity(() => picks.shift() ?? 0)
+  expect(selection).toEqual({ icon: 'bolt', color: 'violet' })
+})
+
+it('randomizes the first topper once, retaining the saved choice on later launches', () => {
+  const store = new MemoryStore()
+  let created = 0
+  const first = new BrowserPreferencesRepository(store, () => {
+    created++
+    return { icon: 'diamond', color: 'lime' }
+  })
+  expect(store.values.has('trackforge-player-topper-v1')).toBe(false)
+  expect(first.load().playerIdentity).toEqual({ icon: 'diamond', color: 'lime' })
+  expect(first.load().playerIdentity).toEqual({ icon: 'diamond', color: 'lime' })
+  expect(created).toBe(1)
+  expect(JSON.parse(store.values.get('trackforge-player-topper-v1') ?? 'null'))
+    .toEqual({ icon: 'diamond', color: 'lime' })
+
+  // A subsequent launch must not roll again when a selection exists.
+  const next = new BrowserPreferencesRepository(store, () => {
+    throw new Error('A saved topper must never be randomized again')
+  })
+  expect(next.load().playerIdentity).toEqual({ icon: 'diamond', color: 'lime' })
+})
+
+it('retains the first random topper for the session when storage cannot write', () => {
+  const store = new MemoryStore()
+  store.failedKeys.add('trackforge-player-topper-v1')
+  let created = 0
+  const repo = new BrowserPreferencesRepository(store, () => {
+    created++
+    return { icon: 'bolt', color: 'pink' }
+  })
+  expect(repo.load().playerIdentity).toEqual({ icon: 'bolt', color: 'pink' })
+  expect(repo.load().playerIdentity).toEqual({ icon: 'bolt', color: 'pink' })
+  expect(created).toBe(1)
 })
 
 it('persists the explicit race mode and rejects unknown stored modes', () => {
@@ -390,7 +432,7 @@ describe('score and preference repositories', () => {
   it('falls back for invalid preferences and persists valid changes', () => {
     const storage = new MemoryStore()
     storage.values.set('trackforge-last-car', 'purple')
-    const preferences = new BrowserPreferencesRepository(storage)
+    const preferences = new BrowserPreferencesRepository(storage, () => ({ icon: 'star', color: 'cyan' }))
 
     expect(preferences.load()).toEqual(DEFAULT_PREFERENCES)
     expect(
