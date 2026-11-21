@@ -1,6 +1,6 @@
 import { courseIdentity } from '@/application/race/raceRecords'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
-import { createCup, recordCupResult, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { DEFAULT_CUP_TRACK_IDS, createCup, recordCupResult, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   CupStore,
@@ -267,6 +267,7 @@ describe('AppController', () => {
     const values = new Map<string, string>()
     const store = new BrowserCupRepository({ get: (key) => values.get(key) ?? null, set: (key, value) => { values.set(key, value); return true }, remove: (key) => values.delete(key) })
     const first = setup(undefined, false, store)
+    first.controller.dispatch({ type: 'open-cup' })
     first.controller.dispatch({ type: 'start-cup' })
     first.controller.dispatch({ type: 'go-home' })
     const resumed = setup(undefined, false, store)
@@ -285,7 +286,7 @@ describe('AppController', () => {
     expect(final.controller.snapshot().overlay.type).toBe('cup-final')
     expect(final.raceSession.start).not.toHaveBeenCalled()
     final.controller.dispatch({ type: 'next-cup-race' })
-    expect(store.load()).toEqual({ checkpoint: null, bestPlacement: 1 })
+    expect(store.load()).toEqual({ checkpoint: null, bestPlacement: 1, lineup: DEFAULT_CUP_TRACK_IDS })
   })
 
   it('shows an official race record on Home without adding the circuit to saved tracks', () => {
@@ -307,6 +308,7 @@ describe('AppController', () => {
     const { controller, raceSession, trackStore } = setup(undefined, true)
     const input = { steering: 0, throttle: 1, braking: false }
     const finish = () => { raceSession.advance(3.7, input); raceSession.advance(0.02, input) }
+    controller.dispatch({ type: 'open-cup' })
     controller.dispatch({ type: 'start-cup' })
     expect(controller.snapshot()).toMatchObject({ mode: 'race', cup: { index: 0 }, currentTrack: { id: 'official-meadow' } })
     expect(raceSession.snapshot().setup).toMatchObject({ mode: 'normal', handling: 'arcade', laps: 1 })
