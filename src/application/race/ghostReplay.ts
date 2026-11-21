@@ -1,4 +1,5 @@
 import { normalizeRouteKind, type CarId, type Track } from '@/domain/model'
+import type { PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
 export interface GhostSetup {
@@ -29,6 +30,8 @@ export interface GhostRun {
 }
 export interface GhostPose extends GhostFrame {
   readonly car: CarId
+  /** Present only for nearby human players, never saved replay ghosts. */
+  readonly identity?: PlayerIdentity
 }
 export interface GhostStore {
   availability?(track: Track, setup: GhostSetup): GhostAvailability
