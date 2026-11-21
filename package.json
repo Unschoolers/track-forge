@@ -13,7 +13,7 @@
     "qa:mobile:production": "playwright test --config=playwright.production.config.mjs",
     "qa:lanes": "node qa/lanes/cli.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome lint .",
+    "lint": "biome lint . --max-diagnostics=150",
     "build": "npm run typecheck && vite build",
     "verify": "npm test && npm run typecheck && npm run lint && npm run build",
     "android:sync": "npm run build && cap sync android",
