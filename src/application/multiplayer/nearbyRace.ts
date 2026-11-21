@@ -74,7 +74,7 @@ function validLineupPositions(cars: (CarId | null)[], positions: (number | null)
   const occupied = positions.filter((slot): slot is number => slot !== null)
   return occupied.length === active && new Set(occupied).size === active &&
     positions.every((position, playerSlot) => cars[playerSlot] === null
-      ? position === null : Number.isInteger(position) && position !== null && position >= 0 && position < active)
+      ? position === null : position !== null && Number.isInteger(position) && position >= 0 && position < active)
 }
 
 function readControl(bytes: Uint8Array): Control | null {
