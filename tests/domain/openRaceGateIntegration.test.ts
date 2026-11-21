@@ -37,11 +37,11 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   expect(crossing.events).toContainEqual({ type: 'gate-crossed', vehicleId: 'player', gate: 1, lap: 0, time: crossing.state.elapsed })
 })
 
-it('counts down after a missed gate, freezes while paused, and recovers before the gate', () => {
+it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, freezes while paused, and recovers before the gate in %s', handling => {
   const track = createStarterTrack(asTrackId('missed-gate'), 1)
   const points = [0, 200, 400, 600, 800].map((x) => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const }))
   const path = buildRoadPath(points, track.terrain, undefined, 'point-to-point')
-  const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling: 'arcade' })
+  const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling })
   const gateIndex = (path.points.length - 1) / 4
   const lower = Math.floor(gateIndex)
   const gateX = path.points[lower]!.x + (path.points[lower + 1]!.x - path.points[lower]!.x) * (gateIndex - lower)
