@@ -182,6 +182,9 @@ export class RaceScene extends Phaser.Scene {
     window.addEventListener('blur', this.onBlur)
     document.addEventListener('visibilitychange', this.onVisibility)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this)
+    if (this.raceSession.snapshot().setup?.mode === 'nearby') {
+      this.controller.dispatch({ type: 'nearby-scene-ready' })
+    }
   }
 
   override update(_time: number, deltaMilliseconds: number): void {
