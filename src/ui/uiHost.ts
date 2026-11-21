@@ -432,9 +432,9 @@ export class DomUiHost implements UiHost {
               id,
             }),
           share: (track) => { void this.shareTrackChallenge(track) },
-          sendNearby: this.runtime.nearby && state.overlay.purpose !== 'nearby'
-            ? (track) => this.controller.dispatch({ type: 'send-nearby-track', track })
-            : undefined,
+          ...(this.runtime.nearby && state.overlay.purpose !== 'nearby'
+            ? { sendNearby: (track: Track) => this.controller.dispatch({ type: 'send-nearby-track', track }) }
+            : {}),
           importFile: (content) => this.controller.dispatch({ type: 'import-track', content }),
           delete: (track) => {
             if (this.environment.confirm(`Delete "${track.name}"?`)) {
