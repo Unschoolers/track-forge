@@ -2,7 +2,7 @@ import { EventBus } from '@/application/eventBus'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { CAR_IDS, type CarId, type LightingMode, type Track } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
-import { decodePose, decodePoseBatch, encodePose, encodePoseBatch, Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, RemoteGhost } from './raceWire'
+import { decodePose, decodePoseBatch, encodePose, encodePoseBatch, Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, POSE_SEQUENCE_MASK, POSE_RECOVERY_MASK, RemoteGhost } from './raceWire'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, isPlayerIdentity, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
@@ -263,7 +263,8 @@ export class NearbyRace {
       now - this.lastSentAt < this.posePeriodMs - 2) return
     const ids = this.endpoints()
     if (!ids.length) return
-    const pose = encodePose(this.slot, this.sequence++, this.recovery, vehicle)
+    const pose = encodePose(this.slot, this.sequence, this.recovery, vehicle)
+    this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
     // Guests upload one pose. Host broadcasts one shared snapshot to all
     // guests instead of relaying every guest's packet individually.
     if (!this.hostId) this.latestPoses.set(this.slot, { bytes: pose, receivedAt: now })
@@ -298,7 +299,7 @@ export class NearbyRace {
     }
   }
 
-  recovered(): void { this.recovery++ }
+  recovered(): void { this.recovery = (this.recovery + 1) & POSE_RECOVERY_MASK }
 
   /** Called only when Phaser has created the race scene and bound its controls. */
   sceneReady(): void {

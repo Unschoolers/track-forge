@@ -122,4 +122,15 @@ describe('Nearby wire and track transfer contracts', () => {
   })
 
 
+  it('accepts the full 16-bit sequence and 8-bit recovery and handles explicit wrap to zero', () => {
+    const ghost = new RemoteGhost('red')
+    const before = decodePose(encodePose(1, 65_535, 255, makeCar('red', 10)))
+    const after = decodePose(encodePose(1, 0, 0, makeCar('red', 300)))
+    assert(before && after)
+    expect(ghost.receive(before, 1_000)).toBe(true)
+    expect(ghost.receive(after, 1_033)).toBe(true)
+    expect(ghost.pose(1_150)?.x).toBe(300)
+  })
+
+
 })

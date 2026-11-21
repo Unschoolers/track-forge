@@ -3,6 +3,8 @@ import type { CarId } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
 export const POSE_BYTES = 19
+export const POSE_SEQUENCE_MASK = 0xffff
+export const POSE_RECOVERY_MASK = 0xff
 export const POSE_PERIOD_MS = 1000 / 30
 export const POSE_FAST_PERIOD_MS = 1000 / 60
 const SCALE = 32
@@ -26,8 +28,8 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
   const signedMin = -0x80000000
   const signedMax = 0x7fffffff
   if (!Number.isInteger(slot) || slot < 0 || slot > 3 ||
-      !Number.isInteger(sequence) || sequence < 0 || sequence > 0xffff ||
-      !Number.isInteger(recovery) || recovery < 0 || recovery > 0xff ||
+      !Number.isInteger(sequence) || sequence < 0 || sequence > POSE_SEQUENCE_MASK ||
+      !Number.isInteger(recovery) || recovery < 0 || recovery > POSE_RECOVERY_MASK ||
       !Number.isFinite(pose.angle) ||
       ![pose.x, pose.y, pose.z].every((coordinate) => {
         const quantized = Math.round(coordinate * SCALE)
