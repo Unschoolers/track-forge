@@ -143,7 +143,7 @@ export function createNearbyRaceResults(
     if (key !== celebrationKey) {
       celebrationKey = key
       const nodes: HTMLElement[] = []
-      if (medal) nodes.push(createFinishCelebration(medal))
+      if (medal) nodes.push(createFinishCelebration(medal), element('p', 'race-finish-medal', `${medal} MEDAL`))
       if (complete && typeof localTime === 'number' && place > 1 &&
           typeof winnerTime === 'number') {
         nodes.push(element('p', 'modal-subtitle', `Behind winner · +${formatRaceTime(Math.max(0, localTime - winnerTime))}`))
