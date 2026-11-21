@@ -19,31 +19,39 @@ export interface PosePacket {
   readonly pose: Omit<GhostPose, 'car' | 't'>
 }
 
+const MIN_POSE_COORDINATE = -0x80000000
+const MAX_POSE_COORDINATE = 0x7fffffff
+
+function poseCoordinate(value: number): number {
+  const fixed = Math.round(value * SCALE)
+  if (!Number.isFinite(fixed) || fixed < MIN_POSE_COORDINATE || fixed > MAX_POSE_COORDINATE) {
+    throw new RangeError('Invalid nearby pose values.')
+  }
+  return fixed
+}
+
 export function encodePose(slot: number, sequence: number, recovery: number, vehicle: RaceVehicle): Uint8Array {
-  const bytes = new Uint8Array(POSE_BYTES)
-  const view = new DataView(bytes.buffer)
   const pose = captureGhost(vehicle, 0)
-  // Avoid silent Uint8Array/DataView coercion: an invalid local vehicle must
-  // never become a plausible remote pose (for example NaN x becomes 0).
-  const signedMin = -0x80000000
-  const signedMax = 0x7fffffff
+  // DataView silently converts NaN to zero and wraps integer overflow.
+  // Validate once, before allocating the high-frequency network packet.
   if (!Number.isInteger(slot) || slot < 0 || slot > 3 ||
       !Number.isInteger(sequence) || sequence < 0 || sequence > POSE_SEQUENCE_MASK ||
       !Number.isInteger(recovery) || recovery < 0 || recovery > POSE_RECOVERY_MASK ||
-      !Number.isFinite(pose.angle) ||
-      ![pose.x, pose.y, pose.z].every((coordinate) => {
-        const quantized = Math.round(coordinate * SCALE)
-        return Number.isFinite(coordinate) && quantized >= signedMin && quantized <= signedMax
-      })) {
+      !Number.isFinite(pose.angle)) {
     throw new RangeError('Invalid nearby pose values.')
   }
+  const x = poseCoordinate(pose.x)
+  const y = poseCoordinate(pose.y)
+  const z = poseCoordinate(pose.z)
+  const bytes = new Uint8Array(POSE_BYTES)
+  const view = new DataView(bytes.buffer)
   bytes[0] = Packet.Pose
   bytes[1] = slot | (pose.structureRunId === null ? 0 : 4)
   bytes[2] = recovery
   view.setUint16(3, sequence, true)
-  view.setInt32(5, Math.round(pose.x * SCALE), true)
-  view.setInt32(9, Math.round(pose.y * SCALE), true)
-  view.setInt32(13, Math.round(pose.z * SCALE), true)
+  view.setInt32(5, x, true)
+  view.setInt32(9, y, true)
+  view.setInt32(13, z, true)
   view.setUint16(17, Math.round(pose.angle / TURN * 65536), true)
   return bytes
 }
