@@ -1,4 +1,4 @@
-import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity, type TopperColor, type TopperIcon } from '@/application/multiplayer/playerIdentity'
+import { TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity, type TopperColor, type TopperIcon } from '@/application/multiplayer/playerIdentity'
 import { button, element } from '@/ui/dom'
 
 export function createTopperSelector(
