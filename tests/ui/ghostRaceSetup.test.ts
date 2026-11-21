@@ -101,8 +101,8 @@ describe('Ghost Race setup', () => {
     modal.querySelector<HTMLButtonElement>('[data-action="open-race-splits"]')?.click()
     const rows = modal.querySelectorAll('.results-splits-detail-row')
     expect(rows).toHaveLength(2)
-    expect([...rows[0]!.children].map(cell => cell.textContent)).toEqual(['CHECKPOINT 1', '00:15.000', '00:15.000'])
-    expect([...rows[1]!.children].map(cell => cell.textContent)).toEqual(['FINISH', '00:46.000', '01:01.000'])
+    expect(Array.from(rows.item(0)?.children ?? [], cell => cell.textContent)).toEqual(['CHECKPOINT 1', '00:15.000', '00:15.000'])
+    expect(Array.from(rows.item(1)?.children ?? [], cell => cell.textContent)).toEqual(['FINISH', '00:46.000', '01:01.000'])
     modal.remove()
   })
 
