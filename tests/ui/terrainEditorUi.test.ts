@@ -206,7 +206,7 @@ describe('terrain editor chrome', () => {
     if (!slider) throw new Error('Point tension slider missing')
     slider.value = '0.85'
     slider.dispatchEvent(new Event('input', { bubbles: true }))
-    expect(slider.isConnected).toBe(true)
+    expect(root.contains(slider)).toBe(true)
     expect(port.dispatch).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'editor' }),
     )
