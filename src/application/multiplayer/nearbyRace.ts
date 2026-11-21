@@ -232,7 +232,10 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle): void {
     const now = this.now()
-    if (this.phase !== 'racing' || this.poseSending || now - this.lastSentAt < this.posePeriodMs) return
+    if (this.phase !== 'racing' || this.poseSending ||
+      // A 60 FPS frame clock can land a fraction below the exact 30 Hz boundary.
+    // Leave a small tolerance so two render frames still produce one update.
+    now - this.lastSentAt < this.posePeriodMs - 2) return
     const ids = this.endpoints()
     if (!ids.length) return
     const pose = encodePose(this.slot, this.sequence++, this.recovery, vehicle)
