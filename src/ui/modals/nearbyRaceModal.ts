@@ -7,8 +7,8 @@ import { createCarPicker } from '@/ui/components/carPicker'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
-import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
-import { createTopperSelector } from '@/ui/components/playerTopperPicker'
+import { DEFAULT_PLAYER_IDENTITY, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
+import { createTopperMarker, createTopperSelector } from '@/ui/components/playerTopperPicker'
 
 function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string | undefined; readonly local: boolean }): string {
   return racer.name ? `${racer.name}${racer.local ? ' (You)' : ''}` : racer.local ? 'You' : `Player ${racer.slot + 1}`
@@ -189,8 +189,7 @@ export function createNearbyRaceResults(
     list.replaceChildren(...standings.map(({ slot, car, identity, name, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
       const label = nearbyRacerLabel({ slot, name, local })
-      const topper = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
-      topper.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
+      const topper = createTopperMarker(identity)
       topper.title = `${identity.color} ${identity.icon} topper`
       row.append(
         topper,
