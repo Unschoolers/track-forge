@@ -21,13 +21,14 @@ export function createFinishCelebration(medal: RaceMedal, newRecord = false): HT
   if (medal === 'GOLD') {
     for (let i = 0; i < 8; i += 1) sparkles.append(element('i'))
   }
-  const accolade = medal === 'GOLD' ? 'CHAMPION' : medal === 'SILVER' ? 'BRILLIANT DRIVE' : 'ON THE PODIUM'
   const placement = medal === 'GOLD' ? '1ST PLACE' : medal === 'SILVER' ? '2ND PLACE' : '3RD PLACE'
+  const crest = element('span', 'results-celebration-crest', '✦')
+  crest.setAttribute('aria-hidden', 'true')
   podium.append(
     sparkles,
-    element('span', 'results-celebration-kicker', accolade),
+    crest,
     element('strong', 'results-celebration-place', placement),
-    element('span', 'results-celebration-detail', medal === 'GOLD' ? 'YOU WON THE RACE' : 'YOU EARNED YOUR MEDAL'),
+    element('span', 'results-celebration-kicker', `${medal} MEDAL`),
   )
   if (newRecord) podium.append(element('span', 'results-celebration-record', '★ NEW RECORD'))
   return podium
