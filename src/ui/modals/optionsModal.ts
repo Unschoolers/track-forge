@@ -99,7 +99,7 @@ export function createOptionsModal(
   const save = button('SAVE NAME', 'save-player-name', submitName, 'button button-primary')
   form.addEventListener('submit', (event) => { event.preventDefault(); submitName() })
   form.append(label, input, save, error)
-  profile.append(form, element('p', 'modal-subtitle', 'Renaming updates your tracks. Built-in tracks belong to Track Forge; future imports retain their original creator.'))
+  profile.append(form)
   frame.body.append(profile)
   const topper = createTopperSelector(
     state.preferences.playerIdentity ?? DEFAULT_PLAYER_IDENTITY,
