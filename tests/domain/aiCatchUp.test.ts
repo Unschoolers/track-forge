@@ -32,9 +32,9 @@ describe('AI catch-up', () => {
     const arranged = {
       ...base,
       vehicles: [
-        { ...player, lap: 1, pathIndex: playerIndex, speed: 200 },
-        { ...near, lap: 1, pathIndex: nearIndex, speed: 200 },
-        { ...far, lap: 1, pathIndex: farIndex, speed: 200 },
+        { ...player, lap: 1, nextSector: 4 as const, pathIndex: playerIndex, speed: 200 },
+        { ...near, lap: 1, nextSector: 4 as const, pathIndex: nearIndex, speed: 200 },
+        { ...far, lap: 1, nextSector: 4 as const, pathIndex: farIndex, speed: 200 },
       ],
     }
     const nearBonus = rivalCatchUp(arranged, arranged.vehicles[1]!)
