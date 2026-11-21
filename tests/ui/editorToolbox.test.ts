@@ -24,12 +24,14 @@ describe('editor mobile toolbox', () => {
     expect(palette.querySelector('details')?.open).toBe(false)
     expect(palette.querySelector('summary')?.textContent).toContain('Road')
     const controls = palette.querySelectorAll<HTMLButtonElement>('.tool-button')
-    expect(controls).toHaveLength(10)
+    expect(controls).toHaveLength(11)
     for (const control of controls) {
       expect(control.querySelector('.editor-control-label')?.textContent?.length).toBeGreaterThan(0)
       expect(control.getAttribute('aria-label')).toBeTruthy()
     }
     expect(palette.querySelector('[data-tool="draw"]')?.getAttribute('aria-pressed')).toBe('true')
+    palette.querySelector<HTMLButtonElement>('[data-tool="insert"]')?.click()
+    expect(onTool).toHaveBeenCalledWith('insert')
     palette.querySelector<HTMLButtonElement>('[data-tool="tree"]')?.click()
     expect(onTool).toHaveBeenCalledWith('tree')
   })

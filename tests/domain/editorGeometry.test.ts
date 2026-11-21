@@ -6,6 +6,7 @@ import {
   nearestControlPoint,
   nearestSegmentIndex,
   nearestTree,
+  planPointInsertion,
   normalizeClosedLoop,
   surfaceForIndex,
 } from '@/domain/editor/editorGeometry'
@@ -111,6 +112,21 @@ describe('editor geometry', () => {
     expect(nearestSegmentIndex(points, { x: 55, y: 5 }, 1)).toBe(0)
     expect(nearestTree(trees, { x: 42, y: 44 }, 1)).toBe(0)
     expect(nearestControlPoint(points, { x: 40, y: 40 }, 2)).toBe(-1)
+  })
+
+  it('projects a new handle onto a segment and inherits its road properties without reusing IDs', () => {
+    const points: readonly TrackPoint[] = [
+      { id: 'a', x: 0, y: 0, surface: 'dirt', structure: 'overpass', curve: 'corner' },
+      { id: 'b', x: 200, y: 0, surface: 'street' },
+    ]
+    expect(planPointInsertion(points, 0, { x: 65, y: 18 })).toEqual({
+      index: 1,
+      point: { x: 65, y: 0, surface: 'dirt', structure: 'overpass', curve: 'smooth', tension: 0.5 },
+    })
+    expect(planPointInsertion(points, 0, { x: 0, y: 0 })?.point.x).toBe(20)
+    expect(planPointInsertion(points, 0, { x: 200, y: 0 })?.point.x).toBe(180)
+    expect(planPointInsertion(points, 1, { x: 65, y: 0 })).toBeNull()
+    expect(planPointInsertion([points[0]!, points[0]!], 0, { x: 0, y: 0 })).toBeNull()
   })
 
   it('snaps a closed loop and expands content around its bounds center', () => {
