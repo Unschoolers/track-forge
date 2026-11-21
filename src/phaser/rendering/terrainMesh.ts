@@ -10,7 +10,6 @@ import { WeightedIdentityCache } from '@/phaser/rendering/terrainPresentationCac
 import {
   buildTerrainComponents,
   mapTerrainComponent,
-  pointInTerrainComponent,
   tileTerrainComponent,
   triangulateTerrainComponent,
   type TerrainComponent,
@@ -174,15 +173,34 @@ function waterTexture(
   for (let y = top + spacing / 2; y < bottom; y += spacing) {
     const row = Math.round((y - top) / spacing)
     const offset = row % 2 === 0 ? 0 : spacing / 2
+    // The point-in-ring ray test only depends on intersections at this y.
+    // Compute them once per ripple row, rather than scanning every coastline
+    // edge twice for each 10-unit stroke (especially costly on large lakes).
+    const intersections: number[] = []
+    for (const ring of [component.outer, ...component.holes]) {
+      for (let index = 0; index < ring.length; index += 1) {
+        const start = ring[index]
+        const end = ring[(index + 1) % ring.length]
+        if (!start || !end || (start.y > y) === (end.y > y)) continue
+        intersections.push(start.x + ((y - start.y) * (end.x - start.x)) / (end.y - start.y))
+      }
+    }
+    intersections.sort((a, b) => a - b)
+    const inside = (x: number): boolean => {
+      // Match the strict x < intersection parity used by pointInRing.
+      let low = 0
+      let high = intersections.length
+      while (low < high) {
+        const middle = (low + high) >>> 1
+        if (x < (intersections[middle] ?? Number.NEGATIVE_INFINITY)) high = middle
+        else low = middle + 1
+      }
+      return (intersections.length - low) % 2 === 1
+    }
     for (let x = left + spacing / 2 + offset; x < right; x += spacing) {
       const start = { x: x - lineLength / 2, y }
       const end = { x: x + lineLength / 2, y }
-      if (
-        pointInTerrainComponent(start, component) &&
-        pointInTerrainComponent(end, component)
-      ) {
-        lines.push({ start, end })
-      }
+      if (inside(start.x) && inside(end.x)) lines.push({ start, end })
     }
   }
   return lines
