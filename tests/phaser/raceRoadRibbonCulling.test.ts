@@ -151,6 +151,23 @@ describe('race road ribbon culling', () => {
     expect(strokes(graphics.filter(({ visible }) => visible))).toBe(total)
   })
 
+  it('keeps static road batches inside a padded visibility window until the camera exits it', () => {
+    const { scene, graphics } = createRecordingScene()
+    const update = renderRaceTrackGeometryBase(scene, lineGeometry(2400), false)
+    if (!update) throw new Error('Expected batched road geometry')
+    const road = graphics.slice(0, -1)
+    // Camera is far from the road; the wider precomputed window overlaps the
+    // middle section, so that section must remain rendered despite being
+    // outside the current instantaneous viewport.
+    const farView = { centerX: 0, centerY: 3000, width: 400, height: 200, zoom: 1, rotation: 0 }
+    update(farView)
+    expect(road.every(({ visible }) => !visible)).toBe(true)
+    update(farView, { left: -500, right: 500, top: -500, bottom: 500 })
+    expect(road.some(({ visible }) => visible)).toBe(true)
+    update(farView)
+    expect(road.every(({ visible }) => !visible)).toBe(true)
+  })
+
   it('keeps batches visible when either set of bounds is invalid', () => {
     const viewport = { left: 0, top: 0, right: 10, bottom: 10 }
     expect(boundsVisible({ left: Number.NaN, top: 20, right: 30, bottom: 30 }, viewport)).toBe(true)
