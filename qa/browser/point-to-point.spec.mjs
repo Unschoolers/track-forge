@@ -49,7 +49,7 @@ test('persists an open route and displays its ordered finish splits', async ({ p
     await expect(rows).toHaveCount(4)
     for (const [index, gate] of ['CHECKPOINT 1', 'CHECKPOINT 2', 'CHECKPOINT 3', 'FINISH'].entries()) {
       await expect(rows.nth(index).locator('strong')).toHaveText(gate)
-      await expect(rows.nth(index).locator('span').last()).toHaveText(/^\\d{2}:\\d{2}\\.\\d{3}$/)
+      await expect(rows.nth(index).locator('span').last()).toHaveText(/^\d{2}:\d{2}\.\d{3}$/)
     }
     await details.locator('[data-action="close-race-splits"]').click()
   }
