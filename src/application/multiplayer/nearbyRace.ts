@@ -54,7 +54,8 @@ export class NearbyRace {
   private purpose: Purpose = 'race'
   private round = 0
   private incomingShare: Track | null = null
-  private sharedCount = 0
+  private readonly sharedPeers = new Set<string>()
+  private sharePacked: Promise<Uint8Array[]> | null = null
   private readonly timeline: Record<string, unknown>[] = []
   private diagnosticStart = 0
   private lastFailure: Record<string, unknown> | null = null
@@ -95,7 +96,7 @@ export class NearbyRace {
     return {
       phase: this.phase, purpose: this.purpose, role: this.role,
       error: this.error, room: this.room, track: this.course?.track.name,
-      incomingTrack: this.incomingShare?.name ?? null, sharedCount: this.sharedCount,
+      incomingTrack: this.incomingShare?.name ?? null, sharedCount: this.sharedPeers.size,
       rooms: [...this.rooms], players: 1 + this.guests.size,
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
         this.guests.size > 0 && this.pendingPairs.size === 0,
@@ -255,7 +256,7 @@ export class NearbyRace {
   private async sendSharedTrack(id: string, active: number): Promise<void> {
     const track = this.course?.track
     if (!track) return
-    const chunks = await packTrack(track)
+    const chunks = await (this.sharePacked ??= packTrack(track))
     if (active !== this.generation || !this.guests.has(id)) return
     await this.transport.send([id], encodeControl({ type: 'share-offer' }))
     for (const chunk of chunks) {
@@ -414,7 +415,7 @@ export class NearbyRace {
             error instanceof Error ? error.message : 'Could not send the nearby track.', 'send_track', error)
         })
       } else if (guestSlot !== undefined && this.phase === 'hosting' && message.type === 'share-result') {
-        if (message.status === 'saved') this.sharedCount++
+        if (message.status === 'saved') this.sharedPeers.add(id)
         this.changed()
       }
       return
@@ -632,7 +633,8 @@ export class NearbyRace {
     this.clearTimeout()
     this.course = null
     this.incomingShare = null
-    this.sharedCount = 0
+    this.sharedPeers.clear()
+    this.sharePacked = null
     this.round = 0
     this.purpose = 'race'
     this.role = null
