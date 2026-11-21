@@ -124,11 +124,24 @@ test('can drag the same starter control point twice, then tap for point controls
   await page.getByRole('button', { name: 'Move points', exact: true }).click()
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
   const originalPoints = await saved()
-  const control = originalPoints[2]
   const camera = (await read()).camera
   const canvas = await page.locator('#game-container canvas').boundingBox()
-  const x = canvas.x + canvas.width / 2 + (control.x - camera.x) * camera.zoom
-  const y = canvas.y + canvas.height / 2 + (control.y - camera.y) * camera.zoom
+  // The mobile dock can cover a control point at fitted zoom. Drag a visible
+  // handle through visible canvas space rather than sending touches to chrome.
+  const target = await page.evaluate(({ points, camera, canvas }) => {
+    const gameCanvas = document.querySelector('#game-container canvas')
+    return points.map((point, index) => ({
+      index,
+      x: canvas.x + canvas.width / 2 + (point.x - camera.x) * camera.zoom,
+      y: canvas.y + canvas.height / 2 + (point.y - camera.y) * camera.zoom,
+    })).find(({ index, x, y }) =>
+      index > 0 && index < points.length - 2 &&
+      [0, 52, 100].every(dx => document.elementFromPoint(x + dx, y) === gameCanvas),
+    )
+  }, { points: originalPoints, camera, canvas })
+  expect(target, 'a draggable control point must be visible beyond the mobile editor chrome').toBeDefined()
+  const { x, y, index: pointIndex } = target
+  const control = originalPoints[pointIndex]
   const panel = page.getByRole('complementary', { name: 'Curve point' })
   const pointer = await context.newCDPSession(page)
   try {
@@ -148,22 +161,13 @@ test('can drag the same starter control point twice, then tap for point controls
     await touch(pointer, 'touchMove', [contact(1, x + 52, y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
-    const afterFirstDrag = await saved()
-    if (afterFirstDrag[2].x <= control.x + 50) {
-      const changed = afterFirstDrag.map((point, index) => ({ index, x: point.x, y: point.y }))
-        .filter((point, index) => point.x !== originalPoints[index]?.x || point.y !== originalPoints[index]?.y)
-      console.info('Control point drag diagnostics:', JSON.stringify({
-        target: control, observed: afterFirstDrag[2], changed,
-        camera: (await read()).camera,
-      }))
-    }
-    await expect.poll(async () => (await saved())[2].x).toBeGreaterThan(control.x + 50)
+    await expect.poll(async () => (await saved())[pointIndex].x).toBeGreaterThan(control.x + 50)
 
     await touch(pointer, 'touchStart', [contact(1, x + 52, y)])
     await touch(pointer, 'touchMove', [contact(1, x + 100, y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(2)
-    await expect.poll(async () => (await saved())[2].x).toBeGreaterThan(control.x + 200)
+    await expect.poll(async () => (await saved())[pointIndex].x).toBeGreaterThan(control.x + 200)
 
     await touch(pointer, 'touchStart', [contact(1, x + 100, y)])
     await releaseTouches(pointer)
