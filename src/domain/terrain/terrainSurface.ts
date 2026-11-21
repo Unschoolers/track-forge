@@ -5,7 +5,7 @@ import type {
   TerrainMap,
   Vector2,
 } from '@/domain/model'
-import { terrainCellKey } from '@/domain/terrain/terrainField'
+import { terrainCellKey, terrainKindIndex } from '@/domain/terrain/terrainField'
 
 export type TerrainMaterial = 'grass' | 'water'
 type TerrainSlopeKind = 'natural' | 'road'
@@ -104,12 +104,6 @@ function cellAt(position: Vector2, cellSize: number): {
     column: Math.floor(position.x / cellSize),
     row: Math.floor(position.y / cellSize),
   }
-}
-
-function kindLookup(terrain: TerrainMap): ReadonlyMap<string, TerrainKind> {
-  return new Map(
-    terrain.cells.map((cell) => [terrainCellKey(cell), cell.kind]),
-  )
 }
 
 function maskFor(
@@ -504,7 +498,7 @@ function compileRoadDistance(
 function compileTerrainField(terrain: TerrainMap): CompiledTerrainField {
   const cached = terrainFields.get(terrain)?.deref()
   if (cached) return cached
-  const lookup = kindLookup(terrain)
+  const lookup = terrainKindIndex(terrain)
   const hillMask = maskFor(lookup, 'hill')
   const waterMask = maskFor(lookup, 'water')
   const hillEdges = boundaryEdges(terrain, hillMask)
