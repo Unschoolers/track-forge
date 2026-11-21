@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PLAYER_IDENTITY } from '@/application/multiplayer/playerIdentity'
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
@@ -11,7 +12,7 @@ function setup(outcome: RaceResult['outcome'] = 'finished') {
     local: true, time: outcome === 'finished' ? 42 : null, left: false }
   const rival: Racer = { slot: 1, car: 'red', identity: DEFAULT_PLAYER_IDENTITY,
     local: false, time: undefined, left: false }
-  let changed = () => undefined
+  let changed: () => void = () => undefined
   const nearby = {
     snapshot: () => ({ role: 'host', track: 'Test Rally', phase: 'racing',
       canRematch: rival.time !== undefined }),

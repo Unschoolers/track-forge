@@ -61,7 +61,7 @@ describe('Nearby sharing and rematch controls', () => {
       }
       const hostResults = createNearbyRaceResults(host, result, hostActions)
       const raceButton = hostResults.element.querySelector<HTMLButtonElement>('[data-action="nearby-race-again"]')
-      expect(raceButton?.textContent).toBe('RACE')
+      expect(raceButton?.textContent).toBe('RACE AGAIN')
       expect(raceButton?.disabled).toBe(true)
       expect(hostResults.element.querySelector('[data-action="nearby-next-track"]')).not.toBeNull()
       hostResults.element.querySelector<HTMLButtonElement>('[data-action="nearby-leave-room"]')?.click()
