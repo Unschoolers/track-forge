@@ -263,7 +263,8 @@ export class NearbyRace {
     if (!track || this.sentShares.has(id)) return
     this.sentShares.add(id)
     try {
-      const chunks = await (this.sharePacked ??= packTrack(track))
+      if (!this.sharePacked) this.sharePacked = packTrack(track)
+      const chunks = await this.sharePacked
       if (active !== this.generation || !this.guests.has(id)) return
       await this.transport.send([id], encodeControl({ type: 'share-offer' }))
       for (const chunk of chunks) {
