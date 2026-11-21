@@ -26,7 +26,7 @@ export type OverlayReturn =
   | { readonly type: 'none' }
   | {
       readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race'
+      readonly purpose: 'edit' | 'race' | 'nearby'
     }
   | { readonly type: 'editor-menu' }
 
@@ -34,7 +34,7 @@ export type AppOverlay =
   | { readonly type: 'none' }
   | {
       readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race'
+      readonly purpose: 'edit' | 'race' | 'nearby'
     }
   | {
       readonly type: 'track-name'
@@ -106,6 +106,12 @@ export type AppCommand =
   | { readonly type: 'open-nearby' }
   | { readonly type: 'toggle-nearby-customize' }
   | { readonly type: 'host-nearby' }
+  | { readonly type: 'send-nearby-track'; readonly track: Track }
+  | { readonly type: 'scan-nearby-track' }
+  | { readonly type: 'save-nearby-track' }
+  | { readonly type: 'decline-nearby-track' }
+  | { readonly type: 'nearby-race-again' }
+  | { readonly type: 'nearby-select-next-track' }
   | { readonly type: 'scan-nearby' }
   | { readonly type: 'leave-nearby' }
   | { readonly type: 'nearby-scene-ready' }
@@ -121,7 +127,7 @@ export type AppCommand =
   | { readonly type: 'select-track'; readonly id: TrackId }
   | {
       readonly type: 'open-track-library'
-      readonly purpose: 'edit' | 'race'
+      readonly purpose: 'edit' | 'race' | 'nearby'
     }
   | { readonly type: 'close-overlay' }
   | {

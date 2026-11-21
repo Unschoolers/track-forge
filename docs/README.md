@@ -13,6 +13,7 @@ Start here for **current team/agent guidelines**. Older specs and plans under `d
 | [AI lane checker](ai-lane-checker.md) | Deterministic simulation diagnostics and regressions |
 | [Race performance](race-performance.md) | Repeatable Chromium/Android measurements |
 | [Race replay exports](race-replays.md) | Hidden diagnostics trigger, all-car capture and export file contract |
+| [Nearby sharing](nearby-track-sharing.md) | Share tracks with approval and stay connected across rematches |
 | [Refactor history](refactorplan.md) | Shipped milestones and historical backlog |
 | [Parity audit](trackforge-parity-audit.md) | Earlier migration parity decisions |
 

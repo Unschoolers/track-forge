@@ -1,0 +1,79 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest'
+import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import type { RaceResult } from '@/application/race/raceSession'
+import { asTrackId } from '@/domain/model'
+import { createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
+import { nearbyTrack } from '../fixtures/nearbyRace'
+
+const transport: NearbyTransport = {
+  subscribe: () => () => undefined,
+  host: async () => undefined,
+  scan: async () => undefined,
+  connect: async () => undefined,
+  respond: async () => undefined,
+  lock: async () => undefined,
+  send: async () => undefined,
+  stop: async () => undefined,
+}
+
+const result: RaceResult = {
+  outcome: 'finished', trackId: asTrackId('nearby-results'),
+  trackName: 'Figure eight', playerPlace: 1, playerTime: 41.5,
+  playerWrecked: false, newRecord: false, standings: [], highScores: [], mode: 'nearby',
+}
+
+describe('Nearby sharing and rematch controls', () => {
+  it('offers track receiving without hiding the existing race actions', () => {
+    const nearby = new NearbyRace(transport, () => true)
+    const scanTracks = vi.fn()
+    try {
+      const modal = createNearbyRaceModal(nearby, 'blue', {
+        close: vi.fn(), chooseTrack: vi.fn(), scan: vi.fn(), scanTracks,
+        saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
+        downloadDiagnostics: vi.fn(async () => true),
+      })
+      expect(modal.querySelector('[data-action="nearby-choose-track"]')).not.toBeNull()
+      expect(modal.querySelector('[data-action="nearby-scan"]')).not.toBeNull()
+      modal.querySelector<HTMLButtonElement>('[data-action="nearby-receive-track"]')?.click()
+      expect(scanTracks).toHaveBeenCalledOnce()
+    } finally {
+      nearby.destroy()
+    }
+  })
+
+  it('gives the host race/select track/leave, but guests only leave', async () => {
+    const host = new NearbyRace(transport, () => true)
+    const guest = new NearbyRace(transport, () => true)
+    try {
+      host.host({ track: nearbyTrack, car: 'blue', laps: 2, lighting: 'day' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'))
+      guest.scan('red')
+      const leaveHost = vi.fn()
+      const hostActions = {
+        race: vi.fn(), selectTrack: vi.fn(), leave: leaveHost,
+        downloadDiagnostics: vi.fn(async () => true),
+      }
+      const hostResults = createNearbyRaceResults(host, result, hostActions)
+      const raceButton = hostResults.element.querySelector<HTMLButtonElement>('[data-action="nearby-race-again"]')
+      expect(raceButton?.textContent).toBe('RACE')
+      expect(raceButton?.disabled).toBe(true)
+      expect(hostResults.element.querySelector('[data-action="nearby-next-track"]')).not.toBeNull()
+      hostResults.element.querySelector<HTMLButtonElement>('[data-action="nearby-leave-room"]')?.click()
+      expect(leaveHost).toHaveBeenCalledOnce()
+
+      const guestResults = createNearbyRaceResults(guest, result, {
+        race: vi.fn(), selectTrack: vi.fn(), leave: vi.fn(),
+        downloadDiagnostics: vi.fn(async () => true),
+      })
+      expect(guestResults.element.querySelector('[data-action="nearby-race-again"]')).toBeNull()
+      expect(guestResults.element.querySelector('[data-action="nearby-next-track"]')).toBeNull()
+      expect(guestResults.element.querySelector('[data-action="nearby-leave-room"]')).not.toBeNull()
+      hostResults.cleanup()
+      guestResults.cleanup()
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+})
