@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DifficultyId, SurfaceId } from '@/domain/model'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
+import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { stepRace } from '@/domain/race/raceEngine'
 import { createRace } from '@/domain/race/raceFactory'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
@@ -119,19 +120,17 @@ describe('rival catch-up', () => {
       vehicles: farBehind.vehicles.map((vehicle) =>
         vehicle.id === 'ai-2' ? { ...vehicle, finishedAt: 0 } : vehicle),
     }
-    const ordinary = { ...farBehind, vehicles: farBehind.vehicles.slice(1) }
-    const stockSpeed = requireFixture(run(ordinary, 1)[0]).speed
-    const assistedSpeed = requireFixture(run(farBehind, 1)[1]).speed
-    expect(assistedSpeed).toBeGreaterThan(stockSpeed)
+    const assisted = rivalCatchUp(farBehind, requireFixture(farBehind.vehicles[1]))
+    expect(assisted?.multiplier).toBeGreaterThan(1)
     // An opponent no longer cancels or changes another opponent's boost.
     for (const race of [withOtherCloser, withOtherAhead, priorFinisher]) {
-      expect(requireFixture(run(race, 1)[1]).speed).toBeCloseTo(assistedSpeed, 5)
+      expect(rivalCatchUp(race, requireFixture(race.vehicles[1]))).toEqual(assisted)
     }
     const almostCaught = {
       ...farBehind,
       vehicles: farBehind.vehicles.map((vehicle) =>
         vehicle.id === 'ai-1' ? onStraight(farBehind, vehicle, 1_270, 20, 300) : vehicle),
     }
-    expect(requireFixture(run(almostCaught, 1)[1]).speed).toBeCloseTo(stockSpeed, 5)
+    expect(rivalCatchUp(almostCaught, requireFixture(almostCaught.vehicles[1]))).toBeUndefined()
   })
 })
