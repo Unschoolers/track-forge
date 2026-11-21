@@ -142,11 +142,12 @@ export function createNearbyRaceResults(
       status.textContent = snapshot.error ??
         (snapshot.phase === 'preparing' || snapshot.phase === 'staging'
           ? 'Preparing the next race…'
+          : snapshot.cup?.finished && snapshot.cup.index === snapshot.cup.total - 1 ? 'Cup complete! Final scores are ready.'
           : snapshot.canRematch ? 'Everyone finished. Ready for the next race.'
           : 'Waiting for the other racers to finish…')
     } else {
-      status.textContent = snapshot.error ?? (snapshot.cup && snapshot.cup.index === snapshot.cup.total - 1
-        ? 'Cup complete!' : 'Waiting for the host to choose the next race…')
+      status.textContent = snapshot.error ?? (snapshot.cup?.finished && snapshot.cup.index === snapshot.cup.total - 1
+        ? 'Cup complete! Final scores are ready.' : 'Waiting for the host to choose the next race…')
     }
     list.replaceChildren(...nearby.standings().map(({ slot, car, identity, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
