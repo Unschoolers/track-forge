@@ -36,7 +36,7 @@ describe('race rendering contracts', () => {
       WORLD_RENDER_DEPTH.upperVehicle,
       WORLD_RENDER_DEPTH.lamp,
       WORLD_RENDER_DEPTH.effect,
-      WORLD_RENDER_DEPTH.nightShade,
+      WORLD_RENDER_DEPTH.nightBeam,
       WORLD_RENDER_DEPTH.nightLight,
     ]
 

@@ -51,6 +51,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 - **Untrusted boundaries:** storage, track import, network packets and native events are untrusted. Normalize/validate early; bound size and coordinate work before expensive geometry.
 - **Lifecycle:** leaving or restarting a race tears down active controls, subscriptions and continuous sound. No stale scene subscriptions, orphaned pointer contacts or background races.
 - **Editor responsiveness:** redraw/invalidate only changed layers; avoid rebuilding geometry and terrain during pointer movement if inputs are unchanged.
+- **Night presentation:** preview and race reuse the same cached headlight beam asset, with night-tinted materials and no additional fullscreen shade. See [night presentation](night-presentation.md).
 - **Backward compatibility:** saved tracks, scores, preferences and Android update identity must survive normal upgrades. Record a migration plan before changing schemas.
 - **Mobile usability:** two-finger interactions, pedal/steering combinations, viewport/safe areas and clear states are first-class constraints.
 

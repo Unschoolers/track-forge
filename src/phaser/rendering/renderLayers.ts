@@ -20,6 +20,6 @@ export const WORLD_RENDER_DEPTH = {
   terrainPreview: 24,
   effect: 25,
   editorOverlay: 30,
-  nightShade: 50,
+  nightBeam: 50,
   nightLight: 51,
 } as const
