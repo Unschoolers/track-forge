@@ -85,7 +85,8 @@ const terrainIndexes = new WeakMap<TerrainMap, WeakRef<ReadonlyMap<string, Terra
 export function terrainKindIndex(terrain: TerrainMap): ReadonlyMap<string, TerrainKind> {
   const cached = terrainIndexes.get(terrain)?.deref()
   if (cached) return cached
-  const index = new Map(terrain.cells.map(cell => [terrainCellKey(cell), cell.kind]))
+  const index = new Map<string, TerrainKind>()
+  for (const cell of terrain.cells) index.set(terrainCellKey(cell), cell.kind)
   terrainIndexes.set(terrain, new WeakRef(index))
   return index
 }
