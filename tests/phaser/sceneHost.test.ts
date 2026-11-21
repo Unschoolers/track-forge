@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SceneControllerPort } from '@/phaser/scenes/EditorScene'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
-import type { TrackGeometryService } from '@/domain/track/trackGeometry'
+import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 
 const { sceneStart, sceneStop } = vi.hoisted(() => ({
   sceneStart: vi.fn(),
