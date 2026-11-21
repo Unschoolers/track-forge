@@ -19,7 +19,7 @@ export function createNearbyRaceModal(
   identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
   customizing = false,
 ): HTMLElement {
-  const { phase, purpose, room, track, incomingTrack, sharedCount, players, canStart, rooms, error } = nearby.snapshot()
+  const { phase, purpose, room, track, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const frame = createModalFrame('Nearby Race', room ?? 'Arcade · Up to 4 players', actions.close, 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
@@ -61,7 +61,11 @@ export function createNearbyRaceModal(
       frame.body.append(element('p', 'modal-subtitle', 'Connecting…'))
       break
     case 'waiting':
-      frame.body.append(element('p', 'modal-subtitle', purpose === 'share' ? 'Waiting for the track…' : 'Waiting for the host to start the race.'))
+      frame.body.append(element('p', 'modal-subtitle', purpose === 'share'
+        ? shareStatus === 'saved' ? 'Track saved to your library. You can leave the sharing room.'
+          : shareStatus === 'declined' ? 'Track declined. You can leave the sharing room.'
+          : 'Waiting for the track…'
+        : 'Waiting for the host to start the race.'))
       break
     case 'preparing':
       frame.body.append(element('p', 'modal-subtitle', purpose === 'share' ? 'Receiving and checking the track…' : 'Sharing the track with all players…'))
