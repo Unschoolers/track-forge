@@ -18,6 +18,32 @@ const updates = registerPlugin<{ download(options: { url: string; version: strin
 type OptionsTab = 'profile' | 'race' | 'audio' | 'controls' | 'display' | 'updates'
 let selectedOptionsTab: OptionsTab = 'race'
 
+const optionsTabPaths: Record<OptionsTab, string> = {
+  profile: 'M20 21a8 8 0 0 0-16 0 M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
+  race: 'M5 21V4 M5 5c6-3 9 3 15 0v10c-6 3-9-3-15 0',
+  audio: 'M11 5 6 9H3v6h3l5 4V5z M15 9a4 4 0 0 1 0 6 M18 6a8 8 0 0 1 0 12',
+  controls: 'M7 8h10a5 5 0 0 1 4.8 3.6l1 4a3 3 0 0 1-4.8 3l-3-2H9l-3 2a3 3 0 0 1-4.8-3l1-4A5 5 0 0 1 7 8z M8 11v5 M5.5 13.5h5 M16 12h.01 M19 14h.01',
+  display: 'M3 4h18v13H3z M8 21h8 M12 17v4',
+  updates: 'M12 3v12 m-5-5 5 5 5-5 M4 19h16',
+}
+
+function optionsTabIcon(tab: OptionsTab): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.classList.add('options-tab-icon')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '1.9')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
+  svg.setAttribute('aria-hidden', 'true')
+  svg.setAttribute('focusable', 'false')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', optionsTabPaths[tab])
+  svg.append(path)
+  return svg
+}
+
 interface OptionsNavigation {
   readonly initialTab?: 'updates' | undefined
   readonly availableUpdate?: UpdateInfo | null
@@ -373,6 +399,7 @@ export function createOptionsModal(
   tabs.setAttribute('role', 'tablist')
   tabs.setAttribute('aria-label', 'Options categories')
   const available = Array.from(tabSections.keys())
+  tabs.style.setProperty('--options-tab-count', String(available.length))
   if (!available.includes(selectedOptionsTab)) selectedOptionsTab = available[0] ?? 'audio'
   const buttons = new Map<OptionsTab, HTMLButtonElement>()
   const tabScroll = new Map<OptionsTab, number>()
@@ -390,8 +417,9 @@ export function createOptionsModal(
     frame.body.scrollTop = tabScroll.get(tab) ?? 0
   }
   for (const tab of available) {
-    const choice = button(tab.toUpperCase(), `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
-    if (tab === 'display') choice.setAttribute('aria-label', 'Display and feedback')
+    const choice = button('', `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
+    choice.append(optionsTabIcon(tab), element('span', 'options-tab-label', tab.toUpperCase()))
+    choice.setAttribute('aria-label', tab === 'display' ? 'Display and feedback' : tab)
     choice.setAttribute('role', 'tab')
     choice.setAttribute('aria-controls', `options-panel-${tab}`)
     choice.id = `options-tab-${tab}`

@@ -171,3 +171,41 @@ describe('single-player topper customization', () => {
     }))
   })
 })
+
+describe('options category navigation', () => {
+  it('keeps every native tab discoverable with an icon, label and working panel', () => {
+    native.current.mockResolvedValue({ state: 'none' })
+    const modal = createOptionsModal({
+      overlay: { type: 'options', returnTo: 'home' },
+      preferences: {
+        difficulty: 'normal',
+        audioEnabled: true,
+        hapticsEnabled: true,
+        dynamicZoomEnabled: true,
+      },
+    } as AppSnapshot, {
+      close: vi.fn(), playerName: vi.fn(), preferences: vi.fn(),
+      previewVolume: vi.fn(), setVolume: vi.fn(),
+    })
+    document.body.replaceChildren(modal)
+
+    const tabs = Array.from(modal.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    expect(tabs.map(tab => tab.textContent)).toEqual([
+      'PROFILE', 'RACE', 'AUDIO', 'DISPLAY', 'CONTROLS', 'UPDATES',
+    ])
+    expect(modal.querySelector<HTMLElement>('[role="tablist"]')?.style.getPropertyValue('--options-tab-count')).toBe('6')
+    for (const tab of tabs) {
+      expect(tab.querySelector('svg[aria-hidden="true"] path')).not.toBeNull()
+      expect(tab.getAttribute('aria-controls')).toBeTruthy()
+    }
+
+    const controls = modal.querySelector<HTMLButtonElement>('[data-action="options-tab-controls"]')!
+    controls.click()
+    expect(controls.getAttribute('aria-selected')).toBe('true')
+    expect(modal.querySelector('[data-options-tab="controls"]')?.hasAttribute('hidden')).toBe(false)
+    expect(modal.querySelector('[data-options-tab="race"]')?.hasAttribute('hidden')).toBe(true)
+
+    controls.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(modal.querySelector('[data-action="options-tab-updates"]')?.getAttribute('aria-selected')).toBe('true')
+  })
+})

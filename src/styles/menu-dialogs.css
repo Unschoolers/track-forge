@@ -70,26 +70,34 @@
   min-height: 0;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
-/* Tabs stay outside the scrolling content, just like the header and footer. */
+/* Every category remains visible; the content below the tabs is the only scroller. */
 .options-modal .options-tab-list {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: .45rem;
+  display: grid;
+  grid-template-columns: repeat(var(--options-tab-count), minmax(0, 1fr));
+  gap: .35rem;
   min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
   padding: .75rem 1.4rem;
   border-bottom: 1px solid #34414e;
 }
 .options-modal .options-tab-list .setup-choice {
-  flex: 1 0 0;
-  min-width: 5.25rem;
-  min-height: 44px;
-  padding: .6rem .4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  min-width: 0;
+  min-height: 48px;
+  padding: .5rem .15rem;
   white-space: nowrap;
-  font-size: .65rem;
+  font-size: .62rem;
+  letter-spacing: .01em;
+  touch-action: manipulation;
 }
+.options-modal .options-tab-icon {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.options-modal .options-tab-label { white-space: nowrap; }
 .options-modal .modal-body {
   min-height: 0;
   overscroll-behavior-y: contain;
@@ -136,7 +144,19 @@
   .modal-overlay .modal-body { padding: 1rem; }
   .modal-overlay .modal-footer { padding: .8rem 1rem 1rem; }
   .options-modal .choice-row { flex-wrap: wrap; }
-  .options-modal .options-tab-list { flex-wrap: nowrap; padding: .65rem 1rem; }
-  .options-modal .options-tab-list .setup-choice { flex: 0 0 auto; min-width: 5.25rem; }
+  .options-modal .options-tab-list { gap: .2rem; padding: .65rem .65rem; }
+  .options-modal .options-tab-list .setup-choice {
+    flex-direction: column;
+    gap: .2rem;
+    min-width: 0;
+    min-height: 54px;
+    padding: .4rem .05rem;
+    font-size: .56rem;
+    letter-spacing: 0;
+  }
   .options-modal .setup-choice { min-width: 5rem; }
+}
+@media (max-width: 320px) {
+  /* Extremely narrow screens prefer two visible rows to clipping a tab. */
+  .options-modal .options-tab-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
