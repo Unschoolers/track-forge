@@ -205,23 +205,23 @@ export function stepAiVehicle(
     (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
     (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
   ) : 0)
-  // Predict lateral drift before reaching a road edge. A long lookahead
-  // can steer through the opposite verge while the car is still on asphalt,
-  // especially after a tight corner when its yaw has not settled.
-  const lateralOffset =
-    (vehicle.x - context.nearest.point.x) * context.normal.x +
-    (vehicle.y - context.nearest.point.y) * context.normal.y
-  const lateralVelocity = vehicle.vx * context.normal.x + vehicle.vy * context.normal.y
-  const outwardVelocity = Math.max(0, Math.sign(lateralOffset) * lateralVelocity)
-  const projectedEdge = Math.abs(lateralOffset) + outwardVelocity * 0.24
-  // Reserve this safeguard for unpracticed Hard arcade driving. Easier
-  // difficulties already use braking margins, while authored racing lines
-  // contain their own pursuit/speed plans and must not be overridden.
-  const edgeRisk = difficulty === 'hard' && arcade && !vehicle.racingLine
-    ? context.onRoad
-      ? clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
-      : 1
-    : 0
+  // Hard arcade uses a longer pursuit target and can run wide if its
+  // lateral momentum carries it toward the verge. Shorten that target only
+  // when needed; never override easier drivers or authored racing lines.
+  let edgeRisk = 0
+  if (difficulty === 'hard' && arcade && !vehicle.racingLine) {
+    if (!context.onRoad) {
+      edgeRisk = 1
+    } else {
+      const lateralOffset =
+        (vehicle.x - context.nearest.point.x) * context.normal.x +
+        (vehicle.y - context.nearest.point.y) * context.normal.y
+      const lateralVelocity = vehicle.vx * context.normal.x + vehicle.vy * context.normal.y
+      const outwardVelocity = Math.max(0, Math.sign(lateralOffset) * lateralVelocity)
+      const projectedEdge = Math.abs(lateralOffset) + outwardVelocity * 0.24
+      edgeRisk = clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
+    }
+  }
   const pursuitSamples = Math.max(1, Math.round(
     (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
   ))
