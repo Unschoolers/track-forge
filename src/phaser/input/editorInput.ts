@@ -48,6 +48,8 @@ import {
 
 export type { EditorTool } from '@/domain/editor/editorGeometry'
 
+const SELECTION_DRAG_SCREEN_PIXELS = 8
+
 export interface EditorCamera {
   x: number
   y: number
@@ -149,6 +151,8 @@ export class EditorInputController {
   private navAnchor: { center: Vector2; distance: number } | undefined
   private lastScreen: Vector2 | undefined
   private selectedPoint = -1
+  private selectionStart: PointerSample | undefined
+  private selectionDragging = false
   private drawStartIndex = 0
   private pendingDrawStart: { screen: Vector2; world: Vector2 } | undefined
   private sceneryGesture: SceneryGesture | undefined
@@ -188,6 +192,8 @@ export class EditorInputController {
     if (this.navigating || this.activePointer !== undefined) return
     this.activePointer = pointer.id
     this.gestureTool = this.dependencies.tool()
+    this.selectionStart = this.gestureTool === 'select' ? pointer : undefined
+    this.selectionDragging = false
     this.lastScreen = pointer
     this.drawStartIndex = this.dependencies.editor().points.length
     this.gestureHasTransaction = this.gestureTool !== 'pan' &&
@@ -239,6 +245,11 @@ export class EditorInputController {
     } else {
       const start = this.pendingDrawStart
       if (start && Math.hypot(pointer.x - start.screen.x, pointer.y - start.screen.y) < 4) return
+      if (this.gestureTool === 'select' && this.selectedPoint >= 0 && !this.selectionDragging) {
+        const origin = this.selectionStart
+        if (origin && Math.hypot(pointer.x - origin.x, pointer.y - origin.y) < SELECTION_DRAG_SCREEN_PIXELS) return
+        this.selectionDragging = true
+      }
       this.commitPendingDrawStart()
       this.applyTool(pointer, 'move')
     }
@@ -296,6 +307,8 @@ export class EditorInputController {
     this.gestureTool = undefined
     this.lastScreen = undefined
     this.selectedPoint = -1
+    this.selectionStart = undefined
+    this.selectionDragging = false
     this.drawStartIndex = 0
   }
 
@@ -328,10 +341,6 @@ export class EditorInputController {
       })
       this.dependencies.dispatch({ type: 'normalize-loop' })
     }
-    if (tool === 'select' && this.selectedPoint >= 0 && this.dependencies.editor().gestureChanged) {
-      // A completed drag leaves the canvas clear for another drag.
-      this.dependencies.onPointSelected?.(null)
-    }
     if (commitTerrain) {
       this.commitTerrainStroke()
     } else {
@@ -345,6 +354,8 @@ export class EditorInputController {
     this.gestureTool = undefined
     this.lastScreen = undefined
     this.selectedPoint = -1
+    this.selectionStart = undefined
+    this.selectionDragging = false
     this.drawStartIndex = 0
     this.pendingDrawStart = undefined
   }
