@@ -1,5 +1,9 @@
 # TrackForge
 
+## Engineering documentation
+
+Start with [docs/README.md](docs/README.md) for architecture, engineering principles, testing strategy (unit > integration > UI), change/review workflow, and the current repo audit. Coding agents should also read [AGENTS.md](AGENTS.md). Historical design documents remain under `docs/superpowers/`.
+
 TrackForge is a local-first 2D track editor and racing game built with Phaser 4,
 strict TypeScript 7, Vite, and modular HTML/CSS UI.
 
