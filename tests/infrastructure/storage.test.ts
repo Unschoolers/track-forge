@@ -44,6 +44,20 @@ it('does not read or write the obsolete lighting preference', () => {
   expect(memory.values.get('trackforge-lighting')).toBe('night')
 })
 
+it('remembers multiplayer topper icon and color without reprompting and validates corrupt storage', () => {
+  const memory = new MemoryStore()
+  const repository = new BrowserPreferencesRepository(memory)
+  expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'cyan' })
+  expect(repository.save({ ...repository.load(), playerIdentity: { icon: 'crown', color: 'violet' } })).toBe(true)
+  expect(new BrowserPreferencesRepository(memory).load().playerIdentity).toEqual({ icon: 'crown', color: 'violet' })
+  memory.values.set('trackforge-player-topper-v1', '{broken JSON')
+  expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'cyan' })
+  memory.values.set('trackforge-player-topper-v1', JSON.stringify({ icon: 'hacked', color: 'pink' }))
+  expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'pink' })
+  expect(repository.save({ ...repository.load(), car: 'yellow' })).toBe(true)
+  expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'pink' })
+})
+
 it('persists the explicit race mode and rejects unknown stored modes', () => {
   const memory = new MemoryStore()
   const preferences = new BrowserPreferencesRepository(memory)
