@@ -301,8 +301,9 @@ export class AppController {
         break
       case 'send-nearby-track': {
         const nearby = this.dependencies.nearby
-        if (!nearby || !this.flushPendingEditorSave()) break
-        nearby.hostShare(command.track)
+        if (!nearby || nearby.snapshot().phase !== 'idle' || !this.flushPendingEditorSave()) break
+        const track = this.state.tracks.find(entry => entry.id === command.track.id) ?? command.track
+        nearby.hostShare(track)
         this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
         break
       }
