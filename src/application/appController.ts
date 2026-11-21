@@ -251,6 +251,17 @@ export class AppController {
         this.launchCupRace(createCup(this.state.preferences.car, this.state.preferences.difficulty, ids))
         break
       }
+      case 'host-nearby-cup': {
+        const nearby = this.dependencies.nearby
+        if (this.state.overlay.type !== 'cup' || !nearby || nearby.snapshot().phase !== 'idle' ||
+            !this.flushPendingEditorSave()) break
+        const ids = this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS
+        if (!this.validateCupTracks(ids)) break
+        const tracks = ids.map(id => this.cupTrack(id)).filter((track): track is Track => !!track)
+        nearby.hostCup(tracks, this.state.preferences.car, this.state.preferences.raceLaps ?? 2)
+        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        break
+      }
       case 'resume-cup': {
         const cup = this.state.cupProgress?.checkpoint
         if (!cup) break
