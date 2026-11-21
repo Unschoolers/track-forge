@@ -373,7 +373,7 @@ export class RaceScene extends Phaser.Scene {
       const nextRoadWindow = terrainVisibilityWindow(viewport, this.roadVisibilityBounds)
       if (nextRoadWindow) {
         this.roadVisibilityBounds = nextRoadWindow
-        this.updateRoadRibbonVisibility(view)
+        this.updateRoadRibbonVisibility(view, nextRoadWindow)
       }
     }
     this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
