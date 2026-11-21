@@ -6,7 +6,8 @@ import { createRace } from '@/domain/race/raceFactory'
 import { recoverRacePlayer, resetRaceVehicle, stepRace } from '@/domain/race/raceEngine'
 import { advanceVehicle, raceVehicleContext } from '@/domain/race/raceVehicleStepper'
 
-const path = buildRoadPath(createStarterTrack(asTrackId('recovery-extraction'), 1).points)
+const track = createStarterTrack(asTrackId('recovery-extraction'), 1)
+const path = buildRoadPath(track.points, track.terrain)
 const random = { next: () => 0.5 }
 const coast = { steering: 0, throttle: 0, braking: false }
 
