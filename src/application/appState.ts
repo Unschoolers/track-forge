@@ -26,7 +26,7 @@ export type OverlayReturn =
   | { readonly type: 'none' }
   | {
       readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host'
+      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
     }
   | { readonly type: 'editor-menu' }
 
@@ -43,6 +43,7 @@ export type AppOverlay =
     }
   | { readonly type: 'player-name' }
   | { readonly type: 'race-setup' }
+  | { readonly type: 'cup' }
   | { readonly type: 'nearby'; readonly customize?: boolean }
   | { readonly type: 'editor-menu' }
   | {
@@ -117,6 +118,10 @@ export type AppCommand =
   | { readonly type: 'nearby-scene-ready' }
   | { readonly type: 'set-race-lighting'; readonly lighting: LightingMode }
   | { readonly type: 'race-again' }
+  | { readonly type: 'open-cup' }
+  | { readonly type: 'cup-add-track' }
+  | { readonly type: 'cup-remove-track'; readonly index: number }
+  | { readonly type: 'cup-move-track'; readonly index: number; readonly direction: -1 | 1 }
   | { readonly type: 'start-cup' }
   | { readonly type: 'resume-cup' }
   | { readonly type: 'next-cup-race' }
