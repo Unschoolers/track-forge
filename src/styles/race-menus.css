@@ -75,18 +75,18 @@
 @media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
 
 /* Nearby identity is always remembered; expanded choices appear only on request. */
-.nearby-race-modal .topper-section {
+:is(.nearby-race-modal, .options-modal) .topper-section {
   gap: .65rem;
   border: 1px solid #344554;
   background: #101923;
 }
-.nearby-race-modal .topper-current {
+:is(.nearby-race-modal, .options-modal) .topper-current {
   display: flex;
   align-items: center;
   gap: .7rem;
   justify-content: space-between;
 }
-.nearby-race-modal .topper-current .modal-subtitle { flex: 1; margin: 0; }
+:is(.nearby-race-modal, .options-modal) .topper-current .modal-subtitle { flex: 1; margin: 0; }
 .topper-marker {
   display: inline-flex;
   align-items: center;
@@ -95,12 +95,12 @@
   font-size: 1.35rem;
   text-shadow: 0 1px 3px #000;
 }
-.nearby-race-modal .topper-options {
+:is(.nearby-race-modal, .options-modal) .topper-options {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: .35rem;
 }
-.nearby-race-modal .topper-choice {
+:is(.nearby-race-modal, .options-modal) .topper-choice {
   min-width: 0;
   min-height: 2.65rem;
   padding: .25rem;
@@ -109,17 +109,17 @@
   color: var(--menu-ink);
   font: 800 1.15rem/1.2 var(--menu-mono);
 }
-.nearby-race-modal .topper-choice[aria-pressed="true"] {
+:is(.nearby-race-modal, .options-modal) .topper-choice[aria-pressed="true"] {
   border-color: var(--menu-accent);
   box-shadow: inset 0 -3px var(--menu-accent);
 }
-.nearby-race-modal .topper-color-choice {
+:is(.nearby-race-modal, .options-modal) .topper-color-choice {
   color: var(--menu-muted);
   font-size: .55rem;
   text-transform: uppercase;
   overflow: hidden;
 }
-.nearby-race-modal .topper-color-choice::before {
+:is(.nearby-race-modal, .options-modal) .topper-color-choice::before {
   content: '';
   display: block;
   width: .85rem;
