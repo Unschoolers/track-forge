@@ -214,9 +214,13 @@ export function stepAiVehicle(
   const lateralVelocity = vehicle.vx * context.normal.x + vehicle.vy * context.normal.y
   const outwardVelocity = Math.max(0, Math.sign(lateralOffset) * lateralVelocity)
   const projectedEdge = Math.abs(lateralOffset) + outwardVelocity * 0.24
-  const edgeRisk = context.onRoad
-    ? clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
-    : 1
+  // Reserve this safeguard for Hard arcade's maximum-push behavior; easier
+  // difficulties already use braking margins and must retain their proven lines.
+  const edgeRisk = difficulty === 'hard' && arcade
+    ? context.onRoad
+      ? clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
+      : 1
+    : 0
   const pursuitSamples = Math.max(3, Math.round(
     (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
   ))
