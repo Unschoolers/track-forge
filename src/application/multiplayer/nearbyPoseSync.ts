@@ -11,6 +11,7 @@ import {
 export interface PoseRacer {
   ghost: RemoteGhost
   identity: PlayerIdentity
+  name?: string
   time?: number | null
   left?: boolean
 }

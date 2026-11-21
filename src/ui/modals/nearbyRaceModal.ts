@@ -9,6 +9,10 @@ import { createModalFrame } from './modalFrame'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, TOPPER_ICONS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { createTopperSelector } from '@/ui/components/playerTopperPicker'
 
+function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string | undefined; readonly local: boolean }): string {
+  return racer.name ? `${racer.name}${racer.local ? ' (You)' : ''}` : racer.local ? 'You' : `Player ${racer.slot + 1}`
+}
+
 export function createNearbyRaceModal(
   nearby: NearbyRace,
   car: CarId,
@@ -130,7 +134,7 @@ export function createNearbyRaceResults(
       cupScores.replaceChildren(
         element('h3', 'results-heading', `CUP STANDINGS · ROUND ${cup.index + 1}/${cup.total}`),
         ...cup.standings.map(({ slot, points }, rank) =>
-          element('p', 'modal-subtitle', `${rank + 1}. ${slot === nearby.localSlot() ? 'You' : `Player ${slot + 1}`} · ${points} pts`)),
+          element('p', 'modal-subtitle', `${rank + 1}. ${nearbyRacerLabel(nearby.standings().find(racer => racer.slot === slot) ?? { slot, local: slot === nearby.localSlot() })} · ${points} pts`)),
       )
     }
     if (snapshot.role === 'host') {
@@ -149,9 +153,9 @@ export function createNearbyRaceResults(
       status.textContent = snapshot.error ?? (snapshot.cup?.finished && snapshot.cup.index === snapshot.cup.total - 1
         ? 'Cup complete! Final scores are ready.' : 'Waiting for the host to choose the next race…')
     }
-    list.replaceChildren(...nearby.standings().map(({ slot, car, identity, local, time, left }, index) => {
+    list.replaceChildren(...nearby.standings().map(({ slot, car, identity, name, local, time, left }, index) => {
       const row = element('li', `scoreboard-row${local ? ' player' : ''}`)
-      const label = local ? 'You' : `Player ${slot + 1}`
+      const label = nearbyRacerLabel({ slot, name, local })
       const topper = element('span', 'topper-marker', TOPPER_ICONS[identity.icon])
       topper.style.color = '#' + TOPPER_COLORS[identity.color].toString(16).padStart(6, '0')
       topper.title = `${identity.color} ${identity.icon} topper`

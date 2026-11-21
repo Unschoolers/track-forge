@@ -36,7 +36,7 @@ test('restores and completes a scored Cup after a reload', async ({ page }) => {
   await page.getByRole('button', { name: 'CUP', exact: true }).click()
   await page.getByRole('button', { name: 'RESUME CUP', exact: true }).click()
   const final = page.getByRole('dialog', { name: 'CUP STANDINGS' })
-  await expect(final.getByText('1. You · 40 points')).toBeVisible()
+  await expect(final.getByText('1. Mobile QA · 40 points')).toBeVisible()
   await final.getByRole('button', { name: 'FINISH CUP' }).click()
   await expect(page.getByText('Best Cup placement: 1')).toBeVisible()
   await page.reload()

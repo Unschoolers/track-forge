@@ -50,6 +50,28 @@ describe('Nearby sharing and rematch controls', () => {
     }
   })
 
+  it('renders each peer name with its car and falls back only for unnamed racers', () => {
+    const nearby = {
+      snapshot: () => ({ role: 'guest', canRematch: false, error: null }),
+      standings: () => [
+        { slot: 0, car: 'blue', identity: { icon: 'star', color: 'cyan' }, name: 'JulienQC', local: false, time: 40, left: false },
+        { slot: 1, car: 'red', identity: { icon: 'crown', color: 'gold' }, name: 'Émile', local: true, time: 41, left: false },
+        { slot: 2, car: 'green', identity: { icon: 'flag', color: 'pink' }, local: false, time: null, left: true },
+      ],
+      subscribe: () => () => undefined,
+    } as unknown as NearbyRace
+    const view = createNearbyRaceResults(nearby, result, {
+      race: vi.fn(), selectTrack: vi.fn(), leave: vi.fn(),
+      downloadDiagnostics: vi.fn(async () => true),
+    })
+    const rows = [...view.element.querySelectorAll('.scoreboard-row')].map(node => node.textContent)
+    expect(rows[0]).toContain('JulienQC · ')
+    expect(rows[1]).toContain('Émile (You) · ')
+    expect(rows[2]).toContain('Player 3 · ')
+    expect(rows[2]).toContain('LEFT')
+    view.cleanup()
+  })
+
   it('gives the host race/select track/leave, but guests only leave', async () => {
     const host = new NearbyRace(transport, () => true)
     const guest = new NearbyRace(transport, () => true)

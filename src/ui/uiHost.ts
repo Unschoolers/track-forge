@@ -391,7 +391,7 @@ export class DomUiHost implements UiHost {
           ...(this.runtime.nearby ? { hostNearby: () => this.controller.dispatch({ type: 'host-nearby-cup' }) } : {}),
         })
       case 'cup-final':
-        return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' })) : undefined
+        return state.cup ? createCupFinalModal(state.cup, () => this.controller.dispatch({ type: 'next-cup-race' }), state.preferences.displayName) : undefined
       case 'results': {
         const result = this.runtime.raceSession.snapshot().result
         if (!result) return undefined
@@ -418,14 +418,14 @@ export class DomUiHost implements UiHost {
           changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           edit: () => this.controller.dispatch({ type: 'open-editor' }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
-        }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined, state.newTimeMedal)
+        }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined, state.newTimeMedal, state.preferences.displayName)
         const standings = modal.querySelector<HTMLElement>('[data-results-standings]')
         if (standings && result.rivalsFinishing) {
           let previous = result
           this.overlayCleanup = this.runtime.raceSession.subscribe(({ result: next }) => {
             if (!next || next === previous) return
             previous = next
-            updateStandings(standings, next.standings, next.rivalsFinishing)
+            updateStandings(standings, next.standings, next.rivalsFinishing, state.preferences.displayName)
           })
         }
         return modal

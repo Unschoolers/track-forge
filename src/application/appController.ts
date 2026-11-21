@@ -120,6 +120,7 @@ export class AppController {
       notice: null,
     }
     dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
+    dependencies.nearby?.setDisplayName(this.state.preferences.displayName)
     this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, gridSlot, startsAt }) => {
       if (this.state.overlay.type !== 'nearby' &&
           !(this.state.mode === 'race' && this.state.overlay.type === 'results')) return
@@ -973,6 +974,7 @@ export class AppController {
       this.update({ ...this.state, notice: 'Could not save your player name. Try again.' })
       return
     }
+    this.dependencies.nearby?.setDisplayName(name)
     const tracks = this.library.list()
     const currentTrack = tracks.find((track) => track.id === this.state.currentTrack?.id) ??
       this.state.currentTrack
@@ -991,6 +993,7 @@ export class AppController {
   ): void {
     const saved = this.dependencies.preferencesStore.save(preferences)
     this.dependencies.nearby?.setIdentity(preferences.playerIdentity)
+    this.dependencies.nearby?.setDisplayName(preferences.displayName)
     this.update({ ...this.state, preferences, notice: saved ? this.state.notice : 'Preferences could not be saved on this device.' })
   }
 
