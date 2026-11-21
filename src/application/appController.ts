@@ -121,8 +121,9 @@ export class AppController {
     }
     dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
     this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, gridSlot, startsAt }) => {
-      if (this.state.overlay.type !== 'nearby') return
-      this.beforeNearbyTrack = this.state.currentTrack
+      if (this.state.overlay.type !== 'nearby' &&
+          !(this.state.mode === 'race' && this.state.overlay.type === 'results')) return
+      if (this.beforeNearbyTrack === undefined) this.beforeNearbyTrack = this.state.currentTrack
       dependencies.raceSession.start(track, {
         car, laps, lighting, difficulty: this.state.preferences.difficulty, handling: 'arcade', mode: 'nearby',
         gridPositions: gridPositionsForPlayer(gridSlot),
@@ -294,6 +295,51 @@ export class AppController {
       case 'scan-nearby':
         if (this.state.overlay.type === 'nearby') {
           this.dependencies.nearby?.scan(this.state.preferences.car)
+        }
+        break
+      case 'scan-nearby-track':
+        if (this.state.overlay.type === 'nearby') {
+          this.dependencies.nearby?.scan(this.state.preferences.car, 'share')
+        }
+        break
+      case 'send-nearby-track': {
+        const nearby = this.dependencies.nearby
+        if (!nearby) break
+        if (nearby.snapshot().phase !== 'idle' || !this.flushPendingEditorSave()) break
+        const track = this.state.tracks.find(entry => entry.id === command.track.id) ?? command.track
+        if (isSeededTrack(track)) {
+          this.update({ ...this.state, notice: 'Built-in tracks cannot be shared.' })
+          break
+        }
+        nearby.hostShare(track)
+        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        break
+      }
+      case 'save-nearby-track': {
+        const nearby = this.dependencies.nearby
+        const track = nearby?.pendingSharedTrack()
+        if (!track || !this.flushPendingEditorSave()) break
+        const saved = this.library.importShared(track)
+        if (!saved.ok) {
+          this.update({ ...this.state, notice: saved.message })
+          break
+        }
+        nearby?.respondToShare(true)
+        this.update({ ...this.state, ...this.librarySnapshot(), notice: `Saved "${saved.track.name}" to your library.` })
+        break
+      }
+      case 'decline-nearby-track':
+        this.dependencies.nearby?.respondToShare(false)
+        break
+      case 'nearby-race-again':
+        if (this.state.mode === 'race' && this.state.overlay.type === 'results') {
+          this.dependencies.nearby?.start()
+        }
+        break
+      case 'nearby-select-next-track':
+        if (this.state.mode === 'race' && this.state.overlay.type === 'results' &&
+            this.dependencies.nearby?.snapshot().canRematch) {
+          this.update({ ...this.state, overlay: { type: 'track-library', purpose: 'nearby' }, ...this.librarySnapshot() })
         }
         break
       case 'nearby-scene-ready':
@@ -629,6 +675,12 @@ export class AppController {
       this.update({ ...this.state, notice: validation.message })
       return
     }
+    if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'nearby') {
+      if (this.dependencies.nearby?.selectNextTrack(track)) {
+        this.update({ ...this.state, overlay: { type: 'results' }, notice: null })
+      }
+      return
+    }
     this.editorSession.discardPendingSave()
     const library = this.librarySnapshot()
     this.update({
@@ -738,6 +790,10 @@ export class AppController {
     }
     if (overlay.type === 'pause' && this.beforeNearbyTrack !== undefined) {
       this.dispatch({ type: 'resume-race' })
+      return
+    }
+    if (overlay.type === 'track-library' && overlay.purpose === 'nearby') {
+      this.update({ ...this.state, overlay: { type: 'results' }, notice: null })
       return
     }
     if (overlay.type === 'race-setup') {
