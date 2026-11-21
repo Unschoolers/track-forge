@@ -1,4 +1,5 @@
 import { CAR_SPECS, ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
+import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
 import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -113,17 +114,11 @@ export function createRaceFlyoverRenderer(
     ctx.translate(position.x - Math.sin(position.angle) * lane, position.y + Math.cos(position.angle) * lane)
     ctx.rotate(position.angle)
     if (night) {
-      const beam = ctx.createLinearGradient(10, 0, 125, 0)
-      beam.addColorStop(0, 'rgba(255, 235, 160, .5)')
-      beam.addColorStop(1, 'rgba(255, 235, 160, 0)')
-      ctx.fillStyle = beam
-      ctx.beginPath()
-      ctx.moveTo(8, -7)
-      ctx.lineTo(125, -38)
-      ctx.lineTo(125, 38)
-      ctx.lineTo(8, 7)
-      ctx.closePath()
-      ctx.fill()
+      ctx.drawImage(
+        getNightHeadlightBeam(),
+        NIGHT_HEADLIGHT.carFrontX - NIGHT_HEADLIGHT.sourceX,
+        -NIGHT_HEADLIGHT.height / 2,
+      )
     }
     ctx.fillStyle = 'rgba(0, 0, 0, .34)'
     ctx.fillRect(-14, -7, 31, 18)
