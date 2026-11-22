@@ -41,6 +41,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 .editor-context-row { display: grid; min-width: 0; }
 .editor-context-row .editor-segmented-buttons { width: min(34rem, 100%); justify-self: center; }
 .editor-context-row .editor-scenery-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: row; row-gap: var(--editor-context-dock-gap); }
+.editor-context-row .editor-scenery-choices-kids-room { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .editor-scenery-choices .editor-segmented-button { white-space: normal; line-height: 1.15; }
 .editor-menu-environment { display: grid; gap: .35rem; }
 .editor-actions { position: absolute; right: max(.75rem, env(safe-area-inset-right)); bottom: var(--editor-track-actions-bottom); display: flex; gap: .4rem; }

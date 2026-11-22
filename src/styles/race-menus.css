@@ -95,6 +95,7 @@
 }
 .track-library-modal .track-environment-dot[data-environment='cityscape'] { background: #9aabb9; box-shadow: 0 0 .32rem #9aabb93d; }
 .track-library-modal .track-environment-dot[data-environment='desert'] { background: #e5c066; box-shadow: 0 0 .32rem #e5c0663d; }
+.track-library-modal .track-environment-dot[data-environment='kids-room'] { background: #d7b4a1; box-shadow: 0 0 .32rem #d7b4a13d; }
 .track-library-modal .track-card-unavailable,
 .track-library-modal .track-card-medal { color: #e8ad86; font: 800 .57rem/1.1 var(--menu-mono); text-transform: uppercase; }
 .track-library-modal .track-card-medal { color: #d9c18c; }
