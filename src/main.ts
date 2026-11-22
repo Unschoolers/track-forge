@@ -230,6 +230,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
                     damage: player.damage,
                     wrecked: player.wrecked,
                     grounded: player.grounded,
+                    z: player.z,
+                    pathIndex: player.pathIndex,
+                    structureRunId: player.structureRunId,
+                    angle: player.angle,
                     surface: player.currentSurface,
                   }
                 : null,
