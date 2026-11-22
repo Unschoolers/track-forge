@@ -192,6 +192,12 @@ describe('modal application flows', () => {
     expect(raceTile?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
     expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(0)
     expect(raceTile?.contains(share ?? null)).toBe(false)
+    const overflow = share?.closest<HTMLDetailsElement>('details.track-card-overflow')
+    expect(overflow).not.toBeNull()
+    if (!overflow) throw new Error('Saved track share action must be in its overflow menu')
+    overflow.open = true
+    share?.click()
+    expect(overflow.open).toBe(false)
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
     expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
