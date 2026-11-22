@@ -270,11 +270,15 @@ public class NearbyRacePlugin extends Plugin {
                 String id = requested.optString(i);
                 if (connected.contains(id)) recipients.add(id);
             }
-            if (recipients.isEmpty()) { call.resolve(); return; }
+            if (requested.length() == 0) { call.resolve(); return; }
+            if (recipients.size() != requested.length()) {
+                call.reject("A nearby player disconnected before the packet was sent.");
+                return;
+            }
             sentPackets++; sentBytes += bytes.length;
             Payload payload = Payload.fromBytes(bytes);
             long id = payload.getId();
-            boolean pose = bytes[0] == 1 || bytes[0] == 3;
+            boolean transientPacket = bytes[0] == 1 || bytes[0] == 3 || bytes[0] == 4;
             // Task success means the transfer was queued. Keep control and track
             // packets pending until each endpoint reports successful delivery.
             pendingSends.put(id, new PendingSend(call, recipients));
@@ -285,7 +289,7 @@ public class NearbyRacePlugin extends Plugin {
                 record("send", "timeout", null);
                 client().cancelPayload(id);
                 finishSend(id, "Nearby data transfer timed out.");
-            }, pose ? 250 : 10_000);
+            }, transientPacket ? 600 : 10_000);
         });
     }
 
@@ -308,7 +312,7 @@ public class NearbyRacePlugin extends Plugin {
             client.stopAllEndpoints();
         }
         connected.clear();
-        pendingSends.values().forEach(send -> send.call().resolve());
+        pendingSends.values().forEach(send -> send.call().reject("Nearby session ended before delivery."));
         pendingSends.clear();
     }
 
