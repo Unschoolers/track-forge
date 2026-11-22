@@ -14,6 +14,7 @@ describe('Nearby per-player diagnostics', () => {
     telemetry.recordProgress(2, 0, true, 250)
 
     const players = telemetry.snapshot(5100, 0)
+    expect(players).toHaveLength(8)
     expect(players[1]?.pose).toMatchObject({
       accepted: 4, rejectedStaleOrDuplicate: 1, sequenceJumps: 1, skippedSamples: 2,
       firstAtMs: 100, lastAtMs: 2800, lastSequence: 15, silenceMs: 2300,

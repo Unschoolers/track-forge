@@ -7,7 +7,7 @@ import { buildSceneryColliders, type RecoveryScenery } from '@/domain/race/scene
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRaceEffectsState } from '@/domain/race/effects'
-import { validGridPositions } from '@/domain/race/startGrid'
+import { EXTRA_NEARBY_GRID, validNearbyGridPositions } from '@/domain/race/startGrid'
 import type { Vector2 } from '@/domain/model'
 
 export interface CreateRaceOptions {
@@ -140,10 +140,11 @@ export function createRace(options: CreateRaceOptions): RaceState {
   const sceneryColliders = options.recoveryScenery
     ? buildSceneryColliders(options.recoveryScenery, options.path.terrainSurface) : undefined
   const openPlacement = open ? sampleOpenStart(options.path) : undefined
-  const slots = validGridPositions(options.gridPositions) ? options.gridPositions : [0, 1, 2, 3]
+  const slots = validNearbyGridPositions(options.gridPositions) ? options.gridPositions : [0, 1, 2, 3]
   const vehicles: RaceVehicle[] = ROAD_GEOMETRY.startGrid.map((_, index) => {
     const gridSlot = slots[index] ?? index
-    const grid = ROAD_GEOMETRY.startGrid[gridSlot]!
+    const grid = ROAD_GEOMETRY.startGrid[gridSlot] ?? EXTRA_NEARBY_GRID[gridSlot - ROAD_GEOMETRY.startGrid.length]
+    if (!grid) throw new RangeError('Invalid player grid pad.')
 
     const placement = openPlacement ?? samplePathBehindStart(
       options.path,

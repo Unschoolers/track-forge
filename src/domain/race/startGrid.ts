@@ -1,8 +1,14 @@
 /** Physical grid slots are independent from racer identities or vehicle array order. */
 export const START_GRID_SIZE = 4
+/** Multiplayer can choose eight physical starting pads without spawning eight solo AI cars. */
+export const NEARBY_START_GRID_SIZE = 8
+export const EXTRA_NEARBY_GRID = [
+  { lane: -20, back: 78 }, { lane: 20, back: 88 },
+  { lane: -8, back: 116 }, { lane: 8, back: 126 },
+] as const
 
 export function randomGridPositions(count: number, random: () => number = Math.random): number[] {
-  if (!Number.isInteger(count) || count < 1 || count > START_GRID_SIZE) {
+  if (!Number.isInteger(count) || count < 1 || count > NEARBY_START_GRID_SIZE) {
     throw new RangeError('Invalid grid player count.')
   }
   const positions = Array.from({ length: count }, (_, index) => index)
@@ -25,10 +31,17 @@ export function validGridPositions(value: unknown, count = START_GRID_SIZE): val
     new Set(value).size === count
 }
 
-/** A nearby phone only simulates its own player, which may occupy any start slot. */
+/** A nearby phone only simulates its own player, which may occupy any of eight pads. */
 export function gridPositionsForPlayer(slot: number): number[] {
-  if (!Number.isInteger(slot) || slot < 0 || slot >= START_GRID_SIZE) {
+  if (!Number.isInteger(slot) || slot < 0 || slot >= NEARBY_START_GRID_SIZE) {
     throw new RangeError('Invalid player grid slot.')
   }
-  return [slot, ...Array.from({ length: START_GRID_SIZE }, (_, index) => index).filter((index) => index !== slot)]
+  return [slot, ...Array.from({ length: START_GRID_SIZE }, (_, index) => index).filter((index) => index !== slot)].slice(0, START_GRID_SIZE)
+}
+
+/** Validate four simulated vehicles referencing any of the eight Nearby starting pads. */
+export function validNearbyGridPositions(value: unknown): value is readonly number[] {
+  return Array.isArray(value) && value.length === START_GRID_SIZE &&
+    value.every((slot) => Number.isInteger(slot) && slot >= 0 && slot < NEARBY_START_GRID_SIZE) &&
+    new Set(value).size === START_GRID_SIZE
 }

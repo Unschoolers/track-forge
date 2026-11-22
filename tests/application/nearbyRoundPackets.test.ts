@@ -11,13 +11,13 @@ import { nearbyCar } from '../fixtures/nearbyRace'
 const rival = nearbyCar('red', 40)
 
 describe('Nearby rematch packet round isolation', () => {
-  it('encodes a 5-bit round epoch without increasing 19/8-byte packet sizes', () => {
-    const pose = encodePose(1, 1, 0, rival, 17)
-    const progress = encodeProgress(1, 1, 13.25, 17)
+  it('encodes a 4-bit round epoch without increasing 19/8-byte packet sizes', () => {
+    const pose = encodePose(1, 1, 0, rival, 15)
+    const progress = encodeProgress(1, 1, 13.25, 15)
     expect(pose).toHaveLength(POSE_BYTES)
     expect(progress).toHaveLength(PROGRESS_BYTES)
-    expect(decodePose(pose)).toMatchObject({ slot: 1, round: 17, sequence: 1 })
-    expect(decodeProgress(progress)).toEqual({ slot: 1, round: 17, sequence: 1, progress: 13.25 })
+    expect(decodePose(pose)).toMatchObject({ slot: 1, round: 15, sequence: 1 })
+    expect(decodeProgress(progress)).toEqual({ slot: 1, round: 15, sequence: 1, progress: 13.25 })
     expect(decodePose(encodePose(1, 1, 0, rival))?.round).toBe(0)
     expect(decodeProgress(encodeProgress(1, 1, 0))?.round).toBe(0)
     expect(decodeProgress(new Uint8Array([4, 0x80, 0, 0, 0, 0, 0, 0]))).toBeNull()

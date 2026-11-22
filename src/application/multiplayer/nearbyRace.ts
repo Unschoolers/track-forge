@@ -105,9 +105,6 @@ export class NearbyRace {
   private slot = 0
   private readonly poseSync: NearbyPoseSync
   private readonly progressSync: NearbyProgressSync
-  private lastQualitySampleAt = Number.NEGATIVE_INFINITY
-  private qualitySamplePending = false
-  private qualityEpoch = 0
   private timeout: ReturnType<typeof setTimeout> | undefined
 
   constructor(
@@ -300,9 +297,6 @@ export class NearbyRace {
   }
 
   private clearRound(): void {
-    this.qualityEpoch++
-    this.qualitySamplePending = false
-    this.lastQualitySampleAt = Number.NEGATIVE_INFINITY
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.replayTrace.reset()
     this.networkTelemetry = new NearbyNetworkTelemetry()
@@ -340,7 +334,6 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle, state?: RaceState): void {
     if (this.phase !== 'racing') return
-    this.sampleDeliveryQuality()
     if (state) this.captureTraceFrame(vehicle, state)
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
@@ -348,32 +341,6 @@ export class NearbyRace {
       vehicle, state.path.points.length, state.startPathIndex, state.reversed,
       normalizeRouteKind(state.routeKind),
     ), recipients)
-  }
-
-  /** Poll just native delivery counters: queue admission alone cannot raise pose Hz. */
-  private sampleDeliveryQuality(): void {
-    const read = this.transport.deliveryQuality
-    if (!read) return
-    const now = this.now()
-    if (this.qualitySamplePending || now - this.lastQualitySampleAt < 1500) return
-    this.qualitySamplePending = true
-    this.lastQualitySampleAt = now
-    const generation = this.generation
-    const epoch = this.qualityEpoch
-    void read().then(
-      counters => {
-        if (generation === this.generation && epoch === this.qualityEpoch && this.phase === 'racing') {
-          this.poseSync.observeDeliveryQuality(counters)
-        }
-      },
-      error => {
-        if (generation !== this.generation || epoch !== this.qualityEpoch) return
-        this.poseSync.deliveryUnavailable()
-        this.record('delivery_quality_unavailable', { error: this.errorKind(error) })
-      },
-    ).finally(() => {
-      if (generation === this.generation && epoch === this.qualityEpoch) this.qualitySamplePending = false
-    })
   }
 
   /** The finishing sample remains available after the room stops sending poses. */
@@ -538,11 +505,12 @@ export class NearbyRace {
         if (this.rooms.delete(event.id)) this.changed()
         break
       case 'pairing': {
-        // Guests explicitly select the room; the host admits up to three peers
-        // without an extra per-device match-code prompt.
+        // Race rooms can host seven guests; track sharing retains the
+        // original three-recipient limit instead of changing its contract.
+        const guestLimit = this.purpose === 'share' ? 3 : MAX_PLAYERS - 1
         const incomingGuest = this.phase === 'hosting' &&
           !this.pendingPairs.has(event.id) && !this.guests.has(event.id) &&
-          this.guests.size + this.pendingPairs.size < MAX_PLAYERS - 1
+          this.guests.size + this.pendingPairs.size < guestLimit
         const invitedHost = this.phase === 'connecting' && event.id === this.hostId
         if (incomingGuest || invitedHost) {
           this.pendingPairs.add(event.id)
@@ -563,7 +531,8 @@ export class NearbyRace {
           this.setPhase('waiting')
           if (this.purpose === 'share') this.sendControl([event.id], { type: 'share-ready' })
         } else if (this.phase === 'hosting') {
-          const slot = [1, 2, 3].find((candidate) => ![...this.guests.values()].includes(candidate))
+          const slot = Array.from({ length: MAX_PLAYERS - 1 }, (_, index) => index + 1)
+            .find(candidate => ![...this.guests.values()].includes(candidate))
           if (slot !== undefined) this.guests.set(event.id, slot)
           this.sendShareToReadyPeer(event.id)
           this.changed()
@@ -701,9 +670,12 @@ export class NearbyRace {
 
   private startHost(): void {
     if (!this.course || this.phase !== 'preparing') return
-    const cars: (CarId | null)[] = [this.course.car, null, null, null]
-    const identities: (PlayerIdentity | null)[] = [this.localIdentity, null, null, null]
-    const names: (string | null)[] = [this.localDisplayName ?? null, null, null, null]
+    const cars: (CarId | null)[] = Array(MAX_PLAYERS).fill(null)
+    const identities: (PlayerIdentity | null)[] = Array(MAX_PLAYERS).fill(null)
+    const names: (string | null)[] = Array(MAX_PLAYERS).fill(null)
+    cars[0] = this.course.car
+    identities[0] = this.localIdentity
+    names[0] = this.localDisplayName ?? null
     for (const [id, slot] of this.guests) {
       const guest = this.ready.get(id)
       if (!guest) return
@@ -716,7 +688,7 @@ export class NearbyRace {
     const occupied = [0, ...this.guests.values()].sort((a, b) => a - b)
     const shuffled = randomGridPositions(occupied.length, () =>
       (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32)
-    const positions: (number | null)[] = [null, null, null, null]
+    const positions: (number | null)[] = Array(MAX_PLAYERS).fill(null)
     occupied.forEach((slot, index) => { positions[slot] = shuffled[index]! })
     this.stage(this.course, cars, identities, positions, names)
     this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions, round: this.round,
@@ -831,9 +803,6 @@ export class NearbyRace {
   }
 
   private begin(phase: Phase): number {
-    this.qualityEpoch++
-    this.qualitySamplePending = false
-    this.lastQualitySampleAt = Number.NEGATIVE_INFINITY
     this.timeline.length = 0
     this.diagnosticStart = this.now()
     this.diagnosticStartedAtUtc = new Date().toISOString()
@@ -882,9 +851,6 @@ export class NearbyRace {
   }
 
   private reset(error: string | null): void {
-    this.qualityEpoch++
-    this.qualitySamplePending = false
-    this.lastQualitySampleAt = Number.NEGATIVE_INFINITY
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.replayTrace.reset()
     this.generation++

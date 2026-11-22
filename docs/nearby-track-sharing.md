@@ -85,6 +85,18 @@ rematch, connection loss, and one outdated APK (confirm no race starts and the
 updated peer sees the message). Unit/CI checks do not establish radio quality.
 
 
+## Eight-player radio pacing (wire protocol v3, 2026-11-22)
+
+- Nearby race hosts support **one host and seven guests** using the existing P2P_STAR topology. Solo races retain four simulated cars. Multiplayer start pads expand to eight; all eight cars are synchronized as remote ghosts, rather than running eight physics simulations per device.
+- Every phone produces at most **30 position updates/s**. A host broadcasts one binary batch of up to eight 19-byte positions (maximum 153 bytes) to the eligible guests, not separate per-car messages. Its maximum position-payload fanout at 30 Hz to seven peers is about 32.1 KB/s before wireless framing overhead.
+- Android maintains independent per-endpoint sending windows and a **30 → 15 → 8 → 4 → 2 → 1 Hz** ladder. Delivery timeouts/failures downshift only the affected endpoint; clean acknowledged delivery gradually restores the rate. Progress updates are also paced so they do not overwhelm a downshifted peer. Other peers continue receiving the highest rate their links can sustain.
+- The sender does not queue outdated poses behind stuck packets. At low rates, interpolation remains strictly bounded; the game cannot guarantee perfectly smooth animation on a 1 Hz link.
+- Eight player slots require three slot bits. Pose headers now use three slot bits, one structure bit and four round bits; progress headers use three slot bits and four round bits. **Payload lengths remain 19 and 8 bytes**, but headers are **not binary compatible** with v2, so the mandatory lobby handshake is bumped to **v3**. All phones must update before racing together.
+- The four-player Cup scoring table is preserved; Cups of 5–8 players use a descending eight-place table.
+
+### Validation gate
+Component tests: eight-slot wire encoding and rejection, eight unique starting pads, eight-person preparation/countdown/host batch, repeat rounds and malformed input. Native JVM tests: independent slow/healthy peer rates, recovery, progress pacing, disconnect. CI must run JS verify and Android compile/JUnit. **Real 2/4/8-device radio trials are still required** to establish 30/15 Hz stability, CPU/frame timing and actual delivery percentiles; unit tests do not prove radio quality. Roll back the networking PR as a unit if the v3 rollout causes problems.
+
 ## Host-selected Day/Night lighting
 
 After selecting a normal race track or a Nearby Cup, the host can choose **DAY** or **NIGHT** from the hosting lobby. All connected players receive the chosen lighting in the existing reliable race preparation message. The chosen override applies to subsequent Cup tracks and new race track selections in the same room; it does not edit the saved track. When no choice is made, each track uses its stored lighting. Track sharing has no lighting selector. The selection remains host-authoritative to avoid players racing in inconsistent visibility conditions.

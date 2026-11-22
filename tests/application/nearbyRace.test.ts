@@ -127,6 +127,68 @@ describe('Nearby Arcade', () => {
     }
   })
 
+  it('stages eight peers with distinct pads and multicasts one eight-car pose batch', async () => {
+    const network = new NearbyNetwork()
+    const devices = Array.from({ length: 8 }, (_, index) => new NearbyRace(
+      network.endpoint(index === 0 ? 'host' : `guest-${index}`),
+      () => true,
+    ))
+    const host = devices[0]!
+    const starts = new Map<number, NearbyStart>()
+    const car = ['blue', 'red', 'green', 'yellow'] as const
+    devices.forEach((device, index) => { device.onStart(start => { starts.set(index, start) }) })
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (let index = 1; index < devices.length; index++) {
+        const guest = devices[index]!
+        guest.scan(car[index % car.length]!)
+        await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        guest.connect('host')
+        await vi.waitFor(() => {
+          expect(guest.snapshot().phase).toBe('waiting')
+          expect(host.snapshot().players).toBe(index + 1)
+        }, { interval: 5 })
+      }
+      expect(host.snapshot().players).toBe(8)
+      host.start()
+      await vi.waitFor(() => expect(starts.size).toBe(8), { interval: 5 })
+      expect([...starts.values()].map(start => start.gridSlot).sort((a,b)=>a-b))
+        .toEqual([0,1,2,3,4,5,6,7])
+      const locations = [...starts.entries()].map(([index, start]) => {
+        expect(devices[index]!.standings()).toHaveLength(8)
+        const stage = createRace({
+          path, laps: 2, difficulty: 'normal', playerCar: car[index % car.length]!,
+          gridPositions: gridPositionsForPlayer(start.gridSlot),
+        })
+        expect(stage.vehicles).toHaveLength(4)
+        const player = stage.vehicles[0]!
+        return [player.x, player.y].map(v => v.toFixed(2)).join(',')
+      })
+      expect(new Set(locations).size).toBe(8)
+      devices.forEach(device => { device.sceneReady() })
+      await vi.waitFor(() => expect(devices.every(device => device.snapshot().phase === 'racing')).toBe(true), { interval: 5 })
+      const posePackets = devices.map((_, index) => {
+        const stage = createRace({
+          path, laps: 2, difficulty: 'normal', playerCar: car[index % car.length]!,
+          gridPositions: gridPositionsForPlayer(starts.get(index)!.gridSlot),
+        })
+        return stage.vehicles[0]!
+      })
+      for (let index = 1; index < devices.length; index++) devices[index]!.update(posePackets[index]!)
+      await vi.waitFor(() => expect(host.diagnostics()).resolves.toMatchObject({ poseCounts: { received: 7 } }), { interval: 5 })
+      host.update(posePackets[0]!)
+      await vi.waitFor(() => {
+        const broadcasts = network.packets.filter(msg => msg.from === 'host' && msg.bytes[0] === Packet.PoseBatch)
+        expect(broadcasts).toHaveLength(1)
+        expect(broadcasts[0]?.to).toHaveLength(7)
+        expect(decodePoseBatch(broadcasts[0]!.bytes)).toHaveLength(8)
+      }, { interval: 5 })
+    } finally {
+      devices.forEach(device => { device.destroy() })
+    }
+  })
+
   it('shares a track and countdown with three paired guests, and relays ghosts and finishing times', async () => {
     const network = new NearbyNetwork()
     const players = [
@@ -439,6 +501,33 @@ describe('Nearby Arcade', () => {
 })
 
 describe('Nearby track sharing and rematches', () => {
+  it('keeps sharing capped at three connected guests when racing supports eight', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guests = Array.from({ length: 4 }, (_, index) =>
+      new NearbyRace(network.endpoint(`guest-${index}`), () => true))
+    try {
+      host.hostShare(track)
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const [index, guest] of guests.entries()) {
+        guest.scan('blue', 'share')
+        await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        guest.connect('host')
+        if (index < 3) {
+          await vi.waitFor(() => expect(host.snapshot().players).toBe(index + 2), { interval: 5 })
+          await vi.waitFor(() => expect(guest.snapshot().phase).toBe('share-review'), { interval: 5 })
+        } else {
+          await vi.waitFor(() => expect(guest.snapshot().phase).toBe('idle'), { interval: 5 })
+          expect(guest.snapshot().error).toContain('Pairing declined')
+          expect(host.snapshot().players).toBe(4)
+        }
+      }
+    } finally {
+      host.destroy()
+      guests.forEach(guest => { guest.destroy() })
+    }
+  })
+
   it('shares a track without starting a race and waits for explicit save confirmation', async () => {
     const network = new NearbyNetwork()
     const host = new NearbyRace(network.endpoint('sender'), () => true)

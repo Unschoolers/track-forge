@@ -11,6 +11,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Base64;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -63,6 +64,7 @@ public class NearbyRacePlugin extends Plugin {
     private final Set<String> connected = new HashSet<>();
     private final Map<Long, PendingSend> pendingSends = new HashMap<>();
     private final TransientPayloadWindow transientWindow = new TransientPayloadWindow();
+    private final AdaptivePeerRates peerRates = new AdaptivePeerRates();
     private long droppedTransientPackets, failedTransientPackets, timedOutTransientPackets, deliveredTransientPackets;
     private ConnectionsClient client;
     private int generation;
@@ -165,6 +167,9 @@ public class NearbyRacePlugin extends Plugin {
             counters.put("failedTransientPackets", failedTransientPackets);
             counters.put("timedOutTransientPackets", timedOutTransientPackets);
             counters.put("deliveredTransientPackets", deliveredTransientPackets);
+            JSArray rates = new JSArray();
+            for (String endpoint : connected) rates.put(peerRates.rateHz(endpoint));
+            report.put("peerPoseRatesHz", rates);
             report.put("counters", counters);
             JSArray history = new JSArray(); for (JSObject event : events) history.put(event);
             report.put("events", history); call.resolve(report);
@@ -274,7 +279,7 @@ public class NearbyRacePlugin extends Plugin {
         main.post(() -> {
             String data = call.getString("data", "");
             JSArray requested = call.getArray("ids");
-            if (data.length() > 4 * ((MAX_BYTES + 2) / 3) || requested == null || requested.length() > 3) {
+            if (data.length() > 4 * ((MAX_BYTES + 2) / 3) || requested == null || requested.length() > 7) {
                 call.reject("Invalid nearby message.");
                 return;
             }
@@ -301,9 +306,12 @@ public class NearbyRacePlugin extends Plugin {
             // Keep one Nearby multicast per frame, but do not let an
             // unresponsive destination queue stale frames for the other peers.
             if (transientPacket) {
+                long now = SystemClock.elapsedRealtime();
                 Set<String> eligible = transientWindow.available(recipients, progressPacket);
+                eligible.removeIf(endpoint -> !peerRates.canSend(endpoint, progressPacket, now));
                 droppedTransientPackets += recipients.size() - eligible.size();
                 if (eligible.isEmpty()) { call.resolve(); return; }
+                for (String endpoint : eligible) peerRates.sent(endpoint, progressPacket, now);
                 Payload payload = Payload.fromBytes(bytes);
                 long payloadId = payload.getId();
                 transientWindow.start(payloadId, eligible, progressPacket);
@@ -319,6 +327,8 @@ public class NearbyRacePlugin extends Plugin {
                     })
                     .addOnFailureListener(error -> {
                         record("send_transient", "enqueue_failed", statusCode(error));
+                        for (String endpoint : transientWindow.pendingEndpoints(payloadId))
+                            peerRates.failed(endpoint, SystemClock.elapsedRealtime());
                         transientWindow.abandon(payloadId);
                         failedTransientPackets++;
                         if (answered.compareAndSet(false, true)) call.reject("Could not queue nearby position data.", error);
@@ -327,6 +337,8 @@ public class NearbyRacePlugin extends Plugin {
                     if (!transientWindow.contains(payloadId)) return;
                     timedOutTransientPackets++;
                     record("send_transient", "timeout", null);
+                    for (String endpoint : transientWindow.pendingEndpoints(payloadId))
+                        peerRates.failed(endpoint, SystemClock.elapsedRealtime());
                     client().cancelPayload(payloadId);
                     transientWindow.abandon(payloadId);
                     if (answered.compareAndSet(false, true)) call.reject("Nearby position data timed out.");
@@ -372,6 +384,7 @@ public class NearbyRacePlugin extends Plugin {
         }
         connected.clear();
         transientWindow.clear();
+        peerRates.clear();
         pendingSends.values().forEach(send -> send.call().reject("Nearby session ended before delivery."));
         pendingSends.clear();
     }
@@ -400,6 +413,7 @@ public class NearbyRacePlugin extends Plugin {
                 record("connection", "disconnected", null);
                 connected.remove(id);
                 transientWindow.disconnect(id);
+                peerRates.disconnect(id);
                 // Reliable operations must fail promptly when a target leaves.
                 for (Long payloadId : new ArrayList<>(pendingSends.keySet())) {
                     PendingSend pending = pendingSends.get(payloadId);
@@ -426,10 +440,13 @@ public class NearbyRacePlugin extends Plugin {
             @Override public void onPayloadTransferUpdate(String endpoint, PayloadTransferUpdate update) {
                 if (active != generation || update.getStatus() == PayloadTransferUpdate.Status.IN_PROGRESS) return;
                 long id = update.getPayloadId();
+                boolean progress = transientWindow.isProgress(id);
                 if (transientWindow.complete(id, endpoint)) {
                     if (update.getStatus() == PayloadTransferUpdate.Status.SUCCESS) {
+                        peerRates.delivered(endpoint, progress, SystemClock.elapsedRealtime());
                         deliveredTransientPackets++;
                     } else {
+                        peerRates.failed(endpoint, SystemClock.elapsedRealtime());
                         failedTransientPackets++;
                         record("send_transient", "transfer_failed", null);
                     }

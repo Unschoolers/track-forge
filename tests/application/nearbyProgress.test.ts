@@ -17,7 +17,7 @@ describe('nearby progress telemetry', () => {
     const invalid = new Uint8Array(packet)
     new DataView(invalid.buffer).setFloat32(4, Number.NaN, true)
     expect(decodeProgress(invalid)).toBeNull()
-    expect(() => encodeProgress(4, 1, 1)).toThrow(RangeError)
+    expect(() => encodeProgress(8, 1, 1)).toThrow(RangeError)
     expect(() => encodeProgress(1, 0, Infinity)).toThrow(RangeError)
   })
 

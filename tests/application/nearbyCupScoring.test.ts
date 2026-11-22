@@ -29,6 +29,12 @@ describe('nearby cup scoring', () => {
     ])
   })
 
+  it('awards meaningful points through eighth place without changing four-player Cup totals', () => {
+    const ranked = Array.from({ length: 8 }, (_, slot) => ({ slot, time: slot + 30, left: false }))
+    const totals = awardNearbyCupRound(ranked, new Map())
+    expect(ranked.map(({ slot }) => totals?.get(slot))).toEqual([16, 12, 10, 8, 6, 4, 2, 1])
+  })
+
   it('keeps tied standings stable by slot and never scores an empty race', () => {
     expect(awardNearbyCupRound([], new Map())).toBeNull()
     expect(nearbyCupStandings([3, 1, 2], new Map([[3, 8], [1, 8]])))

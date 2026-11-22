@@ -3,7 +3,7 @@ import type { PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import {
   decodePose, decodePoseBatch, encodePose, encodePoseBatch,
-  Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS,
+  Packet, POSE_PERIOD_MS,
   POSE_RECOVERY_MASK, POSE_SEQUENCE_MASK, WIRE_ROUND_MASK, type RemoteGhost,
 } from '@/application/multiplayer/raceWire'
 
@@ -18,7 +18,7 @@ export function activePosePackets(
     const racer = racers.get(slot)
     // A live pose can arrive before the room roster is updated. Keep it,
     // matching the original relay rule, until the roster says left or finished.
-    if (racer?.left || racer?.time !== undefined || now - value.receivedAt > 300) continue
+    if (racer?.left || racer?.time !== undefined || now - value.receivedAt > 2000) continue
     packets.push(value.bytes)
   }
   return packets
@@ -42,11 +42,6 @@ export class NearbyPoseSync {
   private recovery = 0
   private lastSentAt = -Infinity
   private poseSending = false
-  private posePeriodMs = POSE_PERIOD_MS
-  private healthySends = 0
-  private fastRetryAfter = 0
-  private deliveryCounters: { delivered: number; failed: number; dropped: number; timedOut: number } | null = null
-  private lastDeliveryAt = 0
 
   constructor(
     private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
@@ -55,7 +50,7 @@ export class NearbyPoseSync {
   ) {}
 
   get counts() { return { ...this.poseCounts } }
-  get targetPoseHz(): number { return Math.round(1000 / this.posePeriodMs) }
+  get targetPoseHz(): number { return Math.round(1000 / POSE_PERIOD_MS) }
 
   resetCounts(): void {
     Object.assign(this.poseCounts, { sent: 0, received: 0, sendFailed: 0, relayed: 0 })
@@ -71,54 +66,6 @@ export class NearbyPoseSync {
     this.recovery = 0
     this.lastSentAt = -Infinity
     this.poseSending = false
-    this.posePeriodMs = POSE_PERIOD_MS
-    this.healthySends = 0
-    this.fastRetryAfter = 0
-    this.deliveryCounters = null
-    this.lastDeliveryAt = 0
-  }
-
-  /** A successful native enqueue is not evidence that any remote car received a pose. */
-  observeDeliveryQuality(raw: Record<string, unknown>): void {
-    const keys = ['delivered', 'failed', 'dropped', 'timedOut'] as const
-    if (!keys.every(key => Number.isSafeInteger(raw[key]) && (raw[key] as number) >= 0)) {
-      this.deliveryUnavailable()
-      return
-    }
-    const next = {
-      delivered: raw.delivered as number,
-      failed: raw.failed as number,
-      dropped: raw.dropped as number,
-      timedOut: raw.timedOut as number,
-    }
-    const previous = this.deliveryCounters
-    this.deliveryCounters = next
-    if (!previous) return
-    const deltas = keys.map(key => next[key] - previous[key])
-    if (deltas.some(delta => delta < 0)) {
-      this.deliveryUnavailable()
-      this.deliveryCounters = next
-      return
-    }
-    const [delivered, failed, dropped, timedOut] = deltas
-    const now = this.now()
-    if ((failed ?? 0) + (dropped ?? 0) + (timedOut ?? 0) > 0) {
-      this.deliveryUnavailable()
-      this.fastRetryAfter = now + 5000
-    } else if ((delivered ?? 0) > 0) {
-      this.lastDeliveryAt = now
-      if (now >= this.fastRetryAfter) {
-        this.healthySends += delivered ?? 0
-        if (this.healthySends >= 80) this.posePeriodMs = POSE_FAST_PERIOD_MS
-      }
-    } else if (now - this.lastDeliveryAt > 3000) {
-      this.deliveryUnavailable()
-    }
-  }
-
-  deliveryUnavailable(): void {
-    this.posePeriodMs = POSE_PERIOD_MS
-    this.healthySends = 0
   }
 
   setRound(round: number): void { this.round = round & WIRE_ROUND_MASK }
@@ -135,7 +82,7 @@ export class NearbyPoseSync {
     const now = this.now()
     // One compact batch is broadcast to all connected guests. Native Nearby
     // drops obsolete per-endpoint poses if a recipient is still congested.
-    if (this.poseSending || now - this.lastSentAt < this.posePeriodMs - 2 || !recipients.length) return
+    if (this.poseSending || now - this.lastSentAt < POSE_PERIOD_MS - 2 || !recipients.length) return
     const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle, this.round)
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
@@ -146,11 +93,8 @@ export class NearbyPoseSync {
     this.poseCounts.sent++
     const active = this.generation
     void this.send(recipients, bytes)
-      .then(() => { if (active === this.generation) this.updatePoseRate(now, true) })
       .catch(() => {
-        if (active !== this.generation) return
-        this.poseCounts.sendFailed++
-        this.updatePoseRate(now, false)
+        if (active === this.generation) this.poseCounts.sendFailed++
       })
       .finally(() => { if (active === this.generation) this.poseSending = false })
   }
@@ -202,14 +146,4 @@ export class NearbyPoseSync {
     })
   }
 
-  private updatePoseRate(startedAt: number, success: boolean): void {
-    const now = this.now()
-    const duration = Math.max(0, now - startedAt)
-    if (!success || duration > 25) {
-      this.deliveryUnavailable()
-      this.fastRetryAfter = now + 5000
-    }
-    // Never promote to 60 Hz from transport queue acceptance; only a native
-    // delivery callback aggregated by observeDeliveryQuality can do that.
-  }
 }
