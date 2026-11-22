@@ -63,7 +63,13 @@ it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, fre
   const recovered = stepRace(lastTick.state, input, 0.05, random)
   expect(recovered.state.missedCheckpoint).toBeUndefined()
   expect(recovered.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'missed-checkpoint' }))
-  expect(recovered.state.vehicles[0]!.pathIndex).toBe(0)
+  const resetCar = recovered.state.vehicles[0]!
+  // A missed timing gate returns before the pending stripe with room to drive
+  // through it, not necessarily all the way back to the race start.
+  expect(resetCar.pathIndex).toBeGreaterThanOrEqual(0)
+  expect(resetCar.pathIndex).toBeLessThan(gateIndex)
+  expect(resetCar.x).toBeCloseTo(path.points[resetCar.pathIndex]!.x)
+  expect(resetCar.lap).toBe(player.lap)
   expect(recovered.state.vehicles[0]!.nextSector).toBe(1)
   expect(recovered.state.elapsed).toBeCloseTo(missed.state.elapsed + 5)
 })
