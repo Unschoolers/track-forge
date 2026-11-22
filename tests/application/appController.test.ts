@@ -914,3 +914,19 @@ describe('gesture revision isolation', () => {
     expect(trackStore.find(track.id)?.raceRevision).toBe(committed)
   })
 })
+
+it('discards an editor draft whose persisted record disappeared without trapping navigation', () => {
+  const { controller, trackStore } = setup()
+  controller.dispatch({ type: 'open-editor' })
+  const draft = controller.snapshot().currentTrack
+  if (!draft) throw new Error('Expected active editor track')
+  trackStore.tracks.delete(draft.id)
+
+  controller.dispatch({ type: 'go-home' })
+  expect(controller.snapshot().overlay.type).toBe('editor-exit')
+  controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' })
+  expect(controller.snapshot().mode).toBe('home')
+  expect(controller.snapshot().currentTrack).toBeNull()
+  expect(controller.snapshot().notice).toBeNull()
+  controller.destroy()
+})
