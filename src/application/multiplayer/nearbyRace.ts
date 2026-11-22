@@ -31,6 +31,7 @@ export interface NearbyTransport {
   send(ids: string[], bytes: Uint8Array): Promise<void>
   stop(): Promise<void>
   diagnostics?(): Promise<Record<string, unknown>>
+  deliveryQuality?(): Promise<Record<string, unknown>>
 }
 
 interface Course {
@@ -100,6 +101,9 @@ export class NearbyRace {
   private slot = 0
   private readonly poseSync: NearbyPoseSync
   private readonly progressSync: NearbyProgressSync
+  private lastQualitySampleAt = Number.NEGATIVE_INFINITY
+  private qualitySamplePending = false
+  private qualityEpoch = 0
   private timeout: ReturnType<typeof setTimeout> | undefined
 
   constructor(
@@ -277,6 +281,9 @@ export class NearbyRace {
   }
 
   private clearRound(): void {
+    this.qualityEpoch++
+    this.qualitySamplePending = false
+    this.lastQualitySampleAt = Number.NEGATIVE_INFINITY
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.networkTelemetry = new NearbyNetworkTelemetry()
     this.ready.clear()
@@ -312,12 +319,39 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle, state?: RaceState): void {
     if (this.phase !== 'racing') return
+    this.sampleDeliveryQuality()
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
     if (state) this.progressSync.update(this.slot, raceProgress(
       vehicle, state.path.points.length, state.startPathIndex, state.reversed,
       normalizeRouteKind(state.routeKind),
     ), recipients)
+  }
+
+  /** Poll just native delivery counters: queue admission alone cannot raise pose Hz. */
+  private sampleDeliveryQuality(): void {
+    const read = this.transport.deliveryQuality
+    if (!read) return
+    const now = this.now()
+    if (this.qualitySamplePending || now - this.lastQualitySampleAt < 1500) return
+    this.qualitySamplePending = true
+    this.lastQualitySampleAt = now
+    const generation = this.generation
+    const epoch = this.qualityEpoch
+    void read().then(
+      counters => {
+        if (generation === this.generation && epoch === this.qualityEpoch && this.phase === 'racing') {
+          this.poseSync.observeDeliveryQuality(counters)
+        }
+      },
+      error => {
+        if (generation !== this.generation || epoch !== this.qualityEpoch) return
+        this.poseSync.deliveryUnavailable()
+        this.record('delivery_quality_unavailable', { error: this.errorKind(error) })
+      },
+    ).finally(() => {
+      if (generation === this.generation && epoch === this.qualityEpoch) this.qualitySamplePending = false
+    })
   }
 
   /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
@@ -734,6 +768,9 @@ export class NearbyRace {
   }
 
   private begin(phase: Phase): number {
+    this.qualityEpoch++
+    this.qualitySamplePending = false
+    this.lastQualitySampleAt = Number.NEGATIVE_INFINITY
     this.timeline.length = 0
     this.diagnosticStart = this.now()
     this.diagnosticStartedAtUtc = new Date().toISOString()
@@ -781,6 +818,9 @@ export class NearbyRace {
   }
 
   private reset(error: string | null): void {
+    this.qualityEpoch++
+    this.qualitySamplePending = false
+    this.lastQualitySampleAt = Number.NEGATIVE_INFINITY
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.generation++
     this.clearTimeout()
