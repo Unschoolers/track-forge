@@ -338,6 +338,7 @@ function advanceRace(
       // before the missed stripe, not at a later contact on the next lap.
       const recovering = previous ? restoreFrameProgress(vehicle, previous) : vehicle
       const reset = resetMissedCheckpoint(recovering, { ...state, missedCheckpoint })
+      if (reset === recovering) return recovering
       events.push({
         type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
         x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
