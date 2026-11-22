@@ -1,5 +1,5 @@
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
-import { lastRoadRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
+import { authoredRecoveryTarget, lastRoadRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
 
@@ -8,7 +8,8 @@ export function resetRaceVehicle(
   race: RecoveryCourse,
 ): RaceVehicle {
   if (vehicle.player) {
-    const pathIndex = lastRoadRecoveryTarget(race, vehicle) ?? safeFallbackRecoveryTarget(race, vehicle)
+    const pathIndex = lastRoadRecoveryTarget(race, vehicle) ??
+      authoredRecoveryTarget(race, vehicle) ?? safeFallbackRecoveryTarget(race, vehicle)
     if (pathIndex === undefined) return vehicle
     return resetVehicleToTrack({
       ...vehicle,
@@ -48,7 +49,7 @@ export function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): Ra
   const target = race.path.closed
     ? ((race.startPathIndex + (race.reversed ? -1 : 1) * progress) % count + count) % count
     : progress
-  const contact = lastRoadRecoveryTarget(race, vehicle)
+  const contact = lastRoadRecoveryTarget(race, vehicle) ?? authoredRecoveryTarget(race, vehicle)
   const candidate = { ...vehicle, pathIndex: contact ?? target, recoveryAnchorIndex: contact ?? target }
   const safe = safeFallbackRecoveryTarget(race, candidate)
   // A badly authored course can have no dry road before the pending gate.

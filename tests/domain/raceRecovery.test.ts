@@ -296,3 +296,16 @@ it('never uses road contact across an unpassed timing gate', () => {
   expect(recovered.pathIndex).toBeLessThan(Math.ceil(count / 4))
   expect(recovered.nextSector).toBe(1)
 })
+
+it('uses an authored marker only when the most recent road contact is unavailable', () => {
+  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const marker = Math.floor(closeArmsPath.points.length / 8)
+  const player = {
+    ...required(race.vehicles[0]),
+    pathIndex: marker + 16, lastRoadContactIndex: undefined,
+    recoveryCheckpoint: marker, nextSector: 2 as const,
+  }
+  const recovered = resetRaceVehicle(player, { ...race, recoveryCheckpoints: [marker] })
+  expect(recovered.pathIndex).toBe(marker)
+  expect(recovered.recoveryCheckpoint).toBe(marker)
+})

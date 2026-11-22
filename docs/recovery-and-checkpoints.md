@@ -3,7 +3,7 @@
 ## Contracts
 
 - RECOVER returns the player to the **latest safe, grounded road contact**, not to the last user-placed recovery checkpoint. Water, wreck and scenery recoveries use the same source when available.
-- The tracked road index is anchored to actual road support. It must not jump to the other arm of an overlapping road or elevated crossing, or advance past a missing timing gate. If the contact is unsafe or invalid, use the existing gate-limited fallback; never award a missed sector or lap.
+- The tracked road index is anchored to actual road support. It must not jump to the other arm of an overlapping road or elevated crossing, or advance past a missing timing gate. If the contact is unsafe or invalid, prefer the last valid authored checkpoint as a fallback, then the existing gate-limited fallback; never award a missed sector or lap.
 - Author-created recovery checkpoint markers remain visible in the editor and during racing. They do **not** determine the manual respawn location. Checkpoint progress and sector timing remain distinct.
 - New tracks default to automatic checkpoint additions: one per **ten authoring control points** during draw. The marker is placed near the penultimate control point on the compiled safe road, avoiding the open-path endpoint. The ratio is provisional tuning, not a gameplay difficulty setting.
 - Automatic addition **only appends** a new marker at each tenth point; it does not regenerate deleted or manually moved markers. Existing markers retain their approximate world distance as the road extends. Imported/older tracks do not silently gain checkpoints.
