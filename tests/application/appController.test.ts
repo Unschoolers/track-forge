@@ -568,17 +568,16 @@ describe('AppController', () => {
     expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
   })
 
-  it('renaming commits only the name while keeping draft geometry discardable', () => {
+  it('renaming stays in the draft and is also reverted by Discard', () => {
     const { controller, trackStore } = setup()
     controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
     controller.dispatch({ type: 'rename-track', name: 'Renamed' })
-    expect(controller.snapshot().currentTrack?.trees).toContainEqual({ x: 4, y: 5 })
-    expect(trackStore.find(asTrackId('starter'))?.name).toBe('Renamed')
-    expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
+    expect(controller.snapshot().currentTrack).toMatchObject({ name: 'Renamed', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
+    expect(trackStore.find(asTrackId('starter'))?.name).toBe('Starter Circuit')
     controller.dispatch({ type: 'go-home' })
     controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' })
-    expect(controller.snapshot().currentTrack?.name).toBe('Renamed')
+    expect(controller.snapshot().currentTrack?.name).toBe('Starter Circuit')
     expect(controller.snapshot().currentTrack?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
