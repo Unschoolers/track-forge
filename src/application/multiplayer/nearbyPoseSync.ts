@@ -10,7 +10,7 @@ import {
 /** Preserve insertion order and avoid intermediate filter/map arrays per host send. */
 export function activePosePackets(
   poses: ReadonlyMap<number, { readonly bytes: Uint8Array; readonly receivedAt: number }>,
-  racers: ReadonlyMap<number, Pick<PoseRacer, 'left' | 'time'>>,
+  racers: ReadonlyMap<number, { readonly left?: boolean | undefined; readonly time?: number | null | undefined }>,
   now: number,
 ): Uint8Array[] {
   const packets: Uint8Array[] = []
