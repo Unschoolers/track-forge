@@ -16,7 +16,9 @@ export function activePosePackets(
   const packets: Uint8Array[] = []
   for (const [slot, value] of poses) {
     const racer = racers.get(slot)
-    if (!racer || racer.left || racer.time !== undefined || now - value.receivedAt > 300) continue
+    // A live pose can arrive before the room roster is updated. Keep it,
+    // matching the original relay rule, until the roster says left or finished.
+    if (racer?.left || racer?.time !== undefined || now - value.receivedAt > 300) continue
     packets.push(value.bytes)
   }
   return packets
