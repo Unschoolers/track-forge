@@ -283,7 +283,7 @@ export function planPointInsertion(
 ): { readonly index: number; readonly point: TrackPoint } | null {
   const start = points[segmentIndex]
   const end = points[segmentIndex + 1]
-  if (!start || !end) return null
+  if (!start || !end || ![target.x, target.y, start.x, start.y, end.x, end.y].every(Number.isFinite)) return null
   const dx = end.x - start.x
   const dy = end.y - start.y
   const lengthSquared = dx * dx + dy * dy
