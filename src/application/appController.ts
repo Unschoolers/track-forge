@@ -1001,7 +1001,7 @@ export class AppController {
     const tracks = this.library.list()
     const storedTrack = tracks.find((track) => track.id === this.state.currentTrack?.id)
     const currentTrack = storedTrack && this.state.mode === 'editor' && this.hasUnsavedEditorChanges()
-      ? { ...this.state.currentTrack!, creator: storedTrack.creator }
+      ? { ...this.state.currentTrack, ...(storedTrack.creator ? { creator: storedTrack.creator } : {}) }
       : storedTrack ?? this.state.currentTrack
     this.update({
       ...this.state,
