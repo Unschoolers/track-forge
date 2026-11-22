@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { createRace } from '@/domain/race/raceFactory'
-import { recoverRacePlayer, resetMissedCheckpoint } from '@/domain/race/raceRecovery'
+import { recoverRacePlayer, resetMissedCheckpoint, resetRaceVehicle } from '@/domain/race/raceRecovery'
 import { stepRace } from '@/domain/race/raceEngine'
 import { crossesRoadGate, lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
@@ -229,7 +229,32 @@ describe('missed timing gate recovery', () => {
       expect(car.finishedAt).toBeNull()
       expect(car.waterRecoveryProtected).toBe(false)
       expect(recovered.missedCheckpoint).toBeUndefined()
+      // Stuck/wreck/scenery recovery calls this entry point directly.
+      expect(resetRaceVehicle(player, state).pathIndex).toBe(car.pathIndex)
     }
+  })
+
+  it('clears wreck damage without changing the pending gate on a missed-gate reset', () => {
+    const path = buildRoadPath([
+      street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
+    ], EMPTY_TERRAIN)
+    const race = createRace({
+      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
+    })
+    const original = race.vehicles[0]
+    if (!original) throw new Error('Missing wrecked car')
+    const vehicle = {
+      ...original, nextSector: 2 as const, lap: 1, wrecked: true, damage: 100,
+    }
+    const state = {
+      ...race, phase: 'running' as const, vehicles: [vehicle],
+      missedCheckpoint: { gate: 2 as const, remainingSeconds: 4, position: { x: 0, y: 0 } },
+    }
+    const recovered = resetRaceVehicle(vehicle, state)
+    expect(recovered.wrecked).toBe(false)
+    expect(recovered.damage).toBe(0)
+    expect(recovered.nextSector).toBe(2)
+    expect(recovered.lap).toBe(1)
   })
 
   it.each([1, 2, 3, 4] as const)('places stage recovery before timing gate %s', gate => {
