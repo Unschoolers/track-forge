@@ -1,5 +1,5 @@
 import { TERRAIN_LIMITS } from '@/domain/config'
-import type { Track, Vector2 } from '@/domain/model'
+import { TERRAIN_KINDS, type Track, type Vector2 } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { CrossingWorkLimitError } from '@/domain/track/crossings'
@@ -26,6 +26,27 @@ function object(value: unknown): Record<string, unknown> | null {
     : null
 }
 
+/** Shared exports must not silently erase malformed authored terrain. */
+function validSharedTerrain(value: unknown): boolean {
+  if (value === undefined) return true // older exports can omit terrain
+  const input = object(value)
+  if (!input || !Array.isArray(input.cells)) return false
+  if (input.cellSize !== undefined &&
+      (typeof input.cellSize !== 'number' || !Number.isFinite(input.cellSize) || input.cellSize <= 0)) return false
+  if (input.cells.length > TERRAIN_LIMITS.maximumCells) return false
+  for (const raw of input.cells) {
+    const cell = object(raw)
+    if (!cell || typeof cell.column !== 'number' || typeof cell.row !== 'number' ||
+        !Number.isInteger(cell.column) || !Number.isInteger(cell.row) ||
+        cell.column < TERRAIN_LIMITS.minimumCoordinate ||
+        cell.column > TERRAIN_LIMITS.maximumCoordinate ||
+        cell.row < TERRAIN_LIMITS.minimumCoordinate ||
+        cell.row > TERRAIN_LIMITS.maximumCoordinate ||
+        !TERRAIN_KINDS.some(kind => kind === cell.kind)) return false
+  }
+  return true
+}
+
 /** Shared-file imports are treated as untrusted; the library supplies a fresh ID. */
 export function parseTrackImport(content: string): TrackImportResult {
   if (content.length > MAX_FILE_CHARS) {
@@ -45,11 +66,10 @@ export function decodeTrackExport(parsed: unknown): TrackImportResult {
   const source = object(envelope.track)
   if (!source) return { ok: false, message: 'Track contents are missing.' }
   const { points, trees } = source
-  const terrain = object(source.terrain)
   if (typeof source.name !== 'string' || !source.name.trim() ||
       !Array.isArray(points) || points.length > MAX_POINTS ||
       !Array.isArray(trees) || trees.length > MAX_TREES ||
-      (Array.isArray(terrain?.cells) && terrain.cells.length > TERRAIN_LIMITS.maximumCells) ||
+      !validSharedTerrain(source.terrain) ||
       (Array.isArray(source.scenery) && source.scenery.length > MAX_SCENERY_PROPS) ||
       (Array.isArray(source.recoveryCheckpoints) && source.recoveryCheckpoints.length > MAX_RECOVERY_CHECKPOINTS)) {
     return { ok: false, message: 'The shared track has invalid or oversized geometry.' }
