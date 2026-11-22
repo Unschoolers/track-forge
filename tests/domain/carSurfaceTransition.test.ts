@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createRace } from '@/domain/race/raceFactory'
+import type { RaceVehicle } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { decodeTrack } from '@/domain/track/trackCodec'
@@ -59,7 +60,7 @@ describe('actual street-to-dirt driving on the creator Speed straight', () => {
         playerCar: 'blue', difficulty: 'normal', laps: 1, handling,
       }).vehicles[0]
       if (!starter) throw new Error('Missing blue race vehicle')
-      let vehicle = {
+      let vehicle: RaceVehicle = {
         ...starter,
         x: before.x,
         y: before.y,
