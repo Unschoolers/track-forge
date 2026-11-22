@@ -99,4 +99,30 @@ describe('nearby pose synchronizer', () => {
     sync.update(player, 1, 'host', ['host'], racers)
     expect(sync.counts.sent).toBe(1)
   })
+  it('lets healthy guests receive fresh poses while another guest is radio-blocked', async () => {
+    let now = 0
+    const sends: { id: string; bytes: Uint8Array }[] = []
+    let unblock: (() => void) | undefined
+    const sync = new NearbyPoseSync((ids, bytes) => {
+      const id = ids[0]
+      if (!id || ids.length !== 1) throw new Error('Expected one endpoint per transport send')
+      sends.push({ id, bytes })
+      return id === 'slow' ? new Promise<void>(resolve => { unblock = resolve }) : Promise.resolve()
+    }, () => now)
+    sync.update(player, 0, null, ['slow', 'fast'], racers)
+    await flush()
+    now = 34
+    sync.update(player, 0, null, ['slow', 'fast'], racers)
+    await flush()
+    expect(sends.map(({ id }) => id)).toEqual(['slow', 'fast', 'fast'])
+    expect(decodePoseBatch(sends[2]?.bytes ?? new Uint8Array())?.[0]?.sequence).toBe(1)
+    expect(sync.counts.sent).toBe(3)
+    unblock?.()
+    await flush()
+    now = 68
+    sync.update(player, 0, null, ['slow', 'fast'], racers)
+    expect(sends.map(({ id }) => id)).toEqual(['slow', 'fast', 'fast', 'slow', 'fast'])
+  })
+
+
 })
