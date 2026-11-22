@@ -374,14 +374,34 @@ describe('race UI flow', () => {
     expect(banner.querySelector('.race-event-title')?.textContent).toBe('FINAL LAP!')
   })
 
-  it('celebrates overtakes and warns about losing a place without announcing the starting grid', () => {
+  it('confirms overtakes after 600 ms without interrupting an active banner', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
     const { root, updateRace } = setup()
     const banner = requiredElement(root, '.race-event-banner')
+    const position = requiredElement(root, '[data-race-position]')
     expect(banner.textContent).toBe('')
+
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(position.textContent).toBe('1/4') // The live position never lags.
+    expect(banner.textContent).toBe('')
+    now = 599
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.textContent).toBe('')
+    now = 600
     updateRace(raceSnapshot({ position: 1 }))
     expect(banner.dataset.kind).toBe('lead')
     expect(banner.querySelector('.race-event-title')?.textContent).toBe('LEAD TAKEN!')
     expect(banner.textContent).toContain('1 PLACE GAINED')
+    const currentTitle = banner.querySelector('.race-event-title')
+
+    now = 750
+    updateRace(raceSnapshot({ position: 3 }))
+    expect(position.textContent).toBe('3/4')
+    now = 1350
+    updateRace(raceSnapshot({ position: 3 }))
+    expect(banner.querySelector('.race-event-title')).toBe(currentTitle)
+    now = 2250 // The first celebration has now finished.
     updateRace(raceSnapshot({ position: 3 }))
     expect(banner.dataset.kind).toBe('loss')
     expect(banner.textContent).toContain('2 PLACES LOST')
@@ -389,7 +409,42 @@ describe('race UI flow', () => {
     expect(banner.dataset.kind).toBe('loss')
   })
 
-  it('shows reliable nearby rank and overtake cues without fabricating a starting-grid pass', () => {
+  it('ignores rapidly alternating ranks but still announces a sustained overtake', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const { root, updateRace } = setup()
+    const banner = requiredElement(root, '.race-event-banner')
+    const position = requiredElement(root, '[data-race-position]')
+
+    for (let frame = 1; frame <= 20; frame++) {
+      now = frame * 100
+      const rank = frame % 2 ? 1 : 2
+      updateRace(raceSnapshot({ position: rank }))
+      expect(position.textContent).toBe(`${rank}/4`)
+      expect(banner.textContent).toBe('')
+    }
+    now = 2100
+    updateRace(raceSnapshot({ position: 1 }))
+    now = 2699
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.textContent).toBe('')
+    now = 2700
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe('LEAD TAKEN!')
+
+    // A cancelled potential loss must not become a second banner later.
+    now = 2750
+    updateRace(raceSnapshot({ position: 2 }))
+    now = 2900
+    updateRace(raceSnapshot({ position: 1 }))
+    now = 4500
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.textContent).toBe('')
+  })
+
+  it('waits for confirmed nearby rank and never invents a pass when it becomes known', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
     const { root, updateRace } = setup()
     const nearbyAt = (position: number, positionKnown: boolean): RaceSessionSnapshot => ({
       ...raceSnapshot({ position, positionKnown, vehicleCount: 2 }),
@@ -399,14 +454,52 @@ describe('race UI flow', () => {
     const banner = requiredElement(root, '.race-event-banner')
     updateRace(nearbyAt(2, false))
     expect(position.textContent).toBe('LIVE')
+    now = 100
     updateRace(nearbyAt(2, true))
     expect(position.textContent).toBe('2/2')
-    expect(banner.querySelector('.race-event-title')?.textContent).not.toBe('OVERTAKE!')
+    expect(banner.textContent).toBe('')
+    now = 110
     updateRace(nearbyAt(1, true))
     expect(position.textContent).toBe('1/2')
+    expect(banner.textContent).toBe('')
+    now = 709
+    updateRace(nearbyAt(1, true))
+    expect(banner.textContent).toBe('')
+    now = 710
+    updateRace(nearbyAt(1, true))
     expect(banner.querySelector('.race-event-title')?.textContent).toBe('LEAD TAKEN!')
+
+    now = 900
     updateRace(nearbyAt(1, false))
     expect(position.textContent).toBe('LIVE')
+    now = 1000
+    updateRace(nearbyAt(2, true))
+    expect(position.textContent).toBe('2/2')
+    now = 2500
+    updateRace(nearbyAt(2, true))
+    expect(banner.textContent).toBe('')
+  })
+
+  it('drops a pending rank change on countdown and on the next race run', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const { root, updateRace } = setup()
+    const banner = requiredElement(root, '.race-event-banner')
+
+    updateRace(raceSnapshot({ position: 1 }))
+    now = 350
+    updateRace(raceSnapshot({ position: 1, phase: 'countdown', elapsed: 0 }))
+    now = 900
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.textContent).toBe('')
+
+    now = 1000
+    updateRace(raceSnapshot({ position: 2 }))
+    now = 1800
+    updateRace({ ...raceSnapshot({ position: 2 }), runId: 99 })
+    now = 2500
+    updateRace({ ...raceSnapshot({ position: 2 }), runId: 99 })
+    expect(banner.textContent).toBe('')
   })
 
   it('exposes separate simulation pedals and releases each touch independently', () => {
