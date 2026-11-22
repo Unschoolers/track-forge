@@ -39,6 +39,16 @@ describe('all-car race diagnostics', () => {
     expect(JSON.parse(JSON.stringify(report)).frames).toHaveLength(2)
   })
 
+  it('forces a recovery frame between sample ticks and records the one-off event', () => {
+    const recording = new RaceDiagnosticsRecording(initial)
+    const moved = { ...initial, tick: 1, elapsed: 1 / 60 }
+    recording.record(moved, [{ type: 'vehicle-recovered', vehicleId: 'player', reason: 'off-road', x: 0, y: 0, pathIndex: 0 }], input)
+    const report = recording.report(track, setup, result)
+    expect(report.frames.map(frame => frame.tick)).toEqual([0, 1])
+    expect(report.frames[1]?.vehicles.find(vehicle => vehicle.id === 'player')?.cut).toBe(true)
+    expect(report.events.map(item => item.event.type)).toEqual(['vehicle-recovered'])
+  })
+
   it('marks a manual teleport as a cut, records the terminal tick and avoids duplicate timestamps', () => {
     const recording = new RaceDiagnosticsRecording(initial)
     const moved = {
