@@ -42,6 +42,37 @@ export function reachedRecoveryCheckpoint(
   return checkpoint
 }
 
+/**
+ * All missed timing gates (including Finish) share this respawn policy.
+ * Use the gate's route-order position, never the latest road contact:
+ * it may be beyond the stripe or too close to cross it on the next tick.
+ */
+export function missedGateRecoveryTarget(
+  course: RecoveryCourse,
+  gate: RaceVehicle['nextSector'],
+): { index: number; safe: boolean } | undefined {
+  const { path, startPathIndex, reversed } = course
+  const count = path.points.length
+  if (count < 2) return undefined
+  const samples = path.closed ? count : count - 1
+  const gateProgress = samples * gate / 4
+  const spacing = path.totalLength / samples
+  const clearance = Math.max(1, Math.ceil(ROAD_GEOMETRY.onRoadRadius / Math.max(spacing, 1)))
+  const approach = Math.max(0, Math.floor(gateProgress - clearance))
+  const indexAt = (progress: number): number => path.closed
+    ? ((startPathIndex + (reversed ? -progress : progress)) % count + count) % count
+    : progress
+
+  // A flooded/unsafe approach must never push the car beyond the missed gate.
+  for (let progress = approach; progress >= 0; progress--) {
+    const index = indexAt(progress)
+    if (isSafeRoadRecoverySample(path, index)) return { index, safe: true }
+  }
+  // A completely unsafe course still recovers; water protection prevents
+  // an immediate recovery loop until the driver reaches safe support.
+  return { index: indexAt(approach), safe: false }
+}
+
 /** Shared boundary: both authored markers and road contact must be safe and pre-gate. */
 function safePreGateSample(course: RecoveryCourse, vehicle: RaceVehicle, index: number): boolean {
   const { path, reversed, startPathIndex } = course

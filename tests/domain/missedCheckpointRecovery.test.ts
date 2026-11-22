@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { createRace } from '@/domain/race/raceFactory'
-import { recoverRacePlayer, resetMissedCheckpoint } from '@/domain/race/raceRecovery'
+import { recoverRacePlayer, resetMissedCheckpoint, resetRaceVehicle } from '@/domain/race/raceRecovery'
 import { stepRace } from '@/domain/race/raceEngine'
 import { crossesRoadGate, lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
@@ -183,6 +183,174 @@ describe('missed timing gate recovery', () => {
     expect(recovered.pathIndex).toBeLessThan(last)
     expect(recovered.nextSector).toBe(4)
     expect(recovered.lap).toBe(0)
+  })
+
+  it.each([false, true])('uses the same pre-gate recovery for all circuit checkpoints (reversed=%s)', reversed => {
+    const path = buildRoadPath([
+      street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
+    ], EMPTY_TERRAIN)
+    const race = createRace({
+      path, handling: 'arcade', startRatio: 0.18, reversed,
+      playerCar: 'blue', difficulty: 'normal', laps: 2,
+    })
+    const starting = race.vehicles[0]
+    if (!starting) throw new Error('Missing player fixture')
+    const count = path.points.length
+    const direction = reversed ? -1 : 1
+    const atProgress = (progress: number) =>
+      ((race.startPathIndex + direction * progress) % count + count) % count
+
+    for (const gate of [1, 2, 3, 4] as const) {
+      const gateProgress = count * gate / 4
+      const beyond = atProgress(Math.floor(gateProgress + 3))
+      const point = path.points[beyond]
+      if (!point) throw new Error('Missing road sample')
+      const player = {
+        ...starting, x: point.x, y: point.y, pathIndex: beyond,
+        lastRoadContactIndex: beyond, nextSector: gate, lap: 1,
+        // Even a stale authored marker after the gate cannot override this rule.
+        recoveryCheckpoint: beyond,
+      }
+      const state = {
+        ...race, phase: 'running' as const, vehicles: [player],
+        recoveryCheckpoints: [beyond],
+        missedCheckpoint: { gate, remainingSeconds: 3, position: { x: point.x, y: point.y } },
+      }
+      const recovered = recoverRacePlayer(state)
+      const car = recovered.vehicles[0]
+      if (!car) throw new Error('Missing recovered player')
+      const progress = ((direction * (car.pathIndex - race.startPathIndex)) % count + count) % count
+      expect(progress, `gate ${gate}`).toBeLessThan(gateProgress)
+      expect(progress, `gate ${gate}`).toBeGreaterThanOrEqual(0)
+      expect(gateProgress - progress, `gate ${gate}`).toBeGreaterThanOrEqual(6)
+      expect(car.pathIndex).not.toBe(beyond)
+      expect(car.nextSector).toBe(gate)
+      expect(car.lap).toBe(1)
+      expect(car.finishedAt).toBeNull()
+      expect(car.waterRecoveryProtected).toBe(false)
+      expect(recovered.missedCheckpoint).toBeUndefined()
+      // Stuck/wreck/scenery recovery calls this entry point directly.
+      expect(resetRaceVehicle(player, state).pathIndex).toBe(car.pathIndex)
+    }
+  })
+
+  it('clears wreck damage without changing the pending gate on a missed-gate reset', () => {
+    const path = buildRoadPath([
+      street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
+    ], EMPTY_TERRAIN)
+    const race = createRace({
+      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
+    })
+    const original = race.vehicles[0]
+    if (!original) throw new Error('Missing wrecked car')
+    const vehicle = {
+      ...original, nextSector: 2 as const, lap: 1, wrecked: true, damage: 100,
+    }
+    const state = {
+      ...race, phase: 'running' as const, vehicles: [vehicle],
+      missedCheckpoint: { gate: 2 as const, remainingSeconds: 4, position: { x: 0, y: 0 } },
+    }
+    const recovered = resetRaceVehicle(vehicle, state)
+    expect(recovered.wrecked).toBe(false)
+    expect(recovered.damage).toBe(0)
+    expect(recovered.nextSector).toBe(2)
+    expect(recovered.lap).toBe(1)
+  })
+
+  it.each([1, 2, 3, 4] as const)('places stage recovery before timing gate %s', gate => {
+    const path = buildRoadPath([street(0, 16), street(1_000, 16)], EMPTY_TERRAIN, undefined, 'point-to-point')
+    const race = createRace({
+      path, routeKind: 'point-to-point', handling: 'arcade',
+      playerCar: 'blue', difficulty: 'normal', laps: 1,
+    })
+    const last = path.points.length - 1
+    const afterGate = Math.min(last, Math.ceil(last * gate / 4) + 4)
+    const sample = path.points[afterGate]
+    const starting = race.vehicles[0]
+    if (!starting || !sample) throw new Error('Missing stage player fixture')
+    const player = {
+      ...starting, nextSector: gate, pathIndex: afterGate,
+      lastRoadContactIndex: afterGate, x: sample.x, y: sample.y,
+    }
+    const state = {
+      ...race, phase: 'running' as const, vehicles: [player],
+      missedCheckpoint: { gate, remainingSeconds: 2, position: { x: sample.x, y: sample.y } },
+    }
+    const recovered = recoverRacePlayer(state).vehicles[0]
+    if (!recovered) throw new Error('Missing recovered stage player')
+    expect(recovered.pathIndex).toBeLessThan(last * gate / 4)
+    expect(last * gate / 4 - recovered.pathIndex).toBeGreaterThanOrEqual(6)
+    expect(recovered.nextSector).toBe(gate)
+    expect(recovered.lap).toBe(0)
+    expect(recovered.finishedAt).toBeNull()
+  })
+
+  it('does not skip the missed gate during automatic stuck recovery', () => {
+    const path = buildRoadPath([
+      street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
+    ], EMPTY_TERRAIN)
+    const race = createRace({
+      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
+    })
+    const count = path.points.length
+    const afterGateIndex = Math.ceil(count / 2) + 4
+    const afterGate = path.points[afterGateIndex]
+    const car = race.vehicles[0]
+    if (!car || !afterGate) throw new Error('Missing stuck car fixture')
+    const missed = {
+      ...race, phase: 'running' as const, elapsed: 3,
+      vehicles: [{
+        ...car, x: afterGate.x, y: afterGate.y,
+        pathIndex: afterGateIndex, lastRoadContactIndex: afterGateIndex,
+        speed: 0, stuckDuration: 0.65, nextSector: 2 as const,
+      }],
+      missedCheckpoint: { gate: 2 as const, remainingSeconds: 4, position: { x: afterGate.x, y: afterGate.y } },
+    }
+    const tick = stepRace(missed,
+      { steering: 0, throttle: 1, braking: false }, 1 / 60, { next: () => 0.5 })
+    const recovered = tick.state.vehicles[0]
+    if (!recovered) throw new Error('Missing unstuck car')
+    expect(recovered.pathIndex).toBeLessThan(count / 2)
+    expect(recovered.pathIndex).toBeGreaterThan(count / 4)
+    expect(recovered.nextSector).toBe(2)
+    expect(recovered.lap).toBe(0)
+    expect(tick.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered', reason: 'off-road',
+    }))
+  })
+
+  it('automatically respawns before a missed middle gate when its countdown expires', () => {
+    const path = buildRoadPath([
+      street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
+    ], EMPTY_TERRAIN)
+    const race = createRace({
+      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
+    })
+    const count = path.points.length
+    const afterGate = path.points[Math.ceil(count / 2) + 3]
+    const player = race.vehicles[0]
+    if (!afterGate || !player) throw new Error('Missing countdown fixture')
+    const missed = {
+      ...race, phase: 'running' as const,
+      vehicles: [{
+        ...player, x: afterGate.x, y: afterGate.y,
+        pathIndex: Math.ceil(count / 2) + 3, lastRoadContactIndex: Math.ceil(count / 2) + 3,
+        nextSector: 2 as const, lap: 1,
+      }],
+      missedCheckpoint: { gate: 2 as const, remainingSeconds: 0.001, position: { x: afterGate.x, y: afterGate.y } },
+    }
+    const tick = stepRace(missed,
+      { steering: 0, throttle: 0, braking: true }, 1 / 60, { next: () => 0.5 })
+    const recovered = tick.state.vehicles[0]
+    if (!recovered) throw new Error('Missing recovered player')
+    expect(recovered.pathIndex).toBeLessThan(count / 2)
+    expect(recovered.pathIndex).toBeGreaterThan(count / 4)
+    expect(recovered.nextSector).toBe(2)
+    expect(recovered.lap).toBe(1)
+    expect(tick.state.missedCheckpoint).toBeUndefined()
+    expect(tick.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered', reason: 'missed-checkpoint',
+    }))
   })
 
   it('finishes a timed reset even if every pre-gate road sample is flooded', () => {
