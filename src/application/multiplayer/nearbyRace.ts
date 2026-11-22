@@ -501,9 +501,7 @@ export class NearbyRace {
           racer.time === undefined && (fromHost || guestSlot === packet.slot) &&
           this.progressSync.receive(packet) && !fromHost) {
         const recipients = this.endpoints(id)
-        if (recipients.length) void this.transport.send(recipients, bytes).catch((error: unknown) => {
-          this.record('progress_relay_failed', { error: this.errorKind(error) })
-        })
+        this.progressSync.relay(bytes, recipients)
       }
       return
     }
