@@ -32,6 +32,8 @@ export interface VehicleDynamicsTuning {
     readonly referenceMass: number
     readonly lateralGripScale: number
     readonly brakeGripUsage: number
+    /** Modest straight-line service brake traction gain without altering corner grip. */
+    readonly brakingTractionScale: number
     readonly minimumLateralBudget: number
     readonly minimumGrip: number
     readonly maximumBrakeUsage: number
@@ -86,6 +88,8 @@ export interface CarPhysicsSpec {
   readonly frontWeightBias: number
   readonly cornerStiffness: number
   readonly brakeForce: number
+  /** Additional braking traction relative to other cars. */
+  readonly brakingTractionScale: number
   readonly recovery: number
 }
 
@@ -130,6 +134,7 @@ export const VEHICLE_DYNAMICS_TUNING = {
     // Lateral authority therefore needs an arcade scale above physical 1g.
     lateralGripScale: 2.55,
     brakeGripUsage: 0.92,
+    brakingTractionScale: 1.12,
     minimumLateralBudget: 0.04,
     minimumGrip: 0.08,
     maximumBrakeUsage: 0.98,
@@ -206,6 +211,7 @@ export const CAR_PHYSICS_SPECS = {
     frontWeightBias: 0.55,
     cornerStiffness: 8.6,
     brakeForce: 132_000,
+    brakingTractionScale: 1,
     recovery: 1.5,
   },
   red: {
@@ -223,6 +229,7 @@ export const CAR_PHYSICS_SPECS = {
     frontWeightBias: 0.53,
     cornerStiffness: 7.4,
     brakeForce: 112_000,
+    brakingTractionScale: 1.03,
     recovery: 1.25,
   },
   green: {
@@ -239,6 +246,7 @@ export const CAR_PHYSICS_SPECS = {
     frontWeightBias: 0.54,
     cornerStiffness: 9.5,
     brakeForce: 125_000,
+    brakingTractionScale: 1,
     recovery: 1.8,
   },
   yellow: {
@@ -255,6 +263,7 @@ export const CAR_PHYSICS_SPECS = {
     frontWeightBias: 0.57,
     cornerStiffness: 8.7,
     brakeForce: 165_000,
+    brakingTractionScale: 1,
     recovery: 1.65,
   },
 } as const satisfies Record<CarId, CarPhysicsSpec>
