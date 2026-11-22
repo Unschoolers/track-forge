@@ -175,6 +175,22 @@ test('can drag the same starter control point twice, then tap for point controls
     await releaseTouches(pointer)
     await expect(panel).toBeVisible()
     expect((await read()).editor.history).toBe(2)
+
+    // The UI root lets canvas touches pass through; the range must opt back in.
+    // A real touch drag catches regressions that programmatic input events miss.
+    const tension = panel.locator('[data-action="point-tension"]')
+    await expect(tension).toHaveCSS('pointer-events', 'auto')
+    const bounds = await tension.boundingBox()
+    if (!bounds) throw new Error('Selected point tension slider is not visible')
+    const sliderY = Math.round(bounds.y + bounds.height / 2)
+    const start = contact(1, Math.round(bounds.x + bounds.width * .5), sliderY)
+    const end = contact(1, Math.round(bounds.x + bounds.width * .85), sliderY)
+    await touch(pointer, 'touchStart', [start])
+    await touch(pointer, 'touchMove', [end])
+    await expect(panel).toBeVisible()
+    await releaseTouches(pointer)
+    await expect.poll(async () => (await saved())[2].tension).toBeGreaterThan(.7)
+    await expect(panel).toBeVisible()
   } finally {
     await pointer.detach()
   }
