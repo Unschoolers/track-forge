@@ -139,6 +139,7 @@ export function safeEntrySpeedAhead(
   carId: CarId = 'blue',
   useSharpBendSafety = false,
   fastCorners = false,
+  useChassisYawSafety = true,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -153,7 +154,7 @@ export function safeEntrySpeedAhead(
     (car.steer / CAR_SPECS.blue.steer) *
     (CAR_SPECS.blue.yawInertia / Math.max(1, car.yawInertia)),
   )
-  const turningPace = clamp(steeringResponse, 0.84, 1)
+  const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
   for (const step of BRAKE_LOOKAHEAD) {
     const raw = nearestIndex + direction * step
