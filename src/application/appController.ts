@@ -1010,10 +1010,13 @@ export class AppController {
   private setPreferences(
     preferences: Preferences,
   ): void {
-    const saved = this.dependencies.preferencesStore.save(preferences)
+    if (!this.dependencies.preferencesStore.save(preferences)) {
+      this.update({ ...this.state, notice: 'Preferences could not be saved on this device.' })
+      return
+    }
     this.dependencies.nearby?.setIdentity(preferences.playerIdentity)
     this.dependencies.nearby?.setDisplayName(preferences.displayName)
-    this.update({ ...this.state, preferences, notice: saved ? this.state.notice : 'Preferences could not be saved on this device.' })
+    this.update({ ...this.state, preferences })
   }
 
   private saveCurrentTrack(): void {

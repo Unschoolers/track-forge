@@ -52,6 +52,8 @@ it('remembers multiplayer topper icon and color without reprompting and validate
   expect(JSON.parse(memory.values.get('trackforge-player-topper-v1') ?? 'null')).toEqual({ icon: 'flag', color: 'orange' })
   expect(repository.save({ ...repository.load(), playerIdentity: { icon: 'crown', color: 'violet' } })).toBe(true)
   expect(new BrowserPreferencesRepository(memory).load().playerIdentity).toEqual({ icon: 'crown', color: 'violet' })
+  // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+  memory.values.delete('trackforge-preferences-snapshot-v1')
   memory.values.set('trackforge-player-topper-v1', '{broken JSON')
   expect(repository.load().playerIdentity).toEqual({ icon: 'star', color: 'cyan' })
   memory.values.set('trackforge-player-topper-v1', JSON.stringify({ icon: 'hacked', color: 'pink' }))
@@ -106,6 +108,8 @@ it('persists the explicit race mode and rejects unknown stored modes', () => {
   expect(preferences.load().raceMode).toBe('normal')
   preferences.save({ ...preferences.load(), raceMode: 'ghost' })
   expect(preferences.load().raceMode).toBe('ghost')
+  // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+  memory.values.delete('trackforge-preferences-snapshot-v1')
   memory.values.set('trackforge-race-mode', 'invalid')
   expect(preferences.load().raceMode).toBe('normal')
 })
@@ -132,6 +136,8 @@ it('round-trips a validated display name and stable creator ID', () => {
   expect(new BrowserPreferencesRepository(store).load()).toMatchObject({
     displayName: 'Émile QC', creatorId: 'local-creator-123',
   })
+  // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+  store.values.delete('trackforge-preferences-snapshot-v1')
   store.values.set('trackforge-player-name-v1', '<script>')
   expect(preferences.load().displayName).toBeUndefined()
   store.values.set('trackforge-creator-id-v1', 'bad')
@@ -435,6 +441,8 @@ describe('score and preference repositories', () => {
     expect(preferences.load().raceLaps).toBe(2)
     expect(preferences.save({ ...preferences.load(), raceLaps: 1 })).toBe(true)
     expect(preferences.load().raceLaps).toBe(1)
+    // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+    storage.values.delete('trackforge-preferences-snapshot-v1')
     storage.values.set('trackforge-race-laps', '999')
     expect(preferences.load().raceLaps).toBe(2)
     expect(preferences.save({ ...preferences.load(), raceLaps: 3 })).toBe(true)
@@ -448,6 +456,8 @@ describe('score and preference repositories', () => {
     expect(preferences.save({ ...preferences.load(), handling: 'simulation' })).toBe(true)
     expect(preferences.load().handling).toBe('simulation')
     expect(storage.values.get('trackforge-handling-mode')).toBe('simulation')
+    // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+    storage.values.delete('trackforge-preferences-snapshot-v1')
     storage.values.set('trackforge-handling-mode', 'invalid')
     expect(preferences.load().handling).toBe('arcade')
   })
@@ -463,6 +473,8 @@ describe('score and preference repositories', () => {
       expect(preferences.save({ ...preferences.load(), steeringSensitivity })).toBe(true)
       expect(new BrowserPreferencesRepository(storage).load().steeringSensitivity).toBe(steeringSensitivity)
     }
+    // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+    storage.values.delete('trackforge-preferences-snapshot-v1')
     storage.values.set('trackforge-steering-sensitivity', '2')
     expect(preferences.load().steeringSensitivity).toBe(1)
   })
@@ -529,6 +541,8 @@ it('stores favorite track ids locally and rejects malformed preference data', ()
   expect(repo.load().favoriteTrackIds).toEqual([])
   expect(repo.save({ ...repo.load(), favoriteTrackIds: ['track-a', 'track-b'] })).toBe(true)
   expect(new BrowserPreferencesRepository(memory).load().favoriteTrackIds).toEqual(['track-a', 'track-b'])
+  // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
+  memory.values.delete('trackforge-preferences-snapshot-v1')
   memory.values.set('trackforge-favorite-tracks-v1', '{broken')
   expect(repo.load().favoriteTrackIds).toEqual([])
   memory.values.set('trackforge-favorite-tracks-v1', JSON.stringify(['good', 'good', '', 42, 'x'.repeat(129)]))
