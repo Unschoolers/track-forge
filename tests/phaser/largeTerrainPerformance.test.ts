@@ -101,6 +101,7 @@ describe('large track rendering budgets', () => {
     }))
     const graphics = {
       fillTriangle: vi.fn(), fillStyle: vi.fn(),
+      lineStyle: vi.fn(), lineBetween: vi.fn(),
       beginPath: vi.fn(), fillPath: vi.fn(),
     }
     renderRoadRibbon(graphics as never, {
@@ -108,6 +109,9 @@ describe('large track rendering budgets', () => {
     } as never, ribbon, false)
     expect(graphics.fillTriangle).toHaveBeenCalledTimes((count - 1) * 4)
     expect(graphics.fillStyle).toHaveBeenCalledTimes(2)
+    // Sparse material detail uses bounded line calls, never polygon tessellation.
+    expect(graphics.lineBetween).toHaveBeenCalled()
+    expect(graphics.lineBetween.mock.calls.length).toBeLessThan(count * 2)
     expect(graphics.beginPath).not.toHaveBeenCalled()
     expect(graphics.fillPath).not.toHaveBeenCalled()
   })

@@ -1,4 +1,5 @@
 import { art, ellipse, polygon } from './artPrimitives'
+import { createGroundTileRandom } from './groundTexture'
 import type { TrackEnvironmentDefinition } from './types'
 
 export const DESERT_ENVIRONMENT: TrackEnvironmentDefinition = {
@@ -6,20 +7,28 @@ export const DESERT_ENVIRONMENT: TrackEnvironmentDefinition = {
   day: {
     editorGround: '#bd9d6b',
     raceGround: '#bd9d6b',
-    flyoverGround: '#c2a77c',
+    flyoverGround: '#bd9d6b',
     hillSlope: 0xa8865d,
     hillPlateau: 0xd0b081,
     flyoverHill: '#d6ba8d',
     shorelineLand: 0xd2bd91,
+    waterFill: 0x338d91,
+    waterRipple: 0xb1eee0,
+    waterShoreline: 0xf4dfb7,
+    flyoverWater: '#338d91',
   },
   night: {
-    editorGround: '#403b38',
+    editorGround: '#3c3734',
     raceGround: '#3c3734',
-    flyoverGround: '#49433f',
+    flyoverGround: '#3c3734',
     hillSlope: 0x5b5147,
     hillPlateau: 0x736454,
     flyoverHill: '#776b5e',
     shorelineLand: 0x817568,
+    waterFill: 0x224b5e,
+    waterRipple: 0x78a6aa,
+    waterShoreline: 0xb99a70,
+    flyoverWater: '#224b5e',
   },
   scenery: {
     'desert-cactus': art('Cactus', 27, (night) => [
@@ -91,14 +100,32 @@ export const DESERT_ENVIRONMENT: TrackEnvironmentDefinition = {
     ]),
   },
   groundArt: (variant, night) => {
-    const shift = (variant % 4) * 22
-    const light = night ? 0xceb99a : 0xe5c999
-    const dark = night ? 0x221b19 : 0x8c6d4d
-    return [
-      ellipse(60 + shift, 56, 78, 23, light, 0.045),
-      ellipse(195 - shift, 180, 90, 28, dark, 0.035),
-      ellipse(100 + shift, 112, 48, 4, light, 0.06),
-      ellipse(174 - shift, 214, 54, 4, light, 0.05),
-    ]
+    const random = createGroundTileRandom(variant, 0xd35e47)
+    const light = night ? 0x9e846a : 0xf9dba5
+    const dark = night ? 0x1f2024 : 0x815d3d
+    const mid = night ? 0x856e57 : 0xd5a46b
+    const shapes = []
+    // Broad dune/compacted-sand nap beneath the fine grains.
+    for (let i = 0; i < 8; i++) {
+      shapes.push(ellipse(random() * 256, random() * 256,
+        35 + random() * 48, 11 + random() * 18,
+        i % 2 === 0 ? light : dark, night ? 0.055 : 0.065))
+    }
+    // Broken, wind-aligned ripple crests; the paired shadow gives relief.
+    for (let i = 0; i < 45; i++) {
+      const x = random() * 256
+      const y = random() * 256
+      const width = 5 + random() * 19
+      shapes.push(ellipse(x, y, width, 0.8 + random() * 0.8, light, 0.27))
+      shapes.push(ellipse(x, y + 2.2, width * 0.8, 0.65, dark, 0.19))
+    }
+    // Sparse granules: a surface material, not generic circles.
+    for (let i = 0; i < 310; i++) {
+      shapes.push(ellipse(random() * 256, random() * 256,
+        0.65 + random() * 1.5, 0.45 + random() * 0.9,
+        i % 4 === 0 ? dark : i % 3 === 0 ? light : mid,
+        night ? 0.21 : 0.26))
+    }
+    return shapes
   },
 }

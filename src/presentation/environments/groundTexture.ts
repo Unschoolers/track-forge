@@ -72,3 +72,13 @@ export function visibleGroundTilesForViewport(view: GroundViewport): readonly Gr
   if (maxAxisTiles * maxAxisTiles > MAX_TILES) return []
   return visibleGroundTiles(groundViewportBounds(view))
 }
+
+/** Stable per-variant noise for cached ground art. Never use Math.random() here:
+ * panning, editor reloads and the flyover must paint exactly the same material. */
+export function createGroundTileRandom(variant: number, salt: number): () => number {
+  let state = (Math.imul((variant | 0) + 1, 747_796_405) ^ salt) >>> 0
+  return () => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0
+    return state / 0x1_0000_0000
+  }
+}
