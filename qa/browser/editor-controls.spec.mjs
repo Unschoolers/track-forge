@@ -52,7 +52,7 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await page.goto('/?qa')
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Edit Starter Circuit', exact: true }).click()
 
     const editor = page.locator('[data-screen="editor"]')
     await expect(editor).toBeVisible()
@@ -108,7 +108,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
     await page.goto('/?qa')
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Edit Environment QA', exact: true }).click()
     await expect.poll(() => page.evaluate(() => window.__trackForgeQa?.snapshot().camera?.zoom ?? 0)).toBeGreaterThan(0)
   }
   async function setEnvironment(name) {

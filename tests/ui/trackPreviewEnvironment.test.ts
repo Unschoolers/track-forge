@@ -4,18 +4,23 @@ import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import { getTrackEnvironment } from '@/presentation/environments'
 import { createTrackPreview } from '@/ui/modals/trackPreview'
 
-describe('track preview environment', () => {
-  it('preserves grass styling and tints themed previews', () => {
+describe('track preview presentation', () => {
+  it('keeps every environment transparent while showing the entire neon circuit', () => {
     const track = createStarterTrack(asTrackId('preview'), 1)
     const path = new TrackGeometryService().get(track).path
-    expect(createTrackPreview(path).style.backgroundColor).toBe('')
-    for (const environment of ['cityscape', 'desert'] as const) {
-      const expected = document.createElement('div')
-      expected.style.backgroundColor = getTrackEnvironment(environment).day.flyoverGround
-      expect(createTrackPreview(path, track.points[0], environment).style.backgroundColor).toBe(expected.style.backgroundColor)
+    const defaultPreview = createTrackPreview(path)
+    expect(defaultPreview.style.backgroundColor).toBe('')
+    expect(defaultPreview.querySelectorAll('path')).toHaveLength(2)
+    expect(defaultPreview.querySelector('.track-preview-halo')?.getAttribute('d'))
+      .toBe(defaultPreview.querySelector('.track-preview-route')?.getAttribute('d'))
+    expect(defaultPreview.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
+    for (const environment of ['grass', 'cityscape', 'desert'] as const) {
+      const preview = createTrackPreview(path, track.points[0], environment)
+      expect(preview.style.backgroundColor).toBe('')
+      expect(preview.dataset.environment).toBe(environment)
+      expect(preview.getAttribute('viewBox')).toBe(defaultPreview.getAttribute('viewBox'))
     }
   })
 })

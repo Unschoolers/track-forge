@@ -4,7 +4,7 @@ import { distance } from '@/domain/geometry/math'
 import { normalizeRouteKind, type Track, type TrackPoint } from '@/domain/model'
 
 // Sampling and crossing work grow with road length, even for a few controls.
-export const MAX_ROAD_CONTROL_LENGTH = 60_000
+export const MAX_ROAD_CONTROL_LENGTH = 100_000
 
 type RoadControls = Pick<Track, 'points' | 'routeKind'>
 
