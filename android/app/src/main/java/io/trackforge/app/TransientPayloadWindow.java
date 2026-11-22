@@ -27,6 +27,11 @@ final class TransientPayloadWindow {
     }
 
     boolean contains(long id) { return pending.containsKey(id); }
+    boolean isProgress(long id) { Pending item = pending.get(id); return item != null && item.progress(); }
+    Set<String> pendingEndpoints(long id) {
+        Pending item = pending.get(id);
+        return item == null ? Set.of() : new HashSet<>(item.remaining());
+    }
     int pendingCount() { return pending.size(); }
 
     /** Free only the reporting endpoint; another endpoint can still be backlogged. */
