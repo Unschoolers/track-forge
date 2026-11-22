@@ -259,6 +259,8 @@ export class NearbyRace {
     if (rematch) {
       this.clearRound()
       this.round = (this.round + 1) & 0xffff
+      this.poseSync.setRound(this.round)
+      this.progressSync.setRound(this.round)
     }
     if (rematch && this.cupTotal > 0) {
       const next = this.cupTracks[this.cupIndex + 1]
@@ -565,6 +567,8 @@ export class NearbyRace {
       if (this.phase === 'racing') {
         this.clearRound()
         this.round = incomingRound
+        this.poseSync.setRound(this.round)
+        this.progressSync.setRound(this.round)
       }
       this.cupIndex = message.cupIndex ?? 0
       this.cupTotal = message.cupTotal ?? 0
