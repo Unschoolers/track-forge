@@ -1,4 +1,4 @@
-import { decodeProgress, encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
+import { decodeProgress, encodeProgress, isNewerWireSequence, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
 
 /** A low-rate optional stream; old peers ignore these packets and still render poses. */
 export class NearbyProgressSync {
@@ -56,10 +56,7 @@ export class NearbyProgressSync {
 
   receive(packet: ProgressPacket): boolean {
     const previous = this.remote.get(packet.slot)
-    if (previous) {
-      const advance = (packet.sequence - previous.sequence) & 0xffff
-      if (advance === 0 || advance >= 0x8000) return false
-    }
+    if (!isNewerWireSequence(packet.sequence, previous?.sequence)) return false
     this.remote.set(packet.slot, { sequence: packet.sequence, value: packet.progress, at: this.now() })
     return true
   }
