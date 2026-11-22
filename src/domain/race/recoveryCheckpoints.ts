@@ -113,14 +113,21 @@ export function safeFallbackRecoveryTarget(course: RecoveryCourse, vehicle: Race
   const anchor = behindStart ? first : Math.max(0, Math.min(last, fromStart))
   const limit = path.closed && behindStart ? Math.min(last, count + first - 1) : last
   const sample = (progress: number) => path.closed ? wrap(startPathIndex + direction * progress) : progress
-  for (let offset = 0; offset <= Math.max(anchor - first, limit - anchor); offset++) {
+  const safeAt = (progress: number): number | undefined => {
+    if (progress < first || progress > limit) return undefined
+    const index = sample(progress)
+    return isSafeRoadRecoverySample(path, index) ? index : undefined
+  }
+  const maxOffset = Math.max(anchor - first, limit - anchor)
+  for (let offset = 0; offset <= maxOffset; offset++) {
+    // No temporary two-element arrays while searching long or malformed roads.
     const trailing = path.closed || !reversed ? anchor - offset : anchor + offset
+    const found = safeAt(trailing)
+    if (found !== undefined) return found
+    if (offset === 0) continue
     const leading = path.closed || !reversed ? anchor + offset : anchor - offset
-    for (const progress of offset === 0 ? [anchor] : [trailing, leading]) {
-      if (progress < first || progress > limit) continue
-      const index = sample(progress)
-      if (isSafeRoadRecoverySample(path, index)) return index
-    }
+    const alternative = safeAt(leading)
+    if (alternative !== undefined) return alternative
   }
   return undefined
 }
