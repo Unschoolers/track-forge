@@ -9,6 +9,7 @@ import type { CarId, SurfaceId } from '@/domain/model'
  * - `stability.brakingRetention`: lower for longer braking drifts.
  * - `forces.lateralGripScale`: raises the tire-force ceiling for every car.
  * - `cornerStiffness`: changes how quickly one car builds tire force.
+ * - `lateralStability`: stabilizes the car body primarily on grippy pavement.
  * - `recovery`: changes how quickly one car settles yaw rotation.
  * - Surface and terrain `grip` values multiply the car and global grip.
  *
@@ -90,6 +91,8 @@ export interface CarPhysicsSpec {
   readonly brakeForce: number
   /** Additional braking traction relative to other cars. */
   readonly brakingTractionScale: number
+  /** Planted lateral behavior per chassis; road grip blends it out on loose surfaces. */
+  readonly lateralStability: number
   readonly recovery: number
 }
 
@@ -212,6 +215,7 @@ export const CAR_PHYSICS_SPECS = {
     cornerStiffness: 8.6,
     brakeForce: 132_000,
     brakingTractionScale: 1,
+    lateralStability: 1.2,
     recovery: 1.5,
   },
   red: {
@@ -229,7 +233,9 @@ export const CAR_PHYSICS_SPECS = {
     frontWeightBias: 0.53,
     cornerStiffness: 7.4,
     brakeForce: 112_000,
-    brakingTractionScale: 1.03,
+    // Race-grade service brakes without granting Red more cornering grip.
+    brakingTractionScale: 1.38,
+    lateralStability: 0.9,
     recovery: 1.25,
   },
   green: {
@@ -247,6 +253,7 @@ export const CAR_PHYSICS_SPECS = {
     cornerStiffness: 9.5,
     brakeForce: 125_000,
     brakingTractionScale: 1,
+    lateralStability: 3,
     recovery: 1.8,
   },
   yellow: {
@@ -264,6 +271,7 @@ export const CAR_PHYSICS_SPECS = {
     cornerStiffness: 8.7,
     brakeForce: 165_000,
     brakingTractionScale: 1,
+    lateralStability: 4.5,
     recovery: 1.65,
   },
 } as const satisfies Record<CarId, CarPhysicsSpec>
