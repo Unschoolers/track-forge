@@ -215,7 +215,6 @@ export function createRaceHud(
   let lastRunId = raceSession.snapshot().runId
   let lastLap: number | null = null
   let bannerUntil = 0
-  let finalLapNotice = false
   let previousHandling: string | undefined
   let previousPaused: boolean | undefined
   let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
@@ -243,7 +242,6 @@ export function createRaceHud(
       pendingPosition = null
       lastLap = null
       bannerUntil = 0
-      finalLapNotice = false
     }
     const handling = snapshot.setup?.handling ?? 'arcade'
     const paused = snapshot.state?.paused ?? false
@@ -304,10 +302,8 @@ export function createRaceHud(
     }
     if (!racing) {
       bannerUntil = 0
-      finalLapNotice = false
     } else if (telemetry.routeKind !== 'point-to-point' && lastLap !== null && telemetry.lap > lastLap &&
       telemetry.lap + 1 === telemetry.totalLaps) {
-      finalLapNotice = true
       announce('THE DECIDING LAP', 'FINAL LAP!', 'EVERY SECOND COUNTS', 'lap', now, 1450)
     } else if (
       confirmedPosition !== null &&
@@ -320,7 +316,6 @@ export function createRaceHud(
       const gained = confirmedPosition - nextPosition
       confirmedPosition = nextPosition
       pendingPosition = null
-      finalLapNotice = false
       const count = Math.abs(gained)
       const detail = `${count} PLACE${count === 1 ? '' : 'S'} ${gained > 0 ? 'GAINED' : 'LOST'} · P${nextPosition}/${telemetry.vehicleCount}`
       if (gained > 0) {
