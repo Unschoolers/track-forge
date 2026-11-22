@@ -482,6 +482,10 @@ it('does not expose Nearby sharing for system-owned tracks', () => {
     selectForEdit: vi.fn(), selectForRace: vi.fn(), toggleFavorite: vi.fn(), delete: vi.fn(),
   }, new TrackGeometryService())
   expect(modal.querySelector('[data-action="send-nearby-system-starter-circuit"]')).toBeNull()
+  const menu = modal.querySelector<HTMLDetailsElement>('.track-card:has([data-action="send-nearby-my-track"]) .track-card-overflow')
+  expect(menu).not.toBeNull()
+  if (menu) menu.open = true
   modal.querySelector<HTMLButtonElement>('[data-action="send-nearby-my-track"]')?.click()
   expect(sendNearby).toHaveBeenCalledWith(personal)
+  expect(menu?.open).toBe(false)
 })
