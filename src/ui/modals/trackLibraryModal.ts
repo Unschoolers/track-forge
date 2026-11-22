@@ -22,6 +22,10 @@ export interface TrackLibraryActions {
   readonly delete: (track: Track) => void
 }
 
+// Built-in tracks are immutable; reuse identity collections on each library redraw.
+const OFFICIAL_TRACKS = OFFICIAL_CIRCUITS.map(({ track }) => track)
+const OFFICIAL_TRACK_IDS = new Set(OFFICIAL_TRACKS.map(track => track.id))
+
 const ENVIRONMENT_NAMES = {
   grass: 'Grass',
   cityscape: 'City',
@@ -136,12 +140,9 @@ export function createTrackLibraryModal(
   }
 
   // A favorite official circuit ranks above non-favorite saved tracks as well.
-  const officialIds = new Set(OFFICIAL_CIRCUITS.map(({ track }) => track.id))
-  const libraryTracks = race
-    ? [...state.tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)]
-    : state.tracks
+  const libraryTracks = race ? [...state.tracks, ...OFFICIAL_TRACKS] : state.tracks
   for (const track of orderLibraryTracks(libraryTracks, state.preferences.favoriteTrackIds)) {
-    list.append(cardFor(track, officialIds.has(track.id)))
+    list.append(cardFor(track, OFFICIAL_TRACK_IDS.has(track.id)))
   }
   if (libraryTracks.length === 0) list.append(element('p', 'empty-state', 'No tracks saved yet.'))
 
