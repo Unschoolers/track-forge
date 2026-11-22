@@ -81,6 +81,26 @@ export class TrackLibraryService {
       : { ok: false, message: 'Shared track could not be saved.' }
   }
 
+  /** Save a draft as a new track without changing its original or its records. */
+  saveAs(source: Track, value: string, creator?: TrackCreator): TrackMutationResult {
+    const validated = this.validateName(value)
+    if (!validated.ok) return validated
+    const now = this.dependencies.now()
+    const copy: Track = {
+      ...source,
+      id: this.dependencies.createId(),
+      name: validated.name,
+      origin: 'local',
+      ...(creator ? { creator } : {}),
+      createdAt: now,
+      updatedAt: now,
+      raceRevision: now,
+    }
+    return this.dependencies.trackStore.save(copy)
+      ? { ok: true, track: copy }
+      : { ok: false, message: 'Track copy could not be saved.' }
+  }
+
   /** Update only tracks with this installation's stable creator ID. */
   recredit(creator: TrackCreator): { readonly ok: boolean; readonly count: number } {
     const updated = this.dependencies.trackStore.list()
