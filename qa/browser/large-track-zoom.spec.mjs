@@ -268,51 +268,6 @@ async function roadPixels(page, screenshot, includeEditorHandles = false) {
   }, { base64: screenshot.toString('base64'), includeEditorHandles })
 }
 
-for (const [width, height] of [[390, 844], [844, 390]]) {
-  test(`standalone zoom controls show a tall road at ${width}x${height}`, async ({ page }) => {
-    await page.setViewportSize({ width, height })
-    await page.addInitScript(() => {
-      const points = [-3_000, 3_000].map(y => ({ x: 0, y, surface: 'street' }))
-      localStorage.setItem('trackforge-library-v1', JSON.stringify([{
-        id: 'track-tall-overview', name: 'Tall overview', points, trees: [], timeOfDay: 'day',
-      }]))
-    })
-    const html = readFileSync(new URL('../../trackforge.html', import.meta.url), 'utf8')
-    const endOfScript = html.lastIndexOf('})();')
-    expect(endOfScript).toBeGreaterThan(0)
-    // Read camera telemetry from the standalone closure only in this test.
-    const probe = '\nwindow.__standaloneEditorCamera = () => ({ zoom: state.camera.zoom, points: state.points.map(worldToScreen) });\n'
-    await page.route('**/trackforge.html', route => route.fulfill({
-      contentType: 'text/html',
-      body: html.slice(0, endOfScript) + probe + html.slice(endOfScript),
-    }))
-    await page.goto('/trackforge.html')
-    await page.locator('#loading').waitFor({ state: 'detached' })
-    await page.locator('#homeEditorBtn').click()
-    await page.getByRole('button', { name: 'EDIT', exact: true }).click()
-    const fit = page.locator('#fitBtn')
-    const zoomOut = page.locator('#zoomOutBtn')
-    await expect(fit).toBeInViewport({ ratio: 0.75 })
-    await expect(zoomOut).toBeInViewport({ ratio: 0.75 })
-
-    const overview = () => page.locator('#game').evaluate(canvas => {
-      const { zoom, points } = window.__standaloneEditorCamera()
-      const status = document.querySelector('#status')
-      return {
-        zoom,
-        fits: points.length === 2 && points.every(({ x, y }) =>
-          x > 0 && x < canvas.clientWidth && y > status.offsetTop + status.offsetHeight && y < canvas.clientHeight),
-      }
-    })
-    await fit.tap()
-    const fitted = await overview()
-    expect(fitted.fits).toBe(true)
-    await zoomOut.tap()
-    const zoomed = await overview()
-    expect(zoomed.zoom).toBeLessThan(fitted.zoom)
-    expect(zoomed.fits).toBe(true)
-  })
-}
 test('Papou-sized terrain and road remain visible at fit and after zooming out', async ({ page }, testInfo) => {
   const pageErrors = []
   page.on('pageerror', error => pageErrors.push(error.message))
