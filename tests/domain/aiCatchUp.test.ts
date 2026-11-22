@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { catchUpBonus, rivalCatchUp } from '@/domain/race/ai/catchUp'
+import { AI_CATCH_UP } from '@/domain/config'
 import { createRace } from '@/domain/race/raceFactory'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -38,22 +39,24 @@ function withPlayer(race: RaceState, changes: Partial<RaceVehicle>): RaceState {
 }
 
 describe('AI catch-up', () => {
-  it.each([
-    [Number.NaN, 0],
-    [Number.POSITIVE_INFINITY, 0],
-    [-1, 0],
-    [0, 0],
-    [0.499, 0],
-    [0.5, 0.01],
-    [1, 0.01 + 0.11 * (0.5 / 4.5) ** 2],
-    [2, 0.01 + 0.11 * (1.5 / 4.5) ** 2],
-    [5, 0.12],
-    [20, 0.12],
-  ])('maps %s seconds behind to a bounded bonus of %s', (gap, expected) => {
-    expect(catchUpBonus(gap)).toBeCloseTo(expected, 8)
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, 0])(
+    'does not assist for an invalid or non-trailing time gap of %s', gap => {
+      expect(catchUpBonus(gap)).toBe(0)
+    },
+  )
+
+  it('begins at the configured delay and gradually reaches its configured cap', () => {
+    const { startGapSeconds, fullGapSeconds, initialSpeedBonus, maximumSpeedBonus } = AI_CATCH_UP
+    expect(catchUpBonus(startGapSeconds - 0.001)).toBe(0)
+    expect(catchUpBonus(startGapSeconds)).toBeCloseTo(initialSpeedBonus)
+    const midpoint = catchUpBonus((startGapSeconds + fullGapSeconds) / 2)
+    expect(midpoint).toBeGreaterThan(initialSpeedBonus)
+    expect(midpoint).toBeLessThan(maximumSpeedBonus)
+    expect(catchUpBonus(fullGapSeconds)).toBeCloseTo(maximumSpeedBonus)
+    expect(catchUpBonus(fullGapSeconds + 100)).toBeCloseTo(maximumSpeedBonus)
   })
 
-  it('increases with the gap but stops increasing at the 12% ceiling', () => {
+  it('increases with the gap but stops increasing at the configured ceiling', () => {
     expect(catchUpBonus(1)).toBeLessThan(catchUpBonus(2))
     expect(catchUpBonus(2)).toBeLessThan(catchUpBonus(4))
     expect(catchUpBonus(5)).toBe(catchUpBonus(100))
@@ -67,7 +70,7 @@ describe('AI catch-up', () => {
     const farBoost = requireFixture(rivalCatchUp(race, far))
     expect(nearBoost.multiplier).toBeGreaterThan(1)
     expect(farBoost.multiplier).toBeGreaterThan(nearBoost.multiplier)
-    expect(farBoost.multiplier).toBeLessThanOrEqual(1.12)
+    expect(farBoost.multiplier).toBeLessThanOrEqual(1 + AI_CATCH_UP.maximumSpeedBonus)
     const withoutNear = { ...race, vehicles: [requireFixture(race.vehicles[0]), far] }
     expect(rivalCatchUp(withoutNear, far)).toEqual(farBoost)
   })
@@ -117,6 +120,6 @@ describe('AI catch-up', () => {
     const bonus = requireFixture(rivalCatchUp(stationary, far))
     expect(Number.isFinite(bonus.multiplier)).toBe(true)
     expect(bonus.multiplier).toBeGreaterThan(1)
-    expect(bonus.multiplier).toBeLessThanOrEqual(1.12)
+    expect(bonus.multiplier).toBeLessThanOrEqual(1 + AI_CATCH_UP.maximumSpeedBonus)
   })
 })
