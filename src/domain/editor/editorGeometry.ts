@@ -347,26 +347,6 @@ export function expandAroundBoundsCenter(
   }
 }
 
-/**
- * Scales sparse terrain footprints with the same bounds-centred transform as
- * roads and trees. A transformed cell is rasterized by target-cell centers in
- * its half-open world rectangle, preserving the 2× authored terrain area.
- */
-export function expandTerrainAroundBoundsCenter(
-  points: readonly TrackPoint[],
-  trees: readonly Tree[],
-  terrain: TerrainMap,
-  factor: 2,
-): TerrainMap {
-  const plan = planTerrainExpansionAroundBoundsCenter(
-    points,
-    trees,
-    terrain,
-    factor,
-  )
-  return plan.ok ? plan.terrain : terrain
-}
-
 export type TerrainExpansionPlan =
   | { readonly ok: true; readonly terrain: TerrainMap }
   | {
