@@ -52,7 +52,7 @@ export function createNearbyRaceModal(
       break
     case 'hosting': {
       frame.body.append(element('p', 'modal-subtitle',
-        `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/${MAX_PLAYERS - 1} nearby friends${cup ? ` · Cup 1/${cup.total}` : ''}`))
+        `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/${purpose === 'share' ? 3 : MAX_PLAYERS - 1} nearby friends${cup ? ` · Cup 1/${cup.total}` : ''}`))
       if (purpose === 'share') {
         frame.body.append(element('p', 'modal-subtitle',
           `${sharedCount} friend${sharedCount === 1 ? '' : 's'} saved the track. Keep this screen open to share with more devices.`))
