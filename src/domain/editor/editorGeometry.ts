@@ -289,6 +289,8 @@ export function planPointInsertion(
   const lengthSquared = dx * dx + dy * dy
   if (!Number.isFinite(lengthSquared) || lengthSquared <= 1) return null
   const projection = ((target.x - start.x) * dx + (target.y - start.y) * dy) / lengthSquared
+  // Finite input coordinates can still overflow during subtraction or dot products.
+  if (!Number.isFinite(projection)) return null
   // Keep inserted handles away from existing endpoints.
   const ratio = Math.max(0.1, Math.min(0.9, projection))
   return {
