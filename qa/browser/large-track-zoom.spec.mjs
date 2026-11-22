@@ -214,16 +214,16 @@ test.describe('Rally editor zoom', () => {
     expect(bottomOfRoad(await readCamera(page))).toBeGreaterThan(dock.y)
 
     const panned = await readCamera(page)
+    // A two-finger move can change both center and scale; this route remains
+    // beyond the manual editing span, so zoom-out must hold the chosen scale.
+    expect(panned.zoom).toBeLessThan(844 / 15_000)
     await useViewAction(page, 'Zoom out', 'tap')
     const overview = await readCamera(page)
-    expect(overview.zoom).toBeLessThan(panned.zoom)
-    expect(overview.zoom).toBeGreaterThan(fit.zoom)
+    expect(overview.zoom).toBe(panned.zoom)
 
-    // Repeated manual zoom stops at its budget floor. Fit explicitly restores
-    // the whole saved route regardless of its authored size.
-    for (let step = 0; step < 40; step += 1) await useViewAction(page, 'Zoom out', 'tap')
+    for (let step = 0; step < 4; step += 1) await useViewAction(page, 'Zoom out', 'tap')
     const minimum = await readCamera(page)
-    expect(minimum.zoom).toBeCloseTo(844 / 15_000)
+    expect(minimum.zoom).toBe(panned.zoom)
     await useViewAction(page, 'Fit track', 'tap')
     expect(await readCamera(page)).toEqual(fit)
     await expectClearRoad(page, road)
