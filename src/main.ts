@@ -184,9 +184,16 @@ const stopSceneSync = controller.subscribe((snapshot) => {
 // The QA bridge exists only on the Vite dev server with ?qa.
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
   const qaWindow = window as Window & {
-    __trackForgeQa?: { snapshot: () => unknown; advanceRace: (seconds: number) => void }
+    __trackForgeQa?: {
+      snapshot: () => unknown
+      advanceRace: (seconds: number) => void
+      pauseRace: () => void
+      resumeRace: () => void
+    }
   }
   qaWindow.__trackForgeQa = {
+    pauseRace: () => raceSession.setPaused(true),
+    resumeRace: () => raceSession.setPaused(false),
     advanceRace: (seconds) => {
       if (!Number.isFinite(seconds) || seconds < 0 || seconds > 20) throw new Error('Invalid QA race interval')
       const { setup } = raceSession.snapshot()
@@ -221,6 +228,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
               paused: race.paused,
               vehicleCount: race.vehicles.length,
               ghostVisible: Boolean(raceSession.snapshot().ghost),
+              vehicles: race.vehicles.map((vehicle) => ({
+                car: vehicle.car, player: vehicle.player, x: vehicle.x, y: vehicle.y,
+                z: vehicle.z, structureRunId: vehicle.structureRunId,
+              })),
               player: player
                 ? {
                     speed: player.speed,
@@ -231,6 +242,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
                     damage: player.damage,
                     wrecked: player.wrecked,
                     grounded: player.grounded,
+                    z: player.z,
+                    pathIndex: player.pathIndex,
+                    structureRunId: player.structureRunId,
+                    angle: player.angle,
                     surface: player.currentSurface,
                   }
                 : null,
