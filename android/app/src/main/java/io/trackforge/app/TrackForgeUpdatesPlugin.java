@@ -3,6 +3,7 @@ package io.trackforge.app;
 import android.app.DownloadManager;
 import android.content.ClipData;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.ParcelFileDescriptor;
@@ -16,6 +17,8 @@ import android.os.Build;
 import androidx.core.content.FileProvider;
 import java.io.File;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import android.net.Uri;
 import android.os.Environment;
 import com.getcapacitor.JSObject;
@@ -30,6 +33,8 @@ public class TrackForgeUpdatesPlugin extends Plugin {
     private static final String PREFS = "trackforge_updates";
     private static final String ID = "downloadId";
     private static final String VERSION = "version";
+    private static final Pattern RELEASE_TAG = Pattern.compile("^android-build-(\\d+)-(\\d+)$");
+    private static final long RELEASE_VERSION_OFFSET = 1_000_000L;
     private static final long MAX_APK_BYTES = 256L * 1024 * 1024;
 
     private long savedId() {
@@ -38,6 +43,57 @@ public class TrackForgeUpdatesPlugin extends Plugin {
 
     private void forget() {
         getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply();
+    }
+
+    /** Android versionCode and release tag follow scripts/android-build-policy.mjs. */
+    static boolean isInstalledVersionAtLeast(String releaseTag, long installedCode) {
+        if (releaseTag == null || installedCode <= 0) return false;
+        Matcher match = RELEASE_TAG.matcher(releaseTag);
+        if (!match.matches()) return false;
+        try {
+            long run = Long.parseLong(match.group(1));
+            long attempt = Long.parseLong(match.group(2));
+            if (run < 1 || attempt < 1 || attempt > 99) return false;
+            long releaseCode = Math.addExact(RELEASE_VERSION_OFFSET,
+                    Math.addExact(Math.multiplyExact(run, 100L), attempt));
+            return installedCode >= releaseCode;
+        } catch (NumberFormatException | ArithmeticException invalidRelease) {
+            return false;
+        }
+    }
+
+    /**
+     * An installed APK is the source of truth. Keep a downloaded APK until Android
+     * really installs its version (or a newer one), even if the installer opened.
+     */
+    static boolean clearInstalledDownload(Context context, long installedCode) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        long id = prefs.getLong(ID, -1);
+        if (id <= 0 || !isInstalledVersionAtLeast(prefs.getString(VERSION, ""), installedCode)) {
+            return false;
+        }
+        DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) throw new IllegalStateException("Android Download Manager is unavailable.");
+        manager.remove(id);
+        File staged = stagedFile(context, id);
+        if (staged.exists() && !staged.delete()) {
+            throw new IllegalStateException("Could not remove the obsolete staged APK.");
+        }
+        prefs.edit().clear().apply();
+        return true;
+    }
+
+    private void clearIfAlreadyInstalled() {
+        if (savedId() <= 0) return;
+        try {
+            Context context = getContext();
+            PackageInfo installed = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            long installedCode = Build.VERSION.SDK_INT >= 28
+                    ? installed.getLongVersionCode() : installed.versionCode;
+            clearInstalledDownload(context, installedCode);
+        } catch (PackageManager.NameNotFoundException error) {
+            throw new IllegalStateException("Could not read installed Track Forge version.", error);
+        }
     }
 
     /** Download Manager owns the public download; the installer needs a private, readable copy. */
@@ -102,14 +158,19 @@ public class TrackForgeUpdatesPlugin extends Plugin {
 
     @PluginMethod
     public void current(PluginCall call) {
-        long id = savedId();
-        JSObject result = id < 0 ? null : snapshot(id);
-        if (result == null) {
-            forget();
-            result = new JSObject();
-            result.put("state", "none");
+        try {
+            clearIfAlreadyInstalled();
+            long id = savedId();
+            JSObject result = id < 0 ? null : snapshot(id);
+            if (result == null) {
+                forget();
+                result = new JSObject();
+                result.put("state", "none");
+            }
+            call.resolve(result);
+        } catch (RuntimeException error) {
+            call.reject("Could not check saved APK download: " + error.getMessage(), error);
         }
-        call.resolve(result);
     }
 
     @PluginMethod
@@ -210,6 +271,7 @@ public class TrackForgeUpdatesPlugin extends Plugin {
             return;
         }
         try {
+            clearIfAlreadyInstalled();
             long previous = savedId();
             if (previous > 0) {
                 JSObject active = snapshot(previous);
