@@ -457,6 +457,33 @@ describe('Nearby Arcade', () => {
 })
 
 describe('Nearby track sharing and rematches', () => {
+  it('keeps sharing capped at three connected guests when racing supports eight', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guests = Array.from({ length: 4 }, (_, index) =>
+      new NearbyRace(network.endpoint(`guest-${index}`), () => true))
+    try {
+      host.hostShare(track)
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const [index, guest] of guests.entries()) {
+        guest.scan('blue', 'share')
+        await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        guest.connect('host')
+        if (index < 3) {
+          await vi.waitFor(() => expect(host.snapshot().players).toBe(index + 2), { interval: 5 })
+          await vi.waitFor(() => expect(guest.snapshot().phase).toBe('share-review'), { interval: 5 })
+        } else {
+          await vi.waitFor(() => expect(guest.snapshot().phase).toBe('idle'), { interval: 5 })
+          expect(guest.snapshot().error).toContain('Pairing declined')
+          expect(host.snapshot().players).toBe(4)
+        }
+      }
+    } finally {
+      host.destroy()
+      guests.forEach(guest => guest.destroy())
+    }
+  })
+
   it('shares a track without starting a race and waits for explicit save confirmation', async () => {
     const network = new NearbyNetwork()
     const host = new NearbyRace(network.endpoint('sender'), () => true)
