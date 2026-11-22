@@ -20,13 +20,13 @@
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
-    "@capacitor/android": "8.6.0",
-    "@capacitor/core": "8.6.0",
-    "phaser": "^4.0.0"
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "phaser": "^4.2.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
-    "@capacitor/cli": "8.6.0",
+    "@capacitor/cli": "8.6.2",
     "@playwright/test": "1.64.1",
     "@types/node": "^24.1.0",
     "jsdom": "^26.1.0",
