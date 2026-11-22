@@ -843,7 +843,8 @@ export class NearbyRace {
         id: this.course.track.id, name: this.course.track.name,
         revision: this.course.track.raceRevision ?? null,
         routeKind: normalizeRouteKind(this.course.track.routeKind),
-        pointCount: this.course.track.points.length,
+        pointCount: this.course.track.points?.length ?? null,
+        trackShapeValid: Array.isArray(this.course.track.points),
         lighting: this.course.lighting, laps: this.course.laps,
       } : null,
       players: [...slots].sort((a, b) => a - b).map(slot => {
