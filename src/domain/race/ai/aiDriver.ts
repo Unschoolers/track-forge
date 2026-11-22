@@ -226,7 +226,7 @@ export function stepAiVehicle(
   }
   // Passing at the outside edge consumes cornering room. Hold a little
   // extra reserve in bends instead of assuming the centerline racing pace.
-  if (ai.phase === 'passing') {
+  if (ai.phase === 'passing' && !vehicle.racingLine) {
     curveSpeed *= 1 - 0.14 * clamp(bend / 0.12, 0, 1)
   }
   // A faster straight-line chassis with weak grip needs extra entry margin.
