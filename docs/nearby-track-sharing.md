@@ -31,7 +31,7 @@ The first round uses the existing room lock; rematches reuse established peer co
 
 The local race engine and ghost/score storage are unchanged. The sharing mode permits unready draft tracks, whereas rematch track selection requires race-ready validation. The UI and session use explicit phase guards and retain the current player identity, peers and car configuration.
 
-Verification should include two Android devices (advertise/discover, permissions, save picker/storage errors, host and guest Leave), with targeted component tests and in-memory Nearby integration tests before browser smoke checks. No Android native code or packet pose format is modified.
+Verification should include two Android devices (advertise/discover, permissions, save picker/storage errors, host and guest Leave), with targeted component tests and in-memory Nearby integration tests before browser smoke checks. The rematch epoch packet extension and lobby version check are documented below; track sharing remains unaffected.
 
 ## Nearby race position and results (optional telemetry)
 
@@ -43,7 +43,7 @@ The podium only settles once every participant has a finish, DNF or departure st
 
 ## Congestion policy and checkpoint correctness (2026-11-22)
 
-Nearby pose packets remain **19 bytes per car** (type 1), including recovery and sequence fields. The host sends **one compact binary batch** (type 3) to all eligible connected guests per cadence tick, not one app-level send per player; optional standings telemetry remains **8 bytes every 150 ms at most** (type 4). No protocol version, saved track format or lobby handshake changes are necessary.
+Nearby pose packets remain **19 bytes per car** (type 1), including recovery and sequence fields. The host sends **one compact binary batch** (type 3) to all eligible connected guests per cadence tick, not one app-level send per player; optional standings telemetry remains **8 bytes every 150 ms at most** (type 4). This section describes the 2026-11-22 congestion fix. The later rematch epoch extension below adds a lobby version check without changing packet lengths or the saved track format.
 
 - Google Nearby's `sendPayload(List<String>, Payload)` is designed for multiple endpoints per call. The Android transport retains one multicast operation and applies **per-endpoint backpressure internally**. Each destination can have at most one outstanding pose and one outstanding progress packet. When one radio is congested, that endpoint skips obsolete snapshots until it acknowledges or times out, while all eligible healthy endpoints receive the **same freshly encoded batch** in a single native send.
 - The native BYTES enqueue result indicates *acceptance into the Nearby transport*, not delivery. This now releases the app-side cadence gate promptly for optional pose/progress packets; per-endpoint transfer results separately control native congestion. **Control and track packets still require successful delivery to all recipients**. Native diagnostics track skipped transient samples, failed transfers and timeouts.
@@ -58,3 +58,28 @@ Pose and progress reports track per-slot accepted/stale updates, sequence gaps (
 **Failure model:** Even multicast cannot guarantee smooth delivery under persistent wireless interference. Congestion lowers the affected peer's actual receive rate without blocking healthy players or allowing an unbounded queue. Late/stale packets are rejected by existing modulo-16-bit sequences. Optional rank telemetry may become unknown/LIVE instead of making up a standing.
 
 **Verification:** Component tests cover one app-level host broadcast and 19-byte wire compatibility. Native JVM tests cover independent per-endpoint pose/progress backpressure, expiration and disconnect. Domain tests cover checkpoint progress-index jumps and genuine bypasses. Physical testing still requires at least two Android phones: p50/p95/p99 receive intervals, losses, device load, 2-4 player races (including a congested third peer), scene rematches, diagonal checkpoints, overpasses and disconnect. No claim of measured wireless improvement until real-device traces are collected. Rollback is this single PR; no data migration.
+
+## Rematch packet epochs and APK compatibility (wire protocol v2)
+
+A delayed pose/progress packet from the previous race can otherwise poison a
+fresh rematch after sequence counters reset. A **five-bit round epoch** now
+occupies previously unused header bits in each **19-byte pose / 8-byte progress**
+packet; host batches reject mixed epochs. The existing reliable control round
+identifier still uses 16 bits. Wire epochs repeat after 32 rounds, so they are
+not cryptographic replay protection or an indefinite sequence identifier.
+
+This changes the meaning of reserved packet header bits: **old and new APKs
+must not participate in the same race**. Reliable `prepare` (host) and `ready`
+(guest) controls advertise `protocolVersion: 2`. Missing or mismatched versions
+are decoded, then **rejected before staging or starting a race**, displaying
+“Multiplayer version mismatch. Update Track Forge on every device.” on the
+client that detects the mismatch. An older APK cannot be made to display this
+new message; it will observe a disconnection, while the updated peer shows the
+update instruction. This fail-closed check also applies to the first race, not
+just rematches. Track-sharing control messages are unchanged.
+
+The tests cover a legacy host sending an unversioned `prepare`, a legacy guest
+replying with an unversioned `ready`, invalid version values, and stale/mixed
+round packets. Release validation must also include 2–4 actual Android devices:
+rematch, connection loss, and one outdated APK (confirm no race starts and the
+updated peer sees the message). Unit/CI checks do not establish radio quality.
