@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyEditorCameraAction,
   fitEditorCamera,
+  minimumEditorManualZoom,
 } from '@/phaser/camera/editorCamera'
 
 describe('editor camera', () => {
@@ -76,6 +77,28 @@ describe('editor camera', () => {
       camera = applyEditorCameraAction(camera, 'zoom-out', [], viewport)
     }
     expect(camera.zoom).toBeGreaterThan(0)
+  })
+
+  it('bounds manual zoom-out by the road budget on both mobile and desktop', () => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      const floor = minimumEditorManualZoom(viewport)
+      expect(floor).toBeCloseTo(844 / 15_000)
+      let camera = { x: 100, y: 200, zoom: 1 }
+      for (let i = 0; i < 60; i += 1) {
+        camera = applyEditorCameraAction(camera, 'zoom-out', [], viewport)
+      }
+      expect(camera).toEqual({ x: 100, y: 200, zoom: floor })
+      expect(applyEditorCameraAction(camera, 'zoom-out', [], viewport)).toEqual(camera)
+    }
+  })
+
+  it('allows Fit track to show a legacy oversized road without letting zoom-out shrink it further', () => {
+    const viewport = { width: 390, height: 844 }
+    const points = [{ x: 0, y: -30_000 }, { x: 0, y: 30_000 }]
+    const fitted = fitEditorCamera(points, viewport)
+    expect(fitted.zoom).toBeLessThan(minimumEditorManualZoom(viewport))
+    expect(applyEditorCameraAction(fitted, 'zoom-out', points, viewport).zoom).toBe(fitted.zoom)
+    expect(applyEditorCameraAction(fitted, 'zoom-in', points, viewport).zoom).toBeGreaterThan(fitted.zoom)
   })
 
   it('fits a long road in the clear space on a short viewport', () => {
