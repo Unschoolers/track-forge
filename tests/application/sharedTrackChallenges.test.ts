@@ -22,9 +22,13 @@ describe('shareable track challenges', () => {
   })
   it('keeps authored recovery checkpoint positions in a shared track', () => {
     const result = parseTrackImport(serializeTrack({
-      ...track, recoveryCheckpoints: [0.6, 0.15, 0.6, -1, 1],
+      ...track, recoveryCheckpoints: [0.6, 0.15],
     }).content)
     expect(result.ok && result.track.recoveryCheckpoints).toEqual([0.15, 0.6])
+    // A present but malformed list must not silently discard authored gates.
+    expect(parseTrackImport(serializeTrack({
+      ...track, recoveryCheckpoints: [0.6, 0.15, 0.6, -1, 1],
+    }).content).ok).toBe(false)
   })
   it('round-trips compact exports at the terrain and tree limits', () => {
     const cells = Array.from({ length: TERRAIN_LIMITS.maximumCells }, (_, index) => ({
@@ -151,9 +155,9 @@ it('round-trips all scenery and rejects oversized shared scenery', () => {
   const invalid = JSON.parse(exported(track))
   invalid.track.environmentId = 'unknown'
   invalid.track.scenery = [{ kind: 'city-house', x: 10, y: 20 }, { kind: 'bad', x: 0, y: 0 }, { kind: 'desert-cactus', x: 10000001, y: 0 }]
-  const normalized = parseTrackImport(JSON.stringify(invalid))
-  expect(normalized.ok).toBe(true)
-  if (normalized.ok) expect(normalized.track).toMatchObject({ environmentId: 'grass', scenery: [{ kind: 'city-house', x: 10, y: 20 }] })
+  // Previously ignored malformed scenery could erase part of the user's
+  // artwork; reject the import instead of reporting a lossy success.
+  expect(parseTrackImport(JSON.stringify(invalid)).ok).toBe(false)
 })
 
 it('keeps the effective ghost revision through a rename', () => {
