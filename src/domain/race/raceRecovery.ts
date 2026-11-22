@@ -5,9 +5,10 @@ import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } 
 
 export function resetRaceVehicle(
   vehicle: RaceVehicle,
-  race: RecoveryCourse,
+  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
 ): RaceVehicle {
   if (vehicle.player) {
+    if (race.missedCheckpoint) return resetMissedCheckpoint(vehicle, race)
     const pathIndex = lastRoadRecoveryTarget(race, vehicle) ??
       authoredRecoveryTarget(race, vehicle) ?? safeFallbackRecoveryTarget(race, vehicle)
     if (pathIndex === undefined) return vehicle
@@ -30,7 +31,7 @@ export function recoverRacePlayer(state: RaceState): RaceState {
   const index = state.vehicles.findIndex((vehicle) => vehicle.player)
   const player = state.vehicles[index]
   if (!player) return state
-  const recovered = state.missedCheckpoint ? resetMissedCheckpoint(player, state) : resetRaceVehicle(player, state)
+  const recovered = resetRaceVehicle(player, state)
   if (recovered === player) return state
   const vehicles = [...state.vehicles]
   vehicles[index] = recovered
@@ -43,7 +44,10 @@ export function recoverRacePlayer(state: RaceState): RaceState {
 }
 
 /** Respawn on the approach side of the pending timing stripe, never past it. */
-export function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): RaceVehicle {
+export function resetMissedCheckpoint(
+  vehicle: RaceVehicle,
+  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
+): RaceVehicle {
   const target = missedGateRecoveryTarget(race, race.missedCheckpoint?.gate ?? vehicle.nextSector)
   if (!target) return vehicle
   return resetVehicleToTrack(
