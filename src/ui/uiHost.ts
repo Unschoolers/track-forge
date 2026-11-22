@@ -344,6 +344,10 @@ export class DomUiHost implements UiHost {
       screen = raceHud.element
       this.screenCleanup = () => raceHud.destroy()
     }
+    // Rebuilding a sorted library after starring a card must not jump back to the top.
+    const libraryScroll = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
+      ? this.root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop
+      : undefined
     const overlay = this.renderOverlay(state)
     const nodes: Node[] = [screen]
     if (overlay) nodes.push(overlay)
@@ -351,6 +355,10 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
+    if (libraryScroll !== undefined) {
+      const body = overlay?.querySelector<HTMLElement>('.modal-body')
+      if (body) body.scrollTop = libraryScroll
+    }
     this.dialogs.afterRender(this.root, state.overlay, () =>
       this.controller.dispatch({ type: 'close-overlay' }),
     )
