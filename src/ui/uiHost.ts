@@ -1,6 +1,7 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
+import { raceDiagnosticsFilename } from '@/infrastructure/export/raceExportName'
 import { formatRaceTime } from '@/ui/format'
 import type { LightingMode, Track, TrackId } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -164,11 +165,10 @@ export class DomUiHost implements UiHost {
       this.showRaceExportNotice('Race replay is no longer available.')
       return
     }
-    const trackName = report.track.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 48) || 'track'
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = raceDiagnosticsFilename(report.track.name, new Date().toISOString())
     try {
       const saved = await saveJsonFile({
-        filename: `trackforge-race-${trackName}-${timestamp}.json`,
+        filename,
         content: JSON.stringify(report),
       })
       this.showRaceExportNotice(saved ? 'Race replay file saved.' : 'Race replay was not saved.', generation)
