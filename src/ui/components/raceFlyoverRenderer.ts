@@ -1,6 +1,6 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
-import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
+import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -63,12 +63,10 @@ export function createRaceFlyoverRenderer(
   }
   // Flyover frames must only paint. Prepare distance-anchored details once
   // rather than allocating strokes for every visible section on every frame.
-  const materialSections = environmentId === 'kids-room'
-    ? sections.map((section) => ({
-      ...section,
-      strokes: kidsRoomRoadStrokes(section.a.surface, section.a, section.b, night),
-    }))
-    : []
+  const materialSections = sections.map((section) => ({
+    ...section,
+    strokes: environmentRoadStrokes(environmentId, section.a.surface, section.a, section.b, night),
+  }))
   const treeStride = Math.max(1, Math.ceil(track.trees.length / 350))
   const trees = track.trees.filter((_, index) => index % treeStride === 0)
 
@@ -260,7 +258,7 @@ export function createRaceFlyoverRenderer(
     }
     // The flyover and Phaser road use identical distance-anchored material
     // strokes, so textures never switch character between preview and race.
-    if (environmentId === 'kids-room') {
+    if (materialSections.length > 0) {
       for (const section of materialSections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
         for (const stroke of section.strokes) {

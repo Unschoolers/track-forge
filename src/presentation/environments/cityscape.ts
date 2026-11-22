@@ -1,4 +1,5 @@
 import { art, ellipse, polygon } from './artPrimitives'
+import { createGroundTileRandom } from './groundTexture'
 import type { SceneryPrimitive, TrackEnvironmentDefinition } from './types'
 
 const rect = (
@@ -23,20 +24,28 @@ export const CITYSCAPE_ENVIRONMENT: TrackEnvironmentDefinition = {
   day: {
     editorGround: '#858982',
     raceGround: '#858982',
-    flyoverGround: '#888c86',
+    flyoverGround: '#858982',
     hillSlope: 0x777f79,
     hillPlateau: 0x969b91,
     flyoverHill: '#a2a79b',
     shorelineLand: 0xa8a99a,
+    waterFill: 0x396e82,
+    waterRipple: 0xa6d2d9,
+    waterShoreline: 0xb5bdbc,
+    flyoverWater: '#396e82',
   },
   night: {
-    editorGround: '#292f35',
+    editorGround: '#252b31',
     raceGround: '#252b31',
-    flyoverGround: '#30383d',
+    flyoverGround: '#252b31',
     hillSlope: 0x39444a,
     hillPlateau: 0x4b5759,
     flyoverHill: '#4b5658',
     shorelineLand: 0x64716e,
+    waterFill: 0x1e3c52,
+    waterRipple: 0x679cae,
+    waterShoreline: 0x778b91,
+    flyoverWater: '#1e3c52',
   },
   scenery: {
     'city-trash-bin': art('Trash bin', 18, (night) => [
@@ -78,49 +87,41 @@ export const CITYSCAPE_ENVIRONMENT: TrackEnvironmentDefinition = {
       rect(-8, -7, 16, 14, night ? 0x414f54 : 0x85928c),
     ]),
   },
-  groundArt: (_variant, night) => {
-    const color = night ? 0xadb7b0 : 0x394841
-    return [
-      polygon(
-        [
-          [0, 63],
-          [256, 63],
-          [256, 64],
-          [0, 64],
-        ],
-        color,
-        0.09,
-      ),
-      polygon(
-        [
-          [0, 191],
-          [256, 191],
-          [256, 192],
-          [0, 192],
-        ],
-        color,
-        0.09,
-      ),
-      polygon(
-        [
-          [63, 0],
-          [64, 0],
-          [64, 256],
-          [63, 256],
-        ],
-        color,
-        0.07,
-      ),
-      polygon(
-        [
-          [191, 0],
-          [192, 0],
-          [192, 256],
-          [191, 256],
-        ],
-        color,
-        0.07,
-      ),
-    ]
+  groundArt: (variant, night) => {
+    const random = createGroundTileRandom(variant, 0xc17e5c)
+    const seam = night ? 0x0d1921 : 0x4b5451
+    const bevel = night ? 0x6b7a80 : 0xc8cbc2
+    const speck = night ? 0x728087 : 0xd3d4cb
+    const dark = night ? 0x171f26 : 0x535f59
+    const shapes: SceneryPrimitive[] = []
+    // Pavement slab joints align at 64 world units across all 256px tiles.
+    // Paired shadow/highlight lines create a subtle raised concrete edge.
+    for (let i = 0; i <= 4; i++) {
+      const at = i * 64
+      shapes.push(rect(at, 0, 1.5, 256, seam))
+      shapes.push(polygon([[at + 2, 0], [at + 3, 0], [at + 3, 256], [at + 2, 256]],
+        bevel, 0.23))
+      shapes.push(polygon([[0, at], [256, at], [256, at + 1.5], [0, at + 1.5]],
+        seam, 0.35))
+      shapes.push(polygon([[0, at + 2], [256, at + 2], [256, at + 3], [0, at + 3]],
+        bevel, 0.2))
+    }
+    // Fine concrete aggregate, chips and a few hairline imperfections.
+    for (let i = 0; i < 255; i++) {
+      const x = random() * 256
+      const y = random() * 256
+      const size = 0.7 + random() * 1.7
+      shapes.push(ellipse(x, y, size * 1.3, size * 0.7,
+        i % 3 === 0 ? dark : speck, night ? 0.26 : 0.25))
+    }
+    for (let i = 0; i < 9; i++) {
+      const x = 10 + random() * 230
+      const y = 10 + random() * 230
+      const len = 5 + random() * 17
+      shapes.push(polygon([[x, y], [x + len, y + len * 0.25],
+        [x + len + 1, y + len * 0.25 + 1], [x, y + 1]],
+      dark, night ? 0.3 : 0.22))
+    }
+    return shapes
   },
 }

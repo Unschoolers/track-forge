@@ -36,8 +36,8 @@ describe('race flyover renderer', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it.each([
-    ['day', '#568453'],
-    ['night', '#182d2b'],
+    ['day', '#2d7344'],
+    ['night', '#0e2b1d'],
   ] as const)('draws %s ground detail below the road', (lighting, baseColor) => {
     const track = { ...createStarterTrack(asTrackId('ground'), 1), trees: [] }
     const geometry = new TrackGeometryService().get(track)
@@ -92,7 +92,7 @@ describe('race flyover renderer', () => {
     createRaceFlyoverRenderer(geometry, track, 'blue', 'night', true)(ghost.ctx, 320, 150, 1)
     expect(ghost.colors).toContain('#3a8cff')
     expect(ghost.colors).not.toContain('#ff4f4f')
-    expect(ghost.colors).toContain('#182d2b')
+    expect(ghost.colors).toContain('#0e2b1d')
     expect(ghost.methods.get('scale')?.mock.calls.filter(
       ([x, y]) => x === VEHICLE_VISUAL_SCALE && y === VEHICLE_VISUAL_SCALE,
     )).toHaveLength(1)

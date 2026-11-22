@@ -8,16 +8,16 @@ describe('Grass environment presentation', () => {
     expect(GRASS_ENVIRONMENT.day).toEqual({
       editorGround: '#2d7344',
       raceGround: '#2d7344',
-      flyoverGround: '#568453',
+      flyoverGround: '#2d7344',
       hillSlope: 0x398858,
       hillPlateau: 0x4c9d63,
       flyoverHill: '#80a66a',
       shorelineLand: 0x83a764,
     })
     expect(GRASS_ENVIRONMENT.night).toEqual({
-      editorGround: '#14251b',
+      editorGround: '#0e2b1d',
       raceGround: '#0e2b1d',
-      flyoverGround: '#182d2b',
+      flyoverGround: '#0e2b1d',
       hillSlope: 0x1b452a,
       hillPlateau: 0x235433,
       flyoverHill: '#34533f',

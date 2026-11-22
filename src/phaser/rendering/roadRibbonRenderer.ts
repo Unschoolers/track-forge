@@ -1,6 +1,6 @@
 import type Phaser from 'phaser'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
-import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
+import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -72,10 +72,19 @@ function fillQuad(
 function renderRoadRibbonPass(
   graphics: Phaser.GameObjects.Graphics,
   quads: readonly RoadRibbonQuad[],
-  pass: 'edge' | 'road',
+  pass: 'edge' | 'road' | 'detail',
   night: boolean,
   environmentId: TrackEnvironmentId = 'grass',
 ): void {
+  if (pass === 'detail') {
+    for (const quad of quads) {
+      for (const stroke of environmentRoadStrokes(environmentId, quad.surface, quad.from, quad.to, night)) {
+        graphics.lineStyle(stroke.width, stroke.color, stroke.alpha)
+        graphics.lineBetween(stroke.start.x, stroke.start.y, stroke.end.x, stroke.end.y)
+      }
+    }
+    return
+  }
   const colorKey = pass === 'edge'
     ? (night ? 'nightEdge' : 'edge')
     : (night ? 'nightRoad' : 'road')
@@ -86,15 +95,6 @@ function renderRoadRibbonPass(
       previous = quad.surface
     }
     fillQuad(graphics, quad[pass])
-  }
-  if (pass === 'road' && environmentId === 'kids-room') {
-    // Pre-baked surface detail stays inside the same road chunk/culling pass.
-    for (const quad of quads) {
-      for (const stroke of kidsRoomRoadStrokes(quad.surface, quad.from, quad.to, night)) {
-        graphics.lineStyle(stroke.width, stroke.color, stroke.alpha)
-        graphics.lineBetween(stroke.start.x, stroke.start.y, stroke.end.x, stroke.end.y)
-      }
-    }
   }
 }
 
@@ -108,6 +108,7 @@ export function renderRoadRibbon(
   const quads = buildRoadRibbonQuads(path, ribbon)
   renderRoadRibbonPass(graphics, quads, 'edge', night, environmentId)
   renderRoadRibbonPass(graphics, quads, 'road', night, environmentId)
+  renderRoadRibbonPass(graphics, quads, 'detail', night, environmentId)
 }
 
 export function validBounds({ left, top, right, bottom }: WorldBounds): boolean {
@@ -164,16 +165,27 @@ export function renderRaceRoadRibbon(
   const chunks = edgeChunks.map(({ batch, bounds, edge }) => {
     const road = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
     renderRoadRibbonPass(road, batch, 'road', night, environmentId)
-    return { bounds, edge, road }
+    return { batch, bounds, edge, road }
+  })
+  // Keep the full painter order consistent with an unchunked ribbon:
+  // all edges, then all road fills, then all subtle material strokes.
+  // Separate static detail objects share the same bounded visibility window.
+  const materials = chunks.map(({ batch }) => {
+    const detail = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
+    renderRoadRibbonPass(detail, batch, 'detail', night, environmentId)
+    return detail
   })
 
   return (view, paddedViewport) => {
     const viewport = paddedViewport ?? groundViewportBounds(view)
-    for (const { bounds, edge, road } of chunks) {
+    chunks.forEach(({ bounds, edge, road }, index) => {
       const visible = boundsVisible(bounds, viewport)
-      if (edge.visible === visible) continue
-      edge.setVisible(visible)
-      road.setVisible(visible)
-    }
+      if (edge.visible !== visible) {
+        edge.setVisible(visible)
+        road.setVisible(visible)
+      }
+      const detail = materials[index]
+      if (detail && detail.visible !== visible) detail.setVisible(visible)
+    })
   }
 }

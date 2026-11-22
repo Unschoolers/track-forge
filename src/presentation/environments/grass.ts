@@ -1,21 +1,21 @@
 import { art, ellipse, polygon } from './artPrimitives'
-import { GROUND_TILE_SIZE } from '@/presentation/environments/groundTexture'
+import { GROUND_TILE_SIZE, createGroundTileRandom } from '@/presentation/environments/groundTexture'
 import type { EnvironmentPalette } from '@/presentation/environments/types'
 
 export const GRASS_ENVIRONMENT = {
   day: {
     editorGround: '#2d7344',
     raceGround: '#2d7344',
-    flyoverGround: '#568453',
+    flyoverGround: '#2d7344',
     hillSlope: 0x398858,
     hillPlateau: 0x4c9d63,
     flyoverHill: '#80a66a',
     shorelineLand: 0x83a764,
   },
   night: {
-    editorGround: '#14251b',
+    editorGround: '#0e2b1d',
     raceGround: '#0e2b1d',
-    flyoverGround: '#182d2b',
+    flyoverGround: '#0e2b1d',
     hillSlope: 0x1b452a,
     hillPlateau: 0x235433,
     flyoverHill: '#34533f',
@@ -78,23 +78,41 @@ export function getGrassTexture(variant: number, night: boolean): readonly Grass
   const cached = textures.get(key)
   if (cached) return cached
 
-  let state = variant + 12345
-  const random = (): number => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0
-    return state / 0x100000000
-  }
-  const lighter = night ? 0x79916a : 0xb1bc80
-  const darker = night ? 0x304b3b : 0x547346
+  const random = createGroundTileRandom(variant, 0x5a1a5)
+  const lighter = night ? 0x698c69 : 0x9ccf76
+  const darker = night ? 0x142f23 : 0x174e33
+  const mid = night ? 0x3b6650 : 0x5dac57
   const marks: GrassMark[] = []
-  for (let i = 0; i < 28; i++) {
-    const tuft = i >= 12
+  // Large soft variations survive zoom-out; dense short blades sell grass
+  // at racing speed without distracting from the asphalt.
+  for (let i = 0; i < 20; i++) {
     marks.push({
       x: random() * GROUND_TILE_SIZE,
       y: random() * GROUND_TILE_SIZE,
-      radiusX: tuft ? 4 + random() * 5 : 24 + random() * 30,
-      radiusY: tuft ? 2 + random() * 3 : 13 + random() * 20,
-      color: i % 2 === 0 ? lighter : darker,
-      alpha: tuft ? 0.10 : 0.055,
+      radiusX: 15 + random() * 36,
+      radiusY: 12 + random() * 25,
+      color: i % 3 === 0 ? lighter : darker,
+      alpha: night ? 0.06 : 0.055,
+    })
+  }
+  for (let i = 0; i < 430; i++) {
+    marks.push({
+      x: random() * GROUND_TILE_SIZE,
+      y: random() * GROUND_TILE_SIZE,
+      radiusX: 0.7 + random() * 1.1,
+      radiusY: 2 + random() * 5,
+      color: i % 6 === 0 ? darker : i % 3 === 0 ? lighter : mid,
+      alpha: night ? 0.24 : 0.27,
+    })
+  }
+  // Sparse pale seed heads add scale without becoming decorative props.
+  for (let i = 0; i < 15; i++) {
+    marks.push({
+      x: random() * GROUND_TILE_SIZE,
+      y: random() * GROUND_TILE_SIZE,
+      radiusX: 1.1, radiusY: 2.2,
+      color: night ? 0x778a61 : 0xc3d4a0,
+      alpha: 0.26,
     })
   }
 

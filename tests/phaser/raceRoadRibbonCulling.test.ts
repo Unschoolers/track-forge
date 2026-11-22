@@ -49,6 +49,9 @@ class RecordingGraphics {
     this.paints.push(['triangle', this.fillColor, this.fillAlpha, ...coordinates])
   }
 
+  lineBetween(x1: number, y1: number, x2: number, y2: number) {
+    this.paints.push(['line', ...this.stroke, x1, y1, x2, y2])
+  }
   beginPath() { this.path = [] }
   moveTo(x: number, y: number) { this.path.push('move', x, y) }
   lineTo(x: number, y: number) { this.path.push('line', x, y) }
@@ -105,6 +108,29 @@ describe('race road ribbon culling', () => {
     expect(graphics.every(({ depth }) => depth === WORLD_RENDER_DEPTH.road)).toBe(true)
     expect(graphics.flatMap(({ paints }) => paints)).toEqual(base.paints)
   })
+
+  it.each(['grass', 'desert', 'cityscape', 'kids-room'] as const)(
+    'draws %s road material detail in the same order across small and batched ribbons', (environment) => {
+      const geometry = buildTrackGeometry({
+        points: [
+          { x: -1800, y: -800, surface: 'street', curve: 'corner' },
+          { x: 1600, y: 1100, surface: 'dirt', curve: 'corner' },
+          { x: 1850, y: -930, surface: 'ice', curve: 'corner' },
+          { x: -1720, y: 850, surface: 'street', curve: 'corner' },
+          { x: -1800, y: -800, surface: 'street', curve: 'corner' },
+        ],
+        terrain: EMPTY_TERRAIN,
+        start: { ratio: 0.1, reversed: false },
+      })
+      const direct = new RecordingGraphics()
+      renderTrackGeometryBase(direct as unknown as Phaser.GameObjects.Graphics, geometry, false, environment)
+      const { scene, graphics } = createRecordingScene()
+      const update = renderRaceTrackGeometryBase(scene, geometry, false, environment)
+      expect(update).toBeTypeOf('function')
+      expect(graphics.flatMap(({ paints }) => paints)).toEqual(direct.paints)
+      expect(graphics.some(({ paints }) => paints.some(([kind]) => kind === 'line'))).toBe(true)
+    },
+  )
 
   it('skips most ribbon triangles on a long stage and restores batches as the camera moves', () => {
     const geometry = lineGeometry(2400)
@@ -182,8 +208,9 @@ describe('race road ribbon culling', () => {
     const ribbon = Array.from({ length: 40 }, () => source.ribbon).flat()
     const geometry = { ...source, path: { ...source.path, points }, ribbon }
     expect(renderRaceTrackGeometryBase(scene, geometry, false)).toBeDefined()
-    // At most 64 edge, 64 road, 64 curb and 64 stripe batches, plus markers.
-    expect(graphics.length).toBeLessThanOrEqual(257)
+    // At most 64 edge, 64 road, 64 material, 64 curb and 64
+    // stripe batches, plus one marker layer.
+    expect(graphics.length).toBeLessThanOrEqual(321)
   })
 
   it('uses the rotated, resized camera bounds', () => {
