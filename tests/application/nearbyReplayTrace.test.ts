@@ -26,6 +26,17 @@ describe('bounded Nearby race trajectory diagnostics', () => {
     expect(trace.snapshot().truncated).toBe(0)
   })
 
+  it('checks sample eligibility before allocating rival snapshots', () => {
+    const trace = new NearbyReplayTrace(5, 125)
+    expect(trace.shouldRecord(0)).toBe(true)
+    trace.record(0, sample(0))
+    expect(trace.shouldRecord(40)).toBe(false)
+    expect(trace.shouldRecord(124)).toBe(false)
+    expect(trace.shouldRecord(125)).toBe(true)
+    expect(trace.shouldRecord(40, true)).toBe(true)
+    expect(trace.shouldRecord(Number.NaN)).toBe(false)
+  })
+
   it('captures missing opponent visibility explicitly and supports a forced terminal frame', () => {
     const trace = new NearbyReplayTrace(5, 125)
     trace.record(10, sample(10))
