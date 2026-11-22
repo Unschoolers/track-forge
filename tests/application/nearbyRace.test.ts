@@ -167,7 +167,7 @@ describe('Nearby Arcade', () => {
       for (const [index, { device, car }] of setups.entries()) {
         device.update(makeCar(car, index * 10, index * 5, index === 1 ? 'bridge' : null))
       }
-      // Host waits for its next tick, then broadcasts all four cars once.
+      // Host sends one newest shared batch for all connected guests.
       await vi.waitFor(() => expect(host.remotePoses()).toHaveLength(3), { interval: 5 })
       time += 1000 / 60
       host.update(makeCar('blue', 0))

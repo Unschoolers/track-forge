@@ -31,6 +31,32 @@ function passedCircuitGateByProgress(
   return after > count * gate / 4 + tolerance && after < count - startApproach
 }
 
+/** A route-index jump can lead the visible car by several samples near
+ * bends and intersections. Never announce a missed checkpoint until the
+ * chassis is clearly past its physical plane, not merely past its index.
+ */
+function clearlyBeyondGate(
+  path: RaceState['path'],
+  position: number,
+  vehicle: Pick<RaceVehicle, 'x' | 'y'>,
+  reversed: boolean,
+): boolean {
+  const count = path.points.length
+  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(position))
+  const a = path.points[lower]
+  const b = path.points[(lower + 1) % count]
+  if (!a || !b) return false
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const length = Math.hypot(dx, dy)
+  if (length < 0.001) return false
+  const fraction = position - lower
+  const gx = a.x + dx * fraction
+  const gy = a.y + dy * fraction
+  const forward = ((vehicle.x - gx) * dx + (vehicle.y - gy) * dy) / length
+  return (reversed ? -forward : forward) > 12
+}
+
 /** Open routes cannot advance to a road sample *after* Finish.
  * Detect a car that has gone beyond the finish plane without crossing
  * its painted stripe; the driver still has time to turn back and retry.
@@ -73,7 +99,11 @@ export function advanceArcadeTimingGate(
     ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
       passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
     : gate === 4 ? passedStageFinish(path, vehicle) : passedPendingCheckpoint(path, vehicle)
-  if (!crossedLine && !passedGate) {
+  // Open-stage finish bypass already checks the actual finish plane.
+  // Do not apply the circuit/index-jump clearance rule twice at the finish.
+  const confirmedBypass = passedGate && (!path.closed && gate === 4 ||
+    clearlyBeyondGate(path, position, vehicle, reversed))
+  if (!crossedLine && !confirmedBypass) {
     return { vehicle, missedCheckpoint }
   }
   // Road classification at a diagonal gate can change on the crossing frame.

@@ -7,6 +7,8 @@ export const PROGRESS_BYTES = 8
 export const PROGRESS_PERIOD_MS = 150
 export const POSE_SEQUENCE_MASK = 0xffff
 export const POSE_RECOVERY_MASK = 0xff
+/** A brief radio pause should freeze a rival, not make its car vanish. */
+export const REMOTE_POSE_EXPIRY_MS = 2000
 export const POSE_PERIOD_MS = 1000 / 30
 export const POSE_FAST_PERIOD_MS = 1000 / 60
 const SCALE = 32
@@ -178,7 +180,7 @@ export class RemoteGhost {
   pose(now: number): GhostPose | null {
     const last = this.frames.at(-1)
     const first = this.frames[0]
-    if (!first || !last || now - this.arrival > 750) return null
+    if (!first || !last || now - this.arrival > REMOTE_POSE_EXPIRY_MS) return null
     const target = Math.max(first.t, now - 100)
     if (target <= last.t) return ghostPoseAt({ car: this.car, frames: this.frames, time: last.t }, target)
 

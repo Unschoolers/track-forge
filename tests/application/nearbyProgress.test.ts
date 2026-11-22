@@ -21,12 +21,14 @@ describe('nearby progress telemetry', () => {
     expect(() => encodeProgress(1, 0, Infinity)).toThrow(RangeError)
   })
 
-  it('throttles updates, rejects duplicates and stale frames, and expires lost peers', () => {
+  it('throttles updates, rejects duplicates and stale frames, and expires lost peers', async () => {
     let now = 1000
     const sent: Uint8Array[] = []
     const send = vi.fn(async (_ids: string[], bytes: Uint8Array) => { sent.push(bytes) })
     const producer = new NearbyProgressSync(send, () => now)
     producer.update(0, 25, ['host'])
+    await Promise.resolve()
+    await Promise.resolve()
     now += 100
     producer.update(0, 29, ['host'])
     expect(sent).toHaveLength(1)
@@ -54,4 +56,34 @@ describe('nearby progress telemetry', () => {
     sync.update(0, 3, ['host'])
     await vi.waitFor(() => expect(sync.failedSends).toBe(1))
   })
+  it('broadcasts progress once per source without queuing stale samples', async () => {
+    let now = 0
+    const sent: { ids: string[]; packet: Uint8Array }[] = []
+    let unlock: (() => void) | undefined
+    const sync = new NearbyProgressSync((ids, packet) => {
+      sent.push({ ids, packet })
+      if (decodeProgress(packet)?.slot === 0) {
+        return new Promise<void>(resolve => { unlock = resolve })
+      }
+      return Promise.resolve()
+    }, () => now)
+    sync.update(0, 1, ['guest-1', 'guest-2', 'guest-3'])
+    now = 151
+    sync.update(0, 2, ['guest-1', 'guest-2', 'guest-3'])
+    sync.relay(encodeProgress(1, 1, 10), ['guest-2', 'guest-3'])
+    sync.relay(encodeProgress(1, 2, 20), ['guest-2', 'guest-3'])
+    expect(sent).toHaveLength(2)
+    expect(sent[0]?.ids).toEqual(['guest-1', 'guest-2', 'guest-3'])
+    expect(sent[1]?.ids).toEqual(['guest-2', 'guest-3'])
+    expect(decodeProgress(sent[1]!.packet)?.progress).toBe(10)
+    unlock?.()
+    await Promise.resolve()
+    await Promise.resolve()
+    now = 302
+    sync.update(0, 3, ['guest-1', 'guest-2', 'guest-3'])
+    expect(sent).toHaveLength(3)
+    expect(decodeProgress(sent[2]!.packet)?.progress).toBe(3)
+  })
+
+
 })

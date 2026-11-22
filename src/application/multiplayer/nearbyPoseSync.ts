@@ -64,12 +64,11 @@ export class NearbyPoseSync {
     racers: ReadonlyMap<number, PoseRacer>,
   ): void {
     const now = this.now()
-    // Two milliseconds of tolerance keeps 30 Hz cadence on a 60 FPS frame clock.
+    // One compact batch is broadcast to all connected guests. Native Nearby
+    // drops obsolete per-endpoint poses if a recipient is still congested.
     if (this.poseSending || now - this.lastSentAt < this.posePeriodMs - 2 || !recipients.length) return
     const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle)
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
-    // The host broadcasts the most recent valid positions in a single batch;
-    // guests upload only their own pose.
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
     const bytes = hostId ? pose : encodePoseBatch(
       [...this.latestPoses].filter(([slot, value]) =>

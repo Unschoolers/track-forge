@@ -1,4 +1,4 @@
-import { encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
+import { decodeProgress, encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
 
 /** A low-rate optional stream; old peers ignore these packets and still render poses. */
 export class NearbyProgressSync {
@@ -6,6 +6,8 @@ export class NearbyProgressSync {
   private nextSequence = 0
   private lastSentAt = Number.NEGATIVE_INFINITY
   private sendFailures = 0
+  private readonly inFlight = new Set<number>()
+  private generation = 0
 
   constructor(
     private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
@@ -15,6 +17,8 @@ export class NearbyProgressSync {
   get failedSends(): number { return this.sendFailures }
 
   reset(): void {
+    this.generation++
+    this.inFlight.clear()
     this.sendFailures = 0
     this.remote.clear()
     this.nextSequence = 0
@@ -23,15 +27,31 @@ export class NearbyProgressSync {
 
   update(slot: number, value: number, recipients: string[]): void {
     const now = this.now()
-    if (!recipients.length || now - this.lastSentAt < PROGRESS_PERIOD_MS) return
+    if (!recipients.length || this.inFlight.has(slot) || now - this.lastSentAt < PROGRESS_PERIOD_MS) return
     const packet = encodeProgress(slot, this.nextSequence, value)
     this.nextSequence = (this.nextSequence + 1) & 0xffff
     this.lastSentAt = now
-    // Progress is optional; failed samples expire instead of interrupting the race.
-    void this.send(recipients, packet).catch(() => {
-      // Explicit diagnostic count; this optional stream never aborts an active race.
-      this.sendFailures++
-    })
+    this.dispatch(slot, packet, recipients)
+  }
+
+  /** One host relay per progress source, addressed to every eligible guest. */
+  relay(packet: Uint8Array, recipients: string[]): void {
+    const message = decodeProgress(packet)
+    if (message && recipients.length && !this.inFlight.has(message.slot)) {
+      this.dispatch(message.slot, packet, recipients)
+    }
+  }
+
+  private dispatch(slot: number, packet: Uint8Array, recipients: string[]): void {
+    const active = this.generation
+    this.inFlight.add(slot)
+    void this.send(recipients, packet)
+      .catch(() => {
+        if (active === this.generation) this.sendFailures++
+      })
+      .finally(() => {
+        if (active === this.generation) this.inFlight.delete(slot)
+      })
   }
 
   receive(packet: ProgressPacket): boolean {

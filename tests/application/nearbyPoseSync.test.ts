@@ -99,4 +99,23 @@ describe('nearby pose synchronizer', () => {
     sync.update(player, 1, 'host', ['host'], racers)
     expect(sync.counts.sent).toBe(1)
   })
+  it('sends one compact batch to all recipients on the same frame', async () => {
+    let now = 0
+    const sends: { ids: string[]; bytes: Uint8Array }[] = []
+    const sync = new NearbyPoseSync(async (ids, bytes) => {
+      sends.push({ ids, bytes })
+    }, () => now)
+    sync.update(player, 0, null, ['guest-1', 'guest-2', 'guest-3'], racers)
+    await flush()
+    now = 34
+    sync.update(player, 0, null, ['guest-1', 'guest-2', 'guest-3'], racers)
+    await flush()
+    expect(sends).toHaveLength(2)
+    expect(sends[0]?.ids).toEqual(['guest-1', 'guest-2', 'guest-3'])
+    expect(sends[1]?.ids).toEqual(['guest-1', 'guest-2', 'guest-3'])
+    expect(decodePoseBatch(sends[1]?.bytes ?? new Uint8Array())?.[0]?.sequence).toBe(1)
+    expect(sync.counts.sent).toBe(2)
+  })
+
+
 })
