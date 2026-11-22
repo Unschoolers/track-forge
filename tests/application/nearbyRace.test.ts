@@ -83,6 +83,50 @@ class NearbyNetwork {
 }
 
 describe('Nearby Arcade', () => {
+  it('lets the host override lighting for a Cup session without changing saved tracks', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const hostStarts: NearbyStart[] = []
+    const guestStarts: NearbyStart[] = []
+    host.onStart(start => hostStarts.push(start))
+    guest.onStart(start => guestStarts.push(start))
+    const first = { ...track, lighting: 'day' as const }
+    const next = { ...track, name: 'Next round', lighting: 'day' as const }
+    try {
+      expect(host.setLighting('night')).toBe(false)
+      host.hostCup([first, next], 'blue', 2)
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      expect(host.snapshot().lighting).toBe('day')
+      expect(host.setLighting('night')).toBe(true)
+      expect(host.snapshot().lighting).toBe('night')
+      expect(first.lighting).toBe('day')
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
+      expect(guest.setLighting('day')).toBe(false)
+      host.start()
+      await vi.waitFor(() => expect(hostStarts).toHaveLength(1), { interval: 5 })
+      expect(hostStarts[0]?.lighting).toBe('night')
+      expect(guestStarts[0]?.lighting).toBe('night')
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('racing'), { interval: 5 })
+      host.finish(40)
+      guest.finish(38)
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(2), { interval: 5 })
+      expect(hostStarts[1]?.lighting).toBe('night')
+      expect(guestStarts[1]?.lighting).toBe('night')
+      expect(next.lighting).toBe('day')
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
   it('stages eight peers with distinct pads and multicasts one eight-car pose batch', async () => {
     const network = new NearbyNetwork()
     const devices = Array.from({ length: 8 }, (_, index) => new NearbyRace(

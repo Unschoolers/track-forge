@@ -96,3 +96,7 @@ updated peer sees the message). Unit/CI checks do not establish radio quality.
 
 ### Validation gate
 Component tests: eight-slot wire encoding and rejection, eight unique starting pads, eight-person preparation/countdown/host batch, repeat rounds and malformed input. Native JVM tests: independent slow/healthy peer rates, recovery, progress pacing, disconnect. CI must run JS verify and Android compile/JUnit. **Real 2/4/8-device radio trials are still required** to establish 30/15 Hz stability, CPU/frame timing and actual delivery percentiles; unit tests do not prove radio quality. Roll back the networking PR as a unit if the v3 rollout causes problems.
+
+## Host-selected Day/Night lighting
+
+After selecting a normal race track or a Nearby Cup, the host can choose **DAY** or **NIGHT** from the hosting lobby. All connected players receive the chosen lighting in the existing reliable race preparation message. The chosen override applies to subsequent Cup tracks and new race track selections in the same room; it does not edit the saved track. When no choice is made, each track uses its stored lighting. Track sharing has no lighting selector. The selection remains host-authoritative to avoid players racing in inconsistent visibility conditions.

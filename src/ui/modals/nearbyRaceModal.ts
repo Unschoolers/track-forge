@@ -24,7 +24,7 @@ export function createNearbyRaceModal(
   },
   identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
 ): HTMLElement {
-  const { phase, purpose, room, track, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
+  const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const cup = nearby.snapshot().cup
   const frame = createModalFrame(cup ? 'Nearby Cup' : 'Nearby Race',
     room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
@@ -57,6 +57,17 @@ export function createNearbyRaceModal(
         frame.body.append(element('p', 'modal-subtitle',
           `${sharedCount} friend${sharedCount === 1 ? '' : 's'} saved the track. Keep this screen open to share with more devices.`))
       } else {
+        const lightingSection = element('section', 'setup-section')
+        lightingSection.append(element('h3', 'setup-label', cup ? 'CUP LIGHTING' : 'RACE LIGHTING'))
+        const choices = element('div', 'choice-row')
+        for (const value of ['day', 'night'] as const) {
+          const choice = button(value.toUpperCase(), `nearby-lighting-${value}`,
+            () => nearby.setLighting(value), `setup-choice${lighting === value ? ' active' : ''}`)
+          choice.setAttribute('aria-pressed', String(lighting === value))
+          choices.append(choice)
+        }
+        lightingSection.append(choices)
+        frame.body.append(lightingSection)
         const start = button('START RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
         start.disabled = !canStart
         if (!canStart) frame.body.append(element('p', 'modal-subtitle',
