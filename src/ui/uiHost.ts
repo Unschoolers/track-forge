@@ -363,7 +363,7 @@ export class DomUiHost implements UiHost {
     const overlay = this.renderOverlay(state)
     const nodes: Node[] = [screen]
     if (overlay) nodes.push(overlay)
-    if (state.notice && state.overlay.type !== 'track-name') {
+    if (state.notice && state.overlay.type !== 'track-name' && state.overlay.type !== 'editor-exit') {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
@@ -588,7 +588,7 @@ export class DomUiHost implements UiHost {
           saveAs: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'save-as' }),
           discard: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' }),
           cancel: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'cancel' }),
-        })
+        }, state.notice)
       case 'editor-menu':
         return createEditorMenuModal(state.editor.environmentId, state.editor.routeKind, {
           close,
