@@ -178,7 +178,8 @@
 .race-setup-modal .setup-label { color: var(--menu-accent); }
 .race-setup-modal .race-flyover-panel { border-color: #465866; border-radius: 0; }
 .race-setup-modal .race-flyover-toggle { border-radius: 0; }
-.race-setup-modal :is(.car-choice, .setup-choice) {
+.race-setup-modal :is(.car-choice, .setup-choice),
+.nearby-race-modal .setup-choice {
   min-width: 0;
   border: 1px solid #465767;
   border-radius: 0;
@@ -204,7 +205,8 @@
   overflow: visible;
   filter: drop-shadow(0 2px 1px #050a12a8);
 }
-.race-setup-modal :is(.car-choice, .setup-choice).active {
+.race-setup-modal :is(.car-choice, .setup-choice).active,
+.nearby-race-modal .setup-choice.active {
   border-color: var(--menu-accent);
   background: #563025;
   color: #ffd0bd;

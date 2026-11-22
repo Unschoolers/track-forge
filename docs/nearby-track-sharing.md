@@ -83,3 +83,8 @@ replying with an unversioned `ready`, invalid version values, and stale/mixed
 round packets. Release validation must also include 2–4 actual Android devices:
 rematch, connection loss, and one outdated APK (confirm no race starts and the
 updated peer sees the message). Unit/CI checks do not establish radio quality.
+
+
+## Host-selected Day/Night lighting
+
+After selecting a normal race track or a Nearby Cup, the host can choose **DAY** or **NIGHT** from the hosting lobby. All connected players receive the chosen lighting in the existing reliable race preparation message. The chosen override applies to subsequent Cup tracks and new race track selections in the same room; it does not edit the saved track. When no choice is made, each track uses its stored lighting. Track sharing has no lighting selector. The selection remains host-authoritative to avoid players racing in inconsistent visibility conditions.
