@@ -7,6 +7,11 @@ export interface EnvironmentPalette {
   readonly hillPlateau: number
   readonly flyoverHill: string
   readonly shorelineLand: number
+  /** Optional themed water/juice colors, separate from water physics. */
+  readonly waterFill?: number
+  readonly waterRipple?: number
+  readonly waterShoreline?: number
+  readonly flyoverWater?: string
 }
 
 import type { Vector2 } from '@/domain/model'
