@@ -72,6 +72,7 @@ export class DomUiHost implements UiHost {
   private updateCheckGeneration = 0
   private previousOverlayType: AppSnapshot['overlay']['type'] = 'none'
   private readonly noticeTimers = new Set<ReturnType<typeof setTimeout>>()
+  private noticeGeneration = 0
 
   constructor(
     private readonly root: HTMLElement,
@@ -111,6 +112,7 @@ export class DomUiHost implements UiHost {
     this.availableUpdate = null
     this.lastUpdateCheckAt = Number.NEGATIVE_INFINITY
     this.previousOverlayType = 'none'
+    this.noticeGeneration++
     for (const timer of this.noticeTimers) clearTimeout(timer)
     this.noticeTimers.clear()
     this.root.replaceChildren()
@@ -146,15 +148,17 @@ export class DomUiHost implements UiHost {
   }
 
   private async exportTrackFile(track: Track): Promise<void> {
+    const generation = this.noticeGeneration
     try {
-      if (await exportTrack(track)) this.showRaceExportNotice('Track file saved.')
+      if (await exportTrack(track)) this.showRaceExportNotice('Track file saved.', generation)
     } catch (error) {
       console.error('Track Forge track export failed:', error)
-      this.showRaceExportNotice('Export failed. Please try another save location.')
+      this.showRaceExportNotice('Export failed. Please try another save location.', generation)
     }
   }
 
   private async exportRaceDiagnostics(): Promise<void> {
+    const generation = this.noticeGeneration
     const report = this.runtime.raceSession.diagnosticsReport?.()
     if (!report) {
       this.showRaceExportNotice('Race replay is no longer available.')
@@ -167,16 +171,16 @@ export class DomUiHost implements UiHost {
         filename: `trackforge-race-${trackName}-${timestamp}.json`,
         content: JSON.stringify(report),
       })
-      this.showRaceExportNotice(saved ? 'Race replay file saved.' : 'Race replay was not saved.')
+      this.showRaceExportNotice(saved ? 'Race replay file saved.' : 'Race replay was not saved.', generation)
     } catch (error) {
       console.error('Track Forge race replay export failed:', error)
-      this.showRaceExportNotice('Race export failed. Please try another save location.')
+      this.showRaceExportNotice('Race export failed. Please try another save location.', generation)
     }
   }
 
-  private showRaceExportNotice(message: string): void {
-    // An export can finish after navigating away or tearing down the UI host.
-    if (!this.mounted) return
+  private showRaceExportNotice(message: string, generation = this.noticeGeneration): void {
+    // A previous mount's pending export must not post into a new session.
+    if (!this.mounted || generation !== this.noticeGeneration) return
     const toast = createToast(message)
     this.root.append(toast)
     const timer = setTimeout(() => {
@@ -194,6 +198,7 @@ export class DomUiHost implements UiHost {
   }
 
   private async shareTrackChallenge(track: Track): Promise<void> {
+    const generation = this.noticeGeneration
     if (isSeededTrack(track)) {
       this.showRaceExportNotice('Built-in tracks are already available to every player.')
       return
@@ -205,6 +210,7 @@ export class DomUiHost implements UiHost {
     } catch {
       // Saving a copy also works when the system share sheet fails to open.
     }
+    if (!this.mounted || generation !== this.noticeGeneration) return
     await this.exportTrackFile(track)
   }
 
