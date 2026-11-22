@@ -16,6 +16,17 @@ describe('large editor world expansion', () => {
     expect(points[0]?.x).toBe(-75_000)
   })
 
+  it('keeps the midpoint finite across opposite extreme finite coordinates', () => {
+    const points = [
+      { x: -1e308, y: 0, surface: 'street' as const },
+      { x: 1e308, y: 0, surface: 'street' as const },
+      { x: 0, y: 0, surface: 'street' as const },
+    ]
+    const result = expandAroundBoundsCenter(points, [], 2)
+    expect(result.points[2]?.x).toBe(0)
+    expect(Number.isFinite(result.points[2]?.x)).toBe(true)
+  })
+
   it('uses scenery-only bounds when a world contains no road or trees', () => {
     const result = expandAroundBoundsCenter([], [], 2, [
       { kind: 'city-house', x: -10, y: -30 },
