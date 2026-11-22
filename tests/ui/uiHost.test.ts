@@ -206,6 +206,9 @@ describe('DomUiHost', () => {
     const { root, port, update } = setup('editor')
     update({ ...snapshot('editor'), overlay: { type: 'editor-exit' } })
     expect(root.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Unsaved track changes')
+    update({ ...snapshot('editor'), overlay: { type: 'editor-exit' }, notice: 'Save unavailable.' })
+    expect(root.querySelector('[role="alert"]')?.textContent).toBe('Save unavailable.')
+    expect(root.querySelector('.toast')).toBeNull()
 
     root.querySelector<HTMLButtonElement>('[data-action="editor-exit-save"]')?.click()
     root.querySelector<HTMLButtonElement>('[data-action="editor-exit-save-as"]')?.click()
