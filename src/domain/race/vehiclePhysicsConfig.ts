@@ -248,7 +248,7 @@ export const CAR_PHYSICS_SPECS = {
     mass: 1190,
     wheelbase: 24,
     centerOfMassHeight: 4.7,
-    yawInertia: 145_000,
+    yawInertia: 132_000,
     frontWeightBias: 0.54,
     cornerStiffness: 9.5,
     brakeForce: 125_000,
