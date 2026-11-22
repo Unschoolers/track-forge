@@ -31,6 +31,7 @@ export class NearbyPoseSync {
   constructor(
     private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
     private readonly now: () => number,
+    private readonly observePose?: (slot: number, sequence: number, accepted: boolean, at: number) => void,
   ) {}
 
   get counts() { return { ...this.poseCounts } }
@@ -104,7 +105,8 @@ export class NearbyPoseSync {
         const racer = racers.get(packet.slot)
         if (!racer || racer.left || packet.slot === localSlot) continue
         this.poseCounts.received++
-        racer.ghost.receive(packet, now)
+        const accepted = racer.ghost.receive(packet, now)
+        this.observePose?.(packet.slot, packet.sequence, accepted, now)
       }
       return true
     }
@@ -114,8 +116,11 @@ export class NearbyPoseSync {
       if (!packet || !racer || racer.left || packet.slot === localSlot ||
           (!fromHost && packet.slot !== guestSlot)) return true
       this.poseCounts.received++
-      if (racer.ghost.receive(packet, this.now()) && !fromHost) {
-        this.latestPoses.set(packet.slot, { bytes: new Uint8Array(bytes), receivedAt: this.now() })
+      const now = this.now()
+      const accepted = racer.ghost.receive(packet, now)
+      this.observePose?.(packet.slot, packet.sequence, accepted, now)
+      if (accepted && !fromHost) {
+        this.latestPoses.set(packet.slot, { bytes: new Uint8Array(bytes), receivedAt: now })
         this.poseCounts.relayed++
       }
       return true

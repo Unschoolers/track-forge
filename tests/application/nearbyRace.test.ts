@@ -187,6 +187,23 @@ describe('Nearby Arcade', () => {
       expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
       expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
 
+      // Exports identify the actual race roster and packet quality without
+      // leaking Nearby connection IDs or requiring packet-level logging.
+      const diagnostic = await host.diagnostics()
+      expect(diagnostic).toMatchObject({ version: 2, race: {
+        round: 0, localSlot: 0,
+        track: { id: track.id, name: track.name, lighting: 'night', laps: 2 },
+        players: [
+          { id: 'slot-0', name: 'JulienQC', car: 'blue', icon: 'crown', color: 'gold', local: true },
+          { id: 'slot-1', name: 'Racer 1', car: 'red', icon: 'star', color: 'pink', local: false },
+          { id: 'slot-2', name: 'Racer 2', car: 'green', icon: 'bolt', color: 'violet', local: false },
+          { id: 'slot-3', name: 'Racer 3', car: 'yellow', icon: 'diamond', color: 'lime', local: false },
+        ],
+      } })
+      const hostDiagnostics = diagnostic.race as { players: { receive: { pose: { accepted: number } } }[] }
+      expect(hostDiagnostics.players.slice(1).every(player => player.receive.pose.accepted > 0)).toBe(true)
+      expect(JSON.stringify(diagnostic)).not.toMatch(/guest-1|guest-2|guest-3/)
+
       // Optional progress telemetry distinguishes race progress from pose position.
       const progressState = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2 })
       const progressCars = setups.map(({ car }, index) =>
@@ -222,6 +239,10 @@ describe('Nearby Arcade', () => {
       yellow.close()
       await vi.waitFor(() => expect(green.standings().at(-1)).toMatchObject({ car: 'yellow', left: true }), { interval: 5 })
       expect(green.remotePoses()).toEqual([])
+      const afterLeave = (await host.diagnostics()).race as { players: { slot: number; left: boolean }[] }
+      expect(afterLeave.players.find(player => player.slot === 3)?.left).toBe(true)
+      host.close()
+      expect((await host.diagnostics()).race).toEqual(afterLeave)
     } finally {
       for (const device of devices) device.destroy()
     }
@@ -477,7 +498,7 @@ describe('Nearby diagnostics', () => {
     race.host({ track, laps: 1, lighting: 'day', car: 'blue' })
     await vi.waitFor(() => expect(race.snapshot().phase).toBe('idle'))
     const report = await race.diagnostics()
-    expect(report).toMatchObject({ version: 1, role: 'host', phase: 'idle',
+    expect(report).toMatchObject({ version: 2, role: 'host', phase: 'idle',
       lastFailure: { source: 'host', phase: 'opening', error: 'Error' }, native: { status: 'failed' } })
     expect(JSON.stringify(report)).not.toContain('secret')
     expect(JSON.stringify(report)).not.toContain('endpoint-123')

@@ -6,6 +6,7 @@ import { raceProgress } from '@/domain/race/ranking'
 import { decodeProgress, Packet, RemoteGhost } from './raceWire'
 import { NearbyProgressSync } from './nearbyProgressSync'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
+import { NearbyNetworkTelemetry } from './nearbyNetworkTelemetry'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
@@ -70,6 +71,9 @@ export class NearbyRace {
   private sharePacked: Promise<Uint8Array[]> | null = null
   private readonly timeline: Record<string, unknown>[] = []
   private diagnosticStart = 0
+  private diagnosticStartedAtUtc: string | null = null
+  private networkTelemetry = new NearbyNetworkTelemetry()
+  private lastRaceDiagnostics: Record<string, unknown> | null = null
   private lastFailure: Record<string, unknown> | null = null
   private static readonly TIMELINE_LIMIT = 100
   private generation = 0
@@ -102,7 +106,8 @@ export class NearbyRace {
     private readonly validateTrack: (track: Track) => boolean,
     private readonly now = () => performance.now(),
   ) {
-    this.poseSync = new NearbyPoseSync((ids, bytes) => transport.send(ids, bytes), this.now)
+    this.poseSync = new NearbyPoseSync((ids, bytes) => transport.send(ids, bytes), this.now,
+      (slot, sequence, accepted, at) => this.networkTelemetry.recordPose(slot, sequence, accepted, at))
     this.progressSync = new NearbyProgressSync((ids, bytes) => transport.send(ids, bytes), this.now)
     this.unsubscribe = transport.subscribe((event) => this.onEvent(event))
   }
@@ -127,7 +132,9 @@ export class NearbyRace {
 
   async diagnostics(): Promise<Record<string, unknown>> {
     const report: Record<string, unknown> = {
-      version: 1,
+      version: 2,
+      exportedAtUtc: new Date().toISOString(),
+      startedAtUtc: this.diagnosticStartedAtUtc,
       role: this.role,
       phase: this.phase,
       counts: this.diagnosticCounts(),
@@ -135,6 +142,7 @@ export class NearbyRace {
       poseCounts: this.poseSync.counts,
       progressSendFailures: this.progressSync.failedSends,
       targetPoseHz: this.poseSync.targetPoseHz,
+      race: this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics,
       lastFailure: this.lastFailure && { ...this.lastFailure },
     }
     if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
@@ -246,6 +254,11 @@ export class NearbyRace {
     const first = this.snapshot().canStart
     const rematch = this.canRematch()
     if ((!first && !rematch) || !this.course) return
+    // Save the previous circuit before switching to the next cup track.
+    if (rematch) {
+      this.clearRound()
+      this.round = (this.round + 1) & 0xffff
+    }
     if (rematch && this.cupTotal > 0) {
       const next = this.cupTracks[this.cupIndex + 1]
       if (!next) return
@@ -255,10 +268,6 @@ export class NearbyRace {
     }
     const course = this.course
     const active = this.generation
-    if (rematch) {
-      this.round = (this.round + 1) & 0xffff
-      this.clearRound()
-    }
     this.setPhase('preparing')
     this.armTimeout('A player did not load the track in time.')
     void this.prepareGuests(course, active, first).catch((error: unknown) => {
@@ -267,6 +276,8 @@ export class NearbyRace {
   }
 
   private clearRound(): void {
+    this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
+    this.networkTelemetry = new NearbyNetworkTelemetry()
     this.ready.clear()
     this.armed.clear()
     this.racers.clear()
@@ -498,10 +509,10 @@ export class NearbyRace {
       const packet = decodeProgress(bytes)
       const racer = packet && this.racers.get(packet.slot)
       if (packet && racer && packet.slot !== this.slot && !racer.left &&
-          racer.time === undefined && (fromHost || guestSlot === packet.slot) &&
-          this.progressSync.receive(packet) && !fromHost) {
-        const recipients = this.endpoints(id)
-        this.progressSync.relay(bytes, recipients)
+          racer.time === undefined && (fromHost || guestSlot === packet.slot)) {
+        const accepted = this.progressSync.receive(packet)
+        this.networkTelemetry.recordProgress(packet.slot, packet.sequence, accepted, this.now())
+        if (accepted && !fromHost) this.progressSync.relay(bytes, this.endpoints(id))
       }
       return
     }
@@ -728,6 +739,9 @@ export class NearbyRace {
   private begin(phase: Phase): number {
     this.timeline.length = 0
     this.diagnosticStart = this.now()
+    this.diagnosticStartedAtUtc = new Date().toISOString()
+    this.lastRaceDiagnostics = null
+    this.networkTelemetry = new NearbyNetworkTelemetry()
     this.lastFailure = null
     this.poseSync.resetCounts()
     this.error = null
@@ -770,6 +784,7 @@ export class NearbyRace {
   }
 
   private reset(error: string | null): void {
+    this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.generation++
     this.clearTimeout()
     this.course = null
@@ -804,6 +819,54 @@ export class NearbyRace {
     this.progressSync.reset()
     this.error = error
     this.setPhase('idle')
+  }
+
+  /** Materialize diagnostics only when exported or leaving a race. Never in the render loop. */
+  private captureRaceDiagnostics(): Record<string, unknown> | null {
+    if (this.purpose !== 'race' || (!this.course && !this.racers.size && !this.ready.size)) return null
+    const now = this.now()
+    const slots = new Set<number>([this.slot])
+    for (const slot of this.guests.values()) slots.add(slot)
+    if (this.role === 'guest' && this.hostId) slots.add(0)
+    for (const slot of this.racers.keys()) slots.add(slot)
+    const streams = this.networkTelemetry.snapshot(now, this.diagnosticStart)
+    const readyBySlot = new Map<number, { car: CarId; identity: PlayerIdentity; name?: string }>()
+    for (const [endpoint, slot] of this.guests) {
+      const ready = this.ready.get(endpoint)
+      if (ready) readyBySlot.set(slot, ready)
+    }
+    return {
+      round: this.round, cupIndex: this.cupTotal ? this.cupIndex : null,
+      elapsedMs: Math.round(Math.max(0, now - this.diagnosticStart)),
+      localSlot: this.slot,
+      track: this.course ? {
+        id: this.course.track.id, name: this.course.track.name,
+        revision: this.course.track.raceRevision ?? null,
+        routeKind: normalizeRouteKind(this.course.track.routeKind),
+        pointCount: this.course.track.points?.length ?? null,
+        trackShapeValid: Array.isArray(this.course.track.points),
+        lighting: this.course.lighting, laps: this.course.laps,
+      } : null,
+      players: [...slots].sort((a, b) => a - b).map(slot => {
+        const racer = this.racers.get(slot)
+        const prepared = readyBySlot.get(slot)
+        const local = slot === this.slot
+        const identity = racer?.identity ?? prepared?.identity ?? (local ? this.localIdentity : null)
+        return {
+          id: `slot-${slot}`, slot, local,
+          // A slot is stable across devices within a race. Raw Nearby endpoint
+          // identifiers and pairing codes are intentionally not exported.
+          connectionRole: local ? 'local' : slot === 0 ? 'host' : 'guest',
+          name: racer?.name ?? prepared?.name ?? (local ? this.localDisplayName : undefined) ?? null,
+          car: racer?.ghost.car ?? prepared?.car ?? (local ? (this.role === 'host' ? this.course?.car ?? this.localCar : this.localCar) : null),
+          icon: identity?.icon ?? null, color: identity?.color ?? null,
+          finishedSeconds: racer?.time ?? null,
+          finished: typeof racer?.time === 'number',
+          left: racer?.left ?? false,
+          receive: streams[slot],
+        }
+      }),
+    }
   }
 
   private armTimeout(message: string): void {

@@ -19,6 +19,8 @@ it('offers a diagnostic download after Nearby hosting fails and allows retrying 
   const track = { name: 'Diagnostic circuit' } as Parameters<NearbyRace['host']>[0]['track']
   nearby.host({ track, laps: 1, lighting: 'day', car: 'blue' })
   await vi.waitFor(() => expect(nearby.snapshot().error).toBe('Could not host a nearby room.'))
+  // Even a malformed test/legacy circuit must not make the failure report crash.
+  expect((await nearby.diagnostics()).race).toMatchObject({ track: { pointCount: null, trackShapeValid: false } })
 
   const download = vi.fn<() => Promise<boolean>>()
     .mockRejectedValueOnce(new Error('Storage unavailable'))
