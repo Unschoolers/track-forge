@@ -103,6 +103,7 @@ Successful main-branch pushes and manual main builds sign and publish the APK
 itself as a versioned [GitHub Release](https://github.com/Unschoolers/track-forge/releases)
 asset. [Download the latest APK directly](https://github.com/Unschoolers/track-forge/releases/latest/download/trackforge-debug.apk).
 Release downloads require no Actions ZIP and have no 30-day artifact expiry.
+In **Options → Updates**, Android automatically forgets and removes a saved APK download once the installed app is at that release version or newer. Merely opening the installer does not discard the download, so canceled installs remain retryable.
 Re-running compilation creates a new version. Re-running only signing/publication
 reuses the original verified build identity and is idempotent; it does not label
 an old APK as a newer attempt. Older builds cannot replace a newer build as the
