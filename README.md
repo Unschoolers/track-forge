@@ -63,8 +63,9 @@ npm run build
 npm run preview
 ```
 
-The original `trackforge.html` remains as a migration reference and is not loaded
-by the Vite application.
+The original single-file game is preserved in Git history at commit `fde57030fd9a481ce1d8bdac7c200b851675c8ab` (`trackforge.html`).
+It is not part of the maintained Vite application; use `git show fde57030fd9a481ce1d8bdac7c200b851675c8ab:trackforge.html`
+if historical implementation details are needed.
 
 Run `npm run qa:lanes` for fast, deterministic AI path checks without graphics.
 Open `qa/results/lanes/report.html` for dot trails and failure locations. See
