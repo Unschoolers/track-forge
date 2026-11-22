@@ -202,6 +202,33 @@ describe('DomUiHost', () => {
     expect(root.querySelector('[aria-label="Brake"]')).not.toBeNull()
   })
 
+  it('offers explicit Save, Save As, Discard and Cancel actions when leaving editor', () => {
+    const { root, port, update } = setup('editor')
+    update({ ...snapshot('editor'), overlay: { type: 'editor-exit' } })
+    expect(root.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Unsaved track changes')
+
+    root.querySelector<HTMLButtonElement>('[data-action="editor-exit-save"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="editor-exit-save-as"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="editor-exit-discard"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="editor-exit-cancel"]')?.click()
+    expect(vi.mocked(port.dispatch).mock.calls.map(([command]) => command)).toEqual([
+      { type: 'resolve-editor-exit', choice: 'save' },
+      { type: 'resolve-editor-exit', choice: 'save-as' },
+      { type: 'resolve-editor-exit', choice: 'discard' },
+      { type: 'resolve-editor-exit', choice: 'cancel' },
+    ])
+
+    update({ ...snapshot('editor'), overlay: {
+      type: 'track-name', purpose: 'save-as', returnTo: { type: 'editor-exit' },
+    } })
+    const input = root.querySelector<HTMLInputElement>('#track-name-input')
+    expect(input?.value).toBe('Starter Circuit Copy')
+    if (!input) throw new Error('Missing Save As name input')
+    input.value = 'My new circuit'
+    root.querySelector<HTMLButtonElement>('[data-action="save-name"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'save-as-track', name: 'My new circuit' })
+  })
+
   it('unsubscribes and removes UI on destroy', () => {
     const { root, host, port } = setup()
     host.destroy()
