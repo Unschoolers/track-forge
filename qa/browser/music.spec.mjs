@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
 
-const menuTrack = /\/clubb-menu(?:-[^/]+)?\.mp3$/
-const raceTrack = /\/clubb-race(?:-[^/]+)?\.mp3$/
+const menuTrack = /\/main-menu(?:-[^/]+)?\.mp3$/
+const raceTrack = /\/grass-race(?:-[^/]+)?\.mp3$/
 
 async function observeMusic(page) {
   await page.addInitScript(() => {
@@ -70,8 +70,9 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
 })
 
 for (const [environmentId, soundtrack] of [
-  ['cityscape', /\/City(?:-[^/]+)?\.mp3$/],
-  ['desert', /\/Desert(?:-[^/]+)?\.mp3$/],
+  ['cityscape', /\/cityscape-race(?:-[^/]+)?\.mp3$/],
+  ['desert', /\/desert-race(?:-[^/]+)?\.mp3$/],
+  ['kids-room', /\/kids-room-race(?:-[^/]+)?\.mp3$/],
 ]) {
   test(`plays the ${environmentId} soundtrack during a race and its pause menu`, async ({ page }) => {
     const music = await observeMusic(page)
