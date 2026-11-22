@@ -524,7 +524,7 @@ export class NearbyRace {
         if (this.rooms.delete(event.id)) this.changed()
         break
       case 'pairing': {
-        // Guests explicitly select the room; the host admits up to three peers
+        // Guests explicitly select the room; the host admits up to seven peers
         // without an extra per-device match-code prompt.
         const incomingGuest = this.phase === 'hosting' &&
           !this.pendingPairs.has(event.id) && !this.guests.has(event.id) &&
@@ -549,7 +549,8 @@ export class NearbyRace {
           this.setPhase('waiting')
           if (this.purpose === 'share') this.sendControl([event.id], { type: 'share-ready' })
         } else if (this.phase === 'hosting') {
-          const slot = [1, 2, 3].find((candidate) => ![...this.guests.values()].includes(candidate))
+          const slot = Array.from({ length: MAX_PLAYERS - 1 }, (_, index) => index + 1)
+            .find(candidate => ![...this.guests.values()].includes(candidate))
           if (slot !== undefined) this.guests.set(event.id, slot)
           this.sendShareToReadyPeer(event.id)
           this.changed()
@@ -687,9 +688,12 @@ export class NearbyRace {
 
   private startHost(): void {
     if (!this.course || this.phase !== 'preparing') return
-    const cars: (CarId | null)[] = [this.course.car, null, null, null]
-    const identities: (PlayerIdentity | null)[] = [this.localIdentity, null, null, null]
-    const names: (string | null)[] = [this.localDisplayName ?? null, null, null, null]
+    const cars: (CarId | null)[] = Array(MAX_PLAYERS).fill(null)
+    const identities: (PlayerIdentity | null)[] = Array(MAX_PLAYERS).fill(null)
+    const names: (string | null)[] = Array(MAX_PLAYERS).fill(null)
+    cars[0] = this.course.car
+    identities[0] = this.localIdentity
+    names[0] = this.localDisplayName ?? null
     for (const [id, slot] of this.guests) {
       const guest = this.ready.get(id)
       if (!guest) return
@@ -702,7 +706,7 @@ export class NearbyRace {
     const occupied = [0, ...this.guests.values()].sort((a, b) => a - b)
     const shuffled = randomGridPositions(occupied.length, () =>
       (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32)
-    const positions: (number | null)[] = [null, null, null, null]
+    const positions: (number | null)[] = Array(MAX_PLAYERS).fill(null)
     occupied.forEach((slot, index) => { positions[slot] = shuffled[index]! })
     this.stage(this.course, cars, identities, positions, names)
     this.sendControl([...this.guests.keys()], { type: 'lineup', cars, identities, positions, round: this.round,

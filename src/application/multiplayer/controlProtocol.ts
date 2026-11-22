@@ -1,12 +1,12 @@
 import { CAR_IDS, type CarId, type LightingMode } from '@/domain/model'
-import { START_GRID_SIZE } from '@/domain/race/startGrid'
+import { NEARBY_START_GRID_SIZE } from '@/domain/race/startGrid'
 import { isPlayerIdentity, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { Packet } from '@/application/multiplayer/raceWire'
 import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
-export const MAX_PLAYERS = START_GRID_SIZE
+export const MAX_PLAYERS = NEARBY_START_GRID_SIZE
 /** Breaking change to compact pose/progress epochs. Enforce before any race starts. */
-export const NEARBY_WIRE_PROTOCOL_VERSION = 2
+export const NEARBY_WIRE_PROTOCOL_VERSION = 3
 const MAX_CONTROL_BYTES = 1024
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()

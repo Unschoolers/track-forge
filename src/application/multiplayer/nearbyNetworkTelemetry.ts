@@ -1,3 +1,5 @@
+import { WIRE_PLAYER_COUNT } from './raceWire'
+
 /**
  * Fixed-size, allocation-free-on-receive Nearby telemetry.
  * Sequence jumps show missing samples, not necessarily radio packet loss:
@@ -73,8 +75,8 @@ class StreamStats {
 
 /** Collect only counters/timestamps on receive; allocate detailed JSON on explicit export. */
 export class NearbyNetworkTelemetry {
-  private readonly poses = Array.from({ length: 4 }, () => new StreamStats())
-  private readonly progress = Array.from({ length: 4 }, () => new StreamStats())
+  private readonly poses = Array.from({ length: WIRE_PLAYER_COUNT }, () => new StreamStats())
+  private readonly progress = Array.from({ length: WIRE_PLAYER_COUNT }, () => new StreamStats())
 
   recordPose(slot: number, sequence: number, accepted: boolean, at: number): void {
     this.poses[slot]?.record(sequence, accepted, at)

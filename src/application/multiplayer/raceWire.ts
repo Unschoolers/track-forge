@@ -7,11 +7,12 @@ export const PROGRESS_BYTES = 8
 export const PROGRESS_PERIOD_MS = 150
 export const POSE_SEQUENCE_MASK = 0xffff
 export const POSE_RECOVERY_MASK = 0xff
-/** Five unused header bits isolate in-flight packets across rematches for up to
- * 32 concurrent round epochs without growing the 19-byte/8-byte payloads.
+/** Four header bits isolate in-flight packets across rematches for up to
+ * 16 round epochs while reserving three bits for eight player slots.
  * Old clients understand round zero; later rounds require this protocol version.
  */
-export const WIRE_ROUND_MASK = 31
+export const WIRE_ROUND_MASK = 15
+export const WIRE_PLAYER_COUNT = 8
 
 function roundBits(round: number): number {
   if (!Number.isInteger(round) || round < 0 || round > 65_535) {
@@ -48,7 +49,7 @@ export interface ProgressPacket {
 
 export function encodeProgress(slot: number, sequence: number, progress: number, round = 0): Uint8Array {
   const epoch = roundBits(round)
-  if (!Number.isInteger(slot) || slot < 0 || slot > 3 ||
+  if (!Number.isInteger(slot) || slot < 0 || slot >= WIRE_PLAYER_COUNT ||
       !Number.isInteger(sequence) || sequence < 0 || sequence > POSE_SEQUENCE_MASK ||
       !Number.isFinite(progress) || Math.abs(progress) > 10_000_000) {
     throw new RangeError('Invalid nearby race progress.')
@@ -56,7 +57,7 @@ export function encodeProgress(slot: number, sequence: number, progress: number,
   const bytes = new Uint8Array(PROGRESS_BYTES)
   const view = new DataView(bytes.buffer)
   bytes[0] = Packet.Progress
-  bytes[1] = slot | (epoch << 2)
+  bytes[1] = slot | (epoch << 3)
   view.setUint16(2, sequence, true)
   view.setFloat32(4, progress, true)
   return bytes
@@ -69,7 +70,7 @@ export function decodeProgress(bytes: Uint8Array): ProgressPacket | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const progress = view.getFloat32(4, true)
   if (!Number.isFinite(progress) || Math.abs(progress) > 10_000_000) return null
-  return { slot: header & 3, round: (header >> 2) & WIRE_ROUND_MASK,
+  return { slot: header & 7, round: (header >> 3) & WIRE_ROUND_MASK,
     sequence: view.getUint16(2, true), progress }
 }
 
@@ -97,7 +98,7 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
   const pose = captureGhost(vehicle, 0)
   // DataView silently converts NaN to zero and wraps integer overflow.
   // Validate once, before allocating the high-frequency network packet.
-  if (!Number.isInteger(slot) || slot < 0 || slot > 3 ||
+  if (!Number.isInteger(slot) || slot < 0 || slot >= WIRE_PLAYER_COUNT ||
       !Number.isInteger(sequence) || sequence < 0 || sequence > POSE_SEQUENCE_MASK ||
       !Number.isInteger(recovery) || recovery < 0 || recovery > POSE_RECOVERY_MASK ||
       !Number.isFinite(pose.angle)) {
@@ -109,7 +110,7 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
   const bytes = new Uint8Array(POSE_BYTES)
   const view = new DataView(bytes.buffer)
   bytes[0] = Packet.Pose
-  bytes[1] = slot | (pose.structureRunId === null ? 0 : 4) | (epoch << 3)
+  bytes[1] = slot | (pose.structureRunId === null ? 0 : 8) | (epoch << 4)
   bytes[2] = recovery
   view.setUint16(3, sequence, true)
   view.setInt32(5, x, true)
@@ -124,8 +125,8 @@ export function decodePose(bytes: Uint8Array): PosePacket | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const flags = view.getUint8(1)
   return {
-    slot: flags & 3,
-    round: flags >> 3,
+    slot: flags & 7,
+    round: flags >> 4,
     sequence: view.getUint16(3, true),
     recovery: view.getUint8(2),
     pose: {
@@ -133,14 +134,14 @@ export function decodePose(bytes: Uint8Array): PosePacket | null {
       y: view.getInt32(9, true) / SCALE,
       z: view.getInt32(13, true) / SCALE,
       angle: view.getUint16(17, true) * TURN / 65536,
-      structureRunId: flags & 4 ? 'elevated' : null,
+      structureRunId: flags & 8 ? 'elevated' : null,
     },
   }
 }
 
 /** One host broadcast containing the latest unique slot positions. */
 export function encodePoseBatch(packets: readonly Uint8Array[]): Uint8Array {
-  if (!packets.length || packets.length > 4) throw new RangeError('Invalid nearby pose batch size.')
+  if (!packets.length || packets.length > WIRE_PLAYER_COUNT) throw new RangeError('Invalid nearby pose batch size.')
   const bytes = new Uint8Array(1 + packets.length * POSE_BYTES)
   const slots = new Set<number>()
   let round: number | undefined
@@ -159,7 +160,7 @@ export function encodePoseBatch(packets: readonly Uint8Array[]): Uint8Array {
 
 export function decodePoseBatch(bytes: Uint8Array): PosePacket[] | null {
   if (bytes[0] !== Packet.PoseBatch || bytes.length < POSE_BYTES + 1 ||
-      bytes.length > 1 + 4 * POSE_BYTES || (bytes.length - 1) % POSE_BYTES !== 0) return null
+      bytes.length > 1 + WIRE_PLAYER_COUNT * POSE_BYTES || (bytes.length - 1) % POSE_BYTES !== 0) return null
   const packets: PosePacket[] = []
   const slots = new Set<number>()
   let round: number | undefined

@@ -5,7 +5,7 @@ export interface NearbyCupFinish {
   readonly left: boolean
 }
 
-const CUP_POINTS = [10, 6, 4, 2] as const
+const CUP_POINTS = [10, 8, 6, 5, 4, 3, 2, 1] as const
 
 /** Pure scoring step; null means at least one peer has not finished or left. */
 export function awardNearbyCupRound(

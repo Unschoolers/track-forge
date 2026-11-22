@@ -1,4 +1,5 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import { MAX_PLAYERS } from '@/application/multiplayer/controlProtocol'
 import type { RaceResult } from '@/application/race/raceSession'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 import { CAR_SPECS } from '@/domain/config'
@@ -26,7 +27,7 @@ export function createNearbyRaceModal(
   const { phase, purpose, room, track, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const cup = nearby.snapshot().cup
   const frame = createModalFrame(cup ? 'Nearby Cup' : 'Nearby Race',
-    room ?? (cup ? `Cup · ${cup.total} tracks · Up to 4 players` : 'Arcade · Up to 4 players'),
+    room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : 'Arcade · Up to ${MAX_PLAYERS} players'),
     actions.close, 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
@@ -51,7 +52,7 @@ export function createNearbyRaceModal(
       break
     case 'hosting': {
       frame.body.append(element('p', 'modal-subtitle',
-        `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/3 nearby friends${cup ? ` · Cup 1/${cup.total}` : ''}`))
+        `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/${MAX_PLAYERS - 1} nearby friends${cup ? ` · Cup 1/${cup.total}` : ''}`))
       if (purpose === 'share') {
         frame.body.append(element('p', 'modal-subtitle',
           `${sharedCount} friend${sharedCount === 1 ? '' : 's'} saved the track. Keep this screen open to share with more devices.`))
