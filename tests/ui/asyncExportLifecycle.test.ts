@@ -64,6 +64,24 @@ describe('async UI export teardown', () => {
     expect(root.childElementCount).toBe(0)
   })
 
+  it('ignores an export from a previous mount after the same host is remounted', async () => {
+    let finish: ((value: boolean) => void) | undefined
+    vi.mocked(exportTrack).mockImplementationOnce(() =>
+      new Promise(resolve => { finish = resolve }))
+    const { root, host } = setup()
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-export"]')
+    if (!exportButton) throw new Error('Editor export button missing')
+    exportButton.click()
+
+    host.destroy()
+    host.mount()
+    finish?.(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(root.textContent).not.toContain('Track file saved.')
+    host.destroy()
+  })
+
   it('still displays a success notice when the host is mounted', async () => {
     vi.mocked(exportTrack).mockResolvedValueOnce(true)
     const { root, host } = setup()
