@@ -33,7 +33,6 @@ export class GroundTextureRenderer {
     const last = tiles.at(-1)
     const key = first && last ? `${environmentId}:${night}:${first.x},${first.y}:${last.x},${last.y}` : `${environmentId}:${night}:fallback`
     if (this.key === key) return
-    this.key = key
     tiles.forEach((tile, index) => {
       const textureKey = ensureGroundTexture(this.scene.textures, environmentId, tile.variant, night)
       let image = this.images[index]
@@ -46,5 +45,8 @@ export class GroundTextureRenderer {
       image.setVisible(true)
     })
     for (let i = tiles.length; i < this.images.length; i++) this.images[i]?.setVisible(false)
+    // Commit only after all textures and images were updated. If a GPU or
+    // texture failure interrupts rendering, retry the same window next frame.
+    this.key = key
   }
 }
