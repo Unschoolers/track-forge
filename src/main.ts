@@ -5,6 +5,7 @@ import { createAndroidNearby } from '@/infrastructure/multiplayer/androidNearby'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
+import { handleAndroidBack } from '@/application/androidBackNavigation'
 import { audioVolumes, musicGain, type AudioVolumeSetting } from '@/application/audioVolume'
 import { createApplication } from '@/app/createApplication'
 import { AppController, type Scheduler } from '@/application/appController'
@@ -169,6 +170,17 @@ sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
 application.start()
+
+// Android sends system Back through this cancelable event. When game navigation
+// handles it, preventDefault suppresses the native exit confirmation.
+const onAndroidBack = (event: Event): void => {
+  if (handleAndroidBack(controller.snapshot(), (command) => controller.dispatch(command))) {
+    event.preventDefault()
+  }
+}
+if (Capacitor.isNativePlatform()) {
+  window.addEventListener('trackforge:android-back', onAndroidBack)
+}
 // No online account exists yet: the first local launch establishes a persistent
 // player display name, reused when creating or crediting tracks.
 if (!controller.snapshot().preferences.displayName) {
@@ -184,9 +196,16 @@ const stopSceneSync = controller.subscribe((snapshot) => {
 // The QA bridge exists only on the Vite dev server with ?qa.
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
   const qaWindow = window as Window & {
-    __trackForgeQa?: { snapshot: () => unknown; advanceRace: (seconds: number) => void }
+    __trackForgeQa?: {
+      snapshot: () => unknown
+      advanceRace: (seconds: number) => void
+      pauseRace: () => void
+      resumeRace: () => void
+    }
   }
   qaWindow.__trackForgeQa = {
+    pauseRace: () => raceSession.setPaused(true),
+    resumeRace: () => raceSession.setPaused(false),
     advanceRace: (seconds) => {
       if (!Number.isFinite(seconds) || seconds < 0 || seconds > 20) throw new Error('Invalid QA race interval')
       const { setup } = raceSession.snapshot()
@@ -226,6 +245,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
               paused: race.paused,
               vehicleCount: race.vehicles.length,
               ghostVisible: Boolean(raceSession.snapshot().ghost),
+              vehicles: race.vehicles.map((vehicle) => ({
+                car: vehicle.car, player: vehicle.player, x: vehicle.x, y: vehicle.y,
+                z: vehicle.z, structureRunId: vehicle.structureRunId,
+              })),
               player: player
                 ? {
                     speed: player.speed,
@@ -236,6 +259,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
                     damage: player.damage,
                     wrecked: player.wrecked,
                     grounded: player.grounded,
+                    z: player.z,
+                    pathIndex: player.pathIndex,
+                    structureRunId: player.structureRunId,
+                    angle: player.angle,
                     surface: player.currentSurface,
                   }
                 : null,
@@ -296,6 +323,7 @@ window.addEventListener('trackforge:resume', () => {
 window.addEventListener(
   'beforeunload',
   () => {
+    window.removeEventListener('trackforge:android-back', onAndroidBack)
     stopSceneSync()
     controller.destroy()
     application.destroy()

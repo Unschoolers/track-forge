@@ -4,11 +4,11 @@
 
 Kids' Room is a visual environment ID, not a new road or terrain physics mode.
 
-- **Ground:** deterministic pre-baked carpet tiles with subtle woven fibers, day/night palettes and existing maximum tile budgets.
+- **Ground:** royal-blue carpet with deterministic, pre-baked woven yarn loops, shaded pile and cross-weave. The editor, race and flyover use the same ground tiles, blue palette and existing maximum tile budgets.
 - **Scenery:** six placeable toys (alphabet blocks, teddy bear, crayons, picture book, dinosaur, spinning top) using the existing scenery codec, selection, collision and culling pipelines.
-- **Hills:** warm layered carpet folds using the existing slope and plateau mesh. Their authored height and road grade remain unchanged.
+- **Hills:** raised blue carpet folds with deeper navy slope shading using the existing slope and plateau mesh. Their authored height and road grade remain unchanged.
 - **Water:** orange spilled juice with amber highlights, a wet edge and the existing water hazard/recovery rules. Saved terrain cells still use the normal water terrain kind; no schema migration.
-- **Road skins:** street looks like a toy-road mat, dirt like cardboard, and ice like glossy molded plastic. Only color/marking materials change; speed, grip and AI still read the original physics.
+- **Road skins:** street has stitched toy-road-mat seams; dirt shows cardboard fibers and panel seams; ice has directional shiny molded-plastic reflections. Decorative marks anchor to world path distance, not the camera or culling chunks, and use the same pure stroke generator for Phaser and flyover. Only color/marking materials change; speed, grip and AI still read the original physics.
 
 The editor, race and flyover must present the same palette and the same deterministic toy silhouettes. Existing grass, city and desert styles are unchanged.
 

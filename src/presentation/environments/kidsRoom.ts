@@ -12,26 +12,26 @@ const rectangle = (x: number, y: number, width: number, height: number, color: n
 export const KIDS_ROOM_ENVIRONMENT: TrackEnvironmentDefinition = {
   label: "Kids' Room",
   day: {
-    editorGround: '#b6a899',
-    raceGround: '#b6a899',
-    flyoverGround: '#b9aa9c',
-    hillSlope: 0x998678,
-    hillPlateau: 0xc8b5a4,
-    flyoverHill: '#c8b5a4',
-    shorelineLand: 0xbb9a79,
+    editorGround: '#2651b1',
+    raceGround: '#2651b1',
+    flyoverGround: '#2651b1',
+    hillSlope: 0x173c91,
+    hillPlateau: 0x426ac1,
+    flyoverHill: '#426ac1',
+    shorelineLand: 0xc78b49,
     waterFill: 0xd99036,
     waterRipple: 0xffcf74,
     waterShoreline: 0xf4be65,
     flyoverWater: '#d99036',
   },
   night: {
-    editorGround: '#423e47',
-    raceGround: '#423e47',
-    flyoverGround: '#47424b',
-    hillSlope: 0x4b4653,
-    hillPlateau: 0x665965,
-    flyoverHill: '#665965',
-    shorelineLand: 0x907053,
+    editorGround: '#122858',
+    raceGround: '#122858',
+    flyoverGround: '#122858',
+    hillSlope: 0x0c1d43,
+    hillPlateau: 0x263e79,
+    flyoverHill: '#263e79',
+    shorelineLand: 0x805a3d,
     waterFill: 0x80501f,
     waterRipple: 0xc99050,
     waterShoreline: 0xba8349,
@@ -99,23 +99,45 @@ export const KIDS_ROOM_ENVIRONMENT: TrackEnvironmentDefinition = {
     ]),
   },
   groundArt: (variant, night) => {
-    // Fine, softly varied woven threads baked once per tile and lighting mode.
-    // Small marks avoid competing with the actual track or miniature props.
+    // Pre-bake directional yarn pile rather than sprinkling a few dots on
+    // a flat fill. The same bounded tile art is used by editor, race and flyover.
     const shapes: SceneryPrimitive[] = []
-    const light = night ? 0x91848f : 0xe7d4bc
-    const dark = night ? 0x1d2833 : 0x88796e
-    for (let index = 0; index < 36; index += 1) {
-      const x = ((index * 79 + variant * 31) % 252) + 2
-      const y = ((index * 53 + variant * 47) % 252) + 2
-      shapes.push(ellipse(x, y, 1.2 + (index % 3), 3.5 + (index % 4), index % 3 === 0 ? dark : light, night ? 0.14 : 0.19))
+    const fiberLight = night ? 0x6181c5 : 0x9fc8ff
+    const fiberMid = night ? 0x36579d : 0x5d8fe9
+    const fiberDark = night ? 0x06142f : 0x153888
+    const hash = (seed: number) => {
+      let value = Math.imul(seed ^ Math.imul(variant + 1, 0x9e3779b1), 0x85ebca6b)
+      value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35)
+      return (value ^ (value >>> 16)) >>> 0
     }
-    // Barely perceptible weave bands give the carpet some directional pile.
-    for (let band = 0; band < 3; band += 1) {
-      const y = 24 + band * 86
-      shapes.push(rectangle(0, y, 256, 2, dark))
-      // Tint is applied with the alpha-aware scenery contract below.
-      const last = shapes[shapes.length - 1]
-      if (last) shapes[shapes.length - 1] = { ...last, alpha: 0.035 }
+    // Broad nap variations show at race zoom; they remain blue, never sandy.
+    for (let patch = 0; patch < 7; patch += 1) {
+      const seed = hash(patch + 2901)
+      const x = seed & 255
+      const y = (seed >>> 8) & 255
+      shapes.push(ellipse(x, y, 28 + ((seed >>> 16) % 36), 14 + ((seed >>> 21) % 21),
+        patch % 2 ? fiberDark : fiberLight, night ? 0.045 : 0.06))
+    }
+    // Fine lengthwise loops and alternating shade mimic short woven carpet
+    // fibers. Geometry is deterministic and drawn only once per tile variant.
+    for (let index = 0; index < 520; index += 1) {
+      const seed = hash(index + 19)
+      const x = seed & 255
+      const y = (seed >>> 8) & 255
+      const length = 2.5 + ((seed >>> 16) % 6)
+      const width = 0.8 + ((seed >>> 23) % 3) * 0.45
+      const color = index % 5 === 0 ? fiberDark : index % 3 === 0 ? fiberLight : fiberMid
+      shapes.push(ellipse(x, y, width, length, color, night ? 0.20 : 0.28))
+    }
+    // Very subtle regular cross-weave sells the material without a tile grid.
+    for (let row = 0; row < 32; row += 1) {
+      for (let column = 0; column < 16; column += 1) {
+        const seed = hash(800 + row * 16 + column)
+        const x = column * 16 + (row % 2) * 5 + ((seed >>> 6) % 5)
+        const y = row * 8 + ((seed >>> 15) % 3)
+        shapes.push(ellipse(x, y, 3.2, 0.8, row % 3 === 0 ? fiberDark : fiberLight,
+          night ? 0.095 : 0.11))
+      }
     }
     return shapes
   },

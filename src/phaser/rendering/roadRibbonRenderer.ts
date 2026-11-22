@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -19,6 +20,8 @@ export type UpdateRoadRibbonVisibility = (view: GroundViewport, paddedViewport?:
 
 export interface RoadRibbonQuad {
   readonly surface: SurfaceId
+  readonly from: RoadRibbonSample['center']
+  readonly to: RoadRibbonSample['center']
   readonly edge: readonly [Vector2, Vector2, Vector2, Vector2]
   readonly road: readonly [Vector2, Vector2, Vector2, Vector2]
 }
@@ -39,6 +42,8 @@ export function buildRoadRibbonQuads(
     if (!current || !next) continue
     quads.push({
       surface: current.surface,
+      from: current.center,
+      to: next.center,
       edge: [
         current.edgeLeft,
         next.edgeLeft,
@@ -81,6 +86,15 @@ function renderRoadRibbonPass(
       previous = quad.surface
     }
     fillQuad(graphics, quad[pass])
+  }
+  if (pass === 'road' && environmentId === 'kids-room') {
+    // Pre-baked surface detail stays inside the same road chunk/culling pass.
+    for (const quad of quads) {
+      for (const stroke of kidsRoomRoadStrokes(quad.surface, quad.from, quad.to, night)) {
+        graphics.lineStyle(stroke.width, stroke.color, stroke.alpha)
+        graphics.lineBetween(stroke.start.x, stroke.start.y, stroke.end.x, stroke.end.y)
+      }
+    }
   }
 }
 

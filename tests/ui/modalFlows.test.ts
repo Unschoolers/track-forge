@@ -239,6 +239,26 @@ describe('modal application flows', () => {
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: ready.id })
   })
 
+  it('only keeps one track overflow menu open at a time', () => {
+    const { root } = setup(state({ type: 'track-library', purpose: 'edit' }))
+    const menus = [...root.querySelectorAll<HTMLDetailsElement>('.track-card-overflow')]
+    expect(menus).toHaveLength(2)
+    const first = menus[0]
+    const second = menus[1]
+    if (!first || !second) throw new Error('Expected two track action menus')
+
+    first.querySelector('summary')?.click()
+    expect(first.open).toBe(true)
+    second.querySelector('summary')?.click()
+    expect(first.open).toBe(false)
+    expect(second.open).toBe(true)
+    first.querySelector('summary')?.click()
+    expect(first.open).toBe(true)
+    expect(second.open).toBe(false)
+    first.querySelector('summary')?.click()
+    expect(first.open).toBe(false)
+  })
+
   it('shows favorite tracks first and labels environment colors without affecting modified dates', () => {
     const favorites = { ...state({ type: 'track-library', purpose: 'edit' }),
       preferences: { ...preferences, favoriteTrackIds: [ready.id] } }
