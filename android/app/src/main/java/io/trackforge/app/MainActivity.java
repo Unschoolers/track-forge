@@ -1,6 +1,6 @@
 package io.trackforge.app;
 
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.os.Bundle;
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.splashscreen.SplashScreen;
@@ -10,7 +10,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    private AlertDialog exitDialog;
+    private Dialog exitDialog;
     private boolean backEvaluationPending;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,14 +79,18 @@ public class MainActivity extends BridgeActivity {
     private void showExitConfirmation() {
         if (isFinishing() || isDestroyed() || (exitDialog != null && exitDialog.isShowing())) return;
 
-        exitDialog = new AlertDialog.Builder(this)
-            .setTitle("Exit Track Forge?")
-            .setMessage("Are you sure you want to leave the game?")
-            .setNegativeButton("Stay", (dialog, which) -> dialog.dismiss())
-            .setPositiveButton("Exit", (dialog, which) -> finish())
-            .create();
+        exitDialog = TrackForgeExitDialog.create(this, this::finish);
         exitDialog.setOnDismissListener(dialog -> exitDialog = null);
         exitDialog.show();
+    }
+
+    @Override
+    public void onDestroy() {
+        if (exitDialog != null) {
+            exitDialog.dismiss();
+            exitDialog = null;
+        }
+        super.onDestroy();
     }
 
     private void enterImmersiveMode() {
