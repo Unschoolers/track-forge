@@ -110,7 +110,7 @@ test.describe('Rally editor zoom', () => {
     await expectClearRoad(page, road)
     // The saved Rally course is longer than the manual map-editing span.
     // Fit may frame it more widely, but normal zoom-out must not encourage extending it.
-    expect(fit.zoom).toBeLessThan(844 / 15_000)
+    expect(fit.zoom).toBeLessThan(844 / 25_000)
     await useViewAction(page, 'Zoom out')
     const first = await readCamera(page)
     expect(first).toEqual(fit)
@@ -216,7 +216,7 @@ test.describe('Rally editor zoom', () => {
     const panned = await readCamera(page)
     // A two-finger move can change both center and scale; this route remains
     // beyond the manual editing span, so zoom-out must hold the chosen scale.
-    expect(panned.zoom).toBeLessThan(844 / 15_000)
+    expect(panned.zoom).toBeLessThan(844 / 25_000)
     await useViewAction(page, 'Zoom out', 'tap')
     const overview = await readCamera(page)
     expect(overview.zoom).toBe(panned.zoom)
@@ -392,7 +392,7 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     await useViewAction(page, 'Zoom out')
     await useViewAction(page, 'Zoom out')
     const zoomed = await readCamera(page)
-    const floor = Math.max(width, height) / 15_000
+    const floor = Math.max(width, height) / 25_000
     expect(zoomed.zoom).toBeCloseTo(Math.max(camera.zoom / (1.2 ** 2), Math.min(camera.zoom, floor)))
     await expectClearRoad(page, outline)
     const after = await captureRoad()
