@@ -49,7 +49,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     }
   })
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-  await page.getByRole('button', { name: 'EDIT', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit Elevated Road Edit', exact: true }).click()
   const work = () => page.evaluate(() => window.roadEditWork)
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
@@ -117,7 +117,7 @@ test('can drag the same starter control point twice, then tap for point controls
   await page.goto('/?qa')
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-  await page.getByRole('button', { name: 'EDIT', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit Starter Circuit', exact: true }).click()
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
   await expect.poll(async () => (await read()).camera).not.toBeNull()
   await page.locator('summary.editor-toolbox-summary').click()
