@@ -8,6 +8,7 @@ import {
 } from '@/application/library/trackName'
 import type { Track, TrackId } from '@/domain/model'
 import { isSeededTrack, type TrackCreator } from '@/domain/track/trackCreator'
+import { allocateUniqueTrackName } from '@/application/library/uniqueTrackName'
 import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
@@ -65,14 +66,10 @@ export class TrackLibraryService {
     // A shared track is always a copy. Never overwrite the sender's or
     // receiver's existing circuit, scores or best-time ghosts.
     const now = this.dependencies.now()
-    let name = source.name.slice(0, 32)
-    let number = 2
-    while (this.dependencies.trackStore.list().some(
-      (item) => item.name.toLowerCase() === name.toLowerCase(),
-    )) {
-      const suffix = ` (${number++})`
-      name = source.name.slice(0, 32 - suffix.length) + suffix
-    }
+    const name = allocateUniqueTrackName(
+      source.name,
+      this.dependencies.trackStore.list().map(track => track.name),
+    )
     const track: Track = {
       ...source, id: this.dependencies.createId(), name, origin: 'imported',
       createdAt: now, updatedAt: now, raceRevision: now,
@@ -122,13 +119,10 @@ export class TrackLibraryService {
   forkSeededForEdit(source: Track, creator?: TrackCreator): TrackMutationResult {
     if (!isSeededTrack(source)) return { ok: false, message: 'Not a built-in track.' }
     const now = this.dependencies.now()
-    const baseName = source.name.slice(0, 32)
-    let name = baseName
-    let number = 2
-    while (this.dependencies.trackStore.list().some((track) => track.name.toLowerCase() === name.toLowerCase())) {
-      const suffix = ` (${number++})`
-      name = baseName.slice(0, 32 - suffix.length) + suffix
-    }
+    const name = allocateUniqueTrackName(
+      source.name,
+      this.dependencies.trackStore.list().map(track => track.name),
+    )
     // Omit the seeded creator instead of accidentally inheriting system credit.
     const { creator: systemCreator, ...sourceWithoutCreator } = source
     void systemCreator
