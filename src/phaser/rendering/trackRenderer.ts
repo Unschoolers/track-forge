@@ -39,6 +39,7 @@ export function renderRecoveryCheckpoints(
   graphics: Phaser.GameObjects.Graphics,
   path: RoadPath,
   checkpoints: readonly number[],
+  editorZoom?: number,
 ): void {
   const count = path.points.length
   for (const index of checkpoints) {
@@ -49,11 +50,20 @@ export function renderRecoveryCheckpoints(
     if (length < 0.001) continue
     const x = -(after.y - point.y) / length * ROAD_GEOMETRY.checkpointHalfWidth
     const y = (after.x - point.x) / length * ROAD_GEOMETRY.checkpointHalfWidth
-    graphics.lineStyle(7, 0x66d9ff, 1)
+    graphics.lineStyle(editorZoom ? 5 / editorZoom : 7, 0x66d9ff, 1)
     graphics.beginPath()
     graphics.moveTo(point.x - x, point.y - y)
     graphics.lineTo(point.x + x, point.y + y)
     graphics.strokePath()
+    if (editorZoom) {
+      const scale = 1 / Math.max(0.01, editorZoom)
+      graphics.fillStyle(0x112c3d, 1)
+      graphics.fillCircle(point.x, point.y, 8 * scale)
+      graphics.lineStyle(2 * scale, 0x66d9ff, 1)
+      graphics.strokeCircle(point.x, point.y, 8 * scale)
+      graphics.fillStyle(0xf4f7fb, 1)
+      graphics.fillCircle(point.x, point.y, 3.5 * scale)
+    }
   }
 }
 

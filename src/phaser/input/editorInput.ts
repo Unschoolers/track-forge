@@ -153,6 +153,7 @@ export class EditorInputController {
   private selectedPoint = -1
   private selectionStart: PointerSample | undefined
   private selectionDragging = false
+  private checkpointGesture: { start: PointerSample; mark: number | undefined; dragging: boolean } | undefined
   private drawStartIndex = 0
   private pendingDrawStart: { screen: Vector2; world: Vector2 } | undefined
   private sceneryGesture: SceneryGesture | undefined
@@ -260,6 +261,9 @@ export class EditorInputController {
     if (pointer.id === this.activePointer && this.sceneryGesture) {
       this.updateSceneryGesture(pointer)
     }
+    if (pointer.id === this.activePointer && this.gestureTool === 'checkpoint' && !this.navigating) {
+      this.finishCheckpointGesture(pointer)
+    }
     this.releasePointer(pointer.id, true)
   }
 
@@ -294,6 +298,7 @@ export class EditorInputController {
     if (this.activePointer === undefined) return
     this.terrainStroke = undefined
     this.sceneryGesture = undefined
+    this.checkpointGesture = undefined
     this.pendingDrawStart = undefined
     if (this.gestureTool === 'select') {
       if (this.selectedPoint >= 0) this.dependencies.onPointSelected?.(null)
@@ -362,6 +367,7 @@ export class EditorInputController {
     this.selectionDragging = false
     this.drawStartIndex = 0
     this.pendingDrawStart = undefined
+    this.checkpointGesture = undefined
   }
 
   zoomBy(delta: number): void {
@@ -633,6 +639,67 @@ export class EditorInputController {
     }
   }
 
+
+  private beginCheckpointGesture(pointer: PointerSample, world: Vector2): void {
+    const path = this.dependencies.path?.()
+    if (!path || path.totalLength <= 0) return
+    const sampleCount = path.closed ? path.points.length : path.points.length - 1
+    const grabRadius = 16 / this.dependencies.camera.zoom
+    const mark = this.dependencies.editor().recoveryCheckpoints
+      .map(ratio => {
+        const point = path.points[Math.min(path.points.length - 1, Math.round(ratio * sampleCount))]
+        return { ratio, distance: point ? Math.hypot(point.x - world.x, point.y - world.y) : Infinity }
+      })
+      .filter(candidate => candidate.distance <= grabRadius)
+      .sort((a, b) => a.distance - b.distance)[0]?.ratio
+    this.checkpointGesture = { start: pointer, mark, dragging: false }
+  }
+
+  private updateCheckpointGesture(pointer: PointerSample): void {
+    const gesture = this.checkpointGesture
+    if (!gesture || gesture.mark === undefined) return
+    if (!gesture.dragging &&
+        Math.hypot(pointer.x - gesture.start.x, pointer.y - gesture.start.y) < SELECTION_DRAG_SCREEN_PIXELS) return
+    gesture.dragging = true
+    const path = this.dependencies.path?.()
+    if (!path || !path.totalLength) return
+    const samples = path.closed ? path.points.length : path.points.length - 1
+    const previousIndex = Math.round(gesture.mark * samples)
+    const world = this.worldPosition(pointer)
+    const nearby = nearestPathPoint(path, world, previousIndex, 80)
+    const nearest = nearby && nearby.distance <= ROAD_GEOMETRY.onRoadRadius + 10 / this.dependencies.camera.zoom
+      ? nearby : nearestPathPoint(path, world)
+    if (!nearest || nearest.distance > ROAD_GEOMETRY.onRoadRadius + 10 / this.dependencies.camera.zoom ||
+        !isSafeRoadRecoverySample(path, nearest.index)) return
+    const to = nearest.point.distance / path.totalLength
+    if (to === gesture.mark || to >= 1 || this.dependencies.editor().recoveryCheckpoints
+      .some(mark => mark !== gesture.mark && Math.abs(mark - to) * path.totalLength < 18)) return
+    this.dependencies.dispatch({ type: 'move-recovery-checkpoint', from: gesture.mark, to })
+    gesture.mark = to
+  }
+
+  private finishCheckpointGesture(pointer: PointerSample): void {
+    const gesture = this.checkpointGesture
+    if (!gesture) return
+    this.updateCheckpointGesture(pointer)
+    if (gesture.dragging) return
+    if (gesture.mark !== undefined) {
+      this.dependencies.dispatch({ type: 'toggle-recovery-checkpoint', ratio: gesture.mark })
+      return
+    }
+    if (Math.hypot(pointer.x - gesture.start.x, pointer.y - gesture.start.y) >= SELECTION_DRAG_SCREEN_PIXELS) return
+    const path = this.dependencies.path?.()
+    if (!path || !path.totalLength) return
+    const nearest = nearestPathPoint(path, this.worldPosition(pointer))
+    if (!nearest || nearest.distance > ROAD_GEOMETRY.onRoadRadius + 10 / this.dependencies.camera.zoom ||
+        !isSafeRoadRecoverySample(path, nearest.index)) return
+    const ratio = nearest.point.distance / path.totalLength
+    if (ratio < 1 && !this.dependencies.editor().recoveryCheckpoints
+      .some(mark => Math.abs(mark - ratio) * path.totalLength < 18)) {
+      this.dependencies.dispatch({ type: 'toggle-recovery-checkpoint', ratio })
+    }
+  }
+
   private applyTool(
     pointer: PointerSample,
     phase: 'down' | 'move',
@@ -683,22 +750,10 @@ export class EditorInputController {
           }
         }
         break
-      case 'checkpoint': {
-        if (phase !== 'down') break
-        const path = this.dependencies.path?.()
-        if (!path || path.totalLength <= 0) break
-        const zoom = this.dependencies.camera.zoom
-        const nearest = nearestPathPoint(path, world)
-        if (!nearest || nearest.distance > ROAD_GEOMETRY.onRoadRadius + 10 / zoom) break
-        const ratio = nearest.point.distance / path.totalLength
-        const existing = this.dependencies.editor().recoveryCheckpoints.find(mark =>
-          Math.abs(mark - ratio) * path.totalLength <= Math.min(18, 10 / zoom),
-        )
-        if (existing !== undefined || (ratio < 1 && isSafeRoadRecoverySample(path, nearest.index))) {
-          this.dependencies.dispatch({ type: 'toggle-recovery-checkpoint', ratio: existing ?? ratio })
-        }
+      case 'checkpoint':
+        if (phase === 'down') this.beginCheckpointGesture(pointer, world)
+        else this.updateCheckpointGesture(pointer)
         break
-      }
       case 'select':
         if (phase === 'down') {
           const editor = this.dependencies.editor()
