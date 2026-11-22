@@ -54,6 +54,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
   const draft = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor.controlPoints)
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
+  const initiallySaved = await saved()
   await expect.poll(async () => (await work()).redraws).toBeGreaterThan(0)
   const expectEditWork = async (before) => {
     const after = await work()
@@ -109,7 +110,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     await expect.poll(async () => (await draft())[4].x).toBe(control.x)
     await expectEditWork(before)
     // No storage writes should occur for a gesture or its Undo.
-    expect(await saved()).toEqual(points)
+    expect(await saved()).toEqual(initiallySaved)
     await page.getByRole('button', { name: 'Save track', exact: true }).click()
     expect(await saved()).toEqual(await draft())
   } finally {
