@@ -227,6 +227,11 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
           trees: app.editor.trees.length,
           history: app.editor.history.length,
           gestureActive: app.editor.gestureStart !== null,
+          // QA-only draft content: inspect edits without implicitly saving them.
+          controlPoints: app.editor.points,
+          scenery: app.editor.scenery,
+          recoveryCheckpoints: app.editor.recoveryCheckpoints,
+          environmentId: app.editor.environmentId,
         },
         camera: sceneHost.editorCameraSnapshot(),
         controls: { ...raceControls.snapshot() },
@@ -303,7 +308,6 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => {
   sceneHost.setRacePreparationForeground(false)
   music.setForeground(false)
-  controller.flushPendingEditorSave()
 })
 window.addEventListener('pageshow', syncForeground)
 window.addEventListener('trackforge:pause', () => {

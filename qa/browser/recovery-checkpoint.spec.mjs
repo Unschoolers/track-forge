@@ -27,6 +27,11 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
     canvas.x + canvas.width / 2 + (400 - camera.x) * camera.zoom,
     canvas.y + canvas.height / 2 - camera.y * camera.zoom,
   )
+  // Verify the checkpoint in the draft before persisting it explicitly.
+  await expect.poll(async () =>
+    page.evaluate(() => window.__trackForgeQa.snapshot().editor.recoveryCheckpoints.length),
+  ).toBe(1)
+  await page.getByRole('button', { name: 'Save track', exact: true }).click()
   const marks = () => page.evaluate(trackId =>
     JSON.parse(localStorage.getItem('trackforge-library-v2'))
       .find(track => track.id === trackId)?.recoveryCheckpoints, id)

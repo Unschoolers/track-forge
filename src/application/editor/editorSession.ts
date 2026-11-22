@@ -1,6 +1,8 @@
 import type { TrackStore } from '@/application/ports/storage'
 import { applyEditorCommand, type EditorCommand, type EditorState } from '@/domain/editor/editorState'
-import type { Track, TrackId } from '@/domain/model'
+import { normalizeRouteKind, type Track, type TrackId } from '@/domain/model'
+import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
+import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
 export interface Scheduler {
   schedule(delayMs: number, task: () => void): () => void
@@ -11,9 +13,6 @@ type EditorEdit =
   | { readonly editor: EditorState; readonly track?: Track }
 
 export class EditorSession {
-  private cancelTimer: (() => void) | undefined
-  private pendingSave = false
-  private saveGeneration = 0
   private gestureRevision: {
     readonly trackId: TrackId
     readonly start: NonNullable<EditorState['gestureStart']>
@@ -22,7 +21,7 @@ export class EditorSession {
 
   constructor(
     private readonly trackStore: Pick<TrackStore, 'save'>,
-    private readonly scheduler: Scheduler,
+    _scheduler: Scheduler,
     private readonly now: () => number,
   ) {}
 
@@ -74,34 +73,30 @@ export class EditorSession {
     return { editor, track: updatedTrack }
   }
 
-  get hasPendingSave(): boolean {
-    return this.pendingSave
-  }
-
-  queueSave(flush: () => void): void {
-    this.stopTimer()
-    this.pendingSave = true
-    const generation = this.saveGeneration
-    this.cancelTimer = this.scheduler.schedule(120, () => {
-      if (generation === this.saveGeneration) flush()
-    })
-  }
-
+  /** Only deliberate Save/Save As actions write an editor draft. */
   save(track: Track | null): boolean {
-    this.stopTimer()
-    this.pendingSave = !track || !this.trackStore.save(track)
-    return !this.pendingSave
+    return !!track && this.trackStore.save(track)
+  }
+
+  /** Compare editable content, not timestamps: undo back to the saved state is clean. */
+  isDirty(draft: Track | null, saved: Track | undefined): boolean {
+    if (!draft || !saved) return false
+    const content = (track: Track): string => JSON.stringify({
+      name: track.name,
+      points: track.points,
+      trees: track.trees,
+      start: track.start ?? { ratio: 0, reversed: false },
+      terrain: track.terrain ?? EMPTY_TERRAIN,
+      routeKind: normalizeRouteKind(track.routeKind),
+      recoveryCheckpoints: track.recoveryCheckpoints ?? [],
+      environmentId: track.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
+      scenery: track.scenery ?? [],
+    })
+    return content(draft) !== content(saved)
   }
 
   discardPendingSave(): void {
-    this.stopTimer()
-    this.pendingSave = false
     this.gestureRevision = null
   }
 
-  private stopTimer(): void {
-    this.cancelTimer?.()
-    this.cancelTimer = undefined
-    this.saveGeneration++
-  }
 }

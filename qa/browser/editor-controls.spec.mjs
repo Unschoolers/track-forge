@@ -104,6 +104,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
   const readTrack = () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('trackforge-library-v2')).find(track => track.id === 'environment-qa'),
   )
+  const readDraft = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor)
   async function enterEditor() {
     await page.goto('/?qa')
     await enterTrackForge(page)
@@ -133,32 +134,35 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
   try {
     await touch(pointer, 'touchStart', [a])
     await releaseTouches(pointer)
-    await expect.poll(async () => (await readTrack()).scenery).toHaveLength(1)
-    const [placed] = (await readTrack()).scenery
+    await expect.poll(async () => (await readDraft()).scenery).toHaveLength(1)
+    const [placed] = (await readDraft()).scenery
     expect(placed.kind).toBe('city-bus-stop')
     await touch(pointer, 'touchStart', [a])
     await touch(pointer, 'touchMove', [b])
     await releaseTouches(pointer)
-    await expect.poll(async () => (await readTrack()).scenery[0]?.x).not.toBe(placed.x)
-    const moved = (await readTrack()).scenery
+    await expect.poll(async () => (await readDraft()).scenery[0]?.x).not.toBe(placed.x)
+    const moved = (await readDraft()).scenery
     expect(moved).toHaveLength(1)
     expect(moved[0].x - placed.x).toBeCloseTo((b.x - a.x) / camera.zoom, 1)
     expect(moved[0].y - placed.y).toBeCloseTo((b.y - a.y) / camera.zoom, 1)
 
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
-    await expect.poll(async () => (await readTrack()).scenery).toEqual([placed])
+    await expect.poll(async () => (await readDraft()).scenery).toEqual([placed])
     await page.getByRole('button', { name: 'Redo', exact: true }).click()
-    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
+    await expect.poll(async () => (await readDraft()).scenery).toEqual(moved)
     await setEnvironment('Desert')
     await expect(page.locator('[data-scenery-kind="desert-cactus"]')).toBeVisible()
     await expect(page.locator('[data-scenery-kind="city-bus-stop"]')).toHaveCount(0)
-    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
+    await expect.poll(async () => (await readDraft()).scenery).toEqual(moved)
     await setEnvironment('Cityscape')
+    // All in-editor changes must remain drafts until this explicit save.
+    expect((await readTrack()).scenery).toEqual([])
     await page.getByRole('button', { name: 'Save track', exact: true }).click()
+    expect((await readTrack()).scenery).toEqual(moved)
 
     await enterEditor()
     await expect.poll(async () => (await readTrack()).environmentId).toBe('cityscape')
-    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
+    await expect.poll(async () => (await readDraft()).scenery).toEqual(moved)
     await page.getByRole('button', { name: 'Race', exact: true }).click()
     const track = page.getByRole('button', { name: 'Race Environment QA', exact: true })
     // Biome identity is now a compact dot; map previews must remain transparent.
