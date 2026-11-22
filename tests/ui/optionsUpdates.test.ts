@@ -66,6 +66,7 @@ describe('home update shortcut', () => {
     const tab = overlay.querySelector('[data-action="options-tab-updates"]')
     expect(tab?.getAttribute('aria-selected')).toBe('true')
     await vi.waitFor(() => expect(overlay.querySelector('[data-action="download-update"]')).not.toBeNull())
+    expect(overlay.querySelector('[data-action="download-update"]')?.classList.contains('button-primary')).toBe(true)
     expect(overlay.textContent).toContain('New version available: android-build-999-1')
     expect(overlay.querySelector('[data-options-tab="updates"]')?.getAttribute('hidden')).toBeNull()
   })
