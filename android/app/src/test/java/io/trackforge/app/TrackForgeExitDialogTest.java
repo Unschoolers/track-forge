@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(manifest = Config.NONE, sdk = 35)
+@Config(sdk = 35)
 public class TrackForgeExitDialogTest {
     @Test public void stayDismissesWithoutQuitting() {
         Activity activity = Robolectric.buildActivity(Activity.class).setup().get();
