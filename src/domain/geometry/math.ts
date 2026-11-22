@@ -6,6 +6,11 @@ export const clamp = (value: number, minimum: number, maximum: number): number =
 export const distance = (left: Vector2, right: Vector2): number =>
   Math.hypot(right.x - left.x, right.y - left.y)
 
+/** Normalize an angular error to a signed shortest turn in radians. */
+export function wrapAngleRadians(angle: number): number {
+  return Math.atan2(Math.sin(angle), Math.cos(angle))
+}
+
 export function catmullRom(
   p0: Vector2,
   p1: Vector2,

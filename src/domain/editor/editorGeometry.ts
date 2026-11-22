@@ -1,6 +1,6 @@
 import type { SceneryProp } from '@/domain/track/trackEnvironment'
 import { TERRAIN_LIMITS, WORLD_ELEVATION } from '@/domain/config'
-import { distance } from '@/domain/geometry/math'
+import { distance, wrapAngleRadians } from '@/domain/geometry/math'
 import type {
   SurfaceId,
   TerrainMap,
@@ -135,10 +135,6 @@ export function finalizeDrawGesture(
   return [...prefix, ...normalized]
 }
 
-function wrapAngle(angle: number): number {
-  return Math.atan2(Math.sin(angle), Math.cos(angle))
-}
-
 export function surfaceForIndex(
   surface: EditorSurface,
   index: number,
@@ -174,7 +170,7 @@ export function appendDrawPoint(
       position.y - last.y,
       position.x - last.x,
     )
-    const turn = Math.abs(wrapAngle(nextAngle - firstAngle))
+    const turn = Math.abs(wrapAngleRadians(nextAngle - firstAngle))
     const deviation = pointLineDistance(last, previous, position)
     const combined = distance(previous, position)
     if (
