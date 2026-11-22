@@ -208,7 +208,7 @@ export function planTerrainPaint(
   positions: readonly TerrainCellCoordinate[],
   kind: TerrainBrushKind,
 ): TerrainPaintPlan {
-  if (kind !== 'ground' && !terrainKind(kind)) {
+  if (positions.length === 0 || (kind !== 'ground' && !terrainKind(kind))) {
     return { ok: true, terrain, changedCells: [] }
   }
 
