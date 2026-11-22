@@ -29,6 +29,25 @@ export function validCupLineup(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length <= MAX_CUP_ROUNDS &&
     value.every(id => typeof id === 'string' && id.length > 0 && id.length <= 120)
 }
+/** Immutable cup-lineup edit rules; invalid requests never alter the current lineup. */
+export function removeCupTrack(lineup: readonly string[], index: number): string[] | null {
+  if (!Number.isInteger(index) || index < 0 || index >= lineup.length) return null
+  return lineup.filter((_, current) => current !== index)
+}
+
+export function moveCupTrack(lineup: readonly string[], index: number, direction: -1 | 1): string[] | null {
+  const target = index + direction
+  if ((direction !== -1 && direction !== 1) || !Number.isInteger(index) ||
+      index < 0 || target < 0 || index >= lineup.length || target >= lineup.length) return null
+  const updated = [...lineup]
+  const selected = updated[index]
+  const displaced = updated[target]
+  if (selected === undefined || displaced === undefined) return null
+  updated[index] = displaced
+  updated[target] = selected
+  return updated
+}
+
 export function cupTrackIds(cup: CircuitCup): readonly string[] {
   return cup.trackIds ?? DEFAULT_CUP_TRACK_IDS
 }

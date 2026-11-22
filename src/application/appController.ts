@@ -2,7 +2,7 @@ import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
+import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 import type {
   CupStore,
   LastRace,
@@ -237,21 +237,14 @@ export class AppController {
         break
       case 'cup-remove-track': {
         if (this.state.overlay.type !== 'cup') break
-        const lineup = [...(this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS)]
-        if (!Number.isInteger(command.index) || command.index < 0 || command.index >= lineup.length) break
-        lineup.splice(command.index, 1)
-        this.setCupLineup(lineup)
+        const lineup = removeCupTrack(this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS, command.index)
+        if (lineup) this.setCupLineup(lineup)
         break
       }
       case 'cup-move-track': {
         if (this.state.overlay.type !== 'cup') break
-        const lineup = [...(this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS)]
-        const next = command.index + command.direction
-        if (!Number.isInteger(command.index) || next < 0 || next >= lineup.length) break
-        const [trackId] = lineup.splice(command.index, 1)
-        if (!trackId) break
-        lineup.splice(next, 0, trackId)
-        this.setCupLineup(lineup)
+        const lineup = moveCupTrack(this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS, command.index, command.direction)
+        if (lineup) this.setCupLineup(lineup)
         break
       }
       case 'start-cup': {
