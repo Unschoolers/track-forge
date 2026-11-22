@@ -72,7 +72,7 @@ export function createEditorContextDock(
   dock.dataset.layout = state.editorUi.tool === 'terrain' ? 'two-row' : 'one-row'
 
   if (state.editorUi.tool === 'checkpoint') {
-    dock.append(createContextRow(element('span', 'label', 'Tap the road to place a checkpoint. Tap a checkpoint to remove it.')))
+    dock.append(createContextRow(element('span', 'label', 'Auto: 1 checkpoint per 10 road points on new tracks. Tap to add/remove; drag a marker to move.')))
     return dock
   }
 

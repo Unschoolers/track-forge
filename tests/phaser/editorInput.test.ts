@@ -771,3 +771,51 @@ describe('EditorInputController', () => {
     expect(editor.history).toHaveLength(1)
   })
 })
+
+
+it('drags a recovery checkpoint to the road and undoes the drag as one gesture', () => {
+  const points = [
+    { x: 0, y: 0, surface: 'street' as const },
+    { x: 1_200, y: 0, surface: 'street' as const },
+  ]
+  let editor = createEditorState(points, [], undefined, undefined, {
+    routeKind: 'point-to-point', recoveryCheckpoints: [0.25],
+  })
+  const geometry = new TrackGeometryService()
+  const input = new EditorInputController({
+    camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'checkpoint', surface: () => 'street',
+    editor: () => editor, path: () => geometry.get(editor).path,
+    dispatch: command => { editor = reduceEditor(editor, command) },
+  })
+  input.pointerDown({ id: 1, x: 300, y: 0 })
+  input.pointerMove({ id: 1, x: 600, y: 0 })
+  input.pointerUp({ id: 1, x: 600, y: 0 })
+  expect(editor.recoveryCheckpoints).toEqual([0.5])
+  expect(editor.history).toHaveLength(1)
+  editor = reduceEditor(editor, { type: 'undo' })
+  expect(editor.recoveryCheckpoints).toEqual([0.25])
+})
+
+it('cancels checkpoint dragging when a second finger begins panning', () => {
+  const points = [
+    { x: 0, y: 0, surface: 'street' as const },
+    { x: 1_200, y: 0, surface: 'street' as const },
+  ]
+  let editor = createEditorState(points, [], undefined, undefined, {
+    routeKind: 'point-to-point', recoveryCheckpoints: [0.25],
+  })
+  const geometry = new TrackGeometryService()
+  const input = new EditorInputController({
+    camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'checkpoint', surface: () => 'street',
+    editor: () => editor, path: () => geometry.get(editor).path,
+    dispatch: command => { editor = reduceEditor(editor, command) },
+  })
+  input.pointerDown({ id: 1, x: 300, y: 0 })
+  input.pointerMove({ id: 1, x: 540, y: 0 })
+  expect(editor.recoveryCheckpoints).toEqual([0.45])
+  input.pointerDown({ id: 2, x: 600, y: 0 })
+  input.pointerUp({ id: 1, x: 540, y: 0 })
+  input.pointerUp({ id: 2, x: 600, y: 0 })
+  expect(editor.recoveryCheckpoints).toEqual([0.25])
+  expect(editor.history).toHaveLength(0)
+})

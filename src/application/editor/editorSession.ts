@@ -42,6 +42,7 @@ export class EditorSession {
       editor.start === savedGesture.start.start && editor.terrain === savedGesture.start.terrain &&
       editor.routeKind === savedGesture.start.routeKind &&
       editor.recoveryCheckpoints === savedGesture.start.recoveryCheckpoints &&
+      editor.autoCheckpoints === savedGesture.start.autoCheckpoints &&
       (!editor.recoveryCheckpoints.length || (editor.environmentId === savedGesture.start.environmentId &&
         editor.scenery === savedGesture.start.scenery))
     if (previous.gestureStart && !editor.gestureStart) this.gestureRevision = null
@@ -51,6 +52,7 @@ export class EditorSession {
       editor.trees !== previous.trees || editor.start !== previous.start ||
       editor.terrain !== previous.terrain || editor.routeKind !== previous.routeKind ||
       editor.recoveryCheckpoints !== previous.recoveryCheckpoints ||
+      editor.autoCheckpoints !== previous.autoCheckpoints ||
       (editor.recoveryCheckpoints.length > 0 && sceneryChanged)
     const contentChanged = raceChanged || sceneryChanged
     if (!contentChanged && !(restoresGesture && previousRevision !== savedGesture.revision)) {
@@ -65,6 +67,7 @@ export class EditorSession {
       terrain: editor.terrain,
       routeKind: editor.routeKind,
       recoveryCheckpoints: editor.recoveryCheckpoints,
+      autoCheckpoints: editor.autoCheckpoints,
       environmentId: editor.environmentId,
       scenery: editor.scenery,
       raceRevision: restoresGesture ? savedGesture.revision : raceChanged ? Math.max(now, previousRevision + 1) : previousRevision,
@@ -89,6 +92,7 @@ export class EditorSession {
       terrain: track.terrain ?? EMPTY_TERRAIN,
       routeKind: normalizeRouteKind(track.routeKind),
       recoveryCheckpoints: track.recoveryCheckpoints ?? [],
+      autoCheckpoints: track.autoCheckpoints ?? false,
       environmentId: track.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
       scenery: track.scenery ?? [],
     })

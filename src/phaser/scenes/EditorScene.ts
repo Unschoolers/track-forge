@@ -604,6 +604,7 @@ export class EditorScene extends Phaser.Scene {
     renderRecoveryCheckpoints(
       this.overlayGraphics, geometry.path,
       resolveRecoveryCheckpoints(geometry.path, snapshot.editor.recoveryCheckpoints),
+      this.editorCamera.zoom,
     )
   }
 

@@ -434,3 +434,48 @@ describe('route kind authoring', () => {
     expect(reduceEditor(circuit, { type: 'normalize-loop' }).points.at(-1)).toMatchObject({ x: 0, y: 0 })
   })
 })
+
+
+describe('automatic checkpoint authoring', () => {
+  const roadPoint = (index: number): TrackPoint => ({ x: index * 100, y: 0, surface: 'street' })
+
+  it('generates one visible checkpoint per ten drawn points and keeps its location as road extends', () => {
+    let editor = createEditorState([], [], undefined, EMPTY_TERRAIN, {
+      routeKind: 'point-to-point', autoCheckpoints: true,
+    })
+    for (let index = 0; index < 9; index += 1) editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(index) })
+    expect(editor.recoveryCheckpoints).toHaveLength(0)
+    editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(9) })
+    expect(editor.recoveryCheckpoints).toHaveLength(1)
+    for (let index = 10; index < 20; index += 1) editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(index) })
+    expect(editor.recoveryCheckpoints).toHaveLength(2)
+    const path = buildRoadPath(editor.points, editor.terrain, undefined, 'point-to-point')
+    const markers = editor.recoveryCheckpoints.map(ratio => path.points.find(point => point.distance >= ratio * path.totalLength)?.x)
+    expect(markers[0]).toBeCloseTo(800, -1)
+    expect(markers[1]).toBeCloseTo(1800, -1)
+  })
+
+  it('preserves removal and manual reposition while continuing to generate new markers', () => {
+    let editor = createEditorState([], [], undefined, EMPTY_TERRAIN, {
+      routeKind: 'point-to-point', autoCheckpoints: true,
+    })
+    for (let index = 0; index < 10; index += 1) editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(index) })
+    const first = editor.recoveryCheckpoints[0]
+    if (first === undefined) throw new Error('Missing generated checkpoint')
+    editor = reduceEditor(editor, { type: 'move-recovery-checkpoint', from: first, to: 0.5 })
+    expect(editor.recoveryCheckpoints).toEqual([0.5])
+    editor = reduceEditor(editor, { type: 'toggle-recovery-checkpoint', ratio: 0.5 })
+    expect(editor.recoveryCheckpoints).toHaveLength(0)
+    for (let index = 10; index < 20; index += 1) editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(index) })
+    expect(editor.recoveryCheckpoints).toHaveLength(1)
+    const restored = reduceEditor(editor, { type: 'undo' })
+    expect(restored.recoveryCheckpoints).toHaveLength(0)
+  })
+
+  it('keeps legacy tracks in manual mode unless auto checkpoint authoring is enabled', () => {
+    let editor = createEditorState([], [], undefined, EMPTY_TERRAIN, { routeKind: 'point-to-point' })
+    for (let index = 0; index < 20; index += 1) editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(index) })
+    expect(editor.autoCheckpoints).toBe(false)
+    expect(editor.recoveryCheckpoints).toEqual([])
+  })
+})

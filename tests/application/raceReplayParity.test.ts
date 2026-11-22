@@ -74,10 +74,10 @@ it('replays a seeded four-car race with the same checkpoint recovery and finish 
   for (const input of inputs) {
     if (input.recoverPlayer) {
       const before = requireFixture(session.snapshot().state?.vehicles.find((vehicle) => vehicle.player))
-      const checkpointIndex = requireFixture(before.recoveryCheckpoint)
+      const contactIndex = requireFixture(before.lastRoadContactIndex)
       session.resetPlayer()
       const after = requireFixture(session.snapshot().state?.vehicles.find((vehicle) => vehicle.player))
-      expect(after.pathIndex).toBe(checkpointIndex)
+      expect(after.pathIndex).toBe(contactIndex)
       expect(after.x).toBeLessThan(before.x)
     }
     session.advance(RACE_TICK_SECONDS, requireFixture(input.controls[playerId]))

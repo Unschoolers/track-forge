@@ -74,6 +74,8 @@ export interface Track {
   readonly terrain: TerrainMap
   readonly start?: TrackStart
   readonly recoveryCheckpoints?: readonly number[]
+  /** New tracks add a checkpoint roughly every ten authored road points. */
+  readonly autoCheckpoints?: boolean
   readonly lighting: LightingMode
   readonly environmentId?: TrackEnvironmentId
   readonly scenery?: readonly SceneryProp[]

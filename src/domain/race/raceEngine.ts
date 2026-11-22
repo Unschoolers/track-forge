@@ -1,7 +1,7 @@
 import type { RandomSource } from '@/domain/race/randomSource'
 import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { solveCollisionFrame } from '@/domain/race/collisions'
-import { reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
+import { lastRoadRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
 import { hitScenery } from '@/domain/race/sceneryCollisions'
 import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
 import type {
@@ -19,7 +19,7 @@ import {
 import { advanceRaceEffects } from '@/domain/race/effects'
 import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
-import { hasVehicleWaterContact } from '@/domain/track/waterExposure'
+import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import { resetRaceVehicle, recoverRacePlayer, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
@@ -242,6 +242,10 @@ function advanceRace(
       updated = { ...updated, pathIndex: context.nearest.index, pathDistance: context.nearest.point.distance,
         recoveryAnchorIndex, recoveryReacquiredIndex }
     }
+    if (updated.player && context.onRoad && updated.grounded && !unrelatedArm &&
+        isSafeRoadRecoverySample(state.path, context.nearest.index)) {
+      updated = { ...updated, lastRoadContactIndex: context.nearest.index }
+    }
     if (usesCheckpoints && previous) {
       const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, onRoadBefore && context.onRoad)
       updated = { ...updated, recoveryCheckpoint: checkpoint }
@@ -331,9 +335,9 @@ function advanceRace(
     }
     const recoverySector = previous?.nextSector ?? vehicle.nextSector
     const pathIndex = vehicle.player
-      ? safeFallbackRecoveryTarget(state, {
+      ? (lastRoadRecoveryTarget(state, vehicle) ?? safeFallbackRecoveryTarget(state, {
           ...vehicle, pathIndex: previous?.pathIndex ?? vehicle.pathIndex, nextSector: recoverySector,
-        })
+        }))
       : findNearestSafeTrackIndex(
           state.path,
           vehicle,

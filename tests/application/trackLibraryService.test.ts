@@ -47,6 +47,7 @@ describe('TrackLibraryService', () => {
         name: 'Midnight Harbor',
         version: 8,
         points: [],
+        autoCheckpoints: true,
         trees: [],
         terrain: { cellSize: 32, cells: [] },
         start: { ratio: 0, reversed: false },

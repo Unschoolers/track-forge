@@ -38,6 +38,22 @@ export function reachedRecoveryCheckpoint(
   return checkpoint
 }
 
+/** The latest physical road support is independent of the checkpoint markers. */
+export function lastRoadRecoveryTarget(course: RecoveryCourse, vehicle: RaceVehicle): number | undefined {
+  if (!vehicle.player) return undefined
+  const index = vehicle.lastRoadContactIndex
+  const { path } = course
+  if (index === undefined || !Number.isInteger(index) || index < 0 || index >= path.points.length ||
+      !isSafeRoadRecoverySample(path, index)) return undefined
+  const count = path.points.length
+  const direction = course.reversed ? -1 : 1
+  const progress = path.closed
+    ? ((direction * (index - course.startPathIndex)) % count + count) % count
+    : index
+  const pendingGate = (path.closed ? count : count - 1) * vehicle.nextSector / 4
+  return progress < pendingGate ? index : undefined
+}
+
 export function authoredRecoveryTarget(course: RecoveryCourse, vehicle: RaceVehicle): number | undefined {
   if (!vehicle.player || !course.recoveryCheckpoints?.length) return undefined
   const index = vehicle.recoveryCheckpoint ?? course.startPathIndex
