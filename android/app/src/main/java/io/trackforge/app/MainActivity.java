@@ -1,6 +1,8 @@
 package io.trackforge.app;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -8,6 +10,8 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private AlertDialog exitDialog;
+    private boolean backEvaluationPending;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
@@ -15,6 +19,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NearbyRacePlugin.class);
         registerPlugin(TrackForgeUpdatesPlugin.class);
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                handleSystemBack();
+            }
+        });
         enterImmersiveMode();
     }
 
@@ -41,6 +51,42 @@ public class MainActivity extends BridgeActivity {
             getBridge().triggerWindowJSEvent("trackforge:pause");
         }
         super.onPause();
+    }
+
+    /**
+     * Android Back navigates the in-game UI first. JavaScript synchronously
+     * prevents the cancelable event when it handled Back; otherwise Android
+     * displays a native confirmation instead of unexpectedly closing the app.
+     */
+    private void handleSystemBack() {
+        if (backEvaluationPending || (exitDialog != null && exitDialog.isShowing())) return;
+
+        if (getBridge() == null || getBridge().getWebView() == null) {
+            showExitConfirmation();
+            return;
+        }
+
+        backEvaluationPending = true;
+        getBridge().getWebView().evaluateJavascript(
+            "(() => { const back = new Event('trackforge:android-back', { cancelable: true }); return !window.dispatchEvent(back); })()",
+            handled -> {
+                backEvaluationPending = false;
+                if (!"true".equals(handled)) showExitConfirmation();
+            }
+        );
+    }
+
+    private void showExitConfirmation() {
+        if (isFinishing() || isDestroyed() || (exitDialog != null && exitDialog.isShowing())) return;
+
+        exitDialog = new AlertDialog.Builder(this)
+            .setTitle("Exit Track Forge?")
+            .setMessage("Are you sure you want to leave the game?")
+            .setNegativeButton("Stay", (dialog, which) -> dialog.dismiss())
+            .setPositiveButton("Exit", (dialog, which) -> finish())
+            .create();
+        exitDialog.setOnDismissListener(dialog -> exitDialog = null);
+        exitDialog.show();
     }
 
     private void enterImmersiveMode() {
