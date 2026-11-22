@@ -10,6 +10,7 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { validateTrack as validateTrackWithGeometry } from '@/domain/track/trackValidation'
 import { analyzeTrack as analyzeTrackWithGeometry } from '@/domain/track/trackDiagnostics'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import { MAX_ROAD_CONTROL_LENGTH, roadControlLength } from '@/domain/track/roadLength'
 import {
   applyEditorCommand,
   createEditorState,
@@ -115,6 +116,34 @@ describe('validateTrack', () => {
 })
 
 describe('oversized saved roads', () => {
+  it('accepts point-to-point races longer than the former 60k cap and rejects additions past 100k', () => {
+    const start: TrackPoint = { x: 0, y: 0, surface: 'street' }
+    const limit: TrackPoint = { x: MAX_ROAD_CONTROL_LENGTH, y: 0, surface: 'street' }
+    const exact = { ...track([start, limit]), routeKind: 'point-to-point' as const }
+    expect(roadControlLength(exact)).toBe(100_000)
+
+    const editor = createEditorState([start], [], undefined, EMPTY_TERRAIN, exact)
+    const accepted = applyEditorCommand(editor, { type: 'add-point', point: limit })
+    expect(accepted.rejection).toBeNull()
+    expect(roadControlLength(accepted.state)).toBe(100_000)
+
+    const extra = applyEditorCommand(accepted.state, {
+      type: 'add-point',
+      point: { x: MAX_ROAD_CONTROL_LENGTH + 1, y: 0, surface: 'street' },
+    })
+    expect(extra.rejection?.code).toBe('road-too-long')
+    expect(extra.state).toBe(accepted.state)
+
+    // This previously produced an empty preview, so also verify the actual
+    // race geometry and readiness of a new long course.
+    const longRace = { ...exact, points: [start, { ...limit, x: 90_000 }] }
+    const path = geometry.get(longRace).path
+    expect(path.points.length).toBeGreaterThan(10_000)
+    expect(path.totalLength).toBeCloseTo(90_000)
+    expect(validateTrackWithGeometry(longRace, path.totalLength).ready).toBe(true)
+  })
+
+
   const loop = closedPoints(21, 'street', 1300)
   loop[20] = { x: 1300, y: 0, surface: 'street' }
   const strayRoad: TrackPoint[] = Array.from({ length: 52 }, (_, index) => ({

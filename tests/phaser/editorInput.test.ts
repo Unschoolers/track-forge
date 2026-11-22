@@ -197,7 +197,7 @@ describe('EditorInputController', () => {
 
   it('clamps wheel and pinch zoom-out to the same road-budget floor', () => {
     const viewport = { width: 390, height: 844 }
-    const floor = 844 / 15_000
+    const floor = 844 / 25_000
     const camera: EditorCamera = { x: 0, y: 0, zoom: 0.08 }
     const input = new EditorInputController({
       camera,

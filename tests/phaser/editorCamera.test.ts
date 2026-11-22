@@ -82,7 +82,7 @@ describe('editor camera', () => {
   it('bounds manual zoom-out by the road budget on both mobile and desktop', () => {
     for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
       const floor = minimumEditorManualZoom(viewport)
-      expect(floor).toBeCloseTo(844 / 15_000)
+      expect(floor).toBeCloseTo(844 / 25_000)
       let camera = { x: 100, y: 200, zoom: 1 }
       for (let i = 0; i < 60; i += 1) {
         camera = applyEditorCameraAction(camera, 'zoom-out', [], viewport)
