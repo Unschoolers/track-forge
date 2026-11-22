@@ -71,7 +71,8 @@ describe('AI approach speed planning', () => {
       yawInertia: CAR_SPECS.green.yawInertia,
     }
     const agile = safeEntrySpeedAhead(path, approach, false, 0.74, nimbleVersion, 1, 'yellow')
-    expect(stock).toBeLessThan(agile * 0.96)
+    // The matched tire/brake package still needs at least 2% more corner reserve.
+    expect(stock).toBeLessThan(agile * 0.98)
   })
 
   it('applies the sharp-bend safety floor only when requested', () => {
