@@ -4,10 +4,6 @@ import { normalizeRouteKind, type Track, type TrackId } from '@/domain/model'
 import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
-export interface Scheduler {
-  schedule(delayMs: number, task: () => void): () => void
-}
-
 type EditorEdit =
   | { readonly rejection: string }
   | { readonly editor: EditorState; readonly track?: Track }
@@ -21,7 +17,6 @@ export class EditorSession {
 
   constructor(
     private readonly trackStore: Pick<TrackStore, 'save'>,
-    _scheduler: Scheduler,
     private readonly now: () => number,
   ) {}
 

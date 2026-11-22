@@ -8,7 +8,7 @@ import { handleBackground } from '@/application/backgroundLifecycle'
 import { handleAndroidBack } from '@/application/androidBackNavigation'
 import { audioVolumes, musicGain, type AudioVolumeSetting } from '@/application/audioVolume'
 import { createApplication } from '@/app/createApplication'
-import { AppController, type Scheduler } from '@/application/appController'
+import { AppController } from '@/application/appController'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
@@ -68,13 +68,6 @@ if (trackStore.list().length === 0) {
   }
 }
 
-const scheduler: Scheduler = {
-  schedule(delayMs, task) {
-    const timer = window.setTimeout(task, delayMs)
-    return () => window.clearTimeout(timer)
-  },
-}
-
 const scoreStore = new BrowserScoreRepository(storage)
 const geometry = new TrackGeometryService()
 const nearbyTransport = createAndroidNearby()
@@ -116,7 +109,6 @@ const controller = new AppController({
   scoreStore,
   lastRaceStore: new BrowserLastRaceRepository(storage),
   preferencesStore: initialPreferences,
-  scheduler,
   raceSession,
   geometry,
 })
