@@ -220,6 +220,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
               paused: race.paused,
               vehicleCount: race.vehicles.length,
               ghostVisible: Boolean(raceSession.snapshot().ghost),
+              vehicles: race.vehicles.map((vehicle) => ({
+                car: vehicle.car, player: vehicle.player, x: vehicle.x, y: vehicle.y,
+                z: vehicle.z, structureRunId: vehicle.structureRunId,
+              })),
               player: player
                 ? {
                     speed: player.speed,
