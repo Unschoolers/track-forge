@@ -227,6 +227,15 @@ describe('Nearby Arcade', () => {
       }, { interval: 5 })
 
 
+      const withTrace = await host.diagnostics()
+      const trace = (withTrace.race as { trace: {
+        frames: { local: { slot: number }; rivals: { slot: number; visible: boolean }[] }[]
+      } }).trace
+      expect(trace.frames.length).toBeGreaterThan(0)
+      expect(trace.frames.at(-1)?.local.slot).toBe(0)
+      expect(trace.frames.at(-1)?.rivals.filter(rival => rival.visible)).toHaveLength(3)
+      expect(JSON.stringify(trace)).not.toMatch(/guest-1|guest-2|guest-3/)
+
       red.finish(40.125)
       host.finish(42)
       time += 50
