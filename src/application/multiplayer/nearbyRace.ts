@@ -829,7 +829,7 @@ export class NearbyRace {
     if (this.role === 'guest' && this.hostId) slots.add(0)
     for (const slot of this.racers.keys()) slots.add(slot)
     const streams = this.networkTelemetry.snapshot(now, this.diagnosticStart)
-    const readyBySlot = new Map<number, (typeof this.ready extends Map<string, infer V> ? V : never)>()
+    const readyBySlot = new Map<number, { car: CarId; identity: PlayerIdentity; name?: string }>()
     for (const [endpoint, slot] of this.guests) {
       const ready = this.ready.get(endpoint)
       if (ready) readyBySlot.set(slot, ready)
@@ -856,10 +856,10 @@ export class NearbyRace {
           // identifiers and pairing codes are intentionally not exported.
           connectionRole: local ? 'local' : slot === 0 ? 'host' : 'guest',
           name: racer?.name ?? prepared?.name ?? (local ? this.localDisplayName : undefined) ?? null,
-          car: racer?.ghost.car ?? prepared?.car ?? (local ? this.localCar : null),
+          car: racer?.ghost.car ?? prepared?.car ?? (local ? (this.role === 'host' ? this.course?.car ?? this.localCar : this.localCar) : null),
           icon: identity?.icon ?? null, color: identity?.color ?? null,
           finishedSeconds: racer?.time ?? null,
-          finished: racer?.time !== undefined && racer.time !== null,
+          finished: typeof racer?.time === 'number',
           left: racer?.left ?? false,
           receive: streams[slot],
         }
