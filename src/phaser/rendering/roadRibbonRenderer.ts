@@ -1,5 +1,6 @@
 import type Phaser from 'phaser'
-import { SURFACE_SPECS } from '@/domain/config'
+import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { RoadRibbonSample } from '@/domain/track/trackGeometry'
@@ -68,6 +69,7 @@ function renderRoadRibbonPass(
   quads: readonly RoadRibbonQuad[],
   pass: 'edge' | 'road',
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
   const colorKey = pass === 'edge'
     ? (night ? 'nightEdge' : 'edge')
@@ -75,7 +77,7 @@ function renderRoadRibbonPass(
   let previous: SurfaceId | undefined
   for (const quad of quads) {
     if (quad.surface !== previous) {
-      graphics.fillStyle(hex(SURFACE_SPECS[quad.surface][colorKey]), 1)
+      graphics.fillStyle(hex(roadColorsForEnvironment(quad.surface, environmentId)[colorKey]), 1)
       previous = quad.surface
     }
     fillQuad(graphics, quad[pass])
@@ -87,10 +89,11 @@ export function renderRoadRibbon(
   path: RoadPath,
   ribbon: readonly RoadRibbonSample[],
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
   const quads = buildRoadRibbonQuads(path, ribbon)
-  renderRoadRibbonPass(graphics, quads, 'edge', night)
-  renderRoadRibbonPass(graphics, quads, 'road', night)
+  renderRoadRibbonPass(graphics, quads, 'edge', night, environmentId)
+  renderRoadRibbonPass(graphics, quads, 'road', night, environmentId)
 }
 
 export function validBounds({ left, top, right, bottom }: WorldBounds): boolean {
@@ -129,6 +132,7 @@ export function renderRaceRoadRibbon(
   path: RoadPath,
   ribbon: readonly RoadRibbonSample[],
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): UpdateRoadRibbonVisibility | undefined {
   if (ribbon.length <= 2 * RIBBON_QUADS_PER_CHUNK) return undefined
   const quads = buildRoadRibbonQuads(path, ribbon)
@@ -138,14 +142,14 @@ export function renderRaceRoadRibbon(
     const batch = quads.slice(index, index + chunkSize)
     const bounds = ribbonChunkBounds(batch)
     const edge = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-    renderRoadRibbonPass(edge, batch, 'edge', night)
+    renderRoadRibbonPass(edge, batch, 'edge', night, environmentId)
     edgeChunks.push({ batch, bounds: validBounds(bounds) ? bounds : undefined, edge })
   }
   // Phaser keeps insertion order within one depth. Paint every edge before
   // any road strip so intersecting sections look the same as the shared renderer.
   const chunks = edgeChunks.map(({ batch, bounds, edge }) => {
     const road = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-    renderRoadRibbonPass(road, batch, 'road', night)
+    renderRoadRibbonPass(road, batch, 'road', night, environmentId)
     return { bounds, edge, road }
   })
 

@@ -1,4 +1,5 @@
-import { ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
+import { ROAD_GEOMETRY } from '@/domain/config'
+import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -241,7 +242,7 @@ export function createRaceFlyoverRenderer(
     for (const edge of [true, false]) {
       for (const section of sections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-        const spec = SURFACE_SPECS[section.a.surface]
+        const spec = roadColorsForEnvironment(section.a.surface, environmentId)
         ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y)
         ctx.lineWidth = edge ? ROAD_GEOMETRY.edgeWidth : ROAD_GEOMETRY.surfaceWidth
         ctx.strokeStyle = edge && section.a.structure === 'overpass' ? (night ? '#aab4b2' : '#f3e9d3') : edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
@@ -253,7 +254,7 @@ export function createRaceFlyoverRenderer(
     ctx.lineWidth = 2
     for (const section of sections) {
       if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-      const spec = SURFACE_SPECS[section.a.surface]
+      const spec = roadColorsForEnvironment(section.a.surface, environmentId)
       ctx.strokeStyle = night ? spec.nightStripe : spec.stripe
       ctx.lineDashOffset = -section.a.distance
       ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y); ctx.stroke()

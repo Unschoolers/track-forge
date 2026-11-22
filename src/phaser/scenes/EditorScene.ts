@@ -405,6 +405,7 @@ export class EditorScene extends Phaser.Scene {
       this.trackGraphics,
       geometry,
       night,
+      snapshot.editor.environmentId,
     )
     renderTrackStartGridPreview(this.trackGraphics, geometry)
     renderBridgeUnderlay(

@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
-import { ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
+import { ROAD_GEOMETRY } from '@/domain/config'
+import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -60,8 +62,9 @@ export function renderTrackGeometry(
   geometry: TrackGeometry,
   night: boolean,
   showGridPreview = false,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
-  renderTrackGeometryBase(graphics, geometry, night)
+  renderTrackGeometryBase(graphics, geometry, night, environmentId)
   renderTrackGeometryStructureUnderlay(graphics, geometry, night)
   if (showGridPreview) {
     renderTrackStartGridPreview(graphics, geometry)
@@ -86,21 +89,23 @@ export function renderTrackGeometryBase(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
-  renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night)
-  renderTrackGeometryMarkings(graphics, geometry, night)
+  renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
+  renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
 }
 
 export function renderRaceTrackGeometryBase(
   scene: Phaser.Scene,
   geometry: TrackGeometry,
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): UpdateRoadRibbonVisibility | undefined {
-  const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night)
+  const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night, environmentId)
   if (!updateVisibility) {
     const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-    renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night)
-    renderTrackGeometryMarkings(graphics, geometry, night)
+    renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
+    renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
     return undefined
   }
 
@@ -146,7 +151,7 @@ export function renderRaceTrackGeometryBase(
   for (let i = 0; i < stripes.length; i += stripeBatchSize) {
     const batch = stripes.slice(i, i + stripeBatchSize)
     addBatch(batch, stripe => [stripe.previous, stripe.current], graphics => {
-      for (const { previous, current } of batch) renderStripe(graphics, previous, current, night)
+      for (const { previous, current } of batch) renderStripe(graphics, previous, current, night, environmentId)
     })
   }
   const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
@@ -173,6 +178,7 @@ function renderTrackGeometryMarkings(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
   const { path } = geometry
   const segmentCount = path.closed
@@ -189,8 +195,8 @@ function renderTrackGeometryMarkings(
   renderTrackMarkers(graphics, geometry, night)
 }
 
-function renderStripe(graphics: Phaser.GameObjects.Graphics, previous: RoadPath['points'][number], current: RoadPath['points'][number], night: boolean): void {
-  const spec = SURFACE_SPECS[previous.surface]
+function renderStripe(graphics: Phaser.GameObjects.Graphics, previous: RoadPath['points'][number], current: RoadPath['points'][number], night: boolean, environmentId: TrackEnvironmentId): void {
+  const spec = roadColorsForEnvironment(previous.surface, environmentId)
   graphics.lineStyle(previous.surface === 'street' ? 2.2 : 1.5, color(night ? spec.nightStripe : spec.stripe), previous.surface === 'street' ? 0.78 : 0.45)
   graphics.beginPath()
   graphics.moveTo(previous.x, previous.y)
