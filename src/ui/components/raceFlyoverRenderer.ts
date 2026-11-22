@@ -61,6 +61,14 @@ export function createRaceFlyoverRenderer(
     const b = points[0]
     if (a && b) sections.push({ a, b })
   }
+  // Flyover frames must only paint. Prepare distance-anchored details once
+  // rather than allocating strokes for every visible section on every frame.
+  const materialSections = environmentId === 'kids-room'
+    ? sections.map((section) => ({
+      ...section,
+      strokes: kidsRoomRoadStrokes(section.a.surface, section.a, section.b, night),
+    }))
+    : []
   const treeStride = Math.max(1, Math.ceil(track.trees.length / 350))
   const trees = track.trees.filter((_, index) => index % treeStride === 0)
 
@@ -253,9 +261,9 @@ export function createRaceFlyoverRenderer(
     // The flyover and Phaser road use identical distance-anchored material
     // strokes, so textures never switch character between preview and race.
     if (environmentId === 'kids-room') {
-      for (const section of sections) {
+      for (const section of materialSections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-        for (const stroke of kidsRoomRoadStrokes(section.a.surface, section.a, section.b, night)) {
+        for (const stroke of section.strokes) {
           ctx.lineWidth = stroke.width
           ctx.strokeStyle = `#${stroke.color.toString(16).padStart(6, '0')}`
           ctx.globalAlpha = stroke.alpha
