@@ -18,8 +18,6 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
-import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
-import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 import { TERRAIN_LIMITS } from '@/domain/config'
 import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 
