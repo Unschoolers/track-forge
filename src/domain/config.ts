@@ -314,6 +314,15 @@ export const AI_OVERTAKE = {
   },
 } as const satisfies Record<DifficultyId, OvertakeSpec>
 
+/** One authority for trailing-rival assist; never tune individual cars by track. */
+export const AI_CATCH_UP = {
+  startGapSeconds: 0.5,
+  fullGapSeconds: 5,
+  initialSpeedBonus: 0.01,
+  maximumSpeedBonus: 0.12,
+  referenceSpeedFloorRatio: 0.5,
+} as const
+
 export const STARTER_TREES: readonly Vector2[] = [
   { x: -245, y: -185 },
   { x: 230, y: -165 },
