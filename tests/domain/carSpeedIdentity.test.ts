@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { CarId } from '@/domain/model'
-import { createRace } from '@/domain/race/raceFactory'
+import { physicsPlayer } from '../support/physicsPlayer'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { decodeTrack } from '@/domain/track/trackCodec'
@@ -34,13 +34,7 @@ function drive(
   handling: 'arcade' | 'simulation',
   seconds: number,
 ): { readonly vehicle: RaceVehicle; readonly distance: number } {
-  const fixture = createRace({
-    path,
-    playerCar: car,
-    difficulty: 'normal',
-    laps: 1,
-  }).vehicles[0]
-  if (!fixture) throw new Error('Missing player on Speed track')
+  const fixture = physicsPlayer(car)
   let vehicle: RaceVehicle = {
     ...fixture,
     x: start.x,
