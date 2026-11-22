@@ -17,16 +17,16 @@ interface RoadColors {
  */
 const KIDS_ROOM_ROADS: Readonly<Record<SurfaceId, RoadColors>> = {
   street: {
-    road: '#637e96', edge: '#e0c9aa', stripe: '#fff2bf',
-    nightRoad: '#344556', nightEdge: '#877c7b', nightStripe: '#e1d3a7',
+    road: '#526d8d', edge: '#d9c29d', stripe: '#ffe5a9',
+    nightRoad: '#2d4361', nightEdge: '#a18e7e', nightStripe: '#f4d4a0',
   },
   dirt: {
-    road: '#b48965', edge: '#e4bd83', stripe: '#f8ddb0',
-    nightRoad: '#69513f', nightEdge: '#a58a69', nightStripe: '#d4b895',
+    road: '#bd946c', edge: '#ebc89c', stripe: '#f8e4c2',
+    nightRoad: '#71583f', nightEdge: '#b89b76', nightStripe: '#e4c8a5',
   },
   ice: {
-    road: '#77ced0', edge: '#dcf7eb', stripe: '#faffdf',
-    nightRoad: '#376e7e', nightEdge: '#8bc4c5', nightStripe: '#d6f5e6',
+    road: '#66bfd6', edge: '#d7f2fa', stripe: '#f6ffff',
+    nightRoad: '#2d668a', nightEdge: '#85c3d7', nightStripe: '#daeffa',
   },
 }
 
