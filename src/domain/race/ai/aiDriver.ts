@@ -223,6 +223,11 @@ export function stepAiVehicle(
     const excessTarget = Math.max(0, cornerTarget - roadSpeed)
     curveSpeed -= bendWeight * (gripReserve + excessTarget)
   }
+  // Passing at the outside edge consumes cornering room. Hold a little
+  // extra reserve in bends instead of assuming the centerline racing pace.
+  if (ai.phase === 'passing') {
+    curveSpeed *= 1 - 0.14 * clamp(bend / 0.12, 0, 1)
+  }
   // A faster straight-line chassis with weak grip needs extra entry margin.
   // Scale braking anticipation by the actual grip deficit and upcoming bend;
   // full speed is still available on straights and no physics cap is added.
