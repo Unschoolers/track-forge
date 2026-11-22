@@ -89,6 +89,9 @@ describe('editor camera', () => {
       }
       expect(camera).toEqual({ x: 100, y: 200, zoom: floor })
       expect(applyEditorCameraAction(camera, 'zoom-out', [], viewport)).toEqual(camera)
+      // A saturated zoom button must not move the camera to the track center.
+      const panned = { ...camera, x: 4_000, y: -3_000 }
+      expect(applyEditorCameraAction(panned, 'zoom-out', [{ x: -1_000, y: 0 }, { x: 1_000, y: 0 }], viewport)).toEqual(panned)
     }
   })
 
