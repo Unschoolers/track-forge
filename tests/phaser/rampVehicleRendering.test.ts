@@ -217,6 +217,50 @@ describe('ramp vehicle rendering', () => {
 		},
 	)
 
+
+  it('keeps the player body on top of overlapping rivals on an elevated deck', () => {
+    const path = buildRoadPath(track.points, track.terrain)
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade' })
+    const index = path.points.findIndex((point, i) =>
+      point.structure === 'overpass' &&
+      path.roadSurface.at(i).structureHeight > 23.99 &&
+      path.roadSurface.at(i + 1).structureHeight > 23.99)
+    expect(index).toBeGreaterThan(0)
+    const point = required(path.points[index])
+    const surface = path.roadSurface.at(index)
+    const upper = new Graphics()
+    const lower = new Graphics()
+    const vehicles = base.vehicles.map((vehicle, i) => ({
+      ...vehicle,
+      x: point.x + i,
+      y: point.y,
+      z: surface.height,
+      pathIndex: index,
+      structureRunId: surface.structureRunId,
+    }))
+    const state = { ...base, phase: 'running' as const, vehicles }
+    const scene = {
+      renderGroundPresentation() {},
+      snapshot: {},
+      controller: { snapshot: () => ({ preferences: { lighting: 'day' } }) },
+      controls: { snapshot: () => ({ steering: 0, throttle: 1, braking: false }) },
+      vehicleGraphics: lower,
+      upperVehicleGraphics: upper,
+      shadowGraphics: new Graphics(),
+      effectGraphics: new Graphics(),
+      game: { loop: { rawDelta: 16 } },
+      raceSession: { advance() {}, snapshot: () => ({ state }) },
+    }
+    RaceScene.prototype.update.call(scene as never, 0, 16)
+    expect(lower.bodies).toEqual([])
+    expect(upper.bodies).toEqual([
+      { x: point.x + 1, y: point.y },
+      { x: point.x + 2, y: point.y },
+      { x: point.x + 3, y: point.y },
+      { x: point.x, y: point.y },
+    ])
+  })
+
 	it('draws only a player outline above a deck that covers a lower car', () => {
 		const path = buildRoadPath(track.points, track.terrain)
 		const base = createRace({
