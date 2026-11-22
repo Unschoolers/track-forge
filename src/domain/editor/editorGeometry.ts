@@ -217,9 +217,9 @@ export function nearestCheckpointMarker(
   target: Vector2,
   zoom: number,
 ): number | undefined {
-  if (samples.length < 2) return undefined
+  if (samples.length < 2 || !Number.isFinite(zoom) || zoom <= 0) return undefined
   const sampleCount = closed ? samples.length : samples.length - 1
-  const radius = 16 / Math.max(0.01, zoom)
+  const radius = 16 / zoom
   let nearest: number | undefined
   let best = radius
   for (const ratio of ratios) {
