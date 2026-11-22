@@ -156,7 +156,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
     await expect.poll(async () => (await readDraft()).scenery).toEqual(moved)
     await setEnvironment('Cityscape')
     // All in-editor changes must remain drafts until this explicit save.
-    expect((await readTrack()).scenery).toEqual([{ kind: 'city-trash-bin', x: 0, y: 0 }].filter(() => false))
+    expect((await readTrack()).scenery).toEqual([])
     await page.getByRole('button', { name: 'Save track', exact: true }).click()
     expect((await readTrack()).scenery).toEqual(moved)
 
