@@ -7,6 +7,23 @@ import {
   POSE_RECOVERY_MASK, POSE_SEQUENCE_MASK, type RemoteGhost,
 } from '@/application/multiplayer/raceWire'
 
+/** Preserve insertion order and avoid intermediate filter/map arrays per host send. */
+export function activePosePackets(
+  poses: ReadonlyMap<number, { readonly bytes: Uint8Array; readonly receivedAt: number }>,
+  racers: ReadonlyMap<number, { readonly left?: boolean | undefined; readonly time?: number | null | undefined }>,
+  now: number,
+): Uint8Array[] {
+  const packets: Uint8Array[] = []
+  for (const [slot, value] of poses) {
+    const racer = racers.get(slot)
+    // A live pose can arrive before the room roster is updated. Keep it,
+    // matching the original relay rule, until the roster says left or finished.
+    if (racer?.left || racer?.time !== undefined || now - value.receivedAt > 300) continue
+    packets.push(value.bytes)
+  }
+  return packets
+}
+
 /** Lifecycle state belongs to the lobby; pose transport only reads it. */
 export interface PoseRacer {
   ghost: RemoteGhost
@@ -72,9 +89,7 @@ export class NearbyPoseSync {
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
     const bytes = hostId ? pose : encodePoseBatch(
-      [...this.latestPoses].filter(([slot, value]) =>
-        now - value.receivedAt <= 300 && !racers.get(slot)?.left &&
-        racers.get(slot)?.time === undefined).map(([, value]) => value.bytes))
+      activePosePackets(this.latestPoses, racers, now))
     this.lastSentAt = now
     this.poseSending = true
     this.poseCounts.sent++
