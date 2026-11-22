@@ -8,6 +8,7 @@ import { NearbyProgressSync } from './nearbyProgressSync'
 import { awardNearbyCupRound, nearbyCupStandings } from './nearbyCupScoring'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
 import { NearbyNetworkTelemetry } from './nearbyNetworkTelemetry'
+import { NearbyReplayTrace, type NearbyTraceRival } from './nearbyReplayTrace'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
@@ -74,6 +75,7 @@ export class NearbyRace {
   private diagnosticStart = 0
   private diagnosticStartedAtUtc: string | null = null
   private networkTelemetry = new NearbyNetworkTelemetry()
+  private readonly replayTrace = new NearbyReplayTrace()
   private lastRaceDiagnostics: Record<string, unknown> | null = null
   private lastFailure: Record<string, unknown> | null = null
   private static readonly TIMELINE_LIMIT = 100
@@ -278,6 +280,7 @@ export class NearbyRace {
 
   private clearRound(): void {
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
+    this.replayTrace.reset()
     this.networkTelemetry = new NearbyNetworkTelemetry()
     this.ready.clear()
     this.armed.clear()
@@ -312,12 +315,42 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle, state?: RaceState): void {
     if (this.phase !== 'racing') return
+    if (state) this.captureTraceFrame(vehicle, state)
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
     if (state) this.progressSync.update(this.slot, raceProgress(
       vehicle, state.path.points.length, state.startPathIndex, state.reversed,
       normalizeRouteKind(state.routeKind),
     ), recipients)
+  }
+
+  /** The finishing sample remains available after the room stops sending poses. */
+  captureFinalFrame(vehicle: RaceVehicle, state: RaceState): void {
+    if (this.phase === 'racing') this.captureTraceFrame(vehicle, state, true)
+  }
+
+  private captureTraceFrame(vehicle: RaceVehicle, state: RaceState, force = false): void {
+    const now = this.now()
+    const rivals: NearbyTraceRival[] = []
+    for (const [slot, racer] of this.racers) {
+      if (slot === this.slot) continue
+      const pose = racer.left ? null : racer.ghost.pose(now)
+      rivals.push(pose ? {
+        slot, car: racer.ghost.car, visible: true,
+        x: pose.x, y: pose.y, z: pose.z, angle: pose.angle,
+        observedAtMs: pose.t, progress: this.progressSync.latest(slot),
+      } : { slot, car: racer.ghost.car, visible: false })
+    }
+    this.replayTrace.record(now, {
+      elapsed: state.elapsed,
+      local: {
+        slot: this.slot, car: vehicle.car, x: vehicle.x, y: vehicle.y, z: vehicle.z,
+        angle: vehicle.angle, lap: vehicle.lap, sector: vehicle.nextSector,
+        pathIndex: vehicle.pathIndex, speed: vehicle.speed,
+      },
+      rivals,
+      ...(state.missedCheckpoint ? { missedGate: state.missedCheckpoint.gate } : {}),
+    }, force)
   }
 
   /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
@@ -738,6 +771,7 @@ export class NearbyRace {
     this.diagnosticStart = this.now()
     this.diagnosticStartedAtUtc = new Date().toISOString()
     this.lastRaceDiagnostics = null
+    this.replayTrace.reset()
     this.networkTelemetry = new NearbyNetworkTelemetry()
     this.lastFailure = null
     this.poseSync.resetCounts()
@@ -782,6 +816,7 @@ export class NearbyRace {
 
   private reset(error: string | null): void {
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
+    this.replayTrace.reset()
     this.generation++
     this.clearTimeout()
     this.course = null
@@ -844,6 +879,13 @@ export class NearbyRace {
         trackShapeValid: Array.isArray(this.course.track.points),
         lighting: this.course.lighting, laps: this.course.laps,
       } : null,
+      /** User-requested export: compact control geometry + observed car positions.
+       * No endpoint IDs, raw Nearby payloads, or player names in the trace.
+       */
+      trace: {
+        ...this.replayTrace.snapshot(),
+        controlPoints: this.course?.track.points.map(point => [point.x, point.y]) ?? [],
+      },
       players: [...slots].sort((a, b) => a - b).map(slot => {
         const racer = this.racers.get(slot)
         const prepared = readyBySlot.get(slot)
