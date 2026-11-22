@@ -14,6 +14,16 @@ describe('authored road point insertion', () => {
     }
   })
 
+  it('rejects arithmetic overflow even when all six input coordinates are finite', () => {
+    const extreme = [
+      { ...segment[0]!, x: -1e308 },
+      { ...segment[1]!, x: -1e308, y: 100 },
+    ]
+    // Subtracting opposite finite extremes produces Infinity; multiplying
+    // that by a zero-width x-axis produces NaN (Infinity * 0).
+    expect(planPointInsertion(extreme, 0, { x: 1e308, y: 50 })).toBeNull()
+  })
+
   it('preserves endpoints and clamps a finite projection within the segment', () => {
     expect(planPointInsertion(segment, 0, { x: -1_000, y: 100 })?.point.x).toBeCloseTo(10)
     expect(planPointInsertion(segment, 0, { x: 1_000, y: 100 })?.point.x).toBeCloseTo(90)
