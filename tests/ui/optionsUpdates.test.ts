@@ -96,6 +96,53 @@ describe('home update shortcut', () => {
   })
 })
 
+
+describe('release notes shortcut', () => {
+  it('opens the aggregated build history from a compact icon and returns without losing the APK action', async () => {
+    vi.stubEnv('VITE_TRACKFORGE_BUILD_RUN', '533')
+    vi.stubEnv('VITE_TRACKFORGE_BUILD_ATTEMPT', '1')
+    native.current.mockReset().mockResolvedValue({ state: 'none' })
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify([
+      { tag_name: 'android-build-535-1', body: "## What's Changed\n* Better steering" },
+      { tag_name: 'android-build-534-1', body: "## What's Changed\n* More grip" },
+      { tag_name: 'android-build-533-1', body: '' },
+    ]), { status: 200 })) as typeof fetch
+    try {
+      const overlay = createOptionsModal({
+        overlay: { type: 'options', returnTo: 'home', tab: 'updates' },
+        preferences: {
+          difficulty: 'normal', audioEnabled: true,
+          hapticsEnabled: true, dynamicZoomEnabled: true,
+        },
+      } as AppSnapshot, {
+        close: vi.fn(), playerName: vi.fn(), preferences: vi.fn(),
+        previewVolume: vi.fn(), setVolume: vi.fn(),
+      }, { initialTab: 'updates', availableUpdate: {
+        version: 'android-build-535-1',
+        url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+        apkUrl: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-535-1/trackforge-debug.apk',
+      } })
+      document.body.replaceChildren(overlay)
+      await vi.waitFor(() => expect(overlay.querySelector('[data-action="view-release-notes"]')).not.toBeNull())
+      const icon = overlay.querySelector<HTMLButtonElement>('[data-action="view-release-notes"]')!
+      expect(icon.querySelector('svg path')).not.toBeNull()
+      expect(icon.getAttribute('aria-label')).toBe('View release notes')
+      icon.click()
+      await vi.waitFor(() => expect(overlay.textContent).toContain('Better steering'))
+      expect(overlay.querySelector('.release-notes-active')).toBeNull()
+      expect(overlay.classList.contains('release-notes-active')).toBe(true)
+      expect(overlay.textContent).toContain('More grip')
+      overlay.querySelector<HTMLButtonElement>('[data-action="back-release-notes"]')?.click()
+      expect(overlay.classList.contains('release-notes-active')).toBe(false)
+      expect(overlay.querySelector('[data-action="download-update"]')).not.toBeNull()
+    } finally {
+      globalThis.fetch = originalFetch
+      vi.unstubAllEnvs()
+    }
+  })
+})
+
 describe('native APK installation feedback', () => {
   beforeEach(() => {
     native.current.mockReset().mockResolvedValue({

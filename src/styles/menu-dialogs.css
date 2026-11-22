@@ -161,3 +161,77 @@
   /* Extremely narrow screens prefer two visible rows to clipping a tab. */
   .options-modal .options-tab-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* A single icon opens a genuine full-screen, scrollable release history reader. */
+.options-modal .options-update-actions {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+}
+.options-modal .options-update-actions [data-action="check-updates"] { flex: 1; }
+.options-modal .options-release-notes-button {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  min-width: 48px;
+  height: 44px;
+  padding: .5rem;
+  color: var(--menu-accent);
+  border-color: var(--menu-accent);
+}
+.options-modal .options-release-notes-button[hidden] { display: none; }
+.options-modal .options-release-notes-button svg { width: 1.45rem; height: 1.45rem; }
+.options-modal.release-notes-active { padding: 0; }
+.options-modal.release-notes-active .release-notes-card {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.options-modal .release-notes-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: max(.85rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) .85rem max(1rem, env(safe-area-inset-left));
+  border-bottom: 1px solid #34414e;
+}
+.options-modal .release-notes-heading { min-width: 0; }
+.options-modal .release-notes-heading .modal-title { font-size: clamp(1.35rem, 3vw, 2.1rem); }
+.options-modal .release-notes-back { font-size: 1.6rem; line-height: 1; }
+.options-modal .release-notes-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  padding: 1rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+.options-modal .release-notes-summary {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #465767;
+  background: #111c28;
+}
+.options-modal .release-notes-range {
+  margin: 0 0 .4rem;
+  color: var(--menu-ink);
+  font: 800 .8rem/1.35 var(--menu-mono);
+}
+.options-modal .release-notes-build {
+  padding: 1rem 0;
+  border-top: 1px solid #34414e;
+}
+.options-modal .release-notes-build-title {
+  margin: 0 0 .5rem;
+  font: 800 1rem/1.25 var(--menu-mono);
+  color: var(--menu-accent);
+}
+.options-modal .release-notes-list {
+  margin: .75rem 0 0;
+  padding-left: 1.5rem;
+  line-height: 1.5;
+}
+.options-modal .release-notes-list li + li { margin-top: .6rem; }
+.options-modal .release-notes-warning { color: #ffcc9f; line-height: 1.4; }

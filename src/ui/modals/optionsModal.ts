@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { GitHubUpdateProvider, type UpdateInfo } from '@/application/updates/updateProvider'
+import { GitHubUpdateProvider, isNewerRelease, type UpdateInfo } from '@/application/updates/updateProvider'
+import { createReleaseNotesButton, openReleaseNotesView } from '@/ui/modals/updateReleaseNotes'
 import type { AppSnapshot } from '@/application/appState'
 import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
 import { DIFFICULTY_IDS } from '@/domain/model'
@@ -274,6 +275,20 @@ export function createOptionsModal(
     )
     const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Android build.')
     let activeDownload: DownloadState | null = null
+    let notesTarget: string | null = null
+    const notesButton = createReleaseNotesButton(() => {
+      const target = notesTarget
+      if (!target) return
+      const provider = new GitHubUpdateProvider(currentRun, currentAttempt)
+      openReleaseNotesView(frame.overlay, () => provider.changesSince(target), () => {
+        if (activeDownload && activeDownload.state !== 'complete' && activeDownload.state !== 'failed') monitor()
+      })
+    })
+    notesButton.hidden = true
+    const setNotesTarget = (version: string | null) => {
+      notesTarget = version && hasBuildId && isNewerRelease(version, currentRun, currentAttempt) ? version : null
+      notesButton.hidden = notesTarget === null
+    }
     const panel = element('section', 'setup-section options-download-panel')
     const progress = document.createElement('progress')
     progress.setAttribute('aria-label', 'APK download progress')
@@ -311,6 +326,7 @@ export function createOptionsModal(
     const render = (state: DownloadState) => {
       if (!panel.isConnected) { stop(); return }
       activeDownload = state
+      setNotesTarget(state.version)
       const { downloaded, total } = state
       if (total > 0) {
         const percent = Math.min(100, Math.round(downloaded * 100 / total))
@@ -349,6 +365,7 @@ export function createOptionsModal(
       timer = window.setInterval(() => { void refresh() }, 1000)
     }
     const showAvailableUpdate = (update: UpdateInfo) => {
+      if (!activeDownload) setNotesTarget(update.version)
       if (activeDownload) {
         status.textContent = `New release: ${update.version}. Remove the existing download before downloading another.`
         return
@@ -376,7 +393,10 @@ export function createOptionsModal(
       void provider.check().then((update) => {
         if (!update) {
           status.textContent = 'You are running the latest GitHub release.'
-          if (!activeDownload) panel.replaceChildren()
+          if (!activeDownload) {
+            panel.replaceChildren()
+            setNotesTarget(null)
+          }
           return
         }
         showAvailableUpdate(update)
@@ -384,7 +404,9 @@ export function createOptionsModal(
         status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
       }).finally(() => { check.disabled = false })
     }, 'button')
-    frame.body.append(installed, check, status, panel)
+    const updateActions = element('div', 'options-update-actions')
+    updateActions.append(check, notesButton)
+    frame.body.append(installed, updateActions, status, panel)
     void updates.current().then((state) => {
       if (state.state !== 'none') {
         render(state as DownloadState)
