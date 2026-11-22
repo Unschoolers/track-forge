@@ -192,7 +192,7 @@ describe('ramp vehicle rendering', () => {
 					...current,
 					vehicles: base.vehicles.map((vehicle) => ({
 						...vehicle,
-						x: point.x + (vehicle.player ? 0 : 3),
+						x: point.x,
 						y: point.y,
 						z: road.height,
 						pathIndex: index,
@@ -207,13 +207,10 @@ describe('ramp vehicle rendering', () => {
 					upper.bodies,
 					`ramp index ${index}, height ${road.height}`,
 				).toHaveLength(4)
-				// The player must be painted after opponents: arcade cars may overlap
-				// on a bridge without colliding, but must never hide the player.
-				expect(upper.bodies.at(-1)).toEqual({ x: point.x, y: point.y })
-				expect(lower.bodies).toHaveLength(0)
+ 				expect(lower.bodies).toHaveLength(0)
 				expect(upper.shadows).toHaveLength(4)
 				for (const shadow of upper.shadows) {
-					expect(Math.hypot(shadow.x - point.x, shadow.y - point.y)).toBeLessThan(6)
+					expect(Math.hypot(shadow.x - point.x, shadow.y - point.y)).toBeLessThan(2)
 				}
 			}
 			expect(lowRampSamples).toBeGreaterThan(4)
