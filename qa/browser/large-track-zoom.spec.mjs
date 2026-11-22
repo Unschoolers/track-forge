@@ -78,7 +78,7 @@ async function expectClearRoad(page, outline) {
 
 async function openRallyEditor(page) {
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-  await page.getByRole('button', { name: 'EDIT', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit Rally', exact: true }).click()
   await expect.poll(() => readCamera(page)).not.toBeNull()
 }
 
@@ -337,7 +337,7 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
       }
     })
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Edit Large geometry stress', exact: true }).click()
     await expect(page.locator('[data-screen="editor"]')).toBeVisible()
     const canvas = page.locator('#game-container canvas')
     await expect(canvas).toBeVisible()
