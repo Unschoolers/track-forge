@@ -1042,7 +1042,9 @@ export class AppController {
   }
 
   private shouldConfirmEditorExit(command: AppCommand): boolean {
-    if (this.state.mode !== 'editor' || !this.hasUnsavedEditorChanges()) return false
+    if (this.state.mode !== 'editor') return false
+    // Compare potentially large track payloads only when an exit is requested,
+    // never for every drag, paint stroke or editor UI action.
     switch (command.type) {
       case 'go-home':
       case 'start-race':
@@ -1055,7 +1057,7 @@ export class AppController {
       case 'import-track':
       case 'open-nearby':
       case 'open-cup':
-        return true
+        return this.hasUnsavedEditorChanges()
       default:
         return false
     }
