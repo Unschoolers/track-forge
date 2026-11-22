@@ -413,10 +413,16 @@ export function planTerrainExpansionAroundBoundsCenter(
 }
 
 function boundsCenter(content: readonly Vector2[]): Vector2 {
-  const xValues = content.map((item) => item.x)
-  const yValues = content.map((item) => item.y)
-  return {
-    x: (Math.min(...xValues) + Math.max(...xValues)) / 2,
-    y: (Math.min(...yValues) + Math.max(...yValues)) / 2,
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const item of content) {
+    minX = Math.min(minX, item.x)
+    minY = Math.min(minY, item.y)
+    maxX = Math.max(maxX, item.x)
+    maxY = Math.max(maxY, item.y)
   }
+  // This is called only with nonempty content by expansion planners.
+  return { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2 }
 }
