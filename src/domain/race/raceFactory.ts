@@ -136,7 +136,8 @@ export function createRace(options: CreateRaceOptions): RaceState {
   )
   const resolvedStartIndex = Math.max(0, startPathIndex)
   const recoveryCheckpoints = resolveRecoveryCheckpoints(options.path, options.recoveryCheckpoints)
-  const sceneryColliders = recoveryCheckpoints.length && options.recoveryScenery
+  // Physical scenery never depends on whether a creator added checkpoint markers.
+  const sceneryColliders = options.recoveryScenery
     ? buildSceneryColliders(options.recoveryScenery, options.path.terrainSurface) : undefined
   const openPlacement = open ? sampleOpenStart(options.path) : undefined
   const slots = validGridPositions(options.gridPositions) ? options.gridPositions : [0, 1, 2, 3]
