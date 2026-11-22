@@ -56,33 +56,33 @@ describe('nearby progress telemetry', () => {
     sync.update(0, 3, ['host'])
     await vi.waitFor(() => expect(sync.failedSends).toBe(1))
   })
-  it('coalesces congested progress updates and relays without queuing old packets', async () => {
+  it('broadcasts progress once per source without queuing stale samples', async () => {
     let now = 0
-    const sent: { id: string; packet: Uint8Array }[] = []
+    const sent: { ids: string[]; packet: Uint8Array }[] = []
     let unlock: (() => void) | undefined
     const sync = new NearbyProgressSync((ids, packet) => {
-      const id = ids[0]
-      if (!id || ids.length !== 1) throw new Error('Expected a single destination')
-      sent.push({ id, packet })
-      return id === 'congested' ? new Promise<void>(resolve => { unlock = resolve }) : Promise.resolve()
+      sent.push({ ids, packet })
+      if (decodeProgress(packet)?.slot === 0) {
+        return new Promise<void>(resolve => { unlock = resolve })
+      }
+      return Promise.resolve()
     }, () => now)
-    sync.update(0, 1, ['congested', 'healthy'])
-    await Promise.resolve()
-    await Promise.resolve()
+    sync.update(0, 1, ['guest-1', 'guest-2', 'guest-3'])
     now = 151
-    sync.update(0, 2, ['congested', 'healthy'])
-    await Promise.resolve()
-    await Promise.resolve()
-    sync.relay(encodeProgress(1, 1, 10), ['congested', 'healthy'])
-    expect(sent.map(item => item.id)).toEqual(['congested', 'healthy', 'healthy', 'healthy'])
-    expect(sent.filter(item => item.id === 'congested')).toHaveLength(1)
-    expect(decodeProgress(sent[2]!.packet)?.progress).toBe(2)
+    sync.update(0, 2, ['guest-1', 'guest-2', 'guest-3'])
+    sync.relay(encodeProgress(1, 1, 10), ['guest-2', 'guest-3'])
+    sync.relay(encodeProgress(1, 2, 20), ['guest-2', 'guest-3'])
+    expect(sent).toHaveLength(2)
+    expect(sent[0]?.ids).toEqual(['guest-1', 'guest-2', 'guest-3'])
+    expect(sent[1]?.ids).toEqual(['guest-2', 'guest-3'])
+    expect(decodeProgress(sent[1]!.packet)?.progress).toBe(10)
     unlock?.()
     await Promise.resolve()
     await Promise.resolve()
     now = 302
-    sync.update(0, 3, ['congested'])
-    expect(sent.filter(item => item.id === 'congested')).toHaveLength(2)
+    sync.update(0, 3, ['guest-1', 'guest-2', 'guest-3'])
+    expect(sent).toHaveLength(3)
+    expect(decodeProgress(sent[2]!.packet)?.progress).toBe(3)
   })
 
 
