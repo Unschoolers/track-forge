@@ -1,5 +1,7 @@
 # TrackForge Legacy-to-Phaser Parity Audit
 
+> **Historical document (2026-07-24):** Statements below describe migration state at the audit date and must not be treated as current code findings. The original `trackforge.html` is preserved in Git history: `git show fde57030fd9a481ce1d8bdac7c200b851675c8ab:trackforge.html`. The maintained runtime starts from `index.html`.
+
 **Audit date:** 2026-07-24  
 **Reference runtime:** `trackforge.html`  
 **Migrated runtime:** `index.html` plus `src/`
