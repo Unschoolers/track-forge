@@ -10,8 +10,14 @@ export function isRecoveryCheckpointRatio(value: unknown): value is number {
 
 export function normalizeRecoveryCheckpoints(value: unknown): readonly number[] {
   if (!Array.isArray(value)) return []
-  return [...new Set(value.slice(0, MAX_RECOVERY_CHECKPOINTS).filter(isRecoveryCheckpointRatio))]
-    .sort((left, right) => left - right)
+  const unique = new Set<number>()
+  // Invalid or repeated input must not consume one of the 64 marker slots.
+  for (const candidate of value) {
+    if (!isRecoveryCheckpointRatio(candidate)) continue
+    unique.add(candidate)
+    if (unique.size === MAX_RECOVERY_CHECKPOINTS) break
+  }
+  return [...unique].sort((left, right) => left - right)
 }
 
 export function resolveRecoveryCheckpoints(
@@ -24,6 +30,7 @@ export function resolveRecoveryCheckpoints(
   return [...new Set(ratios.filter(isRecoveryCheckpointRatio)
     .map(ratio => Math.min(last, Math.round(ratio * samples))))]
     .filter(index => (path.closed || index < last) && isSafeRoadRecoverySample(path, index))
+    .sort((left, right) => left - right)
 }
 
 /** Checkpoints are authored ratios; automatic additions never replace manual edits. */
