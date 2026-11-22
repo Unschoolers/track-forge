@@ -63,7 +63,7 @@ public class NearbyRacePlugin extends Plugin {
     private final Set<String> connected = new HashSet<>();
     private final Map<Long, PendingSend> pendingSends = new HashMap<>();
     private final TransientPayloadWindow transientWindow = new TransientPayloadWindow();
-    private long droppedTransientPackets, failedTransientPackets, timedOutTransientPackets;
+    private long droppedTransientPackets, failedTransientPackets, timedOutTransientPackets, deliveredTransientPackets;
     private ConnectionsClient client;
     private int generation;
     private final ArrayDeque<JSObject> events = new ArrayDeque<>();
@@ -164,6 +164,7 @@ public class NearbyRacePlugin extends Plugin {
             counters.put("droppedTransientPackets", droppedTransientPackets);
             counters.put("failedTransientPackets", failedTransientPackets);
             counters.put("timedOutTransientPackets", timedOutTransientPackets);
+            counters.put("deliveredTransientPackets", deliveredTransientPackets);
             report.put("counters", counters);
             JSArray history = new JSArray(); for (JSObject event : events) history.put(event);
             report.put("events", history); call.resolve(report);
@@ -413,7 +414,9 @@ public class NearbyRacePlugin extends Plugin {
                 if (active != generation || update.getStatus() == PayloadTransferUpdate.Status.IN_PROGRESS) return;
                 long id = update.getPayloadId();
                 if (transientWindow.complete(id, endpoint)) {
-                    if (update.getStatus() != PayloadTransferUpdate.Status.SUCCESS) {
+                    if (update.getStatus() == PayloadTransferUpdate.Status.SUCCESS) {
+                        deliveredTransientPackets++;
+                    } else {
                         failedTransientPackets++;
                         record("send_transient", "transfer_failed", null);
                     }
