@@ -177,6 +177,18 @@ export function renderTerrainPreview(
  * compilation. The alpha treatment keeps committed terrain readable while
  * exposing the shoreline, hill profile, and affected canonical road grades.
  */
+/** Preserve coarse AABB preview culling without per-triangle arrays. */
+export function triangleIntersectsBounds(
+  triangle: TerrainTriangle,
+  bounds: Pick<TerrainPreviewBounds, 'left' | 'right' | 'top' | 'bottom'>,
+): boolean {
+  const [a, b, c] = triangle
+  return Math.max(a.x, b.x, c.x) >= bounds.left &&
+    Math.min(a.x, b.x, c.x) <= bounds.right &&
+    Math.max(a.y, b.y, c.y) >= bounds.top &&
+    Math.min(a.y, b.y, c.y) <= bounds.bottom
+}
+
 export function renderTerrainImpactPreview(
   graphics: Phaser.GameObjects.Graphics,
   surface: TerrainSurface,
@@ -186,17 +198,7 @@ export function renderTerrainImpactPreview(
   palette?: EnvironmentPalette,
 ): void {
   const fillPreviewTriangle = (triangle: TerrainTriangle): void => {
-    const xs = triangle.map((point) => point.x)
-    const ys = triangle.map((point) => point.y)
-    if (
-      Math.max(...xs) < bounds.left ||
-      Math.min(...xs) > bounds.right ||
-      Math.max(...ys) < bounds.top ||
-      Math.min(...ys) > bounds.bottom
-    ) {
-      return
-    }
-    fillTriangle(graphics, triangle)
+    if (triangleIntersectsBounds(triangle, bounds)) fillTriangle(graphics, triangle)
   }
 
   // Impact overlays only need one quad per terrain cell, not four.
