@@ -122,6 +122,11 @@ export function createTrackLibraryModal(
         menu.append(remove)
       }
       if (menu.childElementCount) {
+        trigger.addEventListener('click', () => {
+          for (const openMenu of list.querySelectorAll<HTMLDetailsElement>('.track-card-overflow[open]')) {
+            if (openMenu !== options) openMenu.open = false
+          }
+        })
         options.append(trigger, menu)
         card.append(options)
       }
