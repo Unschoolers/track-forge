@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { DIFFICULTY_SPECS } from '@/domain/config'
-import { CAR_IDS, type DifficultyId } from '@/domain/model'
+import { asTrackId, type DifficultyId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import { asTrackId } from '@/domain/model'
 import { EMILE_COURSE } from '@/domain/race/ai/emileRacingLines'
 import {
   aiSteeringDifficulty,
@@ -48,7 +47,7 @@ describe('AI difficulty policy', () => {
       const race = createRace({
         path,
         courseIdentity: EMILE_COURSE,
-        playerCar: CAR_IDS[0],
+        playerCar: 'blue',
         difficulty,
         handling: 'arcade',
         laps: 1,
