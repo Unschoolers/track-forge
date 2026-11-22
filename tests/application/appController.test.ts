@@ -90,6 +90,15 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('does not apply unsaved preferences to UI state when durable storage rejects the commit', () => {
+    const { controller, preferencesStore } = setup()
+    vi.mocked(preferencesStore.save).mockReturnValueOnce(false)
+    controller.dispatch({ type: 'set-preferences', preferences: { ...preferences, car: 'red' } })
+    expect(controller.snapshot().preferences.car).toBe('blue')
+    expect(controller.snapshot().notice).toContain('could not be saved')
+    controller.destroy()
+  })
+
   it('toggles personal favorites without changing track edit timestamps or geometry', () => {
     const track = createStarterTrack(asTrackId('favorite-track'), 7)
     const { controller, trackStore, preferencesStore } = setup(track)
