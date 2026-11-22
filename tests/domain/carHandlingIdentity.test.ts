@@ -99,10 +99,12 @@ function stoppingDistance(car: CarId, handling: Handling, surface: Surface = 'st
 }
 
 /** Identical effective wheel angle: compare handling rather than steering-rack gearing. */
-function cornering(car: CarId, handling: Handling) {
+function cornering(car: CarId, handling: Handling, speed = 135, matchedWheelAngle = true) {
   const road = context('street')
-  const steer = 0.65 * CAR_SPECS.blue.steer / CAR_SPECS[car].steer
-  let vehicle = makeVehicle(car, 135)
+  const steer = matchedWheelAngle
+    ? 0.65 * CAR_SPECS.blue.steer / CAR_SPECS[car].steer
+    : 0.65
+  let vehicle = makeVehicle(car, speed)
   let angleSum = 0
   let samples = 0
   for (let frame = 0; frame < 50; frame += 1) {
@@ -152,11 +154,22 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     expect(yellow.yawRate).toBeGreaterThan(0.2)
   })
 
-  it('gives Green stronger corner grip and faster response than Blue', () => {
+  it('gives Green less body slip at the same wheel angle than Blue', () => {
     const green = cornering('green', handling)
     const blue = cornering('blue', handling)
     expect(green.slipAngle).toBeLessThan(blue.slipAngle * 0.95)
+  })
+
+  it('makes Green turn faster than Blue for the same player steering input', () => {
+    const green = cornering('green', handling, 135, false)
+    const blue = cornering('blue', handling, 135, false)
     expect(green.yawRate).toBeGreaterThan(blue.yawRate * 1.05)
+  })
+
+  it('makes Red slide more than Blue in fast paved corners despite better braking', () => {
+    const red = cornering('red', handling, 210)
+    const blue = cornering('blue', handling, 210)
+    expect(red.slipAngle).toBeGreaterThan(blue.slipAngle * 1.2)
   })
 
   it('keeps Red markedly less effective on dirt than Blue, unlike Green', () => {
