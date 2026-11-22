@@ -70,19 +70,28 @@ for (const reversed of [false, true]) {
       ['deck-entry', reversed ? 1350 : 250],
       ['deck-travel', reversed ? 950 : 650],
     ]) {
-      await expect.poll(async () => {
-        const race = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
-        return race?.phase === 'running' &&
-          (reversed ? race.player.x < threshold : race.player.x > threshold)
-      }, { timeout: 20_000 }).toBe(true)
+      // Stop physics at the threshold before capturing the rendered frame.
+      // A Chromium screenshot may take a second, enough to cross the ramp
+      // entirely, so a live screenshot does not test the intended stage.
+      await expect.poll(() => page.evaluate(({ threshold, reversed }) => {
+        const qa = window.__trackForgeQa
+        const race = qa.snapshot().race
+        if (race?.phase !== 'running' ||
+            !(reversed ? race.player.x < threshold : race.player.x > threshold)) return false
+        qa.pauseRace()
+        return true
+      }, { threshold, reversed }), { timeout: 20_000, intervals: [30, 40, 50] }).toBe(true)
+      // Wait for the scene to render the frozen state; no physics advances.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
       const before = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
       const image = await page.locator('#game-container canvas').screenshot({ scale: 'css' })
       await testInfo.attach(`${stage}.png`, { body: image, contentType: 'image/png' })
       const pixels = await blueBodyPixels(page, image)
       const after = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
-      console.log(JSON.stringify({ rampProbe: stage, reversed, pixels, before, after }))
-      expect(pixels, `${stage}: the blue car body must be rendered`)
+      expect(after.player.x).toBeCloseTo(before.player.x, 5)
+      expect(pixels, `${stage}: expected a visible blue body at ${JSON.stringify(before.player)}`)
         .toBeGreaterThan(100)
+      await page.evaluate(() => window.__trackForgeQa.resumeRace())
     }
     expect(await page.evaluate(() => window.__rampAirborneFrames)).toBe(0)
     expect(errors).toEqual([])
