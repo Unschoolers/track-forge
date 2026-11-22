@@ -7,6 +7,15 @@ export const PROGRESS_BYTES = 8
 export const PROGRESS_PERIOD_MS = 150
 export const POSE_SEQUENCE_MASK = 0xffff
 export const POSE_RECOVERY_MASK = 0xff
+
+/** Compare unsigned 16-bit wire sequences without accepting delayed/replayed packets. */
+export function isNewerWireSequence(next: number, previous: number | undefined): boolean {
+  if (!Number.isInteger(next) || next < 0 || next > POSE_SEQUENCE_MASK) return false
+  if (previous === undefined) return true
+  if (!Number.isInteger(previous) || previous < 0 || previous > POSE_SEQUENCE_MASK) return false
+  const advance = (next - previous) & POSE_SEQUENCE_MASK
+  return advance !== 0 && advance < 0x8000
+}
 /** A brief radio pause should freeze a rival, not make its car vanish. */
 export const REMOTE_POSE_EXPIRY_MS = 2000
 export const POSE_PERIOD_MS = 1000 / 30
@@ -149,8 +158,8 @@ export class RemoteGhost {
   constructor(readonly car: CarId) {}
 
   receive(packet: PosePacket, now: number): boolean {
-    const advance = this.sequence === undefined ? 1 : (packet.sequence - this.sequence) & 0xffff
-    if (advance === 0 || advance >= 0x8000) return false
+    if (!isNewerWireSequence(packet.sequence, this.sequence)) return false
+    const advance = this.sequence === undefined ? 1 : (packet.sequence - this.sequence) & POSE_SEQUENCE_MASK
     const last = this.frames.at(-1)
     // Accept 30-60 Hz and packet losses without assuming a fixed send cadence.
     if (!last || now - this.arrival > 500) {
