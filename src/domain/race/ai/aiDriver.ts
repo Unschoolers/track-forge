@@ -248,18 +248,17 @@ export function stepAiVehicle(
         emergency || curveBraking
           ? 0
           : recovering
-            ? tuning.pace * 0.45
+            // Coasting preserves lateral tire force; braking while turning
+            // would starve steering through the friction circle.
+            ? vehicle.speed > 90 ? 0 : tuning.pace * 0.45
           : following
             ? tuning.pace * 0.72
             : curveThrottle,
       braking:
         emergency ||
         curveBraking ||
-        // Brake as soon as the car leaves the supported road at pace.
-        // Waiting until 72 world units lets its momentum carry it beyond
-        // the recovery corridor even with stronger dry-road tire grip.
         (recovering &&
-          context.nearest.distance > ROAD_GEOMETRY.onRoadRadius &&
+          context.nearest.distance > 72 &&
           vehicle.speed > 90),
     },
     context,
