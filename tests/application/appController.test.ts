@@ -555,6 +555,26 @@ describe('AppController', () => {
     expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
+  it('Save As resumes a pending race using the new track without overwriting the source', () => {
+    const { controller, trackStore, raceSession } = setup()
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'start-race' })
+    expect(controller.snapshot().overlay.type).toBe('editor-exit')
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save-as' })
+    controller.dispatch({ type: 'save-as-track', name: 'Alternate Circuit' })
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'race',
+      currentTrack: { id: 'created', name: 'Alternate Circuit' },
+    })
+    expect(trackStore.find(asTrackId('created'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
+    expect(raceSession.start).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'created' }),
+      expect.anything(),
+    )
+  })
+
   it('does not leave on save failure and allows retry without draft loss', () => {
     const { controller, trackStore } = setup()
     controller.dispatch({ type: 'open-editor' })
