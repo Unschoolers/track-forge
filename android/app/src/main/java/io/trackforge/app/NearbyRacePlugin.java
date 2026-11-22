@@ -171,6 +171,18 @@ public class NearbyRacePlugin extends Plugin {
         });
     }
 
+    /** Small delivery-only sample for rate control, without expensive device diagnostics. */
+    @PluginMethod public void deliveryQuality(PluginCall call) {
+        main.post(() -> {
+            JSObject counters = new JSObject();
+            counters.put("delivered", deliveredTransientPackets);
+            counters.put("failed", failedTransientPackets);
+            counters.put("dropped", droppedTransientPackets);
+            counters.put("timedOut", timedOutTransientPackets);
+            call.resolve(counters);
+        });
+    }
+
     private record PendingSend(PluginCall call, Set<String> remaining) {}
 
     private ConnectionsClient client() {
