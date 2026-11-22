@@ -94,7 +94,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
   load(): Preferences {
     const committed = snapshotValues(this.storage.get(STORAGE_KEYS.preferencesSnapshot))
     const read = (key: string): string | null => committed
-      ? committed[key] ?? null : read(key)
+      ? committed[key] ?? null : this.storage.get(key)
     const car = read(STORAGE_KEYS.car)
     const difficulty = read(STORAGE_KEYS.difficulty)
     const handling = read(STORAGE_KEYS.handling)
