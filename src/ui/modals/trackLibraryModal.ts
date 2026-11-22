@@ -62,7 +62,6 @@ export function createTrackLibraryModal(
   )
   const favorites = new Set(state.preferences.favoriteTrackIds ?? [])
   const list = element('div', 'track-list')
-  if (race) list.append(element('h3', 'results-heading', 'SAVED TRACKS'))
 
   const cardFor = (track: Track, official = false): HTMLElement => {
     const path = geometry.get(track).path
@@ -122,16 +121,15 @@ export function createTrackLibraryModal(
     return card
   }
 
-  for (const track of orderLibraryTracks(state.tracks, state.preferences.favoriteTrackIds)) {
-    list.append(cardFor(track))
+  // A favorite official circuit ranks above non-favorite saved tracks as well.
+  const officialIds = new Set(OFFICIAL_CIRCUITS.map(({ track }) => track.id))
+  const libraryTracks = race
+    ? [...state.tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)]
+    : state.tracks
+  for (const track of orderLibraryTracks(libraryTracks, state.preferences.favoriteTrackIds)) {
+    list.append(cardFor(track, officialIds.has(track.id)))
   }
-  if (state.tracks.length === 0) list.append(element('p', 'empty-state', 'No tracks saved yet.'))
-  if (race) {
-    list.append(element('h3', 'results-heading', 'OFFICIAL CIRCUITS'))
-    for (const { track } of orderLibraryTracks(OFFICIAL_CIRCUITS.map(({ track }) => track), state.preferences.favoriteTrackIds)) {
-      list.append(cardFor(track, true))
-    }
-  }
+  if (libraryTracks.length === 0) list.append(element('p', 'empty-state', 'No tracks saved yet.'))
 
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
