@@ -5,7 +5,7 @@ import { createRace } from '@/domain/race/raceFactory'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { decodeTrack } from '@/domain/track/trackCodec'
-import { buildRoadPath } from '@/domain/track/pathBuilder'
+import { buildRoadPath, type RoadPathPoint } from '@/domain/track/pathBuilder'
 
 const exported: unknown = JSON.parse(readFileSync('tests/fixtures/speed.trackforge.json', 'utf8'))
 if (!exported || typeof exported !== 'object' || !('track' in exported)) {
@@ -14,9 +14,12 @@ if (!exported || typeof exported !== 'object' || !('track' in exported)) {
 const track = decodeTrack(exported.track, 1)
 if (!track) throw new Error('Invalid Speed track fixture')
 const path = buildRoadPath(track.points, track.terrain, Infinity, track.routeKind)
-const start = path.points[0]
-const finish = path.points.at(-1)
-if (!start || !finish) throw new Error('Speed straightaway is missing an endpoint')
+function requireRoadPoint(point: RoadPathPoint | undefined): RoadPathPoint {
+  if (!point) throw new Error('Speed straightaway is missing an endpoint')
+  return point
+}
+const start = requireRoadPoint(path.points[0])
+const finish = requireRoadPoint(path.points.at(-1))
 const length = Math.hypot(finish.x - start.x, finish.y - start.y)
 const direction = {
   x: (finish.x - start.x) / length,
@@ -40,8 +43,8 @@ function drive(
   if (!fixture) throw new Error('Missing player on Speed track')
   let vehicle: RaceVehicle = {
     ...fixture,
-    x: start!.x,
-    y: start!.y,
+    x: start.x,
+    y: start.y,
     angle: Math.atan2(direction.y, direction.x),
     vx: 0,
     vy: 0,
