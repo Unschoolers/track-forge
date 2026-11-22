@@ -12,6 +12,7 @@ import type {
 import { AppController } from '@/application/appController'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { decodeTrack } from '@/domain/track/trackCodec'
 import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
@@ -491,6 +492,34 @@ describe('AppController', () => {
     controller.destroy()
     expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
+
+  it.each(['before navigating', 'in exit confirmation'] as const)(
+    'does not reopen exit confirmation after saving normalized road data %s',
+    (when) => {
+      const { controller, trackStore } = setup()
+      trackStore.save.mockImplementation((track) => {
+        const normalized = decodeTrack(track, 500)
+        if (!normalized) return false
+        trackStore.tracks.set(normalized.id, normalized)
+        return true
+      })
+      controller.dispatch({ type: 'open-editor' })
+      controller.dispatch({ type: 'editor', command: {
+        type: 'add-point', point: { id: 'additional', x: 250, y: 100, surface: 'street' },
+      } })
+      if (when === 'before navigating') {
+        controller.dispatch({ type: 'save-current-track' })
+        expect(controller.snapshot().notice).toBe('Track saved.')
+      }
+      controller.dispatch({ type: 'go-home' })
+      if (when === 'in exit confirmation') {
+        expect(controller.snapshot().overlay.type).toBe('editor-exit')
+        controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
+      }
+      expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'none' } })
+      expect(trackStore.find(asTrackId('starter'))?.points.at(-1)).toHaveProperty('structure', 'surface')
+    },
+  )
 
   it.each(['go-home', 'start-race'] as const)('Save commits and resumes %s', (type) => {
     const { controller, trackStore, raceSession } = setup()
