@@ -1080,16 +1080,16 @@ export class AppController {
     } else {
       const trackId = this.state.currentTrack?.id
       const saved = trackId ? this.library.select(trackId) : undefined
-      if (!saved) {
-        this.update({ ...this.state, notice: 'Saved track is unavailable.' })
-        return
-      }
+      // Discard is an explicit choice to abandon the draft. Even if its saved
+      // baseline was deleted, allow navigation rather than trapping the user.
       this.editorSession.discardPendingSave()
       this.update({
         ...this.state,
         ...this.librarySnapshot(),
-        currentTrack: saved,
-        editor: createEditorState(saved.points, saved.trees, saved.start, saved.terrain, saved),
+        currentTrack: saved ?? null,
+        editor: saved
+          ? createEditorState(saved.points, saved.trees, saved.start, saved.terrain, saved)
+          : createEditorState([], []),
         overlay: { type: 'none' },
         notice: null,
       })
