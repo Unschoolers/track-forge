@@ -94,7 +94,7 @@ test.describe('Rally editor zoom', () => {
     await openRallyEditor(page)
   })
 
-  test('fits the actual course in landscape and can zoom out from that view', async ({ page, context }) => {
+  test('fits the actual course in landscape without zooming out below the budget floor', async ({ page, context }) => {
     await useViewAction(page, 'Fit track')
     const fit = await readCamera(page)
     const canvas = page.locator('#game-container canvas')
@@ -108,13 +108,15 @@ test.describe('Rally editor zoom', () => {
       expect(screenY).toBeLessThan(dock.y)
     }
     await expectClearRoad(page, road)
+    // The saved Rally course is longer than the manual map-editing span.
+    // Fit may frame it more widely, but normal zoom-out must not encourage extending it.
+    expect(fit.zoom).toBeLessThan(844 / 15_000)
     await useViewAction(page, 'Zoom out')
     const first = await readCamera(page)
-    expect(first.zoom).toBeLessThan(fit.zoom)
+    expect(first).toEqual(fit)
     await useViewAction(page, 'Zoom out')
     const second = await readCamera(page)
-    expect(second.zoom).toBeLessThan(first.zoom)
-    expect(second).toMatchObject({ x: fit.x, y: fit.y })
+    expect(second).toEqual(fit)
     await expectClearRoad(page, road)
     expect((await roadPixels(page, await canvas.screenshot({ scale: 'css' }))).count).toBeGreaterThan(0)
 
@@ -124,7 +126,7 @@ test.describe('Rally editor zoom', () => {
     try {
       await touch(cdp, 'touchStart', [contact(1, midX - 80, midY), contact(2, midX + 80, midY)])
       await touch(cdp, 'touchMove', [contact(1, midX - 50, midY), contact(2, midX + 50, midY)])
-      await expect.poll(async () => (await readCamera(page)).zoom).toBeLessThan(second.zoom)
+      expect((await readCamera(page)).zoom).toBe(second.zoom)
     } finally {
       await releaseTouches(cdp)
       await cdp.detach()
@@ -141,7 +143,14 @@ test.describe('Rally editor zoom', () => {
     const second = contact(2, x, y + 88)
     const overFit = contact(2, x, y)
     const closer = contact(1, x - 95, y)
-    const initial = await readCamera(page)
+    const fitted = await readCamera(page)
+    // Pinch still works normally when zoomed in enough for manual editing.
+    let initial = fitted
+    for (let step = 0; step < 40 && initial.zoom < 0.2; step += 1) {
+      await useViewAction(page, 'Zoom in')
+      initial = await readCamera(page)
+    }
+    expect(initial.zoom).toBeGreaterThanOrEqual(0.2)
     const readEditor = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor)
     const editor = await readEditor()
     const cdp = await context.newCDPSession(page)
@@ -167,7 +176,7 @@ test.describe('Rally editor zoom', () => {
     expect(await readCamera(page)).toEqual(chosen)
     expect(await readEditor()).toEqual(editor)
     await useViewAction(page, 'Fit track', 'tap')
-    expect(await readCamera(page)).toEqual(initial)
+    expect(await readCamera(page)).toEqual(fitted)
     expect(await readEditor()).toEqual(editor)
   })
 
@@ -180,7 +189,7 @@ test.describe('Rally editor zoom', () => {
     expect(await readCamera(page)).toEqual(chosen)
   })
 
-  test('brings the route back into view with Zoom out after panning', async ({ page, context }) => {
+  test('uses Fit track after panning when the already-fitted course exceeds the manual zoom range', async ({ page, context }) => {
     const canvas = await page.locator('#game-container canvas').boundingBox()
     const dock = await page.locator('.editor-context-dock').boundingBox()
     const fit = await readCamera(page)
@@ -206,14 +215,12 @@ test.describe('Rally editor zoom', () => {
 
     await useViewAction(page, 'Zoom out', 'tap')
     const overview = await readCamera(page)
-    expect(overview.zoom).toBeLessThan(fit.zoom)
-    expect(bottomOfRoad(overview)).toBeLessThan(dock.y)
-    await expectClearRoad(page, road)
+    expect(overview.zoom).toBe(fit.zoom)
+    expect(bottomOfRoad(overview)).toBeGreaterThan(dock.y)
 
-    await useViewAction(page, 'Zoom out', 'tap')
-    expect((await readCamera(page)).zoom).toBeLessThan(overview.zoom)
     await useViewAction(page, 'Fit track', 'tap')
     expect(await readCamera(page)).toEqual(fit)
+    await expectClearRoad(page, road)
   })
 })
 
@@ -379,7 +386,8 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     await useViewAction(page, 'Zoom out')
     await useViewAction(page, 'Zoom out')
     const zoomed = await readCamera(page)
-    expect(zoomed.zoom).toBeLessThan(camera.zoom)
+    const floor = Math.max(width, height) / 15_000
+    expect(zoomed.zoom).toBeCloseTo(Math.max(camera.zoom / (1.2 ** 2), Math.min(camera.zoom, floor)))
     await expectClearRoad(page, outline)
     const after = await captureRoad()
     await testInfo.attach(`large-${width}-zoomed-out.png`, { body: after, contentType: 'image/png' })
