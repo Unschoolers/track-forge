@@ -19,6 +19,7 @@ import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/rac
 import { DialogController } from '@/ui/dialogController'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
+import { createEditorExitModal } from '@/ui/modals/editorExitModal'
 import { createNameModal } from '@/ui/modals/nameModal'
 import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
 import { createOptionsModal } from '@/ui/modals/optionsModal'
@@ -478,10 +479,11 @@ export class DomUiHost implements UiHost {
           submit: (name) =>
             this.controller.dispatch({
               type:
-                state.overlay.type === 'track-name' &&
-                state.overlay.purpose === 'rename'
+                state.overlay.type === 'track-name' && state.overlay.purpose === 'rename'
                   ? 'rename-track'
-                  : 'create-track',
+                  : state.overlay.type === 'track-name' && state.overlay.purpose === 'save-as'
+                    ? 'save-as-track'
+                    : 'create-track',
               name,
             }),
         })
@@ -569,6 +571,13 @@ export class DomUiHost implements UiHost {
             }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
         })
+      case 'editor-exit':
+        return createEditorExitModal({
+          save: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' }),
+          saveAs: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'save-as' }),
+          discard: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' }),
+          cancel: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'cancel' }),
+        })
       case 'editor-menu':
         return createEditorMenuModal(state.editor.environmentId, state.editor.routeKind, {
           close,
@@ -585,6 +594,8 @@ export class DomUiHost implements UiHost {
           },
           save: () =>
             this.controller.dispatch({ type: 'save-current-track' }),
+          saveAs: () =>
+            this.controller.dispatch({ type: 'open-track-name', purpose: 'save-as' }),
           rename: () =>
             this.controller.dispatch({
               type: 'open-track-name',
