@@ -195,6 +195,31 @@ describe('EditorInputController', () => {
     expect(dispatch).not.toHaveBeenCalled()
   })
 
+  it('clamps wheel and pinch zoom-out to the same road-budget floor', () => {
+    const viewport = { width: 390, height: 844 }
+    const floor = 844 / 15_000
+    const camera: EditorCamera = { x: 0, y: 0, zoom: 0.08 }
+    const input = new EditorInputController({
+      camera,
+      viewport: () => viewport,
+      tool: () => 'pan',
+      surface: () => 'street',
+      editor: () => createEditorState(),
+      dispatch: vi.fn(),
+    })
+    input.zoomBy(-10)
+    expect(camera.zoom).toBeCloseTo(floor)
+    camera.zoom = 0.08
+    input.pointerDown({ id: 1, x: 50, y: 200 })
+    input.pointerDown({ id: 2, x: 250, y: 200 })
+    input.pointerMove({ id: 2, x: 100, y: 200 })
+    expect(camera.zoom).toBeCloseTo(floor)
+    input.pointerMove({ id: 2, x: 80, y: 200 })
+    expect(camera.zoom).toBeCloseTo(floor)
+    input.pointerUp({ id: 1, x: 50, y: 200 })
+    input.pointerUp({ id: 2, x: 80, y: 200 })
+  })
+
   it('pinches around the gesture midpoint without painting, then requires a fresh touch', () => {
     const dispatch = vi.fn()
     const camera: EditorCamera = { x: 0, y: 0, zoom: 1 }

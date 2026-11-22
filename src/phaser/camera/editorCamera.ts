@@ -1,13 +1,18 @@
 import { clamp } from '@/domain/geometry/math'
+import { MAX_ROAD_CONTROL_LENGTH } from '@/domain/track/roadLength'
 import type { Vector2 } from '@/domain/model'
 import type { EditorCamera } from '@/phaser/input/editorInput'
 import type { EditorCameraAction } from '@/domain/editor/editorGeometry'
 
-/** Keep the zoom positive and leave room to zoom out past large course overviews. */
+/** Absolute safety bounds; fit may need to exceed the manual zoom-out range for imported tracks. */
 export const EDITOR_ZOOM_LIMITS = {
   minimum: 0.00001,
   maximum: 2.7,
 } as const
+
+// One viewport can show at most a quarter of the supported road budget per axis.
+// This prevents empty editor views from expanding into effectively unbounded maps.
+const MANUAL_VIEW_SPAN = MAX_ROAD_CONTROL_LENGTH / 4
 
 interface ViewportArea {
   readonly left: number
@@ -102,6 +107,20 @@ export function fitEditorCamera(
   return best
 }
 
+/** Manual zoom-out has a fixed world-space floor; Fit track can go further for existing maps. */
+export function minimumEditorManualZoom(viewport: Pick<EditorViewport, 'width' | 'height'>): number {
+  return clamp(
+    Math.max(1, viewport.width, viewport.height) / MANUAL_VIEW_SPAN,
+    EDITOR_ZOOM_LIMITS.minimum,
+    EDITOR_ZOOM_LIMITS.maximum,
+  )
+}
+
+/** Preserve the current scale when a legacy/imported track was fitted beyond the manual floor. */
+export function minimumEditorZoomOut(cameraZoom: number, viewport: Pick<EditorViewport, 'width' | 'height'>): number {
+  return Math.min(cameraZoom, minimumEditorManualZoom(viewport))
+}
+
 export function applyEditorCameraAction(
   camera: EditorCamera,
   action: EditorCameraAction,
@@ -111,9 +130,11 @@ export function applyEditorCameraAction(
   if (action === 'fit') return fitEditorCamera(points, viewport)
   const zoom = clamp(
     camera.zoom * (action === 'zoom-in' ? 1.2 : 1 / 1.2),
-    EDITOR_ZOOM_LIMITS.minimum,
+    minimumEditorZoomOut(camera.zoom, viewport),
     EDITOR_ZOOM_LIMITS.maximum,
   )
+  // Reaching the floor must not unexpectedly recenter a manually panned view.
+  if (action === 'zoom-out' && zoom === camera.zoom) return camera
   let nearest = { ...camera, zoom }
   if (action === 'zoom-in' || points.length === 0 || zoom > 1) return nearest
 
