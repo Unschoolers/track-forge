@@ -99,7 +99,11 @@ export function advanceArcadeTimingGate(
     ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
       passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
     : gate === 4 ? passedStageFinish(path, vehicle) : passedPendingCheckpoint(path, vehicle)
-  if (!crossedLine && !(passedGate && clearlyBeyondGate(path, position, vehicle, reversed))) {
+  // Open-stage finish bypass already checks the actual finish plane.
+  // Do not apply the circuit/index-jump clearance rule twice at the finish.
+  const confirmedBypass = passedGate && (!path.closed && gate === 4 ||
+    clearlyBeyondGate(path, position, vehicle, reversed))
+  if (!crossedLine && !confirmedBypass) {
     return { vehicle, missedCheckpoint }
   }
   // Road classification at a diagonal gate can change on the crossing frame.
