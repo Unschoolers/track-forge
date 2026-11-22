@@ -3,6 +3,7 @@ import { decodeProgress, encodeProgress, isNewerWireSequence, PROGRESS_PERIOD_MS
 /** A low-rate optional stream; old peers ignore these packets and still render poses. */
 export class NearbyProgressSync {
   private readonly remote = new Map<number, { sequence: number; value: number; at: number }>()
+  private readonly relayed = new Map<number, number>()
   private nextSequence = 0
   private lastSentAt = Number.NEGATIVE_INFINITY
   private sendFailures = 0
@@ -21,6 +22,7 @@ export class NearbyProgressSync {
     this.inFlight.clear()
     this.sendFailures = 0
     this.remote.clear()
+    this.relayed.clear()
     this.nextSequence = 0
     this.lastSentAt = Number.NEGATIVE_INFINITY
   }
@@ -37,15 +39,22 @@ export class NearbyProgressSync {
   /** One host relay per progress source, addressed to every eligible guest. */
   relay(packet: Uint8Array, recipients: string[]): void {
     const message = decodeProgress(packet)
-    if (message && recipients.length && !this.inFlight.has(message.slot)) {
-      this.dispatch(message.slot, packet, recipients)
-    }
+    if (!message || !recipients.length || this.inFlight.has(message.slot) ||
+        !isNewerWireSequence(message.sequence, this.relayed.get(message.slot))) return
+    // Mark a relay as delivered only on success; a transport failure can
+    // safely retry the same packet instead of stranding remote progress.
+    this.dispatch(message.slot, packet, recipients, () => {
+      this.relayed.set(message.slot, message.sequence)
+    })
   }
 
-  private dispatch(slot: number, packet: Uint8Array, recipients: string[]): void {
+  private dispatch(slot: number, packet: Uint8Array, recipients: string[], onSent?: () => void): void {
     const active = this.generation
     this.inFlight.add(slot)
     void this.send(recipients, packet)
+      .then(() => {
+        if (active === this.generation) onSent?.()
+      })
       .catch(() => {
         if (active === this.generation) this.sendFailures++
       })
