@@ -265,3 +265,33 @@ it('clears the recovery anchor after sustained travel on a newly acquired arm', 
     { steering: 0, throttle: 0, braking: true }, 1 / 60, random).state
   expect(required(travelled.vehicles[0]).recoveryAnchorIndex).toBeUndefined()
 })
+
+
+it('recovers at the last supported road position rather than the latest authored marker', () => {
+  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const contact = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+  const player = {
+    ...required(race.vehicles[0]),
+    x: 440, y: 100, pathIndex: contact, lastRoadContactIndex: contact,
+    recoveryCheckpoint: 0, nextSector: 2 as const, lap: 1,
+  }
+  const state = recoverRacePlayer({ ...race, phase: 'running', vehicles: [player], recoveryCheckpoints: [0] })
+  expect(state.vehicles[0]).toMatchObject({
+    x: expect.closeTo(440, -1), y: expect.closeTo(0), lastRoadContactIndex: contact,
+    nextSector: 2, lap: 1,
+  })
+})
+
+it('never uses road contact across an unpassed timing gate', () => {
+  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const count = closeArmsPath.points.length
+  const beforeGate = Math.floor(count / 8)
+  const beyondGate = Math.floor(count / 2)
+  const player = {
+    ...required(race.vehicles[0]), pathIndex: beforeGate,
+    lastRoadContactIndex: beyondGate, nextSector: 1 as const,
+  }
+  const recovered = resetRaceVehicle(player, race)
+  expect(recovered.pathIndex).toBeLessThan(Math.ceil(count / 4))
+  expect(recovered.nextSector).toBe(1)
+})

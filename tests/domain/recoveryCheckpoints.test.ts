@@ -30,18 +30,18 @@ function at(x: number, speed = 0) {
 }
 
 describe('authored race recovery checkpoints', () => {
-  it.each(['arcade', 'simulation'] as const)('uses the last driven checkpoint for water and manual recovery in %s', handling => {
+  it.each(['arcade', 'simulation'] as const)('uses the latest safe road contact for water and manual recovery in %s', handling => {
     const race = running(handling)
     const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
     const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
     const after = requireFixture(passed.vehicles[0])
-    const fartherAlong = { ...after, ...at(450), nextSector: 2 as const }
-    expect(resetRaceVehicle(fartherAlong, passed).x).toBeCloseTo(180)
+    const fartherAlong = { ...after, ...at(450), lastRoadContactIndex: at(450).pathIndex, nextSector: 2 as const }
+    expect(resetRaceVehicle(fartherAlong, passed).x).toBeCloseTo(450)
 
     const incident = stepRace({ ...passed, elapsed: 9, vehicles: [{ ...fartherAlong, ...at(610) }] }, coast, 1 / 60, random)
     expect(incident.state.phase).toBe('running')
     expect(incident.state.elapsed).toBeGreaterThan(9)
-    expect(incident.state.vehicles[0]).toMatchObject({ x: 180, speed: 0, nextSector: 2 })
+    expect(incident.state.vehicles[0]).toMatchObject({ x: 450, speed: 0, nextSector: 2 })
     expect(incident.events.filter(event => event.type === 'vehicle-recovered')).toHaveLength(1)
   })
 
@@ -53,14 +53,14 @@ describe('authored race recovery checkpoints', () => {
     expect(recovered.state.phase).toBe('running')
   })
 
-  it('returns a wrecked player to their checkpoint with a driveable car', () => {
+  it('returns a wrecked player to their most recent road contact with a driveable car', () => {
     const race = running('simulation')
     const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
     const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
     const after = requireFixture(passed.vehicles[0])
-    const wrecked = { ...after, ...at(450), wrecked: true, damage: after.damageLimit }
+    const wrecked = { ...after, ...at(450), lastRoadContactIndex: at(450).pathIndex, wrecked: true, damage: after.damageLimit }
     const recovered = stepRace({ ...passed, vehicles: [wrecked] }, coast, 1 / 60, random)
-    expect(recovered.state.vehicles[0]).toMatchObject({ x: 180, wrecked: false, damage: 0 })
+    expect(recovered.state.vehicles[0]).toMatchObject({ x: 450, wrecked: false, damage: 0 })
     expect(recovered.state.phase).toBe('running')
   })
 
@@ -73,7 +73,7 @@ describe('authored race recovery checkpoints', () => {
       const approaching = { ...requireFixture(passed.vehicles[0]), ...at(229, 100) }
       const impact = stepRace({ ...passed, vehicles: [approaching] }, coast, 1 / 30, random)
       if (environmentId === 'desert') {
-        expect(impact.state.vehicles[0]?.x).toBe(180)
+        expect(impact.state.vehicles[0]?.x).toBeGreaterThan(210)
         expect(impact.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'scenery' }))
       } else {
         expect(impact.state.vehicles[0]?.x).toBeGreaterThan(229)
