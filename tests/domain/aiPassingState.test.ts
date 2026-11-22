@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { requireFixture } from '../fixtures/requireFixture'
 import { advancePassingState } from '@/domain/race/ai/passingState'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRace } from '@/domain/race/raceFactory'
@@ -10,9 +11,8 @@ import type { TrafficObservation, TrafficState } from '@/domain/race/ai/traffic'
 const track = createStarterTrack(asTrackId('ai-passing-policy'), 1)
 const path = buildRoadPath(track.points, track.terrain)
 const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
-const first = race.vehicles[0]
-const other = race.vehicles[1]
-if (!first || !other) throw new Error('Missing passing vehicle fixtures')
+const first = requireFixture(race.vehicles[0])
+const other = requireFixture(race.vehicles[1])
 const vehicle = { ...first, speed: 160, lane: 0 }
 
 function observation(signedDistance: number, lane = 0): TrafficObservation {
