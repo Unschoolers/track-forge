@@ -19,6 +19,7 @@ import type {
 import {
   appendDrawPoint,
   nearestControlPoint,
+  nearestCheckpointMarker,
   nearestSegmentIndex,
   planPointInsertion,
   nearestTree,
@@ -643,15 +644,10 @@ export class EditorInputController {
   private beginCheckpointGesture(pointer: PointerSample, world: Vector2): void {
     const path = this.dependencies.path?.()
     if (!path || path.totalLength <= 0) return
-    const sampleCount = path.closed ? path.points.length : path.points.length - 1
-    const grabRadius = 16 / this.dependencies.camera.zoom
-    const mark = this.dependencies.editor().recoveryCheckpoints
-      .map(ratio => {
-        const point = path.points[Math.min(path.points.length - 1, Math.round(ratio * sampleCount))]
-        return { ratio, distance: point ? Math.hypot(point.x - world.x, point.y - world.y) : Infinity }
-      })
-      .filter(candidate => candidate.distance <= grabRadius)
-      .sort((a, b) => a.distance - b.distance)[0]?.ratio
+    const mark = nearestCheckpointMarker(
+      path.points, path.closed, this.dependencies.editor().recoveryCheckpoints,
+      world, this.dependencies.camera.zoom,
+    )
     this.checkpointGesture = { start: pointer, mark, dragging: false }
   }
 
