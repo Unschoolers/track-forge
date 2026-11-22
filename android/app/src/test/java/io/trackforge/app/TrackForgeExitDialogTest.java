@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import android.app.Activity;
 import android.app.Dialog;
+import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -13,6 +14,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
@@ -23,6 +25,8 @@ public class TrackForgeExitDialogTest {
         AtomicInteger exits = new AtomicInteger();
         Dialog dialog = TrackForgeExitDialog.create(activity, exits::incrementAndGet);
         dialog.show();
+        // Dialog delivers OnShow via the main Looper; window styling is set there.
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
 
         TextView title = dialog.findViewById(R.id.exit_dialog_title);
         assertEquals(activity.getString(R.string.exit_track_forge_title), title.getText().toString());
