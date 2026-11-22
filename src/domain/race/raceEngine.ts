@@ -262,7 +262,7 @@ function advanceRace(
         : updated
       const reset = rivalBelowDeck
         ? resetVehicleToTrack(candidate, state.path, { pathIndex: candidate.pathIndex, reversed: state.reversed })
-        : resetRaceVehicle(candidate, state)
+        : resetRaceVehicle(candidate, { ...state, missedCheckpoint })
       if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',
@@ -314,7 +314,7 @@ function advanceRace(
       const candidate = previous
         ? restoreFrameProgress({ ...vehicle, pathIndex: previous.pathIndex }, previous)
         : vehicle
-      const reset = resetRaceVehicle(candidate, state)
+      const reset = resetRaceVehicle(candidate, { ...state, missedCheckpoint })
       if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: vehicle.id,
@@ -332,6 +332,17 @@ function advanceRace(
     }
     if (!waterContact) {
       return vehicle
+    }
+    if (vehicle.player && missedCheckpoint) {
+      // Even an off-road/water recovery during the grace period must land
+      // before the missed stripe, not at a later contact on the next lap.
+      const recovering = previous ? restoreFrameProgress(vehicle, previous) : vehicle
+      const reset = resetMissedCheckpoint(recovering, { ...state, missedCheckpoint })
+      events.push({
+        type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
+        x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
+      })
+      return reset
     }
     const recoverySector = previous?.nextSector ?? vehicle.nextSector
     const pathIndex = vehicle.player
