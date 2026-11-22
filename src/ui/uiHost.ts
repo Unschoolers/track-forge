@@ -71,6 +71,7 @@ export class DomUiHost implements UiHost {
   private lastUpdateCheckAt = Number.NEGATIVE_INFINITY
   private updateCheckGeneration = 0
   private previousOverlayType: AppSnapshot['overlay']['type'] = 'none'
+  private readonly noticeTimers = new Set<ReturnType<typeof setTimeout>>()
 
   constructor(
     private readonly root: HTMLElement,
@@ -110,6 +111,8 @@ export class DomUiHost implements UiHost {
     this.availableUpdate = null
     this.lastUpdateCheckAt = Number.NEGATIVE_INFINITY
     this.previousOverlayType = 'none'
+    for (const timer of this.noticeTimers) clearTimeout(timer)
+    this.noticeTimers.clear()
     this.root.replaceChildren()
     if (this.mounted) {
       this.root.removeEventListener('pointerdown', this.onIntent)
@@ -144,15 +147,10 @@ export class DomUiHost implements UiHost {
 
   private async exportTrackFile(track: Track): Promise<void> {
     try {
-      if (await exportTrack(track)) {
-        const toast = createToast('Track file saved.')
-        this.root.append(toast)
-        setTimeout(() => toast.remove(), 5000)
-      }
-    } catch {
-      const toast = createToast('Export failed. Please try another save location.')
-      this.root.append(toast)
-      setTimeout(() => toast.remove(), 5000)
+      if (await exportTrack(track)) this.showRaceExportNotice('Track file saved.')
+    } catch (error) {
+      console.error('Track Forge track export failed:', error)
+      this.showRaceExportNotice('Export failed. Please try another save location.')
     }
   }
 
@@ -177,9 +175,15 @@ export class DomUiHost implements UiHost {
   }
 
   private showRaceExportNotice(message: string): void {
+    // An export can finish after navigating away or tearing down the UI host.
+    if (!this.mounted) return
     const toast = createToast(message)
     this.root.append(toast)
-    setTimeout(() => toast.remove(), 5000)
+    const timer = setTimeout(() => {
+      this.noticeTimers.delete(timer)
+      toast.remove()
+    }, 5000)
+    this.noticeTimers.add(timer)
   }
 
   private async downloadNearbyDiagnostics(nearby: NearbyRace): Promise<boolean> {
