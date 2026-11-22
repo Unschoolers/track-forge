@@ -515,6 +515,7 @@ export class EditorScene extends Phaser.Scene {
           bottom: this.editorCamera.y + halfHeight,
         },
         night,
+        this.editorCamera.zoom,
       )
     }
   }
