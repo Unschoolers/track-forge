@@ -1,6 +1,6 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
-import { authoredRecoveryTarget, lastRoadRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
+import { authoredRecoveryTarget, lastRoadRecoveryTarget, planMissedCheckpointRecovery, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
 import { isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
@@ -78,22 +78,19 @@ export function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): Ra
       )
     }
   }
-  const count = race.path.points.length
-  const previousGate = vehicle.nextSector - 1
-  const progress = Math.floor((race.path.closed ? count : count - 1) * previousGate / 4)
-  const target = race.path.closed
-    ? ((race.startPathIndex + (race.reversed ? -1 : 1) * progress) % count + count) % count
-    : progress
-  const contact = lastRoadRecoveryTarget(race, vehicle) ?? authoredRecoveryTarget(race, vehicle)
-  const candidate = { ...vehicle, pathIndex: contact ?? target, recoveryAnchorIndex: contact ?? target }
-  const safe = safeFallbackRecoveryTarget(race, candidate)
-  // A badly authored course can have no dry road before the pending gate.
-  // Still complete the countdown: restore the pre-gate road centre and
-  // suppress water-reset loops until the driver reaches dry support.
+  const plan = planMissedCheckpointRecovery(race, vehicle)
+  if (!plan) return vehicle
+  // Preserve the fallback for badly authored courses that have no dry road
+  // before the pending gate, without creating water-reset loops.
   return resetVehicleToTrack(
-    { ...candidate, waterRecoveryProtected: safe === undefined },
+    {
+      ...vehicle,
+      pathIndex: plan.anchorIndex,
+      recoveryAnchorIndex: plan.anchorIndex,
+      waterRecoveryProtected: plan.waterRecoveryProtected,
+    },
     race.path,
-    { pathIndex: safe ?? target, reversed: race.reversed },
+    { pathIndex: plan.pathIndex, reversed: race.reversed },
   )
 }
 

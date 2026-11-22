@@ -67,6 +67,31 @@ export function authoredRecoveryTarget(course: RecoveryCourse, vehicle: RaceVehi
   return safePreGateSample(course, vehicle, index) ? index : undefined
 }
 
+export interface MissedCheckpointRecoveryPlan {
+  readonly anchorIndex: number
+  readonly pathIndex: number
+  readonly waterRecoveryProtected: boolean
+}
+
+/** Resolve the recovery location before touching physics or vehicle state. */
+export function planMissedCheckpointRecovery(
+  course: RecoveryCourse,
+  vehicle: RaceVehicle,
+): MissedCheckpointRecoveryPlan | undefined {
+  const count = course.path.points.length
+  if (count === 0) return undefined
+  const previousGate = vehicle.nextSector - 1
+  const progress = Math.floor((course.path.closed ? count : count - 1) * previousGate / 4)
+  const target = course.path.closed
+    ? ((course.startPathIndex + (course.reversed ? -1 : 1) * progress) % count + count) % count
+    : progress
+  const contact = lastRoadRecoveryTarget(course, vehicle) ?? authoredRecoveryTarget(course, vehicle)
+  const anchorIndex = contact ?? target
+  const candidate = { ...vehicle, pathIndex: anchorIndex, recoveryAnchorIndex: anchorIndex }
+  const safe = safeFallbackRecoveryTarget(course, candidate)
+  return { anchorIndex, pathIndex: safe ?? target, waterRecoveryProtected: safe === undefined }
+}
+
 /** Search around the followed sample without jumping to a spatially close arm. */
 export function safeFallbackRecoveryTarget(course: RecoveryCourse, vehicle: RaceVehicle): number | undefined {
   const { path, reversed, startPathIndex } = course
