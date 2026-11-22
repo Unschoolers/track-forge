@@ -82,7 +82,7 @@ export function createEditorContextDock(
     const kinds = SCENERY_KINDS_BY_ENVIRONMENT[environmentId]
     const selected = normalizeEditorSceneryChoice(state.editorUi.sceneryChoice, environmentId)
     const choices = [
-      sceneryChoice('tree', 'Tree', selected, actions.scenery),
+      ...(environmentId === 'kids-room' ? [] : [sceneryChoice('tree', 'Tree', selected, actions.scenery)]),
       ...kinds.flatMap((kind) => {
         const prop = environment.scenery[kind]
         return prop ? [sceneryChoice(kind, prop.label, selected, actions.scenery)] : []
@@ -92,6 +92,7 @@ export function createEditorContextDock(
     const group = createSegmentedButtons('Scenery', choices)
     if (choices.length > 3) {
       group.classList.add('editor-scenery-choices')
+      if (environmentId === 'kids-room') group.classList.add('editor-scenery-choices-kids-room')
       dock.dataset.layout = 'two-row'
     }
     dock.append(createContextRow(group))
