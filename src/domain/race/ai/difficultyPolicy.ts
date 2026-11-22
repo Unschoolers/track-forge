@@ -1,0 +1,50 @@
+import { DIFFICULTY_SPECS } from '@/domain/config'
+import type { DifficultyId } from '@/domain/model'
+
+type Handling = 'arcade' | 'simulation'
+
+/**
+ * Race pacing overrides live together, separate from authored line geometry.
+ * DIFFICULTY_SPECS remains the authority for core driver characteristics.
+ */
+const AI_PACE_POLICY = {
+  easy: { arcadeCornerMargin: 0.16, authoredLineSpeedRatio: 0.86 },
+  normal: { arcadeCornerMargin: 0.10, authoredLineSpeedRatio: 0.908 },
+  hard: { arcadeCornerMargin: 0, authoredLineSpeedRatio: 1 },
+} as const satisfies Record<DifficultyId, {
+  readonly arcadeCornerMargin: number
+  readonly authoredLineSpeedRatio: number
+}>
+
+/** Arcade and authored lines retain Hard steering technique on all levels. */
+export function aiSteeringDifficulty(
+  difficulty: DifficultyId,
+  handling: Handling,
+  hasAuthoredLine: boolean,
+): DifficultyId {
+  return handling === 'arcade' || hasAuthoredLine ? 'hard' : difficulty
+}
+
+/** The corner-speed reserve for non-authored Arcade rivals only. */
+export function arcadeCornerMargin(difficulty: DifficultyId): number {
+  return AI_PACE_POLICY[difficulty].arcadeCornerMargin
+}
+
+/** Émile-specific racing-line speed ratios, independent of line geometry. */
+export function authoredLineSpeedRatio(difficulty: DifficultyId): number {
+  return AI_PACE_POLICY[difficulty].authoredLineSpeedRatio
+}
+
+/**
+ * Grid-rival pace is deliberately chosen independently of steering technique:
+ * Arcade's historical baseline uses Hard's three distinct rival pace values.
+ */
+export function raceRivalPace(
+  difficulty: DifficultyId,
+  handling: Handling | undefined,
+  rivalIndex: number,
+): number {
+  const pace = DIFFICULTY_SPECS[(handling ?? 'arcade') === 'arcade' ? 'hard' : difficulty]
+  return (('aiPaces' in pace ? pace.aiPaces[rivalIndex] : undefined) ??
+    (0.985 - rivalIndex * 0.008))
+}
