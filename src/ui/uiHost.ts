@@ -198,8 +198,9 @@ export class DomUiHost implements UiHost {
     const challenge = `Race "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win?'} Import the attached track file to play.`
     try {
       if (await shareTrack(track, challenge)) return
-    } catch {
-      // Saving a copy also works when the system share sheet fails to open.
+    } catch (error) {
+      // Native sharing can fail without canceling a fallback track export.
+      console.error('Track Forge share failed:', error)
     }
     await this.exportTrackFile(track)
   }
