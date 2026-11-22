@@ -276,7 +276,6 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => {
   sceneHost.setRacePreparationForeground(false)
   music.setForeground(false)
-  controller.flushPendingEditorSave()
 })
 window.addEventListener('pageshow', syncForeground)
 window.addEventListener('trackforge:pause', () => {
