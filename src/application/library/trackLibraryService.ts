@@ -146,6 +146,14 @@ export class TrackLibraryService {
       : { ok: false, message: 'Could not copy the built-in track.' }
   }
 
+  /** Validate a rename without persisting an editor draft. */
+  renameDraft(source: Track, value: string): TrackMutationResult {
+    const validated = this.validateName(value, source.id)
+    return validated.ok
+      ? { ok: true, track: { ...source, name: validated.name } }
+      : validated
+  }
+
   rename(id: TrackId, value: string): TrackMutationResult {
     const existing = this.dependencies.trackStore.find(id)
     if (!existing) {
