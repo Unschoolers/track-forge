@@ -114,7 +114,11 @@ describe('modal application flows', () => {
     const initial: AppSnapshot = { ...state({ type: 'editor-menu' }), mode: 'editor' }
     const { root, port, update, host } = setup(initial)
     const environment = root.querySelector('[role="group"][aria-label="Environment"]')
-    expect(environment?.textContent).toBe('GrassCityscapeDesert')
+    expect(environment?.textContent).toBe("GrassCityscapeDesertKids' Room")
+    root.querySelector<HTMLButtonElement>('[data-environment="kids-room"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'editor', command: { type: 'set-environment', environmentId: 'kids-room' },
+    })
     expect(environment?.querySelector('[data-environment="grass"]')?.getAttribute('aria-pressed')).toBe('true')
     root.querySelector<HTMLButtonElement>('[data-environment="cityscape"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
@@ -136,6 +140,16 @@ describe('modal application flows', () => {
     root.querySelector<HTMLButtonElement>('[aria-label="Erase scenery"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-scenery', choice: 'city-bus-stop' })
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-scenery', choice: 'erase-scenery' })
+    update({
+      ...initial,
+      overlay: { type: 'none' },
+      editor: { ...initial.editor, environmentId: 'kids-room' },
+      editorUi: { ...initial.editorUi, tool: 'tree', sceneryChoice: 'tree' },
+    })
+    expect(root.querySelector('[data-scenery-kind="tree"]')).toBeNull()
+    expect(root.querySelector('[data-scenery-kind="kids-blocks"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(root.querySelectorAll('[data-scenery-kind]')).toHaveLength(7)
+    expect(root.querySelector('.editor-scenery-choices-kids-room')).not.toBeNull()
     host.destroy()
   })
 
@@ -160,7 +174,7 @@ describe('modal application flows', () => {
     })
   })
 
-  it('renders readiness and best times in the race library', () => {
+  it('keeps race readiness accessible without cluttering saved cards with times', () => {
     const { root, port } = setup(
       state({ type: 'track-library', purpose: 'race' }),
     )
@@ -176,12 +190,18 @@ describe('modal application flows', () => {
     expect(share?.textContent).toBe('SHARE')
     expect(share?.querySelector('svg path')).not.toBeNull()
     expect(raceTile?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
-    expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(2)
+    expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(0)
     expect(raceTile?.contains(share ?? null)).toBe(false)
+    const overflow = share?.closest<HTMLDetailsElement>('details.track-card-overflow')
+    expect(overflow).not.toBeNull()
+    if (!overflow) throw new Error('Saved track share action must be in its overflow menu')
+    overflow.open = true
+    share?.click()
+    expect(overflow.open).toBe(false)
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
-    expect(root.querySelector('[data-action^="select-race-"]')?.getAttribute('data-action')).toBe('select-race-ready')
-    expect(root.textContent).toContain('01:02.345')
-    expect(root.textContent).toContain('NEEDS EDITING')
+    expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
+    expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
+    expect(root.textContent).toContain('Needs editing')
     expect(
       root.querySelector<HTMLButtonElement>(
         '[data-action="select-race-incomplete"]',
@@ -197,19 +217,57 @@ describe('modal application flows', () => {
     })
   })
 
-  it('keeps edit, share and delete as distinct labelled icon controls in compact track cards', () => {
+  it('makes edit the main card action with a separate favorite star and overflow management', () => {
     const { root, port } = setup(state({ type: 'track-library', purpose: 'edit' }))
     const card = root.querySelector('.track-card')
     const actions = card?.querySelectorAll<HTMLButtonElement>('.track-icon-action')
-    expect(actions).toHaveLength(3)
-    expect([...actions ?? []].map(action => action.textContent)).toEqual(['SHARE', 'EDIT', 'DELETE'])
+    expect([...actions ?? []].map(action => action.textContent)).toEqual(['SHARE', 'DELETE'])
     for (const action of actions ?? []) {
       expect(action.querySelector('svg path')).not.toBeNull()
       expect(action.getAttribute('aria-label')).toBeTruthy()
     }
     expect(card?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
+    expect(root.textContent).not.toContain('RACE READY')
+    expect(root.textContent).not.toContain('BEST')
+    expect(root.querySelector('[data-environment="grass"]')).not.toBeNull()
+    const favorite = root.querySelector<HTMLButtonElement>('[data-action="favorite-incomplete"]')
+    expect(favorite?.getAttribute('aria-pressed')).toBe('false')
+    favorite?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'toggle-track-favorite', id: incomplete.id })
+    expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'select-track-for-edit', id: incomplete.id })
     root.querySelector<HTMLButtonElement>('[data-action="select-edit-ready"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: ready.id })
+  })
+
+  it('only keeps one track overflow menu open at a time', () => {
+    const { root } = setup(state({ type: 'track-library', purpose: 'edit' }))
+    const menus = [...root.querySelectorAll<HTMLDetailsElement>('.track-card-overflow')]
+    expect(menus).toHaveLength(2)
+    const first = menus[0]
+    const second = menus[1]
+    if (!first || !second) throw new Error('Expected two track action menus')
+
+    first.querySelector('summary')?.click()
+    expect(first.open).toBe(true)
+    second.querySelector('summary')?.click()
+    expect(first.open).toBe(false)
+    expect(second.open).toBe(true)
+    first.querySelector('summary')?.click()
+    expect(first.open).toBe(true)
+    expect(second.open).toBe(false)
+    first.querySelector('summary')?.click()
+    expect(first.open).toBe(false)
+  })
+
+  it('shows favorite tracks first and labels environment colors without affecting modified dates', () => {
+    const favorites = { ...state({ type: 'track-library', purpose: 'edit' }),
+      preferences: { ...preferences, favoriteTrackIds: [ready.id] } }
+    const { root } = setup(favorites)
+    const cards = [...root.querySelectorAll('.track-card')]
+    expect(cards[0]?.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
+    expect(cards[0]?.querySelector('[data-action="favorite-ready"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(cards[0]?.querySelector('.track-environment-dot')?.getAttribute('title')).toBe('Grass')
+    expect(cards[0]?.querySelector('.track-card-name')?.textContent).toBe('Starter Circuit')
   })
 
   it('shows the selected car and lighting in the race setup flyover', () => {
@@ -427,7 +485,7 @@ it('hides share on built-in tracks but keeps it for player tracks', () => {
   const { root } = setup(library)
   expect(root.querySelector('[data-action="share-system-starter-circuit"]')).toBeNull()
   expect(root.querySelector('[data-action="share-my-track"]')).not.toBeNull()
-  expect(root.textContent).toContain('MADE BY Track Forge')
+  expect(root.textContent).toContain('Track Forge')
 })
 
 it('does not expose Nearby sharing for system-owned tracks', () => {
@@ -441,9 +499,13 @@ it('does not expose Nearby sharing for system-owned tracks', () => {
     ...state({ type: 'track-library', purpose: 'edit' }), tracks: [seeded, personal],
   }, {
     share: vi.fn(), sendNearby, importFile: vi.fn(), close: vi.fn(), create: vi.fn(),
-    selectForEdit: vi.fn(), selectForRace: vi.fn(), delete: vi.fn(),
+    selectForEdit: vi.fn(), selectForRace: vi.fn(), toggleFavorite: vi.fn(), delete: vi.fn(),
   }, new TrackGeometryService())
   expect(modal.querySelector('[data-action="send-nearby-system-starter-circuit"]')).toBeNull()
+  const menu = modal.querySelector<HTMLDetailsElement>('.track-card:has([data-action="send-nearby-my-track"]) .track-card-overflow')
+  expect(menu).not.toBeNull()
+  if (menu) menu.open = true
   modal.querySelector<HTMLButtonElement>('[data-action="send-nearby-my-track"]')?.click()
   expect(sendNearby).toHaveBeenCalledWith(personal)
+  expect(menu?.open).toBe(false)
 })

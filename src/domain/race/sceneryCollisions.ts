@@ -19,6 +19,12 @@ const PROP_RADIUS: Record<SceneryPropKind, number> = {
   'desert-boulder': 22,
   'desert-rock-cluster': 22,
   'desert-rock-spire': 17,
+  'kids-blocks': 23,
+  'kids-teddy': 27,
+  'kids-crayons': 7,
+  'kids-book': 29,
+  'kids-dinosaur': 24,
+  'kids-top': 13,
 }
 
 interface SceneryCollider extends Vector2 {

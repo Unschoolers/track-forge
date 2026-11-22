@@ -207,7 +207,7 @@ describe('ramp vehicle rendering', () => {
 					upper.bodies,
 					`ramp index ${index}, height ${road.height}`,
 				).toHaveLength(4)
- 				expect(lower.bodies).toHaveLength(0)
+				expect(lower.bodies).toHaveLength(0)
 				expect(upper.shadows).toHaveLength(4)
 				for (const shadow of upper.shadows) {
 					expect(Math.hypot(shadow.x - point.x, shadow.y - point.y)).toBeLessThan(2)

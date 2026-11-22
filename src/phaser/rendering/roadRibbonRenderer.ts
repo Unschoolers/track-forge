@@ -1,5 +1,7 @@
 import type Phaser from 'phaser'
-import { SURFACE_SPECS } from '@/domain/config'
+import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { RoadRibbonSample } from '@/domain/track/trackGeometry'
@@ -18,6 +20,8 @@ export type UpdateRoadRibbonVisibility = (view: GroundViewport, paddedViewport?:
 
 export interface RoadRibbonQuad {
   readonly surface: SurfaceId
+  readonly from: RoadRibbonSample['center']
+  readonly to: RoadRibbonSample['center']
   readonly edge: readonly [Vector2, Vector2, Vector2, Vector2]
   readonly road: readonly [Vector2, Vector2, Vector2, Vector2]
 }
@@ -38,6 +42,8 @@ export function buildRoadRibbonQuads(
     if (!current || !next) continue
     quads.push({
       surface: current.surface,
+      from: current.center,
+      to: next.center,
       edge: [
         current.edgeLeft,
         next.edgeLeft,
@@ -68,6 +74,7 @@ function renderRoadRibbonPass(
   quads: readonly RoadRibbonQuad[],
   pass: 'edge' | 'road',
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
   const colorKey = pass === 'edge'
     ? (night ? 'nightEdge' : 'edge')
@@ -75,10 +82,19 @@ function renderRoadRibbonPass(
   let previous: SurfaceId | undefined
   for (const quad of quads) {
     if (quad.surface !== previous) {
-      graphics.fillStyle(hex(SURFACE_SPECS[quad.surface][colorKey]), 1)
+      graphics.fillStyle(hex(roadColorsForEnvironment(quad.surface, environmentId)[colorKey]), 1)
       previous = quad.surface
     }
     fillQuad(graphics, quad[pass])
+  }
+  if (pass === 'road' && environmentId === 'kids-room') {
+    // Pre-baked surface detail stays inside the same road chunk/culling pass.
+    for (const quad of quads) {
+      for (const stroke of kidsRoomRoadStrokes(quad.surface, quad.from, quad.to, night)) {
+        graphics.lineStyle(stroke.width, stroke.color, stroke.alpha)
+        graphics.lineBetween(stroke.start.x, stroke.start.y, stroke.end.x, stroke.end.y)
+      }
+    }
   }
 }
 
@@ -87,10 +103,11 @@ export function renderRoadRibbon(
   path: RoadPath,
   ribbon: readonly RoadRibbonSample[],
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
   const quads = buildRoadRibbonQuads(path, ribbon)
-  renderRoadRibbonPass(graphics, quads, 'edge', night)
-  renderRoadRibbonPass(graphics, quads, 'road', night)
+  renderRoadRibbonPass(graphics, quads, 'edge', night, environmentId)
+  renderRoadRibbonPass(graphics, quads, 'road', night, environmentId)
 }
 
 export function validBounds({ left, top, right, bottom }: WorldBounds): boolean {
@@ -129,6 +146,7 @@ export function renderRaceRoadRibbon(
   path: RoadPath,
   ribbon: readonly RoadRibbonSample[],
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): UpdateRoadRibbonVisibility | undefined {
   if (ribbon.length <= 2 * RIBBON_QUADS_PER_CHUNK) return undefined
   const quads = buildRoadRibbonQuads(path, ribbon)
@@ -138,14 +156,14 @@ export function renderRaceRoadRibbon(
     const batch = quads.slice(index, index + chunkSize)
     const bounds = ribbonChunkBounds(batch)
     const edge = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-    renderRoadRibbonPass(edge, batch, 'edge', night)
+    renderRoadRibbonPass(edge, batch, 'edge', night, environmentId)
     edgeChunks.push({ batch, bounds: validBounds(bounds) ? bounds : undefined, edge })
   }
   // Phaser keeps insertion order within one depth. Paint every edge before
   // any road strip so intersecting sections look the same as the shared renderer.
   const chunks = edgeChunks.map(({ batch, bounds, edge }) => {
     const road = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-    renderRoadRibbonPass(road, batch, 'road', night)
+    renderRoadRibbonPass(road, batch, 'road', night, environmentId)
     return { bounds, edge, road }
   })
 

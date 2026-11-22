@@ -1,4 +1,6 @@
-import { ROAD_GEOMETRY, SURFACE_SPECS } from '@/domain/config'
+import { ROAD_GEOMETRY } from '@/domain/config'
+import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -59,6 +61,14 @@ export function createRaceFlyoverRenderer(
     const b = points[0]
     if (a && b) sections.push({ a, b })
   }
+  // Flyover frames must only paint. Prepare distance-anchored details once
+  // rather than allocating strokes for every visible section on every frame.
+  const materialSections = environmentId === 'kids-room'
+    ? sections.map((section) => ({
+      ...section,
+      strokes: kidsRoomRoadStrokes(section.a.surface, section.a, section.b, night),
+    }))
+    : []
   const treeStride = Math.max(1, Math.ceil(track.trees.length / 350))
   const trees = track.trees.filter((_, index) => index % treeStride === 0)
 
@@ -182,10 +192,12 @@ export function createRaceFlyoverRenderer(
       const y = run.row * cellSize
       const runWidth = run.count * cellSize
       if (x > player.x + radius || x + runWidth < player.x - radius || Math.abs(y - player.y) > radius + cellSize) continue
-      ctx.fillStyle = run.kind === 'water' ? (night ? '#214b5c' : '#4d9cb1') : palette.flyoverHill
+      ctx.fillStyle = run.kind === 'water' ? (palette.flyoverWater ?? (night ? '#214b5c' : '#4d9cb1')) : palette.flyoverHill
       ctx.fillRect(x, y, runWidth, cellSize)
       if (run.kind === 'hill') {
-        ctx.fillStyle = night ? 'rgba(181, 204, 155, .10)' : 'rgba(226, 239, 186, .18)'
+        ctx.fillStyle = environmentId === 'kids-room'
+          ? (night ? 'rgba(211, 181, 169, .13)' : 'rgba(255, 235, 214, .30)')
+          : night ? 'rgba(181, 204, 155, .10)' : 'rgba(226, 239, 186, .18)'
         ctx.fillRect(x, y, runWidth, Math.max(2, cellSize * .12))
       }
     }
@@ -239,19 +251,36 @@ export function createRaceFlyoverRenderer(
     for (const edge of [true, false]) {
       for (const section of sections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-        const spec = SURFACE_SPECS[section.a.surface]
+        const spec = roadColorsForEnvironment(section.a.surface, environmentId)
         ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y)
         ctx.lineWidth = edge ? ROAD_GEOMETRY.edgeWidth : ROAD_GEOMETRY.surfaceWidth
         ctx.strokeStyle = edge && section.a.structure === 'overpass' ? (night ? '#aab4b2' : '#f3e9d3') : edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
         ctx.stroke()
       }
     }
+    // The flyover and Phaser road use identical distance-anchored material
+    // strokes, so textures never switch character between preview and race.
+    if (environmentId === 'kids-room') {
+      for (const section of materialSections) {
+        if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
+        for (const stroke of section.strokes) {
+          ctx.lineWidth = stroke.width
+          ctx.strokeStyle = `#${stroke.color.toString(16).padStart(6, '0')}`
+          ctx.globalAlpha = stroke.alpha
+          ctx.beginPath()
+          ctx.moveTo(stroke.start.x, stroke.start.y)
+          ctx.lineTo(stroke.end.x, stroke.end.y)
+          ctx.stroke()
+        }
+      }
+      ctx.globalAlpha = 1
+    }
     // Road markings and warm pools make the direction and night scene readable at small sizes.
     ctx.setLineDash([20, 26])
     ctx.lineWidth = 2
     for (const section of sections) {
       if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-      const spec = SURFACE_SPECS[section.a.surface]
+      const spec = roadColorsForEnvironment(section.a.surface, environmentId)
       ctx.strokeStyle = night ? spec.nightStripe : spec.stripe
       ctx.lineDashOffset = -section.a.distance
       ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y); ctx.stroke()

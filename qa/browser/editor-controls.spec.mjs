@@ -52,7 +52,7 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await page.goto('/?qa')
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Edit Starter Circuit', exact: true }).click()
 
     const editor = page.locator('[data-screen="editor"]')
     await expect(editor).toBeVisible()
@@ -108,7 +108,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
     await page.goto('/?qa')
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Edit Environment QA', exact: true }).click()
     await expect.poll(() => page.evaluate(() => window.__trackForgeQa?.snapshot().camera?.zoom ?? 0)).toBeGreaterThan(0)
   }
   async function setEnvironment(name) {
@@ -161,7 +161,10 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
     await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
     await page.getByRole('button', { name: 'Race', exact: true }).click()
     const track = page.getByRole('button', { name: 'Race Environment QA', exact: true })
-    await expect(track.locator('svg.track-preview')).toHaveAttribute('style', /background-color/)
+    // Biome identity is now a compact dot; map previews must remain transparent.
+    await expect(track.locator('svg.track-preview')).toHaveAttribute('data-environment', 'cityscape')
+    await expect(track.locator('svg.track-preview')).not.toHaveAttribute('style', /background-color/)
+    await expect(track.locator('..').locator('.track-environment-dot')).toHaveAttribute('data-environment', 'cityscape')
     await track.click()
     await page.getByRole('button', { name: 'NIGHT', exact: true }).click()
     await expect(page.locator('.race-flyover')).toHaveAttribute('data-lighting', 'night')

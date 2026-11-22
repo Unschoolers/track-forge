@@ -79,8 +79,10 @@ export type EditorSceneryChoice = 'tree' | SceneryPropKind | 'erase-scenery'
 
 export function normalizeEditorSceneryChoice(choice: EditorSceneryChoice | undefined, environmentId: TrackEnvironmentId): EditorSceneryChoice {
   if (choice === 'erase-scenery') return choice
-  if (choice === 'tree') return choice
-  return choice && sceneryKindBelongsToEnvironment(choice, environmentId) ? choice : 'tree'
+  if (choice === 'tree') return environmentId === 'kids-room' ? 'kids-blocks' : choice
+  return choice && sceneryKindBelongsToEnvironment(choice, environmentId)
+    ? choice
+    : environmentId === 'kids-room' ? 'kids-blocks' : 'tree'
 }
 
 export interface EditorUiState {
@@ -182,6 +184,7 @@ export type AppCommand =
   | { readonly type: 'create-track'; readonly name: string }
   | { readonly type: 'rename-track'; readonly name: string }
   | { readonly type: 'delete-track'; readonly id: TrackId }
+  | { readonly type: 'toggle-track-favorite'; readonly id: TrackId }
   | { readonly type: 'import-track'; readonly content: string }
   | { readonly type: 'select-track-for-edit'; readonly id: TrackId }
   | { readonly type: 'select-track-for-race'; readonly id: TrackId }

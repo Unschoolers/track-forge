@@ -517,3 +517,15 @@ it('round-trips route topology and defaults legacy tracks to circuits', () => {
   expect(repository.save(track)).toBe(true)
   expect(repository.find(track.id)?.routeKind).toBe('circuit')
 })
+
+it('stores favorite track ids locally and rejects malformed preference data', () => {
+  const memory = new MemoryStore()
+  const repo = new BrowserPreferencesRepository(memory)
+  expect(repo.load().favoriteTrackIds).toEqual([])
+  expect(repo.save({ ...repo.load(), favoriteTrackIds: ['track-a', 'track-b'] })).toBe(true)
+  expect(new BrowserPreferencesRepository(memory).load().favoriteTrackIds).toEqual(['track-a', 'track-b'])
+  memory.values.set('trackforge-favorite-tracks-v1', '{broken')
+  expect(repo.load().favoriteTrackIds).toEqual([])
+  memory.values.set('trackforge-favorite-tracks-v1', JSON.stringify(['good', 'good', '', 42, 'x'.repeat(129)]))
+  expect(repo.load().favoriteTrackIds).toEqual(['good'])
+})
