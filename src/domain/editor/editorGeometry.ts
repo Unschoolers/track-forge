@@ -413,10 +413,18 @@ export function planTerrainExpansionAroundBoundsCenter(
 }
 
 function boundsCenter(content: readonly Vector2[]): Vector2 {
-  const xValues = content.map((item) => item.x)
-  const yValues = content.map((item) => item.y)
-  return {
-    x: (Math.min(...xValues) + Math.max(...xValues)) / 2,
-    y: (Math.min(...yValues) + Math.max(...yValues)) / 2,
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const item of content) {
+    minX = Math.min(minX, item.x)
+    minY = Math.min(minY, item.y)
+    maxX = Math.max(maxX, item.x)
+    maxY = Math.max(maxY, item.y)
   }
+  // This is called only with nonempty content by expansion planners.
+  // Halving each finite endpoint avoids overflow when opposite extremes
+  // would make (max - min) infinite, despite both coordinates being finite.
+  return { x: minX / 2 + maxX / 2, y: minY / 2 + maxY / 2 }
 }
