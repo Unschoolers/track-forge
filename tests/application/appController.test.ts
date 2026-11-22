@@ -224,6 +224,7 @@ describe('AppController', () => {
     expect(controller.snapshot().editorUi.tool).toBe('draw')
     expect(controller.snapshot().currentTrack?.raceRevision).toBeGreaterThan(track.updatedAt)
     controller.dispatch({ type: 'select-track-for-race', id: track.id })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
     expect(trackStore.find(track.id)?.routeKind).toBe('point-to-point')
     expect(controller.snapshot().overlay.type).toBe('race-setup')
     controller.dispatch({
@@ -408,6 +409,7 @@ describe('AppController', () => {
     controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
     controller.dispatch({ type: 'start-race' })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
     const input = { steering: 0, throttle: 1, braking: false }
     raceSession.advance(3.7, input)
     raceSession.advance(0.02, input)
@@ -484,135 +486,121 @@ describe('AppController', () => {
     })
   })
 
-  it('debounces editor persistence through the injected scheduler', () => {
-    const { controller, trackStore, scheduler, cancel, flush } = setup()
-    controller.dispatch({
-      type: 'editor',
-      command: { type: 'add-tree', tree: { x: 4, y: 5 } },
-    })
-    controller.dispatch({
-      type: 'editor',
-      command: { type: 'add-tree', tree: { x: 7, y: 8 } },
-    })
 
-    expect(scheduler.schedule).toHaveBeenCalledTimes(2)
-    expect(cancel).toHaveBeenCalledOnce()
+  it('edits only a draft until Save, and never autosaves on destroy', () => {
+    const { controller, trackStore, scheduler } = setup()
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
     expect(trackStore.save).not.toHaveBeenCalled()
-
-    flush()
-    expect(trackStore.save).toHaveBeenCalledOnce()
-    expect(trackStore.save.mock.calls[0]?.[0].trees).toHaveLength(9)
+    expect(scheduler.schedule).not.toHaveBeenCalled()
+    controller.dispatch({ type: 'go-home' })
+    expect(controller.snapshot().overlay.type).toBe('editor-exit')
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'cancel' })
+    expect(controller.snapshot().mode).toBe('editor')
+    controller.destroy()
+    expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
-  it('preserves pending edits when renaming a track', () => {
-    const { controller, trackStore, flush } = setup()
+  it.each(['go-home', 'start-race'] as const)('Save commits and resumes %s', (type) => {
+    const { controller, trackStore, raceSession } = setup()
+    controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    controller.dispatch({ type: 'rename-track', name: 'Renamed' })
-    flush()
-    expect(trackStore.find(asTrackId('starter'))).toMatchObject({ name: 'Renamed', trees: expect.arrayContaining([{ x: 4, y: 5 }]) })
+    controller.dispatch({ type })
+    expect(controller.snapshot()).toMatchObject({ mode: 'editor', overlay: { type: 'editor-exit' } })
+    expect(raceSession.start).not.toHaveBeenCalled()
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
+    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(controller.snapshot().mode).toBe(type === 'go-home' ? 'home' : 'race')
+  })
+
+  it.each(['edit', 'race'] as const)('Discard reverts draft before opening %s picker', (purpose) => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'open-track-library', purpose })
+    expect(controller.snapshot().overlay.type).toBe('editor-exit')
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' })
+    expect(controller.snapshot().overlay).toEqual({ type: 'track-library', purpose })
+    expect(controller.snapshot().currentTrack?.trees).not.toContainEqual({ x: 4, y: 5 })
+    expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
   it.each(['select-track', 'select-track-for-edit', 'select-track-for-race'] as const)(
-    'preserves pending edits before %s', (type) => {
+    'guards %s without accidentally saving prior edits', (type) => {
       const { controller, trackStore } = setup()
       const other = createStarterTrack(asTrackId('other'), 2)
       trackStore.tracks.set(other.id, other)
+      controller.dispatch({ type: 'open-editor' })
       controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
       controller.dispatch({ type, id: other.id })
-      expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+      expect(controller.snapshot().overlay.type).toBe('editor-exit')
+      controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' })
+      expect(controller.snapshot().currentTrack?.id).toBe(other.id)
+      expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
     },
   )
 
-  it('preserves pending edits before creating a track', () => {
+  it('Save As creates a distinct track, validates names and preserves the original', () => {
     const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    controller.dispatch({ type: 'create-track', name: 'New Track' })
-    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    controller.dispatch({ type: 'go-home' })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save-as' })
+    controller.dispatch({ type: 'save-as-track', name: 'Starter Circuit' })
+    expect(controller.snapshot().notice).toBe('That track name is already in use.')
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot().overlay.type).toBe('editor-exit')
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save-as' })
+    controller.dispatch({ type: 'save-as-track', name: 'New Circuit' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', currentTrack: { id: 'created', name: 'New Circuit' } })
+    expect(trackStore.find(asTrackId('created'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
-  it('flushes pending edits on destroy', () => {
+  it('does not leave on save failure and allows retry without draft loss', () => {
     const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    controller.destroy()
-    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
-  })
-
-  it.each([false, true])('recovers quota by deleting another track (still insufficient: %s)', (stillInsufficient) => {
-    const current = createStarterTrack(asTrackId('current'), 2)
-    const other = createStarterTrack(asTrackId('other'), 1)
-    const values = new Map<string, string>([[STORAGE_KEYS.trackMigration, '1']])
-    let limit = Infinity
-    const store = new BrowserTrackRepository({
-      get: (key) => values.get(key) ?? null,
-      set: (key, value) => { if (key === STORAGE_KEYS.tracks && value.length > limit) return false; values.set(key, value); return true },
-      remove: (key) => values.delete(key),
-    })
-    expect(store.save(current)).toBe(true)
-    expect(store.save(other)).toBe(true)
-    limit = stillInsufficient ? JSON.stringify([store.find(current.id)]).length : (values.get(STORAGE_KEYS.tracks) ?? '').length
-    const { controller, scoreStore, scheduler, raceSession } = setup()
-    controller.destroy()
-    const app = new AppController({ trackStore: store, scoreStore, scheduler, raceSession, preferencesStore: { load: () => preferences, save: () => true }, geometry: new TrackGeometryService(), createTrackId: () => asTrackId('new'), now: () => 500 })
-    app.dispatch({ type: 'open-editor' })
-    app.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    expect(app.flushPendingEditorSave()).toBe(false)
-    app.dispatch({ type: 'open-track-library', purpose: 'edit' })
-    expect(app.snapshot()).toMatchObject({ overlay: { type: 'track-library' }, notice: 'Save unavailable.' })
-    app.dispatch({ type: 'select-track-for-edit', id: other.id })
-    expect(app.snapshot().currentTrack?.id).toBe(current.id)
-    app.dispatch({ type: 'delete-track', id: other.id })
-    expect(store.find(other.id)).toBeUndefined()
-    expect(app.snapshot().currentTrack?.trees).toContainEqual({ x: 4, y: 5 })
-    expect(app.snapshot().notice).toBe(stillInsufficient ? 'Save unavailable.' : null)
-    if (stillInsufficient) {
-      app.dispatch({ type: 'close-overlay' })
-      expect(app.snapshot().notice).toBe('Save unavailable.')
-      limit = Infinity
-      expect(app.flushPendingEditorSave()).toBe(true)
-    }
-    expect(store.find(current.id)?.trees).toContainEqual({ x: 4, y: 5 })
-    app.dispatch({ type: 'editor', command: { type: 'undo' } })
-    expect(app.snapshot().currentTrack?.trees).not.toContainEqual({ x: 4, y: 5 })
-  })
-
-  it('retains a failed pending save for retry and blocks replacing the draft', () => {
-    const { controller, trackStore } = setup()
-    const other = createStarterTrack(asTrackId('other'), 2)
-    trackStore.tracks.set(other.id, other)
-    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'go-home' })
     trackStore.save.mockReturnValueOnce(false)
-    controller.dispatch({ type: 'select-track', id: other.id })
-    expect(controller.snapshot().currentTrack?.id).toBe('starter')
-    expect(controller.snapshot().notice).toBe('Save unavailable.')
-    controller.dispatch({ type: 'save-current-track' })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'editor', overlay: { type: 'editor-exit' }, notice: 'Save unavailable.' })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
+    expect(controller.snapshot().mode).toBe('home')
     expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
-    expect(controller.snapshot().notice).toBe('Track saved.')
   })
 
-  it('clears a failure notice after a later successful flush', () => {
-    const { controller, trackStore, flush } = setup()
+  it('renaming commits only the name while keeping draft geometry discardable', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    trackStore.save.mockReturnValueOnce(false)
-    flush()
-    expect(controller.snapshot().notice).toBe('Save unavailable.')
-    expect(controller.flushPendingEditorSave()).toBe(true)
-    expect(controller.snapshot().notice).toBeNull()
-    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
+    controller.dispatch({ type: 'rename-track', name: 'Renamed' })
+    expect(controller.snapshot().currentTrack?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(trackStore.find(asTrackId('starter'))?.name).toBe('Renamed')
+    expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
+    controller.dispatch({ type: 'go-home' })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'discard' })
+    expect(controller.snapshot().currentTrack?.name).toBe('Renamed')
+    expect(controller.snapshot().currentTrack?.trees).not.toContainEqual({ x: 4, y: 5 })
   })
 
-  it('does not resurrect a deleted track when a canceled callback runs', () => {
-    const { controller, trackStore, flush } = setup()
+  it('undoing the whole edit returns to clean without prompting', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'editor', command: { type: 'undo' } })
+    controller.dispatch({ type: 'go-home' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'none' } })
+    expect(trackStore.save).not.toHaveBeenCalled()
+  })
+
+  it('does not resurrect a deleted unsaved track', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
     controller.dispatch({ type: 'delete-track', id: asTrackId('starter') })
-    flush()
+    controller.destroy()
     expect(trackStore.find(asTrackId('starter'))).toBeUndefined()
-  })
-
-  it('flushes pending editor changes before opening race setup', () => {
-    const { controller, trackStore } = setup()
-    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
-    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
-    expect(trackStore.find(asTrackId('starter'))?.trees).toContainEqual({ x: 4, y: 5 })
   })
 
   it('persists preference changes through the injected repository', () => {
@@ -740,7 +728,7 @@ describe('AppController', () => {
   })
 
   it('persists terrain changes through the editor command boundary', () => {
-    const { controller, flush, trackStore } = setup()
+    const { controller, trackStore } = setup()
 
     controller.dispatch({
       type: 'editor',
@@ -757,7 +745,7 @@ describe('AppController', () => {
     expect(controller.snapshot().currentTrack?.terrain.cells).toEqual([
       { column: 2, row: 3, kind: 'hill' },
     ])
-    flush()
+    controller.dispatch({ type: 'save-current-track' })
     expect(trackStore.save).toHaveBeenLastCalledWith(
       expect.objectContaining({
         terrain: {
@@ -851,7 +839,7 @@ describe('AppController', () => {
 })
 
 describe('scenery persistence', () => {
-  it('autosaves appearance before switching and preserves race revision until a road edit', () => {
+  it('saves appearance before switching and preserves race revision until a road edit', () => {
     const original = createStarterTrack(asTrackId('first'), 1)
     const { controller, trackStore } = setup(original)
     const other = createStarterTrack(asTrackId('second'), 2)
@@ -860,6 +848,7 @@ describe('scenery persistence', () => {
     controller.dispatch({ type: 'editor', command: { type: 'add-scenery-prop', prop: { kind: 'city-house', x: 100, y: 100 } } })
     expect(controller.snapshot().currentTrack?.raceRevision).toBe(original.raceRevision ?? original.updatedAt)
     controller.dispatch({ type: 'select-track-for-edit', id: other.id })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
     expect(trackStore.find(original.id)?.scenery).toEqual([{ kind: 'city-house', x: 100, y: 100 }])
     controller.dispatch({ type: 'select-track-for-edit', id: original.id })
     expect(controller.snapshot().editor.environmentId).toBe('cityscape')
@@ -873,7 +862,7 @@ describe('scenery persistence', () => {
 describe('gesture race revisions', () => {
   it.each(['cancel-gesture', 'undo'] as const)('restores the revision and saves the starting course after %s', (finish) => {
     const track = createStarterTrack(asTrackId('gesture'), 1)
-    const { controller, trackStore, flush } = setup(track)
+    const { controller, trackStore } = setup(track)
     controller.dispatch({ type: 'editor', command: { type: 'set-environment', environmentId: 'desert' } })
     const start = controller.snapshot().currentTrack
     if (!start || start.raceRevision === undefined) throw new Error('Missing starting race revision')
@@ -882,7 +871,7 @@ describe('gesture race revisions', () => {
     expect(controller.snapshot().currentTrack?.raceRevision).toBeGreaterThan(start.raceRevision)
     controller.dispatch({ type: 'editor', command: { type: finish } })
     expect(controller.snapshot().currentTrack?.raceRevision).toBe(start.raceRevision)
-    flush()
+    controller.dispatch({ type: 'save-current-track' })
     expect(trackStore.find(track.id)).toMatchObject({ points: start.points, environmentId: 'desert', raceRevision: start.raceRevision })
   })
 })
@@ -890,7 +879,7 @@ describe('gesture race revisions', () => {
 describe('gesture revision isolation', () => {
   it('keeps a committed revision and does not carry a gesture revision to another track', () => {
     const track = createStarterTrack(asTrackId('gesture-first'), 1)
-    const { controller, trackStore, flush } = setup(track)
+    const { controller, trackStore } = setup(track)
     const second = createStarterTrack(asTrackId('gesture-second'), 7)
     trackStore.tracks.set(second.id, second)
     controller.dispatch({ type: 'editor', command: { type: 'begin-gesture' } })
@@ -899,10 +888,11 @@ describe('gesture revision isolation', () => {
     const committed = controller.snapshot().currentTrack!.raceRevision!
     expect(committed).toBeGreaterThan(track.raceRevision ?? track.updatedAt)
     controller.dispatch({ type: 'select-track-for-edit', id: second.id })
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
     controller.dispatch({ type: 'editor', command: { type: 'begin-gesture' } })
     controller.dispatch({ type: 'editor', command: { type: 'move-point', index: 0, point: { x: 10, y: 20 } } })
     controller.dispatch({ type: 'editor', command: { type: 'cancel-gesture' } })
-    flush()
+    controller.dispatch({ type: 'save-current-track' })
     expect(trackStore.find(second.id)?.raceRevision).toBe(second.raceRevision ?? second.updatedAt)
     expect(trackStore.find(track.id)?.raceRevision).toBe(committed)
   })
