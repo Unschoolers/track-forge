@@ -1,3 +1,4 @@
+import { requireFixture } from '../fixtures/requireFixture'
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
@@ -9,11 +10,6 @@ import {
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { validateTrack } from '@/domain/track/trackValidation'
-
-function required<T>(value: T | null | undefined): T {
-  if (value == null) throw new Error('Missing test fixture')
-  return value
-}
 
 // A race-ready route with two crossing branches only 73 path samples apart.
 const points = [
@@ -28,15 +24,15 @@ const points = [
   { x: -84, y: -70, surface: 'street' },
 ] as const
 const path = buildRoadPath(points, EMPTY_TERRAIN)
-const crossing = required(path.crossings.find(({ key }) => key === '0:2'))
+const crossing = requireFixture(path.crossings.find(({ key }) => key === '0:2'))
 const noInput = { steering: 0, throttle: 0, braking: false }
 const random = { next: () => 0.99 }
 
 function raceAtCrossing(lane: number, reversed: boolean) {
   const direction = reversed ? -1 : 1
   const index = crossing.firstPathIndex - direction * 10
-  const point = required(path.points[index])
-  const next = required(path.points[index + direction])
+  const point = requireFixture(path.points[index])
+  const next = requireFixture(path.points[index + direction])
   const length = Math.hypot(next.x - point.x, next.y - point.y)
   const tx = (next.x - point.x) / length
   const ty = (next.y - point.y) / length
@@ -48,7 +44,7 @@ function raceAtCrossing(lane: number, reversed: boolean) {
     reversed,
   })
   const vehicle = {
-    ...required(base.vehicles[0]),
+    ...requireFixture(base.vehicles[0]),
     x: point.x - ty * lane,
     y: point.y + tx * lane,
     angle: Math.atan2(ty, tx),
@@ -78,19 +74,19 @@ describe('road branch continuity', () => {
       { x: 0, y: 20, surface: 'street' },
     ], EMPTY_TERRAIN)
     const index = hairpin.points.findIndex((point) => point.segment === 0 && point.x > 100)
-    const point = required(hairpin.points[index])
+    const point = requireFixture(hairpin.points[index])
     const base = createRace({ path: hairpin, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     let race = {
       ...base,
       handling: 'arcade' as const,
       phase: 'running' as const,
-      vehicles: [{ ...required(base.vehicles[0]), x: point.x, y: 15, angle: 0,
+      vehicles: [{ ...requireFixture(base.vehicles[0]), x: point.x, y: 15, angle: 0,
         vx: 60, vy: 0, speed: 60, pathIndex: index }],
     }
     for (let frame = 0; frame < 20; frame += 1) {
       race = stepRace(race, noInput, 1 / 60, random).state as typeof race
-      const current = required(race.vehicles[0])
-      expect(required(hairpin.points[current.pathIndex]).segment, `frame ${frame}`).toBe(0)
+      const current = requireFixture(race.vehicles[0])
+      expect(requireFixture(hairpin.points[current.pathIndex]).segment, `frame ${frame}`).toBe(0)
     }
   })
 
@@ -123,7 +119,7 @@ describe('road branch continuity', () => {
         let race = raceAtCrossing(lane, reversed)
         for (let frame = 0; frame < 45; frame += 1) {
           race = stepRace(race, noInput, 1 / 60, random).state as typeof race
-          const vehicle = required(race.vehicles[0])
+          const vehicle = requireFixture(race.vehicles[0])
           const context = getVehicleStepContext(path, vehicle)
           expect(
             context.nearest.point.segment,
@@ -138,15 +134,15 @@ describe('road branch continuity', () => {
         const direction = reversed ? -1 : 1
         expect(
           direction *
-            (required(race.vehicles[0]).pathIndex - crossing.firstPathIndex),
+            (requireFixture(race.vehicles[0]).pathIndex - crossing.firstPathIndex),
         ).toBeGreaterThan(0)
       }
     },
   )
 
   it('retains either road when the other crossing branch is closer in 2D', () => {
-    const lower = required(path.points[crossing.firstPathIndex])
-    const upper = required(path.points[crossing.secondPathIndex])
+    const lower = requireFixture(path.points[crossing.firstPathIndex])
+    const upper = requireFixture(path.points[crossing.secondPathIndex])
     const lowerContext = getVehicleStepContext(path, {
       x: upper.x,
       y: upper.y,
@@ -171,11 +167,11 @@ describe('road branch continuity', () => {
       points.map((point) => ({ ...point, structure: 'surface' as const })),
       EMPTY_TERRAIN,
     )
-    const flatCrossing = required(
+    const flatCrossing = requireFixture(
       flat.crossings.find(({ key }) => key === '0:2'),
     )
-    const lower = required(flat.points[flatCrossing.firstPathIndex])
-    const other = required(flat.points[flatCrossing.secondPathIndex])
+    const lower = requireFixture(flat.points[flatCrossing.firstPathIndex])
+    const other = requireFixture(flat.points[flatCrossing.secondPathIndex])
     const first = getVehicleStepContext(flat, {
       x: other.x,
       y: other.y,
@@ -212,9 +208,9 @@ describe('road branch continuity', () => {
       )
       const count = hairpin.points.length
       const lanePoint = (index: number) => {
-        const point = required(hairpin.points[index])
-        const before = required(hairpin.points[(index + count - 1) % count])
-        const after = required(hairpin.points[(index + 1) % count])
+        const point = requireFixture(hairpin.points[index])
+        const before = requireFixture(hairpin.points[(index + count - 1) % count])
+        const after = requireFixture(hairpin.points[(index + 1) % count])
         const length = Math.hypot(after.x - before.x, after.y - before.y)
         return {
           x: point.x - ((after.y - before.y) / length) * 20,
@@ -263,9 +259,9 @@ describe('road branch continuity', () => {
             index + 2,
           )
           expect(
-            required(hairpin.points[previousIndex]).segment,
+            requireFixture(hairpin.points[previousIndex]).segment,
             `sample ${index}`,
-          ).toBe(required(hairpin.points[index]).segment)
+          ).toBe(requireFixture(hairpin.points[index]).segment)
         }
       }
       expect(maximumStep).toBeLessThan(2.31)
@@ -288,13 +284,13 @@ describe('road branch continuity', () => {
       ],
       EMPTY_TERRAIN,
     )
-    const closeCrossing = required(
+    const closeCrossing = requireFixture(
       closePath.crossings.find(({ key }) => key === '0:2'),
     )
     expect(closeCrossing.secondPathIndex - closeCrossing.firstPathIndex).toBe(
       26,
     )
-    const upper = required(closePath.points[closeCrossing.secondPathIndex])
+    const upper = requireFixture(closePath.points[closeCrossing.secondPathIndex])
     const context = getVehicleStepContext(closePath, {
       x: upper.x,
       y: upper.y,
@@ -312,8 +308,8 @@ describe('road branch continuity', () => {
     (reversed) => {
       const direction = reversed ? -1 : 1
       const index = crossing.secondPathIndex - direction * 4
-      const point = required(path.points[index])
-      const next = required(path.points[index + direction])
+      const point = requireFixture(path.points[index])
+      const next = requireFixture(path.points[index + direction])
       const length = Math.hypot(next.x - point.x, next.y - point.y)
       const tx = (next.x - point.x) / length
       const ty = (next.y - point.y) / length
@@ -333,7 +329,7 @@ describe('road branch continuity', () => {
           countdown: 0,
           vehicles: [
             {
-              ...required(base.vehicles[0]),
+              ...requireFixture(base.vehicles[0]),
               ...position,
               angle: Math.atan2(ty, tx),
               vx: tx * 40,
@@ -350,7 +346,7 @@ describe('road branch continuity', () => {
         }
         for (let frame = 0; frame < 60; frame += 1) {
           race = stepRace(race, noInput, 1 / 60, random).state as typeof race
-          const vehicle = required(race.vehicles[0])
+          const vehicle = requireFixture(race.vehicles[0])
           const context = getVehicleStepContext(path, vehicle)
           expect(
             context.nearest.point.segment,
@@ -362,7 +358,7 @@ describe('road branch continuity', () => {
         }
         expect(
           direction *
-            (required(race.vehicles[0]).pathIndex - crossing.secondPathIndex),
+            (requireFixture(race.vehicles[0]).pathIndex - crossing.secondPathIndex),
         ).toBeGreaterThan(0)
       }
     },
@@ -374,7 +370,7 @@ describe('road branch continuity', () => {
   ])(
     'reacquires the $level road at a crossing from a distant route position',
     ({ z, targetIndex, segment }) => {
-      const target = required(path.points[targetIndex])
+      const target = requireFixture(path.points[targetIndex])
       const context = getVehicleStepContext(path, {
         x: target.x,
         y: target.y,
@@ -389,7 +385,7 @@ describe('road branch continuity', () => {
   )
 
   it('finds the lower branch when the route position still points at the deck', () => {
-    const lower = required(path.points[crossing.firstPathIndex])
+    const lower = requireFixture(path.points[crossing.firstPathIndex])
     const context = getVehicleStepContext(path, {
       x: lower.x,
       y: lower.y,
@@ -411,7 +407,7 @@ describe('road branch continuity', () => {
       EMPTY_TERRAIN,
     )
     const index = bridge.points.findIndex((point) => point.x > 240)
-    const point = required(bridge.points[index])
+    const point = requireFixture(bridge.points[index])
     const context = getVehicleStepContext(bridge, {
       ...point,
       z: 0,
@@ -432,7 +428,7 @@ describe('road branch continuity', () => {
       EMPTY_TERRAIN,
     )
     const index = bridge.points.findIndex((point) => point.x > 240)
-    const point = required(bridge.points[index])
+    const point = requireFixture(bridge.points[index])
     const race = createRace({
       path: bridge,
       playerCar: 'blue',
@@ -441,7 +437,7 @@ describe('road branch continuity', () => {
     })
     const reset = resetVehicleToTrack(
       {
-        ...required(race.vehicles[0]),
+        ...requireFixture(race.vehicles[0]),
         x: point.x,
         y: point.y,
         z: 0,
@@ -473,7 +469,7 @@ describe('road branch continuity', () => {
         terrain,
       )
       const index = bridge.points.findIndex((point) => point.x >= 16)
-      const point = required(bridge.points[index])
+      const point = requireFixture(bridge.points[index])
       const base = createRace({
         path: bridge,
         playerCar: 'blue',
@@ -486,7 +482,7 @@ describe('road branch continuity', () => {
         countdown: 0,
         vehicles: [
           {
-            ...required(base.vehicles[0]),
+            ...requireFixture(base.vehicles[0]),
             x: point.x,
             y: point.y,
             z: 13,
@@ -501,19 +497,19 @@ describe('road branch continuity', () => {
       }
       let result = stepRace(race, noInput, 1 / 60, random)
       race = result.state as typeof race
-      expect(required(race.vehicles[0]).z).toBeLessThan(13)
-      expect(required(race.vehicles[0]).grounded).toBe(false)
+      expect(requireFixture(race.vehicles[0]).z).toBeLessThan(13)
+      expect(requireFixture(race.vehicles[0]).grounded).toBe(false)
       expect(race.phase).toBe('running')
       for (
         let frame = 0;
-        frame < 90 && !required(race.vehicles[0]).grounded;
+        frame < 90 && !requireFixture(race.vehicles[0]).grounded;
         frame += 1
       ) {
         result = stepRace(race, noInput, 1 / 60, random)
         race = result.state as typeof race
       }
-      expect(required(race.vehicles[0]).grounded).toBe(true)
-      expect(required(race.vehicles[0]).z).toBe(0)
+      expect(requireFixture(race.vehicles[0]).grounded).toBe(true)
+      expect(requireFixture(race.vehicles[0]).z).toBe(0)
       expect(race.phase).toBe(water ? 'finished' : 'running')
       if (water)
         expect(result.events).toContainEqual({
@@ -532,7 +528,7 @@ describe('road branch continuity', () => {
       EMPTY_TERRAIN,
     )
     const index = bridge.points.findIndex((point) => point.x >= 16)
-    const point = required(bridge.points[index])
+    const point = requireFixture(bridge.points[index])
     const base = createRace({
       path: bridge,
       playerCar: 'blue',
@@ -545,7 +541,7 @@ describe('road branch continuity', () => {
       countdown: 0,
       vehicles: [
         {
-          ...required(base.vehicles[0]),
+          ...requireFixture(base.vehicles[0]),
           x: point.x,
           y: point.y,
           z: 25,
@@ -560,13 +556,13 @@ describe('road branch continuity', () => {
     }
     for (
       let frame = 0;
-      frame < 30 && !required(race.vehicles[0]).grounded;
+      frame < 30 && !requireFixture(race.vehicles[0]).grounded;
       frame += 1
     ) {
       race = stepRace(race, noInput, 1 / 60, random).state as typeof race
     }
-    expect(required(race.vehicles[0]).grounded).toBe(true)
-    expect(required(race.vehicles[0]).z).toBe(24)
+    expect(requireFixture(race.vehicles[0]).grounded).toBe(true)
+    expect(requireFixture(race.vehicles[0]).z).toBe(24)
   })
 
   it('does not treat water below a deck as safe support', () => {
@@ -582,7 +578,7 @@ describe('road branch continuity', () => {
       water,
     )
     const index = bridge.points.findIndex((point) => point.x >= 16)
-    const point = required(bridge.points[index])
+    const point = requireFixture(bridge.points[index])
     const base = createRace({
       path: bridge,
       playerCar: 'blue',
@@ -590,7 +586,7 @@ describe('road branch continuity', () => {
       laps: 3,
     })
     const player = {
-      ...required(base.vehicles[0]),
+      ...requireFixture(base.vehicles[0]),
       x: point.x,
       y: point.y,
       z: 0,
@@ -621,7 +617,7 @@ describe('road branch continuity', () => {
 
   it('keeps the on-road route search bounded', () => {
     const index = 6
-    const point = required(path.points[index])
+    const point = requireFixture(path.points[index])
     let pointReads = 0
     const points = new Proxy(path.points, {
       get(target, property, receiver) {
@@ -658,7 +654,7 @@ describe('road branch continuity', () => {
     const newIndex = parallel.points.findIndex(
       (point) => point.segment === 2 && point.x < 300,
     )
-    const target = required(parallel.points[newIndex])
+    const target = requireFixture(parallel.points[newIndex])
     const context = getVehicleStepContext(parallel, {
       ...target,
       z: 0,
@@ -685,7 +681,7 @@ describe('road branch continuity', () => {
       const heights: number[] = []
       for (let step = 0; step < bridge.points.length; step += 1) {
         const target = reversed ? bridge.points.length - 1 - step : step
-        const point = required(bridge.points[target])
+        const point = requireFixture(bridge.points[target])
         const context = getVehicleStepContext(bridge, {
           ...point,
           z,
@@ -705,7 +701,7 @@ describe('road branch continuity', () => {
 
   it('reacquires a distant road after leaving the previous route', () => {
     const targetIndex = 180
-    const target = required(path.points[targetIndex])
+    const target = requireFixture(path.points[targetIndex])
     const context = getVehicleStepContext(path, {
       x: target.x,
       y: target.y,
