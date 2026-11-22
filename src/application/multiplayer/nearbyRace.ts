@@ -491,11 +491,12 @@ export class NearbyRace {
         if (this.rooms.delete(event.id)) this.changed()
         break
       case 'pairing': {
-        // Guests explicitly select the room; the host admits up to seven peers
-        // without an extra per-device match-code prompt.
+        // Race rooms can host seven guests; track sharing retains the
+        // original three-recipient limit instead of changing its contract.
+        const guestLimit = this.purpose === 'share' ? 3 : MAX_PLAYERS - 1
         const incomingGuest = this.phase === 'hosting' &&
           !this.pendingPairs.has(event.id) && !this.guests.has(event.id) &&
-          this.guests.size + this.pendingPairs.size < MAX_PLAYERS - 1
+          this.guests.size + this.pendingPairs.size < guestLimit
         const invitedHost = this.phase === 'connecting' && event.id === this.hostId
         if (incomingGuest || invitedHost) {
           this.pendingPairs.add(event.id)
