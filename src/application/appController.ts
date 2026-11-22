@@ -36,12 +36,10 @@ import type {
 } from '@/application/appState'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import { EditorSession, type Scheduler } from '@/application/editor/editorSession'
+import { EditorSession } from '@/application/editor/editorSession'
 import { requiresEditorExitConfirmation } from '@/application/editor/editorExitPolicy'
 import { reduceEditorUi } from '@/application/editor/editorUiReducer'
 import { isSeededTrack, normalizeDisplayName } from '@/domain/track/trackCreator'
-
-export type { Scheduler } from '@/application/editor/editorSession'
 
 export interface AppControllerDependencies {
   readonly nearby?: NearbyRace | undefined
@@ -50,7 +48,6 @@ export interface AppControllerDependencies {
   readonly trackStore: TrackStore
   readonly scoreStore: ScoreStore
   readonly preferencesStore: PreferencesStore
-  readonly scheduler: Scheduler
   readonly raceSession: RaceSessionPort
   readonly geometry: TrackGeometryService
   readonly now?: () => number
@@ -75,7 +72,7 @@ export class AppController {
 
   constructor(private readonly dependencies: AppControllerDependencies) {
     this.now = dependencies.now ?? (() => Date.now())
-    this.editorSession = new EditorSession(dependencies.trackStore, dependencies.scheduler, this.now)
+    this.editorSession = new EditorSession(dependencies.trackStore, this.now)
     this.library = new TrackLibraryService({
       trackStore: dependencies.trackStore,
       scoreStore: dependencies.scoreStore,
