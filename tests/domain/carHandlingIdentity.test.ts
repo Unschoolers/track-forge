@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CAR_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
-import { createRace } from '@/domain/race/raceFactory'
+import { physicsPlayer } from '../support/physicsPlayer'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
@@ -46,13 +46,7 @@ function context(surface: Surface): VehicleStepContext {
 }
 
 function makeVehicle(car: CarId, speed: number, sidewaysSpeed = 0, surface: Surface = 'street'): RaceVehicle {
-  const fixture = createRace({
-    path,
-    playerCar: car,
-    difficulty: 'normal',
-    laps: 1,
-  }).vehicles[0]
-  if (!fixture) throw new Error('Missing car handling fixture')
+  const fixture = physicsPlayer(car)
   const road = context(surface)
   const angle = Math.atan2(road.tangent.y, road.tangent.x)
   return {

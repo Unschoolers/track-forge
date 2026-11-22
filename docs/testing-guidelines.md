@@ -37,6 +37,12 @@ The levels describe **scope**, not just folders: `tests/ui` can contain cheap co
 
 **Prefer unit/component tests over integration tests, and integration tests over Playwright.** Use Playwright only for browser-level interactions impossible to prove at the narrower boundary, or one representative end-to-end journey. A browser test is not a replacement for failing fast on a domain invariant.
 
+## Separate vehicle feel from AI race balancing
+
+Car-handling contracts (currently `carHandlingIdentity.test.ts` and `carSpeedIdentity.test.ts`) step an isolated, typed player vehicle through the real physics adapter and deterministic surface contexts. Their setup must not call `createRace` or `RaceSession`: those also initialize AI opponents, grid placement and difficulty, which are unrelated to braking, steering, grip and acceleration. Keep authored track fixture integrity assertions distinct from those vehicle outputs.
+
+AI race-balance scenarios (currently `emileHardRace.test.ts` and `qa/lanes`) intentionally exercise a whole race: opponent behavior, seeds, difficulty ordering, finish times and recoveries. A car-physics regression should fail in the narrow car contract; race-balance tests should fail only when AI/race player-visible behavior changes. Preserve both sets of assertions; this separation is not permission to loosen a threshold or tune a car until an unrelated scenario turns green.
+
 ## Build tests around risk and edges
 
 Each feature should cover a happy path **plus the edges that would matter if broken**. Representative edge families:
