@@ -331,6 +331,7 @@ export class NearbyRace {
 
   private captureTraceFrame(vehicle: RaceVehicle, state: RaceState, force = false): void {
     const now = this.now()
+    if (!this.replayTrace.shouldRecord(now, force)) return
     const rivals: NearbyTraceRival[] = []
     for (const [slot, racer] of this.racers) {
       if (slot === this.slot) continue
