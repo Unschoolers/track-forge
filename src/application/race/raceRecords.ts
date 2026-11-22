@@ -53,6 +53,14 @@ export function scoreCategoryLabel(score: ScoreEntry): string {
 }
 
 export type TimeMedal = 'bronze' | 'silver' | 'gold'
+
+/** Only promotions are awarded; finishing again at the same tier is not a new medal. */
+export function promotedTimeMedal(previous: TimeMedal | null, current: TimeMedal | null): TimeMedal | null {
+  const rank = (medal: TimeMedal | null): number =>
+    medal === 'gold' ? 3 : medal === 'silver' ? 2 : medal === 'bronze' ? 1 : 0
+  return rank(current) > rank(previous) ? current : null
+}
+
 export function medalTargets(track: Track): Readonly<Record<TimeMedal, number>> | null {
   const index = OFFICIAL_CIRCUITS.findIndex(({ track: official }) => official.id === track.id)
   const official = OFFICIAL_CIRCUITS[index]?.track
