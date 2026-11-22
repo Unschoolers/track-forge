@@ -20,7 +20,7 @@ describe('track score lookup', () => {
   })
 
   it('does not read scores for absent tracks and keeps legacy circuit scores', () => {
-    const forTrack = vi.fn(() => [circuit, { ...circuit, category: undefined }])
+    const forTrack = vi.fn(() => [circuit, { time: 18, car: 'blue' as const, difficulty: 'normal' as const, recordedAt: 2 }])
     expect(collectTrackScores([], [], { forTrack })).toEqual({})
     expect(forTrack).not.toHaveBeenCalled()
     const result = collectTrackScores([local], [], { forTrack })
