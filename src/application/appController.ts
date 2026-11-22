@@ -1,6 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
-import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
+import { courseIdentity, timeMedal, promotedTimeMedal } from '@/application/race/raceRecords'
 import { collectTrackScores } from '@/application/race/trackScoreCollection'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
@@ -37,12 +37,10 @@ import type {
 } from '@/application/appState'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import { EditorSession, type Scheduler } from '@/application/editor/editorSession'
+import { EditorSession } from '@/application/editor/editorSession'
 import { requiresEditorExitConfirmation } from '@/application/editor/editorExitPolicy'
 import { reduceEditorUi } from '@/application/editor/editorUiReducer'
 import { isSeededTrack, normalizeDisplayName } from '@/domain/track/trackCreator'
-
-export type { Scheduler } from '@/application/editor/editorSession'
 
 export interface AppControllerDependencies {
   readonly nearby?: NearbyRace | undefined
@@ -51,7 +49,6 @@ export interface AppControllerDependencies {
   readonly trackStore: TrackStore
   readonly scoreStore: ScoreStore
   readonly preferencesStore: PreferencesStore
-  readonly scheduler: Scheduler
   readonly raceSession: RaceSessionPort
   readonly geometry: TrackGeometryService
   readonly now?: () => number
@@ -76,7 +73,7 @@ export class AppController {
 
   constructor(private readonly dependencies: AppControllerDependencies) {
     this.now = dependencies.now ?? (() => Date.now())
-    this.editorSession = new EditorSession(dependencies.trackStore, dependencies.scheduler, this.now)
+    this.editorSession = new EditorSession(dependencies.trackStore, this.now)
     this.library = new TrackLibraryService({
       trackStore: dependencies.trackStore,
       scoreStore: dependencies.scoreStore,
@@ -172,13 +169,12 @@ export class AppController {
       const track = this.state.currentTrack
       const previousMedal = track ? timeMedal(track, this.state.scoresByTrack[track.id] ?? []) : null
       const earnedMedal = track ? timeMedal(track, scores[track.id] ?? []) : null
-      const rank = (medal: typeof earnedMedal) => medal === 'gold' ? 3 : medal === 'silver' ? 2 : medal === 'bronze' ? 1 : 0
       const savedCup = cup ? this.persistCup(cup) : null
       this.update({
         ...this.state,
         paused: true,
         scoresByTrack: scores,
-        newTimeMedal: rank(earnedMedal) > rank(previousMedal) ? earnedMedal : null,
+        newTimeMedal: promotedTimeMedal(previousMedal, earnedMedal),
         cupProgress: savedCup?.progress ?? this.state.cupProgress,
         cup,
         overlay: { type: 'results' },
