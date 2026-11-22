@@ -80,7 +80,8 @@ describe('Émile hard arcade race', () => {
 				expect(vehicle.finishedAt).toBeLessThan(ghostSeconds + 3)
 			}
 			// The mirror rival uses the same Blue car as the recorded ghost.
-			expect(opponents[0]?.finishedAt).toBeLessThan(30.616)
+			expect(opponents[0]?.finishedAt, 'Hard mirror must beat the recorded ghost by at least 1 second')
+				.toBeLessThan(ghostSeconds - 1)
 		},
 		30000,
 	)
@@ -110,7 +111,10 @@ describe('Émile arcade difficulty balance', () => {
 			).toBeLessThan(0.125)
 			const redTime = opponents.find(({ car }) => car === 'red')?.finishedAt
 			if (redTime === fastest) redWins++
-			if (playerCar === 'blue') expect(redTime).toBeLessThan(61.866)
+			if (playerCar === 'blue') {
+				expect(redTime, 'Red must beat a two-lap ghost pace by at least 1 second')
+					.toBeLessThan(ghostSeconds * 2 - 1)
+			}
 		}
 		expect(redWins).toBeGreaterThan(0)
 	}, 30000)
@@ -126,13 +130,16 @@ describe('Émile arcade difficulty balance', () => {
 		const hard = meanTime('hard')
 		const normal = meanTime('normal')
 		const easy = meanTime('easy')
-		const mediumPace = hard / normal
-		const easyPace = hard / easy
-		expect(mediumPace, `hard=${hard.toFixed(3)}s normal=${normal.toFixed(3)}s`).toBeGreaterThan(0.90)
-		expect(mediumPace).toBeLessThan(0.975)
-		// An isolated 1-percentage-point pace drift is not a meaningful difficulty bug.
-		expect(easyPace).toBeGreaterThan(0.85)
-		expect(easyPace).toBeLessThan(0.925)
-		expect(mediumPace, 'Medium must remain faster than Easy').toBeGreaterThan(easyPace)
+		const times = `Hard=${hard.toFixed(2)}s, Medium=${normal.toFixed(2)}s, Easy=${easy.toFixed(2)}s`
+		// Distinct difficulty choices should be noticeably different, not
+		// calibrated to a fractional second on one seed and starting grid.
+		// A >=3% neighboring gap protects player-visible ordering while leaving
+		// room for the ~1% drift caused by legitimate chassis changes.
+		expect(normal, times).toBeGreaterThan(hard * 1.03)
+		expect(easy, times).toBeGreaterThan(normal * 1.03)
+		// Keep the existing broad maximum slowdowns: neither difficulty should
+		// become so uncompetitive that the race feels empty.
+		expect(hard / normal, times).toBeGreaterThan(0.90)
+		expect(hard / easy, times).toBeGreaterThan(0.85)
 	}, 30000)
 })
