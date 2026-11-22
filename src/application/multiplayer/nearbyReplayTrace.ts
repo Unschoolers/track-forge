@@ -44,9 +44,12 @@ export class NearbyReplayTrace {
     }
   }
 
+  shouldRecord(atMs: number, force = false): boolean {
+    return Number.isFinite(atMs) && (force || atMs - this.lastSampleAt >= this.intervalMs)
+  }
+
   record(atMs: number, frame: NearbyTraceFrame, force = false): void {
-    if (!Number.isFinite(atMs) ||
-        (!force && atMs - this.lastSampleAt < this.intervalMs)) return
+    if (!this.shouldRecord(atMs, force)) return
     this.lastSampleAt = atMs
     if (this.frames.length < this.limit) this.frames.push(frame)
     else {
