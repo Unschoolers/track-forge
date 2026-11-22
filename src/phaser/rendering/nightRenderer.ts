@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import type { WorldBounds } from '@/presentation/environments/groundTexture'
 import type { VehicleLightTransform } from '@/phaser/rendering/vehicleRenderer'
-import { buildLampLights, type LampPost } from '@/phaser/rendering/lampPostRenderer'
+import { buildLampLights, type LampLight, type LampPost } from '@/phaser/rendering/lampPostRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 
@@ -59,6 +59,18 @@ export class NightBeamRenderer {
   }
 }
 
+/** Pure viewport decision shared by all night lamp rendering paths. */
+export function lampIntersectsViewport(
+  lamp: Pick<LampLight, 'center' | 'radius'>,
+  bounds?: WorldBounds,
+): boolean {
+  if (!bounds) return true
+  return lamp.center.x + lamp.radius >= bounds.left &&
+    lamp.center.x - lamp.radius <= bounds.right &&
+    lamp.center.y + lamp.radius >= bounds.top &&
+    lamp.center.y - lamp.radius <= bounds.bottom
+}
+
 /** Small fixture glows and brake lights, without a second beam geometry pass. */
 export function renderNightLights(
   graphics: Phaser.GameObjects.Graphics,
@@ -67,11 +79,7 @@ export function renderNightLights(
   visibleBounds?: WorldBounds,
 ): void {
   for (const lamp of buildLampLights(lamps)) {
-    if (visibleBounds &&
-        (lamp.center.x + lamp.radius < visibleBounds.left ||
-          lamp.center.x - lamp.radius > visibleBounds.right ||
-          lamp.center.y + lamp.radius < visibleBounds.top ||
-          lamp.center.y - lamp.radius > visibleBounds.bottom)) continue
+    if (!lampIntersectsViewport(lamp, visibleBounds)) continue
     graphics.fillStyle(0xffd88a, lamp.intensity * 0.14)
     graphics.fillCircle(lamp.center.x, lamp.center.y, lamp.radius)
     graphics.fillStyle(0xffdf98, lamp.intensity * 0.3)
