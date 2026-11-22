@@ -28,6 +28,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   raceLaps: 2,
   raceMode: 'normal',
   playerIdentity: DEFAULT_PLAYER_IDENTITY,
+  favoriteTrackIds: [],
 }
 
 function boolean(value: string | null, fallback: boolean): boolean {
