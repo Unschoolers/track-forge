@@ -245,7 +245,7 @@
 .options-race-settings { display: grid; gap: .75rem; margin-bottom: 1.25rem; }
 .options-race-settings .setup-section + .setup-section { margin-top: 0; }
 
-.checkpoint-warning { position: absolute; z-index: 6; top: calc(env(safe-area-inset-top) + 4.5rem); left: 50%; translate: -50%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: .75rem; width: max-content; max-width: calc(100% - 1rem); padding: .45rem .55rem; border: 2px solid #ff6271; border-radius: .75rem; background: #35151cf2; color: white; box-shadow: 0 .2rem 1rem #0009; font-size: clamp(.7rem, 2.5vw, .9rem); }
+.checkpoint-warning { position: absolute; z-index: 12; pointer-events: auto; touch-action: manipulation; top: calc(env(safe-area-inset-top) + 4.5rem); left: 50%; translate: -50%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: .75rem; width: max-content; max-width: calc(100% - 1rem); padding: .45rem .55rem; border: 2px solid #ff6271; border-radius: .75rem; background: #35151cf2; color: white; box-shadow: 0 .2rem 1rem #0009; font-size: clamp(.7rem, 2.5vw, .9rem); }
 .checkpoint-warning[hidden] { display: none; }
 .checkpoint-timer { grid-column: 1; color: #ffacb4; font-weight: 800; font-variant-numeric: tabular-nums; }
 .checkpoint-reset { grid-column: 2; grid-row: 1 / 3; min-height: 44px; padding: .4rem .65rem; white-space: nowrap; background: #b92e40; color: white; touch-action: manipulation; }
