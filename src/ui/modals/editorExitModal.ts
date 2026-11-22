@@ -1,4 +1,4 @@
-import { button, element } from '@/ui/dom'
+import { button } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
 export function createEditorExitModal(actions: {
