@@ -4,8 +4,8 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { CrossingWorkLimitError } from '@/domain/track/crossings'
 import { roadPointsForPreview } from '@/domain/track/roadLength'
-import { MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
-import { MAX_SCENERY_PROPS } from '@/domain/track/trackEnvironment'
+import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
+import { MAX_SCENERY_PROPS, normalizeSceneryProps } from '@/domain/track/trackEnvironment'
 import { decodeTrack, TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
 
 export type TrackImportResult =
@@ -34,6 +34,7 @@ function validSharedTerrain(value: unknown): boolean {
   if (input.cellSize !== undefined &&
       (typeof input.cellSize !== 'number' || !Number.isFinite(input.cellSize) || input.cellSize <= 0)) return false
   if (input.cells.length > TERRAIN_LIMITS.maximumCells) return false
+  const occupied = new Set<string>()
   for (const raw of input.cells) {
     const cell = object(raw)
     if (!cell || typeof cell.column !== 'number' || typeof cell.row !== 'number' ||
@@ -43,6 +44,9 @@ function validSharedTerrain(value: unknown): boolean {
         cell.row < TERRAIN_LIMITS.minimumCoordinate ||
         cell.row > TERRAIN_LIMITS.maximumCoordinate ||
         !TERRAIN_KINDS.some(kind => kind === cell.kind)) return false
+    const key = `${cell.column}:${cell.row}`
+    if (occupied.has(key)) return false
+    occupied.add(key)
   }
   return true
 }
@@ -70,8 +74,17 @@ export function decodeTrackExport(parsed: unknown): TrackImportResult {
       !Array.isArray(points) || points.length > MAX_POINTS ||
       !Array.isArray(trees) || trees.length > MAX_TREES ||
       !validSharedTerrain(source.terrain) ||
-      (Array.isArray(source.scenery) && source.scenery.length > MAX_SCENERY_PROPS) ||
-      (Array.isArray(source.recoveryCheckpoints) && source.recoveryCheckpoints.length > MAX_RECOVERY_CHECKPOINTS)) {
+      (source.scenery !== undefined && (
+        !Array.isArray(source.scenery) ||
+        source.scenery.length > MAX_SCENERY_PROPS ||
+        normalizeSceneryProps(source.scenery).length !== source.scenery.length
+      )) ||
+      (source.recoveryCheckpoints !== undefined && (
+        !Array.isArray(source.recoveryCheckpoints) ||
+        source.recoveryCheckpoints.length > MAX_RECOVERY_CHECKPOINTS ||
+        !source.recoveryCheckpoints.every(isRecoveryCheckpointRatio)
+      )) ||
+      (source.autoCheckpoints !== undefined && typeof source.autoCheckpoints !== 'boolean')) {
     return { ok: false, message: 'The shared track has invalid or oversized geometry.' }
   }
   const now = Date.now()
