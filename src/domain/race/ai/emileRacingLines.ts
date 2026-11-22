@@ -47,5 +47,5 @@ export const EMILE_RACING_LINES: Readonly<Record<CarId, readonly RacingLineSecti
 // Speed targets use the car's own limits. Track timing includes braking,
 // traffic and acceleration, so these ratios differ from the resulting pace.
 export const EMILE_SPEED_RATIOS: Readonly<Record<DifficultyId, number>> = {
-  hard: 1, normal: 0.892, easy: 0.86,
+  hard: 1, normal: 0.892, easy: 0.871,
 }
