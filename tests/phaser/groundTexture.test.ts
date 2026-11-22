@@ -101,4 +101,35 @@ describe('world ground texture', () => {
     expect(images.length).toBeLessThanOrEqual(64)
     getContext.mockRestore()
   })
+  it('retries the same camera window after a failed texture registration', () => {
+    const context = { beginPath: vi.fn(), ellipse: vi.fn(), fill: vi.fn(), set fillStyle(_value: string) {}, set globalAlpha(_value: number) {} }
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D)
+    try {
+      const textures = new Set<string>()
+      const addCanvas = vi.fn()
+        .mockImplementationOnce(() => { throw new Error('Texture unavailable') })
+        .mockImplementation((key: string) => { textures.add(key) })
+      const image = {
+        setOrigin: vi.fn().mockReturnThis(),
+        setDepth: vi.fn().mockReturnThis(),
+        setTexture: vi.fn().mockReturnThis(),
+        setPosition: vi.fn().mockReturnThis(),
+        setVisible: vi.fn().mockReturnThis(),
+      }
+      const scene = {
+        textures: { exists: (key: string) => textures.has(key), addCanvas },
+        add: { image: vi.fn(() => image) },
+      }
+      const renderer = new GroundTextureRenderer(scene as unknown as Phaser.Scene)
+      const view = { centerX: 0, centerY: 0, width: 100, height: 100, zoom: 1, rotation: 0 }
+      expect(() => renderer.render(view, false)).toThrow('Texture unavailable')
+      expect(() => renderer.render(view, false)).not.toThrow()
+      expect(addCanvas.mock.calls.length).toBeGreaterThan(1)
+      expect(scene.add.image).toHaveBeenCalled()
+    } finally {
+      getContext.mockRestore()
+    }
+  })
+
 })
