@@ -54,7 +54,8 @@ describe('Nearby rematch packet round isolation', () => {
   })
 
   it('rejects old-round progress both on receive and host relay', async () => {
-    const send = vi.fn(async () => undefined)
+    const packets: Uint8Array[] = []
+    const send = vi.fn(async (_recipients: string[], packet: Uint8Array) => { packets.push(packet) })
     const sync = new NearbyProgressSync(send, () => 100)
     sync.setRound(4)
     expect(sync.receive(decodeProgress(encodeProgress(1, 65535, 10, 3))!)).toBe(false)
@@ -65,6 +66,6 @@ describe('Nearby rematch packet round isolation', () => {
     await Promise.resolve()
     expect(send).toHaveBeenCalledOnce()
     sync.update(0, 20, ['guest'])
-    expect(decodeProgress(send.mock.calls.at(-1)?.[1] ?? new Uint8Array())?.round).toBe(4)
+    expect(decodeProgress(packets.at(-1) ?? new Uint8Array())?.round).toBe(4)
   })
 })
