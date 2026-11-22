@@ -255,8 +255,11 @@ export function stepAiVehicle(
       braking:
         emergency ||
         curveBraking ||
+        // Brake as soon as the car leaves the supported road at pace.
+        // Waiting until 72 world units lets its momentum carry it beyond
+        // the recovery corridor even with stronger dry-road tire grip.
         (recovering &&
-          context.nearest.distance > 72 &&
+          context.nearest.distance > ROAD_GEOMETRY.onRoadRadius &&
           vehicle.speed > 90),
     },
     context,
