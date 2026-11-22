@@ -1003,7 +1003,7 @@ export class AppController {
     this.dependencies.nearby?.setDisplayName(name)
     const tracks = this.library.list()
     const storedTrack = tracks.find((track) => track.id === this.state.currentTrack?.id)
-    const currentTrack = storedTrack && this.state.mode === 'editor' && this.hasUnsavedEditorChanges()
+    const currentTrack = storedTrack && this.state.currentTrack && this.state.mode === 'editor' && this.hasUnsavedEditorChanges()
       ? { ...this.state.currentTrack, ...(storedTrack.creator ? { creator: storedTrack.creator } : {}) }
       : storedTrack ?? this.state.currentTrack
     this.update({
