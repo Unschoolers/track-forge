@@ -106,6 +106,34 @@ describe('rival tendencies', () => {
   })
 })
 
+describe('AI off-road recovery', () => {
+  it('brakes before a fast off-road car is too far away to recover', () => {
+    const straight = buildRoadPath(
+      [
+        { x: 0, y: 0, surface: 'street' },
+        { x: 1000, y: 0, surface: 'street' },
+      ],
+      EMPTY_TERRAIN,
+      Infinity,
+      'point-to-point',
+    )
+    const yellow = cars()[3]
+    if (!yellow) throw new Error('Missing Yellow AI fixture')
+    const offRoad = onPath(yellow, straight, 40, 52, 150)
+    const onRoad = onPath(yellow, straight, 40, 15, 150)
+    const offRoadContext = getVehicleStepContext(straight, offRoad)
+    expect(offRoadContext.onRoad).toBe(false)
+    expect(offRoadContext.nearest.distance).toBeLessThan(72)
+
+    const brake = stepAiVehicle(offRoad, straight, getTrafficState(offRoad, [], straight),
+      'normal', 1 / 60)
+    const cruise = stepAiVehicle(onRoad, straight, getTrafficState(onRoad, [], straight),
+      'normal', 1 / 60)
+    expect(brake.braking).toBe(true)
+    expect(cruise.braking).toBe(false)
+  })
+})
+
 describe('overtaking AI', () => {
   it.each(['road path', 'sample count'] as const)(
     'ignores finished opponents when finding traffic using %s',
