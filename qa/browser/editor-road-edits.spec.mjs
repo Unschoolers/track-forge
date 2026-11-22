@@ -52,13 +52,14 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   await page.getByRole('button', { name: 'Edit Elevated Road Edit', exact: true }).click()
   const work = () => page.evaluate(() => window.roadEditWork)
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
+  const draft = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor.controlPoints)
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
   await expect.poll(async () => (await work()).redraws).toBeGreaterThan(0)
   const expectEditWork = async (before) => {
     const after = await work()
     expect(after.redraws - before.redraws).toBe(1)
     expect(after.builds - before.builds).toBeLessThanOrEqual(1)
-    expect(after.writes - before.writes).toBe(1)
+    expect(after.writes - before.writes).toBe(0)
   }
   const canvas = await page.locator('#game-container canvas').boundingBox()
   const x = canvas.x + canvas.width / 2
@@ -80,12 +81,12 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     await touch(pointer, 'touchStart', [contact(1, drawPoint.x, drawPoint.y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
-    await expect.poll(async () => (await saved()).length).toBe(points.length + 1)
+    await expect.poll(async () => (await draft()).length).toBe(points.length + 1)
     await expectEditWork(before)
 
     before = await work()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
-    await expect.poll(async () => (await saved()).length).toBe(points.length)
+    await expect.poll(async () => (await draft()).length).toBe(points.length)
     await expectEditWork(before)
 
     await page.locator('summary.editor-toolbox-summary').click()
@@ -100,13 +101,17 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     await touch(pointer, 'touchMove', [contact(1, screenX + 45, screenY)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
-    await expect.poll(async () => (await saved())[4].x).toBeGreaterThan(control.x + 100)
+    await expect.poll(async () => (await draft())[4].x).toBeGreaterThan(control.x + 100)
     await expectEditWork(before)
 
     before = await work()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
-    await expect.poll(async () => (await saved())[4].x).toBe(control.x)
+    await expect.poll(async () => (await draft())[4].x).toBe(control.x)
     await expectEditWork(before)
+    // No storage writes should occur for a gesture or its Undo.
+    expect(await saved()).toEqual(points)
+    await page.getByRole('button', { name: 'Save track', exact: true }).click()
+    expect(await saved()).toEqual(await draft())
   } finally {
     await pointer.detach()
   }
@@ -123,13 +128,14 @@ test('can drag the same starter control point twice, then tap for point controls
   await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Move points', exact: true }).click()
   // Editing the built-in starter forks it: inspect the editable copy, not the seed.
+  const draft = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor.controlPoints)
   const saved = () => page.evaluate(() => {
     const tracks = JSON.parse(localStorage.getItem('trackforge-library-v2'))
     const edited = tracks.find(track => track.origin === 'local' && track.name.startsWith('Starter Circuit'))
     if (!edited) throw new Error('Expected an editable fork of the built-in Starter Circuit')
     return edited.points
   })
-  const originalPoints = await saved()
+  const originalPoints = await draft()
   const control = originalPoints[2]
   const camera = (await read()).camera
   const canvas = await page.locator('#game-container canvas').boundingBox()
@@ -154,7 +160,7 @@ test('can drag the same starter control point twice, then tap for point controls
     await touch(pointer, 'touchMove', [contact(1, x + 52, y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
-    const afterFirstDrag = await saved()
+    const afterFirstDrag = await draft()
     if (afterFirstDrag[2].x <= control.x + 50) {
       const changed = afterFirstDrag.map((point, index) => ({ index, x: point.x, y: point.y }))
         .filter((point, index) => point.x !== originalPoints[index]?.x || point.y !== originalPoints[index]?.y)
@@ -163,13 +169,13 @@ test('can drag the same starter control point twice, then tap for point controls
         camera: (await read()).camera,
       }))
     }
-    await expect.poll(async () => (await saved())[2].x).toBeGreaterThan(control.x + 50)
+    await expect.poll(async () => (await draft())[2].x).toBeGreaterThan(control.x + 50)
 
     await touch(pointer, 'touchStart', [contact(1, x + 52, y)])
     await touch(pointer, 'touchMove', [contact(1, x + 100, y)])
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(2)
-    await expect.poll(async () => (await saved())[2].x).toBeGreaterThan(control.x + 200)
+    await expect.poll(async () => (await draft())[2].x).toBeGreaterThan(control.x + 200)
 
     await touch(pointer, 'touchStart', [contact(1, x + 100, y)])
     await releaseTouches(pointer)
@@ -189,8 +195,11 @@ test('can drag the same starter control point twice, then tap for point controls
     await touch(pointer, 'touchMove', [end])
     await expect(panel).toBeVisible()
     await releaseTouches(pointer)
-    await expect.poll(async () => (await saved())[2].tension).toBeGreaterThan(.7)
+    await expect.poll(async () => (await draft())[2].tension).toBeGreaterThan(.7)
     await expect(panel).toBeVisible()
+    expect(await saved()).toEqual(originalPoints)
+    await page.getByRole('button', { name: 'Save track', exact: true }).click()
+    expect(await saved()).toEqual(await draft())
   } finally {
     await pointer.detach()
   }
