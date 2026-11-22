@@ -1,6 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
-import { courseIdentity, timeMedal } from '@/application/race/raceRecords'
+import { courseIdentity, timeMedal, promotedTimeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 import type {
@@ -171,13 +171,12 @@ export class AppController {
       const track = this.state.currentTrack
       const previousMedal = track ? timeMedal(track, this.state.scoresByTrack[track.id] ?? []) : null
       const earnedMedal = track ? timeMedal(track, scores[track.id] ?? []) : null
-      const rank = (medal: typeof earnedMedal) => medal === 'gold' ? 3 : medal === 'silver' ? 2 : medal === 'bronze' ? 1 : 0
       const savedCup = cup ? this.persistCup(cup) : null
       this.update({
         ...this.state,
         paused: true,
         scoresByTrack: scores,
-        newTimeMedal: rank(earnedMedal) > rank(previousMedal) ? earnedMedal : null,
+        newTimeMedal: promotedTimeMedal(previousMedal, earnedMedal),
         cupProgress: savedCup?.progress ?? this.state.cupProgress,
         cup,
         overlay: { type: 'results' },
