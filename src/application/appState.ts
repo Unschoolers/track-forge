@@ -143,7 +143,7 @@ export type AppCommand =
   | { readonly type: 'set-player-name'; readonly name: string }
   | {
       readonly type: 'open-track-name'
-      readonly purpose: 'create' | 'rename'
+      readonly purpose: 'create' | 'rename' | 'save-as'
     }
   | {
       readonly type: 'open-options'
