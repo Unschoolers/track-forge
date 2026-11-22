@@ -145,7 +145,7 @@ export interface RaceSessionPort {
 }
 
 export interface RaceSessionDependencies {
-  readonly nearby?: (Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish'> & Partial<Pick<NearbyRace, 'livePosition'>>) | undefined
+  readonly nearby?: (Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish' | 'captureFinalFrame'> & Partial<Pick<NearbyRace, 'livePosition'>>) | undefined
   readonly scoreStore: ScoreStore
   readonly random: RandomSource
   readonly feedback: FeedbackPort
