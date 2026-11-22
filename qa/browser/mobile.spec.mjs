@@ -19,7 +19,7 @@ async function launch(page) {
 
 async function enterEditor(page) {
   await page.getByRole('button', { name: 'TRACK EDITOR' }).click()
-  await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Edit Starter Circuit', exact: true }).click()
   await expect(page.locator('[data-screen="editor"]')).toBeVisible()
   await expect.poll(async () => (await telemetry(page)).camera).not.toBeNull()
 }
