@@ -4,4 +4,8 @@
     <string name="title_activity_main">TrackForge</string>
     <string name="package_name">io.trackforge.app</string>
     <string name="custom_url_scheme">io.trackforge.app</string>
+    <string name="exit_track_forge_title">EXIT TRACK FORGE?</string>
+    <string name="exit_track_forge_message">Ready to leave the game?</string>
+    <string name="exit_track_forge_stay">STAY</string>
+    <string name="exit_track_forge_exit">EXIT</string>
 </resources>
