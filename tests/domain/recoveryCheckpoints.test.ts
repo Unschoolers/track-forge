@@ -69,30 +69,41 @@ describe('authored race recovery checkpoints', () => {
     expect(recovered.state.phase).toBe('running')
   })
 
-  it('does not change scenery collision behavior when no recovery markers are authored', () => {
-    const scenery = { environmentId: 'desert' as const, trees: [], scenery: [
-      { kind: 'desert-cactus' as const, x: 245, y: 16 },
-    ] }
-    for (const markers of [[], [0.15, 0.4, 0.8]]) {
-      const initial = createRace({
-        path, routeKind: 'point-to-point', playerCar: 'blue',
-        difficulty: 'normal', handling: 'arcade', laps: 1,
-        recoveryCheckpoints: markers, recoveryScenery: scenery,
-      })
-      const state = { ...initial, phase: 'running' as const, vehicles: [requireFixture(initial.vehicles[0])] }
-      const approaching = {
-        ...requireFixture(state.vehicles[0]), ...at(229, 100),
-        lastRoadContactIndex: at(179).pathIndex,
+  it.each(['simulation', 'arcade'] as const)(
+    'makes scenery collision independent of recovery markers in %s',
+    handling => {
+      const scenery = { environmentId: 'desert' as const, trees: [], scenery: [
+        { kind: 'desert-cactus' as const, x: 245, y: 16 },
+      ] }
+      for (const markers of [[], [0.15, 0.4, 0.8]]) {
+        const initial = createRace({
+          path, routeKind: 'point-to-point', playerCar: 'blue',
+          difficulty: 'normal', handling, laps: 1,
+          recoveryCheckpoints: markers, recoveryScenery: scenery,
+        })
+        const state = { ...initial, phase: 'running' as const, vehicles: [requireFixture(initial.vehicles[0])] }
+        const approaching = {
+          ...requireFixture(state.vehicles[0]), ...at(229, 100),
+          lastRoadContactIndex: at(179).pathIndex,
+        }
+        const impact = stepRace({ ...state, vehicles: [approaching] }, coast, 1 / 30, random)
+        const sceneryRecoveries = impact.events.filter(
+          event => event.type === 'vehicle-recovered' && event.reason === 'scenery',
+        )
+        if (handling === 'simulation') {
+          expect(sceneryRecoveries).toHaveLength(1)
+        } else {
+          // Arcade intentionally has no physical scenery collisions.
+          expect(sceneryRecoveries).toHaveLength(0)
+        }
       }
-      const impact = stepRace({ ...state, vehicles: [approaching] }, coast, 1 / 30, random)
-      expect(impact.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'scenery' }))
-    }
-  })
+    },
+  )
 
   it('recovers after hitting visible scenery and ignores a hidden prop', () => {
     const scenery = [{ kind: 'desert-cactus' as const, x: 245, y: 16 }]
     for (const environmentId of ['desert', 'cityscape'] as const) {
-      const race = running('arcade', { environmentId, trees: [], scenery })
+      const race = running('simulation', { environmentId, trees: [], scenery })
       const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
       const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
       const approaching = { ...requireFixture(passed.vehicles[0]), ...at(229, 100) }
