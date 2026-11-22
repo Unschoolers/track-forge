@@ -278,8 +278,13 @@ describe('BrowserTrackRepository', () => {
       now: () => 99,
     })
 
-    expect(repository.list()).toHaveLength(1)
+    expect(repository.list()).toHaveLength(0)
     expect(storage.values.has('trackforge-library-v1-migrated')).toBe(false)
+    // Preserve the legacy source for a later successful attempt, rather than
+    // showing an in-memory circuit as a durable recovered library track.
+    storage.failedKeys.clear()
+    expect(repository.list()).toHaveLength(1)
+    expect(repository.list()[0]?.id).toBe('recovered')
   })
 
   it('reports storage write failures', () => {
