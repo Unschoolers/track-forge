@@ -2,6 +2,7 @@ package io.trackforge.app;
 
 import static org.junit.Assert.*;
 import android.content.Context;
+import android.content.SharedPreferences;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,5 +66,48 @@ public class TrackForgeUpdatesPluginTest {
     @Test(expected = IllegalArgumentException.class)
     public void invalidDownloadIdCannotBecomeCachePath() {
         TrackForgeUpdatesPlugin.stagedFile(RuntimeEnvironment.getApplication(), -1);
+    }
+
+    @Test public void installedApkClearsPreviouslyDownloadedVersionAndStagedFile() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        SharedPreferences prefs = context.getSharedPreferences("trackforge_updates", Context.MODE_PRIVATE);
+        long id = 88004;
+        prefs.edit().putLong("downloadId", id).putString("version", "android-build-908-1").commit();
+        java.io.File staged = TrackForgeUpdatesPlugin.copyApkToPrivateCache(
+                context, new ByteArrayInputStream(new byte[]{1, 2, 3}), id);
+        try {
+            assertTrue(TrackForgeUpdatesPlugin.clearInstalledDownload(context, 1_090_801L));
+            assertEquals(-1L, prefs.getLong("downloadId", -1));
+            assertNull(prefs.getString("version", null));
+            assertFalse(staged.exists());
+        } finally {
+            prefs.edit().clear().commit();
+            staged.delete();
+        }
+    }
+
+    @Test public void cancelledInstallationKeepsNewerApkAvailableForRetry() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        SharedPreferences prefs = context.getSharedPreferences("trackforge_updates", Context.MODE_PRIVATE);
+        long id = 88005;
+        prefs.edit().putLong("downloadId", id).putString("version", "android-build-909-1").commit();
+        java.io.File staged = TrackForgeUpdatesPlugin.copyApkToPrivateCache(
+                context, new ByteArrayInputStream(new byte[]{1, 2, 3}), id);
+        try {
+            assertFalse(TrackForgeUpdatesPlugin.clearInstalledDownload(context, 1_090_801L));
+            assertEquals(id, prefs.getLong("downloadId", -1));
+            assertTrue(staged.exists());
+        } finally {
+            prefs.edit().clear().commit();
+            staged.delete();
+        }
+    }
+
+    @Test public void releaseComparisonHandlesNewerInstalledVersionAndInvalidTags() {
+        assertTrue(TrackForgeUpdatesPlugin.isInstalledVersionAtLeast("android-build-908-1", 1_091_001L));
+        assertFalse(TrackForgeUpdatesPlugin.isInstalledVersionAtLeast("android-build-909-1", 1_090_801L));
+        assertFalse(TrackForgeUpdatesPlugin.isInstalledVersionAtLeast("android-build-908-100", 1_090_900L));
+        assertFalse(TrackForgeUpdatesPlugin.isInstalledVersionAtLeast("android-build-not-a-build", 1_090_801L));
+        assertFalse(TrackForgeUpdatesPlugin.isInstalledVersionAtLeast("android-build-999999999999999999999999-1", Long.MAX_VALUE));
     }
 }
