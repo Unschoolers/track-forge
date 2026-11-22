@@ -72,6 +72,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
 for (const [environmentId, soundtrack] of [
   ['cityscape', /\/City(?:-[^/]+)?\.mp3$/],
   ['desert', /\/Desert(?:-[^/]+)?\.mp3$/],
+  ['kids-room', /\/Pixel(?:%20| )Loop(?:-[^/]+)?\.mp3$/],
 ]) {
   test(`plays the ${environmentId} soundtrack during a race and its pause menu`, async ({ page }) => {
     const music = await observeMusic(page)
