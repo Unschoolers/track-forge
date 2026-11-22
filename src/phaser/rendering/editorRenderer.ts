@@ -30,9 +30,8 @@ export function editorGridSpacing(zoom: number): number {
 
 export function buildEditorGrid(
   bounds: WorldBounds,
-  zoom = 1,
+  spacing = 50,
 ): EditorGrid {
-  const spacing = editorGridSpacing(zoom)
   const lines = (minimum: number, maximum: number): readonly GridLine[] => {
     const first = Math.ceil(minimum / spacing)
     const last = Math.floor(maximum / spacing)
@@ -57,7 +56,7 @@ export function renderEditorGrid(
   night: boolean,
   zoom = 1,
 ): void {
-  const grid = buildEditorGrid(bounds, zoom)
+  const grid = buildEditorGrid(bounds, editorGridSpacing(zoom))
   // Graphics widths are world-space; convert from screen pixels so zoom never
   // makes the grid hairline-thin or distractingly heavy.
   const screenScale = 1 / Math.max(0.00001, zoom)
