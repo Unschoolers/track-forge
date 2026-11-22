@@ -128,9 +128,7 @@ describe('Émile arcade difficulty balance', () => {
 		const easy = meanTime('easy')
 		const mediumPace = hard / normal
 		const easyPace = hard / easy
-		// Balance tolerance: minor (~1 percentage-point) physics shifts are not
-		// meaningful difficulty regressions. Enforce ordered, distinct pacing.
-		expect(mediumPace, `hard=${hard.toFixed(3)}s normal=${normal.toFixed(3)}s`).toBeGreaterThan(0.90)
+		expect(mediumPace, `hard=${hard.toFixed(3)}s normal=${normal.toFixed(3)}s`).toBeGreaterThan(0.925)
 		expect(mediumPace).toBeLessThan(0.975)
 		expect(easyPace).toBeGreaterThan(0.875)
 		expect(easyPace).toBeLessThan(0.925)
