@@ -39,8 +39,15 @@ export function createRaceResult({ track, setup, state, terminalReason, scoreSto
     }
     const category = raceCategory(track, setup)
     const comparable = (score: ScoreEntry) => sameCategory(score, category, setup)
-    const oldScores = scoreStore.forTrack(track.id).filter(comparable)
-    const previousBestTime = oldScores.length ? Math.min(...oldScores.map((score) => score.time)) : undefined
+    // Local/legacy stores can contain long histories. Never spread all
+    // recorded times into one Math.min call (V8 has an argument limit).
+    let previousBestTime: number | undefined
+    for (const score of scoreStore.forTrack(track.id)) {
+      if (!comparable(score)) continue
+      previousBestTime = previousBestTime === undefined
+        ? score.time
+        : Math.min(previousBestTime, score.time)
+    }
     const playerTime =
       outcome === 'finished' ? player.finishedAt : null
     const recordCandidate =
