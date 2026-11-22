@@ -9,10 +9,7 @@ import type {
   ScoreStore,
   TrackStore,
 } from '@/application/ports/storage'
-import {
-  AppController,
-  type Scheduler,
-} from '@/application/appController'
+import { AppController } from '@/application/appController'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
@@ -52,14 +49,6 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
     record: vi.fn(() => true),
     removeTrack: vi.fn(() => true),
   }
-  let pending: (() => void) | undefined
-  const cancel = vi.fn()
-  const scheduler: Scheduler = {
-    schedule: vi.fn((_delay, task) => {
-      pending = task
-      return cancel
-    }),
-  }
   const raceSession: RaceSessionPort = {
     start: vi.fn(),
     restart: vi.fn(),
@@ -86,7 +75,6 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
     trackStore,
     preferencesStore,
     scoreStore,
-    scheduler,
     raceSession: session,
     geometry: new TrackGeometryService(),
     createTrackId: () => asTrackId('created'),
@@ -97,10 +85,7 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
     trackStore,
     scoreStore,
     preferencesStore,
-    scheduler,
-    cancel,
     raceSession: session,
-    flush: () => pending?.(),
   }
 }
 
@@ -259,7 +244,7 @@ describe('AppController', () => {
     trackStore.tracks.set(track.id, track)
     const scoreStore: ScoreStore = { forTrack: () => [], record: () => true, removeTrack: () => true }
     const session = new RaceSession({ scoreStore, random: { next: () => 0.5 }, feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() }, step: (state) => ({ state: { ...state, phase: 'finished', vehicles: state.vehicles.map((vehicle) => vehicle.player ? { ...vehicle, finishedAt: 12.5 } : vehicle) }, events: [{ type: 'race-finished', reason: 'finished' }] }) })
-    const controller = new AppController({ trackStore, scoreStore, lastRaceStore: { load: () => null, save: () => false }, preferencesStore: { load: () => preferences, save: () => true }, scheduler: { schedule: () => () => undefined }, raceSession: session, geometry: new TrackGeometryService() })
+    const controller = new AppController({ trackStore, scoreStore, lastRaceStore: { load: () => null, save: () => false }, preferencesStore: { load: () => preferences, save: () => true }, raceSession: session, geometry: new TrackGeometryService() })
     controller.dispatch({ type: 'start-race' })
     session.advance(3.7, { steering: 0, throttle: 1, braking: false })
     session.advance(0.02, { steering: 0, throttle: 1, braking: false })
@@ -274,7 +259,7 @@ describe('AppController', () => {
     const scoreStore: ScoreStore = { forTrack: () => [], record: () => true, removeTrack: () => true }
     const session = new RaceSession({ scoreStore, random: { next: () => 0.5 }, feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() } })
     const lastRaceStore = { load: () => ({ trackId: track.id, course: courseIdentity(track), setup: { car: 'blue' as const, difficulty: 'normal' as const, laps: 2, handling: 'arcade' as const, mode: 'normal' as const, lighting: 'night' as const } }), save: () => true }
-    const controller = new AppController({ trackStore, scoreStore, lastRaceStore, preferencesStore: { load: () => preferences, save: () => true }, scheduler: { schedule: () => () => undefined }, raceSession: session, geometry: new TrackGeometryService() })
+    const controller = new AppController({ trackStore, scoreStore, lastRaceStore, preferencesStore: { load: () => preferences, save: () => true }, raceSession: session, geometry: new TrackGeometryService() })
     expect(controller.snapshot().raceAgainTrackName).toBe(track.name)
     trackStore.remove(track.id)
     controller.dispatch({ type: 'race-again' })
@@ -486,11 +471,10 @@ describe('AppController', () => {
 
 
   it('edits only a draft until Save, and never autosaves on destroy', () => {
-    const { controller, trackStore, scheduler } = setup()
+    const { controller, trackStore } = setup()
     controller.dispatch({ type: 'open-editor' })
     controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
     expect(trackStore.save).not.toHaveBeenCalled()
-    expect(scheduler.schedule).not.toHaveBeenCalled()
     controller.dispatch({ type: 'go-home' })
     expect(controller.snapshot().overlay.type).toBe('editor-exit')
     controller.dispatch({ type: 'resolve-editor-exit', choice: 'cancel' })
@@ -814,7 +798,7 @@ describe('AppController', () => {
         ],
       }),
     }
-    const { controller, scheduler, trackStore } = setup(track)
+    const { controller, trackStore } = setup(track)
     const before = controller.snapshot()
 
     controller.dispatch({
@@ -827,7 +811,6 @@ describe('AppController', () => {
     expect(controller.snapshot().notice).toBe(
       'Expand cancelled: transformed terrain would exceed the map boundary.',
     )
-    expect(scheduler.schedule).not.toHaveBeenCalled()
     expect(trackStore.save).not.toHaveBeenCalled()
   })
 
@@ -839,7 +822,7 @@ describe('AppController', () => {
         cells: [{ column: 0, row: 0, kind: 'water' }],
       }),
     }
-    const { controller, scheduler } = setup(track)
+    const { controller } = setup(track)
     const before = controller.snapshot().editor
 
     controller.dispatch({
@@ -851,7 +834,6 @@ describe('AppController', () => {
     expect(controller.snapshot().notice).toBe(
       'Trees cannot be placed in water.',
     )
-    expect(scheduler.schedule).not.toHaveBeenCalled()
   })
 })
 
