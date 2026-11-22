@@ -236,9 +236,12 @@ export class RaceScene extends Phaser.Scene {
     this.upperVehicleGraphics.clear()
     this.effectGraphics.clear()
     renderRaceEffects(this.effectGraphics, race.effects)
-    const visibleVehicles = race.vehicles.filter(
-      (vehicle) => vehicle.player || vehicle.finishedAt === null,
-    )
+    // Arcade rivals are non-colliding and may overlap the player. Keep the
+    // player's body readable rather than painting a rival over it.
+    // Sorting before the height split preserves deck/underpass occlusion.
+    const visibleVehicles = race.vehicles
+      .filter((vehicle) => vehicle.player || vehicle.finishedAt === null)
+      .sort((left, right) => Number(left.player) - Number(right.player))
     renderVehicleShadows(
       this.shadowGraphics,
       this.upperVehicleGraphics,
