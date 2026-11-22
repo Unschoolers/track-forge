@@ -99,29 +99,22 @@ describe('nearby pose synchronizer', () => {
     sync.update(player, 1, 'host', ['host'], racers)
     expect(sync.counts.sent).toBe(1)
   })
-  it('lets healthy guests receive fresh poses while another guest is radio-blocked', async () => {
+  it('sends one compact batch to all recipients on the same frame', async () => {
     let now = 0
-    const sends: { id: string; bytes: Uint8Array }[] = []
-    let unblock: (() => void) | undefined
-    const sync = new NearbyPoseSync((ids, bytes) => {
-      const id = ids[0]
-      if (!id || ids.length !== 1) throw new Error('Expected one endpoint per transport send')
-      sends.push({ id, bytes })
-      return id === 'slow' ? new Promise<void>(resolve => { unblock = resolve }) : Promise.resolve()
+    const sends: { ids: string[]; bytes: Uint8Array }[] = []
+    const sync = new NearbyPoseSync(async (ids, bytes) => {
+      sends.push({ ids, bytes })
     }, () => now)
-    sync.update(player, 0, null, ['slow', 'fast'], racers)
+    sync.update(player, 0, null, ['guest-1', 'guest-2', 'guest-3'], racers)
     await flush()
     now = 34
-    sync.update(player, 0, null, ['slow', 'fast'], racers)
+    sync.update(player, 0, null, ['guest-1', 'guest-2', 'guest-3'], racers)
     await flush()
-    expect(sends.map(({ id }) => id)).toEqual(['slow', 'fast', 'fast'])
-    expect(decodePoseBatch(sends[2]?.bytes ?? new Uint8Array())?.[0]?.sequence).toBe(1)
-    expect(sync.counts.sent).toBe(3)
-    unblock?.()
-    await flush()
-    now = 68
-    sync.update(player, 0, null, ['slow', 'fast'], racers)
-    expect(sends.map(({ id }) => id)).toEqual(['slow', 'fast', 'fast', 'slow', 'fast'])
+    expect(sends).toHaveLength(2)
+    expect(sends[0]?.ids).toEqual(['guest-1', 'guest-2', 'guest-3'])
+    expect(sends[1]?.ids).toEqual(['guest-1', 'guest-2', 'guest-3'])
+    expect(decodePoseBatch(sends[1]?.bytes ?? new Uint8Array())?.[0]?.sequence).toBe(1)
+    expect(sync.counts.sent).toBe(2)
   })
 
 
