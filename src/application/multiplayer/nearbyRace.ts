@@ -5,6 +5,7 @@ import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { raceProgress } from '@/domain/race/ranking'
 import { decodeProgress, Packet, RemoteGhost } from './raceWire'
 import { NearbyProgressSync } from './nearbyProgressSync'
+import { awardNearbyCupRound, nearbyCupStandings } from './nearbyCupScoring'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
 import { NearbyNetworkTelemetry } from './nearbyNetworkTelemetry'
 import { packTrack, TrackReceiver } from './trackTransfer'
@@ -401,19 +402,15 @@ export class NearbyRace {
   }
 
   cupStandings(): { slot: number; points: number }[] {
-    return [...this.racers.keys()].map(slot => ({ slot, points: this.cupPoints.get(slot) ?? 0 }))
-      .sort((a, b) => b.points - a.points || a.slot - b.slot)
+    return nearbyCupStandings(this.racers.keys(), this.cupPoints)
   }
 
   private scoreCupRound(): void {
-    if (!this.cupTotal || this.scoredCupIndex === this.cupIndex || !this.racers.size ||
-        [...this.racers.values()].some(racer => racer.time === undefined && !racer.left)) return
-    const points = [10, 6, 4, 2]
-    for (const [index, racer] of this.standings().entries()) {
-      if (typeof racer.time === 'number') {
-        this.cupPoints.set(racer.slot, (this.cupPoints.get(racer.slot) ?? 0) + (points[index] ?? 0))
-      }
-    }
+    if (!this.cupTotal || this.scoredCupIndex === this.cupIndex) return
+    const awarded = awardNearbyCupRound(this.standings(), this.cupPoints)
+    if (!awarded) return
+    this.cupPoints.clear()
+    for (const [slot, points] of awarded) this.cupPoints.set(slot, points)
     this.scoredCupIndex = this.cupIndex
   }
 
