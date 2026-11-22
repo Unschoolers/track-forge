@@ -14,7 +14,7 @@ export function createNameModal(
   }
   const renaming = state.overlay.purpose === 'rename'
   const frame = createModalFrame(
-    renaming ? 'Rename track' : 'Name your new track',
+    renaming ? 'Rename track' : state.overlay.purpose === 'save-as' ? 'Save track as' : 'Name your new track',
     'Track names are required and must be unique.',
     actions.close,
   )
@@ -27,7 +27,11 @@ export function createNameModal(
   input.maxLength = 32
   input.autocomplete = 'off'
   input.placeholder = 'Example: Midnight Harbor'
-  input.value = renaming ? (state.currentTrack?.name ?? '') : ''
+  input.value = renaming
+    ? (state.currentTrack?.name ?? '')
+    : state.overlay.purpose === 'save-as'
+      ? `${(state.currentTrack?.name ?? 'Track').slice(0, 27)} Copy`.slice(0, 32)
+      : ''
   const error = element('div', 'name-error', state.notice ?? '')
   error.setAttribute('role', 'alert')
   const submit = (): void => actions.submit(input.value)
@@ -40,7 +44,7 @@ export function createNameModal(
   frame.footer.append(
     button('CANCEL', 'cancel-name', actions.close, 'button'),
     button(
-      renaming ? 'SAVE' : 'CONTINUE',
+      renaming || state.overlay.purpose === 'save-as' ? 'SAVE' : 'CONTINUE',
       'save-name',
       submit,
       'button button-primary',
