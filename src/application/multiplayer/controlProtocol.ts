@@ -5,13 +5,15 @@ import { Packet } from '@/application/multiplayer/raceWire'
 import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export const MAX_PLAYERS = START_GRID_SIZE
+/** Breaking change to compact pose/progress epochs. Enforce before any race starts. */
+export const NEARBY_WIRE_PROTOCOL_VERSION = 2
 const MAX_CONTROL_BYTES = 1024
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
 export type Control =
-  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number; cupIndex?: number; cupTotal?: number }
-  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number; name?: string }
+  | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number; protocolVersion?: number; cupIndex?: number; cupTotal?: number }
+  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number; protocolVersion?: number; name?: string }
   | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number; names?: (string | null)[] }
   | { type: 'armed'; round?: number }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number; round?: number }
@@ -61,6 +63,12 @@ function validRound(value: unknown): boolean {
     value >= 0 && value <= 65_535)
 }
 
+function validProtocolVersion(value: unknown): boolean {
+  // Missing means a legacy client: decode it so the race owner can explicitly
+  // fail with an actionable update message before starting the race.
+  return value === undefined || (Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 255)
+}
+
 function validCupMetadata(index: unknown, total: unknown): boolean {
   return (index === undefined && total === undefined) ||
     (Number.isInteger(total) && (total as number) >= 1 && (total as number) <= 12 &&
@@ -81,9 +89,11 @@ function isControl(value: unknown): value is Control {
         typeof message.laps === 'number' && Number.isInteger(message.laps) &&
         message.laps >= 1 && message.laps <= 5 &&
         (message.lighting === 'day' || message.lighting === 'night') &&
-        validCupMetadata(message.cupIndex, message.cupTotal)
+        validCupMetadata(message.cupIndex, message.cupTotal) &&
+        validProtocolVersion(message.protocolVersion)
     case 'ready':
       return isCar(message.car) && isPlayerIdentity(message.identity) &&
+        validProtocolVersion(message.protocolVersion) &&
         (message.name === undefined || normalizeDisplayName(message.name) === message.name)
     case 'lineup': {
       const cars = message.cars

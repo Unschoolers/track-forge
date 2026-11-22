@@ -7,7 +7,7 @@ describe('nearby progress telemetry', () => {
   it('round-trips a bounded eight-byte packet without changing legacy poses', () => {
     const packet = encodeProgress(2, 65_535, 123.5)
     expect(packet).toHaveLength(PROGRESS_BYTES)
-    expect(decodeProgress(packet)).toEqual({ slot: 2, sequence: 65_535, progress: 123.5 })
+    expect(decodeProgress(packet)).toEqual({ slot: 2, round: 0, sequence: 65_535, progress: 123.5 })
     const pose = encodePose(2, 1, 0, nearbyCar('red', 40))
     expect(pose).toHaveLength(POSE_BYTES)
     expect(decodePose(pose)?.slot).toBe(2)

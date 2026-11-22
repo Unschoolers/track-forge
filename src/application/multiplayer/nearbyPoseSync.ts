@@ -4,7 +4,7 @@ import type { RaceVehicle } from '@/domain/race/raceState'
 import {
   decodePose, decodePoseBatch, encodePose, encodePoseBatch,
   Packet, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS,
-  POSE_RECOVERY_MASK, POSE_SEQUENCE_MASK, type RemoteGhost,
+  POSE_RECOVERY_MASK, POSE_SEQUENCE_MASK, WIRE_ROUND_MASK, type RemoteGhost,
 } from '@/application/multiplayer/raceWire'
 
 /** Preserve insertion order and avoid intermediate filter/map arrays per host send. */
@@ -37,6 +37,7 @@ export class NearbyPoseSync {
   private readonly poseCounts = { sent: 0, received: 0, sendFailed: 0, relayed: 0 }
   private readonly latestPoses = new Map<number, { bytes: Uint8Array; receivedAt: number }>()
   private generation = 0
+  private round = 0
   private sequence = 0
   private recovery = 0
   private lastSentAt = -Infinity
@@ -65,6 +66,7 @@ export class NearbyPoseSync {
     this.generation++
     this.resetCounts()
     this.latestPoses.clear()
+    this.round = 0
     this.sequence = 0
     this.recovery = 0
     this.lastSentAt = -Infinity
@@ -119,6 +121,8 @@ export class NearbyPoseSync {
     this.healthySends = 0
   }
 
+  setRound(round: number): void { this.round = round & WIRE_ROUND_MASK }
+
   recovered(): void { this.recovery = (this.recovery + 1) & POSE_RECOVERY_MASK }
 
   update(
@@ -132,7 +136,7 @@ export class NearbyPoseSync {
     // One compact batch is broadcast to all connected guests. Native Nearby
     // drops obsolete per-endpoint poses if a recipient is still congested.
     if (this.poseSending || now - this.lastSentAt < this.posePeriodMs - 2 || !recipients.length) return
-    const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle)
+    const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle, this.round)
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
     const bytes = hostId ? pose : encodePoseBatch(
@@ -161,7 +165,7 @@ export class NearbyPoseSync {
   ): boolean {
     if (bytes[0] === Packet.PoseBatch && fromHost) {
       const packets = decodePoseBatch(bytes)
-      if (!packets) return true
+      if (!packets || packets.some(packet => packet.round !== this.round)) return true
       const now = this.now()
       for (const packet of packets) {
         const racer = racers.get(packet.slot)
@@ -175,7 +179,7 @@ export class NearbyPoseSync {
     if (bytes[0] === Packet.Pose) {
       const packet = decodePose(bytes)
       const racer = packet && racers.get(packet.slot)
-      if (!packet || !racer || racer.left || packet.slot === localSlot ||
+      if (!packet || packet.round !== this.round || !racer || racer.left || packet.slot === localSlot ||
           (!fromHost && packet.slot !== guestSlot)) return true
       this.poseCounts.received++
       const now = this.now()

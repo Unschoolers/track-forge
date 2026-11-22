@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  decodeControl, encodeControl, MAX_PLAYERS, validLineupPositions,
+  decodeControl, encodeControl, MAX_PLAYERS, NEARBY_WIRE_PROTOCOL_VERSION, validLineupPositions,
   type Control,
 } from '@/application/multiplayer/controlProtocol'
 import { Packet } from '@/application/multiplayer/raceWire'
@@ -44,6 +44,30 @@ describe('nearby reliable control protocol', () => {
     expect(decodeControl(packet(null))).toBeNull()
     expect(decodeControl(packet(['armed']))).toBeNull()
     expect(decodeControl(packet({ type: 'unknown' }))).toBeNull()
+  })
+
+  it('roundtrips a bounded wire version while leaving legacy frames decodeable for explicit rejection', () => {
+    expect(NEARBY_WIRE_PROTOCOL_VERSION).toBe(2)
+    const prepare: Control = {
+      type: 'prepare', slot: 1, laps: 2, lighting: 'day',
+      protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION,
+    }
+    const ready: Control = {
+      type: 'ready', car: 'blue', identity,
+      protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION,
+    }
+    expect(decodeControl(encodeControl(prepare))).toEqual(prepare)
+    expect(decodeControl(encodeControl(ready))).toEqual(ready)
+    // Older devices omit this field; the orchestrator must reject explicitly,
+    // not silently discard the control packet and strand the room on timeout.
+    expect(decodeControl(packet({ ...prepare, protocolVersion: undefined })))
+      .toMatchObject({ type: 'prepare', slot: 1 })
+    expect(decodeControl(packet({ ...ready, protocolVersion: undefined })))
+      .toMatchObject({ type: 'ready', car: 'blue' })
+    for (const version of [-1, 0, 1.5, 256, '2', null]) {
+      expect(decodeControl(packet({ ...prepare, protocolVersion: version }))).toBeNull()
+      expect(decodeControl(packet({ ...ready, protocolVersion: version }))).toBeNull()
+    }
   })
 
   it('bounds optional Nearby Cup metadata without changing legacy race prepares', () => {

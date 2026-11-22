@@ -13,7 +13,7 @@ import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
 import { normalizeDisplayName } from '@/domain/track/trackCreator'
-import { decodeControl, encodeControl, validLineupPositions, MAX_PLAYERS, type Control } from './controlProtocol'
+import { decodeControl, encodeControl, validLineupPositions, MAX_PLAYERS, NEARBY_WIRE_PROTOCOL_VERSION, type Control } from './controlProtocol'
 
 export type NearbyEvent =
   | { type: 'found'; id: string; name: string }
@@ -51,6 +51,7 @@ export interface NearbyStart extends Course {
 
 type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'share-review' | 'staging' | 'racing'
 type Purpose = 'race' | 'share'
+const INCOMPATIBLE_RACE_VERSION = 'Multiplayer version mismatch. Update Track Forge on every device.'
 export class NearbyRace {
   private readonly changes = new EventBus<void>()
   private readonly starts = new EventBus<NearbyStart>()
@@ -265,6 +266,8 @@ export class NearbyRace {
     if (rematch) {
       this.clearRound()
       this.round = (this.round + 1) & 0xffff
+      this.poseSync.setRound(this.round)
+      this.progressSync.setRound(this.round)
     }
     if (rematch && this.cupTotal > 0) {
       const next = this.cupTracks[this.cupIndex + 1]
@@ -312,6 +315,7 @@ export class NearbyRace {
     const guests = [...this.guests]
     await Promise.all(guests.map(([id, slot]) =>
       this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round: this.round,
+        protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION,
         ...(this.cupTotal ? { cupIndex: this.cupIndex, cupTotal: this.cupTotal } : {}) }))))
     for (const chunk of chunks) {
       if (active !== this.generation) return
@@ -601,6 +605,7 @@ export class NearbyRace {
         this.course = { ...this.prepared, track, car: this.localCar }
         this.readySentAt = this.now()
         this.sendControl([id], { type: 'ready', car: this.localCar, identity: this.localIdentity, round: this.round,
+          protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION,
           ...(this.localDisplayName ? { name: this.localDisplayName } : {}) })
         this.changed()
       }).catch((error: unknown) => {
@@ -630,9 +635,15 @@ export class NearbyRace {
     if (fromHost && message.type === 'prepare' &&
         (this.phase === 'waiting' && incomingRound === this.round ||
          this.phase === 'racing' && incomingRound === ((this.round + 1) & 0xffff))) {
+      if (message.protocolVersion !== NEARBY_WIRE_PROTOCOL_VERSION) {
+        this.fail(INCOMPATIBLE_RACE_VERSION, 'protocol')
+        return
+      }
       if (this.phase === 'racing') {
         this.clearRound()
         this.round = incomingRound
+        this.poseSync.setRound(this.round)
+        this.progressSync.setRound(this.round)
       }
       this.cupIndex = message.cupIndex ?? 0
       this.cupTotal = message.cupTotal ?? 0
@@ -643,6 +654,10 @@ export class NearbyRace {
       this.armTimeout('The host did not start the race in time.')
     } else if (guestSlot !== undefined && this.phase === 'preparing' &&
         message.type === 'ready' && incomingRound === this.round) {
+      if (message.protocolVersion !== NEARBY_WIRE_PROTOCOL_VERSION) {
+        this.fail(INCOMPATIBLE_RACE_VERSION, 'protocol')
+        return
+      }
       if (!this.ready.has(id)) this.ready.set(id, { car: message.car, identity: message.identity,
         ...(message.name ? { name: message.name } : {}), receivedAt: this.now() })
       if (this.ready.size === this.guests.size) this.startHost()
