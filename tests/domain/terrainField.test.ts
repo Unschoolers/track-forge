@@ -45,7 +45,7 @@ describe('terrain field', () => {
     expect(terrainKindIndex(revisions[1]!)).toBe(second)
     terrainKindIndex(revisions[3]!)
     terrainKindIndex(revisions[4]!)
-    expect(terrainKindIndex(revisions[1]!)).not.toBe(second)
+    expect(terrainKindIndex(revisions[0]!)).not.toBe(first)
     expect(terrainKindAt(revisions[1]!, { x: 32 + 1, y: 1 })).toBe('water')
   })
 
