@@ -1,8 +1,7 @@
 import type { TrackStore } from '@/application/ports/storage'
 import { applyEditorCommand, type EditorCommand, type EditorState } from '@/domain/editor/editorState'
-import { normalizeRouteKind, type Track, type TrackId } from '@/domain/model'
-import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
-import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { type Track, type TrackId } from '@/domain/model'
+import { decodeTrack } from '@/domain/track/trackCodec'
 
 type EditorEdit =
   | { readonly rejection: string }
@@ -81,19 +80,27 @@ export class EditorSession {
     if (!draft) return false
     // A missing persisted baseline is an unsaved draft, not a clean editor.
     if (!saved) return true
-    const content = (track: Track): string => JSON.stringify({
-      name: track.name,
-      points: track.points,
-      trees: track.trees,
-      start: track.start ?? { ratio: 0, reversed: false },
-      terrain: track.terrain ?? EMPTY_TERRAIN,
-      routeKind: normalizeRouteKind(track.routeKind),
-      recoveryCheckpoints: track.recoveryCheckpoints ?? [],
-      autoCheckpoints: track.autoCheckpoints ?? false,
-      environmentId: track.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
-      scenery: track.scenery ?? [],
-    })
-    return content(draft) !== content(saved)
+    // The repository decodes/normalizes on every save (point metadata,
+    // checkpoint ordering, scenery fields, etc). Compare canonical editable
+    // content so the pending navigation cannot re-open the Save dialog.
+    const content = (track: Track): string | undefined => {
+      const normalized = decodeTrack(track, this.now())
+      if (!normalized) return undefined
+      return JSON.stringify({
+        name: normalized.name,
+        points: normalized.points,
+        trees: normalized.trees,
+        start: normalized.start,
+        terrain: normalized.terrain,
+        routeKind: normalized.routeKind,
+        recoveryCheckpoints: normalized.recoveryCheckpoints ?? [],
+        autoCheckpoints: normalized.autoCheckpoints ?? false,
+        environmentId: normalized.environmentId,
+        scenery: normalized.scenery,
+      })
+    }
+    const draftContent = content(draft)
+    return draftContent === undefined || draftContent !== content(saved)
   }
 
   discardPendingSave(): void {
