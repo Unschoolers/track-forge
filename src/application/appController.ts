@@ -1,6 +1,7 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal, promotedTimeMedal } from '@/application/race/raceRecords'
+import { collectTrackScores } from '@/application/race/trackScoreCollection'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 import type {
@@ -25,7 +26,7 @@ import {
   type TrackMutationResult,
 } from '@/application/library/trackLibraryService'
 import { parseTrackImport } from '@/application/library/trackImport'
-import { asTrackId, normalizeRouteKind, type Track, type TrackId } from '@/domain/model'
+import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type {
@@ -1098,12 +1099,10 @@ export class AppController {
   private scoresForTracks(
     tracks: readonly Track[],
   ): Readonly<Record<string, readonly ScoreEntry[]>> {
-    return Object.fromEntries(
-      [...tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)].map((track) => [
-        track.id,
-        this.dependencies.scoreStore.forTrack(track.id).filter((score) =>
-          normalizeRouteKind(score.category?.routeKind) === normalizeRouteKind(track.routeKind)),
-      ]),
+    return collectTrackScores(
+      tracks,
+      OFFICIAL_CIRCUITS.map(({ track }) => track),
+      this.dependencies.scoreStore,
     )
   }
 
