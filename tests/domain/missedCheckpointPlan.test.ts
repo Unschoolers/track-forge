@@ -47,6 +47,8 @@ describe('missed checkpoint recovery planning', () => {
     )
     expect(progress).toBeGreaterThan(path.points.length / 2)
     expect(progress).toBeLessThan(path.points.length)
+    expect(recovered.nextSector).toBe(4)
+    expect(recovered.lap).toBe(player.lap)
   })
 
   it('returns no plan when there are no samples to recover onto', () => {
