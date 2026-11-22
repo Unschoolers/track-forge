@@ -436,6 +436,7 @@ export class DomUiHost implements UiHost {
               type: 'open-track-name',
               purpose: 'create',
             }),
+          toggleFavorite: (id) => this.controller.dispatch({ type: 'toggle-track-favorite', id }),
           selectForEdit: (id) =>
             this.controller.dispatch({
               type: 'select-track-for-edit',

@@ -528,6 +528,27 @@ export class AppController {
           )
         }
         break
+      case 'toggle-track-favorite': {
+        if (this.state.overlay.type !== 'track-library') break
+        const track = this.library.select(command.id) ??
+          OFFICIAL_CIRCUITS.find(({ track: candidate }) => candidate.id === command.id)?.track
+        if (!track) break
+        const previous = this.state.preferences.favoriteTrackIds ?? []
+        const favoriteTrackIds = previous.includes(track.id)
+          ? previous.filter((id) => id !== track.id)
+          : [...previous, track.id]
+        if (favoriteTrackIds.length > 256) {
+          this.update({ ...this.state, notice: 'You can favorite up to 256 tracks.' })
+          break
+        }
+        const preferences = { ...this.state.preferences, favoriteTrackIds }
+        if (!this.dependencies.preferencesStore.save(preferences)) {
+          this.update({ ...this.state, notice: 'Could not save track favorites on this device.' })
+          break
+        }
+        this.update({ ...this.state, preferences, notice: null })
+        break
+      }
       case 'delete-track':
         this.deleteTrack(command.id)
         break
