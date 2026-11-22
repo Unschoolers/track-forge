@@ -107,12 +107,20 @@ export function createTrackLibraryModal(
       trigger.title = `More actions for ${track.name}`
       const menu = element('div', 'track-card-menu')
       if (!isSeededTrack(track)) {
-        menu.append(iconAction('SHARE', 'share', `share-${track.id}`, () => actions.share(track)))
+        const share = iconAction('SHARE', 'share', `share-${track.id}`, () => actions.share(track))
+        share.setAttribute('aria-label', `Share ${track.name}`)
+        menu.append(share)
         if (actions.sendNearby) {
-          menu.append(iconAction('NEARBY', 'nearby', `send-nearby-${track.id}`, () => actions.sendNearby?.(track)))
+          const nearby = iconAction('NEARBY', 'nearby', `send-nearby-${track.id}`, () => actions.sendNearby?.(track))
+          nearby.setAttribute('aria-label', `Send ${track.name} nearby`)
+          menu.append(nearby)
         }
       }
-      if (!race) menu.append(iconAction('DELETE', 'delete', `delete-${track.id}`, () => actions.delete(track), 'danger'))
+      if (!race) {
+        const remove = iconAction('DELETE', 'delete', `delete-${track.id}`, () => actions.delete(track), 'danger')
+        remove.setAttribute('aria-label', `Delete ${track.name}`)
+        menu.append(remove)
+      }
       if (menu.childElementCount) {
         options.append(trigger, menu)
         card.append(options)
