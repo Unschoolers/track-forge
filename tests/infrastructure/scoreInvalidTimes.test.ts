@@ -5,7 +5,7 @@ import { asTrackId } from '@/domain/model'
 
 describe('score time validity', () => {
   it('never records zero or negative race times as leaderboard records', () => {
-    const values = new Map([[STORAGE_KEYS.scoreMigration, '1']])
+    const values = new Map<string, string>([[STORAGE_KEYS.scoreMigration, '1']])
     const repository = new BrowserScoreRepository({
       get: key => values.get(key) ?? null,
       set: (key, value) => { values.set(key, value); return true },
