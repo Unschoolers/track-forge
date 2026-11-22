@@ -363,7 +363,7 @@ export function createOptionsModal(
           status.textContent = error instanceof Error ? error.message : 'Could not start download.'
           download.disabled = false
         })
-      }, 'button')
+      }, 'button button-primary')
       panel.replaceChildren(download)
     }
     const check = button('CHECK FOR UPDATES', 'check-updates', () => {
