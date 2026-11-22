@@ -238,13 +238,15 @@ describe('race UI flow', () => {
     // on steering or brake, so do not rely on .click() alone.
     session.advance(1 / 60, controls.snapshot())
     expect(warning.hidden).toBe(false)
-    controls.setKeyboard('ArrowRight', true)
+    controls.beginSteering(21, 0.65)
+    controls.beginBrake(22)
+    expect(controls.snapshot()).toMatchObject({ steering: 0.65, braking: true })
     const touch = pointer('pointerdown', 24)
     Object.defineProperty(touch, 'pointerType', { value: 'touch' })
     expect(resetNow.dispatchEvent(touch)).toBe(false) // preventDefault: no synthetic mouse action
     expect(resetPlayer).toHaveBeenCalledTimes(2)
     expect(warning.hidden).toBe(true)
-    expect(controls.snapshot().steering).toBe(0)
+    expect(controls.snapshot()).toMatchObject({ steering: 0, braking: false })
     resetNow.click() // A late compatibility click must not reset twice.
     expect(resetPlayer).toHaveBeenCalledTimes(2)
   })
