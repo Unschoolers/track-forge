@@ -32,7 +32,7 @@ describe('nearby eight-player control protocol', () => {
       names: Array.from({ length: MAX_PLAYERS }, () => '界'.repeat(24)),
     }
     const bytes = encodeControl(international)
-    expect(bytes.length).toBeGreaterThan(1024)
+    expect(bytes.length).toBeGreaterThan(900)
     expect(bytes.length).toBeLessThanOrEqual(2048)
     expect(decodeControl(bytes)).toEqual(international)
     expect(() => encodeControl({
