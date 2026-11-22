@@ -13,6 +13,7 @@ const plugin = registerPlugin<{
   send(options: { ids: string[]; data: string }): Promise<void>
   stop(): Promise<void>
   diagnostics(): Promise<Record<string, unknown>>
+  deliveryQuality(): Promise<Record<string, unknown>>
 }>('TrackNearby')
 
 function toBase64(bytes: Uint8Array): string {
@@ -45,5 +46,6 @@ export function createAndroidNearby(): NearbyTransport | undefined {
     send: (ids, bytes) => plugin.send({ ids, data: toBase64(bytes) }),
     stop: () => plugin.stop(),
     diagnostics: () => plugin.diagnostics(),
+    deliveryQuality: () => plugin.deliveryQuality(),
   }
 }
