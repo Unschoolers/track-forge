@@ -225,10 +225,28 @@ describe('race UI flow', () => {
     expect(warning.textContent).toContain('MISSED CHECKPOINT 1')
     expect(warning.textContent).toContain('Reset in 5 s')
     controls.setKeyboard('ArrowRight', true)
-    requiredElement(warning, 'button[data-action="reset-checkpoint"]').click()
+    const resetNow = requiredElement(warning, 'button[data-action="reset-checkpoint"]')
+    const resetPlayer = vi.spyOn(session, 'resetPlayer')
+    resetNow.click() // Keyboard / mouse / accessible activation
+    expect(resetPlayer).toHaveBeenCalledTimes(1)
     expect(warning.hidden).toBe(true)
     expect(controls.snapshot().steering).toBe(0)
     expect(session.snapshot().telemetry.elapsed).toBe(2)
+
+    // The next miss must also respond directly to a mobile touch down.
+    // A synthesized click is not reliable if the player has another finger
+    // on steering or brake, so do not rely on .click() alone.
+    session.advance(1 / 60, controls.snapshot())
+    expect(warning.hidden).toBe(false)
+    controls.setKeyboard('ArrowRight', true)
+    const touch = pointer('pointerdown', 24)
+    Object.defineProperty(touch, 'pointerType', { value: 'touch' })
+    expect(resetNow.dispatchEvent(touch)).toBe(false) // preventDefault: no synthetic mouse action
+    expect(resetPlayer).toHaveBeenCalledTimes(2)
+    expect(warning.hidden).toBe(true)
+    expect(controls.snapshot().steering).toBe(0)
+    resetNow.click() // A late compatibility click must not reset twice.
+    expect(resetPlayer).toHaveBeenCalledTimes(2)
   })
 
   it('recovers on touch and clears steering, braking, and their feedback', () => {
