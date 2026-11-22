@@ -41,6 +41,8 @@ export interface RaceVehicle {
   /** Previous followed road while a displaced car reacquires another arm. */
   readonly recoveryAnchorIndex?: number | undefined
   readonly recoveryReacquiredIndex?: number | undefined
+  /** Last safe grounded road contact, independent of authored markers. */
+  readonly lastRoadContactIndex?: number | undefined
   /** Absolute world-space height above the base datum, in world units. */
   readonly z: number
   readonly verticalVelocity: number

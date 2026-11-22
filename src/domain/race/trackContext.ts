@@ -504,6 +504,7 @@ export function resetVehicleToTrack(
     ...(vehicle.brakePressure === undefined ? {} : { brakePressure: 0 }),
     yawRate: 0,
     pathIndex: nearest.index,
+    lastRoadContactIndex: nearest.index,
     recoveryAnchorIndex: undefined,
     recoveryReacquiredIndex: undefined,
     pathDistance: nearest.point.distance,

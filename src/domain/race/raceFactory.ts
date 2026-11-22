@@ -191,6 +191,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
               : undefined) ??
             (0.985 - (index - 1) * 0.008)),
       pathIndex: placement.pathIndex,
+      ...(index === 0 ? { lastRoadContactIndex: placement.pathIndex } : {}),
       pathDistance: options.path.points[placement.pathIndex]?.distance ?? 0,
       z: roadSurface.height,
       verticalVelocity: 0,

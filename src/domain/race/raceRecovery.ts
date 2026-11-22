@@ -1,5 +1,5 @@
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
-import { authoredRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
+import { lastRoadRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
 
@@ -7,11 +7,14 @@ export function resetRaceVehicle(
   vehicle: RaceVehicle,
   race: RecoveryCourse,
 ): RaceVehicle {
-  const checkpoint = resetAtAuthoredCheckpoint(vehicle, race)
-  if (checkpoint) return checkpoint
   if (vehicle.player) {
-    const pathIndex = safeFallbackRecoveryTarget(race, vehicle)
-    return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex, reversed: race.reversed })
+    const pathIndex = lastRoadRecoveryTarget(race, vehicle) ?? safeFallbackRecoveryTarget(race, vehicle)
+    if (pathIndex === undefined) return vehicle
+    return resetVehicleToTrack({
+      ...vehicle,
+      waterRecoveryProtected: false,
+      ...(vehicle.wrecked ? { wrecked: false, damage: 0, damageCooldown: 0.55 } : {}),
+    }, race.path, { pathIndex, reversed: race.reversed })
   }
   if (race.routeKind !== 'point-to-point') {
     return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
@@ -39,15 +42,14 @@ export function recoverRacePlayer(state: RaceState): RaceState {
 }
 
 export function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): RaceVehicle {
-  const authored = vehicle.recoveryCheckpoint == null ? undefined : resetAtAuthoredCheckpoint(vehicle, race)
-  if (authored) return authored
   const count = race.path.points.length
   const previousGate = vehicle.nextSector - 1
   const progress = Math.floor((race.path.closed ? count : count - 1) * previousGate / 4)
   const target = race.path.closed
     ? ((race.startPathIndex + (race.reversed ? -1 : 1) * progress) % count + count) % count
     : progress
-  const candidate = { ...vehicle, pathIndex: target, recoveryAnchorIndex: target }
+  const contact = lastRoadRecoveryTarget(race, vehicle)
+  const candidate = { ...vehicle, pathIndex: contact ?? target, recoveryAnchorIndex: contact ?? target }
   const safe = safeFallbackRecoveryTarget(race, candidate)
   // A badly authored course can have no dry road before the pending gate.
   // Still complete the countdown: restore the pre-gate road centre and
@@ -57,16 +59,6 @@ export function resetMissedCheckpoint(vehicle: RaceVehicle, race: RaceState): Ra
     race.path,
     { pathIndex: safe ?? target, reversed: race.reversed },
   )
-}
-
-function resetAtAuthoredCheckpoint(vehicle: RaceVehicle, race: RecoveryCourse): RaceVehicle | undefined {
-  const pathIndex = authoredRecoveryTarget(race, vehicle)
-  if (pathIndex === undefined) return undefined
-  return resetVehicleToTrack({
-    ...vehicle,
-    waterRecoveryProtected: false,
-    ...(vehicle.wrecked ? { wrecked: false, damage: 0, damageCooldown: 0.55 } : {}),
-  }, race.path, { pathIndex, reversed: race.reversed })
 }
 
 export function restoreFrameProgress(vehicle: RaceVehicle, previous: RaceVehicle): RaceVehicle {
