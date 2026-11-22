@@ -405,6 +405,7 @@ export class EditorScene extends Phaser.Scene {
       this.trackGraphics,
       geometry,
       night,
+      snapshot.editor.environmentId,
     )
     renderTrackStartGridPreview(this.trackGraphics, geometry)
     renderBridgeUnderlay(
@@ -523,11 +524,13 @@ export class EditorScene extends Phaser.Scene {
   private renderTerrainPreviewPresentation(): void {
     if (!this.terrainPreviewGraphics || !this.currentSnapshot) return
     const night = this.currentSnapshot.currentTrack?.lighting === 'night'
+    const environment = getTrackEnvironment(this.currentSnapshot.editor.environmentId)
+    const palette = night ? environment.night : environment.day
     this.terrainPreviewGraphics.clear()
     if (terrainDetailForView(this.currentSnapshot.editor.terrain.cells.length, this.editorCamera.zoom) === 'overview') {
       this.compiledTerrainPreviewRevision = undefined
       this.terrainPreviewImpacts = []
-      renderTerrainPreview(this.terrainPreviewGraphics, this.editorInput?.terrainCellPreview() ?? null, night)
+      renderTerrainPreview(this.terrainPreviewGraphics, this.editorInput?.terrainCellPreview() ?? null, night, palette)
       return
     }
     const preview = this.editorInput?.terrainPreview() ?? null
@@ -574,12 +577,14 @@ export class EditorScene extends Phaser.Scene {
         impact.roadSegments,
         night,
         impact.bounds,
+        palette,
       )
     }
     renderTerrainPreview(
       this.terrainPreviewGraphics,
       preview,
       night,
+      palette,
     )
   }
 

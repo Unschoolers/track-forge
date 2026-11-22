@@ -114,7 +114,11 @@ describe('modal application flows', () => {
     const initial: AppSnapshot = { ...state({ type: 'editor-menu' }), mode: 'editor' }
     const { root, port, update, host } = setup(initial)
     const environment = root.querySelector('[role="group"][aria-label="Environment"]')
-    expect(environment?.textContent).toBe('GrassCityscapeDesert')
+    expect(environment?.textContent).toBe("GrassCityscapeDesertKids' Room")
+    root.querySelector<HTMLButtonElement>('[data-environment="kids-room"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'editor', command: { type: 'set-environment', environmentId: 'kids-room' },
+    })
     expect(environment?.querySelector('[data-environment="grass"]')?.getAttribute('aria-pressed')).toBe('true')
     root.querySelector<HTMLButtonElement>('[data-environment="cityscape"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
@@ -136,6 +140,16 @@ describe('modal application flows', () => {
     root.querySelector<HTMLButtonElement>('[aria-label="Erase scenery"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-scenery', choice: 'city-bus-stop' })
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-scenery', choice: 'erase-scenery' })
+    update({
+      ...initial,
+      overlay: { type: 'none' },
+      editor: { ...initial.editor, environmentId: 'kids-room' },
+      editorUi: { ...initial.editorUi, tool: 'tree', sceneryChoice: 'tree' },
+    })
+    expect(root.querySelector('[data-scenery-kind="tree"]')).toBeNull()
+    expect(root.querySelector('[data-scenery-kind="kids-blocks"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(root.querySelectorAll('[data-scenery-kind]')).toHaveLength(7)
+    expect(root.querySelector('.editor-scenery-choices-kids-room')).not.toBeNull()
     host.destroy()
   })
 
@@ -178,6 +192,12 @@ describe('modal application flows', () => {
     expect(raceTile?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
     expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(0)
     expect(raceTile?.contains(share ?? null)).toBe(false)
+    const overflow = share?.closest<HTMLDetailsElement>('details.track-card-overflow')
+    expect(overflow).not.toBeNull()
+    if (!overflow) throw new Error('Saved track share action must be in its overflow menu')
+    overflow.open = true
+    share?.click()
+    expect(overflow.open).toBe(false)
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
     expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')

@@ -26,6 +26,7 @@ const ENVIRONMENT_NAMES = {
   grass: 'Grass',
   cityscape: 'City',
   desert: 'Desert',
+  'kids-room': "Kids' Room",
 } as const
 
 /** Favorites float above recently edited tracks without changing persisted edit dates. */

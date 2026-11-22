@@ -82,7 +82,7 @@ export function createEditorContextDock(
     const kinds = SCENERY_KINDS_BY_ENVIRONMENT[environmentId]
     const selected = normalizeEditorSceneryChoice(state.editorUi.sceneryChoice, environmentId)
     const choices = [
-      sceneryChoice('tree', 'Tree', selected, actions.scenery),
+      ...(environmentId === 'kids-room' ? [] : [sceneryChoice('tree', 'Tree', selected, actions.scenery)]),
       ...kinds.flatMap((kind) => {
         const prop = environment.scenery[kind]
         return prop ? [sceneryChoice(kind, prop.label, selected, actions.scenery)] : []
@@ -92,6 +92,7 @@ export function createEditorContextDock(
     const group = createSegmentedButtons('Scenery', choices)
     if (choices.length > 3) {
       group.classList.add('editor-scenery-choices')
+      if (environmentId === 'kids-room') group.classList.add('editor-scenery-choices-kids-room')
       dock.dataset.layout = 'two-row'
     }
     dock.append(createContextRow(group))
@@ -116,7 +117,7 @@ export function createEditorContextDock(
         createSegmentedButtons('Terrain brush', [
           terrainBrushChoice(
             'raise',
-            'RAISE',
+            state.editor.environmentId === 'kids-room' ? 'BUNCH' : 'RAISE',
             state.editorUi.terrainBrush.mode === 'raise',
             actions.terrainMode,
           ),
@@ -124,13 +125,13 @@ export function createEditorContextDock(
           // GROUND represents the same stateful eraser mode and is selected.
           terrainBrushChoice(
             'lower',
-            'LOWER',
+            state.editor.environmentId === 'kids-room' ? 'FLATTEN' : 'LOWER',
             state.editorUi.terrainBrush.mode === 'lower',
             actions.terrainMode,
           ),
           terrainBrushChoice(
             'water',
-            'WATER',
+            state.editor.environmentId === 'kids-room' ? 'JUICE' : 'WATER',
             state.editorUi.terrainBrush.mode === 'water',
             actions.terrainMode,
           ),

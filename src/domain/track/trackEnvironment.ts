@@ -1,12 +1,13 @@
 import type { Vector2 } from '@/domain/model'
 
-export type TrackEnvironmentId = 'grass' | 'cityscape' | 'desert'
+export type TrackEnvironmentId = 'grass' | 'cityscape' | 'desert' | 'kids-room'
 export const DEFAULT_TRACK_ENVIRONMENT_ID: TrackEnvironmentId = 'grass'
 
 export const SCENERY_KINDS_BY_ENVIRONMENT = {
   grass: ['grass-shrub', 'grass-wildflowers', 'grass-boulder', 'grass-log'],
   cityscape: ['city-trash-bin', 'city-bus-stop', 'city-house', 'city-building'],
   desert: ['desert-cactus', 'desert-boulder', 'desert-rock-cluster', 'desert-rock-spire'],
+  'kids-room': ['kids-blocks', 'kids-teddy', 'kids-crayons', 'kids-book', 'kids-dinosaur', 'kids-top'],
 } as const satisfies Record<TrackEnvironmentId, readonly string[]>
 
 export type SceneryPropKind = (typeof SCENERY_KINDS_BY_ENVIRONMENT)[TrackEnvironmentId][number]
@@ -14,7 +15,7 @@ export interface SceneryProp extends Vector2 { readonly kind: SceneryPropKind }
 export const MAX_SCENERY_PROPS = 256
 
 export function normalizeTrackEnvironmentId(value: unknown): TrackEnvironmentId {
-  return value === 'cityscape' || value === 'desert' ? value : DEFAULT_TRACK_ENVIRONMENT_ID
+  return value === 'cityscape' || value === 'desert' || value === 'kids-room' ? value : DEFAULT_TRACK_ENVIRONMENT_ID
 }
 
 export function sceneryKindBelongsToEnvironment(kind: SceneryPropKind, environmentId: TrackEnvironmentId): boolean {

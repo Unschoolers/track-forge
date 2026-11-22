@@ -77,11 +77,11 @@ export function renderTerrainPrimitives(
   for (const primitive of primitives) {
     switch (primitive.kind) {
       case 'water':
-        graphics.fillStyle(night ? 0x183f52 : 0x287c9c, 1)
+        graphics.fillStyle(palette.waterFill ?? (night ? 0x183f52 : 0x287c9c), 1)
         for (const triangle of primitive.triangles) {
           fillTriangle(graphics, triangle)
         }
-        graphics.lineStyle(1.25, night ? 0x6c9baa : 0x9bd8e8, 0.34)
+        graphics.lineStyle(1.25, palette.waterRipple ?? (night ? 0x6c9baa : 0x9bd8e8), 0.34)
         for (const line of primitive.texture) {
           graphics.lineBetween(
             line.start.x,
@@ -94,7 +94,7 @@ export function renderTerrainPrimitives(
       case 'shoreline':
         graphics.lineStyle(3.5, palette.shorelineLand, 0.9)
         for (const ring of primitive.rings) strokeRing(graphics, ring)
-        graphics.lineStyle(1.2, night ? 0x7eb4c1 : 0xc1edf2, 0.75)
+        graphics.lineStyle(1.2, palette.waterShoreline ?? (night ? 0x7eb4c1 : 0xc1edf2), 0.75)
         for (const ring of primitive.rings) strokeRing(graphics, ring)
         break
       case 'hill-shadow':
@@ -142,13 +142,14 @@ export function renderTerrainPreview(
   graphics: Phaser.GameObjects.Graphics,
   preview: TerrainCellPreview | null,
   night: boolean,
+  palette?: EnvironmentPalette,
 ): void {
   if (!preview) return
   const color =
     preview.kind === 'water'
-      ? night ? 0x5ca7c2 : 0x2f9fc6
+      ? palette?.waterFill ?? (night ? 0x5ca7c2 : 0x2f9fc6)
       : preview.kind === 'hill'
-        ? night ? 0x8cb873 : 0x72bd68
+        ? palette?.hillPlateau ?? (night ? 0x8cb873 : 0x72bd68)
         : night ? 0xd6c99e : 0xe4d8ad
   const { cellSize } = WORLD_ELEVATION
 
@@ -182,6 +183,7 @@ export function renderTerrainImpactPreview(
   roadSegments: readonly TerrainPreviewRoadSegment[],
   night: boolean,
   bounds: TerrainPreviewBounds,
+  palette?: EnvironmentPalette,
 ): void {
   const fillPreviewTriangle = (triangle: TerrainTriangle): void => {
     const xs = triangle.map((point) => point.x)
@@ -201,7 +203,7 @@ export function renderTerrainImpactPreview(
   for (const primitive of buildTerrainPresentation(surface, 'overview')) {
     switch (primitive.kind) {
       case 'water':
-        graphics.fillStyle(night ? 0x5ca7c2 : 0x2f9fc6, 0.28)
+        graphics.fillStyle(palette?.waterFill ?? (night ? 0x5ca7c2 : 0x2f9fc6), 0.28)
         for (const triangle of primitive.triangles) {
           fillPreviewTriangle(triangle)
         }
@@ -216,12 +218,12 @@ export function renderTerrainImpactPreview(
         break
       case 'hill-slope':
         for (const facet of primitive.facets) {
-          graphics.fillStyle(night ? 0x8cb873 : 0x72bd68, 0.22)
+          graphics.fillStyle(palette?.hillSlope ?? (night ? 0x8cb873 : 0x72bd68), 0.22)
           fillPreviewTriangle(facet.triangle)
         }
         break
       case 'hill-plateau':
-        graphics.fillStyle(night ? 0x8cb873 : 0x72bd68, 0.28)
+        graphics.fillStyle(palette?.hillPlateau ?? (night ? 0x8cb873 : 0x72bd68), 0.28)
         for (const triangle of primitive.triangles) {
           fillPreviewTriangle(triangle)
         }
@@ -232,8 +234,8 @@ export function renderTerrainImpactPreview(
   for (const contour of surface.contours) {
     const color =
       contour.kind === 'water'
-        ? night ? 0x9bd8e8 : 0x287c9c
-        : night ? 0xb1d19f : 0x397a43
+        ? palette?.waterShoreline ?? (night ? 0x9bd8e8 : 0x287c9c)
+        : palette?.hillSlope ?? (night ? 0xb1d19f : 0x397a43)
     graphics.lineStyle(2.5, color, 0.86)
     for (let index = 0; index < contour.points.length; index += 1) {
       const start = contour.points[index]

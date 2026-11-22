@@ -79,8 +79,10 @@ export type EditorSceneryChoice = 'tree' | SceneryPropKind | 'erase-scenery'
 
 export function normalizeEditorSceneryChoice(choice: EditorSceneryChoice | undefined, environmentId: TrackEnvironmentId): EditorSceneryChoice {
   if (choice === 'erase-scenery') return choice
-  if (choice === 'tree') return choice
-  return choice && sceneryKindBelongsToEnvironment(choice, environmentId) ? choice : 'tree'
+  if (choice === 'tree') return environmentId === 'kids-room' ? 'kids-blocks' : choice
+  return choice && sceneryKindBelongsToEnvironment(choice, environmentId)
+    ? choice
+    : environmentId === 'kids-room' ? 'kids-blocks' : 'tree'
 }
 
 export interface EditorUiState {
