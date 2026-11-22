@@ -18,7 +18,7 @@ export const DESERT_ENVIRONMENT: TrackEnvironmentDefinition = {
     flyoverWater: '#338d91',
   },
   night: {
-    editorGround: '#403b38',
+    editorGround: '#3c3734',
     raceGround: '#3c3734',
     flyoverGround: '#3c3734',
     hillSlope: 0x5b5147,
