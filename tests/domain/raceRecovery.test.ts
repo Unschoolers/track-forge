@@ -178,14 +178,15 @@ describe('fallback recovery on a circuit', () => {
     const race = createRace({
       path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed,
     })
-    const index = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+    const x = reversed ? 600 : 440
+    const index = required(nearestPathPoint(closeArmsPath, { x, y: 0 })).index
     const player = {
-      ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: index,
+      ...required(race.vehicles[0]), x, y: 100, pathIndex: index, lastRoadContactIndex: index,
       lap: 1, nextSector: reversed ? 4 as const : 1 as const, damage: 20,
     }
     const result = recoverRacePlayer({ ...race, phase: 'running', elapsed: 40, vehicles: [player] })
     expect(result.vehicles[0]).toMatchObject({
-      x: expect.closeTo(440, -1), y: expect.closeTo(0),
+      x: expect.closeTo(x, -1), y: expect.closeTo(0),
       nextSector: player.nextSector, lap: 1, damage: 20, finishedAt: null,
     })
     expect(Math.cos(required(result.vehicles[0]).angle)).toBeCloseTo(reversed ? -1 : 1)
@@ -245,7 +246,7 @@ it.each([false, true])('does not recover at an authored checkpoint beyond the pe
   const indexAt = (progress: number) => ((race.startPathIndex + direction * progress) % count + count) % count
   const anchor = indexAt(Math.floor(count / 8))
   const missed = indexAt(Math.ceil(count / 2))
-  const player = { ...required(race.vehicles[0]), pathIndex: anchor, nextSector: 1 as const, recoveryCheckpoint: missed }
+  const player = { ...required(race.vehicles[0]), pathIndex: anchor, lastRoadContactIndex: anchor, nextSector: 1 as const, recoveryCheckpoint: missed }
   const recovered = resetRaceVehicle(player, { ...race, recoveryCheckpoints: [missed] })
   expect(recovered.pathIndex).toBe(anchor)
   expect(recovered.nextSector).toBe(1)

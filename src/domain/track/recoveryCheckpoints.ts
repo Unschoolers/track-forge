@@ -65,7 +65,7 @@ export function extendAutoRecoveryCheckpoints(
   // The penultimate node remains stable while the last control point is drawn.
   const anchor = after[after.length - 2]
   if (!anchor) return preserved
-  const path = buildRoadPath(after, terrain, 0, routeKind)
+  const path = buildRoadPath(after, terrain, undefined, routeKind)
   const nearest = nearestPathPoint(path, anchor)
   if (!nearest || path.totalLength <= 0 ||
       !isSafeRoadRecoverySample(path, nearest.index)) return preserved

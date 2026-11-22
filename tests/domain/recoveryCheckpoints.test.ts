@@ -58,7 +58,7 @@ describe('authored race recovery checkpoints', () => {
     const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
     const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
     const after = requireFixture(passed.vehicles[0])
-    const wrecked = { ...after, ...at(450), lastRoadContactIndex: at(450).pathIndex, wrecked: true, damage: after.damageLimit }
+    const wrecked = { ...after, ...at(450), lastRoadContactIndex: at(450).pathIndex, nextSector: 2 as const, wrecked: true, damage: after.damageLimit }
     const recovered = stepRace({ ...passed, vehicles: [wrecked] }, coast, 1 / 60, random)
     expect(recovered.state.vehicles[0]).toMatchObject({ x: 450, wrecked: false, damage: 0 })
     expect(recovered.state.phase).toBe('running')

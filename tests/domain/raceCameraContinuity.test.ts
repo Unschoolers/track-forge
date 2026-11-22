@@ -218,7 +218,8 @@ describe('race camera road continuity', () => {
     const path = straightStage()
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const sample = required(nearestPathPoint(path, { x: 1800, y: 0 }))
-    const player = { ...required(race.vehicles[0]), x: 1800, y: 0, pathIndex: sample.index, recoveryCheckpoint: null }
+    const contact = required(nearestPathPoint(path, { x: 1200, y: 0 }))
+    const player = { ...required(race.vehicles[0]), x: 1800, y: 100, pathIndex: sample.index, lastRoadContactIndex: contact.index, nextSector: 4 as const, recoveryCheckpoint: null }
     const recovered = recoverRacePlayer({
       ...race,
       phase: 'running',
@@ -227,7 +228,7 @@ describe('race camera road continuity', () => {
       cameraHints: { ...race.cameraHints, target: player, preview: [player], followingOppositeTravel: true, directionChangeSeconds: 0.2 },
     })
     const after = required(recovered.vehicles[0])
-    expect(after.x).toBeLessThan(100)
+    expect(after.x).toBeCloseTo(1200)
     expect(recovered.cameraHints.preview?.[0]).toMatchObject({ x: after.x, y: after.y })
     expect(recovered.cameraHints.followingOppositeTravel).toBe(false)
     expect(recovered.cameraHints.directionChangeSeconds).toBe(0)
@@ -237,13 +238,15 @@ describe('race camera road continuity', () => {
     const path = straightStage()
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const sample = required(nearestPathPoint(path, { x: 1800, y: 0 }))
-    const player = { ...required(race.vehicles[0]), x: 1800, y: 0, pathIndex: sample.index,
+    const contact = required(nearestPathPoint(path, { x: 1200, y: 0 }))
+    const player = { ...required(race.vehicles[0]), x: 1800, y: 100, pathIndex: sample.index,
+      lastRoadContactIndex: contact.index, nextSector: 4 as const,
       recoveryCheckpoint: null, stuckDuration: 0.66, speed: 0, vx: 0, vy: 0 }
     const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player], recoveryCheckpoints: [10],
       cameraHints: { ...race.cameraHints, followingOppositeTravel: true, directionChangeSeconds: 0.2 } },
       { steering: 0, throttle: 1, braking: false }, 1 / 60, { next: () => 0.5 })
     expect(result.events.some(event => event.type === 'vehicle-recovered')).toBe(true)
-    expect(required(result.state.vehicles[0]).x).toBeLessThan(100)
+    expect(required(result.state.vehicles[0]).x).toBeCloseTo(1200)
     expect(result.state.cameraHints.followingOppositeTravel).toBe(false)
     expect(result.state.cameraHints.directionChangeSeconds).toBe(0)
   })
