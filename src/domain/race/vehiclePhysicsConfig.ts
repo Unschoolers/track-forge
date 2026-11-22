@@ -241,14 +241,14 @@ export const CAR_PHYSICS_SPECS = {
   green: {
     max: 294,
     accel: 214,
-    steer: 3,
+    steer: 3.2,
     grip: 1.14,
     brake: 1.04,
     steerLoss: 0.044,
     mass: 1190,
     wheelbase: 24,
     centerOfMassHeight: 4.7,
-    yawInertia: 175_000,
+    yawInertia: 155_000,
     frontWeightBias: 0.54,
     cornerStiffness: 9.5,
     brakeForce: 125_000,
@@ -300,7 +300,7 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
   },
   red: {
     street: DEFAULT_TERRAIN,
-    dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.8, drag: 1.55 },
+    dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.68, drag: 1.55 },
     ice: { max: 0.95, accel: 0.84, grip: 0.76, brake: 0.78, drag: 1.2 },
     // The pavement specialist pays extra for grass shortcuts; street is unchanged.
     grass: { max: 0.51, accel: 0.40, grip: 0.57, brake: 0.72, drag: 2.35 },
