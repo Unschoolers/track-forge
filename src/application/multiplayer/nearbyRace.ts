@@ -925,7 +925,10 @@ export class NearbyRace {
        */
       trace: {
         ...this.replayTrace.snapshot(),
-        controlPoints: this.course?.track.points.map(point => [point.x, point.y]) ?? [],
+        // Diagnostics also run on a failed/unvalidated room setup, so the
+        // authored point list must not be assumed valid at this boundary.
+        controlPoints: this.course && Array.isArray(this.course.track.points)
+          ? this.course.track.points.map(point => [point.x, point.y]) : [],
       },
       players: [...slots].sort((a, b) => a - b).map(slot => {
         const racer = this.racers.get(slot)
