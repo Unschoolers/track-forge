@@ -135,9 +135,11 @@ function createRenderingScenario() {
 it('removes finished opponent bodies from both height layers while retaining the player', () => {
   const scene = createRenderingScenario()
   scene.draw()
+  // Racing rivals are painted first so overlapping their body never
+  // hides the player on a ramp, flat track or other shared height layer.
   expect(scene.vehicleGraphics.positions).toEqual([
-    { x: 100, y: 100 },
     { x: 200, y: 100 },
+    { x: 100, y: 100 },
   ])
   expect(scene.upperVehicleGraphics.positions).toEqual([
     { x: 300, y: 100 },
