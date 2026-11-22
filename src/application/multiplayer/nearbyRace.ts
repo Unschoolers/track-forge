@@ -65,6 +65,7 @@ export class NearbyRace {
   private cupIndex = 0
   private cupTotal = 0
   private cupLaps = 2
+  private lightingOverride: LightingMode | null = null
   private scoredCupIndex = -1
   private readonly cupPoints = new Map<number, number>()
   private incomingShare: Track | null = null
@@ -124,6 +125,7 @@ export class NearbyRace {
     return {
       phase: this.phase, purpose: this.purpose, role: this.role,
       error: this.error, room: this.room, track: this.course?.track.name,
+      lighting: this.course?.lighting ?? null,
       incomingTrack: this.incomingShare?.name ?? null, sharedCount: this.sharedPeers.size,
       shareStatus: this.shareStatus,
       rooms: [...this.rooms], players: 1 + this.guests.size,
@@ -199,6 +201,17 @@ export class NearbyRace {
       laps: first.routeKind === 'point-to-point' ? 1 : laps }, 'race')
   }
 
+  /** Host-only session lighting; never modifies saved track data. */
+  setLighting(lighting: LightingMode): boolean {
+    if (this.role !== 'host' || this.purpose !== 'race' || !this.course ||
+        (this.phase !== 'hosting' && !this.canRematch()) ||
+        (lighting !== 'day' && lighting !== 'night')) return false
+    this.lightingOverride = lighting
+    this.course = { ...this.course, lighting }
+    this.changed()
+    return true
+  }
+
   hostShare(track: Track): void {
     this.openHost({ track, laps: 1, lighting: track.lighting, car: this.localCar }, 'share')
   }
@@ -206,6 +219,7 @@ export class NearbyRace {
   private openHost(course: Course, purpose: Purpose): void {
     if (this.phase !== 'idle') return
     this.purpose = purpose
+    this.lightingOverride = null
     this.role = 'host'
     this.course = course
     const random = crypto.getRandomValues(new Uint16Array(1))[0] ?? 0
@@ -243,7 +257,7 @@ export class NearbyRace {
   selectNextTrack(track: Track): boolean {
     if (!this.canRematch() || this.cupTotal > 0 || !this.course || !this.validateTrack(track)) return false
     this.course = {
-      ...this.course, track, lighting: track.lighting,
+      ...this.course, track, lighting: this.lightingOverride ?? track.lighting,
       laps: track.routeKind === 'point-to-point' ? 1 : this.course.laps,
     }
     this.changed()
@@ -273,7 +287,7 @@ export class NearbyRace {
       const next = this.cupTracks[this.cupIndex + 1]
       if (!next) return
       this.cupIndex++
-      this.course = { ...this.course, track: next, lighting: next.lighting,
+      this.course = { ...this.course, track: next, lighting: this.lightingOverride ?? next.lighting,
         laps: next.routeKind === 'point-to-point' ? 1 : this.cupLaps }
     }
     const course = this.course
@@ -888,6 +902,7 @@ export class NearbyRace {
     this.cupIndex = 0
     this.cupPoints.clear()
     this.scoredCupIndex = -1
+    this.lightingOverride = null
     this.purpose = 'race'
     this.room = null
     this.hostId = null

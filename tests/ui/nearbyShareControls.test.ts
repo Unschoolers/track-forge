@@ -24,6 +24,35 @@ const result: RaceResult = {
 }
 
 describe('Nearby sharing and rematch controls', () => {
+  it('shows host-selectable Day/Night choices for normal races and Cups', async () => {
+    const nearby = new NearbyRace(transport, () => true)
+    const actions = {
+      close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
+      downloadDiagnostics: vi.fn(async () => true),
+    }
+    try {
+      nearby.host({ track: nearbyTrack, car: 'blue', laps: 2, lighting: 'day' })
+      await vi.waitFor(() => expect(nearby.snapshot().phase).toBe('hosting'))
+      const modal = createNearbyRaceModal(nearby, 'blue', actions)
+      const day = modal.querySelector<HTMLButtonElement>('[data-action="nearby-lighting-day"]')
+      const night = modal.querySelector<HTMLButtonElement>('[data-action="nearby-lighting-night"]')
+      expect(day?.getAttribute('aria-pressed')).toBe('true')
+      expect(night?.getAttribute('aria-pressed')).toBe('false')
+      night?.click()
+      expect(nearby.snapshot().lighting).toBe('night')
+      nearby.close()
+      nearby.hostCup([nearbyTrack, nearbyTrack], 'blue', 2)
+      await vi.waitFor(() => expect(nearby.snapshot().phase).toBe('hosting'))
+      const cup = createNearbyRaceModal(nearby, 'blue', actions)
+      expect(cup.textContent).toContain('CUP LIGHTING')
+      cup.querySelector<HTMLButtonElement>('[data-action="nearby-lighting-night"]')?.click()
+      expect(nearby.snapshot().lighting).toBe('night')
+    } finally {
+      nearby.destroy()
+    }
+  })
+
   it('offers track receiving without hiding the existing race actions', () => {
     const nearby = new NearbyRace(transport, () => true)
     const scanTracks = vi.fn()
