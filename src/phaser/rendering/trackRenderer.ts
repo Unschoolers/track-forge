@@ -190,7 +190,7 @@ function renderTrackGeometryMarkings(
     const previous = path.points[index]
     const current = path.points[(index + 1) % path.points.length]
     if (!previous || !current) continue
-    renderStripe(graphics, previous, current, night)
+    renderStripe(graphics, previous, current, night, environmentId)
   }
   renderTrackMarkers(graphics, geometry, night)
 }
