@@ -10,7 +10,7 @@ describe('adaptive editor grid', () => {
       const spacing = editorGridSpacing(zoom)
       expect(spacing * zoom).toBeGreaterThanOrEqual(32)
       expect(spacing * zoom).toBeLessThanOrEqual(100)
-      const grid = buildEditorGrid(bounds, zoom)
+      const grid = buildEditorGrid(bounds, spacing)
       expect(grid.vertical.length).toBeLessThanOrEqual(240)
       expect(grid.horizontal.length).toBeLessThanOrEqual(240)
       for (const line of [...grid.vertical, ...grid.horizontal]) {
