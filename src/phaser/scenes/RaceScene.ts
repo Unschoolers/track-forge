@@ -253,16 +253,14 @@ export class RaceScene extends Phaser.Scene {
         )
         .map(({ id }) => id),
     )
-    renderVehicles(
-      this.vehicleGraphics,
-      visibleVehicles.filter(({ id }) => !upperVehicles.has(id)),
-      race.path,
-    )
-    renderVehicles(
-      this.upperVehicleGraphics,
-      visibleVehicles.filter(({ id }) => upperVehicles.has(id)),
-      race.path,
-    )
+    // Arcade rivals may overlap the player without physical collisions.
+    // Paint the player last within the same height layer; bridge/underpass
+    // occlusion, physics, shadow order and lighting remain unchanged.
+    const forPaint = (raised: boolean) => visibleVehicles
+      .filter(({ id }) => upperVehicles.has(id) === raised)
+      .sort((a, b) => Number(a.player) - Number(b.player))
+    renderVehicles(this.vehicleGraphics, forPaint(false), race.path)
+    renderVehicles(this.upperVehicleGraphics, forPaint(true), race.path)
     if (player && race.missedCheckpoint && race.phase === 'running' && !race.paused) {
       const target = race.missedCheckpoint.position
       const angle = Math.atan2(target.y - player.y, target.x - player.x)
