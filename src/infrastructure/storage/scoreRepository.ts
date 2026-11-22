@@ -20,7 +20,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
     (category.handling === 'arcade' || category.handling === 'simulation') &&
     (category.mode === 'normal' || category.mode === 'ghost' || category.mode === 'time-trial')
   return typeof item.time === 'number' &&
-    Number.isFinite(item.time) &&
+    Number.isFinite(item.time) && item.time > 0 &&
     isCarId(item.car) &&
     isDifficultyId(item.difficulty) &&
     ((typeof item.recordedAt === 'number' &&
