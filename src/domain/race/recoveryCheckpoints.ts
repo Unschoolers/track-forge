@@ -5,6 +5,15 @@ import { isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 
 export type RecoveryCourse = Pick<RaceState, 'path' | 'routeKind' | 'startPathIndex' | 'reversed' | 'recoveryCheckpoints'>
 
+/** Distance travelled in route order, wrapping only on closed circuits. */
+export function forwardRecoveryDistance(
+  from: number, to: number, count: number, reversed: boolean, closed: boolean,
+): number {
+  if (count <= 0) return 0
+  const distance = (reversed ? -1 : 1) * (to - from)
+  return closed ? ((distance % count) + count) % count : distance
+}
+
 export function reachedRecoveryCheckpoint(
   race: RecoveryCourse,
   previous: RaceVehicle,
@@ -14,17 +23,12 @@ export function reachedRecoveryCheckpoint(
   const last = previous.lap === vehicle.lap ? previous.recoveryCheckpoint ?? null : null
   if (!race.recoveryCheckpoints?.length || vehicle.finishedAt !== null) return last
   const length = race.path.points.length
-  const direction = race.reversed ? -1 : 1
-  const forwardDistance = (from: number, to: number): number => {
-    const distance = direction * (to - from)
-    return race.path.closed ? (distance + length) % length : distance
-  }
   const nextRequiredGate = (race.path.closed ? length : length - 1) * vehicle.nextSector / 4
   let checkpoint = last
   let furthest = -1
   for (const index of race.recoveryCheckpoints) {
-    const fromStart = forwardDistance(race.startPathIndex, index)
-    const distance = forwardDistance(previous.pathIndex, index)
+    const fromStart = forwardRecoveryDistance(race.startPathIndex, index, length, race.reversed, race.path.closed)
+    const distance = forwardRecoveryDistance(previous.pathIndex, index, length, race.reversed, race.path.closed)
     // A recovery cannot land on the far side of a missed timing gate.
     if (fromStart >= nextRequiredGate || distance < furthest) continue
     // At angled checkpoints the car may be just off the sampled road at one
@@ -44,7 +48,7 @@ function safePreGateSample(course: RecoveryCourse, vehicle: RaceVehicle, index: 
   const count = path.points.length
   if (!Number.isInteger(index) || index < 0 || index >= count) return false
   const progress = path.closed
-    ? ((((reversed ? -1 : 1) * (index - startPathIndex)) % count) + count) % count
+    ? forwardRecoveryDistance(startPathIndex, index, count, reversed, true)
     : index
   const nextGate = (path.closed ? count : count - 1) * vehicle.nextSector / 4
   return progress < nextGate && isSafeRoadRecoverySample(path, index)
@@ -75,7 +79,9 @@ export function safeFallbackRecoveryTarget(course: RecoveryCourse, vehicle: Race
     : course.routeKind === 'point-to-point'
       ? lastSampleBeforeCheckpoint(path, vehicle.nextSector)
       : count - 1
-  const fromStart = path.closed ? wrap(direction * ((vehicle.recoveryAnchorIndex ?? vehicle.pathIndex) - startPathIndex)) : (vehicle.recoveryAnchorIndex ?? vehicle.pathIndex)
+  const fromStart = path.closed
+    ? forwardRecoveryDistance(startPathIndex, vehicle.recoveryAnchorIndex ?? vehicle.pathIndex, count, reversed, true)
+    : (vehicle.recoveryAnchorIndex ?? vehicle.pathIndex)
   // Cars can begin just behind Start. Keep that approach available when gate 1 is pending.
   const behindStart = path.closed && vehicle.nextSector === 1 && fromStart >= count - 12
   const first = behindStart ? fromStart - count : 0
