@@ -7,7 +7,8 @@ import { normalizeDisplayName } from '@/domain/track/trackCreator'
 export const MAX_PLAYERS = NEARBY_START_GRID_SIZE
 /** Breaking change to compact pose/progress epochs. Enforce before any race starts. */
 export const NEARBY_WIRE_PROTOCOL_VERSION = 3
-const MAX_CONTROL_BYTES = 1024
+// Eight fully named players may exceed 1 KiB in UTF-8 (24 Unicode letters each).
+const MAX_CONTROL_BYTES = 2048
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
@@ -25,6 +26,9 @@ export type Control =
 
 export function encodeControl(message: Control): Uint8Array {
   const payload = encoder.encode(JSON.stringify(message))
+  if (payload.length + 1 > MAX_CONTROL_BYTES) {
+    throw new RangeError('Nearby control message exceeds the bounded wire limit.')
+  }
   const packet = new Uint8Array(payload.length + 1)
   packet[0] = Packet.Control
   packet.set(payload, 1)
