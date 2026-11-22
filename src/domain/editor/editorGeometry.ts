@@ -11,6 +11,7 @@ import type {
 import { terrainCellKey } from '@/domain/terrain/terrainField'
 
 export const EDITOR_SURFACES = ['street', 'dirt', 'ice', 'mixed'] as const
+const MIXED_SURFACE_ORDER = ['street', 'dirt', 'ice'] as const
 export const EDITOR_TOOLS = [
   'draw',
   'select',
@@ -140,10 +141,9 @@ export function surfaceForIndex(
   index: number,
 ): SurfaceId {
   if (surface !== 'mixed') return surface
-  const surfaces = ['street', 'dirt', 'ice'] as const
-  return surfaces[
-    ((Math.floor(index) % surfaces.length) + surfaces.length) %
-      surfaces.length
+  return MIXED_SURFACE_ORDER[
+    ((Math.floor(index) % MIXED_SURFACE_ORDER.length) + MIXED_SURFACE_ORDER.length) %
+      MIXED_SURFACE_ORDER.length
   ] ?? 'street'
 }
 
