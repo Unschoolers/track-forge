@@ -167,11 +167,11 @@ describe('Nearby Arcade', () => {
       for (const [index, { device, car }] of setups.entries()) {
         device.update(makeCar(car, index * 10, index * 5, index === 1 ? 'bridge' : null))
       }
-      // Host waits for its next tick, then broadcasts all four cars once.
+      // Host sends the newest shared batch independently to each guest.
       await vi.waitFor(() => expect(host.remotePoses()).toHaveLength(3), { interval: 5 })
       time += 1000 / 60
       host.update(makeCar('blue', 0))
-      expect(network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)).toHaveLength(1)
+      expect(network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)).toHaveLength(3)
       time += 1000 / 60
       host.update(makeCar('blue', 0))
       await vi.waitFor(() => {
@@ -182,10 +182,11 @@ describe('Nearby Arcade', () => {
       const hostBatches = network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)
       expect(posePackets).toHaveLength(3)
       expect(posePackets.every(({ bytes }) => bytes.byteLength === POSE_BYTES)).toBe(true)
-      expect(hostBatches).toHaveLength(2)
-      expect(hostBatches.map(({ bytes }) => bytes.byteLength)).toEqual([1 + POSE_BYTES, 1 + 4 * POSE_BYTES])
-      expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
-      expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
+      expect(hostBatches).toHaveLength(6)
+      expect(hostBatches.map(({ bytes }) => bytes.byteLength)).toEqual([1 + POSE_BYTES, 1 + POSE_BYTES, 1 + POSE_BYTES, 1 + 4 * POSE_BYTES, 1 + 4 * POSE_BYTES, 1 + 4 * POSE_BYTES])
+      expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 1)).toBe(true)
+      expect(hostBatches.slice(3).map(({ to }) => to[0])).toEqual(['guest-1', 'guest-2', 'guest-3'])
+      expect(decodePoseBatch(hostBatches[3]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
 
       // Optional progress telemetry distinguishes race progress from pose position.
       const progressState = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2 })
