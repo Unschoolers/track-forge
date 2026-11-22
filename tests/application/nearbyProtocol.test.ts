@@ -64,7 +64,8 @@ describe('Nearby wire and track transfer contracts', () => {
     assert(recovered)
     expect(ghost.receive(recovered, 1160)).toBe(true)
     expect(ghost.pose(1270)?.x).toBe(500)
-    expect(ghost.pose(1950)).toBeNull()
+    expect(ghost.pose(1950)?.x).toBe(500)
+    expect(ghost.pose(3161)).toBeNull()
   })
 
   it('round-trips a 19-byte pose and cuts interpolation on a recovery', () => {
@@ -86,7 +87,8 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(ghost.receive(first, 1060)).toBe(false)
     expect(ghost.pose(1125)?.x).toBe(first.pose.x)
     expect(ghost.pose(1150)).toMatchObject({ car: 'red', x: -75, z: 0, structureRunId: null })
-    expect(ghost.pose(1850)).toBeNull()
+    expect(ghost.pose(1850)?.x).toBe(-75)
+    expect(ghost.pose(3051)).toBeNull()
     expect(decodePose(new Uint8Array(18))).toBeNull()
   })
   it.each([
