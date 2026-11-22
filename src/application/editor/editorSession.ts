@@ -83,7 +83,9 @@ export class EditorSession {
 
   /** Compare editable content, not timestamps: undo back to the saved state is clean. */
   isDirty(draft: Track | null, saved: Track | undefined): boolean {
-    if (!draft || !saved) return false
+    if (!draft) return false
+    // A missing persisted baseline is an unsaved draft, not a clean editor.
+    if (!saved) return true
     const content = (track: Track): string => JSON.stringify({
       name: track.name,
       points: track.points,
