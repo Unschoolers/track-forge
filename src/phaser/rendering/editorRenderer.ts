@@ -19,10 +19,20 @@ export interface EditorGrid {
   readonly horizontal: readonly GridLine[]
 }
 
+/** Choose 1/2/5 steps so grid density stays readable across large zoom ranges. */
+export function editorGridSpacing(zoom: number): number {
+  const target = 64 / Math.max(0.00001, zoom)
+  const magnitude = 10 ** Math.floor(Math.log10(target))
+  const ratio = target / magnitude
+  const multiplier = ratio < 1.5 ? 1 : ratio < 3.5 ? 2 : ratio < 7.5 ? 5 : 10
+  return multiplier * magnitude
+}
+
 export function buildEditorGrid(
   bounds: WorldBounds,
-  spacing = 50,
+  zoom = 1,
 ): EditorGrid {
+  const spacing = editorGridSpacing(zoom)
   const lines = (minimum: number, maximum: number): readonly GridLine[] => {
     const first = Math.ceil(minimum / spacing)
     const last = Math.floor(maximum / spacing)
@@ -45,22 +55,25 @@ export function renderEditorGrid(
   graphics: Phaser.GameObjects.Graphics,
   bounds: WorldBounds,
   night: boolean,
+  zoom = 1,
 ): void {
-  const grid = buildEditorGrid(bounds)
-  for (const line of grid.vertical) {
+  const grid = buildEditorGrid(bounds, zoom)
+  // Graphics widths are world-space; convert from screen pixels so zoom never
+  // makes the grid hairline-thin or distractingly heavy.
+  const screenScale = 1 / Math.max(0.00001, zoom)
+  const stroke = (major: boolean) => {
     graphics.lineStyle(
-      line.major ? 1.4 : 0.7,
-      night ? 0xb7c4bb : 0x163f26,
-      line.major ? 0.24 : 0.12,
+      (major ? 1.55 : 0.85) * screenScale,
+      night ? 0xc7e3dd : 0x14392f,
+      night ? (major ? 0.48 : 0.26) : (major ? 0.44 : 0.23),
     )
+  }
+  for (const line of grid.vertical) {
+    stroke(line.major)
     graphics.lineBetween(line.position, bounds.top, line.position, bounds.bottom)
   }
   for (const line of grid.horizontal) {
-    graphics.lineStyle(
-      line.major ? 1.4 : 0.7,
-      night ? 0xb7c4bb : 0x163f26,
-      line.major ? 0.24 : 0.12,
-    )
+    stroke(line.major)
     graphics.lineBetween(bounds.left, line.position, bounds.right, line.position)
   }
 }
