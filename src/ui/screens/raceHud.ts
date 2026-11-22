@@ -11,6 +11,9 @@ import { formatRaceTime } from '@/ui/format'
 import { bindRacePointer, STEERING_RANGE_PX } from '@/phaser/input/racePointer'
 import { driftCue } from '@/ui/screens/driftCue'
 
+// Keep race-position celebrations stable without delaying the live position HUD.
+const POSITION_CHANGE_HOLD_MS = 600
+
 export interface RaceHudMount {
   readonly element: HTMLElement
   destroy(): void
@@ -207,11 +210,11 @@ export function createRaceHud(
   window.addEventListener('blur', onBlur)
   document.addEventListener('visibilitychange', onVisibility)
 
-  let lastPosition: number | null = null
+  let confirmedPosition: number | null = null
+  let pendingPosition: { value: number; since: number } | null = null
   let lastRunId = raceSession.snapshot().runId
   let lastLap: number | null = null
   let bannerUntil = 0
-  let finalLapNotice = false
   let previousHandling: string | undefined
   let previousPaused: boolean | undefined
   let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
@@ -235,10 +238,10 @@ export function createRaceHud(
   const update = (snapshot: RaceSessionSnapshot): void => {
     if (snapshot.runId !== lastRunId) {
       lastRunId = snapshot.runId
-      lastPosition = null
+      confirmedPosition = null
+      pendingPosition = null
       lastLap = null
       bannerUntil = 0
-      finalLapNotice = false
     }
     const handling = snapshot.setup?.handling ?? 'arcade'
     const paused = snapshot.state?.paused ?? false
@@ -281,27 +284,42 @@ export function createRaceHud(
     slide.classList.toggle('visible', cue !== null)
     const now = performance.now()
     const racing = phase === 'running' && !paused && telemetry.elapsed >= 0.7
+    const nearby = snapshot.setup?.mode === 'nearby'
+    const canAnnouncePosition = telemetry.vehicleCount > 1 &&
+      ((snapshot.setup?.mode ?? 'normal') === 'normal' || (nearby && telemetry.positionKnown))
+    if (!racing || !canAnnouncePosition) {
+      // Countdown, pause, finish and unknown Nearby ranks establish a fresh baseline.
+      // They must not create fictitious passes when gameplay resumes.
+      confirmedPosition = canAnnouncePosition ? telemetry.position : null
+      pendingPosition = null
+    } else if (confirmedPosition === null) {
+      confirmedPosition = telemetry.position
+    } else if (telemetry.position === confirmedPosition) {
+      // Briefly swapping ranks at the timing line is not a confirmed overtake.
+      pendingPosition = null
+    } else if (pendingPosition?.value !== telemetry.position) {
+      pendingPosition = { value: telemetry.position, since: now }
+    }
     if (!racing) {
       bannerUntil = 0
-      finalLapNotice = false
     } else if (telemetry.routeKind !== 'point-to-point' && lastLap !== null && telemetry.lap > lastLap &&
       telemetry.lap + 1 === telemetry.totalLaps) {
-      finalLapNotice = true
       announce('THE DECIDING LAP', 'FINAL LAP!', 'EVERY SECOND COUNTS', 'lap', now, 1450)
     } else if (
-      lastPosition !== null &&
-      telemetry.position !== lastPosition &&
-      ((snapshot.setup?.mode ?? 'normal') === 'normal' ||
-        (snapshot.setup?.mode === 'nearby' && telemetry.positionKnown)) &&
-      telemetry.vehicleCount > 1 &&
-      (!finalLapNotice || now >= bannerUntil)
+      confirmedPosition !== null &&
+      pendingPosition !== null &&
+      now - pendingPosition.since >= POSITION_CHANGE_HOLD_MS &&
+      now >= bannerUntil
     ) {
-      finalLapNotice = false
-      const gained = lastPosition - telemetry.position
+      // Do not restart a visible animation; confirm only the rank that still holds.
+      const nextPosition = pendingPosition.value
+      const gained = confirmedPosition - nextPosition
+      confirmedPosition = nextPosition
+      pendingPosition = null
       const count = Math.abs(gained)
-      const detail = `${count} PLACE${count === 1 ? '' : 'S'} ${gained > 0 ? 'GAINED' : 'LOST'} · P${telemetry.position}/${telemetry.vehicleCount}`
+      const detail = `${count} PLACE${count === 1 ? '' : 'S'} ${gained > 0 ? 'GAINED' : 'LOST'} · P${nextPosition}/${telemetry.vehicleCount}`
       if (gained > 0) {
-        const lead = telemetry.position === 1
+        const lead = nextPosition === 1
         announce(lead ? 'YOU OWN THE FRONT' : 'NICE MOVE', lead ? 'LEAD TAKEN!' : 'OVERTAKE!', detail, lead ? 'lead' : 'gain', now, 1650)
       } else {
         announce('FIGHT BACK', 'YOU GOT PASSED!', detail, 'loss', now, 1400)
@@ -310,8 +328,6 @@ export function createRaceHud(
     const showBanner = racing && now < bannerUntil
     raceBanner.classList.toggle('visible', showBanner)
     if (!showBanner && raceBanner.textContent) raceBanner.replaceChildren()
-    const nearby = snapshot.setup?.mode === 'nearby'
-    lastPosition = nearby && !telemetry.positionKnown ? null : telemetry.position
     lastLap = telemetry.lap
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
     const openRoute = telemetry.routeKind === 'point-to-point'
