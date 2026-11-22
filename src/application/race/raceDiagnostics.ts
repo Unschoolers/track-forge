@@ -88,11 +88,17 @@ export class RaceDiagnosticsRecording {
   }
 
   record(state: RaceState, events: readonly RaceEvent[], input?: DriverInput): void {
+    let forceCapture = false
     for (const event of events) {
-      if (event.type === 'vehicle-recovered') this.pendingCuts.add(event.vehicleId)
+      if (event.type === 'vehicle-recovered') {
+        this.pendingCuts.add(event.vehicleId)
+        forceCapture = true
+      } else if (event.type === 'race-finished') {
+        forceCapture = true
+      }
       this.recordEvent(state, event)
     }
-    this.capture(state, input, events.some(event => event.type === 'race-finished' || event.type === 'vehicle-recovered'))
+    this.capture(state, input, forceCapture)
   }
 
   manualReset(state: RaceState, vehicleId: string): void {
