@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
 
-test('places a recovery checkpoint and returns to it after hitting scenery', async ({ page }) => {
+test('places a checkpoint while arcade ignores physical scenery collisions', async ({ page }) => {
   const id = 'checkpoint-qa'
   await page.addInitScript(trackId => {
     localStorage.setItem('trackforge-library-v2', JSON.stringify([{
@@ -45,11 +45,14 @@ test('places a recovery checkpoint and returns to it after hitting scenery', asy
   await page.getByRole('button', { name: 'TIME TRIAL', exact: true }).click()
   await page.getByRole('button', { name: 'START TIME TRIAL' }).click()
   await expect.poll(async () => (await qa()).race?.player?.y).toBe(-24)
-  await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
+  await page.evaluate(() => window.__trackForgeQa.advanceRace(4.7))
+  // Arcade has no scenery collision: the car does not snap onto the centre
+  // line when it passes the trash bin. Domain tests cover simulation impacts.
   await expect.poll(async () => {
     const race = (await qa()).race
-    return race?.phase === 'running' && Math.abs(race.player.y) < 1
+    return race?.phase === 'running' && race.handling === 'arcade' && race.player.y < -10
   }, { timeout: 15_000 }).toBe(true)
+  await page.evaluate(() => window.__trackForgeQa.advanceRace(20))
   const results = page.locator('[data-modal="results"]')
   await expect(results.locator('[data-action="open-race-splits"]')).toBeVisible({ timeout: 15_000 })
   await results.locator('[data-action="open-race-splits"]').click()
