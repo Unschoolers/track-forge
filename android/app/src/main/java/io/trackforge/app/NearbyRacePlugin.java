@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @CapacitorPlugin(name = "TrackNearby", permissions = {
     @Permission(alias = "bluetooth", strings = {
@@ -61,6 +62,8 @@ public class NearbyRacePlugin extends Plugin {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Set<String> connected = new HashSet<>();
     private final Map<Long, PendingSend> pendingSends = new HashMap<>();
+    private final TransientPayloadWindow transientWindow = new TransientPayloadWindow();
+    private long droppedTransientPackets, failedTransientPackets, timedOutTransientPackets;
     private ConnectionsClient client;
     private int generation;
     private final ArrayDeque<JSObject> events = new ArrayDeque<>();
@@ -157,6 +160,10 @@ public class NearbyRacePlugin extends Plugin {
             JSObject counters = new JSObject(); counters.put("sentPackets", sentPackets); counters.put("sentBytes", sentBytes);
             counters.put("receivedPackets", receivedPackets); counters.put("receivedBytes", receivedBytes);
             counters.put("connectedCount", connected.size()); counters.put("pendingSends", pendingSends.size());
+            counters.put("pendingTransientPackets", transientWindow.pendingCount());
+            counters.put("droppedTransientPackets", droppedTransientPackets);
+            counters.put("failedTransientPackets", failedTransientPackets);
+            counters.put("timedOutTransientPackets", timedOutTransientPackets);
             report.put("counters", counters);
             JSArray history = new JSArray(); for (JSObject event : events) history.put(event);
             report.put("events", history); call.resolve(report);
@@ -275,21 +282,59 @@ public class NearbyRacePlugin extends Plugin {
                 call.reject("A nearby player disconnected before the packet was sent.");
                 return;
             }
+            boolean transientPacket = bytes[0] == 1 || bytes[0] == 3 || bytes[0] == 4;
+            boolean progressPacket = bytes[0] == 4;
+            // Keep one Nearby multicast per frame, but do not let an
+            // unresponsive destination queue stale frames for the other peers.
+            if (transientPacket) {
+                Set<String> eligible = transientWindow.available(recipients, progressPacket);
+                droppedTransientPackets += recipients.size() - eligible.size();
+                if (eligible.isEmpty()) { call.resolve(); return; }
+                Payload payload = Payload.fromBytes(bytes);
+                long payloadId = payload.getId();
+                transientWindow.start(payloadId, eligible, progressPacket);
+                sentPackets++;
+                sentBytes += bytes.length;
+                AtomicBoolean answered = new AtomicBoolean();
+                // The SDK's send Task confirms admission to its transport queue,
+                // not arrival at each endpoint. Individual transfer callbacks
+                // release recipient-specific congestion windows.
+                client().sendPayload(new ArrayList<>(eligible), payload)
+                    .addOnSuccessListener(ignored -> {
+                        if (answered.compareAndSet(false, true)) call.resolve();
+                    })
+                    .addOnFailureListener(error -> {
+                        record("send_transient", "enqueue_failed", statusCode(error));
+                        transientWindow.abandon(payloadId);
+                        failedTransientPackets++;
+                        if (answered.compareAndSet(false, true)) call.reject("Could not queue nearby position data.", error);
+                    });
+                main.postDelayed(() -> {
+                    if (!transientWindow.contains(payloadId)) return;
+                    timedOutTransientPackets++;
+                    record("send_transient", "timeout", null);
+                    client().cancelPayload(payloadId);
+                    transientWindow.abandon(payloadId);
+                    if (answered.compareAndSet(false, true)) call.reject("Nearby position data timed out.");
+                }, 600);
+                return;
+            }
             sentPackets++; sentBytes += bytes.length;
             Payload payload = Payload.fromBytes(bytes);
             long id = payload.getId();
-            boolean transientPacket = bytes[0] == 1 || bytes[0] == 3 || bytes[0] == 4;
-            // Task success means the transfer was queued. Keep control and track
-            // packets pending until each endpoint reports successful delivery.
+            // Reliable control/track messages must be acknowledged by every peer.
             pendingSends.put(id, new PendingSend(call, recipients));
             client().sendPayload(new ArrayList<>(recipients), payload)
-                .addOnFailureListener(error -> { record("send", "failed", statusCode(error)); finishSend(id, "Could not send nearby data."); });
+                .addOnFailureListener(error -> {
+                    record("send", "failed", statusCode(error));
+                    finishSend(id, "Could not send nearby data.");
+                });
             main.postDelayed(() -> {
                 if (!pendingSends.containsKey(id)) return;
                 record("send", "timeout", null);
                 client().cancelPayload(id);
                 finishSend(id, "Nearby data transfer timed out.");
-            }, transientPacket ? 600 : 10_000);
+            }, 10_000);
         });
     }
 
@@ -312,6 +357,7 @@ public class NearbyRacePlugin extends Plugin {
             client.stopAllEndpoints();
         }
         connected.clear();
+        transientWindow.clear();
         pendingSends.values().forEach(send -> send.call().reject("Nearby session ended before delivery."));
         pendingSends.clear();
     }
@@ -339,6 +385,13 @@ public class NearbyRacePlugin extends Plugin {
                 if (active != generation) return;
                 record("connection", "disconnected", null);
                 connected.remove(id);
+                transientWindow.disconnect(id);
+                // Reliable operations must fail promptly when a target leaves.
+                for (Long payloadId : new ArrayList<>(pendingSends.keySet())) {
+                    PendingSend pending = pendingSends.get(payloadId);
+                    if (pending != null && pending.remaining().contains(id))
+                        finishSend(payloadId, "A nearby player disconnected before delivery.");
+                }
                 emit(active, "disconnected", id, null, null);
             }
 
@@ -359,6 +412,13 @@ public class NearbyRacePlugin extends Plugin {
             @Override public void onPayloadTransferUpdate(String endpoint, PayloadTransferUpdate update) {
                 if (active != generation || update.getStatus() == PayloadTransferUpdate.Status.IN_PROGRESS) return;
                 long id = update.getPayloadId();
+                if (transientWindow.complete(id, endpoint)) {
+                    if (update.getStatus() != PayloadTransferUpdate.Status.SUCCESS) {
+                        failedTransientPackets++;
+                        record("send_transient", "transfer_failed", null);
+                    }
+                    return;
+                }
                 PendingSend pending = pendingSends.get(id);
                 if (pending == null || !pending.remaining().remove(endpoint)) return;
                 if (update.getStatus() != PayloadTransferUpdate.Status.SUCCESS) {
