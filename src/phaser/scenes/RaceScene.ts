@@ -236,12 +236,9 @@ export class RaceScene extends Phaser.Scene {
     this.upperVehicleGraphics.clear()
     this.effectGraphics.clear()
     renderRaceEffects(this.effectGraphics, race.effects)
-    // Arcade rivals are non-colliding and may overlap the player. Keep the
-    // player's body readable rather than painting a rival over it.
-    // Sorting before the height split preserves deck/underpass occlusion.
-    const visibleVehicles = race.vehicles
-      .filter((vehicle) => vehicle.player || vehicle.finishedAt === null)
-      .sort((left, right) => Number(left.player) - Number(right.player))
+    const visibleVehicles = race.vehicles.filter(
+      (vehicle) => vehicle.player || vehicle.finishedAt === null,
+    )
     renderVehicleShadows(
       this.shadowGraphics,
       this.upperVehicleGraphics,
@@ -256,16 +253,14 @@ export class RaceScene extends Phaser.Scene {
         )
         .map(({ id }) => id),
     )
-    renderVehicles(
-      this.vehicleGraphics,
-      visibleVehicles.filter(({ id }) => !upperVehicles.has(id)),
-      race.path,
-    )
-    renderVehicles(
-      this.upperVehicleGraphics,
-      visibleVehicles.filter(({ id }) => upperVehicles.has(id)),
-      race.path,
-    )
+    // The player is visible through overlapping arcade rivals, but still
+    // draws below any bridge above them. Only the paint order changes:
+    // shadows, lights, and race simulation retain their original order.
+    const forPaint = (raised: boolean) => visibleVehicles
+      .filter(({ id }) => upperVehicles.has(id) === raised)
+      .sort((a, b) => Number(a.player) - Number(b.player))
+    renderVehicles(this.vehicleGraphics, forPaint(false), race.path)
+    renderVehicles(this.upperVehicleGraphics, forPaint(true), race.path)
     if (player && race.missedCheckpoint && race.phase === 'running' && !race.paused) {
       const target = race.missedCheckpoint.position
       const angle = Math.atan2(target.y - player.y, target.x - player.x)
