@@ -19,8 +19,6 @@ export class SceneryRenderer {
     const bottom = Math.ceil(bounds.bottom / GROUND_TILE_SIZE) + 1
     const key = `${environmentId}:${night}:${left}:${top}:${right}:${bottom}:${preview?.index}:${preview?.position.x}:${preview?.position.y}`
     if (this.key === key && this.props === props) return
-    this.key = key
-    this.props = props
     const shown = preview && props[preview.index]
       ? props.map((prop, index) => index === preview.index ? { ...prop, ...preview.position } : prop)
       : props
@@ -43,5 +41,9 @@ export class SceneryRenderer {
         this.graphics.fillPath()
       }
     }
+    // Never cache an incomplete frame; the next update must retry after a
+    // rendering exception instead of leaving scenery missing indefinitely.
+    this.key = key
+    this.props = props
   }
 }
