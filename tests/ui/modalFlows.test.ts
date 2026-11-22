@@ -160,7 +160,7 @@ describe('modal application flows', () => {
     })
   })
 
-  it('renders readiness and best times in the race library', () => {
+  it('keeps race readiness accessible without cluttering saved cards with times', () => {
     const { root, port } = setup(
       state({ type: 'track-library', purpose: 'race' }),
     )
@@ -176,12 +176,12 @@ describe('modal application flows', () => {
     expect(share?.textContent).toBe('SHARE')
     expect(share?.querySelector('svg path')).not.toBeNull()
     expect(raceTile?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
-    expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(2)
+    expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(0)
     expect(raceTile?.contains(share ?? null)).toBe(false)
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
-    expect(root.querySelector('[data-action^="select-race-"]')?.getAttribute('data-action')).toBe('select-race-ready')
-    expect(root.textContent).toContain('01:02.345')
-    expect(root.textContent).toContain('NEEDS EDITING')
+    expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
+    expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
+    expect(root.textContent).toContain('Needs editing')
     expect(
       root.querySelector<HTMLButtonElement>(
         '[data-action="select-race-incomplete"]',
@@ -197,19 +197,37 @@ describe('modal application flows', () => {
     })
   })
 
-  it('keeps edit, share and delete as distinct labelled icon controls in compact track cards', () => {
+  it('makes edit the main card action with a separate favorite star and overflow management', () => {
     const { root, port } = setup(state({ type: 'track-library', purpose: 'edit' }))
     const card = root.querySelector('.track-card')
     const actions = card?.querySelectorAll<HTMLButtonElement>('.track-icon-action')
-    expect(actions).toHaveLength(3)
-    expect([...actions ?? []].map(action => action.textContent)).toEqual(['SHARE', 'EDIT', 'DELETE'])
+    expect([...actions ?? []].map(action => action.textContent)).toEqual(['SHARE', 'DELETE'])
     for (const action of actions ?? []) {
       expect(action.querySelector('svg path')).not.toBeNull()
       expect(action.getAttribute('aria-label')).toBeTruthy()
     }
     expect(card?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
+    expect(root.textContent).not.toContain('RACE READY')
+    expect(root.textContent).not.toContain('BEST')
+    expect(root.querySelector('[data-environment="grass"]')).not.toBeNull()
+    const favorite = root.querySelector<HTMLButtonElement>('[data-action="favorite-incomplete"]')
+    expect(favorite?.getAttribute('aria-pressed')).toBe('false')
+    favorite?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'toggle-track-favorite', id: incomplete.id })
+    expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'select-track-for-edit', id: incomplete.id })
     root.querySelector<HTMLButtonElement>('[data-action="select-edit-ready"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: ready.id })
+  })
+
+  it('shows favorite tracks first and labels environment colors without affecting modified dates', () => {
+    const favorites = { ...state({ type: 'track-library', purpose: 'edit' }),
+      preferences: { ...preferences, favoriteTrackIds: [ready.id] } }
+    const { root } = setup(favorites)
+    const cards = [...root.querySelectorAll('.track-card')]
+    expect(cards[0]?.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
+    expect(cards[0]?.querySelector('[data-action="favorite-ready"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(cards[0]?.querySelector('.track-environment-dot')?.getAttribute('title')).toBe('Grass')
+    expect(cards[0]?.querySelector('.track-card-name')?.textContent).toBe('Starter Circuit')
   })
 
   it('shows the selected car and lighting in the race setup flyover', () => {
@@ -427,7 +445,7 @@ it('hides share on built-in tracks but keeps it for player tracks', () => {
   const { root } = setup(library)
   expect(root.querySelector('[data-action="share-system-starter-circuit"]')).toBeNull()
   expect(root.querySelector('[data-action="share-my-track"]')).not.toBeNull()
-  expect(root.textContent).toContain('MADE BY Track Forge')
+  expect(root.textContent).toContain('Track Forge')
 })
 
 it('does not expose Nearby sharing for system-owned tracks', () => {
@@ -441,7 +459,7 @@ it('does not expose Nearby sharing for system-owned tracks', () => {
     ...state({ type: 'track-library', purpose: 'edit' }), tracks: [seeded, personal],
   }, {
     share: vi.fn(), sendNearby, importFile: vi.fn(), close: vi.fn(), create: vi.fn(),
-    selectForEdit: vi.fn(), selectForRace: vi.fn(), delete: vi.fn(),
+    selectForEdit: vi.fn(), selectForRace: vi.fn(), toggleFavorite: vi.fn(), delete: vi.fn(),
   }, new TrackGeometryService())
   expect(modal.querySelector('[data-action="send-nearby-system-starter-circuit"]')).toBeNull()
   modal.querySelector<HTMLButtonElement>('[data-action="send-nearby-my-track"]')?.click()

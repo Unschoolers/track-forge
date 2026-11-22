@@ -69,6 +69,8 @@ export interface Preferences {
   readonly playerIdentity?: PlayerIdentity
   readonly displayName?: string
   readonly creatorId?: string
+  /** Personal library ordering, never part of a shared track's geometry. */
+  readonly favoriteTrackIds?: readonly string[]
 }
 
 export interface PreferencesStore {

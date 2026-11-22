@@ -107,6 +107,25 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('toggles personal favorites without changing track edit timestamps or geometry', () => {
+    const track = createStarterTrack(asTrackId('favorite-track'), 7)
+    const { controller, trackStore, preferencesStore } = setup(track)
+    controller.dispatch({ type: 'open-track-library', purpose: 'edit' })
+    controller.dispatch({ type: 'toggle-track-favorite', id: track.id })
+    expect(controller.snapshot().preferences.favoriteTrackIds).toEqual([track.id])
+    expect(preferencesStore.save).toHaveBeenCalledWith(expect.objectContaining({ favoriteTrackIds: [track.id] }))
+    expect(trackStore.find(track.id)).toBe(track)
+    controller.dispatch({ type: 'toggle-track-favorite', id: track.id })
+    expect(controller.snapshot().preferences.favoriteTrackIds).toEqual([])
+    vi.mocked(preferencesStore.save).mockReturnValueOnce(false)
+    controller.dispatch({ type: 'toggle-track-favorite', id: track.id })
+    expect(controller.snapshot().preferences.favoriteTrackIds).toEqual([])
+    expect(controller.snapshot().notice).toContain('Could not save')
+    controller.dispatch({ type: 'toggle-track-favorite', id: asTrackId('unknown') })
+    expect(controller.snapshot().preferences.favoriteTrackIds).toEqual([])
+    controller.destroy()
+  })
+
   it('hosts only after selecting a race-ready track, never starts a solo race', async () => {
     const advertise = vi.fn(async (_room: string) => undefined)
     const transport: NearbyTransport = {

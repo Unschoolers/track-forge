@@ -21,7 +21,7 @@ test('persists an open route and displays its ordered finish splits', async ({ p
   await page.goto('/?qa')
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-  await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Edit Open Stage', exact: true }).click()
   await page.getByRole('button', { name: 'Editor menu' }).click()
   await page.getByRole('button', { name: 'Point to point', exact: true }).click()
   await page.getByRole('button', { name: 'SAVE TRACK', exact: true }).click()

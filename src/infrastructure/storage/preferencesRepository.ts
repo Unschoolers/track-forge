@@ -28,6 +28,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   raceLaps: 2,
   raceMode: 'normal',
   playerIdentity: DEFAULT_PLAYER_IDENTITY,
+  favoriteTrackIds: [],
 }
 
 function boolean(value: string | null, fallback: boolean): boolean {
@@ -37,6 +38,20 @@ function boolean(value: string | null, fallback: boolean): boolean {
 function volume(value: string | null, fallback: number): number {
   const parsed = value?.trim() ? Number(value) : Number.NaN
   return Number.isFinite(parsed) ? Math.round(Math.max(0, Math.min(100, parsed))) : fallback
+}
+
+/** Corrupt or oversized local preference data must not break the track library. */
+function parseFavoriteTrackIds(raw: string | null): readonly string[] {
+  if (!raw) return []
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!Array.isArray(value)) return []
+    return [...new Set(value.filter((id): id is string =>
+      typeof id === 'string' && id.length > 0 && id.length <= 128 && id.trim() === id,
+    ))].slice(0, 256)
+  } catch {
+    return []
+  }
 }
 
 export class BrowserPreferencesRepository implements PreferencesStore {
@@ -86,6 +101,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       raceMode: raceMode === 'ghost' || raceMode === 'time-trial' ? raceMode : 'normal',
       playerIdentity,
+      favoriteTrackIds: parseFavoriteTrackIds(this.storage.get(STORAGE_KEYS.favoriteTrackIds)),
       ...(displayName ? { displayName } : {}),
       ...(creatorId ? { creatorId } : {}),
       audioEnabled: soundEffectsVolume > 0,
@@ -117,6 +133,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       this.storage.set(STORAGE_KEYS.playerIdentity, JSON.stringify(normalizePlayerIdentity(preferences.playerIdentity))),
       this.storage.set(STORAGE_KEYS.displayName, normalizeDisplayName(preferences.displayName) ?? ''),
       this.storage.set(STORAGE_KEYS.creatorId, normalizeCreatorId(preferences.creatorId) ?? ''),
+      this.storage.set(STORAGE_KEYS.favoriteTrackIds, JSON.stringify((preferences.favoriteTrackIds ?? []).slice(0, 256))),
       this.storage.set(STORAGE_KEYS.audio, soundEffectsVolume > 0 ? '1' : '0'),
       this.storage.set(STORAGE_KEYS.musicVolume, String(musicVolume)),
       this.storage.set(STORAGE_KEYS.soundEffectsVolume, String(soundEffectsVolume)),

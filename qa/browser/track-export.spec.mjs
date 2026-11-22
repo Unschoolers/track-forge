@@ -11,6 +11,7 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   await page.goto('/?qa')
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.locator('.track-card-overflow summary').click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()
   const download = await downloadPromise
@@ -21,8 +22,8 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   expect(exported.track.name).toBe(OWNED_TRACK_NAME)
   expect(exported.track.points.length).toBeGreaterThan(8)
   expect(exported.track.terrain).toBeDefined()
-  await expect(page.getByRole('dialog', { name: 'Choose a track to edit' })).toBeVisible()
-  await page.getByRole('button', { name: 'EDIT', exact: true }).first().click()
+  await expect(page.getByRole('dialog', { name: 'Track garage' })).toBeVisible()
+  await page.getByRole('button', { name: `Edit ${OWNED_TRACK_NAME}`, exact: true }).click()
   // Editor menu is the top-right button.
   await page.locator('[data-action="editor-menu"]').click()
   const editorDownload = page.waitForEvent('download')
