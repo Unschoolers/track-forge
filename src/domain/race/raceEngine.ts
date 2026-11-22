@@ -300,17 +300,17 @@ function advanceRace(
     const context = raceVehicleContext(state, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     const usesCheckpoints = vehicle.player && Boolean(state.recoveryCheckpoints?.length)
-    if (vehicle.player && !arcade && !usesCheckpoints) return vehicle
+    if (vehicle.player && !arcade && !usesCheckpoints && !state.sceneryColliders?.size) return vehicle
     const waterContact = hasVehicleWaterContact({
       grounded: vehicle.grounded,
       terrainMaterial: context.terrainMaterial,
       safeAboveWater: context.safeAboveWater,
     })
     const previous = state.vehicles[index]
-    const sceneryHit = usesCheckpoints && previous && state.sceneryColliders &&
+    const sceneryHit = !arcade && vehicle.player && previous && state.sceneryColliders &&
       !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
       hitScenery(state.sceneryColliders, previous, vehicle)
-    if (usesCheckpoints && ((waterContact && !vehicle.waterRecoveryProtected) || vehicle.wrecked || sceneryHit)) {
+    if ((usesCheckpoints && ((waterContact && !vehicle.waterRecoveryProtected) || vehicle.wrecked)) || sceneryHit) {
       const candidate = previous
         ? restoreFrameProgress({ ...vehicle, pathIndex: previous.pathIndex }, previous)
         : vehicle
