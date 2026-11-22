@@ -41,11 +41,11 @@ import { HapticsAdapter } from '@/infrastructure/feedback/hapticsAdapter'
 import { BrowserMusicPlayer } from '@/infrastructure/feedback/musicPlayer'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import cityMusic from '@/assets/music/City.mp3?url&no-inline'
-import desertMusic from '@/assets/music/Desert.mp3?url&no-inline'
-import menuMusic from '@/assets/music/clubb-menu.mp3?url&no-inline'
-import grassMusic from '@/assets/music/clubb-race.mp3?url&no-inline'
-import kidsRoomMusic from '@/assets/music/Pixel Loop.mp3?url&no-inline'
+import cityMusic from '@/assets/music/cityscape-race.mp3?url&no-inline'
+import desertMusic from '@/assets/music/desert-race.mp3?url&no-inline'
+import menuMusic from '@/assets/music/main-menu.mp3?url&no-inline'
+import grassMusic from '@/assets/music/grass-race.mp3?url&no-inline'
+import kidsRoomMusic from '@/assets/music/kids-room-race.mp3?url&no-inline'
 
 const appRoot = document.querySelector<HTMLElement>('#app')
 if (!appRoot) throw new Error('TrackForge requires an #app mount point')
