@@ -45,6 +45,7 @@ export class TrackLibraryService {
       ...(creator ? { creator } : {}),
       version: 8,
       points: [],
+      autoCheckpoints: true,
       trees: [],
       terrain: EMPTY_TERRAIN,
       start: { ratio: 0, reversed: false },

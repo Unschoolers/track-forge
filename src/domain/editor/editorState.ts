@@ -21,7 +21,7 @@ import {
 import type { TrackRepair } from '@/domain/track/trackDiagnostics'
 import { MAX_ROAD_CONTROL_LENGTH, recoverableCircuitPointCount, roadControlLength } from '@/domain/track/roadLength'
 import { trackPointSectionId } from '@/domain/track/pathBuilder'
-import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
+import { extendAutoRecoveryCheckpoints, isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
 import {
   EMPTY_TERRAIN,
   paintTerrain,
@@ -43,6 +43,7 @@ import {
 export interface EditorSnapshot {
   readonly routeKind: RouteKind
   readonly recoveryCheckpoints: readonly number[]
+  readonly autoCheckpoints: boolean
   readonly environmentId: TrackEnvironmentId
   readonly scenery: readonly SceneryProp[]
   readonly points: readonly TrackPoint[]
@@ -61,6 +62,7 @@ export interface EditorState extends EditorSnapshot {
 export type EditorCommand =
   | { readonly type: 'set-route-kind'; readonly routeKind: RouteKind }
   | { readonly type: 'toggle-recovery-checkpoint'; readonly ratio: number }
+  | { readonly type: 'move-recovery-checkpoint'; readonly from: number; readonly to: number }
   | { readonly type: 'begin-gesture' }
   | { readonly type: 'add-point'; readonly point: TrackPoint }
   | {
@@ -141,11 +143,12 @@ export function createEditorState(
   trees: readonly Tree[] = [],
   start: TrackStart = { ratio: 0, reversed: false },
   terrain: TerrainMap = EMPTY_TERRAIN,
-  appearance: Pick<Track, 'environmentId' | 'scenery' | 'routeKind' | 'recoveryCheckpoints'> = {},
+  appearance: Pick<Track, 'environmentId' | 'scenery' | 'routeKind' | 'recoveryCheckpoints' | 'autoCheckpoints'> = {},
 ): EditorState {
   return {
     routeKind: normalizeRouteKind(appearance.routeKind),
     recoveryCheckpoints: appearance.recoveryCheckpoints ?? [],
+    autoCheckpoints: appearance.autoCheckpoints === true,
     environmentId: appearance.environmentId ?? DEFAULT_TRACK_ENVIRONMENT_ID,
     scenery: appearance.scenery ?? [],
     points: [...points],
@@ -163,6 +166,7 @@ function snapshot(state: EditorState): EditorSnapshot {
   return {
     routeKind: state.routeKind,
     recoveryCheckpoints: state.recoveryCheckpoints,
+    autoCheckpoints: state.autoCheckpoints,
     environmentId: state.environmentId,
     scenery: state.scenery,
     points: state.points,
@@ -310,6 +314,14 @@ function reduceEditorUnchecked(
         ? patchEditorState(state, { recoveryCheckpoints: [...current, ratio].sort((a, b) => a - b) })
         : state
     }
+    case 'move-recovery-checkpoint': {
+      const { from, to } = command
+      if (!isRecoveryCheckpointRatio(to) || !state.recoveryCheckpoints.includes(from) || from === to ||
+          state.recoveryCheckpoints.includes(to)) return state
+      return patchEditorState(state, {
+        recoveryCheckpoints: [...state.recoveryCheckpoints.filter(mark => mark !== from), to].sort((a, b) => a - b),
+      })
+    }
     case 'begin-gesture':
       return state.gestureStart
         ? state
@@ -318,10 +330,17 @@ function reduceEditorUnchecked(
             gestureStart: snapshot(state),
             gestureChanged: false,
           }
-    case 'add-point':
+    case 'add-point': {
+      const points = [...state.points, command.point]
       return patchEditorState(state, {
-        points: [...state.points, command.point],
+        points,
+        ...(state.autoCheckpoints ? {
+          recoveryCheckpoints: extendAutoRecoveryCheckpoints(
+            state.points, points, state.recoveryCheckpoints, state.terrain, state.routeKind,
+          ),
+        } : {}),
       })
+    }
     case 'move-point': {
       const current = state.points[command.index]
       if (!current) return state

@@ -183,6 +183,7 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
     ...(Array.isArray(item.recoveryCheckpoints) ? {
       recoveryCheckpoints: normalizeRecoveryCheckpoints(item.recoveryCheckpoints),
     } : {}),
+    ...(typeof item.autoCheckpoints === 'boolean' ? { autoCheckpoints: item.autoCheckpoints } : {}),
     trees: trees.filter((tree) => tree !== undefined),
     terrain: normalizeTerrain(item.terrain),
     start: decodeStart(item.start),
