@@ -1,5 +1,5 @@
 import type { RacingLineSection } from '@/domain/race/ai/aiState'
-import type { CarId, DifficultyId } from '@/domain/model'
+import type { CarId } from '@/domain/model'
 
 // Indexed by the authored road segment. Offsets are in world units and
 // lookahead extends the normal pursuit target by a number of road samples.
@@ -44,8 +44,3 @@ export const EMILE_RACING_LINES: Readonly<Record<CarId, readonly RacingLineSecti
   yellow: EMILE_YELLOW_LINE,
 }
 
-// Speed targets use the car's own limits. Track timing includes braking,
-// traffic and acceleration, so these ratios differ from the resulting pace.
-export const EMILE_SPEED_RATIOS: Readonly<Record<DifficultyId, number>> = {
-  hard: 1, normal: 0.908, easy: 0.86,
-}
