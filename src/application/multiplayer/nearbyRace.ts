@@ -254,6 +254,11 @@ export class NearbyRace {
     const first = this.snapshot().canStart
     const rematch = this.canRematch()
     if ((!first && !rematch) || !this.course) return
+    // Save the previous circuit before switching to the next cup track.
+    if (rematch) {
+      this.clearRound()
+      this.round = (this.round + 1) & 0xffff
+    }
     if (rematch && this.cupTotal > 0) {
       const next = this.cupTracks[this.cupIndex + 1]
       if (!next) return
@@ -263,10 +268,6 @@ export class NearbyRace {
     }
     const course = this.course
     const active = this.generation
-    if (rematch) {
-      this.round = (this.round + 1) & 0xffff
-      this.clearRound()
-    }
     this.setPhase('preparing')
     this.armTimeout('A player did not load the track in time.')
     void this.prepareGuests(course, active, first).catch((error: unknown) => {
