@@ -21,7 +21,8 @@ import {
 import type { TrackRepair } from '@/domain/track/trackDiagnostics'
 import { MAX_ROAD_CONTROL_LENGTH, recoverableCircuitPointCount, roadControlLength } from '@/domain/track/roadLength'
 import { trackPointSectionId } from '@/domain/track/pathBuilder'
-import { extendAutoRecoveryCheckpoints, isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
+import { extendAutoRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
+import { toggleAuthoredCheckpoint, moveAuthoredCheckpoint } from '@/domain/editor/checkpointEdits'
 import {
   EMPTY_TERRAIN,
   paintTerrain,
@@ -304,23 +305,12 @@ function reduceEditorUnchecked(
     case 'set-route-kind':
       return state.routeKind === command.routeKind ? state : patchEditorState(state, { routeKind: command.routeKind })
     case 'toggle-recovery-checkpoint': {
-      const { ratio } = command
-      if (!isRecoveryCheckpointRatio(ratio)) return state
-      const current = state.recoveryCheckpoints
-      if (current.includes(ratio)) {
-        return patchEditorState(state, { recoveryCheckpoints: current.filter(mark => mark !== ratio) })
-      }
-      return current.length < MAX_RECOVERY_CHECKPOINTS
-        ? patchEditorState(state, { recoveryCheckpoints: [...current, ratio].sort((a, b) => a - b) })
-        : state
+      const updated = toggleAuthoredCheckpoint(state.recoveryCheckpoints, command.ratio)
+      return updated ? patchEditorState(state, { recoveryCheckpoints: updated }) : state
     }
     case 'move-recovery-checkpoint': {
-      const { from, to } = command
-      if (!isRecoveryCheckpointRatio(to) || !state.recoveryCheckpoints.includes(from) || from === to ||
-          state.recoveryCheckpoints.includes(to)) return state
-      return patchEditorState(state, {
-        recoveryCheckpoints: [...state.recoveryCheckpoints.filter(mark => mark !== from), to].sort((a, b) => a - b),
-      })
+      const updated = moveAuthoredCheckpoint(state.recoveryCheckpoints, command.from, command.to)
+      return updated ? patchEditorState(state, { recoveryCheckpoints: updated }) : state
     }
     case 'begin-gesture':
       return state.gestureStart
