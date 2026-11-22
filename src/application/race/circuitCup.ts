@@ -41,8 +41,9 @@ export function moveCupTrack(lineup: readonly string[], index: number, direction
       index < 0 || target < 0 || index >= lineup.length || target >= lineup.length) return null
   const updated = [...lineup]
   const selected = updated[index]
-  if (selected === undefined) return null
-  updated[index] = updated[target]!
+  const displaced = updated[target]
+  if (selected === undefined || displaced === undefined) return null
+  updated[index] = displaced
   updated[target] = selected
   return updated
 }
