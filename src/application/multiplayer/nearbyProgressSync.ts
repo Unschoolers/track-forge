@@ -1,4 +1,4 @@
-import { encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
+import { decodeProgress, encodeProgress, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
 
 /** A low-rate optional stream; old peers ignore these packets and still render poses. */
 export class NearbyProgressSync {
@@ -6,7 +6,7 @@ export class NearbyProgressSync {
   private nextSequence = 0
   private lastSentAt = Number.NEGATIVE_INFINITY
   private sendFailures = 0
-  private readonly inFlight = new Set<string>()
+  private readonly inFlight = new Set<number>()
   private generation = 0
 
   constructor(
@@ -27,32 +27,31 @@ export class NearbyProgressSync {
 
   update(slot: number, value: number, recipients: string[]): void {
     const now = this.now()
-    if (now - this.lastSentAt < PROGRESS_PERIOD_MS) return
-    const readyRecipients = recipients.filter(id => !this.inFlight.has(id))
-    if (!readyRecipients.length) return
+    if (!recipients.length || this.inFlight.has(slot) || now - this.lastSentAt < PROGRESS_PERIOD_MS) return
     const packet = encodeProgress(slot, this.nextSequence, value)
     this.nextSequence = (this.nextSequence + 1) & 0xffff
     this.lastSentAt = now
-    this.dispatch(packet, readyRecipients)
+    this.dispatch(slot, packet, recipients)
   }
 
-  /** Relayed standings are best-effort too; never queue old progress samples. */
+  /** One host relay per progress source, addressed to every eligible guest. */
   relay(packet: Uint8Array, recipients: string[]): void {
-    this.dispatch(packet, recipients.filter(id => !this.inFlight.has(id)))
+    const message = decodeProgress(packet)
+    if (message && recipients.length && !this.inFlight.has(message.slot)) {
+      this.dispatch(message.slot, packet, recipients)
+    }
   }
 
-  private dispatch(packet: Uint8Array, recipients: string[]): void {
+  private dispatch(slot: number, packet: Uint8Array, recipients: string[]): void {
     const active = this.generation
-    for (const id of recipients) {
-      this.inFlight.add(id)
-      void this.send([id], packet)
-        .catch(() => {
-          if (active === this.generation) this.sendFailures++
-        })
-        .finally(() => {
-          if (active === this.generation) this.inFlight.delete(id)
-        })
-    }
+    this.inFlight.add(slot)
+    void this.send(recipients, packet)
+      .catch(() => {
+        if (active === this.generation) this.sendFailures++
+      })
+      .finally(() => {
+        if (active === this.generation) this.inFlight.delete(slot)
+      })
   }
 
   receive(packet: ProgressPacket): boolean {
