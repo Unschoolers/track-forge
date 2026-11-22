@@ -105,7 +105,9 @@ describe('Émile arcade difficulty balance', () => {
 			// A 5/5-speed car is intentionally faster than a 2/5-speed car.
 			// Keep the field within a 10% relative pace window across real car specs
 			// and grid positions rather than artificially matching finish times.
-			expect((Math.max(...times) - fastest) / fastest, playerCar).toBeLessThan(0.10)
+			expect((Math.max(...times) - fastest) / fastest,
+				`${playerCar}: ${opponents.map(rival => `${rival.car}=${rival.finishedAt?.toFixed(3) ?? 'DNF'}`).join(', ')}`,
+			).toBeLessThan(0.10)
 			const redTime = opponents.find(({ car }) => car === 'red')?.finishedAt
 			if (redTime === fastest) redWins++
 			if (playerCar === 'blue') expect(redTime).toBeLessThan(61.866)
@@ -122,9 +124,11 @@ describe('Émile arcade difficulty balance', () => {
 			return times.reduce((sum, time) => sum + time, 0) / times.length
 		}
 		const hard = meanTime('hard')
-		const mediumPace = hard / meanTime('normal')
-		const easyPace = hard / meanTime('easy')
-		expect(mediumPace).toBeGreaterThan(0.925)
+		const normal = meanTime('normal')
+		const easy = meanTime('easy')
+		const mediumPace = hard / normal
+		const easyPace = hard / easy
+		expect(mediumPace, `hard=${hard.toFixed(3)}s normal=${normal.toFixed(3)}s`).toBeGreaterThan(0.925)
 		expect(mediumPace).toBeLessThan(0.975)
 		expect(easyPace).toBeGreaterThan(0.875)
 		expect(easyPace).toBeLessThan(0.925)
