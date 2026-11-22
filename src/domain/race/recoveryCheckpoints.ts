@@ -38,31 +38,29 @@ export function reachedRecoveryCheckpoint(
   return checkpoint
 }
 
+/** Shared boundary: both authored markers and road contact must be safe and pre-gate. */
+function safePreGateSample(course: RecoveryCourse, vehicle: RaceVehicle, index: number): boolean {
+  const { path, reversed, startPathIndex } = course
+  const count = path.points.length
+  if (!Number.isInteger(index) || index < 0 || index >= count) return false
+  const progress = path.closed
+    ? ((((reversed ? -1 : 1) * (index - startPathIndex)) % count) + count) % count
+    : index
+  const nextGate = (path.closed ? count : count - 1) * vehicle.nextSector / 4
+  return progress < nextGate && isSafeRoadRecoverySample(path, index)
+}
+
 /** The latest physical road support is independent of the checkpoint markers. */
 export function lastRoadRecoveryTarget(course: RecoveryCourse, vehicle: RaceVehicle): number | undefined {
   if (!vehicle.player) return undefined
   const index = vehicle.lastRoadContactIndex
-  const { path } = course
-  if (index === undefined || !Number.isInteger(index) || index < 0 || index >= path.points.length ||
-      !isSafeRoadRecoverySample(path, index)) return undefined
-  const count = path.points.length
-  const direction = course.reversed ? -1 : 1
-  const progress = path.closed
-    ? ((direction * (index - course.startPathIndex)) % count + count) % count
-    : index
-  const pendingGate = (path.closed ? count : count - 1) * vehicle.nextSector / 4
-  return progress < pendingGate ? index : undefined
+  return index !== undefined && safePreGateSample(course, vehicle, index) ? index : undefined
 }
 
 export function authoredRecoveryTarget(course: RecoveryCourse, vehicle: RaceVehicle): number | undefined {
   if (!vehicle.player || !course.recoveryCheckpoints?.length) return undefined
   const index = vehicle.recoveryCheckpoint ?? course.startPathIndex
-  const count = course.path.points.length
-  const progress = course.path.closed
-    ? (((course.reversed ? -1 : 1) * (index - course.startPathIndex)) % count + count) % count
-    : index
-  const gate = (course.path.closed ? count : count - 1) * vehicle.nextSector / 4
-  return progress < gate && isSafeRoadRecoverySample(course.path, index) ? index : undefined
+  return safePreGateSample(course, vehicle, index) ? index : undefined
 }
 
 /** Search around the followed sample without jumping to a spatially close arm. */
