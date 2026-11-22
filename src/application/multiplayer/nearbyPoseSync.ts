@@ -23,7 +23,7 @@ export class NearbyPoseSync {
   private sequence = 0
   private recovery = 0
   private lastSentAt = -Infinity
-  private poseSending = false
+  private readonly poseSending = new Set<string>()
   private posePeriodMs = POSE_PERIOD_MS
   private healthySends = 0
   private fastRetryAfter = 0
@@ -48,7 +48,7 @@ export class NearbyPoseSync {
     this.sequence = 0
     this.recovery = 0
     this.lastSentAt = -Infinity
-    this.poseSending = false
+    this.poseSending.clear()
     this.posePeriodMs = POSE_PERIOD_MS
     this.healthySends = 0
     this.fastRetryAfter = 0
@@ -64,29 +64,31 @@ export class NearbyPoseSync {
     racers: ReadonlyMap<number, PoseRacer>,
   ): void {
     const now = this.now()
-    // Two milliseconds of tolerance keeps 30 Hz cadence on a 60 FPS frame clock.
-    if (this.poseSending || now - this.lastSentAt < this.posePeriodMs - 2 || !recipients.length) return
+    // Each endpoint owns its own in-flight sample. A slow Android radio must
+    // never stall the other racers, and stale poses must never build a queue.
+    const readyRecipients = recipients.filter(id => !this.poseSending.has(id))
+    if (now - this.lastSentAt < this.posePeriodMs - 2 || !readyRecipients.length) return
     const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle)
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
-    // The host broadcasts the most recent valid positions in a single batch;
-    // guests upload only their own pose.
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
     const bytes = hostId ? pose : encodePoseBatch(
       [...this.latestPoses].filter(([slot, value]) =>
         now - value.receivedAt <= 300 && !racers.get(slot)?.left &&
         racers.get(slot)?.time === undefined).map(([, value]) => value.bytes))
     this.lastSentAt = now
-    this.poseSending = true
-    this.poseCounts.sent++
     const active = this.generation
-    void this.send(recipients, bytes)
-      .then(() => { if (active === this.generation) this.updatePoseRate(now, true) })
-      .catch(() => {
-        if (active !== this.generation) return
-        this.poseCounts.sendFailed++
-        this.updatePoseRate(now, false)
-      })
-      .finally(() => { if (active === this.generation) this.poseSending = false })
+    for (const id of readyRecipients) {
+      this.poseSending.add(id)
+      this.poseCounts.sent++
+      void this.send([id], bytes)
+        .then(() => { if (active === this.generation) this.updatePoseRate(now, true) })
+        .catch(() => {
+          if (active !== this.generation) return
+          this.poseCounts.sendFailed++
+          this.updatePoseRate(now, false)
+        })
+        .finally(() => { if (active === this.generation) this.poseSending.delete(id) })
+    }
   }
 
   /** Only consume position traffic; leave control/track messages to the lobby. */
