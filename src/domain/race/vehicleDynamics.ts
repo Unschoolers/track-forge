@@ -127,7 +127,7 @@ export function stepVehicleDynamics(
   const pressure = clamp(finiteOr(control.brakePressure ?? Number(control.braking)), 0, 1)
   const brakeTractionScale =
     Math.max(0, tuning.forces.brakingTractionScale) *
-    Math.max(0, finiteOr(parameters.brakingTractionScale, 1))
+    Math.max(0, finiteOr(parameters.brakingTractionScale ?? 1, 1))
   const brakeAcceleration = pressure * Math.min(
     (parameters.brakeForce / Math.max(1, parameters.mass)) *
       parameters.brakeGrip * contactLoad,
