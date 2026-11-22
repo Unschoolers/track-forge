@@ -1,3 +1,4 @@
+import { requireFixture } from '../fixtures/requireFixture'
 import { expect, it } from 'vitest'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
@@ -5,10 +6,6 @@ import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { clamp } from '@/domain/geometry/math'
-function required<T>(value: T | undefined): T {
-	if (value === undefined) throw new Error('Missing fixture')
-	return value
-}
 const wrapAngle = (angle: number) =>
 	Math.atan2(Math.sin(angle), Math.cos(angle))
 import type { RaceState } from '@/domain/race/raceState'
@@ -53,14 +50,14 @@ function run(
 		laps: 2,
 		handling: 'arcade',
 	})
-	const start = required(nearestPathPoint(road, { x: -500, y: 0 })).index
-	const point = required(road.points[start])
+	const start = requireFixture(nearestPathPoint(road, { x: -500, y: 0 })).index
+	const point = requireFixture(road.points[start])
 	let race: RaceState = {
 		...base,
 		phase: 'running',
 		vehicles: [
 			{
-				...required(base.vehicles[0]),
+				...requireFixture(base.vehicles[0]),
 				x: point.x,
 				y: point.y,
 				angle: 0,
@@ -79,9 +76,9 @@ function run(
 	let wasOffRoad = false
 	let frame = 0
 	for (; frame < 1200; frame++) {
-		const car = required(race.vehicles[0])
+		const car = requireFixture(race.vehicles[0])
 		const context = getVehicleStepContext(road, car, undefined, 12)
-		const target = required(
+		const target = requireFixture(
 			road.points[
 				Math.min(
 					road.points.length - 1,
@@ -107,7 +104,7 @@ function run(
 			next: () => 0.5,
 		})
 		race = result.state
-		const next = required(race.vehicles[0])
+		const next = requireFixture(race.vehicles[0])
 		const off = !getVehicleStepContext(road, next, undefined, 12).onRoad
 		if (off && !wasOffRoad) offRoad++
 		wasOffRoad = off
@@ -164,14 +161,14 @@ function runDownhill(mode: 'early' | 'unbraked' | 'late') {
 	const index = ramp.points.findIndex(
 		(_, i) => ramp.roadSurface.gradeAt(i) < -0.025,
 	)
-	const point = required(ramp.points[index])
+	const point = requireFixture(ramp.points[index])
 	const support = ramp.roadSurface.at(index, point)
 	let race: RaceState = {
 		...base,
 		phase: 'running',
 		vehicles: [
 			{
-				...required(base.vehicles[0]),
+				...requireFixture(base.vehicles[0]),
 				x: point.x,
 				y: point.y,
 				angle: 0,
@@ -190,8 +187,8 @@ function runDownhill(mode: 'early' | 'unbraked' | 'late') {
 		recoveries = 0,
 		wasOffRoad = false
 	let frame = 0
-	for (; frame < 300 && required(race.vehicles[0]).x < point.x + 250; frame++) {
-		const x = required(race.vehicles[0]).x - point.x
+	for (; frame < 300 && requireFixture(race.vehicles[0]).x < point.x + 250; frame++) {
+		const x = requireFixture(race.vehicles[0]).x - point.x
 		const braking =
 			mode === 'early' ? x < 50 : mode === 'late' ? x > 150 && x < 200 : false
 		const result = stepRace(
@@ -201,7 +198,7 @@ function runDownhill(mode: 'early' | 'unbraked' | 'late') {
 			{ next: () => 0.5 },
 		)
 		race = result.state
-		const off = !getVehicleStepContext(ramp, required(race.vehicles[0])).onRoad
+		const off = !getVehicleStepContext(ramp, requireFixture(race.vehicles[0])).onRoad
 		if (off && !wasOffRoad) offRoad++
 		wasOffRoad = off
 		recoveries += result.events.filter(
@@ -210,7 +207,7 @@ function runDownhill(mode: 'early' | 'unbraked' | 'late') {
 	}
 	return {
 		entry: 180,
-		exit: required(race.vehicles[0]).speed,
+		exit: requireFixture(race.vehicles[0]).speed,
 		seconds: frame / 60,
 		offRoad,
 		recoveries,
