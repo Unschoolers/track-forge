@@ -26,6 +26,12 @@ describe('shared track optional artwork is not silently lost', () => {
     ] } }).ok).toBe(false)
   })
 
+  it('rejects a changed terrain cell size that would silently move authored features', () => {
+    expect(decode({ terrain: { cellSize: 64, cells: [
+      { column: 1, row: 1, kind: 'water' },
+    ] } }).ok).toBe(false)
+  })
+
   it('retains compatibility with absent optional fields and correct empty collections', () => {
     expect(decode({ scenery: undefined, recoveryCheckpoints: undefined, autoCheckpoints: undefined }).ok).toBe(true)
     expect(decode({ scenery: [], recoveryCheckpoints: [], autoCheckpoints: false }).ok).toBe(true)
