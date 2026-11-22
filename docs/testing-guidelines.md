@@ -43,6 +43,17 @@ Car-handling contracts (currently `carHandlingIdentity.test.ts` and `carSpeedIde
 
 AI race-balance scenarios (currently `emileHardRace.test.ts` and `qa/lanes`) intentionally exercise a whole race: opponent behavior, seeds, difficulty ordering, finish times and recoveries. A car-physics regression should fail in the narrow car contract; race-balance tests should fail only when AI/race player-visible behavior changes. Preserve both sets of assertions; this separation is not permission to loosen a threshold or tune a car until an unrelated scenario turns green.
 
+### AI race pace assertions
+
+Keep the narrow handling/speed contracts independent of race balancing. For seeded
+AI integration scenarios, assert results players notice: opponents finish,
+do not loop or repeatedly recover, maintain a competitive field, and preserve
+**Hard → Medium → Easy** race ordering with a meaningful gap. Express recorded
+ghost comparisons relative to the ghost time, not fractional-second constants
+specific to one tuning revision. Broad competitiveness floors are useful safety
+rails, not a demand that every car finish within one percent of another.
+Do not relax the recovery/error limits or skip a failing race to make CI green.
+
 ## Build tests around risk and edges
 
 Each feature should cover a happy path **plus the edges that would matter if broken**. Representative edge families:
