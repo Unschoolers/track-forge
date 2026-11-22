@@ -1,4 +1,5 @@
-import { EMILE_COURSE, EMILE_RACING_LINES, EMILE_SPEED_RATIOS } from '@/domain/race/ai/emileRacingLines'
+import { EMILE_COURSE, EMILE_RACING_LINES } from '@/domain/race/ai/emileRacingLines'
+import { authoredLineSpeedRatio, raceRivalPace } from '@/domain/race/ai/difficultyPolicy'
 import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
 import { DIFFICULTY_SPECS, ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -118,7 +119,6 @@ function sampleOpenStart(path: RoadPath): StartGridSample {
 
 export function createRace(options: CreateRaceOptions): RaceState {
   const difficulty = DIFFICULTY_SPECS[options.difficulty]
-  const pace = (options.handling ?? 'arcade') === 'arcade' ? DIFFICULTY_SPECS.hard : difficulty
   const aiCars: readonly CarId[] =
     options.difficulty === 'hard'
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
@@ -164,7 +164,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
     const car = index === 0 ? options.playerCar : (aiCars[index - 1] ?? 'blue')
     const racingLine = emile && index > 0 ? {
       sections: EMILE_RACING_LINES[car],
-      speedRatio: EMILE_SPEED_RATIOS[options.difficulty],
+      speedRatio: authoredLineSpeedRatio(options.difficulty),
     } : undefined
     return {
       id: index === 0 ? 'player' : `ai-${index}`,
@@ -185,13 +185,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
           ? null
           : createAiDriverState(ROAD_GEOMETRY.aiBaseLanes[gridSlot] ?? 0,
               (['cautious', 'steady', 'opportunist'] as const)[index - 1]),
-      aiPace:
-        index === 0
-          ? 1
-          : (('aiPaces' in pace
-              ? pace.aiPaces[index - 1]
-              : undefined) ??
-            (0.985 - (index - 1) * 0.008)),
+      aiPace: index === 0 ? 1 : raceRivalPace(options.difficulty, options.handling, index - 1),
       pathIndex: placement.pathIndex,
       ...(index === 0 ? { lastRoadContactIndex: placement.pathIndex } : {}),
       pathDistance: options.path.points[placement.pathIndex]?.distance ?? 0,
