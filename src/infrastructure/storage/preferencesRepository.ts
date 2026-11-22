@@ -65,7 +65,7 @@ const SNAPSHOT_KEYS = [
 ] as const
 
 function snapshotValues(raw: string | null): Record<string, string> | null {
-  if (!raw || raw.length > 16_384) return null
+  if (!raw || raw.length > 128_000) return null
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
