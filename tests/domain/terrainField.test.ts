@@ -33,6 +33,22 @@ describe('terrain field', () => {
     expect(terrainKindAt(terrain, { x: -70 * 32 + 16, y: -50 * 32 + 16 })).toBe('hill')
   })
 
+  it('keeps a bounded strong cache for active terrain revisions and evicts older revisions', () => {
+    const revisions = Array.from({ length: 5 }, (_, i) =>
+      normalizeTerrain({ cells: [{ column: i, row: 0, kind: 'water' }] }))
+    const first = terrainKindIndex(revisions[0]!)
+    const second = terrainKindIndex(revisions[1]!)
+    const third = terrainKindIndex(revisions[2]!)
+    expect(terrainKindIndex(revisions[0]!)).toBe(first)
+    expect(terrainKindIndex(revisions[2]!)).toBe(third)
+    // The active three revisions must not be rebuilt between gesture reads.
+    expect(terrainKindIndex(revisions[1]!)).toBe(second)
+    terrainKindIndex(revisions[3]!)
+    terrainKindIndex(revisions[4]!)
+    expect(terrainKindIndex(revisions[0]!)).not.toBe(first)
+    expect(terrainKindAt(revisions[1]!, { x: 32 + 1, y: 1 })).toBe('water')
+  })
+
   it('centralizes the fixed grid, elevation, brush, and authored-cell limits', () => {
     expect(WORLD_ELEVATION).toEqual({
       cellSize: 32,

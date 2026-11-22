@@ -75,19 +75,27 @@ export function terrainCellKey(cell: TerrainCellCoordinate): string {
 }
 
 /**
- * Coordinate queries run for every editor prop/tree drag. Keep one sparse
- * index per immutable terrain revision instead of scanning 14K+ cells on each
- * pointer update. Weak references permit undo history to retain old terrain
- * without permanently retaining an additional index for every revision.
+ * Keep three recently accessed immutable terrain revisions strongly retained,
+ * even across a GC during a drag. Undo history can still reference older maps;
+ * the bounded LRU evicts their derived indexes rather than pinning all edits.
  */
-const terrainIndexes = new WeakMap<TerrainMap, WeakRef<ReadonlyMap<string, TerrainKind>>>()
+const TERRAIN_INDEX_CACHE_SIZE = 3
+const terrainIndexes = new Map<TerrainMap, ReadonlyMap<string, TerrainKind>>()
 
 export function terrainKindIndex(terrain: TerrainMap): ReadonlyMap<string, TerrainKind> {
-  const cached = terrainIndexes.get(terrain)?.deref()
-  if (cached) return cached
+  const cached = terrainIndexes.get(terrain)
+  if (cached) {
+    terrainIndexes.delete(terrain)
+    terrainIndexes.set(terrain, cached)
+    return cached
+  }
   const index = new Map<string, TerrainKind>()
   for (const cell of terrain.cells) index.set(terrainCellKey(cell), cell.kind)
-  terrainIndexes.set(terrain, new WeakRef(index))
+  terrainIndexes.set(terrain, index)
+  if (terrainIndexes.size > TERRAIN_INDEX_CACHE_SIZE) {
+    const oldest = terrainIndexes.keys().next().value
+    if (oldest !== undefined) terrainIndexes.delete(oldest)
+  }
   return index
 }
 
