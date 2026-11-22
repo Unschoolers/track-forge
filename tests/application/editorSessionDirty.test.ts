@@ -3,7 +3,7 @@ import { EditorSession } from '@/application/editor/editorSession'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 
-const editor = new EditorSession({ save: () => true }, { schedule: () => () => undefined }, () => 500)
+const editor = new EditorSession({ save: () => true }, () => 500)
 const stored = createStarterTrack(asTrackId('draft-persistence'), 100)
 
 describe('editor draft dirty state', () => {
