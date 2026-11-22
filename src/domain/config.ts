@@ -253,7 +253,7 @@ export const DIFFICULTY_SPECS = {
   },
   normal: {
     name: 'Medium',
-    pace: 1.25,
+    pace: 1.23,
     reaction: 12,
     brakeMargin: 7,
     lineError: 2.8,
