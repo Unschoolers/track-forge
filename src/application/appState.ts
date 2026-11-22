@@ -29,6 +29,7 @@ export type OverlayReturn =
       readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup' | 'cup'
     }
   | { readonly type: 'editor-menu' }
+  | { readonly type: 'editor-exit' }
 
 export type AppOverlay =
   | { readonly type: 'none' }
@@ -38,7 +39,7 @@ export type AppOverlay =
     }
   | {
       readonly type: 'track-name'
-      readonly purpose: 'create' | 'rename'
+      readonly purpose: 'create' | 'rename' | 'save-as'
       readonly returnTo: OverlayReturn
     }
   | { readonly type: 'player-name' }
@@ -46,6 +47,7 @@ export type AppOverlay =
   | { readonly type: 'cup'; readonly returnTo?: 'nearby' }
   | { readonly type: 'nearby' }
   | { readonly type: 'editor-menu' }
+  | { readonly type: 'editor-exit' }
   | {
       readonly type: 'options'
       readonly returnTo: 'home' | 'editor' | 'race' | 'race-setup'
@@ -150,6 +152,8 @@ export type AppCommand =
     }
   | { readonly type: 'open-editor-menu' }
   | { readonly type: 'save-current-track' }
+  | { readonly type: 'save-as-track'; readonly name: string }
+  | { readonly type: 'resolve-editor-exit'; readonly choice: 'save' | 'save-as' | 'discard' | 'cancel' }
   | { readonly type: 'set-editor-scenery'; readonly choice: EditorSceneryChoice }
   | { readonly type: 'set-editor-tool'; readonly tool: EditorTool }
   | {
