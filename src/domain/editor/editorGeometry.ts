@@ -424,5 +424,7 @@ function boundsCenter(content: readonly Vector2[]): Vector2 {
     maxY = Math.max(maxY, item.y)
   }
   // This is called only with nonempty content by expansion planners.
-  return { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2 }
+  // Halving each finite endpoint avoids overflow when opposite extremes
+  // would make (max - min) infinite, despite both coordinates being finite.
+  return { x: minX / 2 + maxX / 2, y: minY / 2 + maxY / 2 }
 }
