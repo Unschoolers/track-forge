@@ -107,7 +107,7 @@ describe('rival tendencies', () => {
 })
 
 describe('AI off-road recovery', () => {
-  it('brakes before a fast off-road car is too far away to recover', () => {
+  it('coasts while returning to the road rather than accelerate or brake away steering grip', () => {
     const straight = buildRoadPath(
       [
         { x: 0, y: 0, surface: 'street' },
@@ -125,12 +125,14 @@ describe('AI off-road recovery', () => {
     expect(offRoadContext.onRoad).toBe(false)
     expect(offRoadContext.nearest.distance).toBeLessThan(72)
 
-    const brake = stepAiVehicle(offRoad, straight, getTrafficState(offRoad, [], straight),
+    const recovering = stepAiVehicle(offRoad, straight, getTrafficState(offRoad, [], straight),
       'normal', 1 / 60)
     const cruise = stepAiVehicle(onRoad, straight, getTrafficState(onRoad, [], straight),
       'normal', 1 / 60)
-    expect(brake.braking).toBe(true)
+    expect(recovering.braking).toBe(false)
+    expect(recovering.speed).toBeLessThan(offRoad.speed)
     expect(cruise.braking).toBe(false)
+    expect(cruise.speed).toBeGreaterThan(onRoad.speed)
   })
 })
 
