@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { activePosePackets } from '@/application/multiplayer/nearbyPoseSync'
 
 describe('host relay packet selection', () => {
-  it('keeps valid, live and unfinished racers in insertion order', () => {
+  it('preserves live and not-yet-rostered pose packets in insertion order', () => {
     const recent = new Uint8Array([1])
     const stale = new Uint8Array([2])
     const finished = new Uint8Array([3])
@@ -21,7 +21,7 @@ describe('host relay packet selection', () => {
       [3, { left: false, time: 35 }],
       [0, { left: true, time: undefined }],
     ])
-    expect(activePosePackets(poses, racers, 1000)).toEqual([recent])
+    expect(activePosePackets(poses, racers, 1000)).toEqual([recent, unknown])
   })
 
   it('retains the 300ms boundary and excludes peers with a null finish', () => {
