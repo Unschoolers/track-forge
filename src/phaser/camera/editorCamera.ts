@@ -133,6 +133,8 @@ export function applyEditorCameraAction(
     minimumEditorZoomOut(camera.zoom, viewport),
     EDITOR_ZOOM_LIMITS.maximum,
   )
+  // Reaching the floor must not unexpectedly recenter a manually panned view.
+  if (action === 'zoom-out' && zoom === camera.zoom) return camera
   let nearest = { ...camera, zoom }
   if (action === 'zoom-in' || points.length === 0 || zoom > 1) return nearest
 
