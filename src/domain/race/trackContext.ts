@@ -1,5 +1,5 @@
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
-import { clamp } from '@/domain/geometry/math'
+import { clamp, wrapAngleRadians } from '@/domain/geometry/math'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type {
   RaceCameraHints,
@@ -48,7 +48,7 @@ function wrapped(path: RoadPath, index: number) {
 }
 
 function angleDifference(left: number, right: number): number {
-  return Math.atan2(Math.sin(left - right), Math.cos(left - right))
+  return wrapAngleRadians(left - right)
 }
 
 // These two spans are used by drivers and camera hints every physics tick.
