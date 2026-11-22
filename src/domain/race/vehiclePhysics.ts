@@ -122,6 +122,7 @@ export function stepVehicle(
       frontWeightBias: car.frontWeightBias,
       cornerStiffness: car.cornerStiffness,
       brakeForce: car.brakeForce,
+      brakingTractionScale: car.brakingTractionScale,
       recovery: car.recovery,
       maxSpeed,
       safetySpeed: Math.min(physicsSpeedLimit, car.max),

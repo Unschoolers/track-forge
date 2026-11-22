@@ -26,6 +26,7 @@ export interface VehicleDynamicsParameters {
   readonly frontWeightBias: number
   readonly cornerStiffness: number
   readonly brakeForce: number
+  readonly brakingTractionScale?: number
   readonly recovery: number
   /** Speed target for drive and drag, which can change at terrain boundaries. */
   readonly maxSpeed: number
@@ -124,11 +125,14 @@ export function stepVehicleDynamics(
     contactLoad *
     Math.max(0, 1 - speedRatio * speedRatio)
   const pressure = clamp(finiteOr(control.brakePressure ?? Number(control.braking)), 0, 1)
+  const brakeTractionScale =
+    Math.max(0, tuning.forces.brakingTractionScale) *
+    Math.max(0, finiteOr(parameters.brakingTractionScale ?? 1, 1))
   const brakeAcceleration = pressure * Math.min(
     (parameters.brakeForce / Math.max(1, parameters.mass)) *
       parameters.brakeGrip * contactLoad,
     longitudinalGripAcceleration * tuning.forces.brakeGripUsage,
-  )
+  ) * brakeTractionScale
   const direction =
     longitudinal > tuning.integration.directionDeadzone
       ? 1
@@ -179,7 +183,7 @@ export function stepVehicleDynamics(
   )
   const rearLoad = 1 - frontLoad
   const brakeUsage = clamp(
-    brakeAcceleration / Math.max(0.001, longitudinalGripAcceleration),
+    brakeAcceleration / Math.max(0.001, longitudinalGripAcceleration * brakeTractionScale),
     0,
     tuning.forces.maximumBrakeUsage,
   )

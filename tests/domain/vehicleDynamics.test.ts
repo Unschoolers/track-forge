@@ -6,6 +6,7 @@ import {
   type VehicleDynamicsState,
 } from '@/domain/race/vehicleDynamics'
 import {
+  CAR_PHYSICS_SPECS,
   VEHICLE_DYNAMICS_TUNING,
   type VehicleDynamicsTuning,
 } from '@/domain/race/vehiclePhysicsConfig'
@@ -71,6 +72,49 @@ function run(
 }
 
 describe('dynamic bicycle vehicle model', () => {
+  it('reduces stopping distance by about 10% for every car, slightly more for Red', () => {
+    const stoppingDistance = (carId: keyof typeof CAR_PHYSICS_SPECS, baseline: boolean): number => {
+      const car = CAR_PHYSICS_SPECS[carId]
+      const tuning = baseline
+        ? {
+            ...VEHICLE_DYNAMICS_TUNING,
+            forces: { ...VEHICLE_DYNAMICS_TUNING.forces, brakingTractionScale: 1 },
+          }
+        : VEHICLE_DYNAMICS_TUNING
+      const parameters: VehicleDynamicsParameters = {
+        ...PARAMETERS,
+        mass: car.mass,
+        maxSpeed: car.max,
+        brakeForce: car.brakeForce,
+        grip: car.grip,
+        brakeGrip: car.brake,
+        brakingTractionScale: baseline ? 1 : car.brakingTractionScale,
+      }
+      let state: VehicleDynamicsState = { angle: 0, vx: 220, vy: 0, yawRate: 0 }
+      let distance = 0
+      for (let frame = 0; frame < 360 && state.vx > 0.5; frame += 1) {
+        const next = stepVehicleDynamics(
+          state,
+          { steering: 0, throttle: 0, braking: true },
+          parameters,
+          FLAT,
+          1 / 60,
+          tuning,
+        )
+        distance += next.vx / 60
+        state = next
+      }
+      expect(state.vx).toBeLessThan(0.5)
+      return distance
+    }
+
+    for (const carId of ['blue', 'red', 'green', 'yellow'] as const) {
+      const ratio = stoppingDistance(carId, false) / stoppingDistance(carId, true)
+      expect(ratio).toBeGreaterThan(carId === 'red' ? 0.85 : 0.88)
+      expect(ratio).toBeLessThan(carId === 'red' ? 0.89 : 0.92)
+    }
+  })
+
   it('brakes progressively instead of stopping instantly', () => {
     const initial = { angle: 0, vx: 160, vy: 0, yawRate: 0 }
     const coasting = run(
