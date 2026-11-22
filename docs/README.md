@@ -9,6 +9,7 @@ Start here for **current team/agent guidelines**. Older specs and plans under `d
 | [Testing guidelines](testing-guidelines.md) | Selecting, writing, consolidating, and deleting valuable tests |
 | [Change workflow](change-workflow.md) | Delivery phases, verification, reviews, CI and regression handling |
 | [Repository audit — 2026-11-21](repo-audit-2026-11-21.md) | Evidence-based improvement opportunities; **not** claims of fixed issues |
+| [Five-slice refactor closure — 2026-11-22](refactor-closeout-2026-11-22.md) | Completed implementation scope, regression protection, and independent PR verification boundary |
 | [Mobile gameplay QA](gameplay-qa.md) | Touch/browser scenarios and limitations |
 | [AI lane checker](ai-lane-checker.md) | Deterministic simulation diagnostics and regressions |
 | [Race performance](race-performance.md) | Repeatable Chromium/Android measurements |
