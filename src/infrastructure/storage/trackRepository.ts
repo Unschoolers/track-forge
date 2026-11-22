@@ -136,14 +136,12 @@ export class BrowserTrackRepository implements TrackStore {
         now,
       )
       if (track) {
-        if (
-          this.storage.set(
-            STORAGE_KEYS.tracks,
-            JSON.stringify([track]),
-          )
-        ) {
-          this.storage.set(STORAGE_KEYS.trackMigration, '1')
+        if (!this.storage.set(STORAGE_KEYS.tracks, JSON.stringify([track]))) {
+          // The legacy autosave remains intact. Do not advertise an ephemeral
+          // recovered track as saved when storage has denied the write.
+          return []
         }
+        this.storage.set(STORAGE_KEYS.trackMigration, '1')
         return [track]
       }
     }
