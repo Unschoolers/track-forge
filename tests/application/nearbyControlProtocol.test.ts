@@ -28,7 +28,10 @@ describe('nearby eight-player control protocol', () => {
 
   it('accepts eight maximum-length Unicode player names without silently dropping the lineup', () => {
     const international: Control = {
-      ...lineup,
+      type: 'lineup',
+      cars: Array.from({ length: MAX_PLAYERS }, () => 'yellow' as const),
+      identities: Array.from({ length: MAX_PLAYERS }, () => ({ icon: 'diamond' as const, color: 'violet' as const })),
+      positions: [...positions],
       names: Array.from({ length: MAX_PLAYERS }, () => '界'.repeat(24)),
     }
     const bytes = encodeControl(international)
