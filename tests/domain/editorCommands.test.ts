@@ -449,7 +449,7 @@ describe('automatic checkpoint authoring', () => {
     expect(editor.recoveryCheckpoints).toHaveLength(1)
     for (let index = 10; index < 20; index += 1) editor = reduceEditor(editor, { type: 'add-point', point: roadPoint(index) })
     expect(editor.recoveryCheckpoints).toHaveLength(2)
-    const path = buildRoadPath(editor.points, editor.terrain, 0, 'point-to-point')
+    const path = buildRoadPath(editor.points, editor.terrain, undefined, 'point-to-point')
     const markers = editor.recoveryCheckpoints.map(ratio => path.points.find(point => point.distance >= ratio * path.totalLength)?.x)
     expect(markers[0]).toBeCloseTo(800, -1)
     expect(markers[1]).toBeCloseTo(1800, -1)

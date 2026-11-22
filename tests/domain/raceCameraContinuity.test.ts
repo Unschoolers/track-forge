@@ -228,7 +228,7 @@ describe('race camera road continuity', () => {
       cameraHints: { ...race.cameraHints, target: player, preview: [player], followingOppositeTravel: true, directionChangeSeconds: 0.2 },
     })
     const after = required(recovered.vehicles[0])
-    expect(after.x).toBeCloseTo(1200)
+    expect(after.x).toBe(contact.point.x)
     expect(recovered.cameraHints.preview?.[0]).toMatchObject({ x: after.x, y: after.y })
     expect(recovered.cameraHints.followingOppositeTravel).toBe(false)
     expect(recovered.cameraHints.directionChangeSeconds).toBe(0)
@@ -246,7 +246,7 @@ describe('race camera road continuity', () => {
       cameraHints: { ...race.cameraHints, followingOppositeTravel: true, directionChangeSeconds: 0.2 } },
       { steering: 0, throttle: 1, braking: false }, 1 / 60, { next: () => 0.5 })
     expect(result.events.some(event => event.type === 'vehicle-recovered')).toBe(true)
-    expect(required(result.state.vehicles[0]).x).toBeCloseTo(1200)
+    expect(required(result.state.vehicles[0]).x).toBe(contact.point.x)
     expect(result.state.cameraHints.followingOppositeTravel).toBe(false)
     expect(result.state.cameraHints.directionChangeSeconds).toBe(0)
   })
