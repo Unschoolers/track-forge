@@ -12,14 +12,14 @@ const cars = ['blue', 'red', 'green', 'yellow', 'blue', 'red', 'green', 'yellow'
 const identities = Array.from({ length: MAX_PLAYERS }, () => identity)
 const names = Array.from({ length: MAX_PLAYERS }, (_, i) => `Player ${i + 1}`)
 const positions = [7, 0, 6, 1, 5, 2, 4, 3]
-const lineup = { type: 'lineup', cars: [...cars], identities, names, positions } as const
+const lineup: Control = { type: 'lineup', cars: [...cars], identities, names, positions }
 
 describe('nearby eight-player control protocol', () => {
   it('round-trips an eight-player lobby and validates unique starting positions', () => {
     expect(MAX_PLAYERS).toBe(8)
     expect(NEARBY_WIRE_PROTOCOL_VERSION).toBe(3)
     expect(validLineupPositions(cars, positions)).toBe(true)
-    expect(decodeControl(encodeControl(lineup as Control))).toEqual(lineup)
+    expect(decodeControl(encodeControl(lineup))).toEqual(lineup)
     expect(decodeControl(packet({ ...lineup, positions: [0, 0, 2, 3, 4, 5, 6, 7] }))).toBeNull()
     expect(decodeControl(packet({ ...lineup, positions: [0, 1, 2, 3] }))).toBeNull()
     expect(decodeControl(packet({ ...lineup, identities: [identity] }))).toBeNull()
@@ -27,7 +27,7 @@ describe('nearby eight-player control protocol', () => {
   })
 
   it('supports partially occupied eight-slot rooms and never assigns an absent player a pad', () => {
-    const empty = Array.from({ length: MAX_PLAYERS }, (_, index) => index < 2 ? cars[index] : null)
+    const empty = Array.from({ length: MAX_PLAYERS }, (_, index) => index < 2 ? cars[index]! : null)
     const ids = Array.from({ length: MAX_PLAYERS }, (_, index) => index < 2 ? identity : null)
     const places = Array.from({ length: MAX_PLAYERS }, (_, index) => index < 2 ? index : null)
     const msg: Control = { type: 'lineup', cars: empty, identities: ids, positions: places }
