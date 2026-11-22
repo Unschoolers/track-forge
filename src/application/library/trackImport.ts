@@ -1,4 +1,4 @@
-import { TERRAIN_LIMITS } from '@/domain/config'
+import { TERRAIN_LIMITS, WORLD_ELEVATION } from '@/domain/config'
 import { TERRAIN_KINDS, type Track, type Vector2 } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -31,8 +31,7 @@ function validSharedTerrain(value: unknown): boolean {
   if (value === undefined) return true // older exports can omit terrain
   const input = object(value)
   if (!input || !Array.isArray(input.cells)) return false
-  if (input.cellSize !== undefined &&
-      (typeof input.cellSize !== 'number' || !Number.isFinite(input.cellSize) || input.cellSize <= 0)) return false
+  if (input.cellSize !== undefined && input.cellSize !== WORLD_ELEVATION.cellSize) return false
   if (input.cells.length > TERRAIN_LIMITS.maximumCells) return false
   const occupied = new Set<string>()
   for (const raw of input.cells) {
