@@ -278,13 +278,14 @@ public class NearbyRacePlugin extends Plugin {
                 String id = requested.optString(i);
                 if (connected.contains(id)) recipients.add(id);
             }
+            boolean transientPacket = bytes[0] == 1 || bytes[0] == 3 || bytes[0] == 4;
+            boolean progressPacket = bytes[0] == 4;
             if (requested.length() == 0) { call.resolve(); return; }
-            if (recipients.size() != requested.length()) {
+            if (recipients.size() != requested.length() && !transientPacket) {
                 call.reject("A nearby player disconnected before the packet was sent.");
                 return;
             }
-            boolean transientPacket = bytes[0] == 1 || bytes[0] == 3 || bytes[0] == 4;
-            boolean progressPacket = bytes[0] == 4;
+            if (transientPacket) droppedTransientPackets += requested.length() - recipients.size();
             // Keep one Nearby multicast per frame, but do not let an
             // unresponsive destination queue stale frames for the other peers.
             if (transientPacket) {
