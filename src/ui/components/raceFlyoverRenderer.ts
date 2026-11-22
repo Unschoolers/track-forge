@@ -182,10 +182,12 @@ export function createRaceFlyoverRenderer(
       const y = run.row * cellSize
       const runWidth = run.count * cellSize
       if (x > player.x + radius || x + runWidth < player.x - radius || Math.abs(y - player.y) > radius + cellSize) continue
-      ctx.fillStyle = run.kind === 'water' ? (night ? '#214b5c' : '#4d9cb1') : palette.flyoverHill
+      ctx.fillStyle = run.kind === 'water' ? (palette.flyoverWater ?? (night ? '#214b5c' : '#4d9cb1')) : palette.flyoverHill
       ctx.fillRect(x, y, runWidth, cellSize)
       if (run.kind === 'hill') {
-        ctx.fillStyle = night ? 'rgba(181, 204, 155, .10)' : 'rgba(226, 239, 186, .18)'
+        ctx.fillStyle = environmentId === 'kids-room'
+          ? (night ? 'rgba(211, 181, 169, .13)' : 'rgba(255, 235, 214, .30)')
+          : night ? 'rgba(181, 204, 155, .10)' : 'rgba(226, 239, 186, .18)'
         ctx.fillRect(x, y, runWidth, Math.max(2, cellSize * .12))
       }
     }

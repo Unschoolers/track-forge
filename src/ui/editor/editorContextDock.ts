@@ -116,7 +116,7 @@ export function createEditorContextDock(
         createSegmentedButtons('Terrain brush', [
           terrainBrushChoice(
             'raise',
-            'RAISE',
+            state.editor.environmentId === 'kids-room' ? 'BUNCH' : 'RAISE',
             state.editorUi.terrainBrush.mode === 'raise',
             actions.terrainMode,
           ),
@@ -124,13 +124,13 @@ export function createEditorContextDock(
           // GROUND represents the same stateful eraser mode and is selected.
           terrainBrushChoice(
             'lower',
-            'LOWER',
+            state.editor.environmentId === 'kids-room' ? 'FLATTEN' : 'LOWER',
             state.editorUi.terrainBrush.mode === 'lower',
             actions.terrainMode,
           ),
           terrainBrushChoice(
             'water',
-            'WATER',
+            state.editor.environmentId === 'kids-room' ? 'JUICE' : 'WATER',
             state.editorUi.terrainBrush.mode === 'water',
             actions.terrainMode,
           ),
