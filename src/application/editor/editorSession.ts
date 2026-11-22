@@ -82,6 +82,7 @@ export class EditorSession {
   isDirty(draft: Track | null, saved: Track | undefined): boolean {
     if (!draft || !saved) return false
     const content = (track: Track): string => JSON.stringify({
+      name: track.name,
       points: track.points,
       trees: track.trees,
       start: track.start ?? { ratio: 0, reversed: false },
