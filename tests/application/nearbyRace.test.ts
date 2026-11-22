@@ -498,7 +498,7 @@ describe('Nearby diagnostics', () => {
     race.host({ track, laps: 1, lighting: 'day', car: 'blue' })
     await vi.waitFor(() => expect(race.snapshot().phase).toBe('idle'))
     const report = await race.diagnostics()
-    expect(report).toMatchObject({ version: 1, role: 'host', phase: 'idle',
+    expect(report).toMatchObject({ version: 2, role: 'host', phase: 'idle',
       lastFailure: { source: 'host', phase: 'opening', error: 'Error' }, native: { status: 'failed' } })
     expect(JSON.stringify(report)).not.toContain('secret')
     expect(JSON.stringify(report)).not.toContain('endpoint-123')
