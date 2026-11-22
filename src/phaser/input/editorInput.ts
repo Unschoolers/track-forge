@@ -10,7 +10,7 @@ import {
   type TerrainBrushRadius,
 } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
-import { EDITOR_ZOOM_LIMITS } from '@/phaser/camera/editorCamera'
+import { EDITOR_ZOOM_LIMITS, minimumEditorZoomOut } from '@/phaser/camera/editorCamera'
 import type {
   RoadStructure,
   TerrainBrushKind,
@@ -219,7 +219,7 @@ export class EditorInputController {
         const camera = this.dependencies.camera
         const viewport = this.dependencies.viewport?.() ?? { width: 0, height: 0 }
         const oldZoom = camera.zoom
-        const zoom = clamp(oldZoom * next.distance / previous.distance, EDITOR_ZOOM_LIMITS.minimum, EDITOR_ZOOM_LIMITS.maximum)
+        const zoom = clamp(oldZoom * next.distance / previous.distance, minimumEditorZoomOut(oldZoom, viewport), EDITOR_ZOOM_LIMITS.maximum)
         const worldX = camera.x + (previous.center.x - viewport.width / 2) / oldZoom
         const worldY = camera.y + (previous.center.y - viewport.height / 2) / oldZoom
         camera.zoom = zoom
@@ -367,7 +367,7 @@ export class EditorInputController {
   zoomBy(delta: number): void {
     this.dependencies.camera.zoom = clamp(
       this.dependencies.camera.zoom + delta,
-      EDITOR_ZOOM_LIMITS.minimum,
+      minimumEditorZoomOut(this.dependencies.camera.zoom, this.dependencies.viewport?.() ?? { width: 0, height: 0 }),
       EDITOR_ZOOM_LIMITS.maximum,
     )
     this.dependencies.onCameraChanged?.()
