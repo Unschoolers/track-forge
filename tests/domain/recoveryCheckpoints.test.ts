@@ -45,11 +45,16 @@ describe('authored race recovery checkpoints', () => {
     expect(incident.events.filter(event => event.type === 'vehicle-recovered')).toHaveLength(1)
   })
 
-  it('recovers at Start until the player passes a checkpoint', () => {
+  it('recovers on safe road before the pending first timing gate', () => {
     const race = running('simulation')
     const player = { ...requireFixture(race.vehicles[0]), ...at(610) }
     const recovered = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random)
-    expect(recovered.state.vehicles[0]).toMatchObject({ x: 0, nextSector: 1, finishedAt: null })
+    const resetCar = requireFixture(recovered.state.vehicles[0])
+    // Physical recovery is still before gate 1; crossing it must remain required.
+    expect(resetCar.x).toBeGreaterThanOrEqual(0)
+    expect(resetCar.x).toBeLessThan(path.totalLength / 4)
+    expect(resetCar.nextSector).toBe(1)
+    expect(resetCar.finishedAt).toBeNull()
     expect(recovered.state.phase).toBe('running')
   })
 
