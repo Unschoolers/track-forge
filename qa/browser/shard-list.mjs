@@ -7,7 +7,9 @@ import { planBrowserShard } from './shardPlan.mjs'
 const [shardText, totalText, output] = process.argv.slice(2)
 const shard = Number(shardText)
 const total = Number(totalText)
-if (!output) {
+// Fail before starting Playwright discovery for an invalid runner request.
+if (!output || !Number.isInteger(shard) || !Number.isInteger(total) ||
+    shard < 1 || shard > total) {
   throw new Error('Usage: node qa/browser/shard-list.mjs <shard> <total> <output>')
 }
 
