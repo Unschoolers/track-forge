@@ -26,6 +26,21 @@ describe('nearby eight-player control protocol', () => {
     expect(decodeControl(packet({ ...lineup, names: [...names.slice(0, 7), '<img>'] }))).toBeNull()
   })
 
+  it('accepts eight maximum-length Unicode player names without silently dropping the lineup', () => {
+    const international: Control = {
+      ...lineup,
+      names: Array.from({ length: MAX_PLAYERS }, () => '界'.repeat(24)),
+    }
+    const bytes = encodeControl(international)
+    expect(bytes.length).toBeGreaterThan(1024)
+    expect(bytes.length).toBeLessThanOrEqual(2048)
+    expect(decodeControl(bytes)).toEqual(international)
+    expect(() => encodeControl({
+      ...international,
+      names: Array.from({ length: MAX_PLAYERS }, () => '界'.repeat(100)),
+    })).toThrow(RangeError)
+  })
+
   it('supports partially occupied eight-slot rooms and never assigns an absent player a pad', () => {
     const empty = Array.from({ length: MAX_PLAYERS }, (_, index) => index < 2 ? cars[index]! : null)
     const ids = Array.from({ length: MAX_PLAYERS }, (_, index) => index < 2 ? identity : null)
@@ -63,6 +78,6 @@ describe('nearby eight-player control protocol', () => {
     expect(decodeControl(new Uint8Array([Packet.Pose, 123]))).toBeNull()
     expect(decodeControl(packet({ type: 'unknown' }))).toBeNull()
     expect(decodeControl(packet(null))).toBeNull()
-    expect(decodeControl(new Uint8Array(1025))).toBeNull()
+    expect(decodeControl(new Uint8Array(2049))).toBeNull()
   })
 })
