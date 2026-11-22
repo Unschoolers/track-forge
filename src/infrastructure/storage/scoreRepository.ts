@@ -43,27 +43,39 @@ function categoryKey(score: ScoreEntry): string {
   return score.category ? JSON.stringify([score.category.course, score.category.routeKind ?? 'circuit', score.category.laps, score.category.handling, score.category.mode, score.car, score.difficulty]) : 'legacy'
 }
 
+/** Retain the five best scores per category with one accounting pass. */
+function bestScores(scores: readonly ScoreEntry[]): ScoreEntry[] {
+  const keptByCategory = new Map<string, number>()
+  return [...scores]
+    .sort((left, right) => left.time - right.time)
+    .filter((score) => {
+      const category = categoryKey(score)
+      const kept = keptByCategory.get(category) ?? 0
+      if (kept >= 5) return false
+      keptByCategory.set(category, kept + 1)
+      return true
+    })
+}
+
+function decodedScores(raw: unknown): ScoreEntry[] {
+  return Array.isArray(raw)
+    ? raw.map(decodeScore).filter((score): score is ScoreEntry => score !== undefined)
+    : []
+}
+
 export class BrowserScoreRepository implements ScoreStore {
   constructor(private readonly storage: KeyValueStore) {}
 
   forTrack(trackId: TrackId): readonly ScoreEntry[] {
     const all = this.read()
-    const raw = all[trackId]
-    return Array.isArray(raw)
-      ? raw
-          .map(decodeScore)
-          .filter((score) => score !== undefined)
-          .sort((left, right) => left.time - right.time)
-          .filter((score, index, scores) => scores.slice(0, index).filter((previous) => categoryKey(previous) === categoryKey(score)).length < 5)
-      : []
+    return bestScores(decodedScores(all[trackId]))
   }
 
   record(trackId: TrackId, score: ScoreEntry): boolean {
     if (!decodeScore(score)) return false
     const all = this.read()
-    all[trackId] = [...this.forTrack(trackId), score]
-      .sort((left, right) => left.time - right.time)
-      .filter((entry, index, scores) => scores.slice(0, index).filter((previous) => categoryKey(previous) === categoryKey(entry)).length < 5)
+    // Use this same storage snapshot rather than re-reading and re-migrating it.
+    all[trackId] = bestScores([...decodedScores(all[trackId]), score])
     return this.storage.set(STORAGE_KEYS.scores, JSON.stringify(all))
   }
 
@@ -129,9 +141,7 @@ export class BrowserScoreRepository implements ScoreStore {
         ].join(':')
         unique.set(identity, score)
       }
-      const scores = [...unique.values()]
-        .sort((left, right) => left.time - right.time)
-        .filter((entry, index, scores) => scores.slice(0, index).filter((previous) => categoryKey(previous) === categoryKey(entry)).length < 5)
+      const scores = bestScores([...unique.values()])
       if (scores.length > 0) merged[trackId] = scores
     }
     return merged
