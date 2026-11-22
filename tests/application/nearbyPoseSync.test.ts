@@ -77,12 +77,43 @@ describe('nearby pose synchronizer', () => {
       sync.update(player, 1, 'host', ['host'], racers)
       await flush()
     }
+    // SDK queue acceptance is not a radio delivery acknowledgement.
+    expect(sync.targetPoseHz).toBe(30)
+    sync.observeDeliveryQuality({ delivered: 0, failed: 0, dropped: 0, timedOut: 0 })
+    now += 1500
+    sync.observeDeliveryQuality({ delivered: 45, failed: 0, dropped: 0, timedOut: 0 })
+    expect(sync.targetPoseHz).toBe(30)
+    now += 1500
+    sync.observeDeliveryQuality({ delivered: 90, failed: 0, dropped: 0, timedOut: 0 })
     expect(sync.targetPoseHz).toBe(60)
     fail = true
     now += 35
     sync.update(player, 1, 'host', ['host'], racers)
     await flush()
     expect(sync.counts.sendFailed).toBe(1)
+    expect(sync.targetPoseHz).toBe(30)
+  })
+
+  it('drops back to 30 Hz on native radio drops and does not recover on enqueue success alone', async () => {
+    let now = 0
+    const sync = new NearbyPoseSync(async () => undefined, () => now)
+    sync.observeDeliveryQuality({ delivered: 0, failed: 0, dropped: 0, timedOut: 0 })
+    now = 1500
+    sync.observeDeliveryQuality({ delivered: 60, failed: 0, dropped: 0, timedOut: 0 })
+    now = 3000
+    sync.observeDeliveryQuality({ delivered: 120, failed: 0, dropped: 0, timedOut: 0 })
+    expect(sync.targetPoseHz).toBe(60)
+    now = 4500
+    sync.observeDeliveryQuality({ delivered: 120, failed: 0, dropped: 1, timedOut: 0 })
+    expect(sync.targetPoseHz).toBe(30)
+    for (let i = 0; i < 35; i++) {
+      now += 35
+      sync.update(player, 1, 'host', ['host'], racers)
+      await flush()
+    }
+    expect(sync.targetPoseHz).toBe(30)
+    // Reset counters must establish a new baseline, not fabricate deliveries.
+    sync.observeDeliveryQuality({ delivered: 1, failed: 0, dropped: 0, timedOut: 0 })
     expect(sync.targetPoseHz).toBe(30)
   })
 

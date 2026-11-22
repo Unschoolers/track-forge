@@ -44,6 +44,8 @@ export class NearbyPoseSync {
   private posePeriodMs = POSE_PERIOD_MS
   private healthySends = 0
   private fastRetryAfter = 0
+  private deliveryCounters: { delivered: number; failed: number; dropped: number; timedOut: number } | null = null
+  private lastDeliveryAt = 0
 
   constructor(
     private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
@@ -70,6 +72,51 @@ export class NearbyPoseSync {
     this.posePeriodMs = POSE_PERIOD_MS
     this.healthySends = 0
     this.fastRetryAfter = 0
+    this.deliveryCounters = null
+    this.lastDeliveryAt = 0
+  }
+
+  /** A successful native enqueue is not evidence that any remote car received a pose. */
+  observeDeliveryQuality(raw: Record<string, unknown>): void {
+    const keys = ['delivered', 'failed', 'dropped', 'timedOut'] as const
+    if (!keys.every(key => Number.isSafeInteger(raw[key]) && (raw[key] as number) >= 0)) {
+      this.deliveryUnavailable()
+      return
+    }
+    const next = {
+      delivered: raw.delivered as number,
+      failed: raw.failed as number,
+      dropped: raw.dropped as number,
+      timedOut: raw.timedOut as number,
+    }
+    const previous = this.deliveryCounters
+    this.deliveryCounters = next
+    if (!previous) return
+    const deltas = keys.map(key => next[key] - previous[key])
+    if (deltas.some(delta => delta < 0)) {
+      this.deliveryUnavailable()
+      this.deliveryCounters = next
+      return
+    }
+    const [delivered, failed, dropped, timedOut] = deltas
+    const now = this.now()
+    if ((failed ?? 0) + (dropped ?? 0) + (timedOut ?? 0) > 0) {
+      this.deliveryUnavailable()
+      this.fastRetryAfter = now + 5000
+    } else if ((delivered ?? 0) > 0) {
+      this.lastDeliveryAt = now
+      if (now >= this.fastRetryAfter) {
+        this.healthySends += delivered ?? 0
+        if (this.healthySends >= 80) this.posePeriodMs = POSE_FAST_PERIOD_MS
+      }
+    } else if (now - this.lastDeliveryAt > 3000) {
+      this.deliveryUnavailable()
+    }
+  }
+
+  deliveryUnavailable(): void {
+    this.posePeriodMs = POSE_PERIOD_MS
+    this.healthySends = 0
   }
 
   recovered(): void { this.recovery = (this.recovery + 1) & POSE_RECOVERY_MASK }
@@ -155,12 +202,10 @@ export class NearbyPoseSync {
     const now = this.now()
     const duration = Math.max(0, now - startedAt)
     if (!success || duration > 25) {
-      this.posePeriodMs = POSE_PERIOD_MS
-      this.healthySends = 0
+      this.deliveryUnavailable()
       this.fastRetryAfter = now + 5000
-    } else if (now >= this.fastRetryAfter) {
-      this.healthySends = duration <= 12 ? this.healthySends + 1 : 0
-      if (this.healthySends >= 30) this.posePeriodMs = POSE_FAST_PERIOD_MS
     }
+    // Never promote to 60 Hz from transport queue acceptance; only a native
+    // delivery callback aggregated by observeDeliveryQuality can do that.
   }
 }
