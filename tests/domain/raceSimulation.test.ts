@@ -1,3 +1,4 @@
+import { requireFixture } from '../fixtures/requireFixture'
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
@@ -20,11 +21,6 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
 const track = createStarterTrack(asTrackId('starter'), 1)
 const path = buildRoadPath(track.points, track.terrain)
-
-function required<T>(value: T | undefined): T {
-  if (value === undefined) throw new Error('Expected test fixture value')
-  return value
-}
 
 describe('race simulation', () => {
   it('creates a deterministic four-car starting grid', () => {
@@ -62,7 +58,7 @@ describe('race simulation', () => {
       difficulty: 'normal',
       laps: 3,
     })
-    const player = required(race.vehicles[0])
+    const player = requireFixture(race.vehicles[0])
     let rolling = player
     for (let frame = 0; frame < 12; frame += 1) {
       rolling = stepPlayer(
@@ -107,7 +103,7 @@ describe('race simulation', () => {
   })
 
   it('tracks forward lap crossings and finish time', () => {
-    const vehicle = required(
+    const vehicle = requireFixture(
       createRace({
         path,
         playerCar: 'blue',
@@ -127,7 +123,7 @@ describe('race simulation', () => {
   })
 
   it('does not count a backward start-line wrap', () => {
-    const vehicle = required(
+    const vehicle = requireFixture(
       createRace({
         path,
         playerCar: 'blue',
@@ -149,7 +145,7 @@ describe('race simulation', () => {
   })
 
   it('rejects a shortcut across the start line before all sectors', () => {
-    const vehicle = required(
+    const vehicle = requireFixture(
       createRace({
         path,
         playerCar: 'blue',
@@ -183,7 +179,7 @@ describe('race simulation', () => {
       ...race,
       phase: 'running' as const,
       vehicles: race.vehicles.map((vehicle, index) => {
-        const point = required(path.points[40 + index * 10])
+        const point = requireFixture(path.points[40 + index * 10])
         return { ...vehicle, x: point.x, y: point.y, pathIndex: 0 }
       }),
     }
@@ -305,7 +301,7 @@ describe('race simulation', () => {
 
   it('orders grid cars around the first crossing and the relocated seam in both directions', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const [first, second] = race.vehicles.map(required)
+    const [first, second] = race.vehicles.map(requireFixture)
     const length = path.points.length
     if (!first || !second) throw new Error('Missing grid cars')
     for (const [start, reversed] of [[0, false], [1, false], [length - 2, true]] as const) {
@@ -322,7 +318,7 @@ describe('race simulation', () => {
 
   it('orders finish times before progress and resolves equal finishes by grid order', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const [first, second, third, fourth] = race.vehicles.map(required)
+    const [first, second, third, fourth] = race.vehicles.map(requireFixture)
     if (!first || !second || !third || !fourth) throw new Error('Missing grid cars')
     const vehicles = [
       { ...first, finishedAt: 10, pathIndex: 0 },
@@ -335,8 +331,8 @@ describe('race simulation', () => {
 
   it('lets parked cars gently separate without damage', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 0, speed: 0 }
-    const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
+    const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 0, speed: 0 }
+    const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
     const frame = solveCollisionFrame([player, rival], [], 1 / 60)
     expect(frame.vehicles[0]?.damage).toBe(0)
     expect(frame.events).toEqual([])
@@ -345,8 +341,8 @@ describe('race simulation', () => {
 
   it('does not damage during a fast tangential graze without normal closing speed', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 110, speed: 110 }
-    const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
+    const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 110, speed: 110 }
+    const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
     const frame = solveCollisionFrame([player, rival], [], 1 / 60)
     expect(frame.events).toEqual([])
     expect(frame.vehicles[0]?.damage).toBe(0)
@@ -364,11 +360,11 @@ describe('race simulation', () => {
     })
     const [first, second] = race.vehicles
     const collided = solveCollisions([
-      { ...required(first), x: 0, y: 0, vx: 100, vy: 0, speed: 100 },
-      { ...required(second), x: 1, y: 0, vx: 20, vy: 0, speed: 20 },
+      { ...requireFixture(first), x: 0, y: 0, vx: 100, vy: 0, speed: 100 },
+      { ...requireFixture(second), x: 1, y: 0, vx: 20, vy: 0, speed: 20 },
     ])
-    const collidedFirst = required(collided[0])
-    const collidedSecond = required(collided[1])
+    const collidedFirst = requireFixture(collided[0])
+    const collidedSecond = requireFixture(collided[1])
 
     expect(Math.abs(collidedFirst.x - collidedSecond.x)).toBeGreaterThan(10)
     expect(collidedFirst.damage + collidedSecond.damage).toBeGreaterThan(0)
@@ -378,8 +374,8 @@ describe('race simulation', () => {
     'removes a finished opponent from contact without removing its standing (opponent first: %s)',
     (opponentFirst) => {
       const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-      const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
-      const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0, finishedAt: 0, lap: 3 }
+      const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
+      const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0, finishedAt: 0, lap: 3 }
       const pair = opponentFirst ? [rival, player] : [player, rival]
       const previousContact = opponentFirst ? `${rival.id}:${player.id}` : `${player.id}:${rival.id}`
 
@@ -397,8 +393,8 @@ describe('race simulation', () => {
 
   it('continues to collide with an unfinished opponent', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = { ...required(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
-    const rival = { ...required(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0 }
+    const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
+    const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0 }
 
     const frame = solveCollisionFrame([player, rival], [], 0)
 
@@ -412,8 +408,8 @@ describe('race simulation', () => {
 
   it('keeps an earlier finisher in the running race and standings without affecting the player', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = required(race.vehicles[0])
-    const rival = { ...required(race.vehicles[1]), x: player.x + 1, y: player.y, z: player.z, finishedAt: 12, lap: 3 }
+    const player = requireFixture(race.vehicles[0])
+    const rival = { ...requireFixture(race.vehicles[1]), x: player.x + 1, y: player.y, z: player.z, finishedAt: 12, lap: 3 }
     const running = { ...race, phase: 'running' as const, vehicles: [player, rival], activeContacts: [`${player.id}:${rival.id}`] }
     const withoutRival = { ...running, vehicles: [player], activeContacts: [] }
     const input = { steering: 0, throttle: 1, braking: false }
@@ -431,10 +427,10 @@ describe('race simulation', () => {
 
   it('removes an opponent from contact on the frame it finishes', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
-    const point = required(path.points[0])
-    const player = { ...required(race.vehicles[0]), x: point.x, y: point.y, z: 0, pathIndex: 0 }
+    const point = requireFixture(path.points[0])
+    const player = { ...requireFixture(race.vehicles[0]), x: point.x, y: point.y, z: 0, pathIndex: 0 }
     const rival = {
-      ...required(race.vehicles[1]),
+      ...requireFixture(race.vehicles[1]),
       x: point.x - 1,
       y: point.y,
       z: 0,
@@ -465,13 +461,13 @@ describe('race simulation', () => {
       laps: 3,
     })
     const lower = {
-      ...required(race.vehicles[0]),
+      ...requireFixture(race.vehicles[0]),
       x: 0,
       y: 0,
       z: 0,
     }
     const upper = {
-      ...required(race.vehicles[1]),
+      ...requireFixture(race.vehicles[1]),
       x: 0,
       y: 0,
       z: WORLD_ELEVATION.levelHeight,
@@ -505,9 +501,9 @@ describe('race simulation', () => {
     const deckIndex = bridgePath.points.findIndex(
       (point) => point.distance >= 240,
     )
-    const center = required(bridgePath.points[deckIndex])
+    const center = requireFixture(bridgePath.points[deckIndex])
     const airborne = {
-      ...required(
+      ...requireFixture(
         createRace({
           path,
           playerCar: 'blue',
@@ -565,9 +561,9 @@ describe('race simulation', () => {
     const deckIndex = bridgePath.points.findIndex(
       (point) => point.distance >= 240,
     )
-    const center = required(bridgePath.points[deckIndex])
+    const center = requireFixture(bridgePath.points[deckIndex])
     const vehicle = {
-      ...required(
+      ...requireFixture(
         createRace({
           path,
           playerCar: 'blue',
@@ -608,9 +604,9 @@ describe('race simulation', () => {
       ],
       EMPTY_TERRAIN,
     )
-    const center = required(bridgePath.points[0])
+    const center = requireFixture(bridgePath.points[0])
     const vehicle = {
-      ...required(
+      ...requireFixture(
         createRace({
           path: bridgePath,
           playerCar: 'blue',
@@ -645,14 +641,14 @@ describe('race simulation', () => {
       laps: 3,
     })
     const player = {
-      ...required(race.vehicles[0]),
+      ...requireFixture(race.vehicles[0]),
       x: 0,
       y: 0,
       vx: 100,
       speed: 100,
     }
     const ai = {
-      ...required(race.vehicles[1]),
+      ...requireFixture(race.vehicles[1]),
       x: 1,
       y: 0,
       vx: 0,

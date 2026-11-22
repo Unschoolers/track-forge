@@ -1,3 +1,4 @@
+import { requireFixture } from '../fixtures/requireFixture'
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
@@ -7,11 +8,6 @@ import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-
-function required<T>(value: T | undefined): T {
-  if (value === undefined) throw new Error('Missing test fixture')
-  return value
-}
 
 const random = { next: () => 0.5 }
 const track = createStarterTrack(asTrackId('recovery'), 1)
@@ -25,12 +21,12 @@ function stoppedPlayerRace(stuckDuration = 0) {
     laps: 3,
   })
   const index = 40
-  const center = required(path.points[index])
-  const before = required(path.points[index - 3])
-  const after = required(path.points[index + 3])
+  const center = requireFixture(path.points[index])
+  const before = requireFixture(path.points[index - 3])
+  const after = requireFixture(path.points[index + 3])
   const angle = Math.atan2(after.y - before.y, after.x - before.x)
   const player = {
-    ...required(race.vehicles[0]),
+    ...requireFixture(race.vehicles[0]),
     x: center.x - Math.sin(angle) * 20,
     y: center.y + Math.cos(angle) * 20,
     angle: angle + 0.8,
@@ -53,7 +49,7 @@ describe('automatic player recovery', () => {
 
   it('does not move or recover a stopped player holding the brake', () => {
     let race: RaceState = stoppedPlayerRace()
-    const initial = required(race.vehicles[0])
+    const initial = requireFixture(race.vehicles[0])
     const context = getVehicleStepContext(path, initial)
     expect(context.onRoad).toBe(true)
     expect(context.nearest.distance).toBeGreaterThan(19)
@@ -69,7 +65,7 @@ describe('automatic player recovery', () => {
         1 / 60,
         random,
       ).state
-      const player = required(race.vehicles[0])
+      const player = requireFixture(race.vehicles[0])
       greatestDisplacement = Math.max(
         greatestDisplacement,
         Math.hypot(player.x - initial.x, player.y - initial.y),
@@ -89,7 +85,7 @@ describe('automatic player recovery', () => {
 
   it('lets previous stuck time decay when the brake is applied', () => {
     const race = stoppedPlayerRace(0.6)
-    const player = required(
+    const player = requireFixture(
       stepRace(
         race,
         { steering: 0, throttle: 1, braking: true },
@@ -120,9 +116,9 @@ describe('automatic player recovery', () => {
         reversed,
       })
       const index = bridgePath.points.findIndex((point) => point.distance >= 240)
-      const center = required(bridgePath.points[index])
+      const center = requireFixture(bridgePath.points[index])
       const player = {
-        ...required(race.vehicles[0]),
+        ...requireFixture(race.vehicles[0]),
         x: center.x,
         y: center.y + 29,
         angle: Math.PI / 2,
@@ -141,11 +137,11 @@ describe('automatic player recovery', () => {
         ).state
         greatestStuckDuration = Math.max(
           greatestStuckDuration,
-          required(race.vehicles[0]).stuckDuration,
+          requireFixture(race.vehicles[0]).stuckDuration,
         )
       }
 
-      const recovered = required(race.vehicles[0])
+      const recovered = requireFixture(race.vehicles[0])
       const expectedAngle = reversed ? Math.PI : 0
       const headingDifference = Math.atan2(
         Math.sin(recovered.angle - expectedAngle),
@@ -179,9 +175,9 @@ describe('fallback recovery on a circuit', () => {
       path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed,
     })
     const x = reversed ? 600 : 440
-    const index = required(nearestPathPoint(closeArmsPath, { x, y: 0 })).index
+    const index = requireFixture(nearestPathPoint(closeArmsPath, { x, y: 0 })).index
     const player = {
-      ...required(race.vehicles[0]), x, y: 100, pathIndex: index, lastRoadContactIndex: index,
+      ...requireFixture(race.vehicles[0]), x, y: 100, pathIndex: index, lastRoadContactIndex: index,
       lap: 1, nextSector: reversed ? 4 as const : 1 as const, damage: 20,
     }
     const result = recoverRacePlayer({ ...race, phase: 'running', elapsed: 40, vehicles: [player] })
@@ -189,7 +185,7 @@ describe('fallback recovery on a circuit', () => {
       x: expect.closeTo(x, -1), y: expect.closeTo(0),
       nextSector: player.nextSector, lap: 1, damage: 20, finishedAt: null,
     })
-    expect(Math.cos(required(result.vehicles[0]).angle)).toBeCloseTo(reversed ? -1 : 1)
+    expect(Math.cos(requireFixture(result.vehicles[0]).angle)).toBeCloseTo(reversed ? -1 : 1)
     expect(result.elapsed).toBe(40)
   })
 
@@ -201,12 +197,12 @@ describe('fallback recovery on a circuit', () => {
       { x: -200, y: 216, surface: 'street' },
       { x: -200, y: 16, surface: 'street' },
     ], { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] })
-    const wetIndex = required(nearestPathPoint(wetPath, { x: 16, y: 16 })).index
+    const wetIndex = requireFixture(nearestPathPoint(wetPath, { x: 16, y: 16 })).index
     const race = createRace({ path: wetPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = {
-      ...required(race.vehicles[0]), ...required(wetPath.points[wetIndex]), pathIndex: wetIndex,
+      ...requireFixture(race.vehicles[0]), ...requireFixture(wetPath.points[wetIndex]), pathIndex: wetIndex,
     }
-    const recovered = required(resetRaceVehicle(player, {
+    const recovered = requireFixture(resetRaceVehicle(player, {
       ...race, startPathIndex: (wetIndex - Math.ceil(wetPath.points.length / 4) + wetPath.points.length) % wetPath.points.length,
     }))
     expect(recovered.x).toBeLessThan(0)
@@ -216,9 +212,9 @@ describe('fallback recovery on a circuit', () => {
 
   it('retains the followed arm when automatically recovering on a displaced tick', () => {
     const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const index = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+    const index = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
     const player = {
-      ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: index, stuckDuration: 0.65,
+      ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: index, stuckDuration: 0.65,
     }
     const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
       { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
@@ -230,8 +226,8 @@ describe('fallback recovery on a circuit', () => {
 
 it('still recovers to the original arm after a displaced non-recovery tick', () => {
   const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-  const index = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
-  const player = { ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: index }
+  const index = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+  const player = { ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: index }
   const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
     { steering: 0, throttle: 0, braking: true }, 1 / 60, random)
   const recovered = recoverRacePlayer(result.state)
@@ -246,7 +242,7 @@ it.each([false, true])('does not recover at an authored checkpoint beyond the pe
   const indexAt = (progress: number) => ((race.startPathIndex + direction * progress) % count + count) % count
   const anchor = indexAt(Math.floor(count / 8))
   const missed = indexAt(Math.ceil(count / 2))
-  const player = { ...required(race.vehicles[0]), pathIndex: anchor, lastRoadContactIndex: anchor, nextSector: 1 as const, recoveryCheckpoint: missed }
+  const player = { ...requireFixture(race.vehicles[0]), pathIndex: anchor, lastRoadContactIndex: anchor, nextSector: 1 as const, recoveryCheckpoint: missed }
   const recovered = resetRaceVehicle(player, { ...race, recoveryCheckpoints: [missed] })
   expect(recovered.pathIndex).toBe(anchor)
   expect(recovered.nextSector).toBe(1)
@@ -254,25 +250,25 @@ it.each([false, true])('does not recover at an authored checkpoint beyond the pe
 
 it('clears the recovery anchor after sustained travel on a newly acquired arm', () => {
   const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-  const origin = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
-  const destination = required(nearestPathPoint(closeArmsPath, { x: 440, y: 100 })).index
-  const player = { ...required(race.vehicles[0]), x: 440, y: 100, pathIndex: origin }
+  const origin = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+  const destination = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 100 })).index
+  const player = { ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: origin }
   const acquired = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
     { steering: 0, throttle: 0, braking: true }, 1 / 60, random).state
-  expect(required(acquired.vehicles[0]).recoveryAnchorIndex).toBe(origin)
-  const farther = required(closeArmsPath.points[(destination + 16) % closeArmsPath.points.length])
-  const moving = { ...required(acquired.vehicles[0]), x: farther.x, y: farther.y, pathIndex: (destination + 16) % closeArmsPath.points.length }
+  expect(requireFixture(acquired.vehicles[0]).recoveryAnchorIndex).toBe(origin)
+  const farther = requireFixture(closeArmsPath.points[(destination + 16) % closeArmsPath.points.length])
+  const moving = { ...requireFixture(acquired.vehicles[0]), x: farther.x, y: farther.y, pathIndex: (destination + 16) % closeArmsPath.points.length }
   const travelled = stepRace({ ...acquired, vehicles: [moving] },
     { steering: 0, throttle: 0, braking: true }, 1 / 60, random).state
-  expect(required(travelled.vehicles[0]).recoveryAnchorIndex).toBeUndefined()
+  expect(requireFixture(travelled.vehicles[0]).recoveryAnchorIndex).toBeUndefined()
 })
 
 
 it('recovers at the last supported road position rather than the latest authored marker', () => {
   const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-  const contact = required(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
+  const contact = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
   const player = {
-    ...required(race.vehicles[0]),
+    ...requireFixture(race.vehicles[0]),
     x: 440, y: 100, pathIndex: contact, lastRoadContactIndex: contact,
     recoveryCheckpoint: 0, nextSector: 2 as const, lap: 1,
   }
@@ -289,7 +285,7 @@ it('never uses road contact across an unpassed timing gate', () => {
   const beforeGate = Math.floor(count / 8)
   const beyondGate = Math.floor(count / 2)
   const player = {
-    ...required(race.vehicles[0]), pathIndex: beforeGate,
+    ...requireFixture(race.vehicles[0]), pathIndex: beforeGate,
     lastRoadContactIndex: beyondGate, nextSector: 1 as const,
   }
   const recovered = resetRaceVehicle(player, race)
@@ -301,7 +297,7 @@ it('uses an authored marker only when the most recent road contact is unavailabl
   const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
   const marker = Math.floor(closeArmsPath.points.length / 8)
   const player = {
-    ...required(race.vehicles[0]),
+    ...requireFixture(race.vehicles[0]),
     pathIndex: marker + 16, lastRoadContactIndex: undefined,
     recoveryCheckpoint: marker, nextSector: 2 as const,
   }

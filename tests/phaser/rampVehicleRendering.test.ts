@@ -1,3 +1,4 @@
+import { requireFixture } from '../fixtures/requireFixture'
 import { describe, expect, it, vi } from 'vitest'
 import { CAR_IDS, asTrackId, type Track, type Vector2 } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
@@ -79,11 +80,6 @@ class Graphics {
 	}
 }
 
-function required<T>(value: T | undefined): T {
-	if (value === undefined) throw new Error('Missing fixture')
-	return value
-}
-
 describe('ramp vehicle rendering', () => {
   it('draws both ramp entrances below ground-level cars and leaves the deck above them', () => {
     const geometry = buildTrackGeometry(track)
@@ -91,7 +87,7 @@ describe('ramp vehicle rendering', () => {
       (primitive): primitive is BridgePolygonPrimitive => primitive.kind === 'edge',
     )
     const approaches = decks.filter(({ deckHeights }) => Math.max(...deckHeights) <= 2)
-    const deck = required(decks.find(({ deckHeights }) => Math.min(...deckHeights) === 24))
+    const deck = requireFixture(decks.find(({ deckHeights }) => Math.min(...deckHeights) === 24))
     expect(approaches.length).toBeGreaterThan(2)
 
     function recordFills() {
@@ -130,17 +126,17 @@ describe('ramp vehicle rendering', () => {
       path.roadSurface.at(i, point).structureHeight > 16 &&
       path.roadSurface.at(i, point).structureHeight < 24)
     expect(index).toBeGreaterThan(0)
-    const point = required(path.points[index])
+    const point = requireFixture(path.points[index])
     const surface = path.roadSurface.at(index, point)
     const car = {
-      ...required(race.vehicles[0]),
+      ...requireFixture(race.vehicles[0]),
       x: point.x,
       y: point.y,
       z: surface.height - 1,
       pathIndex: index,
       structureRunId: surface.structureRunId,
     }
-    const pose = required(captureRaceSnapshot({ ...race, vehicles: [car] }).vehicles[0])
+    const pose = requireFixture(captureRaceSnapshot({ ...race, vehicles: [car] }).vehicles[0])
     expect(isVehicleAboveStructures(pose, path)).toBe(true)
     expect(isVehicleAboveStructures({
       ...pose, z: 0, structureRunId: null,
@@ -200,7 +196,7 @@ describe('ramp vehicle rendering', () => {
 					})),
 				}
 				expect(
-					getVehicleStepContext(path, required(current.vehicles[0])).onRoad,
+					getVehicleStepContext(path, requireFixture(current.vehicles[0])).onRoad,
 				).toBe(true)
 				RaceScene.prototype.update.call(scene as never, 0, 16)
 				expect(
@@ -226,7 +222,7 @@ describe('ramp vehicle rendering', () => {
       path.roadSurface.at(i).structureHeight > 23.99 &&
       path.roadSurface.at(i + 1).structureHeight > 23.99)
     expect(index).toBeGreaterThan(0)
-    const point = required(path.points[index])
+    const point = requireFixture(path.points[index])
     const surface = path.roadSurface.at(index)
     const upper = new Graphics()
     const lower = new Graphics()
@@ -272,15 +268,15 @@ describe('ramp vehicle rendering', () => {
 		const index = path.points.findIndex(
 			(_, i) => path.roadSurface.at(i).structureHeight === 24 && path.roadSurface.at(i + 1).structureHeight === 24,
 		)
-		const point = required(path.points[index])
+		const point = requireFixture(path.points[index])
 		const upper = new Graphics()
 		const lower = new Graphics()
 		let state = {
 			...base,
 			vehicles: [
 				{
-					...required(base.vehicles[0]),
-					x: (point.x + required(path.points[index + 1]).x) / 2,
+					...requireFixture(base.vehicles[0]),
+					x: (point.x + requireFixture(path.points[index + 1]).x) / 2,
 					y: point.y,
 					pathIndex: index,
 					z: 0,
@@ -310,7 +306,7 @@ describe('ramp vehicle rendering', () => {
 		expect(upper.strokes).toBeGreaterThan(0)
 		expect(upper.shadows).toHaveLength(0)
 
-		const covered = required(state.vehicles[0])
+		const covered = requireFixture(state.vehicles[0])
 		state = { ...state, vehicles: [{ ...covered, player: false }] }
 		RaceScene.prototype.update.call(scene as never, 0, 16)
 		expect(lower.bodies).toHaveLength(1)
