@@ -209,6 +209,32 @@ export function nearestControlPoint(
   return nearest
 }
 
+/** Pick the nearest authored checkpoint within a constant screen-space hit target. */
+export function nearestCheckpointMarker(
+  samples: readonly Vector2[],
+  closed: boolean,
+  ratios: readonly number[],
+  target: Vector2,
+  zoom: number,
+): number | undefined {
+  if (samples.length < 2) return undefined
+  const sampleCount = closed ? samples.length : samples.length - 1
+  const radius = 16 / Math.max(0.01, zoom)
+  let nearest: number | undefined
+  let best = radius
+  for (const ratio of ratios) {
+    if (!Number.isFinite(ratio) || ratio < 0 || ratio >= 1) continue
+    const point = samples[Math.min(samples.length - 1, Math.round(ratio * sampleCount))]
+    if (!point) continue
+    const candidate = distance(point, target)
+    if (candidate <= radius && (nearest === undefined || candidate < best)) {
+      nearest = ratio
+      best = candidate
+    }
+  }
+  return nearest
+}
+
 export function nearestTree(
   trees: readonly Tree[],
   target: Vector2,
