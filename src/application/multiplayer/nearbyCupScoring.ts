@@ -5,7 +5,8 @@ export interface NearbyCupFinish {
   readonly left: boolean
 }
 
-const CUP_POINTS = [10, 8, 6, 5, 4, 3, 2, 1] as const
+const CUP_POINTS_FOUR = [10, 6, 4, 2] as const
+const CUP_POINTS_EIGHT = [16, 12, 10, 8, 6, 4, 2, 1] as const
 
 /** Pure scoring step; null means at least one peer has not finished or left. */
 export function awardNearbyCupRound(
@@ -14,9 +15,11 @@ export function awardNearbyCupRound(
 ): Map<number, number> | null {
   if (!standings.length || standings.some(racer => racer.time === undefined && !racer.left)) return null
   const totals = new Map(accumulated)
+  // Preserve existing four-player Cups; eight-racer Cups reward every finisher.
+  const points = standings.length <= 4 ? CUP_POINTS_FOUR : CUP_POINTS_EIGHT
   for (const [index, racer] of standings.entries()) {
     if (typeof racer.time !== 'number') continue
-    totals.set(racer.slot, (totals.get(racer.slot) ?? 0) + (CUP_POINTS[index] ?? 0))
+    totals.set(racer.slot, (totals.get(racer.slot) ?? 0) + (points[index] ?? 0))
   }
   return totals
 }
