@@ -75,9 +75,13 @@ for (const reversed of [false, true]) {
         return race?.phase === 'running' &&
           (reversed ? race.player.x < threshold : race.player.x > threshold)
       }, { timeout: 20_000 }).toBe(true)
+      const before = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
       const image = await page.locator('#game-container canvas').screenshot({ scale: 'css' })
       await testInfo.attach(`${stage}.png`, { body: image, contentType: 'image/png' })
-      expect(await blueBodyPixels(page, image), `${stage}: the blue car body must be rendered`)
+      const pixels = await blueBodyPixels(page, image)
+      const after = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
+      console.log(JSON.stringify({ rampProbe: stage, reversed, pixels, before, after }))
+      expect(pixels, `${stage}: the blue car body must be rendered`)
         .toBeGreaterThan(100)
     }
     expect(await page.evaluate(() => window.__rampAirborneFrames)).toBe(0)
