@@ -307,10 +307,10 @@ function advanceRace(
       safeAboveWater: context.safeAboveWater,
     })
     const previous = state.vehicles[index]
-    const sceneryHit = usesCheckpoints && previous && state.sceneryColliders &&
+    const sceneryHit = vehicle.player && previous && state.sceneryColliders &&
       !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
       hitScenery(state.sceneryColliders, previous, vehicle)
-    if (usesCheckpoints && ((waterContact && !vehicle.waterRecoveryProtected) || vehicle.wrecked || sceneryHit)) {
+    if ((usesCheckpoints && ((waterContact && !vehicle.waterRecoveryProtected) || vehicle.wrecked)) || sceneryHit) {
       const candidate = previous
         ? restoreFrameProgress({ ...vehicle, pathIndex: previous.pathIndex }, previous)
         : vehicle
