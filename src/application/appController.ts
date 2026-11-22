@@ -524,12 +524,15 @@ export class AppController {
         break
       case 'rename-track':
         if (this.state.currentTrack) {
-          const result = this.library.rename(this.state.currentTrack.id, command.name)
+          const result = this.state.mode === 'editor'
+            ? this.library.renameDraft(this.state.currentTrack, command.name)
+            : this.library.rename(this.state.currentTrack.id, command.name)
           if (!result.ok) {
             this.update({ ...this.state, notice: result.message })
           } else {
-            // Renaming commits only the name, never the unsaved geometry.
-            const track = { ...this.state.currentTrack, name: result.track.name }
+            const track = this.state.mode === 'editor'
+              ? { ...result.track, updatedAt: this.now() }
+              : result.track
             this.update({
               ...this.state,
               currentTrack: track,
