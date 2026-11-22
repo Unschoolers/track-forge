@@ -136,7 +136,7 @@ describe('Nearby Arcade', () => {
     const host = devices[0]!
     const starts = new Map<number, NearbyStart>()
     const car = ['blue', 'red', 'green', 'yellow'] as const
-    devices.forEach((device, index) => device.onStart(start => { starts.set(index, start) }))
+    devices.forEach((device, index) => { device.onStart(start => { starts.set(index, start) }) })
     try {
       host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
@@ -166,7 +166,7 @@ describe('Nearby Arcade', () => {
         return [player.x, player.y].map(v => v.toFixed(2)).join(',')
       })
       expect(new Set(locations).size).toBe(8)
-      devices.forEach(device => device.sceneReady())
+      devices.forEach(device => { device.sceneReady() })
       await vi.waitFor(() => expect(devices.every(device => device.snapshot().phase === 'racing')).toBe(true), { interval: 5 })
       const posePackets = devices.map((_, index) => {
         const stage = createRace({
@@ -185,7 +185,7 @@ describe('Nearby Arcade', () => {
         expect(decodePoseBatch(broadcasts[0]!.bytes)).toHaveLength(8)
       }, { interval: 5 })
     } finally {
-      devices.forEach(device => device.destroy())
+      devices.forEach(device => { device.destroy() })
     }
   })
 
@@ -524,7 +524,7 @@ describe('Nearby track sharing and rematches', () => {
       }
     } finally {
       host.destroy()
-      guests.forEach(guest => guest.destroy())
+      guests.forEach(guest => { guest.destroy() })
     }
   })
 
