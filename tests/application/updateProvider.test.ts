@@ -66,11 +66,11 @@ Commit: abc123`)).toEqual(['Fix checkpoints missed at an angle', 'Improve tire g
 
   it('collects and sorts all published changes newer than the installed build', async () => {
     const releases = [
-      { tag_name: 'android-build-535-1', published_at: '2026-11-21T10:00:00Z', body: "## What's Changed\\n* New race camera" },
+      { tag_name: 'android-build-535-1', published_at: '2026-11-21T10:00:00Z', body: "## What's Changed\n* New race camera" },
       { tag_name: 'android-build-533-2', body: 'TrackForge 2.0.533.2 (build details only)' },
-      { tag_name: 'android-build-534-1', body: "## What's Changed\\n* Better braking\\n* Better steering" },
-      { tag_name: 'android-build-533-1', body: "## What's Changed\\n* Already installed" },
-      { tag_name: 'android-build-532-1', body: "## What's Changed\\n* Too old" },
+      { tag_name: 'android-build-534-1', body: "## What's Changed\n* Better braking\n* Better steering" },
+      { tag_name: 'android-build-533-1', body: "## What's Changed\n* Already installed" },
+      { tag_name: 'android-build-532-1', body: "## What's Changed\n* Too old" },
       { tag_name: 'v2.0', body: 'Other releases' },
     ]
     const request = vi.fn(async () => new Response(JSON.stringify(releases), { status: 200 }))
