@@ -51,16 +51,20 @@ export class NearbyProgressSync {
   private dispatch(slot: number, packet: Uint8Array, recipients: string[], onSent?: () => void): void {
     const active = this.generation
     this.inFlight.add(slot)
-    void this.send(recipients, packet)
-      .then(() => {
-        if (active === this.generation) onSent?.()
-      })
-      .catch(() => {
-        if (active === this.generation) this.sendFailures++
-      })
-      .finally(() => {
-        if (active === this.generation) this.inFlight.delete(slot)
-      })
+    // Settle ordering and in-flight state together. A separate catch/finally
+    // chain leaves an already delivered slot blocked for extra microtasks.
+    void this.send(recipients, packet).then(
+      () => {
+        if (active !== this.generation) return
+        this.inFlight.delete(slot)
+        onSent?.()
+      },
+      () => {
+        if (active !== this.generation) return
+        this.sendFailures++
+        this.inFlight.delete(slot)
+      },
+    )
   }
 
   receive(packet: ProgressPacket): boolean {
