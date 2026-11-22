@@ -12,6 +12,7 @@ import {
 } from '@/domain/track/trackEnvironment'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
 import { buildSceneryPresentation } from '@/presentation/environments/sceneryPresentation'
 import { renderTerrainPrimitives } from '@/phaser/rendering/terrainRenderer'
 import { getEnvironmentTileImage } from '@/presentation/environments/environmentTileImage'
@@ -63,6 +64,40 @@ describe("Kids' Room environment", () => {
       expect(roadColorsForEnvironment(surface, 'kids-room').road).not.toBe(SURFACE_SPECS[surface].road)
       expect(roadColorsForEnvironment(surface, 'kids-room').nightRoad).not.toBe(SURFACE_SPECS[surface].nightRoad)
     }
+  })
+
+  it('renders a recognizable royal-blue carpet and blue carpet folds in both lighting modes', () => {
+    const day = getTrackEnvironment('kids-room').day
+    const night = getTrackEnvironment('kids-room').night
+    expect(day.raceGround).toBe('#2651b1')
+    expect(day.editorGround).toBe(day.flyoverGround)
+    expect(night.raceGround).toBe('#122858')
+    expect(day.hillPlateau).toBe(0x426ac1)
+    const fibers = getTrackEnvironment('kids-room').groundArt(2, false)
+    expect(fibers.length).toBeGreaterThan(1000)
+    expect(fibers).toEqual(getTrackEnvironment('kids-room').groundArt(2, false))
+    expect(getTrackEnvironment('kids-room').groundArt(2, true)).not.toEqual(fibers)
+  })
+
+  it('has distance-anchored toy-mat stitches, cardboard grain and plastic reflections', () => {
+    const from = { x: 0, y: 0, distance: 0 }
+    const to = { x: 220, y: 0, distance: 220 }
+    const mat = kidsRoomRoadStrokes('street', from, to, false)
+    const cardboard = kidsRoomRoadStrokes('dirt', from, to, false)
+    const plastic = kidsRoomRoadStrokes('ice', from, to, false)
+    expect(mat.length).toBeGreaterThan(0)
+    expect(cardboard.length).toBeGreaterThan(mat.length)
+    expect(plastic.length).toBeGreaterThan(0)
+    expect(mat).not.toEqual(cardboard)
+    expect(cardboard).not.toEqual(plastic)
+    expect(kidsRoomRoadStrokes('ice', from, to, true)).not.toEqual(plastic)
+    // Chunk boundaries may bisect a segment; artwork must not shift or duplicate.
+    const firstHalf = { x: 110, y: 0, distance: 110 }
+    expect([
+      ...kidsRoomRoadStrokes('ice', from, firstHalf, false),
+      ...kidsRoomRoadStrokes('ice', firstHalf, to, false),
+    ]).toEqual(plastic)
+    expect(kidsRoomRoadStrokes('ice', to, from, false)).toEqual([])
   })
 
   it('bakes stable carpet fibers once per tile variant and lighting', () => {

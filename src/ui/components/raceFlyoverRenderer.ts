@@ -1,5 +1,6 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
+import { kidsRoomRoadStrokes } from '@/presentation/environments/kidsRoomRoadStrokes'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -248,6 +249,23 @@ export function createRaceFlyoverRenderer(
         ctx.strokeStyle = edge && section.a.structure === 'overpass' ? (night ? '#aab4b2' : '#f3e9d3') : edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
         ctx.stroke()
       }
+    }
+    // The flyover and Phaser road use identical distance-anchored material
+    // strokes, so textures never switch character between preview and race.
+    if (environmentId === 'kids-room') {
+      for (const section of sections) {
+        if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
+        for (const stroke of kidsRoomRoadStrokes(section.a.surface, section.a, section.b, night)) {
+          ctx.lineWidth = stroke.width
+          ctx.strokeStyle = `#${stroke.color.toString(16).padStart(6, '0')}`
+          ctx.globalAlpha = stroke.alpha
+          ctx.beginPath()
+          ctx.moveTo(stroke.start.x, stroke.start.y)
+          ctx.lineTo(stroke.end.x, stroke.end.y)
+          ctx.stroke()
+        }
+      }
+      ctx.globalAlpha = 1
     }
     // Road markings and warm pools make the direction and night scene readable at small sizes.
     ctx.setLineDash([20, 26])
