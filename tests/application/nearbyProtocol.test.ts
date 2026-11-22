@@ -31,7 +31,7 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(received?.points).toEqual(scenicTrack.points)
   })
 
-  it('round-trips and validates four-player batches without duplicate or malformed slots', () => {
+  it('round-trips and validates eight-player batches without duplicate or malformed slots', () => {
     expect(POSE_PERIOD_MS).toBeCloseTo(1000 / 30)
     expect(POSE_FAST_PERIOD_MS).toBeCloseTo(1000 / 60)
     const blue = encodePose(0, 1, 0, makeCar('blue', 12))
@@ -47,7 +47,10 @@ describe('Nearby wire and track transfer contracts', () => {
     const duplicate = new Uint8Array(batch)
     duplicate.set(blue, 1 + POSE_BYTES)
     expect(decodePoseBatch(duplicate)).toBeNull()
-    expect(decodePoseBatch(new Uint8Array(1 + 5 * POSE_BYTES).fill(Packet.PoseBatch))).toBeNull()
+    expect(decodePoseBatch(new Uint8Array(1 + 9 * POSE_BYTES).fill(Packet.PoseBatch))).toBeNull()
+    const eight = Array.from({ length: 8 }, (_, slot) => encodePose(slot, slot + 1, 0, makeCar('blue', slot * 40)))
+    expect(decodePoseBatch(encodePoseBatch(eight))?.map(packet => packet.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+    expect(() => encodePoseBatch([...eight, blue])).toThrow(RangeError)
   })
 
   it('interpolates at 30-60 Hz and briefly predicts movement without crossing recoveries', () => {
@@ -93,7 +96,7 @@ describe('Nearby wire and track transfer contracts', () => {
   })
   it.each([
     ['negative slot', -1, 1, 0],
-    ['fifth player slot', 4, 1, 0],
+    ['ninth player slot', 8, 1, 0],
     ['fractional slot', 0.5, 1, 0],
     ['negative sequence', 0, -1, 0],
     ['overflow sequence', 0, 65_536, 0],

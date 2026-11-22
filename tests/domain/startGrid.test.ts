@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { createRace } from '@/domain/race/raceFactory'
-import { gridPositionsForPlayer, randomGridPositions, validGridPositions } from '@/domain/race/startGrid'
+import { gridPositionsForPlayer, randomGridPositions, validGridPositions, validNearbyGridPositions } from '@/domain/race/startGrid'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -17,12 +17,15 @@ describe('starting grids', () => {
     expect(randomGridPositions(4, () => 0.999)).toEqual([0, 1, 2, 3])
     expect(randomGridPositions(2, () => 0)).toEqual([1, 0])
     expect(() => randomGridPositions(0)).toThrow(RangeError)
-    expect(() => randomGridPositions(5)).toThrow(RangeError)
+    expect(() => randomGridPositions(9)).toThrow(RangeError)
+    expect(randomGridPositions(8, () => 0.999)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
     expect(() => randomGridPositions(4, () => 1)).toThrow(RangeError)
     expect(validGridPositions([3, 1, 0, 2])).toBe(true)
     expect(validGridPositions([0, 0, 1, 2])).toBe(false)
     expect(validGridPositions([0, 1, 2, 9])).toBe(false)
     expect(validGridPositions([0, 1, 2])).toBe(false)
+    expect(validNearbyGridPositions([7, 0, 1, 2])).toBe(true)
+    expect(validNearbyGridPositions([8, 0, 1, 2])).toBe(false)
   })
 
   it('keeps player/rival IDs and cars stable while moving each to a distinct physical pad', () => {
@@ -53,6 +56,18 @@ describe('starting grids', () => {
       expect(spots[pad]?.x).toBeCloseTo(reference.vehicles[pad]!.x)
       expect(spots[pad]?.y).toBeCloseTo(reference.vehicles[pad]!.y)
     }
+  })
+
+  it('places eight Nearby racers at distinct physical pads without adding solo AI cars', () => {
+    const points = Array.from({ length: 8 }, (_, slot) => {
+      const positions = gridPositionsForPlayer(slot)
+      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, gridPositions: positions })
+      expect(race.vehicles).toHaveLength(4)
+      const player = race.vehicles[0]
+      expect(player).toBeDefined()
+      return `${player!.x.toFixed(2)},${player!.y.toFixed(2)}`
+    })
+    expect(new Set(points).size).toBe(8)
   })
 
   it('reverses championship standings, but randomizes the first track', () => {

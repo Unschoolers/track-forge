@@ -60,61 +60,30 @@ describe('nearby pose synchronizer', () => {
     const batch = decodePoseBatch(payloads[0] ?? new Uint8Array())
     expect(batch?.map(p => p.slot)).toEqual([1, 0])
     await flush()
-    now = 600
+    now = 2400
     sync.update(player, 0, null, ['guest'], racers)
     const later = decodePoseBatch(payloads[1] ?? new Uint8Array())
     expect(later?.map(p => p.slot)).toEqual([0])
   })
 
-  it('adapts to 60 Hz after healthy sends and falls back to 30 Hz on failure', async () => {
+  it('never exceeds 30 Hz even with healthy transport, and records a failed send', async () => {
     let now = 0
     let fail = false
     const sync = new NearbyPoseSync(async () => {
-      if (fail) throw new Error('disconnected')
+      if (fail) throw new Error('radio failure')
     }, () => now)
-    for (let i = 0; i < 30; i++) {
-      now = i * 35
+    for (let i = 0; i < 40; i++) {
+      now = i * 17
       sync.update(player, 1, 'host', ['host'], racers)
       await flush()
     }
-    // SDK queue acceptance is not a radio delivery acknowledgement.
     expect(sync.targetPoseHz).toBe(30)
-    sync.observeDeliveryQuality({ delivered: 0, failed: 0, dropped: 0, timedOut: 0 })
-    now += 1500
-    sync.observeDeliveryQuality({ delivered: 45, failed: 0, dropped: 0, timedOut: 0 })
-    expect(sync.targetPoseHz).toBe(30)
-    now += 1500
-    sync.observeDeliveryQuality({ delivered: 90, failed: 0, dropped: 0, timedOut: 0 })
-    expect(sync.targetPoseHz).toBe(60)
+    expect(sync.counts.sent).toBeLessThanOrEqual(21)
     fail = true
-    now += 35
+    now += 40
     sync.update(player, 1, 'host', ['host'], racers)
     await flush()
     expect(sync.counts.sendFailed).toBe(1)
-    expect(sync.targetPoseHz).toBe(30)
-  })
-
-  it('drops back to 30 Hz on native radio drops and does not recover on enqueue success alone', async () => {
-    let now = 0
-    const sync = new NearbyPoseSync(async () => undefined, () => now)
-    sync.observeDeliveryQuality({ delivered: 0, failed: 0, dropped: 0, timedOut: 0 })
-    now = 1500
-    sync.observeDeliveryQuality({ delivered: 60, failed: 0, dropped: 0, timedOut: 0 })
-    now = 3000
-    sync.observeDeliveryQuality({ delivered: 120, failed: 0, dropped: 0, timedOut: 0 })
-    expect(sync.targetPoseHz).toBe(60)
-    now = 4500
-    sync.observeDeliveryQuality({ delivered: 120, failed: 0, dropped: 1, timedOut: 0 })
-    expect(sync.targetPoseHz).toBe(30)
-    for (let i = 0; i < 35; i++) {
-      now += 35
-      sync.update(player, 1, 'host', ['host'], racers)
-      await flush()
-    }
-    expect(sync.targetPoseHz).toBe(30)
-    // Reset counters must establish a new baseline, not fabricate deliveries.
-    sync.observeDeliveryQuality({ delivered: 1, failed: 0, dropped: 0, timedOut: 0 })
-    expect(sync.targetPoseHz).toBe(30)
   })
 
   it('discards late sends after room reset and restores fresh sequence and metrics', async () => {

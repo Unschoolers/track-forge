@@ -27,7 +27,7 @@ export function createNearbyRaceModal(
   const { phase, purpose, room, track, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const cup = nearby.snapshot().cup
   const frame = createModalFrame(cup ? 'Nearby Cup' : 'Nearby Race',
-    room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : 'Arcade · Up to ${MAX_PLAYERS} players'),
+    room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
     actions.close, 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
