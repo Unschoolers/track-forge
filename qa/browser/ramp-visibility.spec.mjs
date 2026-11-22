@@ -70,15 +70,25 @@ for (const reversed of [false, true]) {
       ['deck-entry', reversed ? 1350 : 250],
       ['deck-travel', reversed ? 950 : 650],
     ]) {
-      await expect.poll(async () => {
-        const race = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
-        return race?.phase === 'running' &&
-          (reversed ? race.player.x < threshold : race.player.x > threshold)
-      }, { timeout: 20_000 }).toBe(true)
+      // A screenshot can take over a second under SwiftShader. Freeze physics
+      // at the intended ramp stage rather than capturing a moving later frame.
+      await expect.poll(() => page.evaluate(({ threshold, reversed }) => {
+        const qa = window.__trackForgeQa
+        const race = qa.snapshot().race
+        if (race?.phase !== 'running' ||
+            !(reversed ? race.player.x < threshold : race.player.x > threshold)) return false
+        qa.pauseRace()
+        return true
+      }, { threshold, reversed }), { timeout: 20_000, intervals: [30, 40, 50] }).toBe(true)
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const before = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
       const image = await page.locator('#game-container canvas').screenshot({ scale: 'css' })
       await testInfo.attach(`${stage}.png`, { body: image, contentType: 'image/png' })
-      expect(await blueBodyPixels(page, image), `${stage}: the blue car body must be rendered`)
+      const after = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
+      expect(after.player.x).toBeCloseTo(before.player.x, 5)
+      expect(await blueBodyPixels(page, image), `${stage}: visible blue body at ${JSON.stringify(before.player)}`)
         .toBeGreaterThan(100)
+      await page.evaluate(() => window.__trackForgeQa.resumeRace())
     }
     expect(await page.evaluate(() => window.__rampAirborneFrames)).toBe(0)
     expect(errors).toEqual([])

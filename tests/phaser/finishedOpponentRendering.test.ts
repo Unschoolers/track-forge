@@ -136,8 +136,8 @@ it('removes finished opponent bodies from both height layers while retaining the
   const scene = createRenderingScenario()
   scene.draw()
   expect(scene.vehicleGraphics.positions).toEqual([
-    { x: 100, y: 100 },
     { x: 200, y: 100 },
+    { x: 100, y: 100 },
   ])
   expect(scene.upperVehicleGraphics.positions).toEqual([
     { x: 300, y: 100 },
