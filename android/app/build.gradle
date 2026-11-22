@@ -21,6 +21,9 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
     signingConfigs {
         debug {
             if (suppliedSigningStore) {
