@@ -1,4 +1,6 @@
 import type Phaser from 'phaser'
+import { LampSpacingIndex } from '@/phaser/rendering/lampSpacingIndex'
+export { LampSpacingIndex }
 import type { Vector2 } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
@@ -73,6 +75,7 @@ export function* prepareLampPosts(
   if (path.totalLength <= 0 || ribbon.length === 0) return []
 
   const posts: LampPost[] = []
+  const spacingIndex = new LampSpacingIndex()
   const offset = ROAD_GEOMETRY.edgeWidth / 2 + 11
   let nextDistance = 0
   let nextSide: -1 | 1 = -1
@@ -112,11 +115,7 @@ export function* prepareLampPosts(
       x: sample.center.x + sample.normal.x * offset * side,
       y: sample.center.y + sample.normal.y * offset * side,
     }
-    if (
-      posts.some((post) => pointDistance(position, post.position) < 54)
-    ) {
-      continue
-    }
+    if (!spacingIndex.tryAdd(position)) continue
     const height = 18
     const localRoad = path.roadSurface.at(index, position)
     const shadow = shadowMode === 'local-ground'
