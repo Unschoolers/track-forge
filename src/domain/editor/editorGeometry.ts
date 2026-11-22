@@ -283,12 +283,14 @@ export function planPointInsertion(
 ): { readonly index: number; readonly point: TrackPoint } | null {
   const start = points[segmentIndex]
   const end = points[segmentIndex + 1]
-  if (!start || !end) return null
+  if (!start || !end || ![target.x, target.y, start.x, start.y, end.x, end.y].every(Number.isFinite)) return null
   const dx = end.x - start.x
   const dy = end.y - start.y
   const lengthSquared = dx * dx + dy * dy
   if (!Number.isFinite(lengthSquared) || lengthSquared <= 1) return null
   const projection = ((target.x - start.x) * dx + (target.y - start.y) * dy) / lengthSquared
+  // Finite input coordinates can still overflow during subtraction or dot products.
+  if (!Number.isFinite(projection)) return null
   // Keep inserted handles away from existing endpoints.
   const ratio = Math.max(0.1, Math.min(0.9, projection))
   return {
