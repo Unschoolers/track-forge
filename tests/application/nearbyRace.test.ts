@@ -2,6 +2,7 @@
 import { assert, describe, expect, it, vi } from 'vitest'
 import { NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import { decodePoseBatch, Packet, POSE_BYTES } from '@/application/multiplayer/raceWire'
+import { decodeControl, encodeControl } from '@/application/multiplayer/controlProtocol'
 import { RaceSession } from '@/application/race/raceSession'
 import { createRace } from '@/domain/race/raceFactory'
 import { gridPositionsForPlayer } from '@/domain/race/startGrid'
@@ -13,6 +14,8 @@ class NearbyNetwork {
   private readonly listeners = new Map<string, (event: NearbyEvent) => void>()
   private readonly pairs = new Map<string, Set<string>>()
   private readonly connections = new Map<string, Set<string>>()
+
+  constructor(private readonly rewritePacket?: (sender: string, recipient: string, bytes: Uint8Array) => Uint8Array) {}
 
   endpoint(id: string): NearbyTransport {
     return {
@@ -52,7 +55,8 @@ class NearbyNetwork {
         this.packets.push({ from: id, to: [...ids], bytes })
         for (const remote of ids) {
           if (!this.connections.get(id)?.has(remote)) throw new Error('Unknown connection')
-          this.emit(remote, { type: 'packet', id, bytes: new Uint8Array(bytes) })
+          const delivered = this.rewritePacket?.(id, remote, bytes) ?? bytes
+          this.emit(remote, { type: 'packet', id, bytes: new Uint8Array(delivered) })
         }
       },
       stop: async () => {
@@ -247,6 +251,47 @@ describe('Nearby Arcade', () => {
       for (const device of devices) device.destroy()
     }
   })
+
+  it.each(['host', 'guest'] as const)(
+    'rejects a legacy %s before starting a race with an actionable update message',
+    async legacy => {
+      // An older APK parses unknown JSON keys but omits protocolVersion from
+      // its own control messages. Strip just that field at its send boundary.
+      const network = new NearbyNetwork((sender, _recipient, bytes) => {
+        if (sender !== legacy) return bytes
+        const control = decodeControl(bytes)
+        if (!control || (control.type !== 'prepare' && control.type !== 'ready')) return bytes
+        const packet = { ...control }
+        delete packet.protocolVersion
+        return encodeControl(packet)
+      })
+      const host = new NearbyRace(network.endpoint('host'), () => true)
+      const guest = new NearbyRace(network.endpoint('guest'), () => true)
+      const startHost = vi.fn()
+      const startGuest = vi.fn()
+      host.onStart(startHost)
+      guest.onStart(startGuest)
+      try {
+        host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+        await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+        guest.scan('red')
+        await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        guest.connect('host')
+        await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
+        host.start()
+        const rejectingDevice = legacy === 'host' ? guest : host
+        await vi.waitFor(() => {
+          expect(rejectingDevice.snapshot().phase).toBe('idle')
+          expect(rejectingDevice.snapshot().error).toContain('Update Track Forge')
+        }, { interval: 5 })
+        expect(startHost).not.toHaveBeenCalled()
+        expect(startGuest).not.toHaveBeenCalled()
+      } finally {
+        host.destroy()
+        guest.destroy()
+      }
+    },
+  )
 
   it.each([2, 3])('assigns distinct contiguous start pads with %i nearby players', async (count) => {
     const network = new NearbyNetwork()
