@@ -19,6 +19,13 @@ describe('track score lookup', () => {
     expect(result[local.id]).toEqual([open])
   })
 
+  it('keeps reserved-looking track IDs as ordinary own keys', () => {
+    const special = createStarterTrack(asTrackId('__proto__'), 1)
+    const result = collectTrackScores([special], [], { forTrack: () => [circuit] })
+    expect(Object.hasOwn(result, '__proto__')).toBe(true)
+    expect(result['__proto__']).toEqual([circuit])
+  })
+
   it('does not read scores for absent tracks and keeps legacy circuit scores', () => {
     const forTrack = vi.fn(() => [circuit, { time: 18, car: 'blue' as const, difficulty: 'normal' as const, recordedAt: 2 }])
     expect(collectTrackScores([], [], { forTrack })).toEqual({})
