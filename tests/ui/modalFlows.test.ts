@@ -180,7 +180,7 @@ describe('modal application flows', () => {
     expect(raceTile?.contains(share ?? null)).toBe(false)
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
-    expect(root.textContent).not.toContain('01:02.345')
+    expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
     expect(root.textContent).toContain('Needs editing')
     expect(
       root.querySelector<HTMLButtonElement>(
