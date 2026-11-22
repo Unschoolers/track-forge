@@ -15,9 +15,9 @@ import {
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
+import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
-const ARCADE_CORNER_MARGIN = { easy: 0.16, normal: 0.10, hard: 0 } as const
 const HARD_LOOKAHEAD_SAMPLES = 4
 const SIDESLIP_CORRECTION_GAIN = 0.65
 const SIDESLIP_MIN_SPEED = 20
@@ -80,7 +80,7 @@ export function stepAiVehicle(
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
   // and driver mistakes still use the selected difficulty.
-  const drivingDifficulty = handling === 'arcade' || vehicle.racingLine ? 'hard' : difficulty
+  const drivingDifficulty = aiSteeringDifficulty(difficulty, handling, Boolean(vehicle.racingLine))
   const tuning = DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
@@ -215,7 +215,7 @@ export function stepAiVehicle(
   ) * cornerPace
   const practicedSpeedRatio = vehicle.racingLine?.speedRatio ?? 1
   let curveSpeed = practicedSpeedRatio < 1 ? Math.min(cornerTarget, car.max) * practicedSpeedRatio : cornerTarget
-  const cornerMargin = arcade && !vehicle.racingLine ? ARCADE_CORNER_MARGIN[difficulty] : 0
+  const cornerMargin = arcade && !vehicle.racingLine ? arcadeCornerMargin(difficulty) : 0
   if (cornerMargin > 0 && context.surface !== 'grass') {
     // Add grip reserve as a bend approaches while allowing full speed on straights.
     const bendWeight = clamp((bend - 0.02) / 0.18, 0, 1)
