@@ -116,10 +116,19 @@ export function createRaceHud(
   checkpointTimer.setAttribute('aria-hidden', 'true')
   const checkpointAnnouncement = element('span', 'visually-hidden')
   checkpointAnnouncement.setAttribute('aria-live', 'polite')
-  const resetNow = button('RESET NOW', 'reset-checkpoint', () => {
-    const current = raceSession.snapshot().state
-    if (current?.missedCheckpoint) recoverPlayer()
-  }, 'button checkpoint-reset')
+  const recoverMissedGate = (): void => {
+    if (raceSession.snapshot().state?.missedCheckpoint) recoverPlayer()
+  }
+  const resetNow = button('RESET NOW', 'reset-checkpoint', recoverMissedGate, 'button checkpoint-reset')
+  // Mobile input can cancel the synthesized click when a second racing finger
+  // holds steering/brake. Recover on the touch down itself; retain click for
+  // mouse, keyboard and assistive technology. The guard prevents a second reset.
+  resetNow.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return
+    event.preventDefault()
+    event.stopPropagation()
+    recoverMissedGate()
+  })
   checkpointWarning.append(checkpointMessage, checkpointTimer, resetNow)
   const pedals = element('div', 'race-pedals')
   pedals.append(recover, brake, throttle)
