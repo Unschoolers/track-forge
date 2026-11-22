@@ -42,7 +42,15 @@
   letter-spacing: .08em;
 }
 .editor-screen :is(.start-control-help, .diagnostic-message) { color: var(--editor-menu-muted); }
-.editor-screen .point-tension-label input { accent-color: var(--editor-menu-accent); }
+/* The canvas remains pointer-transparent except where an editor panel needs input. */
+.editor-screen .point-control { pointer-events: auto; }
+.editor-screen .point-tension-label input {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  accent-color: var(--editor-menu-accent);
+  touch-action: none;
+}
 .editor-screen .status-pill {
   border: 1px solid #53616c;
   border-radius: 0;
