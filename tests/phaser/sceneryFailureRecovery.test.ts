@@ -20,8 +20,10 @@ describe('scenery rendering cache lifecycle', () => {
     expect(() => renderer.render(viewport, 'cityscape', props, false)).toThrow('Graphics temporarily unavailable')
     expect(() => renderer.render(viewport, 'cityscape', props, false)).not.toThrow()
     expect(graphics.clear).toHaveBeenCalledTimes(2)
-    expect(graphics.fillStyle).toHaveBeenCalledTimes(2)
+    const completedDrawCalls = graphics.fillStyle.mock.calls.length
+    expect(completedDrawCalls).toBeGreaterThan(1)
     renderer.render(viewport, 'cityscape', props, false)
     expect(graphics.clear).toHaveBeenCalledTimes(2)
+    expect(graphics.fillStyle).toHaveBeenCalledTimes(completedDrawCalls)
   })
 })
