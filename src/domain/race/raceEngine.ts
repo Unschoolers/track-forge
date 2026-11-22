@@ -300,7 +300,7 @@ function advanceRace(
     const context = raceVehicleContext(state, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     const usesCheckpoints = vehicle.player && Boolean(state.recoveryCheckpoints?.length)
-    if (vehicle.player && !arcade && !usesCheckpoints) return vehicle
+    if (vehicle.player && !arcade && !usesCheckpoints && !state.sceneryColliders?.size) return vehicle
     const waterContact = hasVehicleWaterContact({
       grounded: vehicle.grounded,
       terrainMaterial: context.terrainMaterial,
