@@ -21,12 +21,14 @@ describe('nearby progress telemetry', () => {
     expect(() => encodeProgress(1, 0, Infinity)).toThrow(RangeError)
   })
 
-  it('throttles updates, rejects duplicates and stale frames, and expires lost peers', () => {
+  it('throttles updates, rejects duplicates and stale frames, and expires lost peers', async () => {
     let now = 1000
     const sent: Uint8Array[] = []
     const send = vi.fn(async (_ids: string[], bytes: Uint8Array) => { sent.push(bytes) })
     const producer = new NearbyProgressSync(send, () => now)
     producer.update(0, 25, ['host'])
+    await Promise.resolve()
+    await Promise.resolve()
     now += 100
     producer.update(0, 29, ['host'])
     expect(sent).toHaveLength(1)
@@ -54,4 +56,34 @@ describe('nearby progress telemetry', () => {
     sync.update(0, 3, ['host'])
     await vi.waitFor(() => expect(sync.failedSends).toBe(1))
   })
+  it('coalesces congested progress updates and relays without queuing old packets', async () => {
+    let now = 0
+    const sent: { id: string; packet: Uint8Array }[] = []
+    let unlock: (() => void) | undefined
+    const sync = new NearbyProgressSync((ids, packet) => {
+      const id = ids[0]
+      if (!id || ids.length !== 1) throw new Error('Expected a single destination')
+      sent.push({ id, packet })
+      return id === 'congested' ? new Promise<void>(resolve => { unlock = resolve }) : Promise.resolve()
+    }, () => now)
+    sync.update(0, 1, ['congested', 'healthy'])
+    await Promise.resolve()
+    await Promise.resolve()
+    now = 151
+    sync.update(0, 2, ['congested', 'healthy'])
+    await Promise.resolve()
+    await Promise.resolve()
+    sync.relay(encodeProgress(1, 1, 10), ['congested', 'healthy'])
+    expect(sent.map(item => item.id)).toEqual(['congested', 'healthy', 'healthy', 'healthy'])
+    expect(sent.filter(item => item.id === 'congested')).toHaveLength(1)
+    expect(decodeProgress(sent[2]!.packet)?.progress).toBe(2)
+    unlock?.()
+    await Promise.resolve()
+    await Promise.resolve()
+    now = 302
+    sync.update(0, 3, ['congested'])
+    expect(sent.filter(item => item.id === 'congested')).toHaveLength(2)
+  })
+
+
 })
