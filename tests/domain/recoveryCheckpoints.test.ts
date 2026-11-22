@@ -69,6 +69,26 @@ describe('authored race recovery checkpoints', () => {
     expect(recovered.state.phase).toBe('running')
   })
 
+  it('does not change scenery collision behavior when no recovery markers are authored', () => {
+    const scenery = { environmentId: 'desert' as const, trees: [], scenery: [
+      { kind: 'desert-cactus' as const, x: 245, y: 16 },
+    ] }
+    for (const markers of [[], [0.15, 0.4, 0.8]]) {
+      const initial = createRace({
+        path, routeKind: 'point-to-point', playerCar: 'blue',
+        difficulty: 'normal', handling: 'arcade', laps: 1,
+        recoveryCheckpoints: markers, recoveryScenery: scenery,
+      })
+      const state = { ...initial, phase: 'running' as const, vehicles: [requireFixture(initial.vehicles[0])] }
+      const approaching = {
+        ...requireFixture(state.vehicles[0]), ...at(229, 100),
+        lastRoadContactIndex: at(179).pathIndex,
+      }
+      const impact = stepRace({ ...state, vehicles: [approaching] }, coast, 1 / 30, random)
+      expect(impact.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'scenery' }))
+    }
+  })
+
   it('recovers after hitting visible scenery and ignores a hidden prop', () => {
     const scenery = [{ kind: 'desert-cactus' as const, x: 245, y: 16 }]
     for (const environmentId of ['desert', 'cityscape'] as const) {
