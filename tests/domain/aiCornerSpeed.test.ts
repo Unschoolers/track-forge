@@ -62,6 +62,19 @@ describe('AI approach speed planning', () => {
     expect(safeEntrySpeedAhead(ice, approach, false, 1, CAR_SPECS.blue, 1))
       .toBeLessThan(safeEntrySpeedAhead(path, approach, false, 1, CAR_SPECS.blue, 1))
   })
+  it('budgets for the heavy Yellow chassis yaw response instead of treating grip as instant steering', () => {
+    const approach = path.points.findIndex(point => point.distance > 355)
+    const stock = safeEntrySpeedAhead(path, approach, false, 0.74, CAR_SPECS.yellow, 1, 'yellow')
+    const nimbleVersion = {
+      ...CAR_SPECS.yellow,
+      steer: CAR_SPECS.green.steer,
+      yawInertia: CAR_SPECS.green.yawInertia,
+    }
+    const agile = safeEntrySpeedAhead(path, approach, false, 0.74, nimbleVersion, 1, 'yellow')
+    // The matched tire/brake package still needs at least 2% more corner reserve.
+    expect(stock).toBeLessThan(agile * 0.98)
+  })
+
   it('applies the sharp-bend safety floor only when requested', () => {
     const approach = path.points.findIndex((point) => point.distance > 355)
     const normal = safeEntrySpeedAhead(path, approach, false, 0.1, CAR_SPECS.blue, 1, 'blue')

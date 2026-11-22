@@ -27,6 +27,8 @@ export interface VehicleDynamicsParameters {
   readonly cornerStiffness: number
   readonly brakeForce: number
   readonly brakingTractionScale?: number
+  /** Chassis-specific lateral stability, supplied with surface traction blending. */
+  readonly lateralStability?: number
   readonly recovery: number
   /** Speed target for drive and drag, which can change at terrain boundaries. */
   readonly maxSpeed: number
@@ -282,6 +284,7 @@ export function stepVehicleDynamics(
   const brakingStability = 1 - pressure * (1 - clamp(tuning.stability.brakingRetention, 0, 1))
   const lateralStability =
     Math.max(0, tuning.stability.lateralDamping) *
+    Math.max(0, finiteOr(parameters.lateralStability ?? 1, 1)) *
     steeringStability *
     brakingStability *
     tireResponse *

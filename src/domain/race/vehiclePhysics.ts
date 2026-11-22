@@ -124,6 +124,9 @@ export function stepVehicle(
       brakeForce: car.brakeForce,
       brakingTractionScale: car.brakingTractionScale,
       recovery: car.recovery,
+      // Strong stability is a dry-road trait, not an ice/gravel cheat.
+      lateralStability: 1 + (car.lateralStability - 1) *
+        Math.min(1, surfaceGrip * surfaceGrip),
       maxSpeed,
       safetySpeed: Math.min(physicsSpeedLimit, car.max),
       engineAcceleration:

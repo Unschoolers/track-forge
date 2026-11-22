@@ -1,0 +1,36 @@
+{
+  "format": "trackforge-track",
+  "formatVersion": 1,
+  "track": {
+    "id": "track-mwscffd6-ho9zy1",
+    "name": "Speed",
+    "version": 8,
+    "points": [
+      {
+        "x": 109.08354337617675,
+        "y": 577.5532754408011,
+        "surface": "street"
+      },
+      {
+        "x": 110.86058649972438,
+        "y": -703.0657794974115,
+        "surface": "dirt"
+      }
+    ],
+    "autoCheckpoints": true,
+    "trees": [],
+    "terrain": {
+      "cellSize": 32,
+      "cells": []
+    },
+    "start": {
+      "ratio": 0,
+      "reversed": false
+    },
+    "lighting": "day",
+    "environmentId": "grass",
+    "scenery": [],
+    "routeKind": "circuit",
+    "recoveryCheckpoints": []
+  }
+}

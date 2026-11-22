@@ -134,11 +134,12 @@ export function safeEntrySpeedAhead(
   nearestIndex: number,
   reversed: boolean,
   cornerSafety: number,
-  car: Pick<CarPhysicsSpec, 'max' | 'grip' | 'brake'> = CAR_SPECS.blue,
+  car: Pick<CarPhysicsSpec, 'max' | 'grip' | 'brake' | 'steer' | 'yawInertia'> = CAR_SPECS.blue,
   pace = 1,
   carId: CarId = 'blue',
   useSharpBendSafety = false,
   fastCorners = false,
+  useChassisYawSafety = true,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -147,6 +148,13 @@ export function safeEntrySpeedAhead(
   const direction = reversed ? -1 : 1
   const cornerBaseline = fastCorners ? 270 : 225
   const straightSpeed = car.max * pace
+  // Higher tire grip does not make a heavy, slow-yaw chassis turn instantly.
+  // Apply the correction only near bends; straight-line pace is untouched.
+  const steeringResponse = Math.sqrt(
+    (car.steer / CAR_SPECS.blue.steer) *
+    (CAR_SPECS.blue.yawInertia / Math.max(1, car.yawInertia)),
+  )
+  const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
   for (const step of BRAKE_LOOKAHEAD) {
     const raw = nearestIndex + direction * step
@@ -175,7 +183,8 @@ export function safeEntrySpeedAhead(
     distance = Math.max(0, distance)
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
       VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
-    const entrySpeed = Math.sqrt(apexSpeed ** 2 + 2 * brakeDeceleration * distance)
+    const corneringPace = 1 - (1 - turningPace) * clamp(bend / 0.1, 0, 1)
+    const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * brakeDeceleration * distance)
     allowed = Math.min(allowed, entrySpeed)
   }
   return allowed

@@ -88,7 +88,11 @@ describe('dynamic bicycle vehicle model', () => {
         brakeForce: car.brakeForce,
         grip: car.grip,
         brakeGrip: car.brake,
-        brakingTractionScale: baseline ? 1 : car.brakingTractionScale,
+        // Isolate the previous shared ~10% braking upgrade from the new
+        // independently tuned racing brake packages. Red had a 3% extra gain.
+        brakingTractionScale: baseline
+          ? car.brakingTractionScale / (carId === 'red' ? 1.03 : 1)
+          : car.brakingTractionScale,
       }
       let state: VehicleDynamicsState = { angle: 0, vx: 220, vy: 0, yawRate: 0 }
       let distance = 0

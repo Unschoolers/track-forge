@@ -9,6 +9,7 @@ import type { CarId, SurfaceId } from '@/domain/model'
  * - `stability.brakingRetention`: lower for longer braking drifts.
  * - `forces.lateralGripScale`: raises the tire-force ceiling for every car.
  * - `cornerStiffness`: changes how quickly one car builds tire force.
+ * - `lateralStability`: stabilizes the car body primarily on grippy pavement.
  * - `recovery`: changes how quickly one car settles yaw rotation.
  * - Surface and terrain `grip` values multiply the car and global grip.
  *
@@ -90,6 +91,8 @@ export interface CarPhysicsSpec {
   readonly brakeForce: number
   /** Additional braking traction relative to other cars. */
   readonly brakingTractionScale: number
+  /** Planted lateral behavior per chassis; road grip blends it out on loose surfaces. */
+  readonly lateralStability: number
   readonly recovery: number
 }
 
@@ -212,6 +215,7 @@ export const CAR_PHYSICS_SPECS = {
     cornerStiffness: 8.6,
     brakeForce: 132_000,
     brakingTractionScale: 1,
+    lateralStability: 1.2,
     recovery: 1.5,
   },
   red: {
@@ -229,41 +233,45 @@ export const CAR_PHYSICS_SPECS = {
     frontWeightBias: 0.53,
     cornerStiffness: 7.4,
     brakeForce: 112_000,
-    brakingTractionScale: 1.03,
+    // Race-grade service brakes without granting Red more cornering grip.
+    brakingTractionScale: 1.38,
+    lateralStability: 0.9,
     recovery: 1.25,
   },
   green: {
     max: 294,
     accel: 214,
-    steer: 3,
+    steer: 3.2,
     grip: 1.14,
     brake: 1.04,
     steerLoss: 0.044,
     mass: 1190,
     wheelbase: 24,
     centerOfMassHeight: 4.7,
-    yawInertia: 175_000,
+    yawInertia: 132_000,
     frontWeightBias: 0.54,
     cornerStiffness: 9.5,
     brakeForce: 125_000,
     brakingTractionScale: 1,
+    lateralStability: 3,
     recovery: 1.8,
   },
   yellow: {
     max: 286,
     accel: 202,
-    steer: 2.34,
+    steer: 2.46,
     grip: 1.24,
     brake: 1.2,
     steerLoss: 0.061,
     mass: 1510,
     wheelbase: 29,
     centerOfMassHeight: 6,
-    yawInertia: 340_000,
+    yawInertia: 270_000,
     frontWeightBias: 0.57,
     cornerStiffness: 8.7,
     brakeForce: 165_000,
     brakingTractionScale: 1,
+    lateralStability: 4.5,
     recovery: 1.65,
   },
 } as const satisfies Record<CarId, CarPhysicsSpec>
@@ -292,7 +300,7 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
   },
   red: {
     street: DEFAULT_TERRAIN,
-    dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.8, drag: 1.55 },
+    dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.62, drag: 1.55 },
     ice: { max: 0.95, accel: 0.84, grip: 0.76, brake: 0.78, drag: 1.2 },
     // The pavement specialist pays extra for grass shortcuts; street is unchanged.
     grass: { max: 0.51, accel: 0.40, grip: 0.57, brake: 0.72, drag: 2.35 },

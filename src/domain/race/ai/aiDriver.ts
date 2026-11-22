@@ -211,6 +211,7 @@ export function stepAiVehicle(
   const cornerTarget = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
     car, tuning.pace * vehicle.aiPace, vehicle.car, drivingDifficulty === 'hard', fastCorners,
+    !vehicle.racingLine,
   ) * cornerPace
   const practicedSpeedRatio = vehicle.racingLine?.speedRatio ?? 1
   let curveSpeed = practicedSpeedRatio < 1 ? Math.min(cornerTarget, car.max) * practicedSpeedRatio : cornerTarget
@@ -222,6 +223,11 @@ export function stepAiVehicle(
     const gripReserve = Math.min(cornerTarget, roadSpeed) * cornerMargin
     const excessTarget = Math.max(0, cornerTarget - roadSpeed)
     curveSpeed -= bendWeight * (gripReserve + excessTarget)
+  }
+  // Passing at the outside edge consumes cornering room. Hold a little
+  // extra reserve in bends instead of assuming the centerline racing pace.
+  if (ai.phase === 'passing' && !vehicle.racingLine) {
+    curveSpeed *= 1 - 0.14 * clamp(bend / 0.12, 0, 1)
   }
   // A faster straight-line chassis with weak grip needs extra entry margin.
   // Scale braking anticipation by the actual grip deficit and upcoming bend;
@@ -248,7 +254,9 @@ export function stepAiVehicle(
         emergency || curveBraking
           ? 0
           : recovering
-            ? tuning.pace * 0.45
+            // Coasting preserves lateral tire force; braking while turning
+            // would starve steering through the friction circle.
+            ? vehicle.speed > 90 ? 0 : tuning.pace * 0.45
           : following
             ? tuning.pace * 0.72
             : curveThrottle,

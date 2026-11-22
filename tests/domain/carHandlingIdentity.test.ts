@@ -1,0 +1,199 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { CAR_SPECS } from '@/domain/config'
+import type { CarId } from '@/domain/model'
+import { createRace } from '@/domain/race/raceFactory'
+import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
+import type { VehicleStepContext } from '@/domain/race/trackContext'
+import { stepVehicle } from '@/domain/race/vehiclePhysics'
+import { decodeTrack } from '@/domain/track/trackCodec'
+import { buildRoadPath } from '@/domain/track/pathBuilder'
+
+// A creator-authored seven-point handling course. The original geometry and
+// street -> ice -> dirt -> street sequence are retained without player metadata.
+const exported: unknown = JSON.parse(readFileSync('tests/fixtures/turnTest.trackforge.json', 'utf8'))
+if (!exported || typeof exported !== 'object' || !('track' in exported)) {
+  throw new Error('Turn test must be a Track Forge export')
+}
+const track = decodeTrack(exported.track, 1)
+if (!track) throw new Error('Invalid Turn test track fixture')
+const path = buildRoadPath(track.points, track.terrain, Infinity, track.routeKind)
+const dt = 1 / 60
+type Handling = 'simulation' | 'arcade'
+type Surface = 'street' | 'ice' | 'dirt' | 'grass'
+
+function context(surface: Surface): VehicleStepContext {
+  const index = path.points.findIndex(point => point.surface === surface)
+  const point = path.points[index]
+  if (!point) throw new Error(`Turn test has no ${surface} section`)
+  const ahead = path.points[index + 1] ?? path.points[index - 1]
+  if (!ahead) throw new Error('Missing test-track direction')
+  const length = Math.max(0.001, Math.hypot(ahead.x - point.x, ahead.y - point.y))
+  const tangent = { x: (ahead.x - point.x) / length, y: (ahead.y - point.y) / length }
+  return {
+    nearest: { index, point, distance: 0 },
+    onRoad: surface !== 'grass',
+    onCurb: false,
+    surface,
+    tangent,
+    normal: { x: -tangent.y, y: tangent.x },
+    surfaceHeight: 0,
+    grade: 0,
+    structureRunId: null,
+    terrainMaterial: 'grass',
+    safeAboveWater: false,
+  }
+}
+
+function makeVehicle(car: CarId, speed: number, sidewaysSpeed = 0, surface: Surface = 'street'): RaceVehicle {
+  const fixture = createRace({
+    path,
+    playerCar: car,
+    difficulty: 'normal',
+    laps: 1,
+  }).vehicles[0]
+  if (!fixture) throw new Error('Missing car handling fixture')
+  const road = context(surface)
+  const angle = Math.atan2(road.tangent.y, road.tangent.x)
+  return {
+    ...fixture,
+    x: road.nearest.point.x,
+    y: road.nearest.point.y,
+    angle,
+    vx: road.tangent.x * speed - road.tangent.y * sidewaysSpeed,
+    vy: road.tangent.y * speed + road.tangent.x * sidewaysSpeed,
+    speed: Math.hypot(speed, sidewaysSpeed),
+    yawRate: 0,
+    contactLoad: 1,
+    currentSurface: surface,
+    surfaceGrip: 1,
+  }
+}
+
+function travel(
+  initial: RaceVehicle,
+  input: DriverInput,
+  surface: Surface,
+  handling: Handling,
+  frames: number,
+): RaceVehicle {
+  const road = context(surface)
+  let vehicle = initial
+  for (let frame = 0; frame < frames; frame += 1) {
+    vehicle = stepVehicle(vehicle, input, road, dt, handling)
+  }
+  return vehicle
+}
+
+function stoppingDistance(car: CarId, handling: Handling, surface: Surface = 'street'): number {
+  let vehicle = makeVehicle(car, 170, 0, surface)
+  const road = context(surface)
+  const heading = road.tangent
+  const start = { x: vehicle.x, y: vehicle.y }
+  const input = { steering: 0, throttle: 0, braking: true }
+  for (let frame = 0; frame < 360 && vehicle.speed > 0.5; frame += 1) {
+    vehicle = stepVehicle(vehicle, input, road, dt, handling)
+  }
+  expect(vehicle.speed).toBeLessThan(0.5)
+  return (vehicle.x - start.x) * heading.x + (vehicle.y - start.y) * heading.y
+}
+
+/** Identical effective wheel angle: compare handling rather than steering-rack gearing. */
+function cornering(car: CarId, handling: Handling, speed = 135, matchedWheelAngle = true) {
+  const road = context('street')
+  const steer = matchedWheelAngle
+    ? 0.65 * CAR_SPECS.blue.steer / CAR_SPECS[car].steer
+    : 0.65
+  let vehicle = makeVehicle(car, speed)
+  let angleSum = 0
+  let samples = 0
+  for (let frame = 0; frame < 50; frame += 1) {
+    vehicle = stepVehicle(
+      vehicle,
+      { steering: steer, throttle: 0, braking: false },
+      road,
+      dt,
+      handling,
+    )
+    if (frame >= 10) {
+      angleSum += Math.atan2(vehicle.slip, Math.max(1, vehicle.speed))
+      samples += 1
+    }
+  }
+  return { slipAngle: angleSum / samples, yawRate: Math.abs(vehicle.yawRate) }
+}
+
+describe('creator Turn test fixture', () => {
+  it('retains distinct paved, ice, and dirt driving sections', () => {
+    expect(new Set(track.points.map(point => point.surface)))
+      .toEqual(new Set(['street', 'ice', 'dirt']))
+    expect(path.points.length).toBeGreaterThan(track.points.length)
+  })
+})
+
+describe.each(['simulation', 'arcade'] as const)('%s car handling personalities', handling => {
+  it('makes Yellow stop shortest on road, with meaningful advantages over Green and Blue', () => {
+    const yellow = stoppingDistance('yellow', handling)
+    const green = stoppingDistance('green', handling)
+    const blue = stoppingDistance('blue', handling)
+    expect(yellow).toBeLessThan(blue * 0.87)
+    expect(yellow).toBeLessThan(green)
+    expect(green).toBeLessThan(blue * 0.94)
+  })
+
+  it('gives Red race-car brakes on pavement without overtaking Yellow\'s 5/5 brakes', () => {
+    const red = stoppingDistance('red', handling)
+    expect(red).toBeLessThan(stoppingDistance('blue', handling) * 0.97)
+    expect(red).toBeGreaterThan(stoppingDistance('yellow', handling) * 1.05)
+  })
+
+  it('makes Yellow feel more planted than balanced Blue in the same paved corner', () => {
+    const yellow = cornering('yellow', handling)
+    const blue = cornering('blue', handling)
+    expect(yellow.slipAngle).toBeLessThan(blue.slipAngle * 0.9)
+    expect(yellow.yawRate).toBeGreaterThan(0.2)
+  })
+
+  it('gives Green less body slip at the same wheel angle than Blue', () => {
+    const green = cornering('green', handling)
+    const blue = cornering('blue', handling)
+    expect(green.slipAngle).toBeLessThan(blue.slipAngle * 0.95)
+  })
+
+  it('makes Green turn faster than Blue for the same player steering input', () => {
+    const green = cornering('green', handling, 135, false)
+    const blue = cornering('blue', handling, 135, false)
+    expect(green.yawRate).toBeGreaterThan(blue.yawRate * 1.05)
+  })
+
+  it('makes Red slide more than Blue in fast paved corners despite better braking', () => {
+    const red = cornering('red', handling, 210)
+    const blue = cornering('blue', handling, 210)
+    expect(red.slipAngle).toBeGreaterThan(blue.slipAngle * 1.2)
+  })
+
+  it('keeps Red markedly less effective on dirt than Blue, unlike Green', () => {
+    const red = stoppingDistance('red', handling, 'dirt')
+    const blue = stoppingDistance('blue', handling, 'dirt')
+    const green = stoppingDistance('green', handling, 'dirt')
+    expect(red).toBeGreaterThan(blue * 1.2)
+    expect(green).toBeLessThan(blue)
+  })
+
+  it('makes the same corner less slippery on street than ice for every car', () => {
+    for (const car of ['blue', 'red', 'green', 'yellow'] as const) {
+      const initial = makeVehicle(car, 155, 32, 'street')
+      const iceInitial = makeVehicle(car, 155, 32, 'ice')
+      const input = { steering: 0, throttle: 0, braking: false }
+      const street = travel(initial, input, 'street', handling, 18)
+      const ice = travel(iceInitial, input, 'ice', handling, 18)
+      expect(street.slip, `${car} street vs ice`).toBeLessThan(ice.slip * 0.75)
+    }
+  })
+
+  it('preserves Yellow\'s braking advantage through dirt too', () => {
+    expect(stoppingDistance('yellow', handling, 'dirt')).toBeLessThan(
+      stoppingDistance('blue', handling, 'dirt') * 0.9,
+    )
+  })
+})
