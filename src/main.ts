@@ -89,6 +89,7 @@ const music = new BrowserMusicPlayer<'menu' | TrackEnvironmentId>({
   grass: grassMusic,
   cityscape: cityMusic,
   desert: desertMusic,
+  'kids-room': menuMusic,
 }, () => toneSink.audioContext)
 const feedback = new FeedbackRouter({
   audio: new WebAudioAdapter(() => toneSink, true),

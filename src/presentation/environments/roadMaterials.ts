@@ -2,7 +2,14 @@ import { SURFACE_SPECS } from '@/domain/config'
 import type { SurfaceId } from '@/domain/model'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 
-type RoadColors = Pick<(typeof SURFACE_SPECS)[SurfaceId], 'road' | 'edge' | 'stripe' | 'nightRoad' | 'nightEdge' | 'nightStripe'>
+interface RoadColors {
+  readonly road: string
+  readonly edge: string
+  readonly stripe: string
+  readonly nightRoad: string
+  readonly nightEdge: string
+  readonly nightStripe: string
+}
 
 /**
  * Visual skins only. Vehicle grip, speed and road topology always use the
