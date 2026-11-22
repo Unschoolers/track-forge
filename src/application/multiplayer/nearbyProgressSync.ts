@@ -1,9 +1,10 @@
-import { decodeProgress, encodeProgress, isNewerWireSequence, PROGRESS_PERIOD_MS, type ProgressPacket } from './raceWire'
+import { decodeProgress, encodeProgress, isNewerWireSequence, PROGRESS_PERIOD_MS, WIRE_ROUND_MASK, type ProgressPacket } from './raceWire'
 
 /** A low-rate optional stream; old peers ignore these packets and still render poses. */
 export class NearbyProgressSync {
   private readonly remote = new Map<number, { sequence: number; value: number; at: number }>()
   private readonly relayed = new Map<number, number>()
+  private round = 0
   private nextSequence = 0
   private lastSentAt = Number.NEGATIVE_INFINITY
   private sendFailures = 0
@@ -23,14 +24,17 @@ export class NearbyProgressSync {
     this.sendFailures = 0
     this.remote.clear()
     this.relayed.clear()
+    this.round = 0
     this.nextSequence = 0
     this.lastSentAt = Number.NEGATIVE_INFINITY
   }
 
+  setRound(round: number): void { this.round = round & WIRE_ROUND_MASK }
+
   update(slot: number, value: number, recipients: string[]): void {
     const now = this.now()
     if (!recipients.length || this.inFlight.has(slot) || now - this.lastSentAt < PROGRESS_PERIOD_MS) return
-    const packet = encodeProgress(slot, this.nextSequence, value)
+    const packet = encodeProgress(slot, this.nextSequence, value, this.round)
     this.nextSequence = (this.nextSequence + 1) & 0xffff
     this.lastSentAt = now
     this.dispatch(slot, packet, recipients)
@@ -39,7 +43,7 @@ export class NearbyProgressSync {
   /** One host relay per progress source, addressed to every eligible guest. */
   relay(packet: Uint8Array, recipients: string[]): void {
     const message = decodeProgress(packet)
-    if (!message || !recipients.length || this.inFlight.has(message.slot) ||
+    if (!message || message.round !== this.round || !recipients.length || this.inFlight.has(message.slot) ||
         !isNewerWireSequence(message.sequence, this.relayed.get(message.slot))) return
     // Mark a relay as delivered only on success; a transport failure can
     // safely retry the same packet instead of stranding remote progress.
@@ -68,6 +72,7 @@ export class NearbyProgressSync {
   }
 
   receive(packet: ProgressPacket): boolean {
+    if (packet.round !== this.round) return false
     const previous = this.remote.get(packet.slot)
     if (!isNewerWireSequence(packet.sequence, previous?.sequence)) return false
     this.remote.set(packet.slot, { sequence: packet.sequence, value: packet.progress, at: this.now() })
