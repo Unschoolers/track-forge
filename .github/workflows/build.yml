@@ -216,7 +216,28 @@ jobs:
               gh release upload "$tag" trackforge-debug.apk --repo "$GH_REPO"
             fi
           else
-            printf 'TrackForge %s (Android version code %s).\n\nSigned with the fixed original TrackForge certificate.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
+            # Notes are calculated from the previous published APK, not the last commit.
+            # Conditional Android builds can skip web-only commits or several releases.
+            previous_tag=$(jq -r --argjson run "$BUILD_RUN" --argjson attempt "$BUILD_ATTEMPT" '
+              [.[][] | select(.draft == false) | .tag_name as $tag
+                | ($tag | capture("^android-build-(?<run>[0-9]+)-(?<attempt>[0-9]+)$")?) as $v
+                | select($v != null)
+                | {tag: $tag, run: ($v.run | tonumber), attempt: ($v.attempt | tonumber)}
+                | select(.run < $run or (.run == $run and .attempt < $attempt))]
+              | sort_by(.run, .attempt) | last | .tag // empty
+            ' releases.json)
+            if [ -n "$previous_tag" ]; then
+              gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
+                -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" \
+                -f previous_tag_name="$previous_tag" --jq '.body' > generated-notes.md
+            else
+              printf "## What's Changed\n\nFirst published Android build.\n" > generated-notes.md
+            fi
+            {
+              cat generated-notes.md
+              printf '\n### Build details\n\nTrackForge %s (Android version code %s).\n\n' "$VERSION_NAME" "$VERSION_CODE"
+              printf 'Signed with the fixed original TrackForge certificate.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            } > release-notes.md
             gh release create "$tag" trackforge-debug.apk --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge Android ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"
           fi
           printf '## APK release\n\nVersion %s (code %s).\n\n[Download this APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
