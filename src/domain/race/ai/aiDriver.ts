@@ -1,6 +1,6 @@
 import type { RandomSource } from '@/domain/race/randomSource'
 import { AI_OVERTAKE, CAR_SPECS, DIFFICULTY_SPECS, ROAD_GEOMETRY, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
-import { clamp } from '@/domain/geometry/math'
+import { clamp, wrapAngleRadians } from '@/domain/geometry/math'
 import type { DifficultyId } from '@/domain/model'
 import {
   createAiDriverState,
@@ -45,10 +45,6 @@ const RACING_PAVEMENT_EDGE_MARGIN = 31
 const RACING_PAVEMENT_EDGE_LIMIT = 42
 const RACING_PAVEMENT_HEADING_MARGIN = 0.38
 const RACING_PAVEMENT_HEADING_LIMIT = 0.8
-
-function wrapAngle(angle: number): number {
-  return Math.atan2(Math.sin(angle), Math.cos(angle))
-}
 
 function advancePassingState(
   vehicle: RaceVehicle,
@@ -177,7 +173,7 @@ export function stepAiVehicle(
   if (sweep > 0 || racingPace > 0) {
     // Back out smoothly if a rival is running wide or is still turning in.
     const roadHeading = Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
-    const headingError = Math.abs(wrapAngle(roadHeading - vehicle.angle))
+    const headingError = Math.abs(wrapAngleRadians(roadHeading - vehicle.angle))
     const edge = 1 - clamp((context.nearest.distance - SWEEP_EDGE_MARGIN) /
       (SWEEP_EDGE_LIMIT - SWEEP_EDGE_MARGIN), 0, 1)
     const alignment = 1 - clamp((headingError - SWEEP_HEADING_MARGIN) /
@@ -251,10 +247,10 @@ export function stepAiVehicle(
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
   const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
-    ? wrapAngle(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * SIDESLIP_CORRECTION_GAIN
+    ? wrapAngleRadians(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * SIDESLIP_CORRECTION_GAIN
     : 0
   const desiredSteer = clamp(
-    wrapAngle(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
+    wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
       vehicle.yawRate * 0.38,
     -1,
     1,
