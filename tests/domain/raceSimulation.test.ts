@@ -301,7 +301,7 @@ describe('race simulation', () => {
 
   it('orders grid cars around the first crossing and the relocated seam in both directions', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const [first, second] = race.vehicles.map(required)
+    const [first, second] = race.vehicles.map(requireFixture)
     const length = path.points.length
     if (!first || !second) throw new Error('Missing grid cars')
     for (const [start, reversed] of [[0, false], [1, false], [length - 2, true]] as const) {
@@ -318,7 +318,7 @@ describe('race simulation', () => {
 
   it('orders finish times before progress and resolves equal finishes by grid order', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const [first, second, third, fourth] = race.vehicles.map(required)
+    const [first, second, third, fourth] = race.vehicles.map(requireFixture)
     if (!first || !second || !third || !fourth) throw new Error('Missing grid cars')
     const vehicles = [
       { ...first, finishedAt: 10, pathIndex: 0 },
