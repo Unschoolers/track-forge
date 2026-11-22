@@ -11,7 +11,8 @@ export function collectTrackScores(
   for (const track of libraryTracks) distinct.set(track.id, track)
   for (const track of officialTracks) distinct.set(track.id, track)
 
-  const scores: Record<string, readonly ScoreEntry[]> = {}
+  // Track IDs are external identifiers: '__proto__' must remain a data key.
+  const scores = Object.create(null) as Record<string, readonly ScoreEntry[]>
   for (const track of distinct.values()) {
     const route = normalizeRouteKind(track.routeKind)
     scores[track.id] = store.forTrack(track.id).filter(
