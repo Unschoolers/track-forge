@@ -35,12 +35,17 @@ export function choosePassingLane(
       (entry) => Math.abs(entry.signedDistance) < 20 && Math.abs(entry.vehicle.lane - lane) < 20,
     ))),
   )
-  return candidates.reduce(
-    (best, lane) =>
-      scorePassingLane(lane, traffic, difficulty) + preferredSide * lane * 0.01 >
-      scorePassingLane(best, traffic, difficulty) + preferredSide * best * 0.01
-        ? lane
-        : best,
-    candidates[0] ?? vehicle.lane,
-  )
+  let best = candidates[0] ?? vehicle.lane
+  if (candidates.length === 0) return best
+  let bestScore = scorePassingLane(best, traffic, difficulty) + preferredSide * best * 0.01
+  for (let index = 1; index < candidates.length; index++) {
+    const lane = candidates[index]
+    if (lane === undefined) continue
+    const score = scorePassingLane(lane, traffic, difficulty) + preferredSide * lane * 0.01
+    if (score > bestScore) {
+      best = lane
+      bestScore = score
+    }
+  }
+  return best
 }
