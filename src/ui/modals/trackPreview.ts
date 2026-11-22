@@ -1,5 +1,4 @@
 import type { Vector2 } from '@/domain/model'
-import { getTrackEnvironment } from '@/presentation/environments'
 import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -8,8 +7,7 @@ export function createTrackPreview(path: RoadPath, firstPoint?: Vector2, environ
   const { points, closed } = path
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.classList.add('track-preview')
-  const theme = normalizeTrackEnvironmentId(environmentId)
-  if (theme !== 'grass') svg.style.backgroundColor = getTrackEnvironment(theme).day.flyoverGround
+  svg.dataset.environment = normalizeTrackEnvironmentId(environmentId)
   svg.setAttribute('aria-hidden', 'true')
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
   if (points.length === 0) {
@@ -46,6 +44,11 @@ export function createTrackPreview(path: RoadPath, firstPoint?: Vector2, environ
   route.setAttribute('vector-effect', 'non-scaling-stroke')
   route.setAttribute('stroke-linecap', 'round')
   route.setAttribute('stroke-linejoin', 'round')
-  svg.append(route)
+  // The soft under-stroke gives the line its neon edge without covering the geometry.
+  const halo = route.cloneNode(false) as SVGPathElement
+  halo.classList.add('track-preview-halo')
+  halo.setAttribute('stroke-width', '8')
+  route.classList.add('track-preview-route')
+  svg.append(halo, route)
   return svg
 }
