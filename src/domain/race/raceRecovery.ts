@@ -51,7 +51,11 @@ export function resetMissedCheckpoint(
   const target = missedGateRecoveryTarget(race, race.missedCheckpoint?.gate ?? vehicle.nextSector)
   if (!target) return vehicle
   return resetVehicleToTrack(
-    { ...vehicle, waterRecoveryProtected: !target.safe },
+    {
+      ...vehicle,
+      waterRecoveryProtected: !target.safe,
+      ...(vehicle.wrecked ? { wrecked: false, damage: 0, damageCooldown: 0.55 } : {}),
+    },
     race.path,
     { pathIndex: target.index, reversed: race.reversed },
   )
