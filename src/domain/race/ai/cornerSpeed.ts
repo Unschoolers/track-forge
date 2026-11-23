@@ -172,11 +172,14 @@ export function safeEntrySpeedAhead(
   // no bonus on ice and does not change car physics or surface speed limits.
   const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
-  // Stopping-distance estimates must use the braking traction AVAILABLE
-  // between the vehicle and the apex, not only traction at the apex.
-  // E.g. a car still on ice cannot assume the stronger street brakes will
-  // decelerate it before the road transitions into a tight paved bend.
-  let approachBrakeDeceleration = Number.POSITIVE_INFINITY
+  // Braking capability varies along an ice/dirt/pavement approach.
+  // Integrate v² = v_apex² + 2 * sum(a * distance), instead of assuming
+  // either the apex surface or the worst surface covers the entire approach.
+  // Use the smaller deceleration across each sampled interval at transitions,
+  // so a short icy patch is not treated as a whole icy straight.
+  let brakingSpeedSquared = 0
+  let previousDistance = 0
+  let previousDeceleration: number | undefined
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
     const raw = nearestIndex + direction * step
     if (!path.closed && (raw < 0 || raw >= count)) break
@@ -186,8 +189,19 @@ export function safeEntrySpeedAhead(
     const bend = Math.abs(turnAmountAt(path, index, 6))
     const surface = SURFACE_SPECS[point.surface]
     const terrain = VEHICLE_TERRAIN_SPECS[carId][point.surface]
-    if (step > 100 && surface.grip * terrain.grip >= 0.82) continue
     const grip = car.grip * surface.grip * terrain.grip
+    let distance = direction * (point.distance - at.distance)
+    if (path.closed && distance < 0) distance += path.totalLength
+    distance = Math.max(0, distance)
+    const deceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
+      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
+    if (previousDeceleration !== undefined) {
+      brakingSpeedSquared += 2 * Math.min(previousDeceleration, deceleration) *
+        Math.max(0, distance - previousDistance)
+    }
+    previousDistance = distance
+    previousDeceleration = deceleration
+    if (step > 100 && surface.grip * terrain.grip >= 0.82) continue
     const surfaceMax = straightSpeed * surface.max * terrain.max
     // Allow the chassis more time to rotate through tight bends, especially
     // when traffic places it away from the center of the racing line.
@@ -207,20 +221,13 @@ export function safeEntrySpeedAhead(
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
       apexMinimum, straightSpeed,
     ))
-    let distance = direction * (point.distance - at.distance)
-    if (path.closed && distance < 0) distance += path.totalLength
-    distance = Math.max(0, distance)
-    const surfaceBrakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
-      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
-    // Samples are in ascending physical travel distance, including reverse.
-    // Retain the least-available braking force along the scanned approach.
-    approachBrakeDeceleration = Math.min(approachBrakeDeceleration, surfaceBrakeDeceleration)
+
     const agileGripBonus = useChassisYawSafety
       ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
         clamp((grip - 0.75) / 0.2, 0, 1)
       : 0
     const corneringPace = 1 - (1 - turningPace - agileGripBonus) * clamp(bend / 0.1, 0, 1)
-    const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * approachBrakeDeceleration * distance)
+    const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + brakingSpeedSquared)
     allowed = Math.min(allowed, entrySpeed)
   }
   return allowed
