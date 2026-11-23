@@ -143,19 +143,25 @@ export function stepAiVehicle(
       edgeRisk = clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
     }
   }
-  const pursuitSamples = Math.max(1, Math.round(
+  let bend = 0
+  for (const sample of BEND_LOOKAHEAD) {
+    bend = Math.max(bend, Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6)))
+  }
+  // A long pursuit chord across a tight switchback can skip the asphalt
+  // altogether. Aim at the bend before it becomes a shortcut through the verge.
+  // Authored racing lines retain their intentional pursuit geometry.
+  const cornerLookaheadLimit = arcade && !vehicle.racingLine
+    ? clamp(Math.round(20 - bend * 45), 7, 20)
+    : Number.POSITIVE_INFINITY
+  const pursuitSamples = Math.max(1, Math.min(cornerLookaheadLimit, Math.round(
     (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
-  ))
+  )))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
     ? ((rawTargetIndex % path.points.length) + path.points.length) % path.points.length
     : clamp(rawTargetIndex, 0, path.points.length - 1)
   const target = path.points[targetIndex]
   if (!target) return { ...vehicle, ai }
-  let bend = 0
-  for (const sample of BEND_LOOKAHEAD) {
-    bend = Math.max(bend, Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6)))
-  }
   // A wide passing line can point the car across the return arm of a
   // hairpin. Ease toward the center on approach if the space is clear.
   const lane = ai.targetLane + ai.mistakeOffset
