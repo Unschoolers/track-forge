@@ -4,6 +4,7 @@ import { RaceSession } from '@/application/race/raceSession'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import type { ScoreStore } from '@/application/ports/storage'
 import { createRace } from '@/domain/race/raceFactory'
+import type { RaceState } from '@/domain/race/raceState'
 import type { RaceStep } from '@/domain/race/raceEngine'
 import { asTrackId } from '@/domain/model'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
@@ -20,7 +21,7 @@ function runningRace() {
   }
 }
 
-function playerOf(state: ReturnType<typeof runningRace>) {
+function playerOf(state: RaceState) {
   const player = state.vehicles.find((vehicle) => vehicle.player)
   if (!player) throw new Error('Missing player in interpolation fixture')
   return player
@@ -112,7 +113,9 @@ describe('render-only race interpolation', () => {
     const session = new RaceSession({ scoreStore, feedback, random: { next: () => 0.5 }, step })
     session.start(track, { car: 'blue', difficulty: 'normal', laps: 2 })
     session.advance(3.7, { steering: 0, throttle: 1, braking: false })
-    const initialX = playerOf(session.snapshot().state!)
+    const initial = session.snapshot().state
+    if (!initial) throw new Error('Expected countdown to complete')
+    const initialX = playerOf(initial)
     session.advance(1 / 60, { steering: 0, throttle: 1, braking: false })
     expect(playerOf(session.presentationState()!).x).toBeCloseTo(initialX.x)
     session.advance(1 / 120, { steering: 0, throttle: 1, braking: false })
