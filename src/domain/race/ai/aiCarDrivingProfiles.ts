@@ -13,6 +13,10 @@ export interface CarDrivingProfile {
   readonly hardSteerGain: number
   readonly hardCornerReserve: number
   readonly hardLookAheadSamples: number
+  /** Hard-only tactical line choice; never changes tire forces or the road. */
+  readonly hardApexCutScale?: number
+  /** Fraction of pursuit shortening applied near the outer road edge. */
+  readonly hardEdgeAvoidanceScale?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -23,6 +27,8 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 2.22,
     hardCornerReserve: 0,
     hardLookAheadSamples: 10,
+    hardApexCutScale: 1,
+    hardEdgeAvoidanceScale: 1,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
