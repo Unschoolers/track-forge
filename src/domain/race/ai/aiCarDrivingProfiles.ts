@@ -52,10 +52,10 @@ export const CAR_DRIVING_PROFILES = {
   green: {
     hardReaction: 12,
     hardSteerGain: 3,
-    // Cleaner AI-to-AI traffic lets Green carry more speed into tricky bends.
-    // A little extra turn-in margin prevents the late Kids Room slide.
+    // Targeted modest corner-entry reserve instead of an unnecessarily
+    // broad slowdown on Meadow Loop and Figure-eight.
     hardCornerReserve: 0.035,
-    hardHairpinReserve: 0.065,
+    hardHairpinReserve: 0.03,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.35,
     // Validated on Desert sand, Kids Room, Pine Hairpins, Meadow Loop:
