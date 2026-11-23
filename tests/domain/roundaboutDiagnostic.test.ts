@@ -101,7 +101,8 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
   const original = CAR_DRIVING_PROFILES.blue
   const cases: readonly { label: string, changes: Partial<CarDrivingProfile> }[] = [
     { label: 'current', changes: {} },
-    { label: 'edge0-corner006', changes: { hardEdgeAvoidanceScale: 0, hardCornerTargetBonus: 0.06 } },    { label: 'edge01-corner004', changes: { hardEdgeAvoidanceScale: 0.1, hardCornerTargetBonus: 0.04 } },
+    { label: 'edge0-corner006', changes: { hardEdgeAvoidanceScale: 0, hardCornerTargetBonus: 0.06 } },
+    { label: 'edge01-corner004', changes: { hardEdgeAvoidanceScale: 0.1, hardCornerTargetBonus: 0.04 } },
     { label: 'edge01-corner006', changes: { hardEdgeAvoidanceScale: 0.1, hardCornerTargetBonus: 0.06 } },
     { label: 'steer262', changes: { hardSteerGain: 2.62 } },
     { label: 'gain255-preview8', changes: { hardSteerGain: 2.55, hardLookAheadSamples: 8 } },
