@@ -10,7 +10,7 @@ import { decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 
 const sweep = process.env.AI_PROFILE_SWEEP === '1' ? it : it.skip
-const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
+const profiles: Readonly<Record<CarId, CarDrivingProfile>> = CAR_DRIVING_PROFILES
 const [kids] = decodeTrackInput(JSON.parse(readFileSync(
   'tests/fixtures/kidsRoomAi.trackforge.json', 'utf8',
 )) as unknown)
@@ -300,11 +300,11 @@ sweep('measures bounded car-specific Hard controller candidates on Kids Room and
   for (const car of ['blue', 'green', 'red', 'yellow'] as const) {
     const original = profiles[car]
     const results: unknown[] = []
-    try {
-      for (const candidate of cases[car]) {
-        profiles[car] = { ...original, ...candidate.changes }
+    for (const candidate of cases[car]) {
+      const profile: CarDrivingProfile = { ...original, ...candidate.changes }
         const kidsRun = runLaneCheck({
           path: kidsPath, trackName: kids.name, car, seed: 1,
+          aiProfileOverrides: { [car]: profile },
           difficulty: 'hard', handling: 'arcade', mode: 'solo',
           reversed: false, startRatio: 0.21932299012693934,
           laps: 2, seconds: 150,
@@ -312,20 +312,18 @@ sweep('measures bounded car-specific Hard controller candidates on Kids Room and
         const kidsVehicle = kidsRun.vehicles[0]
         const pineRun = runLaneCheck({
           path: pinePath, trackName: pine.track.name, car, seed: 11,
+          aiProfileOverrides: { [car]: profile },
           difficulty: 'hard', handling: 'arcade', mode: 'solo',
           reversed: false, laps: 1, seconds: 75,
         })
         const pineVehicle = pineRun.vehicles[0]
         results.push({
-          label: candidate.label, profile: profiles[car],
+          label: candidate.label, profile,
           kids: { time: kidsVehicle?.finishedAt ?? null, recoveries: kidsVehicle?.recoveries ?? -1,
             offroad: kidsVehicle?.offRoadSeconds ?? -1, reason: kidsRun.stoppedReason },
           pine: { time: pineVehicle?.finishedAt ?? null, recoveries: pineVehicle?.recoveries ?? -1,
             offroad: pineVehicle?.offRoadSeconds ?? -1, reason: pineRun.stoppedReason },
         })
-      }
-    } finally {
-      profiles[car] = original
     }
     outcomes[car] = results
   }
