@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { createRace } from '@/domain/race/raceFactory'
 import { recoverRacePlayer, stepRace } from '@/domain/race/raceEngine'
+import type { RaceState } from '@/domain/race/raceState'
 import { addRecoveryTimePenalty, penalizedRaceTime, RECOVERY_TIME_PENALTY_SECONDS } from '@/domain/race/recoveryPenalty'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -53,7 +54,7 @@ describe('recovery penalty and elevated-road auto respawn', () => {
     const point = requireFixture(path.points[index])
     const surface = path.roadSurface.at(index, point)
     expect(surface.structureHeight).toBeGreaterThan(0)
-    let race = {
+    let race: RaceState = {
       ...initial,
       vehicles: [{
         ...requireFixture(initial.vehicles[0]),
