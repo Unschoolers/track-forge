@@ -115,7 +115,12 @@ export function stepAiVehicle(
     aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
-  ai = advancePassingState(vehicle, ai, relevantTraffic, difficulty, deltaSeconds,
+  // An AI dot may influence short-range speed, but only the player
+  // can trigger a large lane-changing overtake in Arcade.
+  const passingTraffic = relaxedAiRivals && !relevantTraffic.ahead?.vehicle.player
+    ? { ...relevantTraffic, ahead: null }
+    : relevantTraffic
+  ai = advancePassingState(vehicle, ai, passingTraffic, difficulty, deltaSeconds,
     passingPolicyOverride ?? CAR_PASSING_POLICIES[vehicle.car])
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
