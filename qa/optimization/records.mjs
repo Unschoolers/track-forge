@@ -19,6 +19,26 @@ function runId(meta) {
     meta.opponentCar ?? 'none'].join(':')
 }
 
+/** Trace overtake time and attempts separately from lap-line performance. */
+function passingMetrics(samples, vehicleId) {
+  const trace = samples.filter(sample => sample.vehicleId === vehicleId)
+  let passingSeconds = 0
+  let attempts = 0
+  for (let i = 0; i < trace.length; i++) {
+    const sample = trace[i]
+    const previous = trace[i - 1]
+    if (!sample) continue
+    if (sample.phase === 'passing' && previous?.phase !== 'passing') attempts++
+    if (previous?.phase === 'passing') {
+      const delta = sample.time - previous.time
+      if (!validNumber(delta) || delta < 0 || delta > 1)
+        throw new Error('Invalid ordered passing telemetry')
+      passingSeconds += delta
+    }
+  }
+  return { passing_seconds: Number(passingSeconds.toFixed(3)), pass_attempts: attempts }
+}
+
 /**
  * Project a genuine lane simulation into bounded, analysis-friendly rows.
  * Invalid input MUST surface as an error; never silently omit bad samples.
@@ -64,6 +84,7 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
       laps_completed: vehicle.laps, recoveries: vehicle.recoveries,
       offroad_seconds: vehicle.offRoadSeconds, max_lane_error: vehicle.maxLaneError,
       stopped_reason: run.stoppedReason,
+      ...passingMetrics(run.samples, vehicle.vehicleId),
     }
   })
   const events = run.issues.map(issue => ({
