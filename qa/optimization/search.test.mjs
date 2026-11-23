@@ -29,7 +29,7 @@ test('pair comparisons reject recovery, roster, and incomparable metadata', () =
   assert.equal(assessCandidate([[wrap(35), wrap(33)]]).eligible, true)
   assert.equal(assessCandidate([[wrap(35), wrap(34.9)]], { minGain: 0.01 }).eligible, false)
   assert.equal(trialKey({ car: 'blue', scenarioId: 'desert', seed: 1,
-    difficulty: 'hard', mode: 'solo' }), 'blue|blue|desert|1|hard|solo')
+    difficulty: 'hard', mode: 'solo' }), 'blue|blue|player|desert|1|hard|solo')
 })
 
 test('traffic comparison measures the tuned rival, not the player-slot car', () => {
