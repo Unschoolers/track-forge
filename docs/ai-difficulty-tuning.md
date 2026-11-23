@@ -31,15 +31,19 @@ for a broken or uncompetitive Hard lap.
 ## Green on Kids room: explicit regression contract
 
 - **Source:** `tests/fixtures/kidsRoomAi.trackforge.json` captures the
-  mixed street/dirt/ice circuit from the creator's race. The reference human
-  Green Arcade lap total is **1:11.383** for two laps (improved from\n  **1:12.900**). The new Green best was recorded in the same course version.\n  Human records for Blue **1:19.967**, Red **1:25.883**, and Yellow\n  **1:12.117** are live four-car races, not directly identical to solo AI.
+  mixed street/dirt/ice circuit from the creator's race. The latest human
+  Green Arcade best is **1:08.883** for two laps (2026-11-23), improved from
+  **1:11.383**. Other Kids Room human records include Blue **1:19.967**,
+  Red **1:22.100**, and Yellow **1:12.117**. These are live four-car races,
+  not directly identical to solo AI benchmarks.
 - Green is a **cornering/grip specialist**. Its quick yaw response can justify
   a higher *planned* apex speed on sufficiently grippy street and dirt; ice
   remains low-grip. Actual tire friction and car specifications never change
   by difficulty or because an AI is driving.
 - Test Green as an AI rival with Red occupying the player slot on **Hard,
-  Normal and Easy**. For each fixed seed, require clean full-race finishes and
-  strictly increasing times `Hard < Normal < Easy`.
+  Normal and Easy**. For each fixed seed, require clean full-race finishes.
+  Enforce `Hard < Normal < Easy` on the separate matched solo benchmarks;
+  the full-field grids can differ across difficulties.
 - The existing Normal competitiveness check remains independently enforced:
   Green Normal must finish within ten seconds of the 1:12.900 personal best
   on the two seeded Kids room runs. Hard's correctness is **also** mandatory.
@@ -61,8 +65,9 @@ profiles. Treat these as driver decisions, not a second vehicle physics model.
   genuine high service-brake capacity, but avoid aggressive low-grip
   corner entry; verify dirt and ice separately.
 - **Green — corner specialist:** exploit actual yaw response and mixed-surface
-  grip with a longer preview and without an unnecessary Hard apex reserve. Validate
-  drift and tire-force limits.
+  grip with a longer preview and controlled pursuit shortening near road edges.
+  An unguarded edge pursuit was fast in solo runs but caused two off-road
+  recoveries in traffic; keep real-traffic safety and tire-force validation.
 - **Blue — balanced:** steering gain helps Kids Room but can regress Pine
   Hairpins. Prefer well-timed preview over globally aggressive steering.
 - **Yellow — heavy off-road:** optimize turn anticipation and steering response
@@ -75,9 +80,8 @@ must never excuse a slower/unsafe Pine Hairpins run.
 Frozen 12-cell baseline: `qa/benchmarks/kidsRoomAiBaseline.json`. For each PR,
 report the new 4 × 3 matrix and **Hard vs. creator best** for every car,
 marking comparisons between solo AI and four-car human races as approximate.
-Hard-first remains the goal: the existing solo baseline still has Blue and
-Green Hard slower than Normal, so do not claim difficulty ordering is fixed
-until the measurable ordering is corrected.
+The frozen baseline recorded Blue and Green Hard slower than Normal; PR #272
+corrected that ordering. Preserve it on every new benchmark, not just one car.
 
 ## Implementation landmarks
 
