@@ -14,7 +14,9 @@ const BRAKE_LOOKAHEAD = [0, 6, 12, 20, 30, 42, 58, 78, 100]
 // speed the stopping distance can exceed the ordinary 600-unit preview.
 // Check only those low-traction hazards farther ahead: widening the entire
 // scan would over-brake fast asphalt courses.
-const LOW_GRIP_BRAKE_LOOKAHEAD = [120, 140, 165, 195]
+// Six-unit spacing matches resampled road arc-length. A sparse long scan can
+// skip a sharp icy apex entirely, falsely permitting full-speed approach.
+const LOW_GRIP_BRAKE_LOOKAHEAD = Array.from({ length: 18 }, (_, i) => 106 + i * 6)
 const BRAKE_TRACTION = VEHICLE_DYNAMICS_TUNING.forces.gravityAcceleration *
   VEHICLE_DYNAMICS_TUNING.forces.brakeGripUsage
 const PAVEMENT_PREVIEW = [0, 6, 12, 20, 30, 39, 48, 58]
