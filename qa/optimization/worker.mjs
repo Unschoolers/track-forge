@@ -73,7 +73,8 @@ try {
         reversed: scenario.reverse, handling: 'arcade',
         mode: task.mode, startRatio: scenario.startRatio,
         ...(trialGrid ? { gridPositions: trialGrid } : {}),
-        ...(task.mode === 'duel' ? { duelOpponentCar: task.opponentCar } : {}),
+        ...(task.mode === 'duel' ? { duelOpponentCar: task.opponentCar,
+          ...(task.duelOpponentPace !== undefined ? { duelOpponentPace: task.duelOpponentPace } : {}) } : {}),
         laps: scenario.laps, seconds: scenario.seconds,
         ...(passingStudy
           ? { aiPassingPolicyOverrides: { [task.car]: policy } }
@@ -85,6 +86,7 @@ try {
         focusRole: task.focusRole ?? 'player',
         gridPositions: trialGrid?.join(',') ?? null,
         opponentCar: task.opponentCar ?? null,
+        duelOpponentPace: task.duelOpponentPace ?? null,
         policyKind: task.policyKind ?? 'driving',
         seed: task.seed, difficulty: task.difficulty,
         mode: task.mode, startRatio: scenario.startRatio,
