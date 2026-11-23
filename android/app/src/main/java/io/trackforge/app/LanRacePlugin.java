@@ -25,6 +25,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -48,6 +49,14 @@ public class LanRacePlugin extends Plugin {
     private static final String RESPONSE = "TF_LAN_1|";
 
     private final Object gate = new Object();
+    private ArrayDeque<String> handshake = new ArrayDeque<>();
+
+    private static void trace(ArrayDeque<String> events, String event) {
+        synchronized (events) {
+            if (events.size() >= 64) events.removeFirst();
+            events.addLast(event);
+        }
+    }
     private final Map<String, Peer> peers = new HashMap<>();
     private final Set<String> discovered = new HashSet<>();
     private volatile int generation;
@@ -61,19 +70,29 @@ public class LanRacePlugin extends Plugin {
     private static final class Peer {
         final Socket socket;
         final BufferedOutputStream output;
+        final ArrayDeque<String> handshake;
         volatile boolean acceptedHere;
         volatile boolean acceptedThere;
         volatile boolean connected;
-        Peer(Socket socket) throws IOException {
+        Peer(Socket socket, ArrayDeque<String> handshake) throws IOException {
             this.socket = socket;
+            this.handshake = handshake;
             socket.setTcpNoDelay(true);
             this.output = new BufferedOutputStream(socket.getOutputStream());
         }
         synchronized void send(JSONObject packet) throws IOException {
             byte[] line = (packet.toString() + "\n").getBytes(StandardCharsets.UTF_8);
             if (line.length > MAX_FRAME) throw new IOException("LAN packet too large");
-            output.write(line);
-            output.flush();
+            String kind = packet.optString("t", "");
+            boolean control = kind.equals("pair") || kind.equals("accept") || kind.equals("reject");
+            try {
+                output.write(line);
+                output.flush();
+                if (control) trace(handshake, "sent_" + kind);
+            } catch (IOException error) {
+                if (control) trace(handshake, "send_" + kind + "_" + error.getClass().getSimpleName());
+                throw error;
+            }
         }
         void close() {
             try { socket.close(); } catch (IOException ignored) { /* already closed */ }
@@ -176,6 +195,7 @@ public class LanRacePlugin extends Plugin {
     }
 
     private void readPeer(String id, Peer peer, int session) {
+        String reason = "remote_eof";
         try {
             BufferedInputStream input = new BufferedInputStream(peer.socket.getInputStream());
             ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
@@ -183,37 +203,44 @@ public class LanRacePlugin extends Plugin {
                 buffer.reset();
                 int ch;
                 while ((ch = input.read()) != -1 && ch != '\n') {
-                    if (buffer.size() >= MAX_FRAME - 1) throw new IOException("LAN frame exceeded size limit");
+                    if (buffer.size() >= MAX_FRAME - 1) { reason = "invalid_frame_length"; return; }
                     buffer.write(ch);
                 }
                 if (ch == -1) break;
                 JSONObject packet = new JSONObject(new String(buffer.toByteArray(), StandardCharsets.UTF_8));
                 String type = packet.optString("t", "");
                 switch (type) {
-                    case "pair" -> emit("pairing", id, null, null);
+                    case "pair" -> {
+                        trace(peer.handshake, "received_pair");
+                        emit("pairing", id, null, null);
+                    }
                     case "accept" -> {
+                        trace(peer.handshake, "received_accept");
                         peer.acceptedThere = true;
                         maybeConnected(id, peer);
                     }
-                    case "reject" -> { return; }
+                    case "reject" -> { reason = "remote_reject"; return; }
                     case "data" -> {
-                        if (!peer.connected) throw new IOException("Data before LAN pairing");
+                        if (!peer.connected) maybeConnected(id, peer);
+                        if (!peer.connected) { reason = "data_before_pairing"; return; }
                         String encoded = packet.optString("d", "");
                         byte[] data = Base64.decode(encoded, Base64.DEFAULT);
-                        if (data.length == 0 || data.length > MAX_PAYLOAD) throw new IOException("Invalid LAN data");
+                        if (data.length == 0 || data.length > MAX_PAYLOAD) { reason = "invalid_data_length"; return; }
                         emit("packet", id, "data", encoded);
                     }
-                    default -> throw new IOException("Unsupported LAN frame");
+                    default -> { reason = "unsupported_frame"; return; }
                 }
             }
         } catch (IOException | JSONException | IllegalArgumentException exception) {
-            android.util.Log.w("TrackForgeLan", "LAN peer connection ended: " + id, exception);
+            reason = exception.getClass().getSimpleName();
+            android.util.Log.w("TrackForgeLan", "LAN peer connection ended", exception);
         } finally {
+            trace(peer.handshake, "disconnected_" + reason);
             peer.close();
             synchronized (gate) {
                 if (generation == session && peers.get(id) == peer) {
                     peers.remove(id);
-                    emit("disconnected", id, null, null);
+                    emit("disconnected", id, "reason", reason);
                 }
             }
         }
@@ -223,14 +250,16 @@ public class LanRacePlugin extends Plugin {
         synchronized (peer) {
             if (peer.acceptedHere && peer.acceptedThere && !peer.connected) {
                 peer.connected = true;
+                trace(peer.handshake, "connected");
                 emit("connected", id, null, null);
             }
         }
     }
 
     private boolean addPeer(String id, Socket socket, int session, boolean hosting) throws IOException {
-        Peer peer = new Peer(socket);
+        Peer peer;
         synchronized (gate) {
+            peer = new Peer(socket, handshake);
             if (generation != session || (hosting && (locked || peers.size() >= MAX_GUESTS))) {
                 peer.close();
                 return false;
@@ -257,6 +286,7 @@ public class LanRacePlugin extends Plugin {
         final int session;
         try {
             synchronized (gate) {
+                handshake = new ArrayDeque<>();
                 mode = "hosting";
                 acquireWifiDiscoveryLock();
                 server = new ServerSocket();
@@ -324,7 +354,8 @@ public class LanRacePlugin extends Plugin {
             socket.setBroadcast(true);
             socket.setSoTimeout(250);
             synchronized (gate) {
-                mode = "scanning";
+                handshake = new ArrayDeque<>();
+            mode = "scanning";
                 discovery = socket;
                 session = generation;
             }
@@ -446,13 +477,12 @@ public class LanRacePlugin extends Plugin {
         if (peer == null) { call.reject("LAN player disconnected"); return; }
         try {
             if (accepted) {
-                // The remote ACCEPT can arrive while Android is still writing ours.
-                // Mark local acceptance under the same send monitor so that an
-                // early remote ACK cannot cause a race packet to precede our ACK.
+                // Publish acceptance only after the frame is flushed.
+                // The reader uses the same monitor before delivering early data.
                 synchronized (peer) {
-                    peer.acceptedHere = true;
                     try {
                         peer.send(frame("accept"));
+                        peer.acceptedHere = true;
                     } catch (IOException exception) {
                         peer.acceptedHere = false;
                         peer.close();
@@ -514,6 +544,11 @@ public class LanRacePlugin extends Plugin {
             info.put("mode", mode);
             info.put("peers", peers.size());
             info.put("discovered", discovered.size());
+            synchronized (handshake) {
+                org.json.JSONArray events = new org.json.JSONArray();
+                for (String event : handshake) events.put(event);
+                info.put("handshake", events);
+            }
         }
         call.resolve(info);
     }
