@@ -70,6 +70,7 @@ export function advanceVehicle(
       aiRampSpeedLimit(race, vehicle, previousContext.nearest.index),
       race.handling ?? 'arcade',
       catchUp,
+      race.aiProfileOverrides?.[vehicle.car],
     )
   }
   const nextContext = raceVehicleContext(race, moved, previousContext)
