@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "fea2b737484528192b8b0eadf1b516929ee61735",
+  "trackFixture": "tests/fixtures/kidsRoomAi.trackforge.json",
+  "method": "deterministic solo AI without traffic",
+  "track": "Kids room",
+  "handling": "arcade",
+  "laps": 2,
+  "startRatio": 0.21932299012693934,
+  "seeds": [
+    1,
+    4331
+  ],
+  "type": "solo AI, no opponents",
+  "humanReferences": {
+    "greenBest": 72.9,
+    "redRecent": 85.883
+  },
+  "matrix": {
+    "blue": {
+      "easy": {
+        "times": [
+          89.03333333332957,
+          88.73333333332958
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          4.183,
+          4.05
+        ]
+      },
+      "normal": {
+        "times": [
+          83.33333333332989,
+          83.33333333332989
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          2.3,
+          2.3
+        ]
+      },
+      "hard": {
+        "times": [
+          86.1499999999964,
+          86.1499999999964
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          2.517,
+          2.517
+        ]
+      }
+    },
+    "red": {
+      "easy": {
+        "times": [
+          107.7333333333285,
+          107.61666666666184
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          2.383,
+          2.317
+        ]
+      },
+      "normal": {
+        "times": [
+          102.16666666666215,
+          102.18333333332882
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          2.333,
+          2.333
+        ]
+      },
+      "hard": {
+        "times": [
+          101.53333333332886,
+          101.53333333332886
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          4.483,
+          4.483
+        ]
+      }
+    },
+    "green": {
+      "easy": {
+        "times": [
+          85.13333333332979,
+          85.13333333332979
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          3.317,
+          3.317
+        ]
+      },
+      "normal": {
+        "times": [
+          80.86666666666336,
+          80.86666666666336
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          3.617,
+          3.617
+        ]
+      },
+      "hard": {
+        "times": [
+          81.78333333332998,
+          81.78333333332998
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          3,
+          3
+        ]
+      }
+    },
+    "yellow": {
+      "easy": {
+        "times": [
+          96.39999999999581,
+          96.51666666666247
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          1.867,
+          1.633
+        ]
+      },
+      "normal": {
+        "times": [
+          92.0333333333294,
+          92.0333333333294
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          6.017,
+          6
+        ]
+      },
+      "hard": {
+        "times": [
+          90.44999999999615,
+          90.44999999999615
+        ],
+        "recoveries": [
+          0,
+          0
+        ],
+        "offRoadSeconds": [
+          3.1,
+          3.1
+        ]
+      }
+    }
+  }
+}

@@ -18,7 +18,7 @@ function loadKidsRoom() {
 }
 const kidsRoom = loadKidsRoom()
 
-function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal', playerCar: 'green' | 'red' = 'green') {
+function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'normal', playerCar: 'green' | 'red' = 'green') {
   let state = seed >>> 0
   const random = {
     next: () => {
@@ -68,7 +68,7 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal', pl
     if (tick % 60 === 0) {
       for (const vehicle of race.vehicles.filter(vehicle => !vehicle.player && vehicle.finishedAt === null)) {
         const stats = surfaces.get(vehicle.id) ?? {}
-        const surface = race.path.points[vehicle.pathIndex]?.surface ?? 'unknown'
+        const surface = vehicle.currentSurface ?? 'unknown'
         stats[surface] = (stats[surface] ?? 0) + 1
         surfaces.set(vehicle.id, stats)
       }
@@ -85,8 +85,8 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal', pl
 
 describe('AI cornering on the Kids room mixed-surface circuit', () => {
   it.each([1, 4331])('finishes reliably with a competitive field (seed %i)', seed => {
-    const { opponents, recoveries, splits, surfaces } = normalRivals(seed)
-    const hard = normalRivals(seed, 'hard')
+    const { opponents, recoveries, splits, surfaces } = raceRivals(seed)
+    const hard = raceRivals(seed, 'hard')
     const hardTimes = hard.opponents.map(vehicle => `${vehicle.car}:${vehicle.finishedAt?.toFixed(2) ?? 'DNF'}`).join(',')
     const times = opponents.map(vehicle => vehicle.finishedAt ?? Infinity)
     const diagnostic = opponents.map(vehicle =>
@@ -104,7 +104,7 @@ describe('AI cornering on the Kids room mixed-surface circuit', () => {
     // After results appear, the live 40 s settlement budget should be enough
     // for the whole Normal field to produce actual, not invented finish times.
     expect(Math.max(...times), diagnostic).toBeLessThan(PLAYER_REFERENCE_SECONDS + 40)
-    // Release competitiveness floors, not the unsolved pace stretch goal.
+    // Protect the player reference independently of the Hard-first ordering below.
     // #257 acceptance: the fastest Normal rival must be within ten seconds
     // of the player's 1:12.900, without compromising physical corner control.
     expect(Math.min(...times), diagnostic).toBeLessThan(PLAYER_REFERENCE_SECONDS + 10)
@@ -116,7 +116,7 @@ describe('AI cornering on the Kids room mixed-surface circuit', () => {
 describe('Green AI follows its grip advantage on mixed-surface Kids room', () => {
   it.each([1, 4331])('uses a faster yet clean two-lap line against the original player benchmark (seed %i)', seed => {
     // Select Red as the stationary player so Green takes a real AI grid slot.
-    const { opponents, recoveries } = normalRivals(seed, 'normal', 'red')
+    const { opponents, recoveries } = raceRivals(seed, 'normal', 'red')
     const green = opponents.find(vehicle => vehicle.car === 'green')
     const blue = opponents.find(vehicle => vehicle.car === 'blue')
     const yellow = opponents.find(vehicle => vehicle.car === 'yellow')
@@ -132,5 +132,33 @@ describe('Green AI follows its grip advantage on mixed-surface Kids room', () =>
       .toBeLessThan(blue?.finishedAt ?? Infinity)
     expect(green?.finishedAt ?? Infinity, diagnostics)
       .toBeLessThan(yellow?.finishedAt ?? Infinity)
+  }, 30000)
+})
+
+describe('Hard-first Green AI difficulty ordering on the real Kids room circuit', () => {
+  it.each([1, 4331])('keeps Hard faster than Normal and Normal faster than Easy (seed %i)', seed => {
+    const runs = (['hard', 'normal', 'easy'] as const).map(difficulty => {
+      // Red occupies the human slot; Green remains a real AI on the original grid.
+      const result = raceRivals(seed, difficulty, 'red')
+      const green = result.opponents.find(vehicle => vehicle.car === 'green')
+      return { difficulty, green, recoveries: result.recoveries,
+        surfaces: green ? result.surfaces.get(green.id) : undefined,
+        splits: green ? result.splits.get(green.id) : undefined }
+    })
+    const diagnostics = runs.map(({ difficulty, green, recoveries, surfaces, splits }) =>
+      `${difficulty}: Green=${green?.finishedAt?.toFixed(3) ?? 'DNF'}, recoveries=${recoveries.join(',')}, surfaces=${JSON.stringify(surfaces)}, splits=${splits?.join('/')}`
+    ).join('; ')
+    for (const { green, recoveries } of runs) {
+      expect(green?.finishedAt, diagnostics).not.toBeNull()
+      expect(Number.isFinite(green?.finishedAt), diagnostics).toBe(true)
+      expect(recoveries, diagnostics).toEqual([])
+    }
+    const hard = runs[0]?.green?.finishedAt ?? Infinity
+    const normal = runs[1]?.green?.finishedAt ?? Infinity
+    const easy = runs[2]?.green?.finishedAt ?? Infinity
+    // Calibrate the fastest physically safe Green policy on Hard first.
+    // Lower difficulties must be derived slowdowns, not independent drivers.
+    expect(normal, diagnostics).toBeGreaterThan(hard)
+    expect(easy, diagnostics).toBeGreaterThan(normal)
   }, 30000)
 })

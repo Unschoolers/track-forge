@@ -90,12 +90,14 @@ export function stepAiVehicle(
   // Stronger but slower-changing steering follows the next bend without the
   // instant counter-corrections that previously made the car over-brake.
   // Authored racing lines and Simulation retain their original policy.
-  const tuning = handling === 'arcade' && !vehicle.racingLine
-    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
-        reaction: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_REACTION : ARCADE_STEERING.reaction,
-        steerGain: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN : ARCADE_STEERING.steerGain }
-    : DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
+  // Hard is the shared Arcade steering reference; Normal and Easy use that
+  // same controller with additional corner speed reserves and driver errors.
+  // Hard's former slower steering response made nimble and balanced cars
+  // slower than Normal on mixed surfaces even without traffic.
+  const tuning = handling === 'arcade' && !vehicle.racingLine
+    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING }
+    : DIFFICULTY_SPECS[drivingDifficulty]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
