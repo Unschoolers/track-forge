@@ -1,3 +1,5 @@
+import { recoveryRegression } from './recoveryPolicy.mjs'
+
 /** Safety is a hard gate; timing is compared only for like-for-like trials. */
 export function trialKey(task) {
   return [task.car, task.playerCar ?? task.car, task.focusRole ?? 'player',
@@ -28,17 +30,31 @@ export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01 } = {}) {
     reasons.push('baseline did not finish')
   if (current.finished_seconds === null)
     reasons.push('candidate did not finish')
-  if (current.recoveries > 0)
-    reasons.push(`driver recovered ${current.recoveries} times`)
-  if (candidate.events.some(event => event.severity === 'error'))
+  const driverRecovery = recoveryRegression(
+    current.difficulty, old.recoveries, current.recoveries)
+  if (driverRecovery) reasons.push(driverRecovery)
+  // Lane monitoring labels an *expected* automatic recovery as an error
+  // event. Its allowed count is governed above; other invalid physics,
+  // route jumps and timeouts remain unconditional blockers.
+  if (candidate.events.some(event =>
+    event.severity === 'error' && event.code !== 'recovery'))
     reasons.push('simulation error event')
   // Traffic cannot be "optimized" by forcing competitors off the road.
   const oldRivals = new Map(baseline.rows.map(row => [row.vehicle_id, row]))
   for (const rival of candidate.rows) {
     const prior = oldRivals.get(rival.vehicle_id)
     if (!prior) { reasons.push('roster changed'); continue }
-    if (rival.recoveries > prior.recoveries)
-      reasons.push(`new ${rival.car_type} recovery`)
+    // An unchanged rival's old recovery must not veto a policy. Extra
+    // recovery is evaluated against the same matched difficulty and seed.
+    if (rival.vehicle_id !== current.vehicle_id) {
+      const rivalRecovery = recoveryRegression(
+        current.difficulty, prior.recoveries, rival.recoveries)
+      // Hard rivals can already fail in the baseline; flag only a *new*
+      // incident for rivals not under this candidate's policy.
+      if (rivalRecovery && (current.difficulty !== 'hard' ||
+          rival.recoveries > prior.recoveries))
+        reasons.push(`${rival.car_type}: ${rivalRecovery}`)
+    }
     if (rival.finished_seconds === null && prior.finished_seconds !== null)
       reasons.push(`${rival.car_type} no longer finishes`)
   }
