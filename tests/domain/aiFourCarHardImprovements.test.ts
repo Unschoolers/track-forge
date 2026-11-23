@@ -54,7 +54,6 @@ function measure(car: CarId, scenarioIndex: number, mode: 'solo' | 'duel' | 'tra
   const oldDriving = {
     ...CAR_DRIVING_PROFILES[car],
     ...(car === 'blue' ? { hardCornerTargetBonus: 0.04 } : {}),
-    ...(car === 'red' ? { hardHairpinReserve: 0 } : {}),
     ...(car === 'green' ? { hardHairpinReserve: 0 } : {}),
     ...(car === 'yellow' ? { hardHairpinReserve: 0 } : {}),
   }
