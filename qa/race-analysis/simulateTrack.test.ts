@@ -19,7 +19,19 @@ diagnostic('simulates exported geometry with deterministic AI driving', () => {
   if (!['trackforge-track', 'trackforge-race-replay'].includes(exportJson.format))
     throw new Error('Expected an exported Track Forge track or race replay')
   const options = JSON.parse(process.env.TRACKFORGE_ANALYSIS_OPTIONS ?? '{}')
-  const startRatio = options.startRatio ?? track.start?.ratio ?? 0
+  const path = buildRoadPath(track.points, track.terrain)
+  // Exported races don't currently record startRatio directly. Derive it
+  // from the first recorded player position instead of silently using zero.
+  const firstPlayer = exportJson.frames?.[0]?.vehicles?.find((v: { player?: boolean }) => v.player)
+  const replayStart = exportJson.format === 'trackforge-race-replay'
+    ? firstPlayer?.pathDistance / path.totalLength
+    : undefined
+  if (exportJson.format === 'trackforge-race-replay' &&
+      options.startRatio === undefined &&
+      (!Number.isFinite(replayStart) || replayStart < 0 || replayStart >= 1)) {
+    throw new Error('Cannot derive start position from replay; provide --start')
+  }
+  const startRatio = options.startRatio ?? replayStart ?? track.start?.ratio ?? 0
   const selectedCars: readonly string[] = options.cars === undefined
     ? (exportJson.setup?.car ? [exportJson.setup.car] : cars)
     : options.cars === 'all' ? cars : String(options.cars).split(',')
@@ -31,7 +43,6 @@ diagnostic('simulates exported geometry with deterministic AI driving', () => {
   const seconds = options.seconds ?? 110
   const gridPositions = options.gridPositions ?? exportJson.setup?.gridPositions
   const seeds: readonly number[] = options.seeds ?? [options.seed ?? 1]
-  const path = buildRoadPath(track.points, track.terrain)
   const outputs = []
   for (const seed of seeds) {
     for (const carName of selectedCars) {
