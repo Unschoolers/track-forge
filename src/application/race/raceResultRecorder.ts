@@ -68,6 +68,7 @@ export function createRaceResult({ track, setup, state, terminalReason, scoreSto
       mode: setup.mode ?? 'normal',
       routeKind: normalizeRouteKind(track.routeKind),
       splits: [...splits],
+      finishGate: (state.timingGates?.length ?? 0) + 1,
       trackId: track.id,
       trackName: track.name,
       playerPlace: ranked.indexOf(player) + 1,
