@@ -174,7 +174,8 @@ export function stepAiVehicle(
     }
   }
   const pursuitSamples = Math.max(1, Math.round(
-    (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk) *
+    (lookAheadSamples + extraSamples) *
+      (1 - 0.5 * edgeRisk * (difficulty === 'hard' ? hardProfile.hardEdgeAvoidanceScale ?? 1 : 1)) *
       (arcade && !vehicle.racingLine ? corner.pursuitScale : 1),
   ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
@@ -208,8 +209,11 @@ export function stepAiVehicle(
       ? plannedApexCut(path, targetIndex, reversed, difficulty, vehicle.car,
         roadOffset, lateralVelocity, vehicle.speed)
       : { x: 0, y: 0 }
-  const targetX = target.x + context.normal.x * pursuitLane + cut.x
-  const targetY = target.y + context.normal.y * pursuitLane + cut.y
+  // This controls an intended racing line, never the actual friction,
+  // road support or checkpoint collision geometry.
+  const cutScale = difficulty === 'hard' ? hardProfile.hardApexCutScale ?? 1 : 1
+  const targetX = target.x + context.normal.x * pursuitLane + cut.x * cutScale
+  const targetY = target.y + context.normal.y * pursuitLane + cut.y * cutScale
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
