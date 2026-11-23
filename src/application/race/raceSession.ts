@@ -99,6 +99,7 @@ export interface RaceResult {
   readonly mode?: RaceMode
   readonly routeKind?: RouteKind
   readonly splits?: readonly RaceSplit[]
+  readonly finishGate?: number
   readonly outcome: RaceOutcome
   readonly trackId: TrackId
   readonly trackName: string
