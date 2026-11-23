@@ -7,10 +7,14 @@ import { decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 import type { CarId, DifficultyId } from '@/domain/model'
 
-const [track] = decodeTrackInput(JSON.parse(
-  readFileSync('tests/fixtures/desertSandAi.trackforge.json', 'utf8'),
-))
-if (!track) throw new Error('Missing Desert sand fixture')
+function loadTrack() {
+  const [decoded] = decodeTrackInput(JSON.parse(
+    readFileSync('tests/fixtures/desertSandAi.trackforge.json', 'utf8'),
+  ))
+  if (!decoded) throw new Error('Missing Desert sand fixture')
+  return decoded
+}
+const track = loadTrack()
 const path = prepareLanePath(track)
 const cars = ['red', 'green', 'blue', 'yellow'] as const
 const difficulties = ['hard', 'normal'] as const
