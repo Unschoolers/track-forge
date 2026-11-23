@@ -22,12 +22,15 @@ describe('AI difficulty policy', () => {
       .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardLookAheadSamples)
     expect(CAR_DRIVING_PROFILES.yellow.hardSteerGain)
       .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardSteerGain)
-    expect(CAR_DRIVING_PROFILES.green.hardCornerReserve).toBeGreaterThan(0)
+    // Green's latest safe preview no longer needs a positive extra reserve.
+    expect(CAR_DRIVING_PROFILES.green.hardLookAheadSamples)
+      .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardLookAheadSamples)
     expect(CAR_DRIVING_PROFILES.blue.hardCornerReserve).toBe(0)
     for (const profile of Object.values(CAR_DRIVING_PROFILES)) {
       expect(profile.hardReaction).toBeGreaterThan(0)
       expect(profile.hardSteerGain).toBeGreaterThan(0)
       expect(profile.hardLookAheadSamples).toBeGreaterThan(0)
+      expect(profile.hardCornerReserve).toBeGreaterThanOrEqual(0)
     }
   })
 
@@ -44,7 +47,7 @@ describe('AI difficulty policy', () => {
     expect(arcadeCornerMargin('hard')).toBe(0)
     expect(arcadeCornerMargin('hard', 'blue')).toBe(0)
     expect(arcadeCornerMargin('hard', 'red')).toBe(0)
-    expect(arcadeCornerMargin('hard', 'green')).toBeGreaterThan(0)
+    expect(arcadeCornerMargin('hard', 'green')).toBe(0)
     expect(arcadeCornerMargin('hard', 'green')).toBeLessThan(arcadeCornerMargin('normal', 'green'))
     expect(arcadeCornerMargin('easy')).toBeGreaterThan(arcadeCornerMargin('normal'))
     expect(arcadeCornerMargin('normal')).toBeGreaterThan(arcadeCornerMargin('hard'))
