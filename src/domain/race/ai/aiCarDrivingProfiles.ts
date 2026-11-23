@@ -43,12 +43,7 @@ export const CAR_DRIVING_PROFILES = {
   red: {
     hardReaction: 12,
     hardSteerGain: 2.22,
-    // Less reliance on traffic braking exposes tight Hairpins: protect
-    // the physically limited front tires with a modest speed-plan reserve.
     hardCornerReserve: 0.01,
-    // Extra caution for severe road bends where traffic no longer provides
-    // an accidental speed limiter. This targets speed planning, not grip.
-    hardHairpinReserve: 0.08,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
   },
