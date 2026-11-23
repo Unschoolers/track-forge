@@ -329,7 +329,17 @@ export function stepAiVehicle(
   const apexBrakeMargin = arcade && !vehicle.racingLine && context.onRoad &&
     context.surface === 'street' && (corner.phase === 'turn' || corner.phase === 'exit')
       ? 7 : 3
-  const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
+  // A stable Hard racer can coast through a small speed-target overshoot
+  // instead of spending precious tire force on unnecessary brake pulses.
+  // Withdraw the tolerance on ice, at the road edge, during unstable slides,
+  // or before a direction reversal. This changes driver inputs only.
+  const stableBrakeRelease = difficulty === 'hard' && arcade && !vehicle.racingLine &&
+    context.onRoad && context.surface !== 'ice' && !corner.reversal &&
+    !corner.drifting && Math.abs(slipAngle) < 0.07 &&
+    Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.45 &&
+    Math.abs(lateralVelocity) < 20
+  const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3) +
+    (stableBrakeRelease ? hardProfile.hardBrakeOverspeedTolerance ?? 0 : 0)
   const curveOverspeed = vehicle.speed - curveSpeed
   const curveBraking = curveOverspeed > curveBrakeThreshold
   // The former all-or-nothing AI brake rapidly toggled full force in bends,
