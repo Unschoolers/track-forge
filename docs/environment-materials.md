@@ -22,7 +22,8 @@ Each environment should be identifiable from its material treatment at **driving
 ## Performance and compatibility
 
 - Do not allocate material textures or strokes during physics steps or editor pointer movement.
-- Existing 256-world-unit ground tiles, eight cached variants, day/night variants, 64-visible-tile budget and padded viewport culling remain intact.
+- Keep 256-world-unit ground tiles, eight shared cached variants and day/night materials. Compact/mobile windows retain the 64-visible-tile limit. Desktop-size viewports (at least 1 megapixel) can draw up to 768 **reused sprites** to keep grass/sand/concrete/carpet visible from HD through 5K; this does not create 768 new canvas textures.
+- The conservative tile budget uses the largest *rotated* bounding rectangle rather than the diagonal squared. This keeps the material visible when driving, panning and rotating, and only falls back to the base terrain color at extreme overview scales (such as 8K full screen or zooming far out in the editor). Physics and race-camera zoom are unchanged. Validate frame pacing on low-end desktop GPUs before expanding the limit further.
 - Road mesh preserves the painter order across direct and batched renderers: edge, road fill, then subtle detail. Large tracks are capped at 64 ribbon batches with independently culled material layers.
 - The flyover precomputes the decorative road strokes once per preview session and only paints visible sections per frame.
 - Marks are sparse and limited to 32 repeat intervals per segment, including malformed/degenerate segment handling. They stay within road width.

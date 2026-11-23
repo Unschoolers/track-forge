@@ -33,18 +33,35 @@ describe('world ground texture', () => {
     expect(bounds.bottom).toBeGreaterThan(100)
   })
 
-  it('keeps overview fallback stable across camera rotation and translation near the tile budget', () => {
-    const view = { centerX: 0, centerY: 0, width: 1500, height: 800, zoom: 1, rotation: 0 }
-    const windows = [
-      view,
-      { ...view, centerX: 250, centerY: 250 },
-      { ...view, rotation: Math.PI / 4 },
-      { ...view, centerX: 250, centerY: 250, rotation: Math.PI / 4 },
-    ]
-    const selected = windows.map(visibleGroundTilesForViewport)
-    expect(new Set(selected.map((tiles) => tiles.length === 0)).size).toBe(1)
-    expect(selected.every((tiles) => tiles.length <= 64)).toBe(true)
-    expect(visibleGroundTilesForViewport({ ...view, width: 400, height: 300 }).length).toBeGreaterThan(0)
+  it('textures standard and large PC windows at every rotation without blank ground', () => {
+    for (const [width, height] of [
+      [1500, 800], [1920, 1080], [2560, 1440], [3440, 1440],
+      [3840, 2160], [5120, 2880],
+    ]) {
+      for (const rotation of [0, Math.PI / 8, Math.PI / 4, Math.PI / 2]) {
+        for (const offset of [0, 127]) {
+          const view = { centerX: offset, centerY: -offset, width, height, zoom: 1.02, minimumZoom: 1.02, rotation }
+          const tiles = visibleGroundTilesForViewport(view)
+          expect(tiles.length, `${width}x${height} at ${rotation} radians`).toBeGreaterThan(0)
+          expect(tiles.length).toBeLessThanOrEqual(768)
+          // Verify tiles genuinely cover the rendered camera, not just a token patch.
+          expect(tiles).toEqual(visibleGroundTiles(groundViewportBounds(view), 768))
+        }
+      }
+    }
+    const compact = { centerX: 0, centerY: 0, width: 400, height: 300, zoom: 1, rotation: 0 }
+    expect(visibleGroundTilesForViewport(compact).length).toBeGreaterThan(0)
+  })
+
+  it('keeps the mobile overview fallback and rejects extremely large desktop views', () => {
+    const phone = { centerX: 0, centerY: 0, width: 844, height: 390, zoom: 0.35, rotation: 0 }
+    expect(visibleGroundTilesForViewport(phone)).toEqual([])
+    for (const rotation of [0, Math.PI / 4, Math.PI / 2]) {
+      expect(visibleGroundTilesForViewport({ ...phone, rotation, centerX: 150 })).toEqual([])
+      expect(visibleGroundTilesForViewport({
+        ...phone, width: 9000, height: 6000, zoom: 1, rotation,
+      })).toEqual([])
+    }
   })
 
   it('provides deterministic grass marks for day and night', () => {
@@ -58,7 +75,7 @@ describe('world ground texture', () => {
     const view = { centerX: 0, centerY: 0, width: 590, height: 160, rotation: 0 }
     expect(visibleGroundTilesForViewport({ ...view, zoom: 0.37 }).length).toBeGreaterThan(0)
     for (const zoom of [0.35, 0.36, 0.37]) {
-      expect(visibleGroundTilesForViewport({ ...view, zoom, minimumZoom: 0.35 })).toEqual([])
+      expect(visibleGroundTilesForViewport({ ...view, zoom, minimumZoom: 0.3 })).toEqual([])
     }
   })
 
@@ -99,6 +116,10 @@ describe('world ground texture', () => {
     renderer.render({ ...view, width: 10000, height: 10000 }, true)
     expect(images.every((image) => image.setVisible.mock.lastCall?.[0] === false)).toBe(true)
     expect(images.length).toBeLessThanOrEqual(64)
+    renderer.render({ ...view, width: 3840, height: 2160, zoom: 1.02, rotation: Math.PI / 4 }, false)
+    expect(images.length).toBeGreaterThan(64)
+    expect(images.length).toBeLessThanOrEqual(768)
+    expect(images.every((image) => image.setVisible.mock.lastCall?.[0] === true)).toBe(true)
     getContext.mockRestore()
   })
   it('retries the same camera window after a failed texture registration', () => {
