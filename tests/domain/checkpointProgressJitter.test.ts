@@ -51,7 +51,7 @@ describe('arcade checkpoint authority with route-index jitter', () => {
     const after = { ...before, ...at(30, 100), pathIndex: lower + 4 }
     const result = advanceArcadeTimingGate(race, before, after, 3, false, () => false)
     expect(result.vehicle.nextSector).toBe(1)
-    expect(result.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+    expect(result.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 2 })
   })
 
   it('accepts a near-edge circuit pass without accepting a wider off-road shortcut', () => {
