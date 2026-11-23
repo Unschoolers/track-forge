@@ -2,6 +2,7 @@ import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
+/** Indexed progress for rivals: all gates are authored and ordered by race direction. */
 export function updateProgress(
   vehicle: RaceVehicle,
   nextPathIndex: number,
@@ -10,53 +11,46 @@ export function updateProgress(
   totalLaps: number,
   startPathIndex = 0,
   reversed = false,
+  timingGates: readonly number[] = [],
+  closed = true,
 ): RaceVehicle {
-  if (pathLength <= 0 || vehicle.finishedAt !== null) return vehicle
-  const directed = (index: number): number => {
-    const value = reversed
-      ? startPathIndex - index
-      : index - startPathIndex
-    return ((value % pathLength) + pathLength) % pathLength
+  if (pathLength <= 1 || vehicle.finishedAt !== null) return vehicle
+  const directed = (index: number): number => closed
+    ? (((reversed ? startPathIndex - index : index - startPathIndex) % pathLength) + pathLength) % pathLength
+    : index
+  const before = directed(vehicle.pathIndex)
+  const after = directed(nextPathIndex)
+  const travel = closed ? (after - before + pathLength) % pathLength : after - before
+  if (travel < 0 || travel > pathLength / 2) return { ...vehicle, pathIndex: nextPathIndex }
+
+  const finish = vehicle.nextSector === timingGates.length + 1
+  const required = finish
+    ? closed ? pathLength : pathLength - 1
+    : directed(timingGates[vehicle.nextSector - 1] ?? startPathIndex)
+  const distance = closed
+    ? (required - before + pathLength) % pathLength || (finish ? pathLength : 0)
+    : required - before
+  if (distance <= 0 || distance > travel) return { ...vehicle, pathIndex: nextPathIndex }
+  if (finish) {
+    const lap = vehicle.lap + 1
+    return { ...vehicle, pathIndex: nextPathIndex, nextSector: 1, lap,
+      finishedAt: lap >= totalLaps ? elapsed : null }
   }
-  const previous = directed(vehicle.pathIndex)
-  const next = directed(nextPathIndex)
-  const travel = (next - previous + pathLength) % pathLength
-  if (travel > pathLength / 2) {
-    return { ...vehicle, pathIndex: nextPathIndex }
-  }
-  const crossed = (gate: number): boolean => {
-    const distance = (gate - previous + pathLength) % pathLength
-    return distance > 0 && distance <= travel
-  }
-  let nextSector = vehicle.nextSector
-  for (const sector of [1, 2, 3] as const) {
-    if (
-      nextSector === sector &&
-      crossed((pathLength * sector) / 4)
-    ) {
-      nextSector = (sector + 1) as 2 | 3 | 4
-    }
-  }
-  const crossedStart = next < previous && travel > 0
-  const completedLap = crossedStart && nextSector === 4
-  const lap = vehicle.lap + (completedLap ? 1 : 0)
-  if (crossedStart) nextSector = 1
-  return {
-    ...vehicle,
-    pathIndex: nextPathIndex,
-    lap,
-    nextSector,
-    finishedAt: lap >= totalLaps ? elapsed : null,
-  }
+  return { ...vehicle, pathIndex: nextPathIndex, nextSector: vehicle.nextSector + 1 }
 }
 
-export function lastSampleBeforeCheckpoint(path: RoadPath, checkpoint: RaceVehicle['nextSector']): number {
-  return Math.max(0, Math.ceil((path.points.length - 1) * checkpoint / 4) - 1)
+/** Next authored gate index for an open route (finish when all are passed). */
+export function lastSampleBeforeCheckpoint(
+  path: RoadPath, checkpoint: number, timingGates: readonly number[] = [],
+): number {
+  return Math.max(0, Math.ceil(timingGates[checkpoint - 1] ?? path.points.length - 1) - 1)
 }
 
-export function passedPendingCheckpoint(path: RoadPath, vehicle: RaceVehicle): boolean {
-  return vehicle.nextSector < 4 &&
-    vehicle.pathIndex > lastSampleBeforeCheckpoint(path, vehicle.nextSector) + 2
+export function passedPendingCheckpoint(
+  path: RoadPath, vehicle: RaceVehicle, timingGates: readonly number[] = [],
+): boolean {
+  const next = timingGates[vehicle.nextSector - 1] ?? path.points.length - 1
+  return vehicle.pathIndex > next + 2
 }
 
 /** Slightly forgive near-edge timing passes, not distant off-road shortcuts.
@@ -70,6 +64,7 @@ export function timingGateCrossingRadius(roadRadius: number, bothOnRoad: boolean
 }
 
 /** Accept an open-route gate only when the driven segment crosses its road line. */
+/** Retained adapter for open-route tools; no implicit split sectors. */
 export function updateOpenRouteProgress(
   previous: RaceVehicle,
   vehicle: RaceVehicle,
@@ -79,19 +74,19 @@ export function updateOpenRouteProgress(
   onRoadBefore: boolean,
   onRoadAfter: boolean,
   roadRadius: number,
+  timingGates: readonly number[] = [],
 ): RaceVehicle {
   const last = path.points.length - 1
-  const index = Math.max(0, Math.min(last, nextPathIndex))
-  const result = { ...vehicle, pathIndex: index }
+  const result = { ...vehicle, pathIndex: Math.max(0, Math.min(last, nextPathIndex)) }
   if (last < 1 || previous.finishedAt !== null) return result
   const gate = previous.nextSector
-  // A diagonal pass can briefly register off-road; keep the swept
-  // intersection authoritative with a small allowance at the stripe ends.
-  const crossingRadius = timingGateCrossingRadius(roadRadius, onRoadBefore && onRoadAfter)
-  if (!crossesRoadGate(path, previous, result, last * gate / 4, crossingRadius)) return result
-  return gate === 4
-    ? { ...result, lap: previous.lap + 1, finishedAt: elapsed }
-    : { ...result, nextSector: (gate + 1) as 2 | 3 | 4 }
+  const finish = gate === timingGates.length + 1
+  const position = timingGates[gate - 1] ?? last
+  const radius = timingGateCrossingRadius(roadRadius, onRoadBefore && onRoadAfter)
+  if (!crossesRoadGate(path, previous, result, position, radius)) return result
+  return finish
+    ? { ...result, lap: previous.lap + 1, nextSector: 1, finishedAt: elapsed }
+    : { ...result, nextSector: gate + 1 }
 }
 
 /** A forward crossing must stay on the route near this gate, even at crossings. */
