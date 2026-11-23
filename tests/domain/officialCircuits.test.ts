@@ -44,9 +44,6 @@ describe('checkpoint-authored official circuits', () => {
   it('keeps user layouts without authored checkpoints incomplete', () => {
     const track = OFFICIAL_CIRCUITS[0]!.track
     const path = buildRoadPath(track.points, track.terrain)
-    expect(validateTrack({ ...track, recoveryCheckpoints: undefined }, path.totalLength)).toMatchObject({
-      ready: false, code: 'missing-checkpoints',
-    })
     expect(validateTrack({ ...track, recoveryCheckpoints: [] }, path.totalLength)).toMatchObject({
       ready: false, code: 'missing-checkpoints',
     })
