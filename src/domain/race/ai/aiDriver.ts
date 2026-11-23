@@ -91,24 +91,12 @@ export function stepAiVehicle(
   // instant counter-corrections that previously made the car over-brake.
   // Authored racing lines and Simulation retain their original policy.
   const car = CAR_SPECS[vehicle.car]
-  // Hard starts from the same shared Arcade technique as Normal. The older
-  // Hard-only, slow steering response was valid for heavy chassis, but held
-  // Green's quick-yaw chassis back even when its real tires could turn in.
-  // Interpolate using physical steering response; preserve Blue/Red/Yellow's
-  // established conservative Hard technique without a car-name special case.
-  const yawResponse = Math.sqrt(
-    (car.steer / CAR_SPECS.blue.steer) *
-    (CAR_SPECS.blue.yawInertia / Math.max(1, car.yawInertia)),
-  )
-  const agileHardBlend = clamp((yawResponse - 1) / 0.3, 0, 1)
-  const hardReaction = AI_DRIVING_TUNING.HARD_ARCADE_REACTION +
-    (ARCADE_STEERING.reaction - AI_DRIVING_TUNING.HARD_ARCADE_REACTION) * agileHardBlend
-  const hardSteerGain = AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN +
-    (ARCADE_STEERING.steerGain - AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN) * agileHardBlend
+  // Hard is the shared Arcade steering reference; Normal and Easy use that
+  // same controller with additional corner speed reserves and driver errors.
+  // Hard's former slower steering response made nimble and balanced cars
+  // slower than Normal on mixed surfaces even without traffic.
   const tuning = handling === 'arcade' && !vehicle.racingLine
-    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
-        reaction: difficulty === 'hard' ? hardReaction : ARCADE_STEERING.reaction,
-        steerGain: difficulty === 'hard' ? hardSteerGain : ARCADE_STEERING.steerGain }
+    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING }
     : DIFFICULTY_SPECS[drivingDifficulty]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
