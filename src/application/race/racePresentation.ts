@@ -69,8 +69,9 @@ export function interpolateRaceState(
   // describe the same bounds and the camera remains continuous.
   const blendedPreview = !playerRecovered && oldPreview?.length && preview?.length
     ? Array.from({ length: Math.max(oldPreview.length, preview.length) }, (_, index) => {
-      const before = oldPreview[Math.min(index, oldPreview.length - 1)]!
-      const after = preview[Math.min(index, preview.length - 1)]!
+      const before = oldPreview[Math.min(index, oldPreview.length - 1)]
+      const after = preview[Math.min(index, preview.length - 1)]
+      if (!before || !after) return after ?? before ?? hints.target
       return { x: blend(before.x, after.x, alpha), y: blend(before.y, after.y, alpha) }
     })
     : preview
