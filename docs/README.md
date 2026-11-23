@@ -12,6 +12,7 @@ Start here for **current team/agent guidelines**. Older specs and plans under `d
 | [Five-slice refactor closure — 2026-11-22](refactor-closeout-2026-11-22.md) | Completed implementation scope, regression protection, and independent PR verification boundary |
 | [Mobile gameplay QA](gameplay-qa.md) | Touch/browser scenarios and limitations |
 | [AI lane checker](ai-lane-checker.md) | Deterministic simulation diagnostics and regressions |
+| [AI difficulty tuning](ai-difficulty-tuning.md) | Hard-first calibration, Green's grip advantage, and Easy/Normal/Hard ordering |
 | [Race performance](race-performance.md) | Repeatable Chromium/Android measurements |
 | [Night presentation](night-presentation.md) | Preview/race lighting parity and rendering budget |
 | [Kids' Room environment](kids-room-environment.md) | Toy props, carpet hills, juice spills and visual-only road skins |
