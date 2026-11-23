@@ -36,7 +36,7 @@ export const CAR_DRIVING_PROFILES = {
   // stay on line without a separate Hard apex speed reserve.
   green: {
     hardReaction: 10,
-    hardSteerGain: 2.42,
+    hardSteerGain: 2.7,
     hardCornerReserve: 0,
     hardLookAheadSamples: 8,
   },
