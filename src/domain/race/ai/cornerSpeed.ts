@@ -161,6 +161,10 @@ export function safeEntrySpeedAhead(
     (car.steer / CAR_SPECS.blue.steer) *
     (CAR_SPECS.blue.yawInertia / Math.max(1, car.yawInertia)),
   )
+  // Keep the cautious yaw penalty for slower chassis. Agile, high-grip cars
+  // can rotate through an apex more quickly, but only when the CURRENT
+  // surface has enough real tire grip to support it. This deliberately gives
+  // no bonus on ice and does not change car physics or surface speed limits.
   const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
@@ -191,7 +195,11 @@ export function safeEntrySpeedAhead(
     distance = Math.max(0, distance)
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
       VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
-    const corneringPace = 1 - (1 - turningPace) * clamp(bend / 0.1, 0, 1)
+    const agileGripBonus = useChassisYawSafety
+      ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
+        clamp((grip - 0.75) / 0.2, 0, 1)
+      : 0
+    const corneringPace = 1 - (1 - turningPace - agileGripBonus) * clamp(bend / 0.1, 0, 1)
     const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * brakeDeceleration * distance)
     allowed = Math.min(allowed, entrySpeed)
   }
