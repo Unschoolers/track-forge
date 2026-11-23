@@ -17,6 +17,7 @@ import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
+import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -47,6 +48,7 @@ const {
   RACING_PAVEMENT_EDGE_LIMIT,
   RACING_PAVEMENT_HEADING_MARGIN,
   RACING_PAVEMENT_HEADING_LIMIT,
+  ARCADE_STEERING,
 } = AI_DRIVING_TUNING
 
 function advanceMistake(
@@ -84,7 +86,15 @@ export function stepAiVehicle(
   // Arcade shares steering technique across difficulties. Traffic decisions
   // and driver mistakes still use the selected difficulty.
   const drivingDifficulty = aiSteeringDifficulty(difficulty, handling, Boolean(vehicle.racingLine))
-  const tuning = DIFFICULTY_SPECS[drivingDifficulty]
+  // Arcade drivers share steering technique across difficulty levels.
+  // Stronger but slower-changing steering follows the next bend without the
+  // instant counter-corrections that previously made the car over-brake.
+  // Authored racing lines and Simulation retain their original policy.
+  const tuning = handling === 'arcade' && !vehicle.racingLine
+    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
+        reaction: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_REACTION : ARCADE_STEERING.reaction,
+        steerGain: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN : ARCADE_STEERING.steerGain }
+    : DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
@@ -180,8 +190,19 @@ export function stepAiVehicle(
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
-  const targetX = target.x + context.normal.x * pursuitLane
-  const targetY = target.y + context.normal.y * pursuitLane
+  // Legal shoulder cuts are a *target line*, not modified tire physics.
+  // No shortcut during overtakes, uncontrolled slides, missed road contact,
+  // or while using a track's authored racing line.
+  const cut = arcade && !vehicle.racingLine && !occupied &&
+    ai.phase === 'follow' && context.onRoad && vehicle.grounded &&
+    context.surface === 'street' &&
+    context.nearest.distance < ROAD_GEOMETRY.onRoadRadius * 0.62 &&
+    Math.abs(slipAngle) < 0.12
+      ? plannedApexCut(path, targetIndex, reversed, difficulty, vehicle.car,
+        roadOffset, lateralVelocity, vehicle.speed)
+      : { x: 0, y: 0 }
+  const targetX = target.x + context.normal.x * pursuitLane + cut.x
+  const targetY = target.y + context.normal.y * pursuitLane + cut.y
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
@@ -264,8 +285,16 @@ export function stepAiVehicle(
   const apexBrakeMargin = arcade && !vehicle.racingLine && context.onRoad &&
     context.surface === 'street' && (corner.phase === 'turn' || corner.phase === 'exit')
       ? 7 : 3
-  const curveBraking = vehicle.speed > curveSpeed +
-    Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
+  const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
+  const curveOverspeed = vehicle.speed - curveSpeed
+  const curveBraking = curveOverspeed > curveBrakeThreshold
+  // The former all-or-nothing AI brake rapidly toggled full force in bends,
+  // spending lateral tire grip on tiny speed corrections. Modulate pressure
+  // by the actual overspeed; reserve full brakes for sharp approaches,
+  // emergencies, and genuine off-road recovery. Tire physics is unchanged.
+  const cornerBrakePressure = curveBraking
+    ? clamp((curveOverspeed - curveBrakeThreshold + 4) / 18, 0.22, 1)
+    : 0
   // Ease off on approach so the tires can turn without repeated hard braking.
   const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
@@ -303,6 +332,9 @@ export function stepAiVehicle(
         (recovering &&
           context.nearest.distance > 72 &&
           vehicle.speed > 90),
+      brakePressure: emergency || (recovering &&
+        context.nearest.distance > 72 && vehicle.speed > 90)
+        ? 1 : cornerBrakePressure,
     },
     context,
     deltaSeconds,

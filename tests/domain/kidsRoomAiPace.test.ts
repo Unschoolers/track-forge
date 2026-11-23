@@ -106,7 +106,9 @@ describe('AI cornering on the Kids room mixed-surface circuit', () => {
     // for the whole Normal field to produce actual, not invented finish times.
     expect(Math.max(...times), diagnostic).toBeLessThan(PLAYER_REFERENCE_SECONDS + 40)
     // Release competitiveness floors, not the unsolved pace stretch goal.
-    expect(Math.min(...times), diagnostic).toBeLessThan(PLAYER_REFERENCE_SECONDS + 16)
+    // #257 acceptance: the fastest Normal rival must be within ten seconds
+    // of the player's 1:12.900, without compromising physical corner control.
+    expect(Math.min(...times), diagnostic).toBeLessThan(PLAYER_REFERENCE_SECONDS + 10)
     expect(Math.min(...hard.opponents.map(v => v.finishedAt ?? Infinity)), diagnostic)
       .toBeLessThan(PLAYER_REFERENCE_SECONDS + 12)
   }, 30000)

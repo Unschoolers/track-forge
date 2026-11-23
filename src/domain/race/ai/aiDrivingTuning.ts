@@ -9,6 +9,14 @@ export const AI_DRIVING_TUNING = {
   HARD_LOOKAHEAD_SAMPLES: 4,
   SIDESLIP_CORRECTION_GAIN: 0.65,
   SIDESLIP_MIN_SPEED: 20,
+  ARCADE_STEERING: {
+    steerGain: 2.42,
+    lookAhead: 1,
+    reaction: 10,
+  },
+  // Hard remains faster through technical turns with a settled chassis.
+  HARD_ARCADE_REACTION: 8,
+  HARD_ARCADE_STEER_GAIN: 2.22,
   BEND_LOOKAHEAD: [0, 6, 12, 20, 30],
   CENTER_LINE_TURN: 0.28,
   LANE_CHANGE_LOOKAHEAD: 24,
