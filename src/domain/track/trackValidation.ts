@@ -15,6 +15,7 @@ export type TrackValidationCode =
   | 'open-loop'
   | 'too-short'
   | 'road-too-long'
+  | 'missing-checkpoints'
   | 'invalid-data'
 
 export interface TrackValidationResult {
@@ -83,6 +84,10 @@ export function validateTrack(
       code: 'too-short',
       message: 'Track is too short',
     }
+  }
+
+  if (!track.recoveryCheckpoints?.some(ratio => Number.isFinite(ratio) && ratio > 0 && ratio < 1)) {
+    return { ready: false, code: 'missing-checkpoints', message: 'Incomplete track · Add a checkpoint in the editor' }
   }
 
   return { ready: true, code: 'ready', message: 'Track ready' }
