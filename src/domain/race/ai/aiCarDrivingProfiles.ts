@@ -43,13 +43,12 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerTargetBonus: 0.06,
   },
   // Green rotates easily on street/dirt. With its longer preview it can
-  // stay on line without a separate Hard apex speed reserve.
+  // stay on line with a small Hard apex speed reserve.
   green: {
     hardReaction: 10,
     hardSteerGain: 2.7,
-    hardCornerReserve: 0,
-    hardLookAheadSamples: 8,
     hardCornerReserve: 0.035,
+    hardLookAheadSamples: 8,
     hardCornerTargetBonus: 0.3,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
