@@ -56,3 +56,30 @@ jobs:
           path: qa/results/optimization/
           if-no-files-found: warn
           retention-days: 14
+
+  optimize-kids-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Replay-grid four-car optimization with independent holdout tracks
+        run: npm run qa:optimize -- --workers 3 --trials 36 --seeds 1,4331 --calibrate kids-room-replay,pine-hairpins --out qa/results/kids-room-replay
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Convert replay-calibration tables to Parquet
+        run: |
+          python3 -m pip install --quiet 'duckdb>=1.4,<2'
+          python3 qa/optimization/to_parquet.py qa/results/kids-room-replay
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: kids-room-replay-study-${{ github.sha }}
+          path: qa/results/kids-room-replay/
+          if-no-files-found: warn
+          retention-days: 14
