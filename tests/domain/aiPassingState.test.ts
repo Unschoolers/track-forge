@@ -52,7 +52,7 @@ describe('AI overtake decision policy', () => {
       ...observation(8, 0),
       vehicle: { ...other, id: 'blocker', lane: 0 },
     }
-    const ego = { ...vehicle, lane: 24 }
+    const ego = { ...vehicle, car: 'red' as const, lane: 24 }
 
     const rejoin = advancePassingState(ego, passing,
       { ahead: null, nearby: [wideGap] }, 'normal', 0.1)
@@ -63,6 +63,11 @@ describe('AI overtake decision policy', () => {
       { ahead: null, nearby: [wideGap] }, 'normal', 0.1)
     expect(held.phase).toBe('passing')
     expect(held.targetLane).toBe(24)
+
+    // Other cars retain their existing full passing commitment.
+    const green = advancePassingState({ ...ego, car: 'green' }, passing,
+      { ahead: null, nearby: [wideGap] }, 'normal', 0.1)
+    expect(green.phase).toBe('passing')
 
     const stillClosing = advancePassingState(ego, passing,
       { ahead: null, nearby: [nearby] }, 'normal', 0.1)
