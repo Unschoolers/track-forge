@@ -31,3 +31,31 @@ test('pair comparisons reject recovery, roster, and incomparable metadata', () =
   assert.equal(trialKey({ car: 'blue', scenarioId: 'desert', seed: 1,
     difficulty: 'hard', mode: 'solo' }), 'blue|blue|desert|1|hard|solo')
 })
+
+test('traffic comparison measures the tuned rival, not the player-slot car', () => {
+  const base = {
+    vehicle_id: 'green-rival', car_type: 'green',
+    finished_seconds: 75, recoveries: 0,
+    track_fingerprint: 'same', seed: 1, mode: 'traffic',
+    difficulty: 'hard', start_ratio: 0.2, reversed: false,
+    laps_requested: 2, physics_revision: 'sha', scenario_id: 'kids',
+    driver_car: 'red', tuned_car: 'green', grid_positions: null,
+  }
+  const player = { ...base, vehicle_id: 'red-player', car_type: 'red',
+    finished_seconds: 99 }
+  const record = (greenTime, recoveries = 0) => ({
+    rows: [player, { ...base, finished_seconds: greenTime, recoveries }],
+    focusVehicleId: 'green-rival',
+    driverVehicleId: 'red-player', events: [],
+  })
+  const pass = evaluatePair(record(75), record(73))
+  assert.equal(pass.car, 'green')
+  assert.ok(pass.improvement > 0.02)
+  assert.equal(evaluatePair(record(75), record(72, 1)).eligible, false)
+  assert.notEqual(
+    trialKey({ car: 'green', playerCar: 'red', scenarioId: 'kids',
+      seed: 1, difficulty: 'hard', mode: 'traffic' }),
+    trialKey({ car: 'green', playerCar: 'green', scenarioId: 'kids',
+      seed: 1, difficulty: 'hard', mode: 'traffic' }),
+  )
+})
