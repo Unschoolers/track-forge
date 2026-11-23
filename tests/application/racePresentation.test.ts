@@ -89,6 +89,73 @@ describe('render-only race interpolation', () => {
       .toMatchObject({ phase: 'finished' })
   })
 
+  it('does not jump camera framing when high-speed road preview gains or loses a point', () => {
+    const previous = runningRace()
+    const player = playerOf(previous)
+    const previewStart = [
+      { x: player.x, y: player.y },
+      { x: player.x + 50, y: player.y },
+      { x: player.x + 100, y: player.y },
+    ]
+    const longerPreview = [...previewStart, { x: player.x + 170, y: player.y }]
+    const before = {
+      ...previous,
+      cameraHints: { ...previous.cameraHints, preview: previewStart },
+    }
+    const gained = {
+      ...before,
+      cameraHints: { ...before.cameraHints, preview: longerPreview },
+    }
+    // On a new tick alpha=0, the window's world bounds must still match
+    // the previous tick, even though the current preview grew.
+    const entering = interpolateRaceState(before, gained, 0, emptyRecoveries)
+    expect(entering.cameraHints.preview?.at(-1)).toEqual(previewStart.at(-1))
+    const middle = interpolateRaceState(before, gained, 0.5, emptyRecoveries)
+    expect(middle.cameraHints.preview?.at(-1)?.x).toBeCloseTo(player.x + 135)
+    const finished = interpolateRaceState(before, gained, 1, emptyRecoveries)
+    expect(finished).toBe(gained)
+
+    // Removing the far point also needs a continuous transition, not a snap.
+    const losing = interpolateRaceState(gained, before, 0, emptyRecoveries)
+    expect(losing.cameraHints.preview?.at(-1)).toEqual(longerPreview.at(-1))
+    const leaving = interpolateRaceState(gained, before, 0.5, emptyRecoveries)
+    expect(leaving.cameraHints.preview?.at(-1)?.x).toBeCloseTo(player.x + 135)
+  })
+
+  it('keeps the car silhouette and impact shake smooth without modifying the real physics state', () => {
+    const before = runningRace()
+    const current = {
+      ...before,
+      vehicles: before.vehicles.map((vehicle) => vehicle.player
+        ? { ...vehicle, suspensionCompression: 0.6, landingIntensity: 0.8, verticalVelocity: 12 }
+        : vehicle),
+      cameraHints: { ...before.cameraHints, shake: 4 },
+    }
+    const visual = interpolateRaceState(before, current, 0.5, emptyRecoveries)
+    const player = playerOf(visual)
+    expect(player.suspensionCompression).toBeCloseTo(0.3)
+    expect(player.landingIntensity).toBeCloseTo(0.4)
+    expect(player.verticalVelocity).toBeCloseTo(6)
+    expect(visual.cameraHints.shake).toBeCloseTo(2)
+    expect(playerOf(current).landingIntensity).toBe(0.8)
+    expect(current.cameraHints.shake).toBe(4)
+  })
+
+  it('snaps when changing between road decks, rather than morphing through an overpass', () => {
+    const previous = runningRace()
+    const player = playerOf(previous)
+    const current = {
+      ...previous,
+      vehicles: previous.vehicles.map((vehicle) => vehicle.player
+        ? { ...vehicle, x: vehicle.x + 5, structureRunId: 'bridge' }
+        : vehicle),
+    }
+    const visual = interpolateRaceState(previous, current, 0.5, emptyRecoveries)
+    expect(playerOf(visual)).toBe(playerOf(current))
+    expect(playerOf(visual).x).toBeCloseTo(player.x + 5)
+    expect(visual.cameraHints).toBe(current.cameraHints)
+  })
+
   it('keeps 120 Hz presentation frames smooth while fixed-step physics and pause state remain authoritative', () => {
     const scoreStore: ScoreStore = {
       forTrack: () => [],
