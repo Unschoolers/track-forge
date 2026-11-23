@@ -106,7 +106,7 @@ describe('AI approach speed planning', () => {
       { x: 1_050, y: 0, surface: 'ice' as const, curve: 'corner' as const },
       { x: 1_050, y: 400, surface: 'ice' as const, curve: 'corner' as const },
     ]
-    const reverse = forward.toReversed().map(point => ({
+    const reverse = [...forward].reverse().map(point => ({
       ...point, surface: point.x < 1000 ? 'street' as const : 'ice' as const,
     }))
     const makePath = (controls: typeof forward) =>
@@ -114,7 +114,9 @@ describe('AI approach speed planning', () => {
     const check = (controls: typeof forward, backwards: boolean) => {
       const mixed = makePath(controls)
       const allIce = makePath(controls.map(point => ({ ...point, surface: 'ice' as const })))
-      const index = backwards ? mixed.points.length - 20 : 20
+      const index = mixed.points.findIndex(point =>
+        Math.abs(point.x - 800) < 4 && Math.abs(point.y) < 5)
+      expect(index, 'Expected an asphalt approach before the ice apex').toBeGreaterThanOrEqual(0)
       const planned = (road: typeof mixed) =>
         safeEntrySpeedAhead(road, index, backwards, 0.51,
           CAR_SPECS.blue, 1.37, 'blue', true, false, true)
