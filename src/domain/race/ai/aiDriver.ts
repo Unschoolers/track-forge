@@ -82,6 +82,7 @@ export function stepAiVehicle(
   speedLimit = Number.POSITIVE_INFINITY,
   handling: 'arcade' | 'simulation' = 'simulation',
   catchUp?: SpeedAssist,
+  hardProfileOverride?: CarDrivingProfile,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
@@ -94,7 +95,7 @@ export function stepAiVehicle(
   const car = CAR_SPECS[vehicle.car]
   // Each physical chassis needs its own Hard cornering technique.
   // Tuning steering *decisions* never alters the car's actual tire forces.
-  const hardProfile: CarDrivingProfile = CAR_DRIVING_PROFILES[vehicle.car]
+  const hardProfile: CarDrivingProfile = hardProfileOverride ?? CAR_DRIVING_PROFILES[vehicle.car]
   const tuning = handling === 'arcade' && !vehicle.racingLine
     ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
         reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
@@ -274,7 +275,7 @@ export function stepAiVehicle(
       ? (hardProfile.hardHairpinReserve ?? 0) * hairpinSharpness ** 2
       : 0
   const cornerMargin = arcade && !vehicle.racingLine
-    ? arcadeCornerMargin(difficulty, vehicle.car) + hairpinReserve : 0
+    ? arcadeCornerMargin(difficulty, vehicle.car, hardProfile) + hairpinReserve : 0
   if (cornerMargin > 0 && context.surface !== 'grass') {
     // Add grip reserve as a bend approaches while allowing full speed on straights.
     const bendWeight = clamp((bend - 0.02) / 0.18, 0, 1)
