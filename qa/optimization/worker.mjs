@@ -28,6 +28,8 @@ try {
     await server.ssrLoadModule('/src/domain/track/officialCircuits.ts')
   const { CAR_DRIVING_PROFILES } =
     await server.ssrLoadModule('/src/domain/race/ai/aiCarDrivingProfiles.ts')
+  const { CAR_PASSING_POLICIES } =
+    await server.ssrLoadModule('/src/domain/race/ai/aiCarPassingPolicies.ts')
 
   const tracks = new Map()
   for (const scenario of workerData.scenarios) {
@@ -47,7 +49,8 @@ try {
       fingerprint: trackFingerprint({ track }),
     })
   }
-  port.postMessage({ type: 'ready', baselineProfiles: CAR_DRIVING_PROFILES })
+  port.postMessage({ type: 'ready', baselineProfiles: CAR_DRIVING_PROFILES,
+    passingProfiles: CAR_PASSING_POLICIES })
 
   port.on('message', message => {
     if (message.type !== 'trial') return
@@ -57,23 +60,32 @@ try {
       const entry = tracks.get(task.scenarioId)
       const scenario = workerData.scenarios.find(x => x.id === task.scenarioId)
       if (!entry || !scenario) throw new Error(`Unknown scenario ${task.scenarioId}`)
-      const baseline = CAR_DRIVING_PROFILES[task.car]
+      const passingStudy = task.policyKind === 'passing'
+      if (task.policyKind !== undefined && task.policyKind !== 'passing' &&
+          task.policyKind !== 'driving') throw new Error('Unknown policy kind')
+      const baseline = (passingStudy ? CAR_PASSING_POLICIES : CAR_DRIVING_PROFILES)[task.car]
       if (!baseline) throw new Error(`Unknown car ${task.car}`)
       const policy = { ...baseline, ...task.changes }
+      const trialGrid = task.mode === 'duel' ? [3, 0, 1, 2] : scenario.gridPositions
       const run = runLaneCheck({
         path: entry.path, trackName: entry.trackName,
         seed: task.seed, car: task.playerCar ?? task.car, difficulty: task.difficulty,
         reversed: scenario.reverse, handling: 'arcade',
         mode: task.mode, startRatio: scenario.startRatio,
-        ...(scenario.gridPositions ? { gridPositions: scenario.gridPositions } : {}),
+        ...(trialGrid ? { gridPositions: trialGrid } : {}),
+        ...(task.mode === 'duel' ? { duelOpponentCar: task.opponentCar } : {}),
         laps: scenario.laps, seconds: scenario.seconds,
-        aiProfileOverrides: { [task.car]: policy },
+        ...(passingStudy
+          ? { aiPassingPolicyOverrides: { [task.car]: policy } }
+          : { aiProfileOverrides: { [task.car]: policy } }),
       })
       const exported = projectTrial(run, {
         candidateId: task.candidateId, scenarioId: scenario.id,
         driverCar: task.playerCar ?? task.car, tunedCar: task.car,
         focusRole: task.focusRole ?? 'player',
-        gridPositions: scenario.gridPositions?.join(',') ?? null,
+        gridPositions: trialGrid?.join(',') ?? null,
+        opponentCar: task.opponentCar ?? null,
+        policyKind: task.policyKind ?? 'driving',
         seed: task.seed, difficulty: task.difficulty,
         mode: task.mode, startRatio: scenario.startRatio,
         trackFingerprint: entry.fingerprint,
