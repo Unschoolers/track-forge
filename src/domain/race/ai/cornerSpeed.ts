@@ -10,6 +10,13 @@ const SHARP_BEND_SAFETY_GAIN = 1.25
 const SHARP_BEND_SAFETY_MAX = 0.9
 
 const BRAKE_LOOKAHEAD = [0, 6, 12, 20, 30, 42, 58, 78, 100]
+// Ice and loose dirt offer much less braking force than pavement. At racing
+// speed the stopping distance can exceed the ordinary 600-unit preview.
+// Check only those low-traction hazards farther ahead: widening the entire
+// scan would over-brake fast asphalt courses.
+// Six-unit spacing matches resampled road arc-length. A sparse long scan can
+// skip a sharp icy apex entirely, falsely permitting full-speed approach.
+const LOW_GRIP_BRAKE_LOOKAHEAD = Array.from({ length: 18 }, (_, i) => 106 + i * 6)
 const BRAKE_TRACTION = VEHICLE_DYNAMICS_TUNING.forces.gravityAcceleration *
   VEHICLE_DYNAMICS_TUNING.forces.brakeGripUsage
 const PAVEMENT_PREVIEW = [0, 6, 12, 20, 30, 39, 48, 58]
@@ -156,7 +163,7 @@ export function safeEntrySpeedAhead(
   )
   const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
-  for (const step of BRAKE_LOOKAHEAD) {
+  for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
     const raw = nearestIndex + direction * step
     if (!path.closed && (raw < 0 || raw >= count)) break
     const index = ((raw % count) + count) % count
@@ -165,6 +172,7 @@ export function safeEntrySpeedAhead(
     const bend = Math.abs(turnAmountAt(path, index, 6))
     const surface = SURFACE_SPECS[point.surface]
     const terrain = VEHICLE_TERRAIN_SPECS[carId][point.surface]
+    if (step > 100 && surface.grip * terrain.grip >= 0.82) continue
     const grip = car.grip * surface.grip * terrain.grip
     const surfaceMax = straightSpeed * surface.max * terrain.max
     // Allow the chassis more time to rotate through tight bends, especially

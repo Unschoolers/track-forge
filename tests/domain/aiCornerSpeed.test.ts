@@ -81,6 +81,24 @@ describe('AI approach speed planning', () => {
     const hard = safeEntrySpeedAhead(path, approach, false, 0.1, CAR_SPECS.blue, 1, 'blue', true)
     expect(hard).toBeLessThan(normal)
   })
+  it('starts braking earlier for an icy hairpin beyond the dry-road preview', () => {
+    const controls = [
+      { x: 0, y: 0, surface: 'street' as const, curve: 'corner' as const },
+      { x: 900, y: 0, surface: 'ice' as const, curve: 'corner' as const },
+      { x: 900, y: 600, surface: 'ice' as const, curve: 'corner' as const },
+    ]
+    const icy = buildRoadPath(controls, EMPTY_TERRAIN, undefined, 'point-to-point')
+    const pavement = buildRoadPath(controls.map(point => ({ ...point, surface: 'street' as const })),
+      EMPTY_TERRAIN, undefined, 'point-to-point')
+    const approach = icy.points.findIndex(point => point.distance >= 120)
+    const iceSpeed = safeEntrySpeedAhead(icy, approach, false, 0.75,
+      CAR_SPECS.red, 1, 'red')
+    const streetSpeed = safeEntrySpeedAhead(pavement, approach, false, 0.75,
+      CAR_SPECS.red, 1, 'red')
+    expect(iceSpeed).toBeLessThan(streetSpeed * 0.9)
+    expect(iceSpeed).toBeGreaterThan(70)
+  })
+
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)

@@ -16,6 +16,7 @@ import {
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
+import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -95,6 +96,16 @@ export function stepAiVehicle(
   // their own approach, and loose surfaces need the usual braking margin.
   const arcadePavement = arcade && !vehicle.racingLine && context.surface === 'street'
   const direction = reversed ? -1 : 1
+  const slipAngle = vehicle.speed > SIDESLIP_MIN_SPEED
+    ? wrapAngleRadians(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle)
+    : 0
+  const roadOffset =
+    (vehicle.x - context.nearest.point.x) * context.normal.x +
+    (vehicle.y - context.nearest.point.y) * context.normal.y
+  const lateralVelocity = vehicle.vx * context.normal.x +
+    vehicle.vy * context.normal.y
+  const corner = planCornerTactics(path, context.nearest.index, reversed,
+    vehicle.speed, slipAngle, roadOffset, ROAD_GEOMETRY.onRoadRadius, lateralVelocity)
   let sweep = arcadePavement ? sweepingPavementAllowance(path, context.nearest.index, reversed) : 0
   let racingPace = arcadePavement ? racingPavementAllowance(path, context.nearest.index, reversed) : 0
   if (sweep > 0 || racingPace > 0) {
@@ -146,7 +157,8 @@ export function stepAiVehicle(
     }
   }
   const pursuitSamples = Math.max(1, Math.round(
-    (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
+    (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk) *
+      (arcade && !vehicle.racingLine ? corner.pursuitScale : 1),
   ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
@@ -170,11 +182,14 @@ export function stepAiVehicle(
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
   const targetX = target.x + context.normal.x * pursuitLane
   const targetY = target.y + context.normal.y * pursuitLane
-  const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
+  const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
-    : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
+    : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
+    (arcade && !vehicle.racingLine && context.onRoad ? corner.headingLead : 0)
+  // Drift-aware countersteering follows the velocity vector without deleting
+  // slip: the tire model still determines whether the car keeps sliding.
   const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
-    ? wrapAngleRadians(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle) * SIDESLIP_CORRECTION_GAIN
+    ? slipAngle * (arcade && !vehicle.racingLine ? corner.sideslipGain : SIDESLIP_CORRECTION_GAIN)
     : 0
   const desiredSteer = clamp(
     wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
@@ -224,7 +239,12 @@ export function stepAiVehicle(
     const roadSpeed = car.max * SURFACE_SPECS[context.surface].max * VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface].max
     const gripReserve = Math.min(cornerTarget, roadSpeed) * cornerMargin
     const excessTarget = Math.max(0, cornerTarget - roadSpeed)
-    curveSpeed -= bendWeight * (gripReserve + excessTarget)
+    // Medium reserves the full safety margin at hairpins, but may carry
+    // more speed through gentler paved turns. Difficulty ordering still owns
+    // the base reserve and physical grip remains unchanged.
+    const sharpness = clamp((bend - 0.09) / 0.16, 0, 1)
+    const reserveFraction = 0.4 + 0.6 * sharpness
+    curveSpeed -= bendWeight * (gripReserve * reserveFraction + excessTarget)
   }
   // Passing at the outside edge consumes cornering room. Hold a little
   // extra reserve in bends instead of assuming the centerline racing pace.
@@ -237,14 +257,29 @@ export function stepAiVehicle(
   const gripDeficit = Math.max(0, 1 - car.grip)
   const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.17)
   curveSpeed *= 1 - cornerReserve
-  const curveBraking = vehicle.speed > curveSpeed + 3
+  // Braking during turn-in consumes the same tire-force budget that rotates
+  // the chassis. Finish the heavy braking on approach, then release it
+  // progressively through a stable pavement apex. Emergency/traffic braking
+  // still overrides this margin, and loose surfaces keep the conservative rule.
+  const apexBrakeMargin = arcade && !vehicle.racingLine && context.onRoad &&
+    context.surface === 'street' && (corner.phase === 'turn' || corner.phase === 'exit')
+      ? 7 : 3
+  const curveBraking = vehicle.speed > curveSpeed +
+    Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
   // Ease off on approach so the tires can turn without repeated hard braking.
   const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
     : CORNER_THROTTLE_WINDOW
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / throttleWindow, 0, 1)
+  const settledSlide = arcade && !vehicle.racingLine && context.onRoad &&
+    Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.5 && !curveBraking
+  // A car still sliding toward the outside must complete its rotation
+  // before applying exit power. In a clean line traction remains at 1.
+  const plannedThrottle = (settledSlide
+    ? Math.max(curveThrottle, corner.exitThrottle)
+    : curveThrottle) * (arcade && !vehicle.racingLine ? corner.exitTraction : 1)
   const recovering = !context.onRoad
-  const speedAssist = catchUp && !recovering && !emergency && !following && curveThrottle === 1 &&
+  const speedAssist = catchUp && !recovering && !emergency && !following && plannedThrottle === 1 &&
     vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015
       ? catchUp
       : undefined
@@ -261,7 +296,7 @@ export function stepAiVehicle(
             ? vehicle.speed > 90 ? 0 : tuning.pace * 0.45
           : following
             ? tuning.pace * 0.72
-            : curveThrottle,
+            : plannedThrottle,
       braking:
         emergency ||
         curveBraking ||

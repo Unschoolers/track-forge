@@ -171,7 +171,10 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
 
 // Limit running catch-up to 250 ms per frame after background stalls.
 const MAX_CATCH_UP = 0.25
-const RIVAL_FINISH_SECONDS = 5
+// After the player finishes, continue real rival physics long enough for a
+// competitive field to finish; otherwise even valid times 10-35 seconds back
+// become misleading UNFINISHED rows. Stops early once all rivals finish.
+const RIVAL_FINISH_SECONDS = 40
 const EMPTY_RACE: RaceSessionSnapshot = {
   track: null, setup: null, state: null, telemetry: EMPTY_TELEMETRY, standings: [], result: null,
 }
