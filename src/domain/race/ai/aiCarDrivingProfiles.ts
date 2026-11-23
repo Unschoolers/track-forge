@@ -12,6 +12,8 @@ export interface CarDrivingProfile {
   readonly hardReaction: number
   readonly hardSteerGain: number
   readonly hardCornerReserve: number
+  /** Extra tight paved-bend entry caution, only when sharpness justifies it. */
+  readonly hardHairpinReserve?: number
   readonly hardLookAheadSamples: number
   /** Hard-only tactical line choice; never changes tire forces or the road. */
   readonly hardApexCutScale?: number
