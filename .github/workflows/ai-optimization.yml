@@ -68,7 +68,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run independent per-car passing duels and full-field validation
-        run: npm run qa:optimize -- --focus passing --workers 2 --trials 8 --seeds 1,4331 --out qa/results/passing
+        run: npm run qa:optimize -- --focus passing --workers 2 --trials 14 --seeds 1,4331 --out qa/results/passing
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'

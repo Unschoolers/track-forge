@@ -16,7 +16,7 @@ function runId(meta) {
   return [meta.candidateId, meta.scenarioId, meta.seed, meta.difficulty,
     meta.mode, meta.driverCar, meta.tunedCar ?? meta.driverCar,
     meta.focusRole ?? 'player', meta.policyKind ?? 'driving',
-    meta.opponentCar ?? 'none'].join(':')
+    meta.opponentCar ?? 'none', meta.duelOpponentSpeedLimit ?? 'default'].join(':')
 }
 
 /** Trace overtake time and attempts separately from lap-line performance. */
@@ -62,6 +62,7 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
     tuned_car: meta.tunedCar ?? meta.driverCar,
     policy_kind: meta.policyKind ?? 'driving',
     duel_opponent_car: meta.opponentCar ?? null,
+    duel_opponent_speed_limit: meta.duelOpponentSpeedLimit ?? null,
     focus_role: meta.focusRole ?? 'player',
     grid_positions: meta.gridPositions ?? null,
     difficulty: meta.difficulty,

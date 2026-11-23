@@ -22,8 +22,16 @@ export function generatePassingCandidates(car, baseline, count) {
     seen.add(signature)
     result.push({ id: `pass-${car}-${result.length + 1}`, car, changes: changed })
   }
-  for (const [key, values] of Object.entries(ALTERNATIVES)) {
-    for (const value of values) add({ [key]: value })
+  // Interleave parameter families. A short study (--trials 8) must not
+  // spend every candidate on triggers/relative speed while never testing
+  // stuck-pass abandonment or safe rejoining.
+  const families = Object.entries(ALTERNATIVES)
+  const longest = Math.max(...families.map(([, values]) => values.length))
+  for (let index = 0; index < longest; index++) {
+    for (const [key, values] of families) {
+      const value = values[index]
+      if (value !== undefined) add({ [key]: value })
+    }
   }
   const singles = [...result]
   for (let i = 0; result.length < count && i < count * 8; i++) {

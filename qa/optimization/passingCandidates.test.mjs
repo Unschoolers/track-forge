@@ -13,6 +13,11 @@ test('passing candidates are car-scoped, deterministic and distinct from steerin
   assert.deepEqual(red, generatePassingCandidates('red', baseline, 12))
   assert.equal(red.length, 12)
   assert.equal(yellow.length, 12)
+  // A typical 8-candidate CI study must exercise every distinct passing
+  // decision, not only the first parameter family in enumeration order.
+  const eight = generatePassingCandidates('yellow', baseline, 8)
+  assert.deepEqual(new Set(eight.flatMap(x => Object.keys(x.changes))),
+    new Set(Object.keys(baseline)))
   assert.ok(red.every(x => x.car === 'red' && x.id.startsWith('pass-red-')))
   assert.ok(yellow.every(x => x.car === 'yellow' && x.id.startsWith('pass-yellow-')))
   assert.ok(red.every(x => Object.keys(x.changes).every(key => Object.hasOwn(baseline, key))))

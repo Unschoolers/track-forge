@@ -96,6 +96,8 @@ export interface RaceState {
   readonly aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>
   /** Race-local passing parameters, independent of each car's solo steering. */
   readonly aiPassingPolicyOverrides?: Readonly<Partial<Record<CarId, CarPassingPolicy>>>
+  /** Optional controlled-AI race speed caps, keyed by vehicle ID; offline duels only. */
+  readonly aiVehicleSpeedLimits?: Readonly<Record<string, number>>
   readonly difficulty: DifficultyId
   readonly handling?: 'arcade' | 'simulation'
   readonly totalLaps: number

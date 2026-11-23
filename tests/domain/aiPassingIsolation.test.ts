@@ -63,6 +63,45 @@ describe('Independent passing policy contracts', () => {
     expect(first.steps).toBeGreaterThan(0)
   }, 30000)
 
+  it('creates an actual Yellow passing opportunity against a slower AI-controlled rival', () => {
+    const [figureEight] = decodeTrackInput(JSON.parse(
+      readFileSync('tests/fixtures/figureEightRaceAi.trackforge.json', 'utf8'),
+    ))
+    if (!figureEight) throw new Error('Missing replay-accurate Figure-eight fixture')
+    const duel = runLaneCheck({
+      path: prepareLanePath(figureEight), trackName: figureEight.name,
+      car: 'yellow', difficulty: 'hard', handling: 'arcade',
+      mode: 'duel', duelOpponentCar: 'green', duelOpponentSpeedLimit: 220,
+      seed: 1, reversed: false, startRatio: 0.32853982300884954,
+      laps: 2, seconds: 100,
+    })
+    expect(duel.vehicles.map(v => v.car)).toEqual(['yellow', 'green'])
+    expect(duel.samples.some(sample =>
+      sample.car === 'yellow' && sample.phase === 'passing')).toBe(true)
+    expect(duel.vehicles.every(vehicle => vehicle.finishedAt !== null)).toBe(true)
+  }, 30000)
+
+  it('allows a bounded moving opponent pace only inside a duel', () => {
+    const base = {
+      path, trackName: loaded.name, car: 'yellow' as const,
+      difficulty: 'hard' as const, handling: 'arcade' as const,
+      seed: 1, reversed: false, laps: 1, seconds: 70,
+    }
+    expect(() => runLaneCheck({
+      ...base, mode: 'duel', duelOpponentCar: 'green',
+      duelOpponentSpeedLimit: 220,
+    })).not.toThrow()
+    for (const pace of [0, 99, 351, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => runLaneCheck({
+        ...base, mode: 'duel', duelOpponentCar: 'green',
+        duelOpponentSpeedLimit: pace,
+      })).toThrow(/Invalid lane simulation options/)
+    }
+    expect(() => runLaneCheck({
+      ...base, mode: 'solo', duelOpponentSpeedLimit: 220,
+    })).toThrow(/Invalid lane simulation options/)
+  }, 30000)
+
   it('rejects a duel without a real selected rival', () => {
     expect(() => runLaneCheck({
       path, trackName: loaded.name, car: 'red', mode: 'duel',
