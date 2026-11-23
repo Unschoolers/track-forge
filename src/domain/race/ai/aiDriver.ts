@@ -126,12 +126,11 @@ export function stepAiVehicle(
     (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
     (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
   ) : 0)
-  // Arcade's shared Hard steering technique uses long pursuit targets on every
-  // difficulty. Give all non-authored rivals the same edge-aware correction:
-  // Normal and Easy must not run off the road simply because they lack Hard's
-  // recovery steering. Preserve their independent corner-speed reserves.
+  // Hard arcade uses a longer pursuit target and can run wide if its
+  // lateral momentum carries it toward the verge. Shorten that target only
+  // when needed; never override easier drivers or authored racing lines.
   let edgeRisk = 0
-  if (arcade && !vehicle.racingLine) {
+  if (difficulty === 'hard' && arcade && !vehicle.racingLine) {
     if (!context.onRoad) {
       edgeRisk = 1
     } else {
@@ -167,8 +166,20 @@ export function stepAiVehicle(
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
-  const targetX = target.x + context.normal.x * pursuitLane
-  const targetY = target.y + context.normal.y * pursuitLane
+  // A lane offset belongs to the pursued road section, not our current section.
+  // Reusing the current normal on a bend puts the target outside its own road,
+  // provoking identical off-road recoveries on every lap of curved tracks.
+  const targetPrevious = path.points[path.closed
+    ? (targetIndex - 3 + path.points.length) % path.points.length
+    : Math.max(0, targetIndex - 3)] ?? target
+  const targetNext = path.points[path.closed
+    ? (targetIndex + 3) % path.points.length
+    : Math.min(path.points.length - 1, targetIndex + 3)] ?? target
+  const tx = targetNext.x - targetPrevious.x
+  const ty = targetNext.y - targetPrevious.y
+  const normalLength = Math.max(0.001, Math.hypot(tx, ty))
+  const targetX = target.x - ty / normalLength * pursuitLane
+  const targetY = target.y + tx / normalLength * pursuitLane
   const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
