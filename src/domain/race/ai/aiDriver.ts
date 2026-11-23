@@ -115,9 +115,10 @@ export function stepAiVehicle(
   // defensive traffic decisions to stay on-road in all four Hard grids.
   // Other chassis benefit safely from compact non-colliding AI clearance;
   // Red can be migrated when a dedicated corner-entry controller is proven.
-  const defensiveRed = vehicle.car === 'red'
+  const defensiveChassis = vehicle.car === 'red' ||
+    (vehicle.car === 'green' && difficulty === 'hard')
   const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
-    !defensiveRed && aiAiTrafficMode !== 'legacy'
+    !defensiveChassis && aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   // An AI dot may influence short-range speed, but only the player
