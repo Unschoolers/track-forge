@@ -1,0 +1,67 @@
+import type { RoadPath } from '@/domain/track/pathBuilder'
+import { clamp } from '@/domain/geometry/math'
+import { turnAmountAt } from '@/domain/race/trackContext'
+
+export type CornerPhase = 'approach' | 'turn' | 'exit' | 'straight'
+
+export interface CornerTactics {
+  readonly phase: CornerPhase
+  readonly bend: number
+  /** Turn sign along the selected travel direction, not the authored direction. */
+  readonly turnSign: number
+  /** Small early turn-in correction, never a replacement for lane following. */
+  readonly headingLead: number
+  readonly pursuitScale: number
+  readonly drifting: boolean
+  readonly sideslipGain: number
+  readonly exitThrottle: number
+}
+
+/**
+ * Read the local turn and the next arc before making control decisions.
+ * Drift is *observed* from the real velocity vector: steering and throttle
+ * manage an existing slide, never inject lateral velocity or bypass tire grip.
+ * The same plan works when racing the road backwards or across a lap wrap.
+ */
+export function planCornerTactics(
+  path: RoadPath,
+  index: number,
+  reversed: boolean,
+  speed: number,
+  slipAngle: number,
+  roadOffset: number,
+  roadRadius: number,
+): CornerTactics {
+  const direction = reversed ? -1 : 1
+  const near = turnAmountAt(path, index, 6) * direction
+  const next = turnAmountAt(path, index + direction * 12, 6) * direction
+  const far = turnAmountAt(path, index + direction * 24, 6) * direction
+  const bend = Math.max(Math.abs(near), Math.abs(next), Math.abs(far))
+  const peakNext = Math.abs(next) >= Math.abs(far) ? next : far
+  const approaching = Math.abs(peakNext) > Math.abs(near) * 1.3 && Math.abs(peakNext) > 0.045
+  const exiting = Math.abs(near) > 0.055 && Math.abs(peakNext) < Math.abs(near) * 0.62
+  const phase: CornerPhase = approaching ? 'approach'
+    : exiting ? 'exit'
+    : Math.abs(near) > 0.05 ? 'turn' : 'straight'
+  const sign = Math.sign(approaching ? peakNext : near)
+  const edge = clamp((Math.abs(roadOffset) - roadRadius * 0.55) / (roadRadius * 0.25), 0, 1)
+  // A small feed-forward yaw starts the rotation before the apex. Back out
+  // near the edge: arriving too wide calls for recovering the road instead.
+  const headingLead = phase === 'approach'
+    ? sign * Math.min(0.13, bend * 0.23) * (1 - edge)
+    : 0
+  // Preserve a substantial pursuit horizon at speed; choking the target to
+  // a handful of samples makes heavy cars oscillate rather than rotate.
+  const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
+    : phase === 'approach' && bend > 0.15 ? 0.96 : 1
+  const drifting = Math.abs(slipAngle) > 0.075 &&
+    speed > 65 && Math.abs(near) > 0.035 && Math.abs(roadOffset) < roadRadius * 0.75
+  // Controlled countersteering limits spin without suppressing lateral slip.
+  const sideslipGain = drifting ? 0.92 : 0.65
+  // When the road is opening, feed in power progressively. The friction
+  // circle and chassis physics still decide whether the tires can take it.
+  const exitThrottle = phase === 'exit' && drifting
+    ? clamp(0.28 + (0.19 - Math.abs(peakNext)) * 1.5, 0.28, 0.52)
+    : 0
+  return { phase, bend, turnSign: sign, headingLead, pursuitScale, drifting, sideslipGain, exitThrottle }
+}
