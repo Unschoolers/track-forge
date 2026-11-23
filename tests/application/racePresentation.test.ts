@@ -84,6 +84,7 @@ describe('render-only race interpolation', () => {
     expect(playerOf(recovered)).toBe(playerOf(current))
     expect(recovered.cameraHints).toBe(current.cameraHints)
     expect(playerOf(discontinuous)).toBe(playerOf(current))
+    expect(discontinuous.cameraHints).toBe(current.cameraHints)
     expect(interpolateRaceState(previous, { ...current, phase: 'finished' }, 0.5, emptyRecoveries))
       .toMatchObject({ phase: 'finished' })
   })
