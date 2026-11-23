@@ -63,6 +63,27 @@ describe('Independent passing policy contracts', () => {
     expect(first.steps).toBeGreaterThan(0)
   }, 30000)
 
+  it('allows a bounded moving opponent pace only inside a duel', () => {
+    const base = {
+      path, trackName: loaded.name, car: 'yellow' as const,
+      difficulty: 'hard' as const, handling: 'arcade' as const,
+      seed: 1, reversed: false, laps: 1, seconds: 70,
+    }
+    expect(() => runLaneCheck({
+      ...base, mode: 'duel', duelOpponentCar: 'green',
+      duelOpponentPace: 0.8,
+    })).not.toThrow()
+    for (const pace of [0, 0.49, 1.26, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => runLaneCheck({
+        ...base, mode: 'duel', duelOpponentCar: 'green',
+        duelOpponentPace: pace,
+      })).toThrow(/Invalid lane simulation options/)
+    }
+    expect(() => runLaneCheck({
+      ...base, mode: 'solo', duelOpponentPace: 0.8,
+    })).toThrow(/Invalid lane simulation options/)
+  }, 30000)
+
   it('rejects a duel without a real selected rival', () => {
     expect(() => runLaneCheck({
       path, trackName: loaded.name, car: 'red', mode: 'duel',
