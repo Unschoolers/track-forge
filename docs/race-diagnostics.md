@@ -32,6 +32,18 @@ npm run qa:race -- simulate path/to/Roundabout.trackforge.json --car yellow --se
 
 The simulator emits a machine-readable line prefixed `TRACKFORGE_AI_DIAGNOSTIC`. Use this to compare individual AI finish times, recoveries, off-road seconds and failures on identical track/cars/settings. When passed a **race replay**, the command defaults to its player car, difficulty, grid, start and handling; that slot is AI-controlled for this diagnostic. When passed a **track file**, it defaults to four single-car simulations. Override as needed with `--car`, `--mode`, `--seed`, `--laps`, `--start`, `--grid` and `--seconds`. These are deterministic simulations, **not** exact replays of human input or multiplayer network traffic.
 
+The start ratio is inferred from the first recorded player road distance
+when a replay does not explicitly save it. If this cannot be recovered, use
+`--start`: the tool fails rather than silently starting at a different point.
+
+For Roundabout v8, the creator's **installed APK build 1288** is an explicit
+baseline, not the unmerged #270 branch. The Blue-player Hard export uses grid
+`[2,3,1,0]`; the earlier Red-player Hard export uses `[2,1,0,3]`.
+Both capture repeated Red/Blue problems around generated road samples
+1450–1499. Keep these as **separate traffic fixtures**. A deterministic
+run with different grid, seed or physics version does not prove that the
+installed APK's behavior has been reproduced.
+
 The simulator uses actual exported road controls and terrain cells, but the lane-check harness currently does **not** recreate authored scenery colliders, all user checkpoints, or live opponent/player inputs. Do not claim a simulated time is directly comparable to a user's race without recording these differences. For production regressions keep a compact, versioned fixture such as `tests/domain/roundaboutDiagnostic.test.ts` and fixed seeds, and verify on other tracks.
 
 ## Investigation loop
