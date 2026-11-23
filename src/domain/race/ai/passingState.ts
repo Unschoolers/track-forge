@@ -1,5 +1,5 @@
 import { AI_OVERTAKE } from '@/domain/config'
-import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
+import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { DifficultyId } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { AiDriverState } from '@/domain/race/ai/aiState'
@@ -55,7 +55,8 @@ export function advancePassingState(
     // Red's high straight-line speed and limited grip make a futile, wide
     // pass costly. Only its calibrated profile opts into an early abort.
     // Keep the lane hold and clear base-lane requirement for every car.
-    const abortScale = CAR_DRIVING_PROFILES[vehicle.car].lostPassAbortDistanceScale
+    const profile: CarDrivingProfile = CAR_DRIVING_PROFILES[vehicle.car]
+    const abortScale = profile.lostPassAbortDistanceScale
     const targetLost = abortScale !== undefined && target !== undefined &&
       target.signedDistance > tuning.triggerDistance * abortScale
     // Other cars retain the stable eight-second fallback until calibrated.
