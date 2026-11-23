@@ -174,7 +174,9 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     const red = stoppingDistance('red', handling, 'dirt')
     const blue = stoppingDistance('blue', handling, 'dirt')
     const green = stoppingDistance('green', handling, 'dirt')
-    // Red remains meaningfully weaker on loose dirt, but the 0.75 brake tuning\n    // reduces its previous >20% stopping-distance penalty to roughly 11–12%.\n    expect(red).toBeGreaterThan(blue * 1.08)
+    // Red remains meaningfully weaker on loose dirt, but the 0.75 brake tuning
+    // reduces its previous >20% stopping-distance penalty to roughly 11–12%.
+    expect(red).toBeGreaterThan(blue * 1.08)
     expect(green).toBeLessThan(blue)
   })
 
