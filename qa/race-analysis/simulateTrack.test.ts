@@ -20,10 +20,10 @@ diagnostic('simulates exported geometry with deterministic AI driving', () => {
     throw new Error('Expected an exported Track Forge track or race replay')
   const options = JSON.parse(process.env.TRACKFORGE_ANALYSIS_OPTIONS ?? '{}')
   const startRatio = options.startRatio ?? track.start?.ratio ?? 0
-  const selectedCars: readonly CarId[] = options.cars === undefined
+  const selectedCars: readonly string[] = options.cars === undefined
     ? (exportJson.setup?.car ? [exportJson.setup.car] : cars)
     : options.cars === 'all' ? cars : String(options.cars).split(',')
-  if (!selectedCars.length || selectedCars.some((car) => !cars.includes(car)))
+  if (!selectedCars.length || selectedCars.some((car) => !(cars as readonly string[]).includes(car)))
     throw new Error('Unknown car: expected red, green, blue or yellow')
   const difficulty: DifficultyId = options.difficulty ?? exportJson.setup?.difficulty ?? 'hard'
   const mode = options.mode ?? (exportJson.setup ? 'traffic' : 'solo')
@@ -34,7 +34,8 @@ diagnostic('simulates exported geometry with deterministic AI driving', () => {
   const path = buildRoadPath(track.points, track.terrain)
   const outputs = []
   for (const seed of seeds) {
-    for (const car of selectedCars) {
+    for (const carName of selectedCars) {
+      const car = carName as CarId
       const run = runLaneCheck({
         path, trackName: track.name ?? 'Exported track',
         seed, car, difficulty, mode,
