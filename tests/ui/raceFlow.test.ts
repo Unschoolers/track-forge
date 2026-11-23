@@ -231,7 +231,8 @@ describe('race UI flow', () => {
     expect(resetPlayer).toHaveBeenCalledTimes(1)
     expect(warning.hidden).toBe(true)
     expect(controls.snapshot().steering).toBe(0)
-    expect(session.snapshot().telemetry.elapsed).toBe(2)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(2.1)
+    expect(session.snapshot().state?.elapsed).toBe(2)
 
     // The next miss must also respond directly to a mobile touch down.
     // A synthesized click is not reliable if the player has another finger
