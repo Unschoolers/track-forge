@@ -178,26 +178,10 @@ export function stepAiVehicle(
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
   const targetX = target.x + context.normal.x * pursuitLane
   const targetY = target.y + context.normal.y * pursuitLane
-  const pursuitAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
+  const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
-    : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
-  // Pure pursuit alone aims through the inside of a bend. Anticipate how the
-  // road will be aligned at the pursuit point, rather than cutting its chord.
-  // Keep the correction bounded and use the stock rejoin line when off-road.
-  const cornerBlend = arcade && !vehicle.racingLine && context.onRoad &&
-    context.nearest.distance < ROAD_GEOMETRY.onRoadRadius * 0.7
-      ? corner.phase === 'approach' ? 0.35 : corner.phase === 'turn' ? 0.22 : 0
-      : 0
-  const tangentOffset = 4 * direction
-  const wrapIndex = (index: number) => path.closed
-    ? ((index % path.points.length) + path.points.length) % path.points.length
-    : clamp(index, 0, path.points.length - 1)
-  const priorTarget = path.points[wrapIndex(targetIndex - tangentOffset)] ?? target
-  const afterTarget = path.points[wrapIndex(targetIndex + tangentOffset)] ?? target
-  const targetRoadHeading = Math.atan2(afterTarget.y - priorTarget.y, afterTarget.x - priorTarget.x)
-  const tangentLead = cornerBlend * wrapAngleRadians(targetRoadHeading - pursuitAngle)
-  const desiredAngle = pursuitAngle + clamp(tangentLead, -0.22, 0.22) +
-    (cornerBlend > 0 ? corner.headingLead : 0)
+    : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
+    (arcade && !vehicle.racingLine && context.onRoad ? corner.headingLead : 0)
   // Drift-aware countersteering follows the velocity vector without deleting
   // slip: the tire model still determines whether the car keeps sliding.
   const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
