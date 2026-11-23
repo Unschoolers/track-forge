@@ -146,7 +146,9 @@ fn add_peer(
     });
     {
         let mut guard = lock(&state)?;
-        if guard.generation != generation || guard.peers.len() >= MAX_GUESTS + usize::from(!hosting) {
+        if guard.generation != generation ||
+            (hosting && guard.locked.load(Ordering::SeqCst)) ||
+            guard.peers.len() >= MAX_GUESTS + usize::from(!hosting) {
             return Err("LAN room is no longer accepting connections".into());
         }
         guard.peers.insert(id.clone(), Arc::clone(&peer));
