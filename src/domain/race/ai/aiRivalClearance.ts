@@ -16,7 +16,11 @@ const AI_NEAR_LANE_GAP = 7
 
 export function compactAiTraffic(traffic: TrafficState): TrafficState {
   return {
-    ahead: traffic.ahead?.vehicle.player ? traffic.ahead : null,
+    // The raw "ahead" can be a nearer AI sprite masking a human farther
+    // up the same lane. Search the complete traffic list for the human;
+    // preserving player challenges is as important as softening AI rivals.
+    ahead: traffic.nearby.find(({ vehicle, signedDistance, laneGap }) =>
+      vehicle.player && signedDistance >= 0 && laneGap <= 20) ?? null,
     nearby: traffic.nearby.filter(({ vehicle, signedDistance, laneGap }) =>
       vehicle.player || (Math.abs(signedDistance) < AI_NEAR_DISTANCE &&
         laneGap < AI_NEAR_LANE_GAP)),
