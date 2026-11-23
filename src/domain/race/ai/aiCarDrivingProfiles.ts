@@ -54,7 +54,6 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.035,
     hardLookAheadSamples: 8,
     hardCornerTargetBonus: 0.3,
-    hardEdgeAvoidanceScale: 0,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
