@@ -31,7 +31,8 @@ describe('recovery penalty and elevated-road auto respawn', () => {
     expect(twice.vehicles[0]?.recoveryPenaltySeconds).toBeCloseTo(0.2)
     expect(twice.vehicles[1]?.recoveryPenaltySeconds).toBeUndefined()
     expect(penalizedRaceTime(10, requireFixture(twice.vehicles[0]))).toBeCloseTo(10.2)
-    expect(recoverRacePlayer({ ...twice, paused: true })).toBe(twice)
+    const paused = { ...twice, paused: true }
+    expect(recoverRacePlayer(paused)).toBe(paused)
     expect(start().vehicles[0]?.recoveryPenaltySeconds).toBeUndefined()
   })
 
