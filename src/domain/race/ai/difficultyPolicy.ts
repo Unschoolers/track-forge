@@ -4,6 +4,12 @@ import type { DifficultyId } from '@/domain/model'
 type Handling = 'arcade' | 'simulation'
 
 /**
+ * Hard-first tuning contract (docs/ai-difficulty-tuning.md):
+ * calibrate the physically safe Hard controller before adjusting Normal/Easy.
+ * All Arcade cars, including Green, share Hard's chassis-aware steering
+ * technique; Normal/Easy derive slower corner-speed targets via larger
+ * reserves and lower authored-line pace, not separate car physics.
+ *
  * Race pacing overrides live together, separate from authored line geometry.
  * DIFFICULTY_SPECS remains the authority for core driver characteristics.
  */
