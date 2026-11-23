@@ -243,7 +243,7 @@ export function stepAiVehicle(
     // more speed through gentler paved turns. Difficulty ordering still owns
     // the base reserve and physical grip remains unchanged.
     const sharpness = clamp((bend - 0.09) / 0.16, 0, 1)
-    const reserveFraction = 0.7 + 0.3 * sharpness
+    const reserveFraction = 0.4 + 0.6 * sharpness
     curveSpeed -= bendWeight * (gripReserve * reserveFraction + excessTarget)
   }
   // Passing at the outside edge consumes cornering room. Hold a little
