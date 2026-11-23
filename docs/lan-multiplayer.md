@@ -7,7 +7,9 @@
 - Host/scan/pairing/connected/packet/disconnected/lock/stop mirror the existing `NearbyTransport` port. The authoritative `NearbyRace`, checkpoint/progress packets, transfer validation, replay and race state machines are unchanged.
 - Android users choose **LOCAL WI-FI** to join a Windows PC; the original **ANDROID NEARBY** remains the default for Bluetooth/Wi-Fi Direct. Windows offers only LAN. Switch modes only before joining/hosting, never mid-race.
 - The LAN wire protocol is `TF_LAN_1`; neither discovery nor TCP frames contain trusted track data. Bound packets to 16003 decoded bytes and frames to 24000 bytes, and validate on the existing track/race application boundary.
-- Advertisements are room name only (`Room ####` or `Track ####`). Discovery responses reflect the hosting device IP and fixed TCP port. Local firewall and router client isolation can block discovery even on the same SSID; check both devices use the same subnet and Windows allows TrackForge.
+- Advertisements contain room name only (`Room ####` or `Track ####`). Discovery replies carry the host IP and fixed TCP port. Android acquires a scoped Wi-Fi `MulticastLock` while hosting to receive broadcast discovery requests, releasing it on exit.
+- **JOIN BY IP** is available in the LAN scanner on Windows and Android: enter the host device’s private IPv4 address (displayed in the host room, when detectable) to establish direct TCP without discovery packets. It works even if Wi-Fi broadcast is filtered, but not if TCP 47832 is blocked or the router isolates devices.
+- If no rooms appear: confirm **LOCAL WI-FI** on Android (not ANDROID NEARBY); check host IP/subnet, and Windows Defender Firewall *Private network* permission for the current `TrackForge.exe`. Hosting uses incoming UDP 47831 for discovery and incoming TCP 47832 for racing; do not port-forward these to the internet. Some routers isolate wireless clients on guest networks.
 - TCP uses `TCP_NODELAY` for small pose packets. This initial implementation favors reliable ordering and can still exhibit head-of-line stalls on congested Wi-Fi. Follow up with measured packet/latency/loss traces before considering best-effort UDP poses. No transport claims determinism in live radio conditions.
 
 ## Behavior and lifecycle
@@ -20,10 +22,10 @@ Both native hosts bind all local IPv4 interfaces; their listening port is not ex
 
 CI: JavaScript transport-selection/component regression tests, TypeScript/lint, Android native unit/compile, Windows Rust release compile and executable upload. A manual end-to-end acceptance matrix is needed to confirm radio discovery, firewall prompts and real race feel:
 
-1. Windows host → Android join, and Android host → Windows join, on the same Wi-Fi. Verify both devices find the room and enter the lobby.
+1. Windows host → Android join, and Android host → Windows join, on the same Wi-Fi. Verify automatic discovery, then deliberately block UDP broadcasts and use JOIN BY IP to connect via TCP 47832. Check missing host address guidance and invalid/public IP rejection.
 2. Race and rematch with accurate checkpoint progress and visible rival cars; export network diagnostics from both.
 3. Share a track PC → Android and Android → PC. Test a multi-track nearby cup and three-player room.
-4. Disconnect Wi-Fi during lobby and during race; ensure clean peer teardown and responsive Back. Reopen a room immediately without lingering port binding.
+4. Disconnect Wi-Fi during lobby and during race; ensure clean peer teardown and responsive Back. Reopen a room immediately without lingering port binding. Verify the Android Wi-Fi discovery lock is released after closing the host.
 5. Android **ANDROID NEARBY** mode must still race with a second Android device without shared Wi-Fi.
 6. Restart/replace the EXE; saves and profiles survive. Verify layout fills a widescreen desktop and keyboard input works.
 

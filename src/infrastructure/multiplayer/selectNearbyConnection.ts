@@ -12,6 +12,7 @@ export interface NearbyConnectionModes {
   readonly choices: readonly NearbyConnectionChoice[]
   current(): ConnectionMode
   choose(mode: ConnectionMode): boolean
+  hostAddress(): string | null
 }
 
 /** A NearbyRace sees exactly one adapter per room; no cross-transport peer IDs leak into the protocol. */
@@ -55,6 +56,12 @@ export function selectNearbyConnection(android?: NearbyTransport, lan?: NearbyTr
       catch (error) { running = false; throw error }
     },
     connect: id => adapters.get(mode)!.connect(id),
+    connectDirect: ip => {
+      const adapter = adapters.get(mode)
+      if (!adapter?.connectDirect) return Promise.reject(new Error('Direct IP is available only on local Wi-Fi.'))
+      return adapter.connectDirect(ip)
+    },
+    hostAddress: () => adapters.get(mode)?.hostAddress?.() ?? null,
     respond: (id, accepted) => adapters.get(mode)!.respond(id, accepted),
     lock: () => adapters.get(mode)!.lock(),
     send: (ids, bytes) => adapters.get(mode)!.send(ids, bytes),
@@ -75,6 +82,7 @@ export function selectNearbyConnection(android?: NearbyTransport, lan?: NearbyTr
     modes: {
       choices,
       current: () => mode,
+      hostAddress: () => adapters.get(mode)?.hostAddress?.() ?? null,
       choose(nextMode) {
         if (running || !adapters.has(nextMode)) return false
         if (mode !== nextMode) {

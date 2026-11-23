@@ -28,7 +28,7 @@ describe('Nearby sharing and rematch controls', () => {
     const nearby = new NearbyRace(transport, () => true)
     const actions = {
       close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
-      saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
       downloadDiagnostics: vi.fn(async () => true),
     }
     try {
@@ -61,7 +61,7 @@ describe('Nearby sharing and rematch controls', () => {
     try {
       const modal = createNearbyRaceModal(nearby, 'blue', {
         close: vi.fn(), chooseTrack, configureCup, scan: vi.fn(), scanTracks,
-        saveTrack: vi.fn(), declineTrack: vi.fn(), selectCar: vi.fn(),
+        saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
         downloadDiagnostics: vi.fn(async () => true),
       })
       const host = modal.querySelector<HTMLButtonElement>('[data-action="nearby-choose-track"]')

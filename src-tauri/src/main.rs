@@ -10,6 +10,7 @@ fn main() {
             lan::lan_host,
             lan::lan_scan,
             lan::lan_connect,
+            lan::lan_connect_direct,
             lan::lan_respond,
             lan::lan_lock,
             lan::lan_send,

@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Read, Write},
-    net::{Shutdown, SocketAddr, TcpListener, TcpStream, UdpSocket},
+    net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpListener, TcpStream, UdpSocket},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex, MutexGuard,
@@ -199,12 +199,38 @@ fn begin(manager: &LanManager, mode: &'static str) -> Result<(u64, Arc<AtomicBoo
     Ok((guard.generation, Arc::clone(&guard.cancelled)))
 }
 
+/// Native validation: only numeric, private on-link IPv4 targets are allowed.
+fn parse_lan_ip(input: &str) -> Result<Ipv4Addr, String> {
+    if input.len() > 15 || input.split('.').count() != 4 ||
+        !input.split('.').all(|octet| !octet.is_empty() &&
+            octet.len() <= 3 && octet.bytes().all(|b| b.is_ascii_digit()) &&
+            (octet == "0" || !octet.starts_with('0'))) {
+        return Err("Enter a valid private Wi-Fi IPv4 address".into());
+    }
+    let ip: Ipv4Addr = input.parse().map_err(|_| "Invalid LAN IPv4 address")?;
+    if !ip.is_private() && !ip.is_link_local() {
+        return Err("Only private LAN addresses are allowed".into());
+    }
+    Ok(ip)
+}
+
+fn local_host_ip() -> Option<String> {
+    // Determines the interface chosen by Windows' default route without sending traffic.
+    let socket = UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+    socket.connect(("192.0.2.1", 9)).ok()?;
+    match socket.local_addr().ok()? {
+        SocketAddr::V4(address) if address.ip().is_private() || address.ip().is_link_local() =>
+            Some(address.ip().to_string()),
+        _ => None,
+    }
+}
+
 #[tauri::command]
 pub fn lan_host(
     app: AppHandle,
     manager: State<'_, LanManager>,
     name: String,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     if name.len() > 48 || !name.starts_with("Room ") && !name.starts_with("Track ") {
         return Err("Invalid LAN room name".into());
     }
@@ -271,7 +297,7 @@ pub fn lan_host(
     });
     let mut guard = lock(&manager.state)?;
     guard.workers.extend([discovery_worker, server_worker]);
-    Ok(())
+    Ok(local_host_ip())
 }
 
 #[tauri::command]
@@ -354,6 +380,40 @@ pub fn lan_connect(app: AppHandle, manager: State<'_, LanManager>, id: String) -
     let stream = TcpStream::connect_timeout(&address, Duration::from_secs(3))
         .map_err(|e| format!("Cannot connect to LAN host: {e}"))?;
     add_peer(app, Arc::clone(&manager.state), generation, id, stream, false)
+}
+
+/// Direct connection is deliberately independent of UDP broadcast discovery.
+#[tauri::command]
+pub fn lan_connect_direct(
+    app: AppHandle,
+    manager: State<'_, LanManager>,
+    ip: String,
+) -> Result<(), String> {
+    let address = parse_lan_ip(&ip)?;
+    let generation = {
+        let guard = lock(&manager.state)?;
+        if guard.mode != "scanning" { return Err("Start searching for a LAN race first".into()); }
+        guard.generation
+    };
+    let target = SocketAddr::V4(SocketAddrV4::new(address, RACE_PORT));
+    let stream = TcpStream::connect_timeout(&target, Duration::from_secs(3))
+        .map_err(|error| format!("Cannot reach {address}:{RACE_PORT}. Check the Wi-Fi and Windows firewall: {error}"))?;
+    add_peer(app, Arc::clone(&manager.state), generation, ip, stream, false)
+}
+
+#[cfg(test)]
+mod local_address_tests {
+    use super::parse_lan_ip;
+    #[test]
+    fn restricts_manual_join_to_private_ip_addresses() {
+        for allowed in ["192.168.1.2", "10.0.0.9", "172.16.0.1", "172.31.255.254", "169.254.1.4"] {
+            assert!(parse_lan_ip(allowed).is_ok(), "{allowed}");
+        }
+        for invalid in ["", "127.0.0.1", "8.8.8.8", "255.255.255.255", "192.168.1.2:47832",
+            "192.168.001.2", "192.168.1.999", "192.168.1.1/24", "172.32.0.1", "localhost"] {
+            assert!(parse_lan_ip(invalid).is_err(), "{invalid}");
+        }
+    }
 }
 
 #[tauri::command]

@@ -27,6 +27,9 @@ export interface NearbyTransport {
   host(name: string): Promise<void>
   scan(): Promise<void>
   connect(id: string): Promise<void>
+  /** LAN-only: connect directly to an RFC1918 host even when UDP discovery is blocked. */
+  connectDirect?(ip: string): Promise<void>
+  hostAddress?(): string | null
   respond(id: string, accepted: boolean): Promise<void>
   lock(): Promise<void>
   send(ids: string[], bytes: Uint8Array): Promise<void>
@@ -52,6 +55,15 @@ export interface NearbyStart extends Course {
 type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'share-review' | 'staging' | 'racing'
 type Purpose = 'race' | 'share'
 const INCOMPATIBLE_RACE_VERSION = 'Multiplayer version mismatch. Update Track Forge on every device.'
+/** No DNS, public addresses, loopback, multicast or metacharacters from untrusted input. */
+export function validLanIp(ip: string): boolean {
+  const fields = ip.split('.')
+  if (fields.length !== 4 || fields.some(part => !/^(0|[1-9]\d{0,2})$/.test(part) || Number(part) > 255)) return false
+  const [first, second] = fields.map(Number)
+  return first === 10 || (first === 172 && second! >= 16 && second! <= 31) ||
+    (first === 192 && second === 168) || (first === 169 && second === 254)
+}
+
 export class NearbyRace {
   private readonly changes = new EventBus<void>()
   private readonly starts = new EventBus<NearbyStart>()
@@ -248,6 +260,23 @@ export class NearbyRace {
     this.setPhase('connecting')
     this.armTimeout('Could not connect to the nearby room.')
     this.perform('connect', () => this.transport.connect(id), this.generation)
+  }
+
+  /** Direct local IPv4 fallback: UDP discovery can be filtered on phones and routers. */
+  connectByIp(rawIp: string): void {
+    if (this.phase !== 'scanning' || !this.transport.connectDirect) return
+    const ip = rawIp.trim()
+    if (!validLanIp(ip)) {
+      this.error = 'Enter a private LAN IPv4 address, e.g. 192.168.1.20.'
+      this.changed()
+      return
+    }
+    this.hostId = ip
+    this.room = `LAN ${ip}`
+    this.error = null
+    this.setPhase('connecting')
+    this.armTimeout('Could not connect to this LAN address. Check the host IP and firewall.')
+    this.perform('connect-direct', () => this.transport.connectDirect!(ip), this.generation)
   }
 
   /** The host can select the next circuit without releasing any peer connection. */
