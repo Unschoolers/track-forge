@@ -33,6 +33,7 @@ export class SimulationPool {
         const onMessage = message => {
           if (message.type === 'ready') {
             initialized = true
+            this.baselineProfiles ??= message.baselineProfiles
             resolve()
             this.pump()
           } else if (message.type === 'fatal') {
