@@ -3,37 +3,52 @@ import { createRace } from '@/domain/race/raceFactory'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
-import { requireFixture } from '../fixtures/requireFixture'
+import { validateTrack } from '@/domain/track/trackValidation'
 
-describe('new official circuits', () => {
-  const additions = OFFICIAL_CIRCUITS.filter(({ track }) =>
-    ['official-quarry', 'official-switchback'].includes(track.id))
-
-  it('offers a long, unbroken passing straight on Quarry Run', () => {
-    const { track } = requireFixture(additions.find(({ track }) => track.id === 'official-quarry'))
-    const path = buildRoadPath(track.points, track.terrain)
-    const straight = path.points.filter((point) => point.y < -280)
-    expect(requireFixture(straight.at(-1)).distance - requireFixture(straight[0]).distance).toBeGreaterThan(700)
-    expect(straight.every((point) => point.surface === 'street')).toBe(true)
+describe('checkpoint-authored official circuits', () => {
+  it('ships exactly three simple, complete, visibly marked circuits with props', () => {
+    expect(OFFICIAL_CIRCUITS).toHaveLength(3)
+    for (const { track } of OFFICIAL_CIRCUITS) {
+      expect(track.points).toHaveLength(25)
+      expect(track.autoCheckpoints).toBe(true)
+      expect(track.scenery?.length).toBeGreaterThanOrEqual(4)
+      const path = buildRoadPath(track.points, track.terrain)
+      expect(path.crossings).toHaveLength(0)
+      expect(validateTrack(track, path.totalLength).ready).toBe(true)
+      expect(track.recoveryCheckpoints).toHaveLength(2)
+      const race = createRace({
+        path, recoveryCheckpoints: track.recoveryCheckpoints,
+        playerCar: 'blue', difficulty: 'normal', laps: 1,
+        startRatio: track.start?.ratio ?? 0,
+      })
+      expect(race.timingGates).toHaveLength(2)
+      expect(race.timingGates?.every(index => index > 0 && index < path.points.length)).toBe(true)
+    }
   })
 
-  it('separates the two branches at Switchback Viaduct', () => {
-    const { track } = requireFixture(additions.find(({ track }) => track.id === 'official-switchback'))
-    const path = buildRoadPath(track.points, track.terrain)
-    expect(path.crossings).toHaveLength(1)
-    const crossing = requireFixture(path.crossings[0])
-    expect(crossing.upperPathIndex).not.toBeNull()
-    expect(Math.abs(crossing.firstHeight - crossing.secondHeight)).toBeGreaterThan(15)
-  })
-
-  it('fits the full start grid in both directions on each new layout', () => {
-    expect(additions).toHaveLength(2)
-    for (const { track } of additions) {
+  it('orders the actual markers independently for forward and reverse races', () => {
+    for (const { track } of OFFICIAL_CIRCUITS) {
       const path = buildRoadPath(track.points, track.terrain)
       for (const reversed of [false, true]) {
-        const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, reversed, startRatio: track.start?.ratio ?? 0 })
-        expect(race.vehicles.every((vehicle) => getVehicleStepContext(path, vehicle).onRoad)).toBe(true)
+        const race = createRace({
+          path, recoveryCheckpoints: track.recoveryCheckpoints,
+          playerCar: 'blue', difficulty: 'normal', laps: 1,
+          reversed, startRatio: track.start?.ratio ?? 0,
+        })
+        expect(race.timingGates).toHaveLength(2)
+        expect(race.vehicles.every(vehicle => getVehicleStepContext(path, vehicle).onRoad)).toBe(true)
       }
     }
+  })
+
+  it('keeps user layouts without authored checkpoints incomplete', () => {
+    const track = OFFICIAL_CIRCUITS[0]!.track
+    const path = buildRoadPath(track.points, track.terrain)
+    expect(validateTrack({ ...track, recoveryCheckpoints: undefined }, path.totalLength)).toMatchObject({
+      ready: false, code: 'missing-checkpoints',
+    })
+    expect(validateTrack({ ...track, recoveryCheckpoints: [] }, path.totalLength)).toMatchObject({
+      ready: false, code: 'missing-checkpoints',
+    })
   })
 })
