@@ -16,6 +16,7 @@ export class SimulationPool {
     this.running = new Map()
     this.nextId = 1
     this.fatalError = null
+    this.baselineProfiles = null
     this.closing = false
   }
 
