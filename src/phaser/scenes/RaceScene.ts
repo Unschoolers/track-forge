@@ -190,7 +190,7 @@ export class RaceScene extends Phaser.Scene {
     }
   }
 
-  override update(_time: number, deltaMilliseconds: number): void {
+  override update(_time: number, _deltaMilliseconds: number): void {
     if (
       !this.vehicleGraphics ||
       !this.shadowGraphics ||
@@ -201,12 +201,17 @@ export class RaceScene extends Phaser.Scene {
     const benchmark = this.racePerformance?.beginUpdate()
     this.snapshot = this.controller.snapshot()
     benchmark?.beginSimulation()
+    // Use one real display-frame delta for physics accumulation and camera
+    // following. Phaser's smoothed scene delta can diverge at high refresh.
+    const frameSeconds = Math.max(0, this.game.loop.rawDelta / 1000)
     this.raceSession.advance(
-      Math.max(0, this.game.loop.rawDelta / 1000),
+      frameSeconds,
       inputForHandling(this.snapshot.paused ? { steering: 0, throttle: 0, braking: false } : this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
     )
     benchmark?.endSimulation()
-    const race = this.raceSession.snapshot().state
+    // Draw interpolated poses while the simulation, HUD, network and collision
+    // systems continue to use the authoritative 60 Hz state.
+    const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
     if (!race) return
     const player = race.vehicles.find((vehicle) => vehicle.player)
     if (player && this.raceCamera) {
@@ -218,7 +223,7 @@ export class RaceScene extends Phaser.Scene {
           steering: this.controls.snapshot().steering,
           viewport: this.cameras.main,
         },
-        Math.min(0.033, deltaMilliseconds / 1000),
+        Math.min(0.033, frameSeconds),
       )
       this.cameras.main.centerOn(
         this.raceCamera.x + this.raceCamera.shake.x,

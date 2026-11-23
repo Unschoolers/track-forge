@@ -24,6 +24,32 @@ first five seconds after **GO**.
 3. Capture three pairs per scenario on each build. Compare the median of the
    three first runs and the median of the three warm runs separately.
 
+## Visual frame pacing and high-refresh motion
+
+Race physics stays fixed at 60 Hz for deterministic handling, collision,
+multiplayer and recordings. `RaceSession.presentationState()` is a **render-only**
+view: it blends the two most recent simulation poses using the remaining
+fractional fixed-step time. Phaser's normal `requestAnimationFrame` display
+loop may draw at 30/60/90/120+ FPS; it is **not capped at 60 FPS**. Drawing
+never advances simulation or publishes extra race snapshots. Interpolation
+resets on restart, pause, manual recovery and automatic recovery/teleport.
+
+Do not enable pixel rounding on the rotating, fractionally zoomed race camera
+or force `setTimeout` as a pacing workaround. Do not request Android 120 Hz or
+pick a default FPS cap based on desktop benchmarks: Android may impose a
+display cap and higher refresh rates cost battery.
+
+To verify visually, drive at high speed on City Harbor daylight and night,
+Rally and Sandy Beach with dynamic zoom on and off, ideally on both a
+60 Hz and a 90/120 Hz device. Watch whether the car **and its shadow, lights,
+topper and camera** move smoothly, including steering, ramps, restart and
+recovery. Compare actual `frameIntervalMs` p50/p95/p99 and recording setup
+with the same device and track. A 30 FPS mode is desirable only if its
+presentation times are evenly paced (about 33.3 ms apart on a 60 Hz panel);
+do not treat an unverified `fps.target` setting as a limiter or an energy
+optimization. Measure temperature, energy use and thermally sustained FPS on
+physical Android devices before enabling high-refresh native requests.
+
 ## Physical Android debug APK
 
 Build an instrumented debug APK locally using the Android prerequisites in the

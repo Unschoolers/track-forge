@@ -43,6 +43,7 @@ import {
 import { LapTiming } from '@/application/race/lapTiming'
 import { penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 import { GhostRecording } from '@/application/race/ghostRecording'
+import { interpolateRaceState } from '@/application/race/racePresentation'
 import { RaceDiagnosticsRecording, type RaceDiagnosticsReport } from '@/application/race/raceDiagnostics'
 import { createRaceResult, toRaceStanding } from '@/application/race/raceResultRecorder'
 import { routeRaceFeedback } from '@/application/race/raceFeedback'
@@ -140,6 +141,8 @@ export interface RaceSessionPort {
   setPaused(paused: boolean): void
   advance(deltaSeconds: number, input: DriverInput): void
   snapshot(): RaceSessionSnapshot
+  /** Optional render-only interpolation for display refresh rates above or below 60 Hz. */
+  presentationState?(): RaceState | null
   nearbyGhosts?(): readonly GhostPose[]
   subscribe(listener: (snapshot: RaceSessionSnapshot) => void): Unsubscribe
   destroy(): void
@@ -193,6 +196,8 @@ export class RaceSession implements RaceSessionPort {
   private runId = 0
   private lastPositionCueAt = Number.NEGATIVE_INFINITY
   private remainder = 0
+  private previousPresentationTick: RaceState | null = null
+  private presentationDiscontinuities = new Set<string>()
   private startsAt: number | undefined
   private rivalFinishRemaining = 0
   private destroyed = false
@@ -211,6 +216,8 @@ export class RaceSession implements RaceSessionPort {
 
   start(track: Track, setup: RaceSetup, startsAt?: number): void {
     if (this.destroyed) return
+    this.previousPresentationTick = null
+    this.presentationDiscontinuities.clear()
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
     this.rivalFinishRemaining = 0
@@ -284,6 +291,8 @@ export class RaceSession implements RaceSessionPort {
 
   stop(): void {
     if (!this.current.state || this.destroyed) return
+    this.previousPresentationTick = null
+    this.presentationDiscontinuities.clear()
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
     this.rivalFinishRemaining = 0
@@ -299,6 +308,8 @@ export class RaceSession implements RaceSessionPort {
     if (!state || this.destroyed) return
     const recovered = recoverRacePlayer(state)
     if (recovered === state) return
+    this.previousPresentationTick = null
+    this.presentationDiscontinuities.clear()
     const before = state.vehicles.find((vehicle) => vehicle.player)
     const after = recovered.vehicles.find((vehicle) => vehicle.player)
     if (!before || !after) return
@@ -321,6 +332,8 @@ export class RaceSession implements RaceSessionPort {
     if (paused) this.dependencies.feedback.silenceContinuous()
     const state = this.current.state
     if (!state || state.paused === paused) return
+    this.previousPresentationTick = null
+    this.presentationDiscontinuities.clear()
     this.remainder = 0
     this.publish(
       this.buildSnapshot(
@@ -371,6 +384,10 @@ export class RaceSession implements RaceSessionPort {
     while (state.phase === 'running' && this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       const before = state.vehicles.find((vehicle) => vehicle.player)
       const next = this.step(state, input, RACE_TICK_SECONDS, this.dependencies.random)
+      this.previousPresentationTick = state
+      this.presentationDiscontinuities = new Set(next.events.flatMap((event) =>
+        event.type === 'vehicle-recovered' ? [event.vehicleId] : [],
+      ))
       state = next.state
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
@@ -508,6 +525,17 @@ export class RaceSession implements RaceSessionPort {
     return this.current
   }
 
+  presentationState(): RaceState | null {
+    const state = this.current.state
+    if (!state || state.phase !== 'running' || state.paused || !this.previousPresentationTick) return state
+    return interpolateRaceState(
+      this.previousPresentationTick,
+      state,
+      this.remainder / RACE_TICK_SECONDS,
+      this.presentationDiscontinuities,
+    )
+  }
+
   diagnosticsReport(): RaceDiagnosticsReport | null {
     const { track, setup, result } = this.current
     return track && setup && result && this.diagnostics
@@ -523,6 +551,8 @@ export class RaceSession implements RaceSessionPort {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.destroyed = true
+    this.previousPresentationTick = null
+    this.presentationDiscontinuities.clear()
     this.diagnostics = null
     this.events.clear()
   }
