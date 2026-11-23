@@ -13,8 +13,11 @@ import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/tra
 
 const MIGRATION_MARKER = 'trackforge-creator-migration-v1'
 
-const originalStarterSignature =
-  courseIdentity(createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0))
+const { recoveryCheckpoints: _unusedMarkers, autoCheckpoints: _unusedAuto, ...legacyStarter } =
+  createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0)
+void _unusedMarkers
+void _unusedAuto
+const originalStarterSignature = courseIdentity(legacyStarter)
 
 function isLegacyBuiltInStarter(track: Track): boolean {
   // Pre-credit starter tracks had a random "starter-..." ID. Identify only
