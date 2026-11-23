@@ -16,10 +16,13 @@
         "minHeight": 540,
         "maximized": true
       }
-    ]
+    ],
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": false,
-    "icon": ["icons/icon.ico"]
+    "icon": [
+      "icons/icon.ico"
+    ]
   }
 }

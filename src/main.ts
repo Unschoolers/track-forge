@@ -2,6 +2,8 @@ import { Capacitor } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
 import { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { createAndroidNearby } from '@/infrastructure/multiplayer/androidNearby'
+import { createLanNearby } from '@/infrastructure/multiplayer/lanNearby'
+import { selectNearbyConnection } from '@/infrastructure/multiplayer/selectNearbyConnection'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
@@ -70,7 +72,8 @@ if (trackStore.list().length === 0) {
 
 const scoreStore = new BrowserScoreRepository(storage)
 const geometry = new TrackGeometryService()
-const nearbyTransport = createAndroidNearby()
+const nearbyConnection = selectNearbyConnection(createAndroidNearby(), createLanNearby())
+const nearbyTransport = nearbyConnection.transport
 const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
   (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
@@ -114,6 +117,7 @@ const controller = new AppController({
 })
 const uiHost = new DomUiHost(uiRoot, controller, {
   nearby,
+  ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),
   raceSession,
   raceControls,
   feedback,
