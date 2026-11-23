@@ -17,7 +17,9 @@
     "build": "npm run typecheck && vite build",
     "verify": "npm test && npm run lint && npm run build",
     "android:sync": "npm run build && cap sync android",
-    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "qa:race": "node qa/race-analysis/cli.mjs",
+    "qa:race:test": "node --test qa/race-analysis/summary.check.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",
