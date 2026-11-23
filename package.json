@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "npm run test:fast && npm run test:ai:matrix",
     "test:watch": "vitest",
     "qa:mobile": "playwright test --config=playwright.mobile.config.mjs",
     "qa:mobile:production": "playwright test --config=playwright.production.config.mjs",
@@ -21,7 +21,9 @@
     "qa:race": "node qa/race-analysis/cli.mjs",
     "qa:race:test": "node --test qa/race-analysis/summary.check.mjs",
     "qa:optimize": "node qa/optimization/cli.mjs",
-    "qa:optimize:test": "node --test qa/optimization/*.test.mjs"
+    "qa:optimize:test": "node --test qa/optimization/*.test.mjs",
+    "test:fast": "vitest run --exclude tests/domain/aiFourCarHardImprovements.test.ts",
+    "test:ai:matrix": "vitest run tests/domain/aiFourCarHardImprovements.test.ts --maxWorkers=1"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",
