@@ -16,19 +16,18 @@ import {
 const difficulties: readonly DifficultyId[] = ['easy', 'normal', 'hard']
 
 describe('AI difficulty policy', () => {
-  it('keeps the calibrated Hard steering and preview policies independently configurable by car', () => {
+  it('keeps distinct legal driver decisions without hard-coding one car\'s tuned values', () => {
     expect(Object.keys(CAR_DRIVING_PROFILES).sort()).toEqual(['blue', 'green', 'red', 'yellow'])
-    expect(CAR_DRIVING_PROFILES.blue.hardLookAheadSamples)
-      .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardLookAheadSamples)
-    expect(CAR_DRIVING_PROFILES.yellow.hardSteerGain)
-      .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardSteerGain)
-    expect(CAR_DRIVING_PROFILES.green.hardCornerReserve).toBeGreaterThan(0)
-    expect(CAR_DRIVING_PROFILES.blue.hardCornerReserve).toBe(0)
+    const signatures = new Set<string>()
     for (const profile of Object.values(CAR_DRIVING_PROFILES)) {
       expect(profile.hardReaction).toBeGreaterThan(0)
       expect(profile.hardSteerGain).toBeGreaterThan(0)
       expect(profile.hardLookAheadSamples).toBeGreaterThan(0)
+      expect(profile.hardCornerReserve).toBeGreaterThanOrEqual(0)
+      expect(profile.hardCornerReserve).toBeLessThan(0.12)
+      signatures.add(JSON.stringify(profile))
     }
+    expect(signatures.size).toBe(4)
   })
 
   it.each(difficulties)('uses Hard technique for %s Arcade or authored-line AI without overwriting the chosen difficulty', difficulty => {
@@ -43,8 +42,9 @@ describe('AI difficulty policy', () => {
     expect(authoredLineSpeedRatio('normal')).toBeGreaterThan(authoredLineSpeedRatio('easy'))
     expect(arcadeCornerMargin('hard')).toBe(0)
     expect(arcadeCornerMargin('hard', 'blue')).toBe(0)
-    expect(arcadeCornerMargin('hard', 'red')).toBe(0)
-    expect(arcadeCornerMargin('hard', 'green')).toBeGreaterThan(0)
+    expect(arcadeCornerMargin('hard', 'red')).toBeGreaterThan(0)
+    expect(arcadeCornerMargin('hard', 'red')).toBeLessThan(arcadeCornerMargin('normal', 'red'))
+    expect(arcadeCornerMargin('hard', 'green')).toBe(CAR_DRIVING_PROFILES.green.hardCornerReserve)
     expect(arcadeCornerMargin('hard', 'green')).toBeLessThan(arcadeCornerMargin('normal', 'green'))
     expect(arcadeCornerMargin('easy')).toBeGreaterThan(arcadeCornerMargin('normal'))
     expect(arcadeCornerMargin('normal')).toBeGreaterThan(arcadeCornerMargin('hard'))

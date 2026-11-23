@@ -1,5 +1,5 @@
 import { DIFFICULTY_SPECS } from '@/domain/config'
-import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
+import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { CarId, DifficultyId } from '@/domain/model'
 
 type Handling = 'arcade' | 'simulation'
@@ -38,11 +38,11 @@ export function aiSteeringDifficulty(
  * reserve to avoid losing more time to excessive slip or offroad recoveries.
  * This modifies only the AI's speed *target*, not physical grip or brakes.
  */
-export function arcadeCornerMargin(difficulty: DifficultyId, car?: CarId): number {
+export function arcadeCornerMargin(difficulty: DifficultyId, car?: CarId, hardProfile?: CarDrivingProfile): number {
   if (difficulty !== 'hard' || !car) {
     return AI_PACE_POLICY[difficulty].arcadeCornerMargin
   }
-  return CAR_DRIVING_PROFILES[car].hardCornerReserve
+  return (hardProfile ?? CAR_DRIVING_PROFILES[car]).hardCornerReserve
 }
 
 /** Émile-specific racing-line speed ratios, independent of line geometry. */

@@ -30,8 +30,13 @@ const racingPavementByPath = new WeakMap<RoadPath, Map<number, number>>()
 const SHARP_LOCAL_TURN = 0.2
 const MAX_SHARP_SAMPLE_FRACTION = 0.012
 const MIN_PAVED_SAMPLE_FRACTION = 0.95
-const RACING_PAVEMENT_FULL_PACE_TURN = 0.5
-const RACING_PAVEMENT_BASE_PACE_TURN = 0.57
+// High-speed pavement pursuit can only increase corner pace on true sweeps.
+// At the western Roundabout hairpin, six-sample curvature reaches ~0.41:
+// the old 0.50/0.57 gate incorrectly granted the full 2.15x pace multiplier,
+// so Red and Blue reached the turn at 300+ without meaningful braking.
+// Fade this allowance *before* tight turn-in; steering and tire physics stay unchanged.
+const RACING_PAVEMENT_FULL_PACE_TURN = 0.2
+const RACING_PAVEMENT_BASE_PACE_TURN = 0.34
 
 /** Fraction of extra pavement pace a sweeping approach can support. */
 export function sweepingPavementAllowance(path: RoadPath, index: number, reversed: boolean): number {

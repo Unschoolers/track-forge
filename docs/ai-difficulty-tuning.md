@@ -61,7 +61,8 @@ profiles. Treat these as driver decisions, not a second vehicle physics model.
   genuine high service-brake capacity, but avoid aggressive low-grip
   corner entry; verify dirt and ice separately.
 - **Green — corner specialist:** exploit actual yaw response and mixed-surface
-  grip with a safe apex reserve. Validate drift and tire-force limits.
+  grip with a longer preview and without an unnecessary Hard apex reserve. Validate
+  drift and tire-force limits.
 - **Blue — balanced:** steering gain helps Kids Room but can regress Pine
   Hairpins. Prefer well-timed preview over globally aggressive steering.
 - **Yellow — heavy off-road:** optimize turn anticipation and steering response

@@ -7,9 +7,11 @@ import {
 } from '@/domain/model'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRace } from '@/domain/race/raceFactory'
+import { validNearbyGridPositions } from '@/domain/race/startGrid'
 import { stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import {
 	LaneMonitor,
 	sampleLaneVehicle,
@@ -25,6 +27,10 @@ export interface LaneRunOptions {
 	readonly difficulty: DifficultyId
 	readonly reversed: boolean
 	readonly startRatio?: number
+	/** Match exported race starting slots for reproducible traffic diagnostics. */
+	readonly gridPositions?: readonly number[]
+	/** Simulation-only, race-local AI driving profiles (no shared mutation). */
+	readonly aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>
 	readonly seconds: number
 	readonly laps: number
 	readonly mode: 'solo' | 'traffic'
@@ -95,7 +101,9 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		(options.startRatio !== undefined &&
 			(!Number.isFinite(options.startRatio) ||
 				options.startRatio < 0 ||
-				options.startRatio >= 1))
+				options.startRatio >= 1)) ||
+		(options.gridPositions !== undefined &&
+			!validNearbyGridPositions(options.gridPositions))
 	) {
 		throw new Error('Invalid lane simulation options')
 	}
@@ -107,9 +115,11 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		laps: options.laps,
 		reversed: options.reversed,
 		startRatio: options.startRatio ?? 0,
+		gridPositions: options.gridPositions,
 	})
 	let race: RaceState = {
 		...created,
+		...(options.aiProfileOverrides ? { aiProfileOverrides: options.aiProfileOverrides } : {}),
 		phase: 'running',
 		countdown: 0,
 		vehicles: created.vehicles

@@ -7,6 +7,7 @@ import type {
 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { AiDriverState, RacingLine } from '@/domain/race/ai/aiState'
+import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { RaceEffectsState } from '@/domain/race/effects'
 import type { SceneryColliders } from '@/domain/race/sceneryCollisions'
 
@@ -90,6 +91,8 @@ export interface RaceState {
   readonly missedCheckpoint?: { readonly gate: 1 | 2 | 3 | 4; readonly remainingSeconds: number; readonly position: Vector2 } | undefined
   readonly routeKind?: RouteKind
   readonly vehicles: readonly RaceVehicle[]
+  /** Per-race, immutable driver overrides for deterministic offline diagnostics. */
+  readonly aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>
   readonly difficulty: DifficultyId
   readonly handling?: 'arcade' | 'simulation'
   readonly totalLaps: number
