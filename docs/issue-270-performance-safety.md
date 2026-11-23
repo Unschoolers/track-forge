@@ -1,11 +1,11 @@
 # Issue #270 — consolidated performance and safety
 
-**Decision: NOT READY TO MERGE.** Hard AI is faster on Kids Room, but Red and Blue still incur automatic recoveries during representative Roundabout traffic. A green CI run is **not** acceptance of the gameplay goal.
+**Decision: Roundabout recovery blocker FIXED in deterministic QA.** Red and Blue now complete the original Roundabout replay grids and two additional traffic configurations without forced recovery. The fix changes the AI's planned corner pace, **not** car physics. **Merge is still conditional on all four workflows passing on the final PR head.**
 
 ## Provenance and apples-to-apples conditions
 
 - **Before:** [frozen original matrix](../qa/benchmarks/kidsRoomAiBaseline.json) from commit [`fea2b737`](https://github.com/Unschoolers/track-forge/commit/fea2b737484528192b8b0eadf1b516929ee61735). This precedes the Red improvement already merged in PR #269. Therefore the gains below are **total progress since frozen baseline**, not solely PR #272 changes.
-- **After:** PR performance code commit [`c2883ae2`](https://github.com/Unschoolers/track-forge/commit/c2883ae26c384bd22c74f6f3f28f99e71a1089a0), [CI run 45121339543](https://github.com/Unschoolers/track-forge/actions/runs/45121339543) / [benchmark job 137515576429](https://github.com/Unschoolers/track-forge/actions/runs/45121339543/job/137515576429). All steps passed, including strict replay validation, TypeScript, performance sweeps, full domain suite and lane QA.
+- **Original fast-but-unsafe PR:** PR performance code commit [`c2883ae2`](https://github.com/Unschoolers/track-forge/commit/c2883ae26c384bd22c74f6f3f28f99e71a1089a0), [CI run 45121339543](https://github.com/Unschoolers/track-forge/actions/runs/45121339543) / [benchmark job 137515576429](https://github.com/Unschoolers/track-forge/actions/runs/45121339543/job/137515576429). All steps passed, including strict replay validation, TypeScript, performance sweeps, full domain suite and lane QA.
 - **Kids Room:** exact fixture `tests/fixtures/kidsRoomAi.trackforge.json`, Arcade, 2 laps, solo AI without traffic, start ratio `0.21932299012693934`, deterministic seeds **1** and **4331**. Identical course, physics and start for before/after.
 - **Your best:** four-car live races, **not controlled equivalents** of solo AI; gap is contextual only. All times in seconds, smaller is better. "Recovery" means forced recovery, not momentarily leaving the road.
 
@@ -57,17 +57,22 @@ Short off-road excursions are recorded separately from forced recoveries.
 
 ### Roundabout v8 — Hard, 2 laps, four AI-driven vehicles
 
-Real exported road/terrain, Arcade, start ratio `0.7746478873239436`, two physical grids reproduced from the creator's replays. The simulated player slot is *also AI-operated*, so these are deterministic traffic simulations, **not** human-race replays. Seeds **1** and **4331** yielded the same forced-recovery totals; the table presents per-seed counts for seed 1.
+**Root cause.** On a long smooth all-pavement circuit, `racingPavementAllowance` treated a six-sample curvature of approximately **0.41 radians** as a safe sweeping corner. It granted the full **2.15×** corner-speed pace multiplier instead of using the physically achievable braking target. Red entered the western hairpin at over 300 speed units, saturated steering, and recovered off the road. The focused fix [`88a9d9d7`](https://github.com/Unschoolers/track-forge/commit/88a9d9d79b0289dc10fa84c1b58cf5e9b4993dd4) tapers that allowance between **0.20 and 0.34 radians**. No physics, grip, checkpoint, or recovery code changed.
 
-| Starting grid / AI player slot | Red recoveries | Blue recoveries | Green recoveries | Yellow recoveries | Total |
-|---|---:|---:|---:|---:|---:|
-| `[2,1,0,3]`, AI `red` in player slot | 3 | 0 | 0 | — | **3** |
-| `[2,3,1,0]`, AI `red` in player slot | 2 | 1 | 0 | — | **3** |
-| `[2,3,1,0]`, AI `yellow` in player slot | 1 | 0 | — | 0 | **1** |
+**Matched before/after:** identical real Roundabout v8 geometry and terrain, Arcade, start ratio `0.7746478873239436`, 2 laps, all four vehicles AI-driven, fixed physical grids and seeds. Compare the original [fast PR baseline, run 45121339543](https://github.com/Unschoolers/track-forge/actions/runs/45121339543) to the [corrected controller, run 45122947131](https://github.com/Unschoolers/track-forge/actions/runs/45122947131). The latter ran at `fce22116` (the subsequent `49a2046f` commit **only expands test grid coverage**).
 
-All vehicles eventually finished, but **forced recoveries make these FAIL safety acceptance**. The western hairpin around road indices 1450–1499 remains the primary known failure site.
+| Replay physical grid / AI player | Before Red recoveries | Before Blue recoveries | After Red recoveries | After Blue recoveries |
+|---|---:|---:|---:|---:|
+| `[2,1,0,3]`, Red | 3 | 0 | **0** | **0** |
+| `[2,3,1,0]`, Red | 2 | 1 | **0** | **0** |
+| `[2,3,1,0]`, Yellow | 1 | 0 | **0** | **0** |
+| **Total per seed** | **6** | **1** | **0** | **0** |
 
-Live build **1288** Roundabout replays establish real incident examples, but cannot be interpreted as directly matched pre/post traffic benchmarks (different engine versions and AI-vs-human control conditions).
+For these three directly matched conditions, **all 12 vehicles have zero off-road time after the fix**. The revised Red times include **65.500 → 64.767 s**, **70.150 → 63.767 s**, **66.217 → 64.550 s** and **66.167 → 63.783 s**. Blue finished between **0.033 s faster and 0.600 s slower**, depending on grid. The largest slowdown for any car across the three full traffic grids is **0.867 s** (Yellow); there is **no material cross-track pace regression**. Recovered laps are not fair clean-driving lap comparisons, so the time figures are supporting context, not the sole success metric.
+
+**Expanded traffic gate:** `tests/domain/roundaboutDiagnostic.test.ts` now enforces no Red/Blue forced recoveries on **five** physical grid/player-slot combinations, including Blue in the AI player position and two independently rearranged grids, across seeds `1`, `4331`, and `98765` (**15 deterministic two-lap traffic runs**). The [expanded test's Roundabout step passed](https://github.com/Unschoolers/track-forge/actions/runs/45123274448). Different physical grids, not merely different random seeds, provide the meaningful traffic variation; Hard can behave identically across seeds.
+
+Kids Room remains **96.833 / 76.483 / 81.950 / 80.850 s** (Red/Green/Blue/Yellow), each with zero forced recovery in both seeds. Pine Hairpins safety and pace checks also pass; the narrow racing-pavement rule does not alter its low-speed profile. The full official lane suite must remain green before merge.
 
 ### Rejected experiments: important counterexamples
 
@@ -102,10 +107,12 @@ Look for `AI_PACE_MATRIX`, `AI_PROFILE_SWEEP`, `AI_HARD_CROSS_TRACK_CANDIDATES` 
 - [x] Controlled ordering: Hard faster than Normal faster than Easy for each car.
 - [x] Present Pine Hairpins solo completions without recovery.
 - [x] No global profile mutation; complete race export validation with regression tests.
-- [x] Full target branch QA workflow at performance commit `c2883ae2`.
-- [ ] **Zero Red and Blue forced recoveries** on representative Roundabout four-car grids.
-- [ ] Like-for-like cross-track **before/after pace** with no meaningful speed regression.
-- [ ] More *meaningfully varied* traffic scenarios; current two seeds alone are inadequate.
-- [ ] Confirm live competitiveness without altering the physical limits of cars or checkpoints.
+- [x] **Zero Red and Blue recoveries** on all original Roundabout traffic replay grids.
+- [x] **Five** distinct traffic grid/player combinations, with three deterministic seeds each, assert the safety requirement.
+- [x] Matched before/after Roundabout pace, plus unchanged Kids Room performance and clean Pine safety; no significant regression.
+- [x] Race analysis, typecheck, domain and targeted Roundabout tests at `fce22116` in [run 45122947131](https://github.com/Unschoolers/track-forge/actions/runs/45122947131).
+- [ ] **Before merge:** four GitHub workflows must pass on the *final PR commit*: Issue 270 Hard AI branch QA, AI lane QA, Mobile gameplay QA, Verify and build Android. Check live statuses in the PR.
 
-**Keep issue #270 and PR #272 open; do not merge on green CI alone.**
+**Post-merge validation:** compare a new human four-car live replay against the original user bests. Deterministic AI-only traffic tests do not prove human-versus-AI competitiveness; this is follow-up telemetry, not an excuse to bypass the four-workflow merge gate.
+
+**Merge only after all final-head checks are green.**
