@@ -352,7 +352,7 @@ export function createRaceHud(
     lapTimes.textContent = openRoute || bestLap == null || ghostRace ? '' : `BEST ${formatRaceTime(bestLap)}`
     lapTimes.hidden = !lapTimes.textContent
     const split = telemetry.latestSplit
-    const splitLabel = split?.gate === telemetry.finishGate ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
+    const splitLabel = split && split.gate === telemetry.finishGate ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
     splitTime.textContent = !missed && telemetry.missedCheckpoint !== undefined
       ? `MISSED CP ${telemetry.missedCheckpoint}`
       : split ? `${splitLabel} ${formatRaceTime(split.time)}` : ''
