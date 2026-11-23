@@ -27,10 +27,10 @@ export const CAR_DRIVING_PROFILES = {
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
   red: {
-    hardReaction: 8,
+    hardReaction: 12,
     hardSteerGain: 2.22,
-    hardCornerReserve: 0,
-    hardLookAheadSamples: 4,
+    hardCornerReserve: 0.06,
+    hardLookAheadSamples: 10,
   },
   // Green rotates easily on street/dirt. With its longer preview it can
   // stay on line without a separate Hard apex speed reserve.
