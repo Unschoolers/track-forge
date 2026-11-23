@@ -4,6 +4,7 @@ import {
   createRaceCamera,
 } from '@/phaser/camera/raceCamera'
 import { createRace } from '@/domain/race/raceFactory'
+import { interpolateRaceState } from '@/application/race/racePresentation'
 import { buildRaceCameraHints } from '@/domain/race/trackContext'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
@@ -67,6 +68,37 @@ describe('race camera', () => {
       1 / 60,
     )
     expect(Math.abs(next.angle)).toBeLessThanOrEqual(2.3 / 60 + 0.00001)
+  })
+
+  it('does not kick camera zoom on the physics tick where a preview point is added', () => {
+    const path = buildRoadPath([
+      { x: 0, y: 0, surface: 'street', curve: 'corner' },
+      { x: 600, y: 0, surface: 'street', curve: 'corner' },
+    ], EMPTY_TERRAIN)
+    const state = { ...createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 }),
+      phase: 'running' as const }
+    const player = state.vehicles.find((vehicle) => vehicle.player)
+    if (!player) throw new Error('Missing player fixture')
+    const preview = [player, { x: player.x + 50, y: player.y }]
+    const previous = { ...state, cameraHints: {
+      ...state.cameraHints, roadAngle: 0, speed: 150, upcomingCurve: 0, preview,
+    } }
+    const current = { ...previous, cameraHints: {
+      ...previous.cameraHints,
+      preview: [...preview, { x: player.x + 500, y: player.y }],
+    } }
+    const options = { dynamicZoom: true, steering: 0, viewport: { width: 280, height: 280 } }
+    const camera = createRaceCamera({ x: player.x, y: player.y, angle: 0 })
+    const before = advanceRaceCamera(camera, previous.cameraHints, options, 1 / 60)
+    const abrupt = advanceRaceCamera(camera, current.cameraHints, options, 1 / 60)
+    const boundary = interpolateRaceState(previous, current, 0, new Set())
+    const smooth = advanceRaceCamera(camera, boundary.cameraHints, options, 1 / 60)
+    // A sample appearing at the edge of the look-ahead may change the target
+    // zoom substantially, but not instantaneously at interpolation alpha=0.
+    expect(abrupt.zoom).toBeLessThan(before.zoom)
+    expect(smooth.zoom).toBeCloseTo(before.zoom, 8)
+    expect(smooth.x).toBeCloseTo(before.x, 8)
+    expect(smooth.y).toBeCloseTo(before.y, 8)
   })
 
   it('starts close enough for the player car to remain readable', () => {

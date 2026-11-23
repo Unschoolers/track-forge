@@ -16,6 +16,7 @@ function mustSnap(
 ): boolean {
   return !before || discontinuities.has(vehicle.id) ||
     before.finishedAt !== vehicle.finishedAt ||
+    before.structureRunId !== vehicle.structureRunId ||
     // Guard non-event teleports and stale state without inventing physics.
     Math.hypot(vehicle.x - before.x, vehicle.y - before.y) >
       Math.max(30, Math.max(Math.abs(before.speed), Math.abs(vehicle.speed)) / 24)
@@ -46,6 +47,11 @@ export function interpolateRaceState(
       y: blend(before.y, vehicle.y, alpha),
       z: blend(before.z, vehicle.z, alpha),
       angle: blendAngle(before.angle, vehicle.angle, alpha),
+      // The car's vector silhouette depends on the suspension and landing
+      // animation as well as its pose. Don't step its scale at 60 Hz.
+      suspensionCompression: blend(before.suspensionCompression, vehicle.suspensionCompression, alpha),
+      landingIntensity: blend(before.landingIntensity, vehicle.landingIntensity, alpha),
+      verticalVelocity: blend(before.verticalVelocity, vehicle.verticalVelocity, alpha),
     }
   })
 
@@ -56,15 +62,17 @@ export function interpolateRaceState(
   const hints = current.cameraHints
   const oldPreview = oldHints.preview
   const preview = hints.preview
-  // Preview points feed the camera's high-speed framing. Interpolating them
-  // together with the car prevents the camera from stepping at 60 Hz.
-  const blendedPreview = !playerRecovered && oldPreview && preview &&
-    oldPreview.length === preview.length
-    ? preview.map((point, index) => {
-      const before = oldPreview[index]
-      return before
-        ? { x: blend(before.x, point.x, alpha), y: blend(before.y, point.y, alpha) }
-        : point
+  // The look-ahead window adds and drops road points as the car moves.
+  // Falling back to the newest preview when lengths differ makes framing
+  // (including zoom) jump on exactly those high-speed physics ticks.
+  // Duplicate the shorter window's endpoint so both ends of the transition
+  // describe the same bounds and the camera remains continuous.
+  const blendedPreview = !playerRecovered && oldPreview?.length && preview?.length
+    ? Array.from({ length: Math.max(oldPreview.length, preview.length) }, (_, index) => {
+      const before = oldPreview[Math.min(index, oldPreview.length - 1)]
+      const after = preview[Math.min(index, preview.length - 1)]
+      if (!before || !after) return after ?? before ?? hints.target
+      return { x: blend(before.x, after.x, alpha), y: blend(before.y, after.y, alpha) }
     })
     : preview
   return {
@@ -79,6 +87,7 @@ export function interpolateRaceState(
       roadAngle: blendAngle(oldHints.roadAngle, hints.roadAngle, alpha),
       speed: blend(oldHints.speed, hints.speed, alpha),
       upcomingCurve: blend(oldHints.upcomingCurve, hints.upcomingCurve, alpha),
+      shake: blend(oldHints.shake, hints.shake, alpha),
       ...(blendedPreview ? {
         preview: player ? [
           { x: player.x, y: player.y },
