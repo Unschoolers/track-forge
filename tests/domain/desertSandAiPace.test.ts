@@ -140,3 +140,18 @@ it('screens Blue corner pace tradeoff across Desert and Kids room', () => {
   console.log(`BLUE_CORNER_PACE_TRADEOFF ${JSON.stringify(rows)}`)
   expect(rows).toHaveLength(8)
 }, 180_000)
+
+it('cross-checks faster Green with both seeds in traffic and solo', () => {
+  const rows = [1, 4331].flatMap(seed => [0.2, 0.3, 0.4].flatMap(edge => {
+    const green: CarDrivingProfile = { ...CAR_DRIVING_PROFILES.green, hardEdgeAvoidanceScale: edge }
+    const overrides = { green }
+    const shared = {
+      seed, edge, desertSolo: measure(desert, 'green', 'hard', 'solo', seed, overrides),
+      desertTraffic: measure(desert, 'green', 'hard', 'traffic', seed, overrides),
+      kidsTraffic: measure(courses[0], 'red', 'hard', 'traffic', seed, overrides),
+    }
+    return [shared]
+  }))
+  console.log(`GREEN_EDGE_SEEDS ${JSON.stringify(rows)}`)
+  expect(rows).toHaveLength(6)
+}, 180_000)
