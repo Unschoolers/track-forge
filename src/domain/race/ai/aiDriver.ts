@@ -140,7 +140,9 @@ export function stepAiVehicle(
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
-  const hardLookAhead = drivingDifficulty === 'hard' ? HARD_LOOKAHEAD_SAMPLES : 0
+  const hardLookAhead = drivingDifficulty === 'hard'
+    ? (arcade && !vehicle.racingLine ? hardProfile.hardLookAheadSamples : HARD_LOOKAHEAD_SAMPLES)
+    : 0
   const lookAheadSamples = Math.round(
     context.onRoad
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)
