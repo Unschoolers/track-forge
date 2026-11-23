@@ -31,6 +31,8 @@ jobs:
       - name: Exported-track simulation smoke test
         run: npm run qa:race -- simulate tests/fixtures/kidsRoomAi.trackforge.json --car blue --mode solo --difficulty hard --seed 1 --laps 2 --seconds 120
       - name: Kids Room all cars and difficulties, plus Pine and policy regressions
+        env:
+          AI_TRAFFIC_SWEEP: '1'
         run: npx vitest run tests/domain/kidsRoomAiBenchmark.test.ts tests/domain/kidsRoomAiPace.test.ts tests/domain/aiHardPace.test.ts tests/domain/aiDifficultyPolicy.test.ts --reporter=verbose
       - name: Diagnostic car-specific Hard profile sweep
         env:
