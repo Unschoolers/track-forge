@@ -206,6 +206,16 @@ profileSweep('compares four-car Hard candidates on both replay starting grids', 
     { label: 'current', changes: {} },
     { label: 'red-reserve018', changes: { red: { hardCornerReserve: 0.18 } } },
     { label: 'red-reserve022', changes: { red: { hardCornerReserve: 0.22 } } },
+    { label: 'red-hairpin010', changes: { red: { hardHairpinReserve: 0.1 } } },
+    { label: 'red-hairpin016', changes: { red: { hardHairpinReserve: 0.16 } } },
+    { label: 'red-hairpin022', changes: { red: { hardHairpinReserve: 0.22 } } },
+    { label: 'red-hairpin028', changes: { red: { hardHairpinReserve: 0.28 } } },
+    { label: 'blue-edge01-corner004', changes: {
+      blue: { hardEdgeAvoidanceScale: 0.1, hardCornerTargetBonus: 0.04 },
+    } },
+    { label: 'blue-reaction10-gain242-preview10', changes: {
+      blue: { hardReaction: 10, hardSteerGain: 2.42, hardLookAheadSamples: 10 },
+    } },
     { label: 'blue-edge0-corner006', changes: {
       blue: { hardEdgeAvoidanceScale: 0, hardCornerTargetBonus: 0.06 },
     } },
