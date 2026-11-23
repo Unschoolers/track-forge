@@ -42,6 +42,9 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
   const recoveries: string[] = []
   const splits = new Map<string, string[]>()
   const surfaces = new Map<string, Record<string, number>>()
+  // Temporary forensic telemetry for #257 (will be removed after calibration).
+  const paceSegments = new Map<string, { count: number, speedSum: number,
+    brakes: number, slow: number, slide: number, speedPeak: number }>()
   for (let tick = 0; tick < 150 / RACE_TICK_SECONDS; tick++) {
     const before = race
     const stepped = stepRace(
@@ -65,6 +68,21 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
         recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, reason=${event.reason}, x=${event.x.toFixed(0)}, y=${event.y.toFixed(0)}, index=${event.pathIndex}, surface=${point?.surface ?? '?'}, speed=${prior?.speed.toFixed(0) ?? '?'}, slip=${prior?.slip.toFixed(0) ?? '?'}, yaw=${prior?.yawRate.toFixed(2) ?? '?'}, offset=${distance.toFixed(0)}`)
       }
     }
+    if (tick % 6 === 0) {
+      for (const vehicle of race.vehicles.filter(vehicle => !vehicle.player && vehicle.finishedAt === null)) {
+        const surface = vehicle.currentSurface
+        const key = `${vehicle.car}/${vehicle.nextSector}/${surface}`
+        const sample = paceSegments.get(key) ?? { count: 0, speedSum: 0,
+          brakes: 0, slow: 0, slide: 0, speedPeak: 0 }
+        sample.count++
+        sample.speedSum += vehicle.speed
+        sample.brakes += vehicle.braking ? 1 : 0
+        sample.slow += vehicle.speed < 95 ? 1 : 0
+        sample.slide += Math.abs(vehicle.slip) > 12 ? 1 : 0
+        sample.speedPeak = Math.max(sample.speedPeak, vehicle.speed)
+        paceSegments.set(key, sample)
+      }
+    }
     if (tick % 60 === 0) {
       for (const vehicle of race.vehicles.filter(vehicle => !vehicle.player && vehicle.finishedAt === null)) {
         const stats = surfaces.get(vehicle.id) ?? {}
@@ -80,12 +98,24 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
     recoveries,
     splits,
     surfaces,
+    paceSegments,
   }
 }
 
 describe('AI cornering on the Kids room mixed-surface circuit', () => {
   it.each([1, 4331])('finishes reliably with a competitive field (seed %i)', seed => {
-    const { opponents, recoveries, splits, surfaces } = normalRivals(seed)
+    const { opponents, recoveries, splits, surfaces, paceSegments } = normalRivals(seed)
+    if (seed === 1) {
+      console.info('CORNER_PACE_FORENSICS', JSON.stringify(
+        Array.from(paceSegments.entries()).sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, stat]) => ({
+            key, seconds: Number((stat.count / 10).toFixed(1)),
+            avg: Math.round(stat.speedSum / stat.count), peak: Math.round(stat.speedPeak),
+            brakesPercent: Math.round(100 * stat.brakes / stat.count),
+            slowPercent: Math.round(100 * stat.slow / stat.count),
+            driftPercent: Math.round(100 * stat.slide / stat.count),
+          }))))
+    }
     const hard = normalRivals(seed, 'hard')
     const hardTimes = hard.opponents.map(vehicle => `${vehicle.car}:${vehicle.finishedAt?.toFixed(2) ?? 'DNF'}`).join(',')
     const times = opponents.map(vehicle => vehicle.finishedAt ?? Infinity)
