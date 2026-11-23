@@ -37,7 +37,7 @@ export interface LaneRunOptions {
 	/** Required in duel mode; the second AI has this physical chassis. */
 	readonly duelOpponentCar?: CarId
 	/** Duel-only: physical opponent drives its own AI at this pace multiplier. */
-	readonly duelOpponentPace?: number
+	readonly duelOpponentSpeedLimit?: number
 	readonly seconds: number
 	readonly laps: number
 	readonly mode: 'solo' | 'duel' | 'traffic'
@@ -107,9 +107,9 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		!['solo', 'duel', 'traffic'].includes(options.mode) ||
 		(options.mode === 'duel' && (options.duelOpponentCar === undefined || !CAR_IDS.includes(options.duelOpponentCar))) ||
 		(options.mode !== 'duel' && options.duelOpponentCar !== undefined) ||
-		(options.duelOpponentPace !== undefined && (
-			options.mode !== 'duel' || !Number.isFinite(options.duelOpponentPace) ||
-			options.duelOpponentPace < 0.5 || options.duelOpponentPace > 1.25)) ||
+		(options.duelOpponentSpeedLimit !== undefined && (
+			options.mode !== 'duel' || !Number.isFinite(options.duelOpponentSpeedLimit) ||
+			options.duelOpponentSpeedLimit < 100 || options.duelOpponentSpeedLimit > 350)) ||
 		(options.startRatio !== undefined &&
 			(!Number.isFinite(options.startRatio) ||
 				options.startRatio < 0 ||
@@ -132,8 +132,13 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		startRatio: options.startRatio ?? 0,
 		gridPositions: options.gridPositions ?? (options.mode === 'duel' ? [3, 0, 1, 2] : undefined),
 	})
+	if (options.mode === 'duel' && !created.vehicles[1])
+		throw new Error('Duel opponent missing from race grid')
 	let race: RaceState = {
 		...created,
+		...(options.duelOpponentSpeedLimit !== undefined ? {
+			aiVehicleSpeedLimits: { [created.vehicles[1]!.id]: options.duelOpponentSpeedLimit },
+		} : {}),
 		...(options.aiProfileOverrides ? { aiProfileOverrides: options.aiProfileOverrides } : {}),
 		...(options.aiPassingPolicyOverrides ? { aiPassingPolicyOverrides: options.aiPassingPolicyOverrides } : {}),
 		phase: 'running',
@@ -147,7 +152,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 				// with a selectable chassis, not a frozen obstacle or fake telemetry.
 				...(options.mode === 'duel' && index === 1 ? {
 					car: options.duelOpponentCar ?? vehicle.car,
-					...(options.duelOpponentPace !== undefined ? { aiPace: options.duelOpponentPace } : {}),
+					
 				} : {}),
 				player: false,
 				damageLimit: Number.POSITIVE_INFINITY,
