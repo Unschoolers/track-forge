@@ -276,10 +276,11 @@ export function createRaceHud(
     checkpointWarning.hidden = !missed || phase !== 'running' || paused
     resetNow.disabled = checkpointWarning.hidden
     if (missed && !checkpointWarning.hidden) {
-      const message = `MISSED CHECKPOINT ${missed.gate}`
+      const message = missed.gate === (snapshot.state?.timingGates?.length ?? 0) + 1
+        ? 'MISSED FINISH LINE' : `MISSED CHECKPOINT ${missed.gate}`
       if (checkpointMessage.textContent !== message) {
         checkpointMessage.textContent = message
-        checkpointAnnouncement.textContent = `Missed checkpoint ${missed.gate}. Return to the checkpoint or reset now.`
+        checkpointAnnouncement.textContent = `${message}. Return to the line or reset now.`
       }
       const timerLabel = `Reset in ${Math.max(0, Math.ceil(missed.remainingSeconds))} s`
       if (checkpointTimer.textContent !== timerLabel) checkpointTimer.textContent = timerLabel
@@ -351,7 +352,7 @@ export function createRaceHud(
     lapTimes.textContent = openRoute || bestLap == null || ghostRace ? '' : `BEST ${formatRaceTime(bestLap)}`
     lapTimes.hidden = !lapTimes.textContent
     const split = telemetry.latestSplit
-    const splitLabel = split?.gate === 4 ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
+    const splitLabel = split?.gate === telemetry.finishGate ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
     splitTime.textContent = !missed && telemetry.missedCheckpoint !== undefined
       ? `MISSED CP ${telemetry.missedCheckpoint}`
       : split ? `${splitLabel} ${formatRaceTime(split.time)}` : ''
