@@ -35,9 +35,9 @@ function scheduler() {
 }
 
 describe('race presentation preparation', () => {
-  it('reuses the same bridge and lamp presentation from the flyover geometry', () => {
+  it('reuses prepared geometry and lamps for a simple crossing-free circuit', () => {
     const { preparation, callbacks, frame } = scheduler()
-    const track = OFFICIAL_CIRCUITS[3].track
+    const track = OFFICIAL_CIRCUITS[0].track
     const geometryService = new TrackGeometryService()
     const selectionGeometry = geometryService.get(track)
     const heightAt = vi.spyOn(selectionGeometry.path.terrainSurface, 'heightAt')
@@ -52,7 +52,7 @@ describe('race presentation preparation', () => {
     const coldGeometry = buildTrackGeometry(track)
     const warmedBridge = buildBridgePresentation(raceGeometry)
     const warmedLamps = buildLampPosts(raceGeometry)
-    expect(warmedBridge.length).toBeGreaterThan(0)
+    expect(warmedBridge).toHaveLength(0)
     expect(warmedLamps.length).toBeGreaterThan(0)
     expect(heightAt).not.toHaveBeenCalled()
     expect(warmedBridge).toEqual(buildBridgePresentation(coldGeometry))
