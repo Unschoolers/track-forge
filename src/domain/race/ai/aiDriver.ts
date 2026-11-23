@@ -205,8 +205,8 @@ export function stepAiVehicle(
   }
   // A wide passing line can point the car across the return arm of a
   // hairpin. Ease toward the center on approach if the space is clear.
-  // Hard makes no deliberate AI↔AI dodges: its sprites may overlap without
-  // physical contact. Normal/Easy retain the small courtesy adjustment.
+  // Hard and Normal make no AI↔AI dodges: their sprites may overlap without
+  // physical contact. Easy retains a tiny low-speed courtesy adjustment.
   const lane = ai.targetLane + ai.mistakeOffset + (relaxedAiRivals &&
     difficulty === 'easy' && ai.phase === 'follow'
     ? aiCourtesyNudge(vehicle, traffic, bend, context.onRoad) : 0)
