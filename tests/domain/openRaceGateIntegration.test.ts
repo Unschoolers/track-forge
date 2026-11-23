@@ -51,14 +51,14 @@ it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, fre
   movement.x = gateX + 1
   movement.y = 80
   const missed = stepRace({ ...race, phase: 'running', vehicles: [player] }, input, 0.01, random)
-  expect(missed.state.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+  expect(missed.state.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 2 })
   expect(missed.state.vehicles[0]!.nextSector).toBe(1)
   const paused = stepRace({ ...missed.state, paused: true }, input, 0.05, random)
-  expect(paused.state.missedCheckpoint?.remainingSeconds).toBe(5)
+  expect(paused.state.missedCheckpoint?.remainingSeconds).toBe(2)
   const countdown = stepRace(missed.state, input, 0.05, random)
-  expect(countdown.state.missedCheckpoint?.remainingSeconds).toBeCloseTo(4.95)
+  expect(countdown.state.missedCheckpoint?.remainingSeconds).toBeCloseTo(1.95)
   let lastTick = countdown
-  for (let i = 0; i < 98; i++) lastTick = stepRace(lastTick.state, input, 0.05, random)
+  for (let i = 0; i < 38; i++) lastTick = stepRace(lastTick.state, input, 0.05, random)
   expect(lastTick.state.missedCheckpoint?.remainingSeconds).toBeCloseTo(0.05)
   const recovered = stepRace(lastTick.state, input, 0.05, random)
   expect(recovered.state.missedCheckpoint).toBeUndefined()
@@ -70,8 +70,9 @@ it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, fre
   expect(resetCar.pathIndex).toBeLessThan(gateIndex)
   expect(resetCar.x).toBeCloseTo(path.points[resetCar.pathIndex]!.x)
   expect(resetCar.lap).toBe(player.lap)
+  expect(resetCar.recoveryPenaltySeconds).toBeCloseTo(0.1)
   expect(recovered.state.vehicles[0]!.nextSector).toBe(1)
-  expect(recovered.state.elapsed).toBeCloseTo(missed.state.elapsed + 5)
+  expect(recovered.state.elapsed).toBeCloseTo(missed.state.elapsed + 2)
 })
 
 it('clears the countdown only on a valid forward recross', () => {
