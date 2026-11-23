@@ -26,12 +26,17 @@ describe('LAN pairing disconnect regression', () => {
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'))
       emit({ type: 'pairing', id: 'guest-1' })
       await vi.waitFor(() => expect(respond).toHaveBeenCalledWith('guest-1', true))
-      emit({ type: 'disconnected', id: 'guest-1' })
+      emit({ type: 'disconnected', id: 'guest-1', reason: 'socket_WouldBlock_10035' })
       rejectAccept?.(new Error('LAN player disconnected'))
       await vi.waitFor(async () => {
         const trace = await host.diagnostics()
         expect(trace.timeline).toEqual(expect.arrayContaining([
           expect.objectContaining({ event: 'pairing_peer_left', stage: 'during_accept' }),
+          expect.objectContaining({ event: 'native_disconnect', reason: 'socket_WouldBlock_10035' }),
+          expect.objectContaining({ event: 'operation', operation: 'respond', result: 'failed' }),
+        ]))
+        expect(trace.timeline).not.toEqual(expect.arrayContaining([
+          expect.objectContaining({ event: 'operation', operation: 'respond', result: 'succeeded' }),
         ]))
       })
       expect(host.snapshot().phase).toBe('hosting')
