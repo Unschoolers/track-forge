@@ -15,6 +15,8 @@ export interface CornerTactics {
   readonly drifting: boolean
   readonly sideslipGain: number
   readonly exitThrottle: number
+  /** How much exit throttle the road can support while sliding sideways. */
+  readonly exitTraction: number
 }
 
 /**
@@ -31,6 +33,7 @@ export function planCornerTactics(
   slipAngle: number,
   roadOffset: number,
   roadRadius: number,
+  lateralVelocity = 0,
 ): CornerTactics {
   const direction = reversed ? -1 : 1
   const past = turnAmountAt(path, index - direction * 12, 6) * direction
@@ -79,5 +82,15 @@ export function planCornerTactics(
   const exitThrottle = phase === 'exit' && drifting
     ? clamp(0.28 + (0.19 - Math.abs(peakNext)) * 1.5, 0.28, 0.52)
     : 0
-  return { phase, bend, turnSign: sign, headingLead, pursuitScale, drifting, sideslipGain, exitThrottle }
+  // Power on exit only once the *velocity* is taking the car back toward
+  // the pavement. Looking at chassis heading alone misses a genuine slide.
+  // This leaves friction-circle tire physics untouched and avoids braking
+  // while the wheels are needed for lateral recovery.
+  const predictedOffset = roadOffset + lateralVelocity * 0.28
+  const exitTraction = (phase === 'turn' || phase === 'exit') && speed > 50
+    ? clamp((roadRadius * 0.85 - Math.abs(predictedOffset)) /
+      (roadRadius * 0.45), 0, 1)
+    : 1
+  return { phase, bend, turnSign: sign, headingLead, pursuitScale, drifting,
+    sideslipGain, exitThrottle, exitTraction }
 }
