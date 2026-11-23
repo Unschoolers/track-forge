@@ -18,7 +18,7 @@ function loadKidsRoom() {
 }
 const kidsRoom = loadKidsRoom()
 
-function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
+function normalRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'normal') {
   let state = seed >>> 0
   const random = {
     next: () => {
@@ -112,4 +112,30 @@ describe('AI cornering on the Kids room mixed-surface circuit', () => {
     expect(Math.min(...hard.opponents.map(v => v.finishedAt ?? Infinity)), diagnostic)
       .toBeLessThan(PLAYER_REFERENCE_SECONDS + 12)
   }, 30000)
+})
+
+// Temporary research benchmark. This branch/PR is not intended for release.
+describe('Kids room AI two-lap times by difficulty', () => {
+  it('measures identical seeds and car identities across difficulties', () => {
+    const values = [] as Array<{ seed: number, difficulty: string, cars: Array<{
+      car: string, seconds: number | null, recovered: boolean
+    }> }>
+    for (const seed of [1, 4331]) {
+      for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+        const result = normalRivals(seed, difficulty)
+        values.push({
+          seed,
+          difficulty,
+          cars: result.opponents.map(v => ({
+            car: v.car,
+            seconds: v.finishedAt === null ? null : Number(v.finishedAt.toFixed(3)),
+            recovered: result.recoveries.some(x => x.startsWith(v.car + '@')),
+          })),
+        })
+      }
+    }
+    console.info('KIDS_ROOM_DIFFICULTY_TIMES', JSON.stringify(values))
+    expect(values).toHaveLength(6)
+    expect(values.every(result => result.cars.length === 3)).toBe(true)
+  }, 90000)
 })
