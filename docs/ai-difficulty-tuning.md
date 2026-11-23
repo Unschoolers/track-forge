@@ -52,6 +52,25 @@ for a broken or uncompetitive Hard lap.
   `tests/domain/emileHardRace.test.ts`, and lane/official-course QA.
   A win on this one circuit is not proof that every course improved.
 
+## Desert sand reverse-course validation (2026-11-23)
+
+The replay-derived `tests/fixtures/desertSandAi.trackforge.json` preserves the
+original road, terrain, reverse direction, start ratio and 2-lap grid. The
+creator's Green 27.433s was a live Normal race, **not** an AI-only benchmark.
+The same deterministic seed-1 Hard solo simulation improved Green from
+31.867s (1 forced recovery) to **29.717s (0 recoveries)** by reducing
+Green's road-edge pursuit shortening from 0.4 to 0.2. The matched Hard
+four-AI traffic simulation improves the two Green cars' finishes while
+removing a Green recovery. Green's Kids Room solo improves
+71.767s → 71.450s, Pine Hairpins 25.200s → 25.000s and Meadow Loop
+18.617s → 18.033s at seed 1, all with no recoveries.
+
+**Trade-off:** the four-AI Kids Room Hard traffic run (Red as AI player)
+shows Green 73.333s → 74.350s (0 recoveries). The source track's three-AI
+full-race tests remain the separate acceptance gate; never conceal traffic
+regressions behind a solo gain. Keep an eye on the trade-off during future
+Green calibration.
+
 ## Individual car driving profiles
 
 The common physics engine, collision safety, gates, recovery, traffic rules and
