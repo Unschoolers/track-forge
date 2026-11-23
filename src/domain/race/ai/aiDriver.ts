@@ -180,8 +180,30 @@ export function stepAiVehicle(
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
-  const targetX = target.x + context.normal.x * pursuitLane
-  const targetY = target.y + context.normal.y * pursuitLane
+  // On gentle bends, use road width to enter from the outside, clip the
+  // apex, then unwind toward the exit. Anchor this *additional* racing
+  // offset in the target road frame, not the car's current tangent.
+  // Tight hairpins, overtakes, and an unsafe road edge retain stock pursuit.
+  const racingOffset = arcade && !vehicle.racingLine && ai.phase === 'follow' &&
+    !occupied && context.onRoad && context.nearest.distance < ROAD_GEOMETRY.onRoadRadius * 0.5
+      ? corner.racingOffset * (context.surface === 'street' ? 1 : 0.45)
+      : 0
+  let apexX = 0
+  let apexY = 0
+  if (Math.abs(racingOffset) > 0.01) {
+    const wrapIndex = (index: number) => path.closed
+      ? ((index % path.points.length) + path.points.length) % path.points.length
+      : clamp(index, 0, path.points.length - 1)
+    const beforeTarget = path.points[wrapIndex(targetIndex - 3)] ?? target
+    const afterTarget = path.points[wrapIndex(targetIndex + 3)] ?? target
+    const vx = afterTarget.x - beforeTarget.x
+    const vy = afterTarget.y - beforeTarget.y
+    const tangentLength = Math.max(0.001, Math.hypot(vx, vy))
+    apexX = -vy / tangentLength * racingOffset * direction
+    apexY = vx / tangentLength * racingOffset * direction
+  }
+  const targetX = target.x + context.normal.x * pursuitLane + apexX
+  const targetY = target.y + context.normal.y * pursuitLane + apexY
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
