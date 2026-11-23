@@ -20,6 +20,13 @@ Simulation; the selected difficulty still controls mistakes, overtaking, and
 the authored line's speed ratio. Non-authored Arcade rivals use the shared
 difficulty-specific corner reserve; authored lines override that reserve.
 
+An overtake remains committed for its difficulty-specific lane hold, then can
+rejoin only after a quarter-second of clear base-lane space. In addition to
+completing the pass or hitting the eight-second stall limit, it abandons a
+chase once the target has pulled beyond the difficulty's passing range.
+This prevents sustained shoulder driving after an unsuccessful pass without
+introducing a teleport, a speed boost, or an unsafe immediate lane change.
+
 When changing AI balance, first update the owning data or policy, then run
 `tests/domain/aiDifficultyPolicy.test.ts`, the relevant car-handling tests,
 the seeded Émile race, and `qa:lanes`. Keep physical braking/grip and the
