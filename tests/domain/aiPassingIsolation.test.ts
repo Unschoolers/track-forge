@@ -64,12 +64,16 @@ describe('Independent passing policy contracts', () => {
   }, 30000)
 
   it('creates an actual Yellow passing opportunity against a slower AI-controlled rival', () => {
+    const [figureEight] = decodeTrackInput(JSON.parse(
+      readFileSync('tests/fixtures/figureEightRaceAi.trackforge.json', 'utf8'),
+    ))
+    if (!figureEight) throw new Error('Missing replay-accurate Figure-eight fixture')
     const duel = runLaneCheck({
-      path, trackName: loaded.name,
+      path: prepareLanePath(figureEight), trackName: figureEight.name,
       car: 'yellow', difficulty: 'hard', handling: 'arcade',
       mode: 'duel', duelOpponentCar: 'green', duelOpponentSpeedLimit: 220,
-      seed: 1, reversed: false, startRatio: 0.21932299012693934,
-      laps: 2, seconds: 140,
+      seed: 1, reversed: false, startRatio: 0.32853982300884954,
+      laps: 2, seconds: 100,
     })
     expect(duel.vehicles.map(v => v.car)).toEqual(['yellow', 'green'])
     expect(duel.samples.some(sample =>
