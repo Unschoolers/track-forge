@@ -10,7 +10,7 @@ type Handling = 'arcade' | 'simulation'
 const AI_PACE_POLICY = {
   easy: { arcadeCornerMargin: 0.16, authoredLineSpeedRatio: 0.86 },
   normal: { arcadeCornerMargin: 0.08, authoredLineSpeedRatio: 0.908 },
-  hard: { arcadeCornerMargin: 0, authoredLineSpeedRatio: 1 },
+  hard: { arcadeCornerMargin: 0.025, authoredLineSpeedRatio: 1 },
 } as const satisfies Record<DifficultyId, {
   readonly arcadeCornerMargin: number
   readonly authoredLineSpeedRatio: number
