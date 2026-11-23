@@ -42,18 +42,18 @@ export function planCornerTactics(
   const far = turnAmountAt(path, index + direction * 24, 6) * direction
   const bend = Math.max(Math.abs(near), Math.abs(next), Math.abs(far))
   const peakNext = Math.abs(next) >= Math.abs(far) ? next : far
-  const approaching = Math.abs(peakNext) > Math.abs(near) * 1.3 && Math.abs(peakNext) > 0.045
+  const approaching = Math.abs(peakNext) > Math.abs(near) * 1.3 && Math.abs(peakNext) > 0.03
   // A sharp apex can fall away in the very next sample; that's still the
   // turning phase until curvature is *declining* relative to the approach.
-  const atApex = Math.abs(near) > 0.05 &&
+  const atApex = Math.abs(near) > 0.029 &&
     Math.abs(near) >= Math.abs(past) * 0.85 &&
     Math.abs(near) >= Math.abs(peakNext) * 0.85
-  const exiting = Math.abs(near) > 0.04 && !atApex &&
+  const exiting = Math.abs(near) > 0.025 && !atApex &&
     Math.abs(peakNext) < Math.abs(near) * 0.62
   const phase: CornerPhase = atApex ? 'turn'
     : approaching ? 'approach'
     : exiting ? 'exit'
-    : Math.abs(near) > 0.05 ? 'turn' : 'straight'
+    : Math.abs(near) > 0.029 ? 'turn' : 'straight'
   const sign = Math.sign(approaching ? peakNext : near)
   const edge = clamp((Math.abs(roadOffset) - roadRadius * 0.55) / (roadRadius * 0.25), 0, 1)
   // A small feed-forward yaw starts the rotation before the apex. Back out
@@ -63,9 +63,11 @@ export function planCornerTactics(
     : 0
   const projectedOffset = roadOffset + lateralVelocity * 0.28
   const warningOffset = roadRadius * 0.52
-  const edgeCorrection = -Math.sign(projectedOffset) * direction *
-    clamp((Math.abs(projectedOffset) - warningOffset) /
-      Math.max(1, roadRadius - warningOffset), 0, 1) * 0.26
+  const edgeStrength = clamp((Math.abs(projectedOffset) - warningOffset) /
+    Math.max(1, roadRadius - warningOffset), 0, 1)
+  const edgeCorrection = edgeStrength === 0
+    ? 0
+    : -Math.sign(projectedOffset) * direction * edgeStrength * 0.26
   // Preserve a substantial pursuit horizon at speed; choking the target to
   // a handful of samples makes heavy cars oscillate rather than rotate.
   const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
