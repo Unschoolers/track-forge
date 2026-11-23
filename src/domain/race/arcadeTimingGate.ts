@@ -1,5 +1,5 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
-import { crossesRoadGate, passedPendingCheckpoint } from '@/domain/race/progress'
+import { crossesRoadGate, passedPendingCheckpoint, timingGateCrossingRadius } from '@/domain/race/progress'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 
 const MISSED_GATE_GRACE_SECONDS = 5
@@ -106,12 +106,9 @@ export function advanceArcadeTimingGate(
   if (!crossedLine && !confirmedBypass) {
     return { vehicle, missedCheckpoint }
   }
-  // Road classification at a diagonal gate can change on the crossing frame.
-  // If either endpoint falls off the road, require the actual swept crossing
-  // to intersect the painted stripe rather than granting a grass shortcut.
-  const crossingRadius = onRoad && wasOnRoad()
-    ? ROAD_GEOMETRY.onRoadRadius
-    : ROAD_GEOMETRY.checkpointHalfWidth
+  // Require the swept path to pass near the stripe, with a small edge
+  // allowance even if one frame is classified off-road.
+  const crossingRadius = timingGateCrossingRadius(ROAD_GEOMETRY.onRoadRadius, onRoad && wasOnRoad())
   if (crossedLine &&
       crossesRoadGate(path, previous, vehicle, position, crossingRadius, reversed)) {
     if (gate === 4) {

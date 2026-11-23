@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ROAD_GEOMETRY } from '@/domain/config'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { createRace } from '@/domain/race/raceFactory'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -51,6 +52,22 @@ describe('arcade checkpoint authority with route-index jitter', () => {
     const result = advanceArcadeTimingGate(race, before, after, 3, false, () => false)
     expect(result.vehicle.nextSector).toBe(1)
     expect(result.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+  })
+
+  it('accepts a near-edge circuit pass without accepting a wider off-road shortcut', () => {
+    const attempt = (offset: number) => {
+      const before = { ...player, ...at(-14, offset), pathIndex: lower, nextSector: 1 as const }
+      const after = { ...before, ...at(14, offset), pathIndex: lower + 1 }
+      return advanceArcadeTimingGate(race, before, after, 3, false, () => false)
+    }
+
+    const forgiven = attempt(ROAD_GEOMETRY.checkpointHalfWidth + 3)
+    expect(forgiven.vehicle.nextSector).toBe(2)
+    expect(forgiven.missedCheckpoint).toBeUndefined()
+
+    const bypass = attempt(ROAD_GEOMETRY.checkpointHalfWidth + ROAD_GEOMETRY.checkpointGrace + 4)
+    expect(bypass.vehicle.nextSector).toBe(1)
+    expect(bypass.missedCheckpoint?.gate).toBe(1)
   })
 
   it('continues awarding an actual centerline crossing even when the path index advances', () => {
