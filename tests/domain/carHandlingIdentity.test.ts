@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CAR_SPECS } from '@/domain/config'
+import { CAR_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
 import { physicsPlayer } from '../support/physicsPlayer'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
@@ -167,6 +167,10 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
   })
 
   it('keeps Red markedly less effective on dirt than Blue, unlike Green', () => {
+    // More usable race-car brakes on dirt without changing its weak dirt traction.
+    expect(VEHICLE_TERRAIN_SPECS.red.dirt.brake).toBe(0.75)
+    expect(VEHICLE_TERRAIN_SPECS.red.dirt.grip).toBeLessThan(VEHICLE_TERRAIN_SPECS.blue.dirt.grip)
+    expect(VEHICLE_TERRAIN_SPECS.red.street).toEqual(VEHICLE_TERRAIN_SPECS.blue.street)
     const red = stoppingDistance('red', handling, 'dirt')
     const blue = stoppingDistance('blue', handling, 'dirt')
     const green = stoppingDistance('green', handling, 'dirt')
