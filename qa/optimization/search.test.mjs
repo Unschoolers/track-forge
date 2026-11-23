@@ -71,7 +71,7 @@ test('Hard mirror role differs from the AI-controlled player, even for the same 
 test('calibration selection keeps multi-track out-of-sample safety gates', () => {
   const chosen = selectCalibration(['kids-room', 'pine-hairpins'])
   assert.deepEqual(chosen.map(x => x.id), ['kids-room', 'pine-hairpins'])
-  assert.equal(STUDY_SCENARIOS.length - chosen.length, 2)
+  assert.equal(STUDY_SCENARIOS.length - chosen.length, 3)
   assert.throws(() => selectCalibration(['kids-room']), /at least two/)
   assert.throws(() => selectCalibration(STUDY_SCENARIOS.map(s => s.id)), /holdout/)
   assert.throws(() => selectCalibration(['kids-room', 'kids-room']), /Duplicate/)
@@ -86,4 +86,13 @@ test('Red can explore safer pursuit, reaction and reserve decisions independentl
   assert.ok(candidates.some(x => x.changes.hardEdgeAvoidanceScale === 0.2))
   assert.ok(candidates.some(x => x.changes.hardReaction === 8))
   assert.ok(candidates.some(x => x.changes.hardCornerReserve === 0.05))
+})
+
+test('replay scenario preserves the exported Hard player grid and direction', () => {
+  const replay = STUDY_SCENARIOS.find(x => x.id === 'kids-room-replay')
+  assert.ok(replay)
+  assert.deepEqual(replay.gridPositions, [3, 1, 0, 2])
+  assert.equal(replay.startRatio, 0.21932299012693934)
+  assert.equal(replay.reverse, false)
+  assert.equal(replay.laps, 2)
 })
