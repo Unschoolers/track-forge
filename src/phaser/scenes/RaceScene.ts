@@ -206,7 +206,9 @@ export class RaceScene extends Phaser.Scene {
       inputForHandling(this.snapshot.paused ? { steering: 0, throttle: 0, braking: false } : this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
     )
     benchmark?.endSimulation()
-    const race = this.raceSession.snapshot().state
+    // Draw interpolated poses while the simulation, HUD, network and collision
+    // systems continue to use the authoritative 60 Hz state.
+    const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
     if (!race) return
     const player = race.vehicles.find((vehicle) => vehicle.player)
     if (player && this.raceCamera) {
