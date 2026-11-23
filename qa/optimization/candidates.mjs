@@ -12,10 +12,12 @@ const BOUNDS = {
 
 const DELTAS = {
   red: {
-    hardCornerTargetBonus: [-0.05, 0.04, 0.09],
-    hardLookAheadSamples: [-3, 2, 4],
-    hardSteerGain: [-0.2, 0.2],
-    hardCornerReserve: [-0.01, 0.02],
+    hardCornerTargetBonus: [-0.06, -0.05, 0.04, 0.09],
+    hardLookAheadSamples: [-4, -3, 2, 4],
+    hardSteerGain: [-0.35, -0.2, 0.2, 0.35],
+    hardReaction: [-4, -2, 2, 4],
+    hardEdgeAvoidanceScale: [-0.8, -0.6, -0.4, -0.2],
+    hardCornerReserve: [-0.01, 0.02, 0.04],
   },
   green: {
     hardEdgeAvoidanceScale: [-0.1, -0.15, -0.2, 0.1],
@@ -24,10 +26,12 @@ const DELTAS = {
     hardLookAheadSamples: [-2, 2],
   },
   blue: {
-    hardCornerTargetBonus: [-0.03, 0.04, 0.07, 0.11],
-    hardLookAheadSamples: [-2, 2, 4],
-    hardSteerGain: [-0.12, 0.18],
-    hardEdgeAvoidanceScale: [-0.1, 0.1],
+    hardCornerTargetBonus: [-0.04, -0.03, 0.04, 0.07, 0.11],
+    hardLookAheadSamples: [-4, -2, 2, 4],
+    hardSteerGain: [-0.3, -0.12, 0.18, 0.3],
+    hardReaction: [-3, 3],
+    hardEdgeAvoidanceScale: [-0.2, -0.1, 0.1],
+    hardCornerReserve: [0.02, 0.04],
   },
   yellow: {
     hardCornerTargetBonus: [-0.1, -0.2, -0.3, -0.35],
