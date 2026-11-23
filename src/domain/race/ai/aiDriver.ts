@@ -126,11 +126,12 @@ export function stepAiVehicle(
     (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
     (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
   ) : 0)
-  // Hard arcade uses a longer pursuit target and can run wide if its
-  // lateral momentum carries it toward the verge. Shorten that target only
-  // when needed; never override easier drivers or authored racing lines.
+  // Arcade's shared Hard steering technique uses long pursuit targets on every
+  // difficulty. Give all non-authored rivals the same edge-aware correction:
+  // Normal and Easy must not run off the road simply because they lack Hard's
+  // recovery steering. Preserve their independent corner-speed reserves.
   let edgeRisk = 0
-  if (difficulty === 'hard' && arcade && !vehicle.racingLine) {
+  if (arcade && !vehicle.racingLine) {
     if (!context.onRoad) {
       edgeRisk = 1
     } else {
