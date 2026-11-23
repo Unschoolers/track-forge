@@ -58,6 +58,24 @@ describe('AI corner tactics', () => {
     expect(tactics(exitIndex, 0.17, 6).exitThrottle).toBeGreaterThan(0)
   })
 
+  it('turns into the second bend before the chassis finishes the first chicane', () => {
+    const chicane = buildRoadPath([
+      { x: 0, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 180, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 250, y: 120, surface: 'street', curve: 'smooth' },
+      { x: 350, y: 120, surface: 'street', curve: 'smooth' },
+      { x: 430, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 600, y: 0, surface: 'street', curve: 'smooth' },
+    ], EMPTY_TERRAIN, undefined, 'point-to-point')
+    const plans = chicane.points.map((_point, index) =>
+      planCornerTactics(chicane, index, false, 145, 0.12, -15, 42, -65))
+    const anticipation = plans.find(plan => plan.reversal)
+    expect(anticipation, 'S-curve must be recognized before the second apex').toBeDefined()
+    expect(anticipation?.headingLead).not.toBe(0)
+    expect(Math.sign(anticipation?.headingLead ?? 0)).toBe(anticipation?.turnSign)
+    expect(anticipation?.exitTraction).toBeLessThan(1)
+  })
+
   it('keeps corner prediction usable when reversing across a closed-lap boundary', () => {
     const plans = path.points.map((_p, i) => tactics(i, 0, 0, true))
     expect(plans.some(plan => plan.phase === 'approach')).toBe(true)
