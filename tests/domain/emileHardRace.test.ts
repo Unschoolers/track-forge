@@ -19,6 +19,23 @@ const track = loadCircuit()
 const geometry = new TrackGeometryService()
 const ghostSeconds = 31.633
 
+// Balance contracts are expressed in player-visible relative differences.
+// This is an integration safety rail, not a target for chassis tuning.
+const BALANCE = {
+  maxHardFieldSpread: 0.125,
+  minAdjacentDifficultyGap: 0.03,
+  minHardToMediumPaceRatio: 0.90,
+  minHardToEasyPaceRatio: 0.85,
+} as const
+
+function finishedTime(finishedAt: number | null, label: string): number {
+  expect(finishedAt, `${label} must finish the race`).not.toBeNull()
+  expect(finishedAt, `${label} must finish within the scenario time budget`).toBeTypeOf('number')
+  if (finishedAt === null) throw new Error(`${label} did not finish`)
+  expect(Number.isFinite(finishedAt), `${label} must have a finite finish time`).toBe(true)
+  return finishedAt
+}
+
 function raceSeed(seed: number, laps = 1, difficulty: DifficultyId = 'hard', playerCar: CarId = 'blue') {
 	let value = seed >>> 0
 	const random = {
@@ -101,14 +118,14 @@ describe('Émile arcade difficulty balance', () => {
 		let redWins = 0
 		for (const playerCar of CAR_IDS) {
 			const { opponents } = hardRun(playerCar)
-			const times = opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
+			const times = opponents.map(({ car, finishedAt }) => finishedTime(finishedAt, `${playerCar}/Hard/${car}`))
 			const fastest = Math.min(...times)
 			// A 5/5-speed car is intentionally faster than a 2/5-speed car.
 			// Preserve a competitive field without artificially equalizing
 			// distinctive cars. Allow ~12.5% across real chassis and grid positions.
 			expect((Math.max(...times) - fastest) / fastest,
 				`${playerCar}: ${opponents.map(rival => `${rival.car}=${rival.finishedAt?.toFixed(3) ?? 'DNF'}`).join(', ')}`,
-			).toBeLessThan(0.125)
+			).toBeLessThan(BALANCE.maxHardFieldSpread)
 			const redTime = opponents.find(({ car }) => car === 'red')?.finishedAt
 			if (redTime === fastest) redWins++
 			if (playerCar === 'blue') {
@@ -123,7 +140,7 @@ describe('Émile arcade difficulty balance', () => {
 		const meanTime = (difficulty: DifficultyId) => {
 			const times = (['blue', 'yellow'] as const).flatMap((playerCar) => {
 				const run = difficulty === 'hard' ? hardRun(playerCar) : raceSeed(4331, 2, difficulty, playerCar)
-				return run.opponents.map(({ finishedAt }) => finishedAt ?? Infinity)
+				return run.opponents.map(({ car, finishedAt }) => finishedTime(finishedAt, `${playerCar}/${difficulty}/${car}`))
 			})
 			return times.reduce((sum, time) => sum + time, 0) / times.length
 		}
@@ -135,11 +152,11 @@ describe('Émile arcade difficulty balance', () => {
 		// calibrated to a fractional second on one seed and starting grid.
 		// A >=3% neighboring gap protects player-visible ordering while leaving
 		// room for the ~1% drift caused by legitimate chassis changes.
-		expect(normal, times).toBeGreaterThan(hard * 1.03)
-		expect(easy, times).toBeGreaterThan(normal * 1.03)
+		expect(normal, times).toBeGreaterThan(hard * (1 + BALANCE.minAdjacentDifficultyGap))
+		expect(easy, times).toBeGreaterThan(normal * (1 + BALANCE.minAdjacentDifficultyGap))
 		// Keep the existing broad maximum slowdowns: neither difficulty should
 		// become so uncompetitive that the race feels empty.
-		expect(hard / normal, times).toBeGreaterThan(0.90)
-		expect(hard / easy, times).toBeGreaterThan(0.85)
+		expect(hard / normal, times).toBeGreaterThan(BALANCE.minHardToMediumPaceRatio)
+		expect(hard / easy, times).toBeGreaterThan(BALANCE.minHardToEasyPaceRatio)
 	}, 30000)
 })
