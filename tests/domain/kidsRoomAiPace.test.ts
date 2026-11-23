@@ -156,40 +156,36 @@ describe('AI #257 calibration sweep', () => {
     }
     const original = { ...tuning }
     const candidates: ReadonlyArray<readonly [string, Partial<typeof original>]> = [
-      ['gain2.42-la1', { steerGain: 2.42, lookAhead: 1 }],
-      ['gain2.60-la1', { steerGain: 2.60, lookAhead: 1 }],
-      ['gain2.80-la1', { steerGain: 2.80, lookAhead: 1 }],
-      ['gain3.0-la1', { steerGain: 3.0, lookAhead: 1 }],
-      ['gain3.2-la1', { steerGain: 3.2, lookAhead: 1 }],
-      ['gain2.42-la2', { steerGain: 2.42, lookAhead: 2 }],
-      ['gain2.60-la2', { steerGain: 2.60, lookAhead: 2 }],
-      ['gain2.80-la2', { steerGain: 2.80, lookAhead: 2 }],
-      ['gain3.0-la2', { steerGain: 3.0, lookAhead: 2 }],
-      ['gain2.42-la3', { steerGain: 2.42, lookAhead: 3 }],
-      ['gain2.60-la3', { steerGain: 2.60, lookAhead: 3 }],
-      ['gain2.80-la3', { steerGain: 2.80, lookAhead: 3 }],
-      ['gain2.42-la4', { steerGain: 2.42, lookAhead: 4 }],
-      ['gain2.42-la1-pace1.42', { steerGain: 2.42, lookAhead: 1, pace: 1.42 }],
-      ['gain2.42-la1-pace1.45', { steerGain: 2.42, lookAhead: 1, pace: 1.45 }],
-      ['gain2.42-la1-pace1.48', { steerGain: 2.42, lookAhead: 1, pace: 1.48 }],
-      ['gain2.42-la1-pace1.52', { steerGain: 2.42, lookAhead: 1, pace: 1.52 }],
-      ['gain2.42-la1-safety.42', { steerGain: 2.42, lookAhead: 1, cornerSafety: 0.42 }],
-      ['gain2.42-la1-safety.32', { steerGain: 2.42, lookAhead: 1, cornerSafety: 0.32 }],
-      ['gain2.42-la1-react24', { steerGain: 2.42, lookAhead: 1, reaction: 24 }],
+      ['base', {}],
       ['gain2.42-la1-react10', { steerGain: 2.42, lookAhead: 1, reaction: 10 }],
-      ['gain2.60-la1-pace1.45', { steerGain: 2.60, lookAhead: 1, pace: 1.45 }],
-      ['gain2.80-la1-pace1.45', { steerGain: 2.80, lookAhead: 1, pace: 1.45 }],
+      ['gain2.42-la1-react10-pace1.45', { steerGain: 2.42, lookAhead: 1, reaction: 10, pace: 1.45 }],
+      ['gain2.42-la1-react10-pace1.48', { steerGain: 2.42, lookAhead: 1, reaction: 10, pace: 1.48 }],
+      ['gain2.42-la1-react10-pace1.50', { steerGain: 2.42, lookAhead: 1, reaction: 10, pace: 1.5 }],
+      ['gain2.42-la1-react12-pace1.48', { steerGain: 2.42, lookAhead: 1, reaction: 12, pace: 1.48 }],
+      ['gain2.42-la1-react14-pace1.48', { steerGain: 2.42, lookAhead: 1, reaction: 14, pace: 1.48 }],
+      ['gain2.38-la1-react10-pace1.48', { steerGain: 2.38, lookAhead: 1, reaction: 10, pace: 1.48 }],
+      ['gain2.45-la1-react10-pace1.48', { steerGain: 2.45, lookAhead: 1, reaction: 10, pace: 1.48 }],
+      ['gain2.50-la1-react10-pace1.48', { steerGain: 2.50, lookAhead: 1, reaction: 10, pace: 1.48 }],
+      ['gain2.42-la1-react10-pace1.48-safety.44', { steerGain: 2.42, lookAhead: 1, reaction: 10, pace: 1.48, cornerSafety: 0.44 }],
+      ['gain2.42-la1-react10-pace1.48-safety.58', { steerGain: 2.42, lookAhead: 1, reaction: 10, pace: 1.48, cornerSafety: 0.58 }],
+      ['gain2.42-la0-react10-pace1.48', { steerGain: 2.42, lookAhead: 0, reaction: 10, pace: 1.48 }],
+      ['gain2.42-la2-react10-pace1.48', { steerGain: 2.42, lookAhead: 2, reaction: 10, pace: 1.48 }],
+      ['gain2.32-la1-react12-pace1.48', { steerGain: 2.32, lookAhead: 1, reaction: 12, pace: 1.48 }],
+      ['gain2.50-la1-react12-pace1.48', { steerGain: 2.50, lookAhead: 1, reaction: 12, pace: 1.48 }],
     ]
     const observations: unknown[] = []
     try {
       for (const [name, config] of candidates) {
         Object.assign(tuning, original, config)
-        const run = normalRivals(1)
-        const results = run.opponents.map(vehicle => ({
-          car: vehicle.car, time: Number((vehicle.finishedAt ?? Infinity).toFixed(2)),
-        }))
-        observations.push({ name, results, recoveries: run.recoveries.length,
-          incidents: run.recoveries.slice(0, 3) })
+        const sample = ([1, 4331] as const).map(seed => {
+          const run = normalRivals(seed)
+          const results = run.opponents.map(vehicle => ({
+            car: vehicle.car, time: Number((vehicle.finishedAt ?? Infinity).toFixed(2)),
+          }))
+          return { seed, results, recoveries: run.recoveries.length,
+            incidents: run.recoveries.slice(0, 2) }
+        })
+        observations.push({ name, sample })
       }
     } finally {
       Object.assign(tuning, original)
