@@ -30,7 +30,6 @@ const BALANCE = {
 
 function finishedTime(finishedAt: number | null, label: string): number {
   expect(finishedAt, `${label} must finish the race`).not.toBeNull()
-  expect(finishedAt, `${label} must finish within the scenario time budget`).toBeTypeOf('number')
   if (finishedAt === null) throw new Error(`${label} did not finish`)
   expect(Number.isFinite(finishedAt), `${label} must have a finite finish time`).toBe(true)
   return finishedAt
