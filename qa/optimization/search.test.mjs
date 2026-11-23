@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateCandidates } from './candidates.mjs'
 import { assessCandidate, evaluatePair, trialKey } from './score.mjs'
+import { STUDY_SCENARIOS, selectCalibration } from './scenarios.mjs'
 
 test('candidate enumeration stays bounded and deterministic', () => {
   const base = { hardCornerTargetBonus: 0.04, hardSteerGain: 2.22,
@@ -65,4 +66,24 @@ test('Hard mirror role differs from the AI-controlled player, even for the same 
     seed: 1, difficulty: 'hard', mode: 'traffic' }
   assert.notEqual(trialKey({ ...task, focusRole: 'player' }),
     trialKey({ ...task, focusRole: 'rival' }))
+})
+
+test('calibration selection keeps multi-track out-of-sample safety gates', () => {
+  const chosen = selectCalibration(['kids-room', 'pine-hairpins'])
+  assert.deepEqual(chosen.map(x => x.id), ['kids-room', 'pine-hairpins'])
+  assert.equal(STUDY_SCENARIOS.length - chosen.length, 2)
+  assert.throws(() => selectCalibration(['kids-room']), /at least two/)
+  assert.throws(() => selectCalibration(STUDY_SCENARIOS.map(s => s.id)), /holdout/)
+  assert.throws(() => selectCalibration(['kids-room', 'kids-room']), /Duplicate/)
+  assert.throws(() => selectCalibration(['not-a-track', 'kids-room']), /Unknown/)
+})
+test('Red can explore safer pursuit, reaction and reserve decisions independently', () => {
+  const baseline = {
+    hardCornerTargetBonus: 0.06, hardSteerGain: 2.22,
+    hardLookAheadSamples: 10, hardReaction: 12, hardCornerReserve: 0.01,
+  }
+  const candidates = generateCandidates('red', baseline, 34)
+  assert.ok(candidates.some(x => x.changes.hardEdgeAvoidanceScale === 0.2))
+  assert.ok(candidates.some(x => x.changes.hardReaction === 8))
+  assert.ok(candidates.some(x => x.changes.hardCornerReserve === 0.05))
 })
