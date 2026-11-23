@@ -43,6 +43,8 @@ describe('recovery penalty and elevated-road auto respawn', () => {
 
     const airborne = trackBridgeFall(prior, { ...prior, grounded: false, z: 23 }, false, null, 0, 1 / 60)
     expect(airborne.bridgeFallSeconds).toBeCloseTo(1 / 60)
+    const lowerArm = trackBridgeFall(prior, { ...prior, grounded: false, z: 23 }, true, null, 0, 1 / 60)
+    expect(lowerArm.bridgeFallSeconds).toBeCloseTo(1 / 60)
     const landed = trackBridgeFall(airborne, { ...airborne, grounded: true, z: 0 }, false, null, 0, 1 / 60)
     expect(landed.bridgeFallSeconds).toBeCloseTo(2 / 60)
     const rejoined = trackBridgeFall(landed, { ...landed, grounded: true, z: 24 }, true, 'bridge', 24, 1 / 60)
