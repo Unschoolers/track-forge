@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CAR_SPECS } from '@/domain/config'
+import { CAR_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
 import { physicsPlayer } from '../support/physicsPlayer'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
@@ -166,11 +166,18 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     expect(red.slipAngle).toBeGreaterThan(blue.slipAngle * 1.2)
   })
 
-  it('keeps Red markedly less effective on dirt than Blue, unlike Green', () => {
+  it('keeps Red weaker than Blue on dirt without the old excessive braking penalty', () => {
+    // Dirt grip remains Red's weakness, while its brakes have a usable range.
+    expect(VEHICLE_TERRAIN_SPECS.red.dirt.grip).toBeLessThan(VEHICLE_TERRAIN_SPECS.blue.dirt.grip)
+    expect(VEHICLE_TERRAIN_SPECS.red.street).toEqual(VEHICLE_TERRAIN_SPECS.blue.street)
     const red = stoppingDistance('red', handling, 'dirt')
     const blue = stoppingDistance('blue', handling, 'dirt')
     const green = stoppingDistance('green', handling, 'dirt')
-    expect(red).toBeGreaterThan(blue * 1.2)
+    // Compare player-visible distance, not an exact internal tuning value:
+    // Red stays meaningfully worse than Blue, but the old >20% gap is gone.
+    const redToBlue = red / blue
+    expect(redToBlue, `${handling}: Red=${red.toFixed(1)}, Blue=${blue.toFixed(1)}`).toBeGreaterThan(1.08)
+    expect(redToBlue, `${handling}: Red=${red.toFixed(1)}, Blue=${blue.toFixed(1)}`).toBeLessThan(1.2)
     expect(green).toBeLessThan(blue)
   })
 
