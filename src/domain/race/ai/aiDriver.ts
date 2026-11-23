@@ -202,7 +202,10 @@ export function stepAiVehicle(
   }
   // A wide passing line can point the car across the return arm of a
   // hairpin. Ease toward the center on approach if the space is clear.
-  const lane = ai.targetLane + ai.mistakeOffset + (relaxedAiRivals && ai.phase === 'follow'
+  // Hard makes no deliberate AI↔AI dodges: its sprites may overlap without
+  // physical contact. Normal/Easy retain the small courtesy adjustment.
+  const lane = ai.targetLane + ai.mistakeOffset + (relaxedAiRivals &&
+    difficulty !== 'hard' && ai.phase === 'follow'
     ? aiCourtesyNudge(vehicle, traffic, bend, context.onRoad) : 0)
   const centered = lane * (1 - clamp(bend / CENTER_LINE_TURN, 0, 1))
   const inner = Math.min(vehicle.lane, centered) - LANE_CHANGE_CLEARANCE
