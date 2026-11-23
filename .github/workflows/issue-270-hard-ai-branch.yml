@@ -29,6 +29,10 @@ jobs:
         env:
           AI_PROFILE_SWEEP: '1'
         run: npx vitest run tests/domain/aiHardProfileSweep.test.ts --reporter=verbose
+      - name: Roundabout Blue traffic and recovery diagnostic
+        env:
+          AI_ROUNDABOUT_SWEEP: '1'
+        run: npx vitest run tests/domain/roundaboutDiagnostic.test.ts --reporter=verbose
       - name: All domain regression tests
         run: npx vitest run tests/domain --maxWorkers=4
       - name: Lane checker
