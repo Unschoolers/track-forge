@@ -5,10 +5,14 @@ import { CAR_PASSING_POLICIES } from '@/domain/race/ai/aiCarPassingPolicies'
 import { decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 
-const [loaded] = decodeTrackInput(JSON.parse(
-  readFileSync('tests/fixtures/kidsRoomAi.trackforge.json', 'utf8'),
-))
-if (!loaded) throw new Error('Missing Kids Room AI fixture')
+function loadTrack() {
+  const [track] = decodeTrackInput(JSON.parse(
+    readFileSync('tests/fixtures/kidsRoomAi.trackforge.json', 'utf8'),
+  ))
+  if (!track) throw new Error('Missing Kids Room AI fixture')
+  return track
+}
+const loaded = loadTrack()
 const path = prepareLanePath(loaded)
 
 function race(
