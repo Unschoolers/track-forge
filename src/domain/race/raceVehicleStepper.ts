@@ -73,6 +73,7 @@ export function advanceVehicle(
       catchUp,
       race.aiProfileOverrides?.[vehicle.car],
       race.aiPassingPolicyOverrides?.[vehicle.car],
+      race.aiAiTrafficMode,
     )
   }
   const nextContext = raceVehicleContext(race, moved, previousContext)
