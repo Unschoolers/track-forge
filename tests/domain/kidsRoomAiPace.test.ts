@@ -18,7 +18,7 @@ function loadKidsRoom() {
 }
 const kidsRoom = loadKidsRoom()
 
-function normalRivals(seed: number) {
+function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
   let state = seed >>> 0
   const random = {
     next: () => {
@@ -32,7 +32,7 @@ function normalRivals(seed: number) {
     scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
     feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
   })
-  session.start(kidsRoom, { car: 'green', difficulty: 'normal', laps: 2, handling: 'arcade' })
+  session.start(kidsRoom, { car: 'green', difficulty, laps: 2, handling: 'arcade' })
   const starting = session.snapshot().state
   session.destroy()
   if (!starting) throw new Error('Missing Kids room race state')
@@ -82,10 +82,12 @@ function normalRivals(seed: number) {
 describe('Normal AI on the Kids room mixed-surface circuit', () => {
   it.each([1, 4331])('finishes two laps near the player reference pace (seed %i)', seed => {
     const { opponents, recoveries, splits, surfaces } = normalRivals(seed)
+    const hard = normalRivals(seed, 'hard')
+    const hardTimes = hard.opponents.map(vehicle => `${vehicle.car}:${vehicle.finishedAt?.toFixed(2) ?? 'DNF'}`).join(',')
     const times = opponents.map(vehicle => vehicle.finishedAt ?? Infinity)
     const diagnostic = opponents.map(vehicle =>
       `${vehicle.car}: ${vehicle.finishedAt?.toFixed(2) ?? 'DNF'}s, lap=${vehicle.lap}, gate=${vehicle.nextSector}`,
-    ).join('; ') + `; recoveries=${recoveries.join('; ')}; ` + opponents.map(v =>
+    ).join('; ') + `; hard=${hardTimes}; hardRecoveries=${hard.recoveries.join('; ')}; recoveries=${recoveries.join('; ')}; ` + opponents.map(v =>
       `${v.car} splits=${splits.get(v.id)?.join('/') ?? ''} surfaces=${JSON.stringify(surfaces.get(v.id))}`,
     ).join('; ')
     expect(opponents).toHaveLength(3)
