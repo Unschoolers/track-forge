@@ -290,7 +290,20 @@ export function stepAiVehicle(
   // Scale braking anticipation by the actual grip deficit and upcoming bend;
   // full speed is still available on straights and no physics cap is added.
   const gripDeficit = Math.max(0, 1 - car.grip)
-  const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.17)
+  // A chassis with stronger service brakes can release a fraction of its
+  // *extra* low-grip entry margin while aligned on a non-icy road. The tires
+  // still supply every newton of braking/turning force; unstable or wide
+  // entries retain the full conservative margin.
+  const stableLateBrake = arcade && difficulty === 'hard' && !vehicle.racingLine &&
+    context.onRoad && context.surface !== 'ice' &&
+    Math.abs(slipAngle) < 0.085 &&
+    Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.45 &&
+    Math.abs(lateralVelocity) < 22
+  const serviceBrakeRelease = stableLateBrake
+    ? clamp((car.brakingTractionScale - 1) * 0.7, 0, 0.27)
+    : 0
+  const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.17) *
+    (1 - serviceBrakeRelease)
   curveSpeed *= 1 - cornerReserve
   // Braking during turn-in consumes the same tire-force budget that rotates
   // the chassis. Finish the heavy braking on approach, then release it
@@ -318,8 +331,19 @@ export function stepAiVehicle(
     Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.5 && !curveBraking
   // A car still sliding toward the outside must complete its rotation
   // before applying exit power. In a clean line traction remains at 1.
+  // Quick-turning, high-grip cars may use a modest exit throttle floor once
+  // the chassis and velocity are aligned inside the road. Do not push through
+  // a reversal, ice, active brake demand, or an outward slide.
+  const cleanCornerExit = difficulty === 'hard' && arcade && !vehicle.racingLine &&
+    corner.phase === 'exit' && !corner.reversal && !corner.drifting &&
+    context.onRoad && context.surface !== 'ice' && !curveBraking &&
+    Math.abs(slipAngle) < 0.055 &&
+    Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.4
+  const exitPowerFloor = cleanCornerExit
+    ? clamp((car.grip - 1) * 3, 0, 0.42)
+    : 0
   const plannedThrottle = (settledSlide
-    ? Math.max(curveThrottle, corner.exitThrottle)
+    ? Math.max(curveThrottle, corner.exitThrottle, exitPowerFloor)
     : curveThrottle) * (arcade && !vehicle.racingLine ? corner.exitTraction : 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && plannedThrottle === 1 &&
