@@ -16,7 +16,6 @@ function usage() {
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 const [command, ...args] = process.argv.slice(2)
 const flags = new Set(args.filter((v) => v.startsWith('--')))
-const fileArgs = args.filter((v, i) => i === 0 || (!v.startsWith('--') && !args[i - 1]?.startsWith('--')))
 function flagValue(name) {
   const index = args.indexOf('--' + name)
   return index < 0 ? undefined : args[index + 1]
@@ -32,11 +31,11 @@ if (command === 'simulate') {
     const { fileURLToPath } = await import('node:url')
     const root = fileURLToPath(new URL('../../', import.meta.url))
     const config = {
-      cars: flagValue('car') ?? 'all',
-      mode: flagValue('mode') ?? 'solo',
-      difficulty: flagValue('difficulty') ?? 'hard',
+      cars: flagValue('car'),
+      mode: flagValue('mode'),
+      difficulty: flagValue('difficulty'),
       seed: Number(flagValue('seed') ?? 1),
-      laps: Number(flagValue('laps') ?? 2),
+      laps: flagValue('laps') ? Number(flagValue('laps')) : undefined,
       seconds: Number(flagValue('seconds') ?? 110),
       ...(flagValue('start') !== undefined ? { startRatio: Number(flagValue('start')) } : {}),
       ...(flagValue('grid') ? { gridPositions: flagValue('grid').split(',').map(Number) } : {}),
