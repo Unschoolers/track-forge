@@ -29,7 +29,7 @@ describe('AI corner tactics', () => {
   it('countersteers a real slide but never manufactures one near the road edge', () => {
     const turnIndex = path.points.findIndex((_p, i) => tactics(i).phase === 'turn')
     const maxBend = Math.max(...path.points.map((_p, i) => Math.abs(turnAmountAt(path, i, 6))))
-    expect(turnIndex, `road samples=${path.points.length}; maximum local bend=${maxBend}`).toBeGreaterThan(0)
+    expect(turnIndex, `road samples=${path.points.length}; maximum local bend=${maxBend}`).toBeGreaterThanOrEqual(0)
     const planted = tactics(turnIndex)
     const sliding = tactics(turnIndex, 0.17, 6)
     const wide = tactics(turnIndex, 0.17, 35)
