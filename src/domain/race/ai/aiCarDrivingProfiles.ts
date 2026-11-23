@@ -17,6 +17,8 @@ export interface CarDrivingProfile {
   readonly hardApexCutScale?: number
   /** Fraction of pursuit shortening applied near the outer road edge. */
   readonly hardEdgeAvoidanceScale?: number
+  /** Extra planned corner speed on a controlled Hard racing line, never physics. */
+  readonly hardCornerTargetBonus?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
