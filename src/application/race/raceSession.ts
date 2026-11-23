@@ -68,6 +68,7 @@ export interface RaceTelemetry {
   readonly routeProgress?: number
   readonly latestSplit?: RaceSplit
   readonly missedCheckpoint?: number
+  readonly finishGate?: number
   readonly phase: RacePhase
   readonly waitingForStart?: boolean
   readonly countdown: number
