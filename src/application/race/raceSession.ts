@@ -593,6 +593,7 @@ export class RaceSession implements RaceSessionPort {
           state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player, state.timingGates)
           ? { missedCheckpoint: player.nextSector } : {}),
         ...(latestSplit ? { latestSplit } : {}),
+        finishGate: (state.timingGates?.length ?? 0) + 1,
         phase: state.phase,
         waitingForStart: setup?.mode === 'nearby' && state.phase === 'countdown' && this.startsAt === undefined,
         countdown: state.countdown,
