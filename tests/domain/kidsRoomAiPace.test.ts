@@ -9,10 +9,14 @@ import { decodeTrackInput } from '../../qa/lanes/scenarios'
 // Exact mixed-surface two-lap circuit reported by a player, anonymized.
 // Their clean Green arcade finish was 1:12.900; Medium rivals should race it.
 const PLAYER_REFERENCE_SECONDS = 72.9
-const [kidsRoom] = decodeTrackInput(
-  JSON.parse(readFileSync('tests/fixtures/kidsRoomAi.trackforge.json', 'utf8')),
-)
-if (!kidsRoom) throw new Error('Missing Kids room AI regression track')
+function loadKidsRoom() {
+  const [track] = decodeTrackInput(
+    JSON.parse(readFileSync('tests/fixtures/kidsRoomAi.trackforge.json', 'utf8')),
+  )
+  if (!track) throw new Error('Missing Kids room AI regression track')
+  return track
+}
+const kidsRoom = loadKidsRoom()
 
 function normalRivals(seed: number) {
   let state = seed >>> 0
