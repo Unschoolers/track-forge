@@ -56,8 +56,7 @@ it.each([1, 4331, 98765])('keeps Green on the Roundabout course through both lap
 const replayGrid = [2, 1, 0, 3] as const
 const profileSweep = process.env.AI_ROUNDABOUT_SWEEP === '1' ? it : it.skip
 profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy', () => {
-  const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
-  const original = profiles.blue
+  const original = CAR_DRIVING_PROFILES.blue
   const cases: readonly { label: string, changes: Partial<CarDrivingProfile> }[] = [
     { label: 'current', changes: {} },
     { label: 'edge0-corner006', changes: { hardEdgeAvoidanceScale: 0, hardCornerTargetBonus: 0.06 } },
@@ -70,14 +69,14 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
     { label: 'edge04-corner006', changes: { hardEdgeAvoidanceScale: 0.4, hardCornerTargetBonus: 0.06 } },
   ]
   const results: { label: string, difficulty: string, blue: unknown, blueRecoveries: unknown[] }[] = []
-  try {
-    for (const strategy of cases) {
-      profiles.blue = { ...original, ...strategy.changes }
+  for (const strategy of cases) {
+      const aiProfileOverrides = { blue: { ...original, ...strategy.changes } }
       for (const seed of [1, 4331]) {
         const run = runLaneCheck({
           path, trackName: 'Roundabout', seed, difficulty: 'hard',
           mode: 'traffic', car: 'red', handling: 'arcade',
           gridPositions: replayGrid,
+          aiProfileOverrides,
           reversed: false, startRatio: 0.7746478873239436,
           laps: 2, seconds: 110,
         })
@@ -86,9 +85,8 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
           blueRecoveries: run.issues.filter(issue => issue.vehicleId === run.vehicles.find(vehicle => vehicle.car === 'blue')?.vehicleId && issue.code === 'recovery')
             .map(issue => ({ time: issue.time, index: issue.pathIndex, detail: issue.detail })) })
       }
-    }
-    profiles.blue = original
-    for (const seed of [1, 4331]) {
+  }
+  for (const seed of [1, 4331]) {
       const run = runLaneCheck({
         path, trackName: 'Roundabout', seed, difficulty: 'normal',
         mode: 'traffic', car: 'red', handling: 'arcade',
@@ -100,9 +98,6 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
       results.push({ label: 'normal/seed' + seed, difficulty: 'normal', blue,
         blueRecoveries: run.issues.filter(issue => issue.vehicleId === blue?.vehicleId && issue.code === 'recovery')
           .map(issue => ({ time: issue.time, index: issue.pathIndex, detail: issue.detail })) })
-    }
-  } finally {
-    profiles.blue = original
   }
   console.log('AI_ROUNDABOUT_SWEEP ' + JSON.stringify(results))
   expect(results.length).toBe(cases.length * 2 + 2)
@@ -114,8 +109,7 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
  * simulated player to Yellow includes Yellow as an AI-driven fourth chassis.
  */
 profileSweep('measures all four colors and sweeps Red through the western hairpin', () => {
-  const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
-  const original = profiles.red
+  const original = CAR_DRIVING_PROFILES.red
   const cases: readonly { label: string, changes: Partial<CarDrivingProfile> }[] = [
     { label: 'current', changes: {  } },
     { label: 'reserve0.04', changes: { hardCornerReserve: 0.04 } },
@@ -147,17 +141,16 @@ profileSweep('measures all four colors and sweeps Red through the western hairpi
     { label: 'reaction16-reserve07', changes: { hardCornerReserve: 0.07, hardReaction: 16 } },
   ]
   const results: unknown[] = []
-  const run = (car: CarId) => runLaneCheck({
+  const run = (car: CarId, aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>) => runLaneCheck({
     path, trackName: 'Roundabout', seed: 1, difficulty: 'hard',
     mode: 'traffic', car, handling: 'arcade',
     gridPositions: replayGrid,
+    ...(aiProfileOverrides ? { aiProfileOverrides } : {}),
     reversed: false, startRatio: 0.7746478873239436,
     laps: 2, seconds: 110,
   })
-  try {
-    for (const { label, changes } of cases) {
-      profiles.red = { ...original, ...changes }
-      const simulation = run('red')
+  for (const { label, changes } of cases) {
+      const simulation = run('red', { red: { ...original, ...changes } })
       results.push({
         label,
         vehicles: simulation.vehicles.map(v => ({
@@ -169,9 +162,8 @@ profileSweep('measures all four colors and sweeps Red through the western hairpi
           .filter(issue => issue.code === 'recovery')
           .map(issue => ({ id: issue.vehicleId, time: issue.time, index: issue.pathIndex })),
       })
-    }
-    profiles.red = original
-    const yellow = run('yellow')
+  }
+  const yellow = run('yellow')
     results.push({
       label: 'yellow-grid',
       vehicles: yellow.vehicles.map(v => ({
@@ -183,9 +175,6 @@ profileSweep('measures all four colors and sweeps Red through the western hairpi
         .filter(issue => issue.code === 'recovery')
         .map(issue => ({ id: issue.vehicleId, time: issue.time, index: issue.pathIndex })),
     })
-  } finally {
-    profiles.red = original
-  }
   console.log('AI_RED_ROUNDABOUT_SWEEP ' + JSON.stringify(results))
   expect(results.length).toBe(cases.length + 1)
 }, 180_000)
@@ -195,10 +184,8 @@ profileSweep('measures all four colors and sweeps Red through the western hairpi
 // two real exported physical grids. Do not accept a fast solo lap if it adds
 // hairpin recoveries in traffic or makes another car slower.
 profileSweep('compares four-car Hard candidates on both replay starting grids', () => {
-  const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
   const carIds = ['red', 'blue', 'green', 'yellow'] as const
-  const originals = Object.fromEntries(carIds.map(car => [car, profiles[car]])) as
-    Record<CarId, CarDrivingProfile>
+  const originals: Readonly<Record<CarId, CarDrivingProfile>> = CAR_DRIVING_PROFILES
   const candidates: readonly {
     label: string
     changes: Partial<Record<CarId, Partial<CarDrivingProfile>>>
@@ -236,17 +223,19 @@ profileSweep('compares four-car Hard candidates on both replay starting grids', 
     { grid: [2, 3, 1, 0], car: 'yellow' },
   ] as const
   const outcomes: unknown[] = []
-  try {
-    for (const candidate of candidates) {
-      for (const car of carIds) {
-        profiles[car] = { ...originals[car], ...candidate.changes[car] }
-      }
-      for (const situation of situations) {
+  for (const candidate of candidates) {
+    const aiProfileOverrides: Partial<Record<CarId, CarDrivingProfile>> = {}
+    for (const car of carIds) {
+      const changes = candidate.changes[car]
+      if (changes) aiProfileOverrides[car] = { ...originals[car], ...changes }
+    }
+    for (const situation of situations) {
         for (const seed of [1, 4331]) {
           const run = runLaneCheck({
             path, trackName: 'Roundabout', seed, difficulty: 'hard',
             mode: 'traffic', car: situation.car, handling: 'arcade',
             gridPositions: situation.grid,
+            aiProfileOverrides,
             reversed: false, startRatio: 0.7746478873239436,
             laps: 2, seconds: 110,
           })
@@ -261,9 +250,6 @@ profileSweep('compares four-car Hard candidates on both replay starting grids', 
           })
         }
       }
-    }
-  } finally {
-    for (const car of carIds) profiles[car] = originals[car]
   }
   console.log('AI_HARD_CROSS_TRACK_CANDIDATES ' + JSON.stringify(outcomes))
   expect(outcomes).toHaveLength(candidates.length * situations.length * 2)
