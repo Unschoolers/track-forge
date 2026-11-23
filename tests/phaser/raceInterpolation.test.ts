@@ -52,7 +52,7 @@ describe('race presentation interpolation', () => {
     const previous = { ...player(), x: 0 }
     const current = { ...previous, x: 10 }
     for (const alpha of [1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(interpolateRaceVehicles([previous], [current], alpha, new Set())).toBe([current])
+      expect(interpolateRaceVehicles([previous], [current], alpha, new Set())[0]).toBe(current)
     }
     expect(interpolateRaceVehicles([previous], [current], -1, new Set())[0]?.x).toBe(0)
   })
