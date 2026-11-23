@@ -160,7 +160,9 @@ describe('Hard-first Green AI safety on the real Kids room circuit', () => {
     // player's Red (rather than fielding Yellow), so its Green racer has a
     // different grid slot and traffic; comparing their clock times directly
     // is invalid. The separate solo benchmark controls both factors.
-    expect(hard, diagnostics).toBeLessThan(PLAYER_REFERENCE_SECONDS + 15)
+    // Green's Hard competitor now keeps its corner momentum in a three-AI field.
+    // Keep the real-traffic pace improvement without permitting recoveries.
+    expect(hard, diagnostics).toBeLessThan(74.5)
     expect(easy, diagnostics).toBeGreaterThan(normal)
   }, 30000)
 })
