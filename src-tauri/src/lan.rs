@@ -65,6 +65,7 @@ struct Peer {
     accepted_here: AtomicBool,
     accepted_there: AtomicBool,
     connected: AtomicBool,
+    connected_notified: AtomicBool,
     handshake: HandshakeTrace,
 }
 
@@ -83,7 +84,7 @@ fn notify(app: &AppHandle, event_type: &str, id: &str, extra: Option<(&str, Stri
 }
 
 fn write_frame(peer: &Peer, frame: Value) -> Result<(), String> {
-    let kind = frame.get("t").and_then(Value::as_str).unwrap_or("unknown").to_owned();
+    let kind = frame.get("t").and_then(Value::as_str).unwrap_or("unknown");
     let mut line = serde_json::to_vec(&frame).map_err(|e| e.to_string())?;
     if line.len() + 1 > MAX_FRAME as usize {
         return Err("LAN frame exceeds limit".into());
@@ -124,6 +125,7 @@ fn mark_connected(app: &AppHandle, peer: &Peer, id: &str) {
     {
         trace(&peer.handshake, "connected".into());
         notify(app, "connected", id, None);
+        peer.connected_notified.store(true, Ordering::SeqCst);
     }
 }
 
@@ -160,7 +162,7 @@ fn read_peer(
             }
             Some("reject") => break "remote_reject".to_owned(),
             Some("data") => {
-                if !peer.connected.load(Ordering::SeqCst) {
+                if !peer.connected_notified.load(Ordering::SeqCst) {
                     mark_connected(&app, &peer, &id);
                 }
                 if !peer.connected.load(Ordering::SeqCst) { break "data_before_pairing".to_owned(); }
@@ -204,6 +206,7 @@ fn add_peer(
         accepted_here: AtomicBool::new(false),
         accepted_there: AtomicBool::new(false),
         connected: AtomicBool::new(false),
+        connected_notified: AtomicBool::new(false),
         handshake,
     });
     {
@@ -237,6 +240,7 @@ fn stop_inner(manager: &LanManager) -> Result<(), String> {
         guard.cancelled.store(true, Ordering::SeqCst);
         guard.locked.store(true, Ordering::SeqCst);
         for peer in guard.peers.values() {
+            trace(&peer.handshake, "local_stop".into());
             if let Ok(writer) = peer.writer.lock() {
                 let _ = writer.shutdown(Shutdown::Both);
             }
@@ -567,6 +571,7 @@ mod pairing_order_tests {
             accepted_here: AtomicBool::new(false),
             accepted_there: AtomicBool::new(true),
             connected: AtomicBool::new(false),
+            connected_notified: AtomicBool::new(false),
             handshake: Default::default(),
         };
         write_accept_frame(&peer).unwrap();
