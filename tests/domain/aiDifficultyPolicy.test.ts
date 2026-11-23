@@ -44,7 +44,7 @@ describe('AI difficulty policy', () => {
     expect(arcadeCornerMargin('hard', 'blue')).toBe(0)
     expect(arcadeCornerMargin('hard', 'red')).toBeGreaterThan(0)
     expect(arcadeCornerMargin('hard', 'red')).toBeLessThan(arcadeCornerMargin('normal', 'red'))
-    expect(arcadeCornerMargin('hard', 'green')).toBe(0)
+    expect(arcadeCornerMargin('hard', 'green')).toBe(CAR_DRIVING_PROFILES.green.hardCornerReserve)
     expect(arcadeCornerMargin('hard', 'green')).toBeLessThan(arcadeCornerMargin('normal', 'green'))
     expect(arcadeCornerMargin('easy')).toBeGreaterThan(arcadeCornerMargin('normal'))
     expect(arcadeCornerMargin('normal')).toBeGreaterThan(arcadeCornerMargin('hard'))
