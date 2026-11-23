@@ -37,7 +37,7 @@ describe('world ground texture', () => {
     for (const [width, height] of [
       [1500, 800], [1920, 1080], [2560, 1440], [3440, 1440],
       [3840, 2160], [5120, 2880],
-    ]) {
+    ] as const) {
       for (const rotation of [0, Math.PI / 8, Math.PI / 4, Math.PI / 2]) {
         for (const offset of [0, 127]) {
           const view = { centerX: offset, centerY: -offset, width, height, zoom: 1.02, minimumZoom: 1.02, rotation }
