@@ -1,7 +1,7 @@
 /** Safety is a hard gate; timing is compared only for like-for-like trials. */
 export function trialKey(task) {
-  return [task.car, task.playerCar ?? task.car, task.scenarioId, task.seed,
-    task.difficulty, task.mode].join('|')
+  return [task.car, task.playerCar ?? task.car, task.focusRole ?? 'player',
+    task.scenarioId, task.seed, task.difficulty, task.mode].join('|')
 }
 function driver(record) {
   return record.rows.find(row => row.vehicle_id === (record.focusVehicleId ?? record.driverVehicleId))
@@ -19,7 +19,8 @@ export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01 } = {}) {
       old.physics_revision !== current.physics_revision ||
       old.driver_car !== current.driver_car ||
       old.tuned_car !== current.tuned_car ||
-      old.grid_positions !== current.grid_positions)
+      old.grid_positions !== current.grid_positions ||
+      old.focus_role !== current.focus_role)
     throw new Error('Non-comparable simulations: context mismatch')
 
   const reasons = []
@@ -49,7 +50,7 @@ export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01 } = {}) {
     eligible: reasons.length === 0, reasons,
     improvement, before: old.finished_seconds, after: current.finished_seconds,
     scenarioId: current.scenario_id, mode: current.mode, seed: current.seed,
-    playerCar: current.driver_car,
+    playerCar: current.driver_car, focusRole: current.focus_role,
     car: current.car_type,
     recoveriesBefore: old.recoveries, recoveriesAfter: current.recoveries,
     offroadBefore: old.offroad_seconds, offroadAfter: current.offroad_seconds,
