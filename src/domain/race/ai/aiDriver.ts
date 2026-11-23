@@ -194,9 +194,11 @@ export function stepAiVehicle(
   // or while using a track's authored racing line.
   const cut = arcade && !vehicle.racingLine && !occupied &&
     ai.phase === 'follow' && context.onRoad && vehicle.grounded &&
-    Math.abs(slipAngle) < 0.24
+    context.surface === 'street' &&
+    context.nearest.distance < ROAD_GEOMETRY.onRoadRadius * 0.62 &&
+    Math.abs(slipAngle) < 0.12
       ? plannedApexCut(path, targetIndex, reversed, difficulty, vehicle.car,
-        roadOffset, lateralVelocity)
+        roadOffset, lateralVelocity, vehicle.speed)
       : { x: 0, y: 0 }
   const targetX = target.x + context.normal.x * pursuitLane + cut.x
   const targetY = target.y + context.normal.y * pursuitLane + cut.y
