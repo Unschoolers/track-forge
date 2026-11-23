@@ -62,6 +62,41 @@ describe('AI approach speed planning', () => {
     expect(safeEntrySpeedAhead(ice, approach, false, 1, CAR_SPECS.blue, 1))
       .toBeLessThan(safeEntrySpeedAhead(path, approach, false, 1, CAR_SPECS.blue, 1))
   })
+  it('rewards Green agility only where the actual surface provides traction', () => {
+    const approach = path.points.findIndex(point => point.distance > 355)
+    const lessAgileGreen = {
+      ...CAR_SPECS.green,
+      steer: CAR_SPECS.blue.steer,
+      yawInertia: CAR_SPECS.blue.yawInertia,
+    }
+    const dirt = {
+      ...path,
+      points: path.points.map(point => ({ ...point, surface: 'dirt' as const })),
+    }
+    const ice = {
+      ...path,
+      points: path.points.map(point => ({ ...point, surface: 'ice' as const })),
+    }
+    const fullGrip = safeEntrySpeedAhead(path, approach, false, 0.51,
+      CAR_SPECS.green, 1, 'green', true)
+    const slowTurning = safeEntrySpeedAhead(path, approach, false, 0.51,
+      lessAgileGreen, 1, 'green', true)
+    expect(fullGrip).toBeGreaterThan(slowTurning)
+
+    const dirtNimble = safeEntrySpeedAhead(dirt, approach, false, 0.51,
+      CAR_SPECS.green, 1, 'green', true)
+    const dirtSlow = safeEntrySpeedAhead(dirt, approach, false, 0.51,
+      lessAgileGreen, 1, 'green', true)
+    expect(dirtNimble).toBeGreaterThan(dirtSlow)
+
+    const iceNimble = safeEntrySpeedAhead(ice, approach, false, 0.51,
+      CAR_SPECS.green, 1, 'green', true)
+    const iceSlow = safeEntrySpeedAhead(ice, approach, false, 0.51,
+      lessAgileGreen, 1, 'green', true)
+    // No extra corner aggression in ice's genuinely low traction.
+    expect(iceNimble).toBeCloseTo(iceSlow, 4)
+  })
+
   it('budgets for the heavy Yellow chassis yaw response instead of treating grip as instant steering', () => {
     const approach = path.points.findIndex(point => point.distance > 355)
     const stock = safeEntrySpeedAhead(path, approach, false, 0.74, CAR_SPECS.yellow, 1, 'yellow')
