@@ -37,6 +37,16 @@ describe('AI corner tactics', () => {
     expect(wide.drifting).toBe(false)
   })
 
+  it('anticipates outward momentum while keeping slides inside a safe lane', () => {
+    const approach = path.points.findIndex(p => p.distance > 400)
+    const settled = planCornerTactics(path, approach, false, 150, 0.12, 10, 42, 0)
+    const driftingOutward = planCornerTactics(path, approach, false, 150, 0.12, 10, 42, 70)
+    const reversed = planCornerTactics(path, approach, true, 150, -0.12, 10, 42, 70)
+    expect(settled.edgeCorrection).toBe(0)
+    expect(driftingOutward.edgeCorrection).toBeLessThan(0)
+    expect(reversed.edgeCorrection).toBeGreaterThan(0)
+  })
+
   it('keeps corner prediction usable when reversing across a closed-lap boundary', () => {
     const plans = path.points.map((_p, i) => tactics(i, 0, 0, true))
     expect(plans.some(plan => plan.phase === 'approach')).toBe(true)
