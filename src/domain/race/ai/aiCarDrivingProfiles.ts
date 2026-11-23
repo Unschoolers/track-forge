@@ -30,15 +30,17 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 10,
     hardApexCutScale: 1,
-    hardEdgeAvoidanceScale: 1,
+    hardEdgeAvoidanceScale: 0.4,
+    hardCornerTargetBonus: 0.04,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
   red: {
     hardReaction: 12,
     hardSteerGain: 2.22,
-    hardCornerReserve: 0.02,
+    hardCornerReserve: 0.01,
     hardLookAheadSamples: 10,
+    hardCornerTargetBonus: 0.06,
   },
   // Green rotates easily on street/dirt. With its longer preview it can
   // stay on line without a separate Hard apex speed reserve.
@@ -47,6 +49,7 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 2.7,
     hardCornerReserve: 0,
     hardLookAheadSamples: 8,
+    hardCornerReserve: 0.035,
     hardCornerTargetBonus: 0.3,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
@@ -56,6 +59,6 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 3.2,
     hardCornerReserve: 0,
     hardLookAheadSamples: 10,
-    hardCornerTargetBonus: 0.3,
+    hardCornerTargetBonus: 0.45,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
