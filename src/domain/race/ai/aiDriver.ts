@@ -19,6 +19,7 @@ import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/diffi
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
+import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
 const {
@@ -91,23 +92,13 @@ export function stepAiVehicle(
   // instant counter-corrections that previously made the car over-brake.
   // Authored racing lines and Simulation retain their original policy.
   const car = CAR_SPECS[vehicle.car]
-  // Hard keeps the proven stable controller on slow-yaw chassis (important
-  // for Pine Hairpins) while agile chassis interpolate toward the responsive
-  // Arcade controller. This is physical chassis response, not a named-car
-  // override or an engine/grip multiplier.
-  const yawResponse = Math.sqrt(
-    (car.steer / CAR_SPECS.blue.steer) *
-    (CAR_SPECS.blue.yawInertia / Math.max(1, car.yawInertia)),
-  )
-  const agileHardBlend = clamp((yawResponse - 1) / 0.3, 0, 1)
-  const hardReaction = AI_DRIVING_TUNING.HARD_ARCADE_REACTION +
-    (ARCADE_STEERING.reaction - AI_DRIVING_TUNING.HARD_ARCADE_REACTION) * agileHardBlend
-  const hardSteerGain = AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN +
-    (ARCADE_STEERING.steerGain - AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN) * agileHardBlend
+  // Each physical chassis needs its own Hard cornering technique.
+  // Tuning steering *decisions* never alters the car's actual tire forces.
+  const hardProfile = CAR_DRIVING_PROFILES[vehicle.car]
   const tuning = handling === 'arcade' && !vehicle.racingLine
     ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
-        reaction: difficulty === 'hard' ? hardReaction : ARCADE_STEERING.reaction,
-        steerGain: difficulty === 'hard' ? hardSteerGain : ARCADE_STEERING.steerGain }
+        reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
+        steerGain: difficulty === 'hard' ? hardProfile.hardSteerGain : ARCADE_STEERING.steerGain }
     : DIFFICULTY_SPECS[drivingDifficulty]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
@@ -149,7 +140,10 @@ export function stepAiVehicle(
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
-  const hardLookAhead = drivingDifficulty === 'hard' ? HARD_LOOKAHEAD_SAMPLES : 0
+  const hardLookAhead = drivingDifficulty === 'hard'
+    ? (arcade && !vehicle.racingLine && difficulty === 'hard'
+      ? hardProfile.hardLookAheadSamples : HARD_LOOKAHEAD_SAMPLES)
+    : 0
   const lookAheadSamples = Math.round(
     context.onRoad
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)

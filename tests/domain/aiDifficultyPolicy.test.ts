@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DIFFICULTY_SPECS } from '@/domain/config'
+import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
 import { asTrackId, type DifficultyId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -15,6 +16,21 @@ import {
 const difficulties: readonly DifficultyId[] = ['easy', 'normal', 'hard']
 
 describe('AI difficulty policy', () => {
+  it('keeps the calibrated Hard steering and preview policies independently configurable by car', () => {
+    expect(Object.keys(CAR_DRIVING_PROFILES).sort()).toEqual(['blue', 'green', 'red', 'yellow'])
+    expect(CAR_DRIVING_PROFILES.blue.hardLookAheadSamples)
+      .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardLookAheadSamples)
+    expect(CAR_DRIVING_PROFILES.yellow.hardSteerGain)
+      .toBeGreaterThan(CAR_DRIVING_PROFILES.red.hardSteerGain)
+    expect(CAR_DRIVING_PROFILES.green.hardCornerReserve).toBeGreaterThan(0)
+    expect(CAR_DRIVING_PROFILES.blue.hardCornerReserve).toBe(0)
+    for (const profile of Object.values(CAR_DRIVING_PROFILES)) {
+      expect(profile.hardReaction).toBeGreaterThan(0)
+      expect(profile.hardSteerGain).toBeGreaterThan(0)
+      expect(profile.hardLookAheadSamples).toBeGreaterThan(0)
+    }
+  })
+
   it.each(difficulties)('uses Hard technique for %s Arcade or authored-line AI without overwriting the chosen difficulty', difficulty => {
     expect(aiSteeringDifficulty(difficulty, 'arcade', false)).toBe('hard')
     expect(aiSteeringDifficulty(difficulty, 'simulation', true)).toBe('hard')

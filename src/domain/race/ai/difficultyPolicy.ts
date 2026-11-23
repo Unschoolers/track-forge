@@ -1,4 +1,5 @@
-import { CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
+import { DIFFICULTY_SPECS } from '@/domain/config'
+import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { CarId, DifficultyId } from '@/domain/model'
 
 type Handling = 'arcade' | 'simulation'
@@ -41,12 +42,7 @@ export function arcadeCornerMargin(difficulty: DifficultyId, car?: CarId): numbe
   if (difficulty !== 'hard' || !car) {
     return AI_PACE_POLICY[difficulty].arcadeCornerMargin
   }
-  const spec = CAR_SPECS[car]
-  const yawResponse = Math.sqrt(
-    (spec.steer / CAR_SPECS.blue.steer) *
-    (CAR_SPECS.blue.yawInertia / Math.max(1, spec.yawInertia)),
-  )
-  return Math.min(0.06, Math.max(0, (yawResponse - 1) * 0.12))
+  return CAR_DRIVING_PROFILES[car].hardCornerReserve
 }
 
 /** Émile-specific racing-line speed ratios, independent of line geometry. */
