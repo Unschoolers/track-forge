@@ -15,7 +15,8 @@ function requiredString(value, field) {
 function runId(meta) {
   return [meta.candidateId, meta.scenarioId, meta.seed, meta.difficulty,
     meta.mode, meta.driverCar, meta.tunedCar ?? meta.driverCar,
-    meta.focusRole ?? 'player'].join(':')
+    meta.focusRole ?? 'player', meta.policyKind ?? 'driving',
+    meta.opponentCar ?? 'none'].join(':')
 }
 
 /**
@@ -39,6 +40,8 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
     track_fingerprint: meta.trackFingerprint,
     driver_car: meta.driverCar,
     tuned_car: meta.tunedCar ?? meta.driverCar,
+    policy_kind: meta.policyKind ?? 'driving',
+    duel_opponent_car: meta.opponentCar ?? null,
     focus_role: meta.focusRole ?? 'player',
     grid_positions: meta.gridPositions ?? null,
     difficulty: meta.difficulty,
