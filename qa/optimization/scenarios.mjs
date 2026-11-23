@@ -12,6 +12,15 @@ export const STUDY_SCENARIOS = [
     laps: 1, seconds: 80, group: 'calibration',
   },
   {
+    // Geometry and start grid from the 2026-11-23 Figure-eight replay.
+    // All four cars compete in separate trials; the live Hard grid mirrors
+    // Green and therefore does not include Yellow.
+    id: 'figure-eight-replay', file: 'tests/fixtures/figureEightRaceAi.trackforge.json',
+    reverse: false, startRatio: 0.32853982300884954,
+    laps: 2, seconds: 100, gridPositions: [0, 2, 3, 1],
+    group: 'calibration',
+  },
+  {
     id: 'kids-room', file: 'tests/fixtures/kidsRoomAi.trackforge.json',
     reverse: false, startRatio: 0.21932299012693934,
     laps: 2, seconds: 145, group: 'validation',
