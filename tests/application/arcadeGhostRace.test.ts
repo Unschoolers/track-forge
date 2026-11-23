@@ -6,6 +6,7 @@ import { RaceSession } from '@/application/race/raceSession'
 import { ghostPoseAt, MAX_GHOST_FRAMES, type GhostFrame } from '@/application/race/ghostReplay'
 import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository'
 import { GhostRecording } from '@/application/race/ghostRecording'
+import { addRecoveryTimePenalty } from '@/domain/race/recoveryPenalty'
 import type { KeyValueStore } from '@/application/ports/storage'
 import type { RaceStep } from '@/domain/race/raceEngine'
 
@@ -51,6 +52,22 @@ function finishAt(time: number, recover = false): RaceStep {
 }
 
 describe('Arcade ghost racing', () => {
+  it('holds the car during the added 100 ms ghost penalty instead of skipping time', () => {
+    const race = session(new BrowserGhostRepository(memory()))
+    race.start(track, setup)
+    const source = race.snapshot().state?.vehicles[0]
+    if (!source) throw new Error('Missing player')
+    const before = { ...source, x: 1000 }
+    const after = addRecoveryTimePenalty({ ...before, x: 0 })
+    const recorder = new GhostRecording(before, true)
+    recorder.sample(before, 0.9)
+    recorder.recover(before, after, 1)
+    const recorded = recorder.finish(after, 2)
+    expect(recorded?.at(-1)?.t).toBeCloseTo(2.1)
+    const run = { car: 'blue' as const, time: 2.1, frames: recorded ?? [] }
+    expect(ghostPoseAt(run, 1.05)?.x).toBe(1000)
+    expect(ghostPoseAt(run, 1.1)?.x).toBe(0)
+  })
   it('preserves the original pre-cut pose when recovery repeats in the same tick', () => {
     const race = session(new BrowserGhostRepository(memory()))
     race.start(track, setup)
