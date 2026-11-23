@@ -50,8 +50,8 @@ export function plannedApexCut(
   const capability = car === 'red' ? 0.55 : car === 'blue' ? 0.9 : 1
   const cornerStrength = clamp((bend - 0.04) / 0.065, 0, 1)
   const width = ROAD_GEOMETRY.onRoadRadius
-  // At the center of the apex this targets up to 8-12 units of shoulder
-  // beyond the on-road radius, well inside the ordinary AI recovery distance.
+  // At the apex, the target may extend only 3-6 units into the shoulder,
+  // well inside the ordinary AI recovery distance.
   const maximumCut = width + (difficulty === 'hard' ? 6 : 3)
   const offset = maximumCut * cornerStrength * capability
   if (offset < 7) return none

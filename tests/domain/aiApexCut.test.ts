@@ -39,6 +39,11 @@ describe('legal AI shoulder cutting', () => {
     expect(distance(normal)).toBeGreaterThan(0)
     expect(distance(hard)).toBeGreaterThan(distance(normal))
     expect(distance(hard)).toBeLessThan(ROAD_GEOMETRY.onRoadRadius + 30)
+    // Prove the planner can actually aim a little beyond the pavement edge.
+    // A hypothetical offset that never reaches grass isn't an offroad cut.
+    const maximumShoulder = Math.max(...sweep.points.map((_p, index) =>
+      distance(plannedApexCut(sweep, index, false, 'hard', 'green', 0, 0))))
+    expect(maximumShoulder).toBeGreaterThan(ROAD_GEOMETRY.onRoadRadius)
     const red = plannedApexCut(sweep, apex, false, 'normal', 'red', 0, 0)
     expect(distance(red)).toBeLessThan(distance(normal))
   })
