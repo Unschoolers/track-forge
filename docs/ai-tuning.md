@@ -1,5 +1,8 @@
 # AI tuning ownership
 
+**Architecture invariant:** no track-specific AI rules. A track's geometry, local surfaces, crossing structure and its validated race options are inputs; its name, saved ID, content hash and manually indexed segment list must not select a dedicated racing line, handling rule, speed bonus or difficulty. Use real tracks only as deterministic regression fixtures. See [architecture](architecture.md#shared-invariants-to-protect).
+
+
 Only the policy selection changed in this refactor; no pace, handling, or racing
 line parameters were retuned.
 
