@@ -43,6 +43,7 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
   const splits = new Map<string, string[]>()
   const surfaces = new Map<string, Record<string, number>>()
   for (let tick = 0; tick < 150 / RACE_TICK_SECONDS; tick++) {
+    const before = race
     const stepped = stepRace(
       race,
       { steering: 0, throttle: 0, braking: true },
@@ -58,7 +59,10 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal') {
       }
       if (event.type === 'vehicle-recovered' && event.vehicleId !== 'player') {
         const vehicle = race.vehicles.find(candidate => candidate.id === event.vehicleId)
-        recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, reason=${event.reason}, x=${event.x.toFixed(0)}, y=${event.y.toFixed(0)}, index=${event.pathIndex}, surface=${race.path.points[event.pathIndex]?.surface ?? '?'}`)
+        const prior = before.vehicles.find(candidate => candidate.id === event.vehicleId)
+        const point = race.path.points[event.pathIndex]
+        const distance = point ? Math.hypot((prior?.x ?? 0) - point.x, (prior?.y ?? 0) - point.y) : NaN
+        recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, reason=${event.reason}, x=${event.x.toFixed(0)}, y=${event.y.toFixed(0)}, index=${event.pathIndex}, surface=${point?.surface ?? '?'}, speed=${prior?.speed.toFixed(0) ?? '?'}, slip=${prior?.slip.toFixed(0) ?? '?'}, yaw=${prior?.yawRate.toFixed(2) ?? '?'}, offset=${distance.toFixed(0)}`)
       }
     }
     if (tick % 60 === 0) {
