@@ -14,8 +14,6 @@ export interface CornerTactics {
   /** Small early turn-in correction, never a replacement for lane following. */
   readonly headingLead: number
   readonly pursuitScale: number
-  /** Gentle outside–apex–outside path offset; sharp reversals stay centered. */
-  readonly racingOffset: number
   readonly drifting: boolean
   readonly sideslipGain: number
   readonly exitThrottle: number
@@ -82,11 +80,6 @@ export function planCornerTactics(
   const headingLead = clamp(approachLead + reversalLead, -0.22, 0.22) * (1 - edge)
   // Preserve a substantial pursuit horizon at speed; choking the target to
   // a handful of samples makes heavy cars oscillate rather than rotate.
-  const smoothCurve = clamp((bend - 0.025) / 0.08, 0, 1) *
-    (1 - clamp((bend - 0.2) / 0.12, 0, 1))
-  const apex = clamp((Math.abs(near) - Math.max(Math.abs(past), Math.abs(peakNext)) * 0.5) / 0.1, 0, 1)
-  const outside = clamp((Math.max(Math.abs(past), Math.abs(peakNext)) - Math.abs(near)) / 0.12, 0, 1)
-  const racingOffset = reversal ? 0 : sign * smoothCurve * (apex * 7 - outside * 5)
   const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
     : phase === 'approach' && bend > 0.15 ? 0.96 : 1
   const drifting = Math.abs(slipAngle) > 0.075 &&
@@ -109,6 +102,6 @@ export function planCornerTactics(
     ? clamp((roadRadius * 0.85 - Math.abs(predictedOffset)) /
       (roadRadius * 0.45), 0, 1)
     : 1
-  return { phase, bend, turnSign: sign, reversal, headingLead, racingOffset, pursuitScale, drifting,
+  return { phase, bend, turnSign: sign, reversal, headingLead, pursuitScale, drifting,
     sideslipGain, exitThrottle, exitTraction }
 }
