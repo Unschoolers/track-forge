@@ -1,4 +1,5 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import type { NearbyConnectionModes } from '@/infrastructure/multiplayer/selectNearbyConnection'
 import { MAX_PLAYERS } from '@/application/multiplayer/controlProtocol'
 import type { RaceResult } from '@/application/race/raceSession'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
@@ -23,6 +24,7 @@ export function createNearbyRaceModal(
     selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
   },
   identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
+  connections?: NearbyConnectionModes,
 ): HTMLElement {
   const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const cup = nearby.snapshot().cup
@@ -37,6 +39,31 @@ export function createNearbyRaceModal(
   }
   switch (phase) {
     case 'idle':
+      if (connections) {
+        const section = element('section', 'setup-section')
+        section.append(element('h3', 'setup-label', 'CONNECTION'))
+        const choices = element('div', 'choice-row')
+        const message = element('p', 'modal-subtitle')
+        const updateChoice = () => {
+          const selected = connections.current()
+          for (const node of choices.querySelectorAll<HTMLButtonElement>('button[data-mode]')) {
+            const active = node.dataset.mode === selected
+            node.classList.toggle('active', active)
+            node.setAttribute('aria-pressed', String(active))
+          }
+          message.textContent = connections.choices.find(option => option.mode === selected)?.description ?? ''
+        }
+        for (const option of connections.choices) {
+          const choice = button(option.label, `nearby-mode-${option.mode}`, () => {
+            if (connections.choose(option.mode)) updateChoice()
+          }, 'setup-choice')
+          choice.dataset.mode = option.mode
+          choices.append(choice)
+        }
+        section.append(choices, message)
+        updateChoice()
+        frame.body.append(section)
+      }
       frame.body.append(
         createCarPicker(car, actions.selectCar),
         createTopperSelector(identity, false),

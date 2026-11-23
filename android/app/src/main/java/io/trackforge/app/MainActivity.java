@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
         SplashScreen.installSplashScreen(this);
         registerPlugin(TrackExportPlugin.class);
         registerPlugin(NearbyRacePlugin.class);
+        registerPlugin(LanRacePlugin.class);
         registerPlugin(TrackForgeUpdatesPlugin.class);
         super.onCreate(savedInstanceState);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {

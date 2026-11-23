@@ -6,7 +6,7 @@
 - **One game build:** reuse the verified Vite `dist/` from `web-build`. The Rust/Tauri build embeds those assets inside the EXE; it does **not** launch a local HTTP server or need a browser tab.
 - **Offline first:** racing, editing, local tracks and local records work without an internet connection. Online-only services are not made offline by the desktop wrapper.
 - **Data survives upgrades:** the stable `io.trackforge.desktop` app identity keeps the WebView2 profile/localStorage separate from Chrome and Android. Replacing/moving the EXE must not clear local saves. Do not change the identifier without an explicit data migration.
-- **No multiplayer promise:** `TrackNearby` uses Android's Google Nearby Connections bridge. `createAndroidNearby()` correctly returns no transport on Windows; Nearby Race is unavailable until a cross-platform adapter is implemented.
+- **LAN Nearby Race:** Windows uses the native Tauri TCP/UDP LAN transport on the local Wi-Fi network. Android users select **LOCAL WI-FI** in Nearby Race; Android Nearby remains available as a separate fallback mode. The multiplayer state machine and binary packet protocol are unchanged. See [LAN multiplayer](lan-multiplayer.md).
 - **No extra privileges:** no Tauri IPC commands, file-system permissions, sidecars, updater or network service are added. Avoid shipping a second game engine.
 - **Windows runtime:** requires the Microsoft Edge WebView2 Runtime and a supported x64 Windows 10/11 system. The EXE is not code-signed yet; Windows SmartScreen may warn. Do not circumvent security checks.
 
@@ -35,7 +35,7 @@ Windows output is an unsigned quality-gated build artifact on PRs, never publish
 2. Disconnect the internet; start a race, finish it, use the editor, save a track, and restart the application.
 3. Verify saved tracks, identity, ghosts, settings and race results survive restarts and replacement with a newer EXE.
 4. Use keyboard steering, braking and menus; verify audio, window resize, game startup and exit.
-5. Confirm that Nearby Race is unavailable rather than showing a broken lobby; Android-to-Android remains unchanged.
+5. Confirm that Windows can host and join LAN rooms with an Android phone on the same Wi-Fi (including recovery, cup, track transfer and rematch); the Android-only Nearby mode remains independently usable.
 6. Inspect Windows security warnings and runtime behavior on a clean non-developer PC.
 
 Rollback is the small Rust desktop wrapper and Windows job/release-asset changes. Removing the desktop release path must not touch Android signing or delete existing desktop user profiles.

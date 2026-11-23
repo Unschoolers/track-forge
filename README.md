@@ -77,7 +77,7 @@ Download [TrackForge.exe](https://github.com/Unschoolers/track-forge/releases/la
 
 Windows uses the system **Microsoft Edge WebView2 Runtime** (preinstalled on most supported Windows systems); it must be installed for the EXE to start. The executable is currently unsigned and may trigger a Windows SmartScreen warning. The maximized game window can be closed normally; saved tracks and progress remain in the app's Windows user profile when replacing the EXE with an update.
 
-**Nearby Races are Android-only in this phase.** Cross-platform LAN multiplayer is a separate follow-up. Building from source, smoke checks and the release contract are described in [Windows desktop packaging](docs/windows-desktop.md).
+**Nearby Races:** Windows and Android can race together over the same local Wi-Fi. Choose **LOCAL WI-FI** in Android Nearby Race; Windows uses LAN automatically. Android's original Nearby mode is still offered for wireless play without a common Wi-Fi network. See [LAN multiplayer](docs/lan-multiplayer.md). Building from source, smoke checks and the release contract are described in [Windows desktop packaging](docs/windows-desktop.md).
 
 ## Android APK
 
