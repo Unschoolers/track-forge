@@ -42,7 +42,7 @@ if (command === 'simulate') {
     }
     const result = spawnSync(process.execPath, [
       resolve(root, 'node_modules/vitest/vitest.mjs'), 'run',
-      'qa/race-analysis/simulateTrack.test.ts', '--reporter=verbose',
+      'tests/qa/raceAnalysisSimulation.test.ts', '--reporter=verbose',
     ], {
       cwd: root, stdio: 'inherit',
       env: {
