@@ -206,7 +206,7 @@ describe('race UI flow', () => {
       state: {
         ...state,
         elapsed: 2,
-        missedCheckpoint: { gate: 1, remainingSeconds: 4.8, position: { x: 25, y: 20 } },
+        missedCheckpoint: { gate: 1, remainingSeconds: 1.8, position: { x: 25, y: 20 } },
       },
       events: [],
     })
@@ -223,7 +223,7 @@ describe('race UI flow', () => {
     session.advance(3.8, controls.snapshot())
     expect(warning.hidden).toBe(false)
     expect(warning.textContent).toContain('MISSED CHECKPOINT 1')
-    expect(warning.textContent).toContain('Reset in 5 s')
+    expect(warning.textContent).toContain('Reset in 2 s')
     controls.setKeyboard('ArrowRight', true)
     const resetNow = requiredElement(warning, 'button[data-action="reset-checkpoint"]')
     const resetPlayer = vi.spyOn(session, 'resetPlayer')
@@ -283,7 +283,7 @@ describe('race UI flow', () => {
     const after = session.snapshot()
     expect(after.state?.vehicles[0]?.x).not.toBe(before.state?.vehicles[0]?.x)
     expect(after.state?.vehicles[0]).toMatchObject({ speed: 0, lap: 1, nextSector: 2, damage: 2 })
-    expect(after.telemetry).toMatchObject({ elapsed: 23, lap: 1, damage: 2 })
+    expect(after.telemetry).toMatchObject({ elapsed: 23.1, lap: 1, damage: 2 })
     expect(controls.snapshot()).toMatchObject({ steering: 0, braking: false })
     expect(pad.getAttribute('aria-valuenow')).toBe('0.00')
     expect(knob.style.transform).toBe('translateX(0px)')
