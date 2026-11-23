@@ -40,6 +40,37 @@ describe('AI overtake decision policy', () => {
     expect(advancePassingState(vehicle, follow, { ahead: null, nearby: [] }, 'normal', 0.05).phase).toBe('follow')
   })
 
+  it('abandons a pass when the target pulls beyond passing range without cutting into occupied traffic', () => {
+    const passing = {
+      ...createAiDriverState(0), phase: 'passing' as const,
+      passLane: 24, targetLane: 24, holdRemaining: 0, clearTime: 0.2,
+      passTargetId: other.id, passElapsed: 2,
+    }
+    const wideGap = observation(120, 24)
+    const nearby = observation(50, 24)
+    const blocked = {
+      ...observation(8, 0),
+      vehicle: { ...other, id: 'blocker', lane: 0 },
+    }
+    const ego = { ...vehicle, lane: 24 }
+
+    const rejoin = advancePassingState(ego, passing,
+      { ahead: null, nearby: [wideGap] }, 'normal', 0.1)
+    expect(rejoin.phase).toBe('rejoin')
+    expect(rejoin.targetLane).toBe(0)
+    expect(rejoin.passElapsed).toBe(2)
+
+    const stillClosing = advancePassingState(ego, passing,
+      { ahead: null, nearby: [nearby] }, 'normal', 0.1)
+    expect(stillClosing.phase).toBe('passing')
+    expect(stillClosing.targetLane).toBe(24)
+
+    const noGap = advancePassingState(ego, passing,
+      { ahead: null, nearby: [wideGap, blocked] }, 'normal', 0.1)
+    expect(noGap.phase).toBe('passing')
+    expect(noGap.targetLane).toBe(24)
+  })
+
   it('holds the passing lane while the base lane is occupied, then rejoins after sustained clearance', () => {
     const passing = {
       ...createAiDriverState(0), phase: 'passing' as const,
