@@ -26,13 +26,12 @@ const BASELINE_PASSING: CarPassingPolicy = {
 }
 
 export const CAR_PASSING_POLICIES: Readonly<Record<CarId, CarPassingPolicy>> = {
-  // Begin the pass only with more distance to choose a clean lane.
-  // The earlier 5.5s abort helped Red locally but blocked Green AI in
-  // Desert sand traffic; keeping its 8s escape restores that race.
-  red: { ...BASELINE_PASSING, triggerDistanceScale: 0.85 },
-  // Green has the best cornering chassis. Retain safe rejoining while
-  // the Hard corner-speed planner is independently tuned below.
-  green: { ...BASELINE_PASSING },
+  // Red's shared pass timing affects the surrounding Hard grid. Keep its
+  // already proven collision-safe passing decisions; tune brakes separately.
+  red: { ...BASELINE_PASSING },
+  // Green was stuck passing a faster human for over five seconds. Abort a
+  // futile attempt after four seconds only when its base lane is clear.
+  green: { ...BASELINE_PASSING, abandonAfterSeconds: 4 },
   // Blue's repeated ~8-second passes on Figure-eight point to an overly
   // long futile-pass wait. Keep the shared safety gate for rejoining.
   blue: { ...BASELINE_PASSING, abandonAfterSeconds: 6.5 },

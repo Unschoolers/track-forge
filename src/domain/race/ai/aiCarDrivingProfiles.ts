@@ -21,8 +21,6 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
-  /** Optional reduced target-speed bonus only for genuinely tight bends. */
-  readonly hardTightBendTargetBonus?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -42,7 +40,7 @@ export const CAR_DRIVING_PROFILES = {
   red: {
     hardReaction: 12,
     hardSteerGain: 2.22,
-    hardCornerReserve: 0.01,
+    hardCornerReserve: 0.008,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
   },
@@ -53,7 +51,7 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 3,
     hardCornerReserve: 0.035,
     hardLookAheadSamples: 10,
-    hardCornerTargetBonus: 0.37,
+    hardCornerTargetBonus: 0.35,
     // Validated on Desert sand, Kids Room, Pine Hairpins, Meadow Loop:
     // preserve forward pursuit preview near ordinary road edges without
     // overriding real tire grip, corner/braking safety, or recovery rules.
@@ -67,8 +65,8 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
-    // Hard Yellow already recovered twice on Desert sand in a solo race.
-    // Preserve sweeping straight-line speed; stop over-driving tight bends.
-    hardTightBendTargetBonus: 0.12,
+    // Concentrate caution in real hairpins rather than reducing speed on
+    // the Figure-eight's ordinary sweeping turns; grip is never changed.
+    hardHairpinReserve: 0.07,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>

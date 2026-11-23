@@ -323,13 +323,7 @@ export function stepAiVehicle(
   if (difficulty === 'hard' && arcade && !vehicle.racingLine && context.onRoad) {
     const controlled = (1 - edgeRisk) *
       (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))
-    // Some high-power chassis can use the full controlled straight/sweep
-    // allowance but need more margin where the next bend is very tight.
-    // Keep this a speed-planning decision; physical tire forces are unchanged.
-    const bonus = hardProfile.hardCornerTargetBonus ?? 0
-    const tightBendBonus = hardProfile.hardTightBendTargetBonus ?? bonus
-    const tightBendWeight = clamp((bend - 0.14) / 0.08, 0, 1)
-    curveSpeed *= 1 + (bonus + (tightBendBonus - bonus) * tightBendWeight) * controlled
+    curveSpeed *= 1 + (hardProfile.hardCornerTargetBonus ?? 0) * controlled
   }
   // Braking during turn-in consumes the same tire-force budget that rotates
   // the chassis. Finish the heavy braking on approach, then release it
