@@ -57,11 +57,13 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
   it('nudges at most four units on a straight and never into a tight corner or near the player', () => {
     const ahead = observation(rival, 9)
     const traffic: TrafficState = { ahead, nearby: [ahead] }
-    const nudge = aiCourtesyNudge(driver, traffic, 0.01, true)
+    const slowerDriver = { ...driver, speed: 130 }
+    const nudge = aiCourtesyNudge(slowerDriver, traffic, 0.01, true)
     expect(Math.abs(nudge)).toBeGreaterThan(0)
-    expect(Math.abs(nudge)).toBeLessThanOrEqual(4)
-    expect(aiCourtesyNudge(driver, traffic, 0.12, true)).toBe(0)
-    expect(aiCourtesyNudge(driver, traffic, 0.01, false)).toBe(0)
-    expect(aiCourtesyNudge(driver, { ahead, nearby: [ahead, observation(player, 25)] }, 0.01, true)).toBe(0)
+    expect(Math.abs(nudge)).toBeLessThanOrEqual(2)
+    expect(aiCourtesyNudge(driver, traffic, 0.01, true)).toBe(0)
+    expect(aiCourtesyNudge(slowerDriver, traffic, 0.12, true)).toBe(0)
+    expect(aiCourtesyNudge(slowerDriver, traffic, 0.01, false)).toBe(0)
+    expect(aiCourtesyNudge(slowerDriver, { ahead, nearby: [ahead, observation(player, 25)] }, 0.01, true)).toBe(0)
   })
 })
