@@ -21,11 +21,12 @@ the authored line's speed ratio. Non-authored Arcade rivals use the shared
 difficulty-specific corner reserve; authored lines override that reserve.
 
 An overtake remains committed for its difficulty-specific lane hold, then can
-rejoin only after a quarter-second of clear base-lane space. In addition to
-completing the pass or hitting the eight-second stall limit, it abandons a
-chase once the target has pulled beyond the difficulty's passing range.
-This prevents sustained shoulder driving after an unsuccessful pass without
-introducing a teleport, a speed boost, or an unsafe immediate lane change.
+rejoin only after a quarter-second of clear base-lane space. Red's driving
+profile also abandons a failed passing attempt after the target pulls beyond
+the difficulty's overtaking range; all other cars retain the original
+eight-second stalled-pass fallback. This avoids changing Green's validated
+mixed-surface passing behavior while improving Red's pavement racing decisions.
+The policy never adds grip, brakes, or engine power.
 
 When changing AI balance, first update the owning data or policy, then run
 `tests/domain/aiDifficultyPolicy.test.ts`, the relevant car-handling tests,
