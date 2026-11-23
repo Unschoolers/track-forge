@@ -29,15 +29,13 @@ export const CAR_PASSING_POLICIES: Readonly<Record<CarId, CarPassingPolicy>> = {
   // Red's shared pass timing affects the surrounding Hard grid. Keep its
   // already proven collision-safe passing decisions; tune brakes separately.
   red: { ...BASELINE_PASSING },
-  // Green was stuck passing a faster human for over five seconds. Abort a
-  // futile attempt after four seconds only when its base lane is clear.
-  green: { ...BASELINE_PASSING, abandonAfterSeconds: 4 },
+  // Keep the verified player-facing overtaking decisions unchanged.
+  green: { ...BASELINE_PASSING },
   // Blue's repeated ~8-second passes on Figure-eight point to an overly
   // long futile-pass wait. Keep the shared safety gate for rejoining.
   blue: { ...BASELINE_PASSING, abandonAfterSeconds: 6.5 },
-  // Yellow's repeated failed full-field passes benefit from more time to
-  // verify its base lane is clear. This does not change tire grip.
-  yellow: { ...BASELINE_PASSING, rejoinClearSeconds: 0.4 },
+  // Yellow's experimental rejoin delay gained no safe pace; restore baseline.
+  yellow: { ...BASELINE_PASSING },
 }
 
 export function validatePassingPolicy(policy: CarPassingPolicy): void {

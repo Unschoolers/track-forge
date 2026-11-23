@@ -40,7 +40,7 @@ export const CAR_DRIVING_PROFILES = {
   red: {
     hardReaction: 12,
     hardSteerGain: 2.22,
-    hardCornerReserve: 0.008,
+    hardCornerReserve: 0.01,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
   },
@@ -65,8 +65,5 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
-    // Concentrate caution in real hairpins rather than reducing speed on
-    // the Figure-eight's ordinary sweeping turns; grip is never changed.
-    hardHairpinReserve: 0.07,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>

@@ -38,7 +38,9 @@ export function aiCourtesyNudge(
   bend: number,
   onRoad: boolean,
 ): number {
-  if (!onRoad || bend >= 0.065) return 0
+  // A nudge at racing speed can create more risk than a harmless sprite
+  // overlap. Only offer the courtesy on a genuine, slower straight.
+  if (!onRoad || bend >= 0.035 || vehicle.speed >= 145) return 0
   // A nearby human takes priority and retains real passing clearance.
   if (traffic.nearby.some(({ vehicle: other, signedDistance }) =>
     other.player && Math.abs(signedDistance) < 45)) return 0
@@ -48,6 +50,6 @@ export function aiCourtesyNudge(
     laneGap < 10 && vehicle.speed > other.speed + 8)
   if (!ahead) return 0
   const side = vehicle.id < ahead.vehicle.id ? -1 : 1
-  return side * 4 * clamp((26 - ahead.signedDistance) / 14, 0, 1) *
-    clamp((0.065 - bend) / 0.04, 0, 1)
+  return side * 2 * clamp((26 - ahead.signedDistance) / 14, 0, 1) *
+    clamp((0.035 - bend) / 0.025, 0, 1)
 }
