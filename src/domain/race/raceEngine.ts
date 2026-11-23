@@ -3,7 +3,7 @@ import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { solveCollisionFrame } from '@/domain/race/collisions'
 import { lastRoadRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
 import { hitScenery } from '@/domain/race/sceneryCollisions'
-import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
+import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateProgress } from '@/domain/race/progress'
 import type {
   DriverInput,
   RaceOutcome,
@@ -21,7 +21,7 @@ import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import { resetRaceVehicle, recoverRacePlayer, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
-import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
+import { advanceArcadeTimingGate, finishGateNumber } from '@/domain/race/arcadeTimingGate'
 import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { addRecoveryTimePenalty, penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
@@ -30,7 +30,7 @@ import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domai
 export { resetRaceVehicle, recoverRacePlayer } from '@/domain/race/raceRecovery'
 
 export type RaceEvent =
-  | { readonly type: 'gate-crossed'; readonly vehicleId: string; readonly gate: 1 | 2 | 3 | 4; readonly lap: number; readonly time: number }
+  | { readonly type: 'gate-crossed'; readonly vehicleId: string; readonly gate: number; readonly lap: number; readonly time: number }
   | {
       readonly type: 'surface-changed'
       readonly vehicleId: string
@@ -218,29 +218,18 @@ function advanceRace(
         )
       : { ...prepared, pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance }
     let updated: RaceVehicle
-    if (vehicle.player && previous &&
-        (state.routeKind === 'point-to-point' || (arcade && state.path.closed))) {
+    if (vehicle.player && previous) {
       const progress = advanceArcadeTimingGate(
-        state,
-        previous,
-        { ...withPath, pathIndex: progressIndex },
-        elapsed,
-        context.onRoad,
-        () => state.path.closed && !usesCheckpoints
-          ? raceVehicleContext(state, previous).onRoad
-          : onRoadBefore,
+        state, previous, { ...withPath, pathIndex: progressIndex },
+        elapsed, context.onRoad, () => onRoadBefore,
       )
       updated = progress.vehicle
       missedCheckpoint = progress.missedCheckpoint
-    } else if (state.routeKind === 'point-to-point' && previous) {
-      updated = updateOpenRouteProgress(
-        previous, withPath, state.path, context.nearest.index, elapsed,
-        onRoadBefore, context.onRoad, ROAD_GEOMETRY.onRoadRadius,
-      )
     } else {
       updated = updateProgress(
         withPath, progressIndex, state.path.points.length, elapsed,
         state.totalLaps, state.startPathIndex, state.reversed,
+        state.timingGates ?? [], state.path.closed,
       )
     }
     if (vehicle.player && state.path.closed) {
@@ -264,7 +253,7 @@ function advanceRace(
       context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
     const lostRival = !updated.player && updated.grounded &&
       (rivalBelowDeck || context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
-        (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated)))
+        (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated, state.timingGates)))
     if (playerStuck || bridgeFallExpired || lostRival) {
       const candidate = previous && (rivalBelowDeck || updated.player || state.routeKind === 'point-to-point')
         ? restoreFrameProgress({ ...updated, pathIndex: previous.pathIndex }, previous)
@@ -367,7 +356,7 @@ function advanceRace(
           state.path,
           vehicle,
           state.reversed,
-          state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector) : undefined,
+          state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector, state.timingGates) : undefined,
         )
     events.push({
       type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
@@ -458,9 +447,9 @@ function advanceRace(
       if (!previous.grounded && vehicle.grounded && vehicle.landingIntensity > 0.1) {
         events.push({ type: 'vehicle-landed', vehicleId: vehicle.id, strength: vehicle.landingIntensity })
       }
-      const endGate = vehicle.lap > previous.lap ? 4 : vehicle.nextSector - 1
+      const endGate = vehicle.lap > previous.lap ? finishGateNumber(state) : vehicle.nextSector - 1
       for (let gate = previous.nextSector; gate <= endGate; gate++) {
-        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate: gate as 1 | 2 | 3 | 4, lap: previous.lap, time: penalizedRaceTime(elapsed, vehicle) })
+        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate, lap: previous.lap, time: penalizedRaceTime(elapsed, vehicle) })
       }
     }
     if (previous.finishedAt === null && vehicle.finishedAt !== null) {
