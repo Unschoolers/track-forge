@@ -36,7 +36,9 @@ function normalRivals(seed: number) {
   const starting = session.snapshot().state
   session.destroy()
   if (!starting) throw new Error('Missing Kids room race state')
-  let race: RaceState = { ...starting, phase: 'running', countdown: 0 }
+  // The player's stationary test vehicle must not obstruct the grid. Measure real rival AI on its own.
+  let race: RaceState = { ...starting, phase: 'running', countdown: 0,
+    vehicles: starting.vehicles.filter(vehicle => !vehicle.player) }
   const recoveries: string[] = []
   const splits = new Map<string, string[]>()
   const surfaces = new Map<string, Record<string, number>>()
@@ -56,7 +58,7 @@ function normalRivals(seed: number) {
       }
       if (event.type === 'vehicle-recovered' && event.vehicleId !== 'player') {
         const vehicle = race.vehicles.find(candidate => candidate.id === event.vehicleId)
-        recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, index=${event.pathIndex}, surface=${race.path.points[event.pathIndex]?.surface ?? '?' }`)
+        recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, reason=${event.reason}, x=${event.x.toFixed(0)}, y=${event.y.toFixed(0)}, index=${event.pathIndex}, surface=${race.path.points[event.pathIndex]?.surface ?? '?'}`)
       }
     }
     if (tick % 60 === 0) {
