@@ -59,3 +59,10 @@ test('traffic comparison measures the tuned rival, not the player-slot car', () 
       seed: 1, difficulty: 'hard', mode: 'traffic' }),
   )
 })
+
+test('Hard mirror role differs from the AI-controlled player, even for the same car', () => {
+  const task = { car: 'yellow', playerCar: 'yellow', scenarioId: 'kids-room',
+    seed: 1, difficulty: 'hard', mode: 'traffic' }
+  assert.notEqual(trialKey({ ...task, focusRole: 'player' }),
+    trialKey({ ...task, focusRole: 'rival' }))
+})
