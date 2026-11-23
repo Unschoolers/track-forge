@@ -128,6 +128,13 @@ export interface RaceSessionSnapshot {
   readonly ghostTime?: number
 }
 
+/** A read-only view of the last two physics steps for visual interpolation. */
+export interface RacePresentationFrame {
+  readonly previous: RaceState
+  readonly alpha: number
+  readonly discontinuousVehicleIds: ReadonlySet<string>
+}
+
 export interface RaceSessionPort {
   ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
@@ -140,6 +147,7 @@ export interface RaceSessionPort {
   setPaused(paused: boolean): void
   advance(deltaSeconds: number, input: DriverInput): void
   snapshot(): RaceSessionSnapshot
+  presentationFrame?(): RacePresentationFrame | null
   nearbyGhosts?(): readonly GhostPose[]
   subscribe(listener: (snapshot: RaceSessionSnapshot) => void): Unsubscribe
   destroy(): void
@@ -172,6 +180,7 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
 
 // Limit running catch-up to 250 ms per frame after background stalls.
 const MAX_CATCH_UP = 0.25
+const NO_DISCONTINUITIES: ReadonlySet<string> = new Set()
 // After the player finishes, continue real rival physics long enough for a
 // competitive field to finish; otherwise even valid times 10-35 seconds back
 // become misleading UNFINISHED rows. Stops early once all rivals finish.
@@ -193,6 +202,8 @@ export class RaceSession implements RaceSessionPort {
   private runId = 0
   private lastPositionCueAt = Number.NEGATIVE_INFINITY
   private remainder = 0
+  private previousPresentationState: RaceState | null = null
+  private discontinuousVehicleIds: ReadonlySet<string> = NO_DISCONTINUITIES
   private startsAt: number | undefined
   private rivalFinishRemaining = 0
   private destroyed = false
@@ -213,6 +224,8 @@ export class RaceSession implements RaceSessionPort {
     if (this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
+    this.previousPresentationState = null
+    this.discontinuousVehicleIds = NO_DISCONTINUITIES
     this.rivalFinishRemaining = 0
     this.lastPositionCueAt = Number.NEGATIVE_INFINITY
     const routeKind = normalizeRouteKind(track.routeKind)
@@ -242,6 +255,7 @@ export class RaceSession implements RaceSessionPort {
       ? { ...created, countdown: this.startsAt === undefined ? created.countdown : Math.max(0, (this.startsAt - this.monotonicNow()) / 1000),
           vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
       : created
+    this.previousPresentationState = state
     const player = state.vehicles.find((vehicle) => vehicle.player)
     this.recording = !nearby && player && this.dependencies.ghostStore
       ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
@@ -286,6 +300,8 @@ export class RaceSession implements RaceSessionPort {
     if (!this.current.state || this.destroyed) return
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
+    this.previousPresentationState = null
+    this.discontinuousVehicleIds = NO_DISCONTINUITIES
     this.rivalFinishRemaining = 0
     this.bestGhost = null
     this.recording = null
@@ -306,6 +322,8 @@ export class RaceSession implements RaceSessionPort {
     this.diagnostics?.manualReset(recovered, after.id)
     if (this.current.setup?.mode === 'nearby') this.dependencies.nearby?.recovered()
     this.timing.recover()
+    this.previousPresentationState = recovered
+    this.discontinuousVehicleIds = new Set([after.id])
     this.publish(
       this.buildSnapshot(
         this.current.track,
@@ -322,11 +340,14 @@ export class RaceSession implements RaceSessionPort {
     const state = this.current.state
     if (!state || state.paused === paused) return
     this.remainder = 0
+    const updated = { ...state, paused }
+    this.previousPresentationState = updated
+    this.discontinuousVehicleIds = NO_DISCONTINUITIES
     this.publish(
       this.buildSnapshot(
         this.current.track,
         this.current.setup,
-        { ...state, paused },
+        updated,
         this.current.result,
       ),
     )
@@ -369,9 +390,13 @@ export class RaceSession implements RaceSessionPort {
     let peakShake = 0
     let peakLanding = 0
     while (state.phase === 'running' && this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
+      this.previousPresentationState = state
       const before = state.vehicles.find((vehicle) => vehicle.player)
       const next = this.step(state, input, RACE_TICK_SECONDS, this.dependencies.random)
       state = next.state
+      this.discontinuousVehicleIds = new Set(next.events
+        .filter((event) => event.type === 'vehicle-recovered')
+        .map((event) => event.vehicleId))
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
       const player = state.vehicles.find((vehicle) => vehicle.player)
@@ -481,6 +506,8 @@ export class RaceSession implements RaceSessionPort {
     this.remainder += Math.min(remainingTime, MAX_CATCH_UP)
     if (this.remainder + 1e-10 < RACE_TICK_SECONDS && this.rivalFinishRemaining > 0) return
     while (this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
+      this.previousPresentationState = state
+      this.discontinuousVehicleIds = NO_DISCONTINUITIES
       state = stepFinishingRivals(state, this.dependencies.random)
       this.diagnostics?.record(state, [])
       this.remainder = Math.max(0, this.remainder - RACE_TICK_SECONDS)
@@ -506,6 +533,19 @@ export class RaceSession implements RaceSessionPort {
 
   snapshot(): RaceSessionSnapshot {
     return this.current
+  }
+
+  presentationFrame(): RacePresentationFrame | null {
+    const state = this.current.state
+    if (!state) return null
+    return {
+      previous: this.previousPresentationState ?? state,
+      // Alpha is the unconsumed fraction of the *existing* fixed-step accumulator.
+      // Do not run another clock or advance physics from the renderer.
+      alpha: state.phase === 'running' && !state.paused
+        ? Math.max(0, Math.min(1, this.remainder / RACE_TICK_SECONDS)) : 1,
+      discontinuousVehicleIds: this.discontinuousVehicleIds,
+    }
   }
 
   diagnosticsReport(): RaceDiagnosticsReport | null {
