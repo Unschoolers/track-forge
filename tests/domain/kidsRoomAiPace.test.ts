@@ -1,3 +1,4 @@
+import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import { RaceSession } from '@/application/race/raceSession'
 import { RACE_TICK_SECONDS, stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
@@ -18,7 +19,7 @@ function loadKidsRoom() {
 }
 const kidsRoom = loadKidsRoom()
 
-function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'normal', playerCar: 'green' | 'red' = 'green') {
+function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'normal', playerCar: 'green' | 'red' = 'green', greenProfile?: CarDrivingProfile) {
   let state = seed >>> 0
   const random = {
     next: () => {
@@ -38,6 +39,7 @@ function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'norm
   if (!starting) throw new Error('Missing Kids room race state')
   // The player's stationary test vehicle must not obstruct the grid. Measure real rival AI on its own.
   let race: RaceState = { ...starting, phase: 'running', countdown: 0,
+    ...(greenProfile ? { aiProfileOverrides: { green: greenProfile } } : {}),
     vehicles: starting.vehicles.filter(vehicle => !vehicle.player) }
   const recoveries: string[] = []
   const splits = new Map<string, string[]>()
@@ -164,3 +166,21 @@ describe('Hard-first Green AI safety on the real Kids room circuit', () => {
     expect(easy, diagnostics).toBeGreaterThan(normal)
   }, 30000)
 })
+
+/** Opt-in genuine rival-traffic sweep, unlike the solo optimizer. */
+const trafficSweep = process.env.AI_TRAFFIC_SWEEP === '1' ? it : it.skip
+trafficSweep('measures Green Hard line speed and recoveries against real AI traffic', () => {
+  const cases = [0, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+  const results = cases.map(edge => {
+    const result = raceRivals(1, 'hard', 'red', {
+      ...CAR_DRIVING_PROFILES.green, hardEdgeAvoidanceScale: edge,
+    })
+    return {
+      edge,
+      green: result.opponents.find(v => v.car === 'green')?.finishedAt,
+      recoveries: result.recoveries,
+    }
+  })
+  console.log('AI_GREEN_TRAFFIC_SWEEP ' + JSON.stringify(results))
+  expect(results).toHaveLength(cases.length)
+}, 120_000)
