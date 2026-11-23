@@ -161,6 +161,10 @@ export function safeEntrySpeedAhead(
     (car.steer / CAR_SPECS.blue.steer) *
     (CAR_SPECS.blue.yawInertia / Math.max(1, car.yawInertia)),
   )
+  // Keep the cautious yaw penalty for slower chassis. Agile, high-grip cars
+  // can rotate through an apex more quickly, but only when the CURRENT
+  // surface has enough real tire grip to support it. This deliberately gives
+  // no bonus on ice and does not change car physics or surface speed limits.
   const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
@@ -181,17 +185,28 @@ export function safeEntrySpeedAhead(
       SHARP_BEND_SAFETY_BASE + bend * SHARP_BEND_SAFETY_GAIN, 0, SHARP_BEND_SAFETY_MAX,
     )
     const effectiveSafety = useSharpBendSafety ? Math.max(cornerSafety, sharpBendSafety) : cornerSafety
+    // Green's very quick-yaw, high-grip chassis can safely retain a little
+    // more speed at the tightest dirt/pavement apexes. Keep the historical
+    // minimum on ice and for less responsive cars; this is a target speed,
+    // never a physics or traction exemption.
+    const nimbleGrip = Math.max(0, steeringResponse - 1) *
+      clamp((grip - 0.75) / 0.2, 0, 1)
+    const apexMinimum = 70 + Math.min(14, nimbleGrip * 35)
     const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
       (cornerBaseline - bend * (fastCorners ? 600 : 350) * effectiveSafety) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
-      70, straightSpeed,
+      apexMinimum, straightSpeed,
     ))
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
       VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
-    const corneringPace = 1 - (1 - turningPace) * clamp(bend / 0.1, 0, 1)
+    const agileGripBonus = useChassisYawSafety
+      ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
+        clamp((grip - 0.75) / 0.2, 0, 1)
+      : 0
+    const corneringPace = 1 - (1 - turningPace - agileGripBonus) * clamp(bend / 0.1, 0, 1)
     const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * brakeDeceleration * distance)
     allowed = Math.min(allowed, entrySpeed)
   }
