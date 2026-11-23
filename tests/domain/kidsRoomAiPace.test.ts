@@ -67,7 +67,7 @@ function normalRivals(seed: number, difficulty: 'normal' | 'hard' = 'normal', ch
           vehicle.player ? {
             ...pacer, x: point.x + 10000, y: point.y + 10000, z: 0,
             pathIndex: index, pathDistance: point.distance, lap,
-            nextSector: Math.max(1, Math.min(4, Math.floor(fraction * 4) + 1)),
+            nextSector: Math.max(1, Math.min(4, Math.floor(fraction * 4) + 1)) as 1 | 2 | 3 | 4,
             currentSurface: point.surface, speed, vx: speed, vy: 0,
             finishedAt: null, grounded: true, wrecked: false,
           } : vehicle) }
