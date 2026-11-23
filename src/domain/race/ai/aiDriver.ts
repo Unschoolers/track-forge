@@ -141,7 +141,8 @@ export function stepAiVehicle(
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
   const hardLookAhead = drivingDifficulty === 'hard'
-    ? (arcade && !vehicle.racingLine ? hardProfile.hardLookAheadSamples : HARD_LOOKAHEAD_SAMPLES)
+    ? (arcade && !vehicle.racingLine && difficulty === 'hard'
+      ? hardProfile.hardLookAheadSamples : HARD_LOOKAHEAD_SAMPLES)
     : 0
   const lookAheadSamples = Math.round(
     context.onRoad
