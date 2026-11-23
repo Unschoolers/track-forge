@@ -7,6 +7,7 @@ import {
   type AiDriverState,
 } from '@/domain/race/ai/aiState'
 import { advancePassingState } from '@/domain/race/ai/passingState'
+import { compactAiTraffic, aiCourtesyNudge } from '@/domain/race/ai/aiRivalClearance'
 import type { TrafficState } from '@/domain/race/ai/traffic'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import {
@@ -85,6 +86,8 @@ export function stepAiVehicle(
   catchUp?: SpeedAssist,
   hardProfileOverride?: CarDrivingProfile,
   passingPolicyOverride?: CarPassingPolicy,
+  /** Test-only compatibility switch; Arcade defaults to compact AI rivals. */
+  aiAiTrafficMode: 'legacy' | 'compact' = 'compact',
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
@@ -103,8 +106,27 @@ export function stepAiVehicle(
         reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
         steerGain: difficulty === 'hard' ? hardProfile.hardSteerGain : ARCADE_STEERING.steerGain }
     : DIFFICULTY_SPECS[drivingDifficulty]
+  // Only human vehicles can demand a full overtake or emergency braking.
+  // AI-to-AI sprites are non-colliding in Arcade: a compact awareness bubble
+  // is enough, with a tiny straight-only courtesy nudge below.
+  // Authored racing lines already include their own traffic-facing lane
+  // decisions; preserve that proven behaviour on curated circuits.
+  // Red is the fastest/lowest-grip chassis and still needs its established
+  // defensive traffic decisions to stay on-road in all four Hard grids.
+  // Other chassis benefit safely from compact non-colliding AI clearance;
+  // Red can be migrated when a dedicated corner-entry controller is proven.
+  const defensiveChassis = vehicle.car === 'red' ||
+    (vehicle.car === 'green' && difficulty === 'hard')
+  const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
+    !defensiveChassis && aiAiTrafficMode !== 'legacy'
+  const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
-  ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds,
+  // An AI dot may influence short-range speed, but only the player
+  // can trigger a large lane-changing overtake in Arcade.
+  const passingTraffic = relaxedAiRivals && !relevantTraffic.ahead?.vehicle.player
+    ? { ...relevantTraffic, ahead: null }
+    : relevantTraffic
+  ai = advancePassingState(vehicle, ai, passingTraffic, difficulty, deltaSeconds,
     passingPolicyOverride ?? CAR_PASSING_POLICIES[vehicle.car])
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
@@ -194,11 +216,15 @@ export function stepAiVehicle(
   }
   // A wide passing line can point the car across the return arm of a
   // hairpin. Ease toward the center on approach if the space is clear.
-  const lane = ai.targetLane + ai.mistakeOffset
+  // Hard and Normal make no AI↔AI dodges: their sprites may overlap without
+  // physical contact. Easy retains a tiny low-speed courtesy adjustment.
+  const lane = ai.targetLane + ai.mistakeOffset + (relaxedAiRivals &&
+    difficulty === 'easy' && ai.phase === 'follow'
+    ? aiCourtesyNudge(vehicle, traffic, bend, context.onRoad) : 0)
   const centered = lane * (1 - clamp(bend / CENTER_LINE_TURN, 0, 1))
   const inner = Math.min(vehicle.lane, centered) - LANE_CHANGE_CLEARANCE
   const outer = Math.max(vehicle.lane, centered) + LANE_CHANGE_CLEARANCE
-  const occupied = traffic.nearby.some((entry) =>
+  const occupied = relevantTraffic.nearby.some((entry) =>
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
@@ -239,7 +265,7 @@ export function stepAiVehicle(
       clamp(tuning.reaction * deltaSeconds, 0, 1)
   ai = { ...ai, steer }
 
-  const ahead = traffic.ahead
+  const ahead = relevantTraffic.ahead
   const emergency =
     ahead !== null &&
     (ahead.distance <= AI_OVERTAKE[difficulty].emergencyDistance ||
@@ -320,6 +346,12 @@ export function stepAiVehicle(
   // line is under control. This changes the target used by braking/throttle,
   // never the tire forces, speed limit, off-road drag or recovery behavior.
   // Back out when drifting outward; do not reward unstable or off-road lines.
+  if (difficulty === 'normal' && arcade && !vehicle.racingLine && context.onRoad &&
+    Math.abs(slipAngle) < 0.08) {
+    // Blue needed one 60 Hz tick to remain within its player-relative Normal
+    // pace budget. Adjust the planned speed, never the actual tire forces.
+    curveSpeed *= 1 + (hardProfile.normalCornerTargetBonus ?? 0)
+  }
   if (difficulty === 'hard' && arcade && !vehicle.racingLine && context.onRoad) {
     const controlled = (1 - edgeRisk) *
       (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))

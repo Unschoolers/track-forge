@@ -63,22 +63,28 @@ describe('Independent passing policy contracts', () => {
     expect(first.steps).toBeGreaterThan(0)
   }, 30000)
 
-  it('creates an actual Yellow passing opportunity against a slower AI-controlled rival', () => {
+  it('preserves human-style pass study but compacts physical AI-to-AI clearance', () => {
     const [figureEight] = decodeTrackInput(JSON.parse(
       readFileSync('tests/fixtures/figureEightRaceAi.trackforge.json', 'utf8'),
     ))
     if (!figureEight) throw new Error('Missing replay-accurate Figure-eight fixture')
-    const duel = runLaneCheck({
+    const options = {
       path: prepareLanePath(figureEight), trackName: figureEight.name,
-      car: 'yellow', difficulty: 'hard', handling: 'arcade',
-      mode: 'duel', duelOpponentCar: 'green', duelOpponentSpeedLimit: 220,
+      car: 'yellow' as const, difficulty: 'hard' as const, handling: 'arcade' as const,
+      mode: 'duel' as const, duelOpponentCar: 'green' as const, duelOpponentSpeedLimit: 220,
       seed: 1, reversed: false, startRatio: 0.32853982300884954,
       laps: 2, seconds: 100,
-    })
-    expect(duel.vehicles.map(v => v.car)).toEqual(['yellow', 'green'])
-    expect(duel.samples.some(sample =>
+    }
+    // Offline passing studies deliberately model the rival as a human-style
+    // obstacle. Normal Arcade AI↔AI racing has only compact dot clearance.
+    const proxyHuman = runLaneCheck({ ...options, aiAiTrafficMode: 'legacy' })
+    expect(proxyHuman.vehicles.map(v => v.car)).toEqual(['yellow', 'green'])
+    expect(proxyHuman.samples.some(sample =>
       sample.car === 'yellow' && sample.phase === 'passing')).toBe(true)
-    expect(duel.vehicles.every(vehicle => vehicle.finishedAt !== null)).toBe(true)
+    const actualAiDuel = runLaneCheck(options)
+    expect(actualAiDuel.samples.some(sample =>
+      sample.car === 'yellow' && sample.phase === 'passing')).toBe(false)
+    expect(actualAiDuel.vehicles.every(vehicle => vehicle.finishedAt !== null)).toBe(true)
   }, 30000)
 
   it('allows a bounded moving opponent pace only inside a duel', () => {

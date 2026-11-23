@@ -63,8 +63,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test -- --maxWorkers=4
+      - run: npm run test:fast -- --maxWorkers=4
       - run: npm run lint
+
+  # Required deterministic AI physics regression, isolated from fast test workers.
+  ai-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ai:matrix
 
   android:
     needs: web-build
@@ -174,7 +187,7 @@ jobs:
           if-no-files-found: error
 
   sign-and-release:
-    needs: [android, verify, windows]
+    needs: [android, verify, windows, ai-matrix]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
     runs-on: ubuntu-latest
