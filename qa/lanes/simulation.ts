@@ -12,6 +12,7 @@ import { stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
+import { validatePassingPolicy, type CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import {
 	LaneMonitor,
 	sampleLaneVehicle,
@@ -31,9 +32,13 @@ export interface LaneRunOptions {
 	readonly gridPositions?: readonly number[]
 	/** Simulation-only, race-local AI driving profiles (no shared mutation). */
 	readonly aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>
+	/** A pass policy changes only the named car, never the other simulated cars. */
+	readonly aiPassingPolicyOverrides?: Readonly<Partial<Record<CarId, CarPassingPolicy>>>
+	/** Required in duel mode; the second AI has this physical chassis. */
+	readonly duelOpponentCar?: CarId
 	readonly seconds: number
 	readonly laps: number
-	readonly mode: 'solo' | 'traffic'
+	readonly mode: 'solo' | 'duel' | 'traffic'
 	readonly car: CarId
 	readonly handling?: RaceState['handling']
 }
@@ -45,7 +50,7 @@ export interface LaneRun {
 	readonly startRatio: number
 	readonly seconds: number
 	readonly laps: number
-	readonly mode: 'solo' | 'traffic'
+	readonly mode: 'solo' | 'duel' | 'traffic'
 	readonly car: CarId
 	readonly steps: number
 	readonly simulatedSeconds: number
@@ -97,7 +102,9 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		options.seed > 0xffff_ffff ||
 		!CAR_IDS.includes(options.car) ||
 		!DIFFICULTY_IDS.includes(options.difficulty) ||
-		!['solo', 'traffic'].includes(options.mode) ||
+		!['solo', 'duel', 'traffic'].includes(options.mode) ||
+		(options.mode === 'duel' && (options.duelOpponentCar === undefined || !CAR_IDS.includes(options.duelOpponentCar))) ||
+		(options.mode !== 'duel' && options.duelOpponentCar !== undefined) ||
 		(options.startRatio !== undefined &&
 			(!Number.isFinite(options.startRatio) ||
 				options.startRatio < 0 ||
@@ -107,6 +114,9 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	) {
 		throw new Error('Invalid lane simulation options')
 	}
+	for (const policy of Object.values(options.aiPassingPolicyOverrides ?? {})) {
+		if (policy) validatePassingPolicy(policy)
+	}
 	const created = createRace({
 		path,
 		handling: options.handling,
@@ -115,17 +125,22 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		laps: options.laps,
 		reversed: options.reversed,
 		startRatio: options.startRatio ?? 0,
-		gridPositions: options.gridPositions,
+		gridPositions: options.gridPositions ?? (options.mode === 'duel' ? [3, 0, 1, 2] : undefined),
 	})
 	let race: RaceState = {
 		...created,
 		...(options.aiProfileOverrides ? { aiProfileOverrides: options.aiProfileOverrides } : {}),
+		...(options.aiPassingPolicyOverrides ? { aiPassingPolicyOverrides: options.aiPassingPolicyOverrides } : {}),
 		phase: 'running',
 		countdown: 0,
 		vehicles: created.vehicles
-			.filter((_, index) => options.mode === 'traffic' || index === 0)
-			.map((vehicle) => ({
+			.filter((_, index) => options.mode === 'traffic' || index === 0 ||
+				(options.mode === 'duel' && index === 1))
+			.map((vehicle, index) => ({
 				...vehicle,
+				// A duel's rival is an actual physical vehicle from the real grid,
+				// with a selectable chassis, not a frozen obstacle or fake telemetry.
+				...(options.mode === 'duel' && index === 1 ? { car: options.duelOpponentCar ?? vehicle.car } : {}),
 				player: false,
 				damageLimit: Number.POSITIVE_INFINITY,
 				ai: vehicle.ai ?? createAiDriverState(0),

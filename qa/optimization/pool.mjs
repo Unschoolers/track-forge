@@ -17,6 +17,7 @@ export class SimulationPool {
     this.nextId = 1
     this.fatalError = null
     this.baselineProfiles = null
+    this.passingProfiles = null
     this.closing = false
   }
 
@@ -34,6 +35,7 @@ export class SimulationPool {
           if (message.type === 'ready') {
             initialized = true
             this.baselineProfiles ??= message.baselineProfiles
+            this.passingProfiles ??= message.passingProfiles
             resolve()
             this.pump()
           } else if (message.type === 'fatal') {

@@ -20,6 +20,7 @@ import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
+import { CAR_PASSING_POLICIES, type CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
 const {
@@ -83,6 +84,7 @@ export function stepAiVehicle(
   handling: 'arcade' | 'simulation' = 'simulation',
   catchUp?: SpeedAssist,
   hardProfileOverride?: CarDrivingProfile,
+  passingPolicyOverride?: CarPassingPolicy,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
@@ -102,7 +104,8 @@ export function stepAiVehicle(
         steerGain: difficulty === 'hard' ? hardProfile.hardSteerGain : ARCADE_STEERING.steerGain }
     : DIFFICULTY_SPECS[drivingDifficulty]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
-  ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
+  ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds,
+    passingPolicyOverride ?? CAR_PASSING_POLICIES[vehicle.car])
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
   const context = getVehicleStepContext(path, vehicle)

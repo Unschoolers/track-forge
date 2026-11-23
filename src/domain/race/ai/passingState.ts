@@ -4,6 +4,7 @@ import type { RaceVehicle } from '@/domain/race/raceState'
 import type { AiDriverState } from '@/domain/race/ai/aiState'
 import type { TrafficState } from '@/domain/race/ai/traffic'
 import { choosePassingLane } from '@/domain/race/ai/lanePlanner'
+import { CAR_PASSING_POLICIES, type CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 
 /** Pure overtake state machine. Vehicle integration remains in the AI driver. */
 export function advancePassingState(
@@ -12,6 +13,7 @@ export function advancePassingState(
   traffic: TrafficState,
   difficulty: DifficultyId,
   deltaSeconds: number,
+  policy: CarPassingPolicy = CAR_PASSING_POLICIES[vehicle.car],
 ): AiDriverState {
   const tuning = AI_OVERTAKE[difficulty]
   const ahead = traffic.ahead
@@ -21,8 +23,10 @@ export function advancePassingState(
       cooldownRemaining <= 0 &&
       ahead &&
       ahead.distance < tuning.triggerDistance *
-        (ai.personality === 'cautious' ? 1 : ai.personality === 'opportunist' ? 1.4 : 1.25) &&
-      ahead.vehicle.speed + (ai.personality === 'cautious' ? 12 : 4) < vehicle.speed
+        (ai.personality === 'cautious' ? 1 : ai.personality === 'opportunist' ? 1.4 : 1.25) *
+        policy.triggerDistanceScale &&
+      ahead.vehicle.speed + (ai.personality === 'cautious' ? 12 : 4) +
+        policy.passSpeedAdvantage < vehicle.speed
     ) {
       const passLane = choosePassingLane(vehicle, traffic, difficulty,
         ai.personality === 'opportunist' ? 1 : ai.personality === 'steady' ? -1 : 0, true)
@@ -52,9 +56,9 @@ export function advancePassingState(
     const target = traffic.nearby.find((entry) => entry.vehicle.id === ai.passTargetId)
     const targetClear = !target || target.signedDistance < -tuning.completionDistance
     // A stuck pass eventually aborts, but never enters an occupied lane.
-    const clear = destinationClear && (targetClear || passElapsed > 8)
+    const clear = destinationClear && (targetClear || passElapsed > policy.abandonAfterSeconds)
     const clearTime = clear ? ai.clearTime + deltaSeconds : 0
-    if (holdRemaining <= 0 && clearTime >= 0.25) {
+    if (holdRemaining <= 0 && clearTime >= policy.rejoinClearSeconds) {
       return {
         ...ai,
         phase: 'rejoin',

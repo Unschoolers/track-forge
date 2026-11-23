@@ -8,6 +8,7 @@ import type {
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { AiDriverState, RacingLine } from '@/domain/race/ai/aiState'
 import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
+import type { CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import type { RaceEffectsState } from '@/domain/race/effects'
 import type { SceneryColliders } from '@/domain/race/sceneryCollisions'
 
@@ -93,6 +94,8 @@ export interface RaceState {
   readonly vehicles: readonly RaceVehicle[]
   /** Per-race, immutable driver overrides for deterministic offline diagnostics. */
   readonly aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>
+  /** Race-local passing parameters, independent of each car's solo steering. */
+  readonly aiPassingPolicyOverrides?: Readonly<Partial<Record<CarId, CarPassingPolicy>>>
   readonly difficulty: DifficultyId
   readonly handling?: 'arcade' | 'simulation'
   readonly totalLaps: number
