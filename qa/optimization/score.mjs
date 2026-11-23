@@ -2,7 +2,7 @@
 export function trialKey(task) {
   return [task.car, task.playerCar ?? task.car, task.focusRole ?? 'player',
     task.policyKind ?? 'driving', task.opponentCar ?? 'none',
-    task.duelOpponentPace ?? 'default', 
+    task.duelOpponentSpeedLimit ?? 'default', 
     task.scenarioId, task.seed, task.difficulty, task.mode].join('|')
 }
 function driver(record) {
@@ -25,7 +25,7 @@ export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01 } = {}) {
       old.focus_role !== current.focus_role ||
       old.policy_kind !== current.policy_kind ||
       old.duel_opponent_car !== current.duel_opponent_car ||
-      old.duel_opponent_pace !== current.duel_opponent_pace)
+      old.duel_opponent_speed_limit !== current.duel_opponent_speed_limit)
     throw new Error('Non-comparable simulations: context mismatch')
 
   const reasons = []
