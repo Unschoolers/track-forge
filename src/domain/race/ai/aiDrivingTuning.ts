@@ -14,6 +14,7 @@ export const AI_DRIVING_TUNING = {
     lookAhead: 1,
     reaction: 10,
   },
+  HARD_ARCADE_REACTION: 16,
   BEND_LOOKAHEAD: [0, 6, 12, 20, 30],
   CENTER_LINE_TURN: 0.28,
   LANE_CHANGE_LOOKAHEAD: 24,
