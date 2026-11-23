@@ -40,6 +40,10 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
       nearby: [distantAi, humanAhead, closeAi] })
     expect(mixed.ahead).toBe(humanAhead)
     expect(mixed.nearby).toEqual([humanAhead, closeAi])
+    // A nearer AI must not hide the human from the passing controller.
+    const behindRival = compactAiTraffic({ ahead: closeAi,
+      nearby: [closeAi, humanAhead] })
+    expect(behindRival.ahead).toBe(humanAhead)
   })
   it('does not start an extreme AI-to-AI pass, but still overtakes a human', () => {
     const aiState = createAiDriverState(0, 'opportunist')
