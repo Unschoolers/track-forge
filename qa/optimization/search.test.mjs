@@ -29,7 +29,7 @@ test('pair comparisons reject recovery, roster, and incomparable metadata', () =
   assert.equal(assessCandidate([[wrap(35), wrap(33)]]).eligible, true)
   assert.equal(assessCandidate([[wrap(35), wrap(34.9)]], { minGain: 0.01 }).eligible, false)
   assert.equal(trialKey({ car: 'blue', scenarioId: 'desert', seed: 1,
-    difficulty: 'hard', mode: 'solo' }), 'blue|blue|player|desert|1|hard|solo')
+    difficulty: 'hard', mode: 'solo' }), 'blue|blue|player|driving|none|desert|1|hard|solo')
 })
 
 test('traffic comparison measures the tuned rival, not the player-slot car', () => {
@@ -65,4 +65,17 @@ test('Hard mirror role differs from the AI-controlled player, even for the same 
     seed: 1, difficulty: 'hard', mode: 'traffic' }
   assert.notEqual(trialKey({ ...task, focusRole: 'player' }),
     trialKey({ ...task, focusRole: 'rival' }))
+})
+
+test('duel experiments have independent dimensions from solo or full traffic', () => {
+  const common = {
+    car: 'red', playerCar: 'red', scenarioId: 'kids-room',
+    seed: 4331, difficulty: 'hard', policyKind: 'passing',
+  }
+  assert.notEqual(trialKey({ ...common, mode: 'duel', opponentCar: 'yellow' }),
+    trialKey({ ...common, mode: 'solo' }))
+  assert.notEqual(trialKey({ ...common, mode: 'duel', opponentCar: 'yellow' }),
+    trialKey({ ...common, mode: 'duel', opponentCar: 'green' }))
+  assert.notEqual(trialKey({ ...common, mode: 'duel', opponentCar: 'yellow' }),
+    trialKey({ ...common, mode: 'traffic' }))
 })
