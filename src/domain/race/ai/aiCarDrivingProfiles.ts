@@ -33,11 +33,11 @@ export const CAR_DRIVING_PROFILES = {
     hardLookAheadSamples: 4,
   },
   // Green rotates easily on street/dirt. A small planned apex reserve reduces
-  // excessive sliding, but a full 6% reserve cost measurable lap time.
+  // excessive sliding. A small Hard-only reserve balances entry grip against speed.
   green: {
     hardReaction: 10,
     hardSteerGain: 2.42,
-    hardCornerReserve: 0.035,
+    hardCornerReserve: 0.02,
     hardLookAheadSamples: 4,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
