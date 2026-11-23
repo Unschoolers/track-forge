@@ -14,8 +14,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: trackforge-optimizer-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+    # Running worker-thread studies are short but do not cancel promptly mid-trial.
+  # Finish the active study; GitHub keeps only the latest pending revision.
+  group: trackforge-ai-study-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   contracts:
