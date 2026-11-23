@@ -33,13 +33,17 @@ export function planCornerTactics(
   roadRadius: number,
 ): CornerTactics {
   const direction = reversed ? -1 : 1
+  const past = turnAmountAt(path, index - direction * 12, 6) * direction
   const near = turnAmountAt(path, index, 6) * direction
   const next = turnAmountAt(path, index + direction * 12, 6) * direction
   const far = turnAmountAt(path, index + direction * 24, 6) * direction
   const bend = Math.max(Math.abs(near), Math.abs(next), Math.abs(far))
   const peakNext = Math.abs(next) >= Math.abs(far) ? next : far
   const approaching = Math.abs(peakNext) > Math.abs(near) * 1.3 && Math.abs(peakNext) > 0.045
-  const exiting = Math.abs(near) > 0.055 && Math.abs(peakNext) < Math.abs(near) * 0.62
+  // A sharp apex can fall away in the very next sample; that's still the
+  // turning phase until curvature is *declining* relative to the approach.
+  const exiting = Math.abs(near) > 0.055 && Math.abs(peakNext) < Math.abs(near) * 0.62 &&
+    Math.abs(past) >= Math.abs(near) * 0.65
   const phase: CornerPhase = approaching ? 'approach'
     : exiting ? 'exit'
     : Math.abs(near) > 0.05 ? 'turn' : 'straight'
