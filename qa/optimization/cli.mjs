@@ -4,6 +4,7 @@ import { availableParallelism } from 'node:os'
 import { resolve } from 'node:path'
 import { SimulationPool } from './pool.mjs'
 import { generateCandidates, DEFAULT_CARS } from './candidates.mjs'
+import { generatePassingCandidates } from './passingCandidates.mjs'
 import { STUDY_SCENARIOS, selectScenarios } from './scenarios.mjs'
 import { trialKey, assessCandidate } from './score.mjs'
 import { jsonLines } from './records.mjs'
@@ -15,25 +16,28 @@ function options(args) {
   }
   const cars = take('cars', DEFAULT_CARS.join(',')).split(',').filter(Boolean)
   const workers = Number(take('workers', Math.min(3, Math.max(1, availableParallelism() - 1))))
+  const focus = take('focus', 'driving')
   const trials = Number(take('trials', 14))
   const seeds = take('seeds', '1,4331').split(',').map(Number)
   const out = resolve(take('out', 'qa/results/optimization'))
   if (args.includes('--help')) return { help: true }
   if (cars.some(car => !DEFAULT_CARS.includes(car)) || new Set(cars).size !== cars.length || !cars.length)
     throw new Error('Invalid --cars: expected unique red,green,blue,yellow')
+  if (!['driving', 'passing'].includes(focus))
+    throw new Error('--focus must be driving or passing')
   if (!Number.isInteger(workers) || workers < 1 || workers > 8)
     throw new Error('--workers must be 1..8')
   if (!Number.isInteger(trials) || trials < 1 || trials > 100)
     throw new Error('--trials must be 1..100 per car')
   if (!seeds.length || seeds.some(x => !Number.isInteger(x) || x < 0 || x > 0xffffffff))
     throw new Error('--seeds requires nonnegative integers')
-  return { cars, workers, trials, seeds, out,
+  return { cars, focus, workers, trials, seeds, out,
     sampleTelemetry: !args.includes('--no-telemetry') }
 }
 
 const args = options(process.argv.slice(2))
 if (args.help) {
-  console.log('Usage: npm run qa:optimize -- [--cars red,green,blue,yellow]' +
+  console.log('Usage: npm run qa:optimize -- [--focus driving|passing] [--cars red,green,blue,yellow]' +
     ' [--workers 2] [--trials 14] [--seeds 1,4331]' +
     ' [--out qa/results/optimization] [--no-telemetry]')
 } else {
@@ -65,31 +69,40 @@ if (args.help) {
     if (!found) throw new Error(`Missing matched trial: ${candidateId} / ${trialKey(task)}`)
     return found.result
   }
-  function trial(car, scenario, seed, mode, candidate, playerCar = car, focusRole = 'player') {
+  function trial(car, scenario, seed, mode, candidate, playerCar = car, focusRole = 'player', opponentCar) {
     return {
       car, playerCar, focusRole, scenarioId: scenario.id, seed, mode, difficulty: 'hard',
+      policyKind: args.focus, ...(opponentCar ? { opponentCar } : {}),
       candidateId: candidate.id, changes: candidate.changes,
     }
   }
 
   try {
     await pool.start()
-    const profiles = pool.baselineProfiles
+    const profiles = args.focus === 'passing' ? pool.passingProfiles : pool.baselineProfiles
     if (!profiles) throw new Error('Simulator did not publish AI profiles')
     const baselines = args.cars.map(car => ({ id: `base-${car}`, car, changes: {} }))
-    const candidates = args.cars.flatMap(car =>
-      generateCandidates(car, profiles[car], args.trials))
+    const candidates = args.cars.flatMap(car => args.focus === 'passing'
+      ? generatePassingCandidates(car, profiles[car], args.trials)
+      : generateCandidates(car, profiles[car], args.trials))
+    const duelOpponents = { red: 'green', green: 'red', blue: 'red', yellow: 'green' }
+    const screeningTask = (candidate, scenario) => trial(
+      candidate.car, scenario, args.seeds[0],
+      args.focus === 'passing' ? 'duel' : 'solo', candidate,
+      candidate.car, 'player',
+      args.focus === 'passing' ? duelOpponents[candidate.car] : undefined,
+    )
     const baselineTasks = baselines.flatMap(base =>
-      calibration.map(scenario => trial(base.car, scenario, args.seeds[0], 'solo', base)))
+      calibration.map(scenario => screeningTask(base, scenario)))
     await batch(baselineTasks, 'calibration baselines')
     const candidateTasks = candidates.flatMap(candidate =>
-      calibration.map(scenario => trial(candidate.car, scenario, args.seeds[0], 'solo', candidate)))
+      calibration.map(scenario => screeningTask(candidate, scenario)))
     await batch(candidateTasks, 'parallel bounded search')
 
     const screening = candidates.map(candidate => {
       const baseId = `base-${candidate.car}`
       const pairs = calibration.map(scenario => {
-        const task = trial(candidate.car, scenario, args.seeds[0], 'solo', candidate)
+        const task = screeningTask(candidate, scenario)
         return [get(baseId, task), get(candidate.id, task)]
       })
       return { ...candidate, score: assessCandidate(pairs, {
@@ -112,22 +125,26 @@ if (args.help) {
     const allCasesFor = car => scenarios.flatMap(scenario =>
       args.seeds.flatMap(seed => [
         { scenario, seed, mode: 'solo', playerCar: car, focusRole: 'player' },
+        ...(args.focus === 'passing' ? [{
+          scenario, seed, mode: 'duel', playerCar: car, focusRole: 'player',
+          opponentCar: duelOpponents[car],
+        }] : []),
         { scenario, seed, mode: 'traffic', playerCar: car, focusRole: 'player' },
         { scenario, seed, mode: 'traffic', playerCar: opponents[car], focusRole: 'rival' },
       ]))
 
     const baseMore = baselines.flatMap(base => allCasesFor(base.car)
-      .map(({ scenario, seed, mode, playerCar, focusRole }) => trial(base.car, scenario, seed, mode, base, playerCar, focusRole))
+      .map(({ scenario, seed, mode, playerCar, focusRole, opponentCar }) => trial(base.car, scenario, seed, mode, base, playerCar, focusRole, opponentCar))
       .filter(task => !cache.has(`${task.candidateId}/${trialKey(task)}`)))
     await batch(baseMore, 'full-field baselines')
     const finalistTasks = shortlisted.flatMap(candidate => allCasesFor(candidate.car)
-      .map(({ scenario, seed, mode, playerCar, focusRole }) => trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole))
+      .map(({ scenario, seed, mode, playerCar, focusRole, opponentCar }) => trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole, opponentCar))
       .filter(task => !cache.has(`${task.candidateId}/${trialKey(task)}`)))
     await batch(finalistTasks, 'cross-track solo + traffic validation')
 
     const validation = shortlisted.map(candidate => {
-      const pairs = allCasesFor(candidate.car).map(({ scenario, seed, mode, playerCar, focusRole }) => {
-        const task = trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole)
+      const pairs = allCasesFor(candidate.car).map(({ scenario, seed, mode, playerCar, focusRole, opponentCar }) => {
+        const task = trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole, opponentCar)
         return [get(`base-${candidate.car}`, task), get(candidate.id, task)]
       })
       return { ...candidate, score: assessCandidate(pairs, {
@@ -153,17 +170,18 @@ if (args.help) {
         }
       })(),
     }))
-    const matrix = args.cars.flatMap(car => allCasesFor(car).map(({ scenario, seed, mode, playerCar, focusRole }) => {
-      const task = trial(car, scenario, seed, mode, { id: `base-${car}`, changes: {} }, playerCar, focusRole)
+    const matrix = args.cars.flatMap(car => allCasesFor(car).map(({ scenario, seed, mode, playerCar, focusRole, opponentCar }) => {
+      const task = trial(car, scenario, seed, mode, { id: `base-${car}`, changes: {} }, playerCar, focusRole, opponentCar)
       const run = get(`base-${car}`, task)
       const driver = run.rows.find(row => row.vehicle_id === run.focusVehicleId)
       if (!driver) throw new Error('Missing baseline driver row')
-      return { car, playerCar, focusRole, scenarioId: scenario.id, seed, mode,
+      return { car, playerCar, focusRole, opponentCar: opponentCar ?? null,
+        scenarioId: scenario.id, seed, mode,
         seconds: driver.finished_seconds, recoveries: driver.recoveries }
     }))
     const result = {
       schemaVersion: 1,
-      physicsRevision, cars: args.cars, seeds: args.seeds,
+      physicsRevision, focus: args.focus, cars: args.cars, seeds: args.seeds,
       workers: args.workers, trialsPerCar: args.trials,
       scenarios, baselineMatrix: matrix, candidates: reports,
       recommendation: best ? {
