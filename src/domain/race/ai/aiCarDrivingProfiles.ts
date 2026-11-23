@@ -21,8 +21,6 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
-  /** Speed above the planned corner target tolerated before applying brakes, when stable. */
-  readonly hardBrakeOverspeedTolerance?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -50,10 +48,10 @@ export const CAR_DRIVING_PROFILES = {
   // stay on line with a small Hard apex speed reserve.
   green: {
     hardReaction: 12,
-    hardSteerGain: 2.7,
+    hardSteerGain: 3,
     hardCornerReserve: 0.035,
-    hardLookAheadSamples: 8,
-    hardCornerTargetBonus: 0.3,
+    hardLookAheadSamples: 10,
+    hardCornerTargetBonus: 0.35,
     hardEdgeAvoidanceScale: 0.4,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
