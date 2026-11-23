@@ -58,7 +58,11 @@ describe('AI overtake decision policy', () => {
       { ahead: null, nearby: [wideGap] }, 'normal', 0.1)
     expect(rejoin.phase).toBe('rejoin')
     expect(rejoin.targetLane).toBe(0)
-    expect(rejoin.passElapsed).toBe(2)
+
+    const held = advancePassingState(ego, { ...passing, holdRemaining: 0.3 },
+      { ahead: null, nearby: [wideGap] }, 'normal', 0.1)
+    expect(held.phase).toBe('passing')
+    expect(held.targetLane).toBe(24)
 
     const stillClosing = advancePassingState(ego, passing,
       { ahead: null, nearby: [nearby] }, 'normal', 0.1)
