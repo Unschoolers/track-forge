@@ -37,12 +37,15 @@ function finishAt(time: number, recover = false): RaceStep {
     const finished = elapsed + 1e-8 >= time
     const player = state.vehicles.find((vehicle) => vehicle.player)
     if (!player) throw new Error('Missing player')
+    const recovering = recover && state.elapsed === 0
+    // Stub the same per-car clock contract as the real race engine.
+    const updated = recovering ? addRecoveryTimePenalty(player) : player
     return {
       state: { ...state, elapsed, phase: finished ? 'finished' : 'running',
-        vehicles: [{ ...player, x: player.x + (recover && state.elapsed === 0 ? 1000 : 1),
-          speed: 60, finishedAt: finished ? elapsed : null }] },
+        vehicles: [{ ...updated, x: player.x + (recovering ? 1000 : 1),
+          speed: 60, finishedAt: finished ? elapsed + (updated.recoveryPenaltySeconds ?? 0) : null }] },
       events: [
-        ...(recover && state.elapsed === 0 ? [{ type: 'vehicle-recovered' as const,
+        ...(recovering ? [{ type: 'vehicle-recovered' as const,
           vehicleId: player.id, reason: 'water' as const,
           x: player.x, y: player.y, pathIndex: player.pathIndex }] : []),
         ...(finished ? [{ type: 'race-finished' as const, reason: 'finished' as const }] : []),
