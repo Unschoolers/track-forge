@@ -1,0 +1,85 @@
+/**
+ * Stable tabular diagnostics for offline AI optimization.
+ * Dataset contract v1: one row per vehicle/trial, zero or more issue/telemetry rows.
+ * No game runtime dependency and no requirement to install DuckDB.
+ */
+export const DIAGNOSTIC_SCHEMA_VERSION = 1
+
+function validNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+function requiredString(value, field) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`Invalid ${field}`)
+  return value
+}
+function runId(meta) {
+  return [meta.candidateId, meta.scenarioId, meta.seed, meta.difficulty,
+    meta.mode, meta.driverCar, meta.tunedCar ?? meta.driverCar,
+    meta.focusRole ?? 'player'].join(':')
+}
+
+/**
+ * Project a genuine lane simulation into bounded, analysis-friendly rows.
+ * Invalid input MUST surface as an error; never silently omit bad samples.
+ */
+export function projectTrial(run, meta, { telemetry = false } = {}) {
+  requiredString(meta.candidateId, 'candidateId')
+  requiredString(meta.scenarioId, 'scenarioId')
+  requiredString(meta.driverCar, 'driverCar')
+  requiredString(meta.trackFingerprint, 'trackFingerprint')
+  if (!Number.isInteger(meta.seed) || meta.seed < 0 ||
+    !validNumber(meta.startRatio) || !validNumber(run.simulatedSeconds))
+    throw new Error('Invalid trial seed, start ratio or duration')
+  const id = runId(meta)
+  const base = {
+    schema_version: DIAGNOSTIC_SCHEMA_VERSION,
+    trial_id: id,
+    candidate_id: meta.candidateId,
+    scenario_id: meta.scenarioId,
+    track_fingerprint: meta.trackFingerprint,
+    driver_car: meta.driverCar,
+    tuned_car: meta.tunedCar ?? meta.driverCar,
+    focus_role: meta.focusRole ?? 'player',
+    grid_positions: meta.gridPositions ?? null,
+    difficulty: meta.difficulty,
+    mode: meta.mode,
+    seed: meta.seed,
+    start_ratio: meta.startRatio,
+    reversed: run.reversed,
+    laps_requested: run.laps,
+    physics_revision: meta.physicsRevision ?? 'unknown',
+  }
+  const rows = run.vehicles.map(vehicle => {
+    if (vehicle.finishedAt !== null && !validNumber(vehicle.finishedAt))
+      throw new Error(`Invalid finish time for ${vehicle.vehicleId}`)
+    if (!Number.isInteger(vehicle.recoveries) || vehicle.recoveries < 0 ||
+      !validNumber(vehicle.offRoadSeconds) || !validNumber(vehicle.maxLaneError))
+      throw new Error(`Invalid vehicle metrics for ${vehicle.vehicleId}`)
+    return {
+      ...base, vehicle_id: vehicle.vehicleId, car_type: vehicle.car,
+      finished_seconds: vehicle.finishedAt,
+      laps_completed: vehicle.laps, recoveries: vehicle.recoveries,
+      offroad_seconds: vehicle.offRoadSeconds, max_lane_error: vehicle.maxLaneError,
+      stopped_reason: run.stoppedReason,
+    }
+  })
+  const events = run.issues.map(issue => ({
+    ...base,
+    vehicle_id: issue.vehicleId, event_time: issue.time, code: issue.code,
+    severity: issue.severity, path_index: issue.pathIndex,
+    section_id: issue.sectionId, detail: issue.detail,
+  }))
+  const samples = telemetry ? run.samples.map(sample => ({
+    ...base, vehicle_id: sample.vehicleId, car_type: sample.car,
+    time: sample.time, path_index: sample.pathIndex,
+    section_id: sample.sectionId, speed: sample.speed,
+    lane: sample.lane, target_lane: sample.targetLane,
+    on_road: sample.onRoad, grounded: sample.grounded,
+    ai_phase: sample.phase,
+  })) : []
+  return { rows, events, samples }
+}
+
+export function jsonLines(rows) {
+  return rows.map(row => JSON.stringify(row)).join('\n') + (rows.length ? '\n' : '')
+}
