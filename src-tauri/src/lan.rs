@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::{json, Value};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     io::{BufRead, BufReader, Read, Write},
     net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpListener, TcpStream, UdpSocket},
     sync::{
@@ -21,6 +21,26 @@ const EVENT: &str = "trackforge-lan";
 const MAX_PAYLOAD: usize = 16_003;
 const MAX_FRAME: u64 = 24_000;
 const MAX_GUESTS: usize = 7;
+const TRACE_LIMIT: usize = 64;
+type HandshakeTrace = Arc<Mutex<VecDeque<String>>>;
+
+fn trace(events: &HandshakeTrace, event: String) {
+    if let Ok(mut events) = events.lock() {
+        if events.len() >= TRACE_LIMIT { events.pop_front(); }
+        events.push_back(event);
+    }
+}
+
+fn socket_reason(error: &std::io::Error) -> String {
+    format!("socket_{:?}_{}", error.kind(), error.raw_os_error().unwrap_or(0))
+}
+
+fn configure_peer_stream(stream: &TcpStream) -> std::io::Result<()> {
+    // Accepted Windows sockets may inherit the nonblocking listener mode.
+    // The dedicated reader expects blocking reads, not WouldBlock polling.
+    stream.set_nonblocking(false)?;
+    stream.set_nodelay(true)
+}
 
 #[derive(Default)]
 pub struct LanManager {
@@ -37,6 +57,7 @@ struct LanState {
     discovered: HashMap<String, String>,
     next_peer: u64,
     mode: &'static str,
+    handshake: HandshakeTrace,
 }
 
 struct Peer {
@@ -44,6 +65,8 @@ struct Peer {
     accepted_here: AtomicBool,
     accepted_there: AtomicBool,
     connected: AtomicBool,
+    connected_notified: AtomicBool,
+    handshake: HandshakeTrace,
 }
 
 fn lock<'a, T>(mutex: &'a Mutex<T>) -> Result<MutexGuard<'a, T>, String> {
@@ -61,37 +84,48 @@ fn notify(app: &AppHandle, event_type: &str, id: &str, extra: Option<(&str, Stri
 }
 
 fn write_frame(peer: &Peer, frame: Value) -> Result<(), String> {
+    let kind = frame.get("t").and_then(Value::as_str).unwrap_or("unknown");
     let mut line = serde_json::to_vec(&frame).map_err(|e| e.to_string())?;
     if line.len() + 1 > MAX_FRAME as usize {
         return Err("LAN frame exceeds limit".into());
     }
     line.push(b'\n');
     let mut writer = lock(&peer.writer)?;
-    writer.write_all(&line).map_err(|e| format!("LAN send failed: {e}"))
+    let result = writer.write_all(&line);
+    if kind == "pair" || kind == "reject" {
+        trace(&peer.handshake, match &result {
+            Ok(()) => format!("sent_{kind}"),
+            Err(error) => format!("send_{kind}_{}", socket_reason(error)),
+        });
+    }
+    result.map_err(|e| format!("LAN send failed: {e}"))
 }
 
 
-/** Mark local acceptance while holding the TCP send lock. A remote ACCEPT
- * may arrive immediately, triggering game packets from another thread.
- * Those packets must never overtake our outbound ACCEPT frame.
- */
+/** Publish local acceptance only after the frame has been written. */
 fn write_accept_frame(peer: &Peer) -> Result<(), String> {
     let mut writer = lock(&peer.writer)?;
-    peer.accepted_here.store(true, Ordering::SeqCst);
     if let Err(error) = writer.write_all(b"{\"t\":\"accept\"}\n") {
-        peer.accepted_here.store(false, Ordering::SeqCst);
+        trace(&peer.handshake, format!("send_accept_{}", socket_reason(&error)));
         let _ = writer.shutdown(Shutdown::Both);
         return Err(format!("LAN pairing accept failed: {error}"));
     }
+    peer.accepted_here.store(true, Ordering::SeqCst);
+    trace(&peer.handshake, "sent_accept".into());
     Ok(())
 }
 
 fn mark_connected(app: &AppHandle, peer: &Peer, id: &str) {
+    // A remote DATA may arrive immediately after our ACCEPT reaches the wire.
+    // Wait for the write and publish the connected event before delivering DATA.
+    let Ok(_writer) = peer.writer.lock() else { return };
     if peer.accepted_here.load(Ordering::SeqCst)
         && peer.accepted_there.load(Ordering::SeqCst)
         && !peer.connected.swap(true, Ordering::SeqCst)
     {
+        trace(&peer.handshake, "connected".into());
         notify(app, "connected", id, None);
+        peer.connected_notified.store(true, Ordering::SeqCst);
     }
 }
 
@@ -104,32 +138,44 @@ fn read_peer(
     stream: TcpStream,
 ) {
     let mut reader = BufReader::new(stream);
-    loop {
+    let reason = loop {
         let mut bytes = Vec::new();
-        let result = (&mut reader).take(MAX_FRAME + 1).read_until(b'\n', &mut bytes);
-        if !matches!(result, Ok(n) if n > 0 && n <= MAX_FRAME as usize && bytes.last() == Some(&b'\n')) {
-            break;
+        match (&mut reader).take(MAX_FRAME + 1).read_until(b'\n', &mut bytes) {
+            Ok(0) => break "remote_eof".to_owned(),
+            Ok(n) if n <= MAX_FRAME as usize && bytes.last() == Some(&b'\n') => {}
+            Ok(_) => break "invalid_frame_length".to_owned(),
+            Err(error) => break socket_reason(&error),
         }
         let frame: Value = match serde_json::from_slice(&bytes[..bytes.len() - 1]) {
             Ok(v) => v,
-            Err(_) => break,
+            Err(_) => break "invalid_json".to_owned(),
         };
         match frame.get("t").and_then(Value::as_str) {
-            Some("pair") => notify(&app, "pairing", &id, None),
+            Some("pair") => {
+                trace(&peer.handshake, "received_pair".into());
+                notify(&app, "pairing", &id, None);
+            }
             Some("accept") => {
+                trace(&peer.handshake, "received_accept".into());
                 peer.accepted_there.store(true, Ordering::SeqCst);
                 mark_connected(&app, &peer, &id);
             }
-            Some("reject") => break,
-            Some("data") if peer.connected.load(Ordering::SeqCst) => {
-                let Some(encoded) = frame.get("d").and_then(Value::as_str) else { break };
-                let Ok(raw) = STANDARD.decode(encoded) else { break };
-                if raw.is_empty() || raw.len() > MAX_PAYLOAD { break; }
+            Some("reject") => break "remote_reject".to_owned(),
+            Some("data") => {
+                if !peer.connected_notified.load(Ordering::SeqCst) {
+                    mark_connected(&app, &peer, &id);
+                }
+                if !peer.connected.load(Ordering::SeqCst) { break "data_before_pairing".to_owned(); }
+                let Some(encoded) = frame.get("d").and_then(Value::as_str) else { break "missing_data".to_owned() };
+                let Ok(raw) = STANDARD.decode(encoded) else { break "invalid_base64".to_owned() };
+                if raw.is_empty() || raw.len() > MAX_PAYLOAD { break "invalid_data_length".to_owned(); }
                 notify(&app, "packet", &id, Some(("data", encoded.to_owned())));
             }
-            _ => break,
+            _ => break "unsupported_frame".to_owned(),
         }
-    }
+    };
+    trace(&peer.handshake, format!("disconnected_{reason}"));
+    if let Ok(writer) = peer.writer.lock() { let _ = writer.shutdown(Shutdown::Both); }
     let removed = if let Ok(mut guard) = state.lock() {
         if guard.generation != generation { false } else {
             let matching = guard.peers.get(&id).is_some_and(|current| Arc::ptr_eq(current, &peer));
@@ -140,7 +186,7 @@ fn read_peer(
         false
     };
     if removed {
-        notify(&app, "disconnected", &id, None);
+        notify(&app, "disconnected", &id, Some(("reason", reason)));
     }
 }
 
@@ -152,13 +198,16 @@ fn add_peer(
     stream: TcpStream,
     hosting: bool,
 ) -> Result<(), String> {
-    stream.set_nodelay(true).map_err(|e| e.to_string())?;
+    configure_peer_stream(&stream).map_err(|e| e.to_string())?;
+    let handshake = Arc::clone(&lock(&state)?.handshake);
     let writer = stream.try_clone().map_err(|e| e.to_string())?;
     let peer = Arc::new(Peer {
         writer: Mutex::new(writer),
         accepted_here: AtomicBool::new(false),
         accepted_there: AtomicBool::new(false),
         connected: AtomicBool::new(false),
+        connected_notified: AtomicBool::new(false),
+        handshake,
     });
     {
         let mut guard = lock(&state)?;
@@ -191,6 +240,7 @@ fn stop_inner(manager: &LanManager) -> Result<(), String> {
         guard.cancelled.store(true, Ordering::SeqCst);
         guard.locked.store(true, Ordering::SeqCst);
         for peer in guard.peers.values() {
+            trace(&peer.handshake, "local_stop".into());
             if let Ok(writer) = peer.writer.lock() {
                 let _ = writer.shutdown(Shutdown::Both);
             }
@@ -210,6 +260,7 @@ fn begin(manager: &LanManager, mode: &'static str) -> Result<(u64, Arc<AtomicBoo
     stop_inner(manager)?;
     let mut guard = lock(&manager.state)?;
     guard.mode = mode;
+    guard.handshake = Arc::new(Mutex::new(VecDeque::new()));
     guard.cancelled = Arc::new(AtomicBool::new(false));
     guard.locked = Arc::new(AtomicBool::new(false));
     Ok((guard.generation, Arc::clone(&guard.cancelled)))
@@ -485,7 +536,8 @@ pub fn lan_stop(manager: State<'_, LanManager>) -> Result<(), String> {
 #[tauri::command]
 pub fn lan_diagnostics(manager: State<'_, LanManager>) -> Result<Value, String> {
     let guard = lock(&manager.state)?;
-    Ok(json!({"transport":"tcp-lan","mode":guard.mode,"connected":guard.peers.values()
+    let handshake: Vec<_> = lock(&guard.handshake)?.iter().cloned().collect();
+    Ok(json!({"transport":"tcp-lan","handshake":handshake,"mode":guard.mode,"connected":guard.peers.values()
         .filter(|p| p.connected.load(Ordering::SeqCst)).count(),"discovered":guard.discovered.len()}))
 }
 
@@ -493,7 +545,24 @@ pub fn lan_diagnostics(manager: State<'_, LanManager>) -> Result<Value, String> 
 mod pairing_order_tests {
     use super::*;
     #[test]
-    fn sends_accept_only_after_marking_local_side_accepted() {
+    fn peer_reader_blocks_until_handshake_frame_arrives() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut sender = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (receiver, _) = listener.accept().unwrap();
+        receiver.set_nonblocking(true).unwrap();
+        configure_peer_stream(&receiver).unwrap();
+        receiver.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        let worker = thread::spawn(move || {
+            let mut line = String::new();
+            BufReader::new(receiver).read_line(&mut line).unwrap();
+            line
+        });
+        thread::sleep(Duration::from_millis(30));
+        sender.write_all(b"{\"t\":\"pair\"}\n").unwrap();
+        assert_eq!(worker.join().unwrap(), "{\"t\":\"pair\"}\n");
+    }
+    #[test]
+    fn marks_local_acceptance_after_sending_frame() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let sender = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         let (receiver, _) = listener.accept().unwrap();
@@ -502,6 +571,8 @@ mod pairing_order_tests {
             accepted_here: AtomicBool::new(false),
             accepted_there: AtomicBool::new(true),
             connected: AtomicBool::new(false),
+            connected_notified: AtomicBool::new(false),
+            handshake: Default::default(),
         };
         write_accept_frame(&peer).unwrap();
         assert!(peer.accepted_here.load(Ordering::SeqCst));

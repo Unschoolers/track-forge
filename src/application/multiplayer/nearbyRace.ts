@@ -17,7 +17,8 @@ import { decodeControl, encodeControl, validLineupPositions, MAX_PLAYERS, NEARBY
 
 export type NearbyEvent =
   | { type: 'found'; id: string; name: string }
-  | { type: 'lost' | 'connected' | 'disconnected'; id: string }
+  | { type: 'lost' | 'connected'; id: string }
+  | { type: 'disconnected'; id: string; reason?: string }
   | { type: 'pairing'; id: string }
   | { type: 'packet'; id: string; bytes: Uint8Array<ArrayBuffer> }
   | { type: 'error'; message: string; id?: string }
@@ -550,14 +551,14 @@ export class NearbyRace {
             // per-peer failure, not a reason to close the host's entire room.
             if (this.role === 'host' && !this.pendingPairs.has(event.id)) {
               this.record('pairing_peer_left', { stage: 'before_accept' })
-              return
+              return 'skipped'
             }
             try {
               await this.transport.respond(event.id, true)
             } catch (error: unknown) {
               if (this.role === 'host' && !this.pendingPairs.has(event.id)) {
                 this.record('pairing_peer_left', { stage: 'during_accept', error: this.errorKind(error) })
-                return
+                return 'failed'
               }
               throw error
             }
@@ -584,7 +585,10 @@ export class NearbyRace {
           this.changed()
         }
         break
-      case 'disconnected': this.disconnected(event.id); break
+      case 'disconnected':
+        if (event.reason) this.record('native_disconnect', { reason: event.reason })
+        this.disconnected(event.id)
+        break
       case 'packet': this.receive(event.id, event.bytes); break
       case 'error':
         if (event.id && event.id !== this.hostId) {
@@ -862,14 +866,14 @@ export class NearbyRace {
     return ++this.generation
   }
 
-  private perform(operation: string, action: () => Promise<void>, active: number, complete?: () => void): void {
+  private perform(operation: string, action: () => Promise<void | 'skipped' | 'failed'>, active: number, complete?: () => void): void {
     this.busy = this.busy.then(async () => {
       if (active !== this.generation) return
       this.record('operation', { operation, result: 'started' })
-      await action()
+      const outcome = await action()
       if (active === this.generation) {
-        this.record('operation', { operation, result: 'succeeded' })
-        complete?.()
+        this.record('operation', { operation, result: outcome ?? 'succeeded' })
+        if (!outcome) complete?.()
       }
     }).catch((error: unknown) => {
       if (active === this.generation) {

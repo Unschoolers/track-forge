@@ -6,6 +6,7 @@ interface LanNativeEvent {
   id: string
   name?: string
   message?: string
+  reason?: string
   data?: string
 }
 
@@ -58,8 +59,14 @@ function parseEvent(value: unknown): NearbyEvent {
   if (event.type === 'found' && typeof event.name === 'string') {
     return { type: 'found', id: event.id, name: event.name }
   }
+  if (event.type === 'disconnected') {
+    // Native reasons are bounded codes, never arbitrary socket messages or endpoint IDs.
+    const reason = event.reason
+    const known = typeof reason === 'string' && /^(remote_eof|remote_reject|invalid_frame_length|invalid_json|data_before_pairing|missing_data|invalid_base64|invalid_data_length|unsupported_frame|[A-Za-z]+Exception|socket_[A-Za-z]+_-?\d{1,10})$/.test(reason)
+    return known ? { type: 'disconnected', id: event.id, reason } : { type: 'disconnected', id: event.id }
+  }
   if (event.type === 'lost' || event.type === 'pairing' ||
-      event.type === 'connected' || event.type === 'disconnected') {
+      event.type === 'connected') {
     return { type: event.type, id: event.id }
   }
   return { type: 'error', id: event.id, message: event.message ?? 'Unexpected LAN transport event' }
