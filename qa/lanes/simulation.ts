@@ -11,6 +11,7 @@ import { validNearbyGridPositions } from '@/domain/race/startGrid'
 import { stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import {
 	LaneMonitor,
 	sampleLaneVehicle,
@@ -28,6 +29,8 @@ export interface LaneRunOptions {
 	readonly startRatio?: number
 	/** Match exported race starting slots for reproducible traffic diagnostics. */
 	readonly gridPositions?: readonly number[]
+	/** Simulation-only, race-local AI driving profiles (no shared mutation). */
+	readonly aiProfileOverrides?: Readonly<Partial<Record<CarId, CarDrivingProfile>>>
 	readonly seconds: number
 	readonly laps: number
 	readonly mode: 'solo' | 'traffic'
@@ -116,6 +119,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	})
 	let race: RaceState = {
 		...created,
+		...(options.aiProfileOverrides ? { aiProfileOverrides: options.aiProfileOverrides } : {}),
 		phase: 'running',
 		countdown: 0,
 		vehicles: created.vehicles
