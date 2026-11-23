@@ -68,6 +68,7 @@ function measure(car: CarId, scenarioIndex: number, mode: 'solo' | 'duel' | 'tra
       duelOpponentSpeedLimit: 220,
     } : {}),
     ...(old ? {
+      aiAiTrafficMode: 'legacy',
       aiPassingPolicyOverrides: { [car]: oldPassing },
       aiProfileOverrides: { [car]: oldDriving },
     } : {}),
