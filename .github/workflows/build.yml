@@ -165,6 +165,8 @@ jobs:
           artifact-ids: ${{ needs.web-build.outputs.web_artifact_id }}
           path: dist
           merge-multiple: true
+      - name: Test Windows LAN handshake and native contracts
+        run: cargo test --manifest-path src-tauri/Cargo.toml --release --bin trackforge
       - name: Compile portable Windows application with embedded game assets
         run: cargo build --manifest-path src-tauri/Cargo.toml --release
       - name: Validate and stage standalone Windows executable
