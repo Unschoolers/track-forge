@@ -191,21 +191,9 @@ export function stepAiVehicle(
   const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
     ? slipAngle * (arcade && !vehicle.racingLine ? corner.sideslipGain : SIDESLIP_CORRECTION_GAIN)
     : 0
-  // Track the rotation the *road* calls for instead of damping all yaw.
-  // A neutral yaw damper slows legitimate turn-in and makes the AI rely on
-  // full braking to follow a bend. Curvature feed-forward lets the tires
-  // initiate the turn while body-slip correction still controls real drifts.
-  // The edge reserve withdraws feed-forward when recovering a wide line.
-  const roadYaw = arcade && !vehicle.racingLine && context.onRoad
-    ? clamp(vehicle.speed * turnAmountAt(path,
-        context.nearest.index + direction * 6, 6) * direction / 72, -1.8, 1.8)
-    : 0
-  const roadYawReserve = clamp(
-    (ROAD_GEOMETRY.onRoadRadius * 0.75 - context.nearest.distance) /
-      (ROAD_GEOMETRY.onRoadRadius * 0.45), 0, 1)
   const desiredSteer = clamp(
     wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
-      (vehicle.yawRate - roadYaw * roadYawReserve * 0.65) * 0.38,
+      vehicle.yawRate * 0.38,
     -1,
     1,
   )
@@ -278,7 +266,13 @@ export function stepAiVehicle(
       ? 7 : 3
   const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
   const curveOverspeed = vehicle.speed - curveSpeed
-  const curveBraking = curveOverspeed > curveBrakeThreshold
+  const stableExit = arcade && !vehicle.racingLine && context.onRoad &&
+    context.surface === 'street' && corner.phase === 'exit' &&
+    !corner.reversal && Math.abs(slipAngle) < 0.08 &&
+    Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.32 &&
+    Math.abs(lateralVelocity) < 30
+  const curveBraking = curveOverspeed > curveBrakeThreshold &&
+    !(stableExit && curveOverspeed < 9)
   // The former all-or-nothing AI brake rapidly toggled full force in bends,
   // spending lateral tire grip on tiny speed corrections. Modulate pressure
   // by the actual overspeed; reserve full brakes for sharp approaches,
@@ -295,8 +289,12 @@ export function stepAiVehicle(
     Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.5 && !curveBraking
   // A car still sliding toward the outside must complete its rotation
   // before applying exit power. In a clean line traction remains at 1.
+  // Release the brake sooner on a settled corner exit so the engine can
+  // rebuild speed. Do not power through uncontrolled slip, a sharp reversal
+  // or a car already being carried toward the road edge.
+  const exitPower = stableExit && !curveBraking && curveOverspeed < 9 ? 0.42 : 0
   const plannedThrottle = (settledSlide
-    ? Math.max(curveThrottle, corner.exitThrottle)
+    ? Math.max(curveThrottle, corner.exitThrottle, exitPower)
     : curveThrottle) * (arcade && !vehicle.racingLine ? corner.exitTraction : 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && plannedThrottle === 1 &&
