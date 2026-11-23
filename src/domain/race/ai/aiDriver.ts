@@ -143,25 +143,19 @@ export function stepAiVehicle(
       edgeRisk = clamp((projectedEdge - 18) / (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
     }
   }
-  let bend = 0
-  for (const sample of BEND_LOOKAHEAD) {
-    bend = Math.max(bend, Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6)))
-  }
-  // A long pursuit chord across a tight switchback can skip the asphalt
-  // altogether. Aim at the bend before it becomes a shortcut through the verge.
-  // Authored racing lines retain their intentional pursuit geometry.
-  const cornerLookaheadLimit = arcade && !vehicle.racingLine && bend >= 0.1
-    ? clamp(Math.round(20 - bend * 45), 7, 20)
-    : Number.POSITIVE_INFINITY
-  const pursuitSamples = Math.max(1, Math.min(cornerLookaheadLimit, Math.round(
+  const pursuitSamples = Math.max(1, Math.round(
     (lookAheadSamples + extraSamples) * (1 - 0.5 * edgeRisk),
-  )))
+  ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
     ? ((rawTargetIndex % path.points.length) + path.points.length) % path.points.length
     : clamp(rawTargetIndex, 0, path.points.length - 1)
   const target = path.points[targetIndex]
   if (!target) return { ...vehicle, ai }
+  let bend = 0
+  for (const sample of BEND_LOOKAHEAD) {
+    bend = Math.max(bend, Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6)))
+  }
   // A wide passing line can point the car across the return arm of a
   // hairpin. Ease toward the center on approach if the space is clear.
   const lane = ai.targetLane + ai.mistakeOffset
@@ -172,20 +166,8 @@ export function stepAiVehicle(
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
-  // A lane offset belongs to the pursued road section, not our current section.
-  // Reusing the current normal on a bend puts the target outside its own road,
-  // provoking identical off-road recoveries on every lap of curved tracks.
-  const targetPrevious = path.points[path.closed
-    ? (targetIndex - 3 + path.points.length) % path.points.length
-    : Math.max(0, targetIndex - 3)] ?? target
-  const targetNext = path.points[path.closed
-    ? (targetIndex + 3) % path.points.length
-    : Math.min(path.points.length - 1, targetIndex + 3)] ?? target
-  const tx = targetNext.x - targetPrevious.x
-  const ty = targetNext.y - targetPrevious.y
-  const normalLength = Math.max(0.001, Math.hypot(tx, ty))
-  const targetX = target.x - ty / normalLength * pursuitLane
-  const targetY = target.y + tx / normalLength * pursuitLane
+  const targetX = target.x + context.normal.x * pursuitLane
+  const targetY = target.y + context.normal.y * pursuitLane
   const desiredAngle = !path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)
