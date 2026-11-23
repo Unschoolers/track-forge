@@ -170,6 +170,18 @@ describe('AI #257 calibration sweep', () => {
       ['lookahead+2', { lookAhead: 2 }],
       ['pace-1.52-safety-0.42', { pace: 1.52, cornerSafety: 0.42 }],
       ['gain-2.22-safety-0.42', { steerGain: 2.22, cornerSafety: 0.42 }],
+      ['gain-2.42-lookahead+1', { steerGain: 2.42, lookAhead: -1 }],
+      ['gain-2.42-lookahead+2', { steerGain: 2.42, lookAhead: 0 }],
+      ['gain-2.42-lookahead+3', { steerGain: 2.42, lookAhead: 1 }],
+      ['gain-2.42-pace1.52', { steerGain: 2.42, pace: 1.52 }],
+      ['gain-2.42-pace1.62', { steerGain: 2.42, pace: 1.62 }],
+      ['gain-2.22-lookahead+1', { steerGain: 2.22, lookAhead: -1 }],
+      ['gain-2.22-pace1.52', { steerGain: 2.22, pace: 1.52 }],
+      ['lookahead+1', { lookAhead: -1 }],
+      ['lookahead+3', { lookAhead: 1 }],
+      ['lookahead+4', { lookAhead: 2 }],
+      ['pace1.52-lookahead+1', { pace: 1.52, lookAhead: -1 }],
+      ['pace1.52-lookahead+2', { pace: 1.52, lookAhead: 0 }],
     ]
     const observations: unknown[] = []
     try {
