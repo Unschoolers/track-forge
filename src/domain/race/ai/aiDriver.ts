@@ -19,7 +19,7 @@ import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/diffi
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
-import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
+import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
 const {
@@ -94,7 +94,7 @@ export function stepAiVehicle(
   const car = CAR_SPECS[vehicle.car]
   // Each physical chassis needs its own Hard cornering technique.
   // Tuning steering *decisions* never alters the car's actual tire forces.
-  const hardProfile = CAR_DRIVING_PROFILES[vehicle.car]
+  const hardProfile: CarDrivingProfile = CAR_DRIVING_PROFILES[vehicle.car]
   const tuning = handling === 'arcade' && !vehicle.racingLine
     ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
         reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
