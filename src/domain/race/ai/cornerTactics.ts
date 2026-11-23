@@ -9,6 +9,8 @@ export interface CornerTactics {
   readonly bend: number
   /** Turn sign along the selected travel direction, not the authored direction. */
   readonly turnSign: number
+  /** Next bend reverses the current rotation before the chassis has settled. */
+  readonly reversal: boolean
   /** Small early turn-in correction, never a replacement for lane following. */
   readonly headingLead: number
   readonly pursuitScale: number
@@ -60,19 +62,28 @@ export function planCornerTactics(
     : approaching ? 'approach'
     : exiting ? 'exit'
     : Math.abs(near) > 0.029 ? 'turn' : 'straight'
-  const sign = Math.sign(approaching ? peakNext : near)
+  const reversal = near * peakNext < 0 &&
+    Math.abs(near) > 0.025 && Math.abs(peakNext) > 0.08
+  const sign = Math.sign(reversal || approaching ? peakNext : exiting ? past : near)
   const edge = clamp((Math.abs(roadOffset) - roadRadius * 0.55) / (roadRadius * 0.25), 0, 1)
   // A small feed-forward yaw starts the rotation before the apex. Back out
   // near the edge: arriving too wide calls for recovering the road instead.
-  const headingLead = phase === 'approach'
-    ? sign * Math.min(0.13, bend * 0.23) * (1 - edge)
+  // Chicanes require steering into the *next* direction while the current
+  // corner is still unwinding. A simple pursuit chord reacts too late for
+  // heavier chassis, especially at a quick right-to-left transition.
+  const approachLead = phase === 'approach'
+    ? sign * Math.min(0.13, bend * 0.23)
     : 0
+  const reversalLead = reversal
+    ? Math.sign(peakNext) * Math.min(0.15, Math.abs(peakNext) * 0.45)
+    : 0
+  const headingLead = clamp(approachLead + reversalLead, -0.22, 0.22) * (1 - edge)
   // Preserve a substantial pursuit horizon at speed; choking the target to
   // a handful of samples makes heavy cars oscillate rather than rotate.
   const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
     : phase === 'approach' && bend > 0.15 ? 0.96 : 1
   const drifting = Math.abs(slipAngle) > 0.075 &&
-    speed > 65 && (Math.abs(near) > 0.035 ||
+    speed > 65 && (bend > 0.045 ||
       (exiting && Math.abs(past) > 0.055)) &&
     Math.abs(roadOffset) < roadRadius * 0.75
   // Controlled countersteering limits spin without suppressing lateral slip.
@@ -87,10 +98,10 @@ export function planCornerTactics(
   // This leaves friction-circle tire physics untouched and avoids braking
   // while the wheels are needed for lateral recovery.
   const predictedOffset = roadOffset + lateralVelocity * 0.28
-  const exitTraction = (phase === 'turn' || phase === 'exit') && speed > 50
+  const exitTraction = (phase === 'turn' || phase === 'exit' || reversal) && speed > 50
     ? clamp((roadRadius * 0.85 - Math.abs(predictedOffset)) /
       (roadRadius * 0.45), 0, 1)
     : 1
-  return { phase, bend, turnSign: sign, headingLead, pursuitScale, drifting,
+  return { phase, bend, turnSign: sign, reversal, headingLead, pursuitScale, drifting,
     sideslipGain, exitThrottle, exitTraction }
 }
