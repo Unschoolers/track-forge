@@ -303,6 +303,15 @@ export function stepAiVehicle(
   const cornerReserve = clamp(gripDeficit * bend / 0.09, 0, 0.17) *
     (1 - serviceBrakeRelease)
   curveSpeed *= 1 - cornerReserve
+  // A strong driver can *request* a more ambitious entry speed when their
+  // line is under control. This changes the target used by braking/throttle,
+  // never the tire forces, speed limit, off-road drag or recovery behavior.
+  // Back out when drifting outward; do not reward unstable or off-road lines.
+  if (difficulty === 'hard' && arcade && !vehicle.racingLine && context.onRoad) {
+    const controlled = (1 - edgeRisk) *
+      (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))
+    curveSpeed *= 1 + (hardProfile.hardCornerTargetBonus ?? 0) * controlled
+  }
   // Braking during turn-in consumes the same tire-force budget that rotates
   // the chassis. Finish the heavy braking on approach, then release it
   // progressively through a stable pavement apex. Emergency/traffic braking
