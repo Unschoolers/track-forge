@@ -2,12 +2,9 @@
 import { readFileSync } from 'node:fs'
 import { expect, it, vi } from 'vitest'
 
-// Diagnostic sweep: same Blue physics, two very different corners/track shapes.
-// We must find one Hard policy that is quicker on Kids Room *and* Pine Hairpins.
-const probe = vi.hoisted(() => ({
-  reaction: null as number | null,
-  gain: null as number | null,
-}))
+// Diagnostic only: preview length changes the road point Blue *aims* at,
+// never vehicle grip, engine, brakes, checkpoint rules or race timing.
+const probe = vi.hoisted(() => ({ hardLookAheadSamples: null as number | null }))
 vi.mock('@/domain/race/ai/aiCarDrivingProfiles', async importOriginal => {
   const original = await importOriginal<typeof import('@/domain/race/ai/aiCarDrivingProfiles')>()
   return {
@@ -18,19 +15,17 @@ vi.mock('@/domain/race/ai/aiCarDrivingProfiles', async importOriginal => {
         if (key !== 'blue' || !profile) return profile
         return {
           ...profile,
-          hardReaction: probe.reaction ?? profile.hardReaction,
-          hardSteerGain: probe.gain ?? profile.hardSteerGain,
+          hardLookAheadSamples: probe.hardLookAheadSamples ?? profile.hardLookAheadSamples,
         }
       },
     }),
   }
 })
-
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 
-it('compares Hard Blue steering on Kids Room and Pine Hairpins', () => {
+it('compares Hard Blue preview on Kids Room and Pine Hairpins', () => {
   const [kidsRoom] = decodeTrackInput(JSON.parse(
     readFileSync('tests/fixtures/kidsRoomAi.trackforge.json', 'utf8'),
   ))
@@ -42,16 +37,11 @@ it('compares Hard Blue steering on Kids Room and Pine Hairpins', () => {
       startRatio: 0.21932299012693934 },
     { track: pine, seed: 11, laps: 1, seconds: 45, startRatio: 0 },
   ] as const
-  const variants = [
-    [8, 2.22], [8, 2.42], [8, 2.7], [8, 2.95], [8, 3.2],
-    [9, 2.7], [9, 2.95], [10, 2.42], [10, 2.7], [10, 2.95],
-    [12, 2.42], [12, 2.7], [12, 2.95], [12, 3.2], [14, 2.95],
-  ] as const
+  const previews = [-4, -2, 0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15] as const
   const matrix: Record<string, unknown> = {}
   try {
-    for (const [reaction, gain] of variants) {
-      probe.reaction = reaction
-      probe.gain = gain
+    for (const lookAhead of previews) {
+      probe.hardLookAheadSamples = lookAhead
       const record: Record<string, unknown> = {}
       for (const entry of paths) {
         const run = runLaneCheck({
@@ -66,12 +56,11 @@ it('compares Hard Blue steering on Kids Room and Pine Hairpins', () => {
           offRoadSeconds: run.vehicles[0]?.offRoadSeconds ?? null,
         }
       }
-      matrix[`${reaction}/${gain}`] = record
+      matrix[String(lookAhead)] = record
     }
   } finally {
-    probe.reaction = null
-    probe.gain = null
+    probe.hardLookAheadSamples = null
   }
-  console.log(`AI_BLUE_TWO_TRACK_STEERING_SWEEP ${JSON.stringify(matrix)}`)
-  expect(Object.keys(matrix)).toHaveLength(variants.length)
+  console.log(`AI_BLUE_TWO_TRACK_PREVIEW_SWEEP ${JSON.stringify(matrix)}`)
+  expect(Object.keys(matrix)).toHaveLength(previews.length)
 }, 180_000)
