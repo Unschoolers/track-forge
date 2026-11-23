@@ -28,7 +28,7 @@ diagnostic('simulates exported geometry with deterministic AI driving', () => {
     : undefined
   if (exportJson.format === 'trackforge-race-replay' &&
       options.startRatio === undefined &&
-      (!Number.isFinite(replayStart) || replayStart < 0 || replayStart >= 1)) {
+      (typeof replayStart !== 'number' || !Number.isFinite(replayStart) || replayStart < 0 || replayStart >= 1)) {
     throw new Error('Cannot derive start position from replay; provide --start')
   }
   const startRatio = options.startRatio ?? replayStart ?? track.start?.ratio ?? 0
