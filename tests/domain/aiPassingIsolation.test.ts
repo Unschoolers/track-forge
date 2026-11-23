@@ -63,6 +63,20 @@ describe('Independent passing policy contracts', () => {
     expect(first.steps).toBeGreaterThan(0)
   }, 30000)
 
+  it('creates an actual Yellow passing opportunity against a slower AI-controlled rival', () => {
+    const duel = runLaneCheck({
+      path, trackName: loaded.name,
+      car: 'yellow', difficulty: 'hard', handling: 'arcade',
+      mode: 'duel', duelOpponentCar: 'green', duelOpponentSpeedLimit: 220,
+      seed: 1, reversed: false, startRatio: 0.21932299012693934,
+      laps: 2, seconds: 140,
+    })
+    expect(duel.vehicles.map(v => v.car)).toEqual(['yellow', 'green'])
+    expect(duel.samples.some(sample =>
+      sample.car === 'yellow' && sample.phase === 'passing')).toBe(true)
+    expect(duel.vehicles.every(vehicle => vehicle.finishedAt !== null)).toBe(true)
+  }, 30000)
+
   it('allows a bounded moving opponent pace only inside a duel', () => {
     const base = {
       path, trackName: loaded.name, car: 'yellow' as const,
