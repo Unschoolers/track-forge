@@ -12,7 +12,7 @@
 
 ## Behavior and lifecycle
 
-The host accepts up to seven guests. A two-sided pairing handshake must complete before data traffic; rejection, malformed frames, disconnects, and race exit tear down the socket. `lock` stops admitting peers once a race starts, while established connections survive cup rounds and rematches. Android plugin registration is additive; Android Nearby is untouched. Tauri `io.trackforge.desktop` identity and browser storage persist without migration.
+The host accepts up to seven guests. A two-sided pairing handshake must complete before data traffic; rejection, malformed frames, disconnects, and race exit tear down the socket. `lock` stops admitting peers once a race starts, while established connections survive cup rounds and rematches. Android plugin registration is additive; Android Nearby is untouched. Android currently targets SDK 36, so Android 17's new local-network runtime permission is not required for this release. **When raising targetSdk to 37+, explicitly add and request ACCESS_LOCAL_NETWORK** or LAN discovery/TCP will be blocked. Native LAN code must remain compatible with minSdk 24. Tauri `io.trackforge.desktop` identity and browser storage persist without migration.
 
 Both native hosts bind all local IPv4 interfaces; their listening port is not exposed publicly by TrackForge. This transport is intended only for trusted local networks. Do **not** forward TCP port 47832 to the internet; authentication/encryption would be required for internet play.
 

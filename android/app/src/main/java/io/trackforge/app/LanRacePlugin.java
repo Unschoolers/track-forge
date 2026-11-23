@@ -117,7 +117,7 @@ public class LanRacePlugin extends Plugin {
                     buffer.write(ch);
                 }
                 if (ch == -1) break;
-                JSONObject packet = new JSONObject(buffer.toString(StandardCharsets.UTF_8));
+                JSONObject packet = new JSONObject(new String(buffer.toByteArray(), StandardCharsets.UTF_8));
                 String type = packet.optString("t", "");
                 switch (type) {
                     case "pair" -> emit("pairing", id, null, null);
@@ -188,7 +188,9 @@ public class LanRacePlugin extends Plugin {
         try {
             synchronized (gate) {
                 mode = "hosting";
-                server = new ServerSocket(RACE_PORT);
+                server = new ServerSocket();
+                server.setReuseAddress(true);
+                server.bind(new InetSocketAddress(RACE_PORT));
                 discovery = new DatagramSocket(DISCOVERY_PORT);
                 discovery.setSoTimeout(250);
                 session = generation;
