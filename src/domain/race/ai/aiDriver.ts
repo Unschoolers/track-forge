@@ -271,8 +271,16 @@ export function stepAiVehicle(
   // spending lateral tire grip on tiny speed corrections. Modulate pressure
   // by the actual overspeed; reserve full brakes for sharp approaches,
   // emergencies, and genuine off-road recovery. Tire physics is unchanged.
+  // Give a sweeping bend a longer settling horizon than a hairpin.
+  // The brake remains proportional to speed error, but hard turn-in and
+  // road-edge risk retain short-horizon braking and full available pressure.
+  const sharpness = clamp((bend - 0.07) / 0.17, 0, 1)
+  const edgeExposure = clamp(
+    (context.nearest.distance + Math.max(0, Math.sign(roadOffset) * lateralVelocity) * 0.18 - 18) /
+      (ROAD_GEOMETRY.onRoadRadius - 18), 0, 1)
+  const brakeHorizon = 32 - 14 * Math.max(sharpness, edgeExposure)
   const cornerBrakePressure = curveBraking
-    ? clamp((curveOverspeed - curveBrakeThreshold + 4) / 18, 0.22, 1)
+    ? clamp((curveOverspeed - curveBrakeThreshold + 4) / brakeHorizon, 0.17, 1)
     : 0
   // Ease off on approach so the tires can turn without repeated hard braking.
   const throttleWindow = fastCorners ? 5 : arcadePavement
