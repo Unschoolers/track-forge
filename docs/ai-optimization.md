@@ -173,9 +173,9 @@ because Green is inherently quicker. It is invalid to conclude from
 such a duel that Yellow has no passing problem: in the actual Figure-eight
 full-field simulation Yellow tried to pass six times, spending 24.8s
 in the passing state. Passing calibration now uses a **real independently
-AI-driven moving opponent** with `duelOpponentPace = 0.8`, rather
+AI-driven moving opponent** with `duelOpponentSpeedLimit = 220`, rather
 than a stationary obstacle or a rival which the car cannot catch.
-The pace override is legal only for a duel, is race-local, and is
+The speed-limit override is legal only for a duel, is race-local, and is
 recorded in comparison metadata and Parquet. Full-field traffic
 validation always uses real unmodified opponents.
 
