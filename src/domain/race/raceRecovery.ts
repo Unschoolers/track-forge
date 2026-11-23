@@ -1,4 +1,5 @@
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
+import { addRecoveryTimePenalty } from '@/domain/race/recoveryPenalty'
 import { authoredRecoveryTarget, lastRoadRecoveryTarget, missedGateRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
@@ -34,7 +35,7 @@ export function recoverRacePlayer(state: RaceState): RaceState {
   const recovered = resetRaceVehicle(player, state)
   if (recovered === player) return state
   const vehicles = [...state.vehicles]
-  vehicles[index] = recovered
+  vehicles[index] = addRecoveryTimePenalty(recovered)
   return {
     ...state,
     vehicles,
