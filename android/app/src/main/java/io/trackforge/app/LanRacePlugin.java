@@ -1,6 +1,9 @@
 package io.trackforge.app;
 
 import android.util.Base64;
+import android.content.Context;
+import android.net.wifi.WifiManager;
+import android.util.Log;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -12,6 +15,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -49,6 +56,7 @@ public class LanRacePlugin extends Plugin {
     private volatile boolean locked;
     private ServerSocket server;
     private DatagramSocket discovery;
+    private WifiManager.MulticastLock wifiDiscoveryLock;
 
     private static final class Peer {
         final Socket socket;
@@ -90,6 +98,64 @@ public class LanRacePlugin extends Plugin {
         emit("error", "", "message", message);
     }
 
+    /** Keep Android's Wi-Fi receiver awake for broadcast discovery while hosting only. */
+    private void acquireWifiDiscoveryLock() throws IOException {
+        WifiManager wifi = (WifiManager) getContext().getApplicationContext()
+                .getSystemService(Context.WIFI_SERVICE);
+        if (wifi == null) return; // e.g. wired-only device
+        try {
+            WifiManager.MulticastLock reception = wifi.createMulticastLock("TrackForgeLanDiscovery");
+            reception.setReferenceCounted(false);
+            reception.acquire();
+            wifiDiscoveryLock = reception;
+        } catch (SecurityException exception) {
+            throw new IOException("Cannot receive Wi-Fi discovery broadcasts: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static String localWifiIpv4() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                NetworkInterface candidate = interfaces.nextElement();
+                String name = candidate.getName();
+                if (!candidate.isUp() || candidate.isLoopback() ||
+                    !(name.startsWith("wlan") || name.startsWith("eth"))) continue;
+                Enumeration<InetAddress> addresses = candidate.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address && address.isSiteLocalAddress()) {
+                        return address.getHostAddress();
+                    }
+                }
+            }
+        } catch (SocketException error) {
+            Log.w("TrackForgeLan", "Could not determine local host address", error);
+        }
+        return null;
+    }
+
+    private static boolean validLanIp(String ip) {
+        if (ip == null || ip.length() > 15) return false;
+        String[] parts = ip.split("\\.", -1);
+        if (parts.length != 4) return false;
+        int[] octets = new int[4];
+        for (int index = 0; index < 4; index++) {
+            String part = parts[index];
+            if (part.isEmpty() || part.length() > 3 || (part.length() > 1 && part.charAt(0) == '0')) return false;
+            for (int i = 0; i < part.length(); i++) {
+                if (part.charAt(i) < '0' || part.charAt(i) > '9') return false;
+            }
+            try {
+                octets[index] = Integer.parseInt(part);
+                if (octets[index] > 255) return false;
+            } catch (NumberFormatException error) { return false; }
+        }
+        return octets[0] == 10 || octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31 ||
+            octets[0] == 192 && octets[1] == 168 ||
+            octets[0] == 169 && octets[1] == 254;
+    }
+
     private void stopInternal() {
         synchronized (gate) {
             generation++;
@@ -102,6 +168,10 @@ public class LanRacePlugin extends Plugin {
             for (Peer peer : peers.values()) peer.close();
             peers.clear();
             discovered.clear();
+            if (wifiDiscoveryLock != null) {
+                if (wifiDiscoveryLock.isHeld()) wifiDiscoveryLock.release();
+                wifiDiscoveryLock = null;
+            }
         }
     }
 
@@ -188,6 +258,7 @@ public class LanRacePlugin extends Plugin {
         try {
             synchronized (gate) {
                 mode = "hosting";
+                acquireWifiDiscoveryLock();
                 server = new ServerSocket();
                 server.setReuseAddress(true);
                 server.bind(new InetSocketAddress(RACE_PORT));
@@ -237,7 +308,10 @@ public class LanRacePlugin extends Plugin {
                 }
             }
         }, "lan-host-discovery").start();
-        call.resolve();
+        JSObject address = new JSObject();
+        String hostIp = localWifiIpv4();
+        if (hostIp != null) address.put("hostIp", hostIp);
+        call.resolve(address);
     }
 
     @PluginMethod
@@ -322,18 +396,43 @@ public class LanRacePlugin extends Plugin {
             }
             session = generation;
         }
+        String[] address = id.split(":", 2);
+        if (address.length != 2 || !String.valueOf(RACE_PORT).equals(address[1]) ||
+            !validLanIp(address[0])) {
+            call.reject("Invalid discovered LAN address");
+            return;
+        }
+        connectToHost(id, address[0], session, call);
+    }
+
+    @PluginMethod
+    public void connectDirect(PluginCall call) {
+        String ip = call.getString("ip", "");
+        if (!validLanIp(ip)) {
+            call.reject("Enter a private LAN IPv4 address.");
+            return;
+        }
+        final int session;
+        synchronized (gate) {
+            if (!"scanning".equals(mode)) {
+                call.reject("Start searching for LAN races first.");
+                return;
+            }
+            session = generation;
+        }
+        connectToHost(ip, ip, session, call);
+    }
+
+    private void connectToHost(String id, String ip, int session, PluginCall call) {
         new Thread(() -> {
             try {
-                String[] address = id.split(":", 2);
-                if (address.length != 2 || Integer.parseInt(address[1]) != RACE_PORT) {
-                    throw new IOException("Invalid LAN host address");
-                }
                 Socket socket = new Socket();
-                socket.connect(new InetSocketAddress(address[0], RACE_PORT), 3_000);
+                socket.connect(new InetSocketAddress(ip, RACE_PORT), 3_000);
                 if (addPeer(id, socket, session, false)) call.resolve();
                 else call.reject("LAN room closed");
-            } catch (IOException | NumberFormatException exception) {
-                call.reject("Cannot connect to LAN room: " + exception.getMessage());
+            } catch (IOException exception) {
+                call.reject("Cannot reach " + ip + ":" + RACE_PORT +
+                    ". Check Wi-Fi and the host firewall: " + exception.getMessage());
             }
         }, "lan-connect").start();
     }

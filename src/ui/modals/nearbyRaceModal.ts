@@ -20,7 +20,7 @@ export function createNearbyRaceModal(
   nearby: NearbyRace,
   car: CarId,
   actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
-    saveTrack: () => void; declineTrack: () => void;
+    saveTrack: () => void; declineTrack: () => void; connectByIp: (ip: string) => void;
     selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
   },
   identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
@@ -78,6 +78,12 @@ export function createNearbyRaceModal(
       frame.body.append(element('p', 'modal-subtitle', 'Opening nearby room…'))
       break
     case 'hosting': {
+      if (connections?.current() === 'lan') {
+        const ip = connections.hostAddress()
+        frame.body.append(element('p', 'modal-subtitle',
+          ip ? `JOIN BY IP · Host address: ${ip} · TCP 47832`
+            : 'Local Wi-Fi · Share this device’s Wi-Fi IPv4 address with your friends.'))
+      }
       frame.body.append(element('p', 'modal-subtitle',
         `${track} · ${purpose === 'share' ? 'Sharing with' : 'Players'} ${players - 1}/${purpose === 'share' ? 3 : MAX_PLAYERS - 1} nearby friends${cup ? ` · Cup 1/${cup.total}` : ''}`))
       if (purpose === 'share') {
@@ -103,10 +109,29 @@ export function createNearbyRaceModal(
       }
       break
     }
-    case 'scanning':
+    case 'scanning': {
       frame.body.append(element('p', 'modal-subtitle', rooms.length ? 'Choose a room to join.' : purpose === 'share' ? 'Looking for nearby track senders…' : 'Looking for races…'))
       for (const [id, name] of rooms) frame.body.append(button(name, `nearby-room-${id}`, () => nearby.connect(id), 'button'))
+      if (connections?.current() === 'lan') {
+        const section = element('section', 'setup-section')
+        section.append(element('h3', 'setup-label', 'CAN’T SEE THE HOST? JOIN BY IP'))
+        const hint = element('p', 'modal-subtitle', 'Enter the host device’s Wi-Fi IPv4 address. This bypasses automatic discovery. Windows Firewall must allow TrackForge on private networks.')
+        const form = element('form', 'name-form')
+        const input = element('input', 'name-input')
+        input.type = 'text'
+        input.inputMode = 'decimal'
+        input.autocomplete = 'off'
+        input.maxLength = 15
+        input.placeholder = '192.168.1.20'
+        input.setAttribute('aria-label', 'LAN host IPv4 address')
+        const join = button('JOIN BY IP', 'nearby-connect-ip', () => actions.connectByIp(input.value), 'button button-primary')
+        form.addEventListener('submit', event => { event.preventDefault(); actions.connectByIp(input.value) })
+        form.append(input, join)
+        section.append(hint, form)
+        frame.body.append(section)
+      }
       break
+    }
     case 'connecting':
       frame.body.append(element('p', 'modal-subtitle', 'Connecting…'))
       break

@@ -10,7 +10,8 @@ interface LanNativeEvent {
 }
 
 interface LanApi {
-  host(options: { name: string }): Promise<void>
+  host(options: { name: string }): Promise<{ hostIp?: string }>
+  connectDirect(options: { ip: string }): Promise<void>
   scan(): Promise<void>
   connect(options: { id: string }): Promise<void>
   respond(options: { id: string; accepted: boolean }): Promise<void>
@@ -67,6 +68,7 @@ function parseEvent(value: unknown): NearbyEvent {
 function androidTransport(): NearbyTransport | undefined {
   if (Capacitor.getPlatform() !== 'android' || !Capacitor.isPluginAvailable('TrackLan')) return undefined
   let subscription: Promise<PluginListenerHandle> | undefined
+  let hostIp: string | null = null
   return {
     subscribe(listener) {
       let active = true
@@ -80,13 +82,15 @@ function androidTransport(): NearbyTransport | undefined {
           console.error('Could not remove LAN event listener', error))
       }
     },
-    async host(name) { await subscription; await androidLan.host({ name }) },
-    async scan() { await subscription; await androidLan.scan() },
+    async host(name) { await subscription; hostIp = (await androidLan.host({ name })).hostIp ?? null },
+    async scan() { await subscription; hostIp = null; await androidLan.scan() },
     connect: id => androidLan.connect({ id }),
+    connectDirect: ip => androidLan.connectDirect({ ip }),
+    hostAddress: () => hostIp,
     respond: (id, accepted) => androidLan.respond({ id, accepted }),
     lock: () => androidLan.lock(),
     send: (ids, bytes) => androidLan.send({ ids, data: encode(bytes) }),
-    stop: () => androidLan.stop(),
+    async stop() { hostIp = null; await androidLan.stop() },
     diagnostics: () => androidLan.diagnostics(),
   }
 }
@@ -95,6 +99,7 @@ function windowsTransport(): NearbyTransport | undefined {
   const api = (window as Window & { __TAURI__?: TauriGlobal }).__TAURI__
   if (!api?.core?.invoke || !api.event?.listen) return undefined
   let subscription: Promise<() => void> | undefined
+  let hostIp: string | null = null
   const invoke = <T>(command: string, args?: Record<string, unknown>) => api.core.invoke<T>(command, args)
   return {
     subscribe(listener) {
@@ -109,13 +114,18 @@ function windowsTransport(): NearbyTransport | undefined {
           console.error('Could not remove LAN event listener', error))
       }
     },
-    async host(name) { await subscription; await invoke('lan_host', { name }) },
-    async scan() { await subscription; await invoke('lan_scan') },
+    async host(name) {
+      await subscription
+      hostIp = await invoke<string | null>('lan_host', { name })
+    },
+    async scan() { await subscription; hostIp = null; await invoke('lan_scan') },
     connect: id => invoke('lan_connect', { id }),
+    connectDirect: ip => invoke('lan_connect_direct', { ip }),
+    hostAddress: () => hostIp,
     respond: (id, accepted) => invoke('lan_respond', { id, accepted }),
     lock: () => invoke('lan_lock'),
     send: (ids, bytes) => invoke('lan_send', { ids, data: encode(bytes) }),
-    stop: () => invoke('lan_stop'),
+    async stop() { hostIp = null; await invoke('lan_stop') },
     diagnostics: () => invoke('lan_diagnostics'),
   }
 }
