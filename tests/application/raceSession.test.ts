@@ -231,7 +231,7 @@ describe('RaceSession', () => {
     expect(session.snapshot().state?.cameraHints).toMatchObject({ shake: 0.8, speed: 3 })
   })
 
-  it('posts the player result once and advances active rivals for up to five seconds', () => {
+  it('posts the player result once and advances active rivals for up to forty seconds', () => {
     const { store } = createScoreStore()
     const step = vi.fn<RaceStep>((state) => ({
       state: { ...state, phase: 'finished', elapsed: 1, vehicles: state.vehicles.map((vehicle) => {
@@ -262,10 +262,13 @@ describe('RaceSession', () => {
 
     for (let i = 0; i < 18; i++) session.advance(0.25, noInput)
     expect(session.snapshot().result?.rivalsFinishing).toBe(true)
+    // The old five-second cap made genuinely racing rivals appear as DNF.
+    for (let i = 0; i < 139; i++) session.advance(0.25, noInput)
+    expect(session.snapshot().result?.rivalsFinishing).toBe(true)
     session.advance(0.25, noInput)
     const settled = session.snapshot()
     expect(settled.result).toMatchObject({ playerTime: 1, playerPlace: 1, rivalsFinishing: false })
-    expect(settled.state?.elapsed).toBeCloseTo(6)
+    expect(settled.state?.elapsed).toBeCloseTo(41)
     expect(settled.result?.standings.some(({ finishTime }) => finishTime === null)).toBe(true)
     session.advance(0.25, noInput)
     expect(session.snapshot()).toBe(settled)

@@ -239,7 +239,12 @@ export function stepAiVehicle(
     const roadSpeed = car.max * SURFACE_SPECS[context.surface].max * VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface].max
     const gripReserve = Math.min(cornerTarget, roadSpeed) * cornerMargin
     const excessTarget = Math.max(0, cornerTarget - roadSpeed)
-    curveSpeed -= bendWeight * (gripReserve + excessTarget)
+    // Medium reserves the full safety margin at hairpins, but may carry
+    // more speed through gentler paved turns. Difficulty ordering still owns
+    // the base reserve and physical grip remains unchanged.
+    const sharpness = clamp((bend - 0.09) / 0.16, 0, 1)
+    const reserveFraction = 0.7 + 0.3 * sharpness
+    curveSpeed -= bendWeight * (gripReserve * reserveFraction + excessTarget)
   }
   // Passing at the outside edge consumes cornering room. Hold a little
   // extra reserve in bends instead of assuming the centerline racing pace.
