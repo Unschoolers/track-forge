@@ -21,6 +21,8 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
+  /** Optional reduced target-speed bonus only for genuinely tight bends. */
+  readonly hardTightBendTargetBonus?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -33,7 +35,7 @@ export const CAR_DRIVING_PROFILES = {
     hardLookAheadSamples: 10,
     hardApexCutScale: 1,
     hardEdgeAvoidanceScale: 0.4,
-    hardCornerTargetBonus: 0.04,
+    hardCornerTargetBonus: 0.08,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
@@ -65,5 +67,8 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
+    // Hard Yellow already recovered twice on Desert sand in a solo race.
+    // Preserve sweeping straight-line speed; stop over-driving tight bends.
+    hardTightBendTargetBonus: 0.12,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
