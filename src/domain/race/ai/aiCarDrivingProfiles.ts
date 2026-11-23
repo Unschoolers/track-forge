@@ -43,7 +43,9 @@ export const CAR_DRIVING_PROFILES = {
   red: {
     hardReaction: 12,
     hardSteerGain: 2.22,
-    hardCornerReserve: 0.01,
+    // Less reliance on traffic braking exposes tight Hairpins: protect
+    // the physically limited front tires with a modest speed-plan reserve.
+    hardCornerReserve: 0.022,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
   },
@@ -52,7 +54,9 @@ export const CAR_DRIVING_PROFILES = {
   green: {
     hardReaction: 12,
     hardSteerGain: 3,
-    hardCornerReserve: 0.035,
+    // Cleaner AI-to-AI traffic lets Green carry more speed into tricky bends.
+    // A little extra turn-in margin prevents the late Kids Room slide.
+    hardCornerReserve: 0.045,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.35,
     // Validated on Desert sand, Kids Room, Pine Hairpins, Meadow Loop:

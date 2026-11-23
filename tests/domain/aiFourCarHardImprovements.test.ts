@@ -55,6 +55,7 @@ function measure(car: CarId, scenarioIndex: number, mode: 'solo' | 'duel' | 'tra
     ...CAR_DRIVING_PROFILES[car],
     ...(car === 'blue' ? { hardCornerTargetBonus: 0.04 } : {}),
     ...(car === 'red' ? { hardCornerReserve: 0.01 } : {}),
+    ...(car === 'green' ? { hardCornerReserve: 0.035 } : {}),
     ...(car === 'yellow' ? { hardHairpinReserve: 0 } : {}),
   }
   return runLaneCheck({
