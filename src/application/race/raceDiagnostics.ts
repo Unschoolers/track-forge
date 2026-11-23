@@ -8,6 +8,8 @@ import type { RaceResult, RaceSetup } from './raceSession'
 const BASE_SAMPLE_TICKS = 3 // 20 Hz positions, on the fixed 60 Hz simulation clock
 const MAX_FRAMES = 6000
 const MAX_EVENTS = 10000
+// Preserve precise pedal/steering transitions for several minutes of racing.
+const MAX_CONTROL_SAMPLES = 18000
 
 const round = (value: number): number => Math.round(value * 1000) / 1000
 
@@ -27,6 +29,10 @@ export interface DiagnosticVehicle {
   readonly verticalVelocity: number
   readonly grounded: boolean
   readonly braking: boolean
+  /** Observed player brake pressure (AI pressure isn't persisted in RaceVehicle). */
+  readonly brakePressure: number | null
+  readonly surfaceGrip: number | null
+  readonly onCurb: boolean
   readonly pathIndex: number
   readonly pathDistance: number
   readonly lap: number
@@ -53,6 +59,11 @@ export interface DiagnosticFrame {
   readonly input?: DriverInput
 }
 
+/** [simulation tick, player steering, player throttle, player brake pressed]. */
+export type DiagnosticControlSample = readonly [
+  tick: number, steering: number, throttle: number, braking: 0 | 1,
+]
+
 export interface DiagnosticEvent {
   readonly tick: number
   readonly t: number
@@ -64,6 +75,9 @@ export interface RaceDiagnosticsReport {
   readonly formatVersion: 1
   readonly tickSeconds: number
   readonly sampleTicks: number
+  /** 60 Hz player inputs, compacted only for unusually long races. */
+  readonly playerInputSampleTicks: number
+  readonly playerControls: readonly DiagnosticControlSample[]
   readonly track: Track
   readonly setup: RaceSetup
   readonly result: RaceResult
@@ -82,6 +96,8 @@ export class RaceDiagnosticsRecording {
   private pendingCuts = new Set<string>()
   private sampleTicks = BASE_SAMPLE_TICKS
   private droppedEvents = 0
+  private playerControls: DiagnosticControlSample[] = []
+  private playerInputSampleTicks = 1
 
   constructor(state: RaceState) {
     this.capture(state)
@@ -98,6 +114,7 @@ export class RaceDiagnosticsRecording {
       }
       this.recordEvent(state, event)
     }
+    this.recordPlayerControl(state.tick, input)
     this.capture(state, input, forceCapture)
   }
 
@@ -114,6 +131,8 @@ export class RaceDiagnosticsRecording {
       formatVersion: 1,
       tickSeconds: RACE_TICK_SECONDS,
       sampleTicks: this.sampleTicks,
+      playerInputSampleTicks: this.playerInputSampleTicks,
+      playerControls: [...this.playerControls],
       track,
       setup,
       result,
@@ -131,6 +150,22 @@ export class RaceDiagnosticsRecording {
     this.events.push({ tick: state.tick, t: round(state.elapsed), event })
   }
 
+  private recordPlayerControl(tick: number, input?: DriverInput): void {
+    if (!input || tick % this.playerInputSampleTicks !== 0) return
+    const sample: DiagnosticControlSample = [
+      tick, round(input.steering), round(input.throttle), input.braking ? 1 : 0,
+    ]
+    const last = this.playerControls.at(-1)
+    if (last?.[0] === tick) this.playerControls[this.playerControls.length - 1] = sample
+    else this.playerControls.push(sample)
+    if (this.playerControls.length <= MAX_CONTROL_SAMPLES) return
+    // Only long recordings lose input resolution. The report records the
+    // effective cadence; never silently pretend that every tick was kept.
+    this.playerControls = this.playerControls.filter((_, index) =>
+      index % 2 === 0 || index === this.playerControls.length - 1)
+    this.playerInputSampleTicks *= 2
+  }
+
   private capture(state: RaceState, input?: DriverInput, force = false): void {
     const last = this.frames.at(-1)
     if (!force && last && state.tick - last.tick < this.sampleTicks) return
@@ -144,6 +179,9 @@ export class RaceDiagnosticsRecording {
         speed: round(vehicle.speed), yawRate: round(vehicle.yawRate),
         slip: round(vehicle.slip), verticalVelocity: round(vehicle.verticalVelocity),
         grounded: vehicle.grounded, braking: vehicle.braking,
+        brakePressure: vehicle.brakePressure === undefined ? null : round(vehicle.brakePressure),
+        surfaceGrip: vehicle.surfaceGrip === undefined ? null : round(vehicle.surfaceGrip),
+        onCurb: vehicle.onCurb,
         pathIndex: vehicle.pathIndex, pathDistance: round(vehicle.pathDistance),
         lap: vehicle.lap, nextSector: vehicle.nextSector,
         finishedAt: vehicle.finishedAt, wrecked: vehicle.wrecked,

@@ -35,8 +35,48 @@ describe('all-car race diagnostics', () => {
     expect(report.frames[1]?.vehicles.map(vehicle => vehicle.id)).toEqual(initial.vehicles.map(vehicle => vehicle.id))
     expect(report.frames[1]?.vehicles.find(vehicle => vehicle.player)?.speed).toBe(44)
     expect(report.frames[1]?.input).toEqual(input)
+    expect(report.playerControls).toEqual([[3, 0.2, 1, 0]])
+    expect(report.playerInputSampleTicks).toBe(1)
     expect(report.events[0]?.event.type).toBe('gate-crossed')
     expect(JSON.parse(JSON.stringify(report)).frames).toHaveLength(2)
+  })
+
+  it('keeps a one-tick brake press and steering changes between 20 Hz pose frames', () => {
+    const recording = new RaceDiagnosticsRecording(initial)
+    recording.record({ ...initial, tick: 1, elapsed: 1 / 60 }, [], {
+      steering: 0.12, throttle: 1, braking: false,
+    })
+    recording.record({ ...initial, tick: 2, elapsed: 2 / 60 }, [], {
+      steering: 0.45, throttle: 0, braking: true,
+    })
+    recording.record({ ...initial, tick: 3, elapsed: 3 / 60 }, [], {
+      steering: 0.55, throttle: 1, braking: false,
+    })
+    const report = recording.report(track, setup, result)
+    expect(report.frames.map(frame => frame.tick)).toEqual([0, 3])
+    expect(report.playerInputSampleTicks).toBe(1)
+    expect(report.playerControls).toEqual([
+      [1, 0.12, 1, 0],
+      [2, 0.45, 0, 1],
+      [3, 0.55, 1, 0],
+    ])
+  })
+
+  it('captures grip, curb contact and actual player brake pressure for corner comparisons', () => {
+    const recording = new RaceDiagnosticsRecording(initial)
+    const next = {
+      ...initial, tick: 3, elapsed: 3 / 60,
+      vehicles: initial.vehicles.map(vehicle => vehicle.player
+        ? { ...vehicle, surfaceGrip: 0.75, brakePressure: 0.35, onCurb: true, currentSurface: 'street' as const }
+        : vehicle),
+    }
+    recording.record(next, [], { steering: 0.3, throttle: 0, braking: true })
+    const report = recording.report(track, setup, result)
+    const player = report.frames[1]?.vehicles.find(vehicle => vehicle.player)
+    expect(player?.surfaceGrip).toBe(0.75)
+    expect(player?.brakePressure).toBe(0.35)
+    expect(player?.onCurb).toBe(true)
+    expect(report.frames[1]?.vehicles.find(vehicle => !vehicle.player)?.brakePressure).toBeNull()
   })
 
   it('forces a recovery frame between sample ticks and records the one-off event', () => {
