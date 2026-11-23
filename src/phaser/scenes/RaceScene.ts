@@ -55,6 +55,7 @@ import { getTrackEnvironment } from '@/presentation/environments'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
 import { bindRacePointer, type RacePointerBinding } from '@/phaser/input/racePointer'
+import { interpolateRaceCameraHints, interpolateRaceVehicles } from '@/phaser/rendering/raceInterpolation'
 
 const EMPTY_SCENERY = [] as const
 
@@ -208,11 +209,20 @@ export class RaceScene extends Phaser.Scene {
     benchmark?.endSimulation()
     const race = this.raceSession.snapshot().state
     if (!race) return
-    const player = race.vehicles.find((vehicle) => vehicle.player)
+    const presentation = this.raceSession.presentationFrame?.()
+    const presentedVehicles = presentation
+      ? interpolateRaceVehicles(presentation.previous.vehicles, race.vehicles,
+        presentation.alpha, presentation.discontinuousVehicleIds)
+      : race.vehicles
+    const player = presentedVehicles.find((vehicle) => vehicle.player)
     if (player && this.raceCamera) {
+      const hints = presentation
+        ? interpolateRaceCameraHints(presentation.previous.cameraHints, race.cameraHints,
+          presentation.alpha, presentation.discontinuousVehicleIds.has(player.id))
+        : race.cameraHints
       this.raceCamera = advanceRaceCamera(
         this.raceCamera,
-        race.cameraHints,
+        hints,
         {
           dynamicZoom: this.snapshot.preferences.dynamicZoomEnabled,
           steering: this.controls.snapshot().steering,
@@ -236,7 +246,7 @@ export class RaceScene extends Phaser.Scene {
     this.upperVehicleGraphics.clear()
     this.effectGraphics.clear()
     renderRaceEffects(this.effectGraphics, race.effects)
-    const visibleVehicles = race.vehicles.filter(
+    const visibleVehicles = presentedVehicles.filter(
       (vehicle) => vehicle.player || vehicle.finishedAt === null,
     )
     renderVehicleShadows(
