@@ -7,6 +7,7 @@ import {
   type AiDriverState,
 } from '@/domain/race/ai/aiState'
 import { advancePassingState } from '@/domain/race/ai/passingState'
+import { compactAiTraffic, aiCourtesyNudge } from '@/domain/race/ai/aiRivalClearance'
 import type { TrafficState } from '@/domain/race/ai/traffic'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import {
@@ -85,6 +86,8 @@ export function stepAiVehicle(
   catchUp?: SpeedAssist,
   hardProfileOverride?: CarDrivingProfile,
   passingPolicyOverride?: CarPassingPolicy,
+  /** Test-only compatibility switch; Arcade defaults to compact AI rivals. */
+  aiAiTrafficMode: 'legacy' | 'compact' = 'compact',
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
@@ -103,8 +106,13 @@ export function stepAiVehicle(
         reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
         steerGain: difficulty === 'hard' ? hardProfile.hardSteerGain : ARCADE_STEERING.steerGain }
     : DIFFICULTY_SPECS[drivingDifficulty]
+  // Only human vehicles can demand a full overtake or emergency braking.
+  // AI-to-AI sprites are non-colliding in Arcade: a compact awareness bubble
+  // is enough, with a tiny straight-only courtesy nudge below.
+  const relaxedAiRivals = handling === 'arcade' && aiAiTrafficMode !== 'legacy'
+  const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
-  ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds,
+  ai = advancePassingState(vehicle, ai, relevantTraffic, difficulty, deltaSeconds,
     passingPolicyOverride ?? CAR_PASSING_POLICIES[vehicle.car])
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
@@ -194,11 +202,12 @@ export function stepAiVehicle(
   }
   // A wide passing line can point the car across the return arm of a
   // hairpin. Ease toward the center on approach if the space is clear.
-  const lane = ai.targetLane + ai.mistakeOffset
+  const lane = ai.targetLane + ai.mistakeOffset + (relaxedAiRivals && ai.phase === 'follow'
+    ? aiCourtesyNudge(vehicle, traffic, bend, context.onRoad) : 0)
   const centered = lane * (1 - clamp(bend / CENTER_LINE_TURN, 0, 1))
   const inner = Math.min(vehicle.lane, centered) - LANE_CHANGE_CLEARANCE
   const outer = Math.max(vehicle.lane, centered) + LANE_CHANGE_CLEARANCE
-  const occupied = traffic.nearby.some((entry) =>
+  const occupied = relevantTraffic.nearby.some((entry) =>
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
@@ -239,7 +248,7 @@ export function stepAiVehicle(
       clamp(tuning.reaction * deltaSeconds, 0, 1)
   ai = { ...ai, steer }
 
-  const ahead = traffic.ahead
+  const ahead = relevantTraffic.ahead
   const emergency =
     ahead !== null &&
     (ahead.distance <= AI_OVERTAKE[difficulty].emergencyDistance ||
