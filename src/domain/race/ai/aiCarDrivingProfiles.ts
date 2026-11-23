@@ -32,12 +32,12 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 4,
   },
-  // Green rotates easily on street/dirt. A small planned apex reserve reduces
-  // excessive sliding. A small Hard-only reserve balances entry grip against speed.
+  // Green rotates easily on street/dirt. With its longer preview it can
+  // stay on line without a separate Hard apex speed reserve.
   green: {
     hardReaction: 10,
     hardSteerGain: 2.42,
-    hardCornerReserve: 0.02,
+    hardCornerReserve: 0,
     hardLookAheadSamples: 8,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
