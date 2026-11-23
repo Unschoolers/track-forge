@@ -43,10 +43,10 @@ public class LanRacePlugin extends Plugin {
     private final Object gate = new Object();
     private final Map<String, Peer> peers = new HashMap<>();
     private final Set<String> discovered = new HashSet<>();
-    private int generation;
+    private volatile int generation;
     private long nextPeer;
-    private String mode = "idle";
-    private boolean locked;
+    private volatile String mode = "idle";
+    private volatile boolean locked;
     private ServerSocket server;
     private DatagramSocket discovery;
 
