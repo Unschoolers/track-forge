@@ -134,8 +134,47 @@ jobs:
       - name: Explain build artifact
         run: printf '## Android build\n\nUnsigned QA artifact verified. Installable APKs are signed and published from main in the protected android-signing environment.\n' >> "$GITHUB_STEP_SUMMARY"
 
+
+  windows:
+    needs: web-build
+    if: needs.web-build.outputs.native != 'false'
+    runs-on: windows-latest
+    outputs:
+      exe_artifact_id: ${{ steps.exe.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.web-build.outputs.web_artifact_id }}
+          path: dist
+          merge-multiple: true
+      - name: Compile portable Windows application with embedded game assets
+        run: cargo build --manifest-path src-tauri/Cargo.toml --release
+      - name: Validate and stage standalone Windows executable
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/trackforge.exe"
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Windows executable was not produced" }
+          if ((Get-Item $exe).Length -lt 1MB) { throw "Windows executable is unexpectedly small" }
+          $magic = Get-Content -Path $exe -AsByteStream -TotalCount 2
+          if ($magic[0] -ne 0x4D -or $magic[1] -ne 0x5A) { throw "Windows executable is not a PE file" }
+          Copy-Item $exe TrackForge.exe
+      - name: Upload portable Windows executable
+        id: exe
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: trackforge-windows-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: TrackForge.exe
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+
   sign-and-release:
-    needs: [android, verify]
+    needs: [android, verify, windows]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
     runs-on: ubuntu-latest
@@ -164,6 +203,12 @@ jobs:
           artifact-ids: ${{ needs.android.outputs.apk_artifact_id }}
           path: unsigned-apk
           merge-multiple: true
+      - name: Download verified Windows executable
+        uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.windows.outputs.exe_artifact_id }}
+          path: windows-exe
+          merge-multiple: true
       - name: Sign with permanent identity and verify install metadata
         env:
           DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
@@ -190,7 +235,7 @@ jobs:
       - name: Remove temporary signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/trackforge-signing.keystore"
-      - name: Publish APK release
+      - name: Publish Android APK and portable Windows EXE
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -215,6 +260,9 @@ jobs:
             if ! jq -e '.assets[] | select(.name == "trackforge-debug.apk")' existing-release.json > /dev/null; then
               gh release upload "$tag" trackforge-debug.apk --repo "$GH_REPO"
             fi
+            if ! jq -e '.assets[] | select(.name == "TrackForge.exe")' existing-release.json > /dev/null; then
+              gh release upload "$tag" windows-exe/TrackForge.exe --repo "$GH_REPO"
+            fi
           else
             # Notes are calculated from the previous published APK, not the last commit.
             # Conditional Android builds can skip web-only commits or several releases.
@@ -236,8 +284,9 @@ jobs:
             {
               cat generated-notes.md
               printf '\n### Build details\n\nTrackForge %s (Android version code %s).\n\n' "$VERSION_NAME" "$VERSION_CODE"
-              printf 'Signed with the fixed original TrackForge certificate.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+              printf 'Android APK is signed with the fixed original TrackForge certificate. Windows portable EXE is unsigned and requires WebView2. Nearby multiplayer is currently Android-only.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             } > release-notes.md
-            gh release create "$tag" trackforge-debug.apk --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge Android ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"
+            gh release create "$tag" trackforge-debug.apk windows-exe/TrackForge.exe --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"
           fi
-          printf '## APK release\n\nVersion %s (code %s).\n\n[Download this APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Android + Windows release\n\nVersion %s (Android code %s).\n\n[Download Android APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          printf '[Download Windows EXE](%s/%s/releases/download/%s/TrackForge.exe)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"

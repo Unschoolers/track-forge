@@ -10,6 +10,7 @@ Start here for **current team/agent guidelines**. Older specs and plans under `d
 | [Change workflow](change-workflow.md) | Delivery phases, verification, reviews, CI and regression handling |
 | [Repository audit — 2026-11-21](repo-audit-2026-11-21.md) | Evidence-based improvement opportunities; **not** claims of fixed issues |
 | [Five-slice refactor closure — 2026-11-22](refactor-closeout-2026-11-22.md) | Completed implementation scope, regression protection, and independent PR verification boundary |
+| [Windows desktop packaging](windows-desktop.md) | Portable EXE contract, release pipeline, runtime dependencies and smoke checks |
 | [Mobile gameplay QA](gameplay-qa.md) | Touch/browser scenarios and limitations |
 | [AI lane checker](ai-lane-checker.md) | Deterministic simulation diagnostics and regressions |
 | [AI difficulty tuning](ai-difficulty-tuning.md) | Hard-first calibration, Green's grip advantage, and Easy/Normal/Hard ordering |
