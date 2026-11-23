@@ -17,6 +17,7 @@ import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
+import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 
@@ -188,8 +189,17 @@ export function stepAiVehicle(
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
   const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
-  const targetX = target.x + context.normal.x * pursuitLane
-  const targetY = target.y + context.normal.y * pursuitLane
+  // Legal shoulder cuts are a *target line*, not modified tire physics.
+  // No shortcut during overtakes, uncontrolled slides, missed road contact,
+  // or while using a track's authored racing line.
+  const cut = arcade && !vehicle.racingLine && !occupied &&
+    ai.phase === 'follow' && context.onRoad && vehicle.grounded &&
+    Math.abs(slipAngle) < 0.24
+      ? plannedApexCut(path, targetIndex, reversed, difficulty, vehicle.car,
+        roadOffset, lateralVelocity)
+      : { x: 0, y: 0 }
+  const targetX = target.x + context.normal.x * pursuitLane + cut.x
+  const targetY = target.y + context.normal.y * pursuitLane + cut.y
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
