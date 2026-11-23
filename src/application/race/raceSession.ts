@@ -61,7 +61,7 @@ export interface RaceSetup {
   readonly gridPositions?: readonly number[]
 }
 
-export interface RaceSplit { readonly lap: number; readonly gate: 1 | 2 | 3 | 4; readonly time: number }
+export interface RaceSplit { readonly lap: number; readonly gate: number; readonly time: number }
 
 export interface RaceTelemetry {
   readonly routeKind?: RouteKind
@@ -227,8 +227,6 @@ export class RaceSession implements RaceSessionPort {
     this.startsAt = setup.mode === 'nearby' ? startsAt : undefined
     const nearby = setup.mode === 'nearby'
     this.bestGhost = nearby ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
-    this.timing = new LapTiming(setup.mode === 'ghost' && this.bestGhost?.splits?.length === setup.laps * 4
-      ? this.bestGhost.splits : undefined)
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
       courseIdentity: resolved.mode === 'normal' &&
@@ -245,6 +243,12 @@ export class RaceSession implements RaceSessionPort {
       recoveryCheckpoints: track.recoveryCheckpoints,
       recoveryScenery: track,
     })
+    const gatesPerLap = (created.timingGates?.length ?? 0) + 1
+    this.timing = new LapTiming(
+      setup.mode === 'ghost' && this.bestGhost?.splits?.length === setup.laps * gatesPerLap
+        ? this.bestGhost.splits : undefined,
+      gatesPerLap,
+    )
     const state = nearby || resolved.mode === 'ghost' || resolved.mode === 'time-trial'
       ? { ...created, countdown: this.startsAt === undefined ? created.countdown : Math.max(0, (this.startsAt - this.monotonicNow()) / 1000),
           vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
@@ -585,7 +589,7 @@ export class RaceSession implements RaceSessionPort {
         routeKind: normalizeRouteKind(track?.routeKind),
         routeProgress: player ? Math.max(0, Math.min(1, raceProgress(player, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind)) / Math.max(1, state.path.points.length - 1))) : 0,
         ...(player && state.handling === 'simulation' &&
-          state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player)
+          state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player, state.timingGates)
           ? { missedCheckpoint: player.nextSector } : {}),
         ...(latestSplit ? { latestSplit } : {}),
         phase: state.phase,
