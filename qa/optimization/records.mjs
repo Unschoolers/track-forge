@@ -14,7 +14,7 @@ function requiredString(value, field) {
 }
 function runId(meta) {
   return [meta.candidateId, meta.scenarioId, meta.seed, meta.difficulty,
-    meta.mode, meta.driverCar].join(':')
+    meta.mode, meta.driverCar, meta.tunedCar ?? meta.driverCar].join(':')
 }
 
 /**
@@ -37,6 +37,8 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
     scenario_id: meta.scenarioId,
     track_fingerprint: meta.trackFingerprint,
     driver_car: meta.driverCar,
+    tuned_car: meta.tunedCar ?? meta.driverCar,
+    grid_positions: meta.gridPositions ?? null,
     difficulty: meta.difficulty,
     mode: meta.mode,
     seed: meta.seed,
