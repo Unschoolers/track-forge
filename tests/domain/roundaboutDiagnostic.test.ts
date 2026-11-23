@@ -41,6 +41,9 @@ const safetyGrids = [
   { grid: [2, 1, 0, 3], player: 'red' },
   { grid: [2, 3, 1, 0], player: 'red' },
   { grid: [2, 3, 1, 0], player: 'yellow' },
+  // Additional independently arranged traffic, including Blue in the AI player slot.
+  { grid: [0, 1, 2, 3], player: 'blue' },
+  { grid: [3, 2, 0, 1], player: 'red' },
 ] as const
 const safetyRuns = safetyGrids.flatMap(situation => [1, 4331, 98765].map(seed => ({
   ...situation, seed,
