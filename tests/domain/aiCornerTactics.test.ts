@@ -39,6 +39,13 @@ describe('AI corner tactics', () => {
     expect(wide.drifting).toBe(false)
   })
 
+  it('adds progressive exit power only for a controlled slide', () => {
+    const exitIndex = path.points.findIndex((_p, i) => tactics(i).phase === 'exit')
+    expect(exitIndex).toBeGreaterThanOrEqual(0)
+    expect(tactics(exitIndex, 0, 6).exitThrottle).toBe(0)
+    expect(tactics(exitIndex, 0.17, 6).exitThrottle).toBeGreaterThan(0)
+  })
+
   it('keeps corner prediction usable when reversing across a closed-lap boundary', () => {
     const plans = path.points.map((_p, i) => tactics(i, 0, 0, true))
     expect(plans.some(plan => plan.phase === 'approach')).toBe(true)
