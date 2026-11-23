@@ -47,12 +47,14 @@ function measure(car: CarId, scenarioIndex: number, mode: 'solo' | 'duel' | 'tra
   if (!scenario || !path) throw new Error('Missing track')
   const oldPassing = {
     ...CAR_PASSING_POLICIES[car],
+    triggerDistanceScale: 1,
     abandonAfterSeconds: 8,
     rejoinClearSeconds: 0.25,
   }
   const oldDriving = {
     ...CAR_DRIVING_PROFILES[car],
     ...(car === 'blue' ? { hardCornerTargetBonus: 0.04 } : {}),
+    ...(car === 'green' ? { hardCornerTargetBonus: 0.35 } : {}),
     ...(car === 'yellow' ? { hardTightBendTargetBonus: 0.45 } : {}),
   }
   return runLaneCheck({

@@ -328,7 +328,7 @@ export function stepAiVehicle(
     // Keep this a speed-planning decision; physical tire forces are unchanged.
     const bonus = hardProfile.hardCornerTargetBonus ?? 0
     const tightBendBonus = hardProfile.hardTightBendTargetBonus ?? bonus
-    const tightBendWeight = clamp((bend - 0.06) / 0.07, 0, 1)
+    const tightBendWeight = clamp((bend - 0.14) / 0.08, 0, 1)
     curveSpeed *= 1 + (bonus + (tightBendBonus - bonus) * tightBendWeight) * controlled
   }
   // Braking during turn-in consumes the same tire-force budget that rotates

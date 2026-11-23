@@ -53,7 +53,7 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 3,
     hardCornerReserve: 0.035,
     hardLookAheadSamples: 10,
-    hardCornerTargetBonus: 0.35,
+    hardCornerTargetBonus: 0.37,
     // Validated on Desert sand, Kids Room, Pine Hairpins, Meadow Loop:
     // preserve forward pursuit preview near ordinary road edges without
     // overriding real tire grip, corner/braking safety, or recovery rules.
