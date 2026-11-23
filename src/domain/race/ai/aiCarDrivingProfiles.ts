@@ -22,7 +22,7 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 8,
     hardSteerGain: 2.22,
     hardCornerReserve: 0,
-    hardLookAheadSamples: 4,
+    hardLookAheadSamples: 10,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
