@@ -39,6 +39,18 @@ describe('AI corner tactics', () => {
     expect(wide.drifting).toBe(false)
   })
 
+  it('waits for lateral momentum to return before accelerating out of a bend', () => {
+    const turnIndex = path.points.findIndex((_point, index) => tactics(index).phase === 'turn')
+    expect(turnIndex).toBeGreaterThanOrEqual(0)
+    const plan = (lateralVelocity: number) =>
+      planCornerTactics(path, turnIndex, false, 180, 0.14, -15, 42, lateralVelocity)
+    expect(plan(-65).exitTraction).toBeLessThan(0.4)
+    expect(plan(45).exitTraction).toBe(1)
+    expect(plan(-65).drifting).toBe(true)
+    const straightIndex = path.points.findIndex(point => point.distance > 180)
+    expect(planCornerTactics(path, straightIndex, false, 180, 0.14, -15, 42, -65).exitTraction).toBe(1)
+  })
+
   it('adds progressive exit power only for a controlled slide', () => {
     const exitIndex = path.points.findIndex((_p, i) => tactics(i).phase === 'exit')
     expect(exitIndex).toBeGreaterThanOrEqual(0)
