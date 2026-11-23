@@ -59,6 +59,16 @@ export function passedPendingCheckpoint(path: RoadPath, vehicle: RaceVehicle): b
     vehicle.pathIndex > lastSampleBeforeCheckpoint(path, vehicle.nextSector) + 2
 }
 
+/** Slightly forgive near-edge timing passes, not distant off-road shortcuts.
+ * Author-placed recovery markers continue to use their own strict geometry.
+ */
+export function timingGateCrossingRadius(roadRadius: number, bothOnRoad: boolean): number {
+  const base = bothOnRoad
+    ? roadRadius
+    : Math.min(roadRadius, ROAD_GEOMETRY.checkpointHalfWidth)
+  return base + ROAD_GEOMETRY.checkpointGrace
+}
+
 /** Accept an open-route gate only when the driven segment crosses its road line. */
 export function updateOpenRouteProgress(
   previous: RaceVehicle,
@@ -75,12 +85,9 @@ export function updateOpenRouteProgress(
   const result = { ...vehicle, pathIndex: index }
   if (last < 1 || previous.finishedAt !== null) return result
   const gate = previous.nextSector
-  // A diagonal crossing can clip the road edge for one frame. Validate the
-  // swept crossing against the visible checkpoint stripe in that case instead
-  // of rejecting it solely because an endpoint was classified off-road.
-  const crossingRadius = onRoadBefore && onRoadAfter
-    ? roadRadius
-    : Math.min(roadRadius, ROAD_GEOMETRY.checkpointHalfWidth)
+  // A diagonal pass can briefly register off-road; keep the swept
+  // intersection authoritative with a small allowance at the stripe ends.
+  const crossingRadius = timingGateCrossingRadius(roadRadius, onRoadBefore && onRoadAfter)
   if (!crossesRoadGate(path, previous, result, last * gate / 4, crossingRadius)) return result
   return gate === 4
     ? { ...result, lap: previous.lap + 1, finishedAt: elapsed }
