@@ -15,7 +15,7 @@ concurrency:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -25,6 +25,10 @@ jobs:
       - run: npm ci
       - name: Kids Room all cars and difficulties, plus Pine and policy regressions
         run: npx vitest run tests/domain/kidsRoomAiBenchmark.test.ts tests/domain/kidsRoomAiPace.test.ts tests/domain/aiHardPace.test.ts tests/domain/aiDifficultyPolicy.test.ts --reporter=verbose
+      - name: Diagnostic car-specific Hard profile sweep
+        env:
+          AI_PROFILE_SWEEP: '1'
+        run: npx vitest run tests/domain/aiHardProfileSweep.test.ts --reporter=verbose
       - name: All domain regression tests
         run: npx vitest run tests/domain --maxWorkers=4
       - name: Lane checker
