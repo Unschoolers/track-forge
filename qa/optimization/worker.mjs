@@ -45,7 +45,7 @@ try {
       fingerprint: trackFingerprint({ track }),
     })
   }
-  port.postMessage({ type: 'ready' })
+  port.postMessage({ type: 'ready', baselineProfiles: CAR_DRIVING_PROFILES })
 
   port.on('message', message => {
     if (message.type !== 'trial') return
