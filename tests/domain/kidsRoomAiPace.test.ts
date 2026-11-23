@@ -1,3 +1,4 @@
+import { DIFFICULTY_SPECS } from '@/domain/config'
 import { RaceSession } from '@/application/race/raceSession'
 import { RACE_TICK_SECONDS, stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
@@ -142,4 +143,48 @@ describe('AI cornering on the Kids room mixed-surface circuit', () => {
     expect(Math.min(...hard.opponents.map(v => v.finishedAt ?? Infinity)), diagnostic)
       .toBeLessThan(PLAYER_REFERENCE_SECONDS + 12)
   }, 30000)
+})
+
+
+// Temporary calibration experiment. Removed before review; production settings
+// are restored in a finally block so the real regression contract is unaffected.
+describe('AI #257 calibration sweep', () => {
+  it('compares actual driving outcomes across realistic policy choices', () => {
+    const tuning = DIFFICULTY_SPECS.hard as unknown as {
+      pace: number; steerGain: number; cornerSafety: number;
+      reaction: number; lookAhead: number
+    }
+    const original = { ...tuning }
+    const candidates: ReadonlyArray<readonly [string, Partial<typeof original>]> = [
+      ['baseline', {}],
+      ['pace-1.44', { pace: 1.44 }],
+      ['pace-1.52', { pace: 1.52 }],
+      ['pace-1.62', { pace: 1.62 }],
+      ['gain-1.88', { steerGain: 1.88 }],
+      ['gain-2.22', { steerGain: 2.22 }],
+      ['gain-2.42', { steerGain: 2.42 }],
+      ['safety-0.42', { cornerSafety: 0.42 }],
+      ['safety-0.32', { cornerSafety: 0.32 }],
+      ['safety-0.62', { cornerSafety: 0.62 }],
+      ['reaction-22', { reaction: 22 }],
+      ['lookahead+2', { lookAhead: 2 }],
+      ['pace-1.52-safety-0.42', { pace: 1.52, cornerSafety: 0.42 }],
+      ['gain-2.22-safety-0.42', { steerGain: 2.22, cornerSafety: 0.42 }],
+    ]
+    const observations: unknown[] = []
+    try {
+      for (const [name, config] of candidates) {
+        Object.assign(tuning, original, config)
+        const run = normalRivals(1)
+        const results = run.opponents.map(vehicle => ({
+          car: vehicle.car, time: Number((vehicle.finishedAt ?? Infinity).toFixed(2)),
+        }))
+        observations.push({ name, results, recoveries: run.recoveries.length,
+          incidents: run.recoveries.slice(0, 3) })
+      }
+    } finally {
+      Object.assign(tuning, original)
+    }
+    console.info('AI_TUNING_SWEEP', JSON.stringify(observations))
+  }, 120000)
 })

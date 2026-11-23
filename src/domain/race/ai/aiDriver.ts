@@ -266,13 +266,7 @@ export function stepAiVehicle(
       ? 7 : 3
   const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
   const curveOverspeed = vehicle.speed - curveSpeed
-  const stableExit = arcade && !vehicle.racingLine && context.onRoad &&
-    context.surface === 'street' && corner.phase === 'exit' &&
-    !corner.reversal && Math.abs(slipAngle) < 0.08 &&
-    Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.32 &&
-    Math.abs(lateralVelocity) < 30
-  const curveBraking = curveOverspeed > curveBrakeThreshold &&
-    !(stableExit && curveOverspeed < 9)
+  const curveBraking = curveOverspeed > curveBrakeThreshold
   // The former all-or-nothing AI brake rapidly toggled full force in bends,
   // spending lateral tire grip on tiny speed corrections. Modulate pressure
   // by the actual overspeed; reserve full brakes for sharp approaches,
@@ -289,12 +283,8 @@ export function stepAiVehicle(
     Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.5 && !curveBraking
   // A car still sliding toward the outside must complete its rotation
   // before applying exit power. In a clean line traction remains at 1.
-  // Release the brake sooner on a settled corner exit so the engine can
-  // rebuild speed. Do not power through uncontrolled slip, a sharp reversal
-  // or a car already being carried toward the road edge.
-  const exitPower = stableExit && !curveBraking && curveOverspeed < 9 ? 0.42 : 0
   const plannedThrottle = (settledSlide
-    ? Math.max(curveThrottle, corner.exitThrottle, exitPower)
+    ? Math.max(curveThrottle, corner.exitThrottle)
     : curveThrottle) * (arcade && !vehicle.racingLine ? corner.exitTraction : 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && plannedThrottle === 1 &&
