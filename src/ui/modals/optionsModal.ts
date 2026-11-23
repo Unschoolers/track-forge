@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { GitHubUpdateProvider, isNewerRelease, type UpdateInfo } from '@/application/updates/updateProvider'
+import { isPortableWindows, downloadWindowsUpdate } from '@/infrastructure/updates/windowsPortableUpdate'
 import { createReleaseNotesButton, openReleaseNotesView } from '@/ui/modals/updateReleaseNotes'
 import type { AppSnapshot } from '@/application/appState'
 import { audioVolumes, type AudioVolumeSetting } from '@/application/audioVolume'
@@ -374,6 +375,11 @@ export function createOptionsModal(
       const download = button('DOWNLOAD APK', 'download-update', () => {
         download.disabled = true
         status.textContent = 'Starting Android download…'
+        if (!update.apkUrl) {
+          status.textContent = 'The release has no verified Android APK.'
+          download.disabled = false
+          return
+        }
         void updates.download({ url: update.apkUrl, version: update.version }).then(() => {
           monitor()
         }).catch((error: unknown) => {
@@ -418,7 +424,66 @@ export function createOptionsModal(
       status.textContent = error instanceof Error ? error.message : 'Could not restore download.'
     })
   }
-  if (Capacitor.isNativePlatform()) capture('updates', updatesStart)
+  else if (isPortableWindows()) {
+    const currentRun = Number(import.meta.env.VITE_TRACKFORGE_BUILD_RUN)
+    const currentAttempt = Number(import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT)
+    const hasBuildId = Number.isSafeInteger(currentRun) && currentRun > 0 &&
+      Number.isSafeInteger(currentAttempt) && currentAttempt > 0
+    const provider = new GitHubUpdateProvider(currentRun, currentAttempt, undefined, 'windows')
+    const installed = element('p', 'modal-subtitle options-installed-build',
+      hasBuildId ? `Installed build: ${currentRun}.${currentAttempt}` : 'Installed build: unavailable')
+    const status = element('p', 'modal-subtitle', 'Check GitHub Releases for a newer Windows EXE.')
+    status.setAttribute('role', 'status')
+    const panel = element('section', 'setup-section options-download-panel')
+    const instructions = element('p', 'modal-subtitle',
+      'Portable update: download the new EXE in your browser, close TrackForge, then replace the old file. No installer is required; your saved tracks stay in your Windows profile.')
+    const notesButton = createReleaseNotesButton(() => {
+      if (!notesTarget) return
+      openReleaseNotesView(frame.overlay, () => provider.changesSince(notesTarget!))
+    })
+    let notesTarget: string | null = null
+    notesButton.hidden = true
+    const showAvailableUpdate = (release: UpdateInfo) => {
+      if (!release.exeUrl) {
+        panel.replaceChildren()
+        status.textContent = 'The release has no verified Windows EXE.'
+        return
+      }
+      notesTarget = hasBuildId && isNewerRelease(release.version, currentRun, currentAttempt) ? release.version : null
+      notesButton.hidden = notesTarget === null
+      status.textContent = `New Windows version available: ${release.version}`
+      const download = button('DOWNLOAD NEW EXE', 'download-windows-update', () => {
+        download.disabled = true
+        status.textContent = 'Opening the Windows browser for download…'
+        void downloadWindowsUpdate(release.version).then(() => {
+          status.textContent = 'Download opened in your browser. Close TrackForge before replacing its EXE.'
+        }).catch((error: unknown) => {
+          status.textContent = error instanceof Error ? error.message : 'Could not open the Windows browser.'
+        }).finally(() => { download.disabled = false })
+      }, 'button button-primary')
+      panel.replaceChildren(download, instructions)
+    }
+    const check = button('CHECK FOR UPDATES', 'check-updates', () => {
+      check.disabled = true
+      status.textContent = 'Checking for updates…'
+      void provider.check().then((release) => {
+        if (release) showAvailableUpdate(release)
+        else {
+          status.textContent = 'You are running the latest GitHub release.'
+          panel.replaceChildren()
+          notesTarget = null
+          notesButton.hidden = true
+        }
+      }).catch((error: unknown) => {
+        status.textContent = error instanceof Error ? error.message : 'Could not check for updates.'
+      }).finally(() => { check.disabled = false })
+    }, 'button')
+    const actionsRow = element('div', 'options-update-actions')
+    actionsRow.append(check, notesButton)
+    frame.body.append(installed, actionsRow, status, panel)
+    if (navigation.availableUpdate) showAvailableUpdate(navigation.availableUpdate)
+  }
+  if (Capacitor.isNativePlatform() || isPortableWindows()) capture('updates', updatesStart)
   const tabs = element('nav', 'choice-row options-tab-list')
   tabs.setAttribute('role', 'tablist')
   tabs.setAttribute('aria-label', 'Options categories')

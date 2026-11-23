@@ -21,6 +21,32 @@ describe('GitHub update checks', () => {
     expect(request).toHaveBeenCalledOnce()
   })
 
+  it('checks Windows releases against the EXE asset, never the APK', async () => {
+    const exeUrl = 'https://github.com/Unschoolers/track-forge/releases/download/android-build-535-1/TrackForge.exe'
+    const request = vi.fn(async () => new Response(JSON.stringify({
+      tag_name: 'android-build-535-1',
+      assets: [
+        { name: 'trackforge-debug.apk', browser_download_url: 'https://example.test/other.apk' },
+        { name: 'TrackForge.exe', browser_download_url: exeUrl },
+      ],
+    }), { status: 200 }))
+    const provider = new GitHubUpdateProvider(534, 1, request as typeof fetch, 'windows')
+    expect(await provider.check()).toEqual({
+      version: 'android-build-535-1',
+      url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+      exeUrl,
+    })
+    expect(request).toHaveBeenCalledOnce()
+  })
+
+  it('never offers an APK-only release as an update for Windows', async () => {
+    const provider = new GitHubUpdateProvider(534, 1, async () =>
+      new Response(JSON.stringify({ tag_name: 'android-build-535-1', assets: [
+        { name: 'trackforge-debug.apk', browser_download_url: 'https://example.test/trackforge-debug.apk' },
+      ] }), { status: 200 }), 'windows')
+    await expect(provider.check()).rejects.toThrow('no verified EXE')
+  })
+
   it('rejects missing build identity rather than claiming up-to-date', async () => {
     const provider = new GitHubUpdateProvider(Number.NaN, Number.NaN)
     await expect(provider.check()).rejects.toThrow('Installed build version is unavailable')

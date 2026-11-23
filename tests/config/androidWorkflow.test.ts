@@ -28,15 +28,24 @@ describe('Android CI selection', () => {
   })
 })
 
-it('keeps full web checks and gates signing on native and JavaScript verification', () => {
+it('keeps full web checks and gates publishing on Android, JavaScript, and Windows verification', () => {
   const workflow = readFileSync('.github/workflows/build.yml', 'utf8')
   expect(workflow).toMatch(/\n {2}push:\s*\n {4}branches: \[main\]\s*\n {2}pull_request:\s*\n {2}workflow_dispatch:/)
   expect(workflow.match(/npm run build/g)).toHaveLength(1)
-  expect(workflow.match(/npm test -- --maxWorkers=4/g)).toHaveLength(1)
+  expect(workflow.match(/npm run test:fast -- --maxWorkers=4/g)).toHaveLength(1)
+  expect(workflow.match(/npm run test:ai:matrix/g)).toHaveLength(1)
   expect(workflow.match(/npm run lint/g)).toHaveLength(1)
-  expect(workflow).toContain('needs: [android, verify]')
+  expect(workflow).toContain('needs: [android, verify, windows, ai-matrix]')
   expect(workflow).toContain("if: needs.web-build.outputs.native != 'false'")
   expect(workflow).toContain('artifact-ids: ${{ needs.web-build.outputs.web_artifact_id }}')
   expect(workflow).toContain('./gradlew testDebugUnitTest assembleDebug')
+  expect(workflow).toContain('Nearby LAN multiplayer supports Windows and Android')
+  expect(workflow).toContain('GitHub release-notes API failed after three attempts.')
+  expect(workflow).toContain('GitHub release creation failed after three attempts.')
+  expect(workflow).toContain('runs-on: windows-latest')
+  expect(workflow).toContain('cargo build --manifest-path src-tauri/Cargo.toml --release')
+  expect(workflow).toContain('artifact-ids: ${{ needs.windows.outputs.exe_artifact_id }}')
+  expect(workflow).toContain('gh release create "$tag" trackforge-debug.apk windows-exe/TrackForge.exe')
+
   expect(workflow).toContain('actions/upload-artifact@')
 })

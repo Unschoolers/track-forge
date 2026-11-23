@@ -71,6 +71,16 @@ Run `npm run qa:lanes` for fast, deterministic AI path checks without graphics.
 Open `qa/results/lanes/report.html` for dot trails and failure locations. See
 [AI lane checker](docs/ai-lane-checker.md) for custom tracks and larger batches.
 
+## Windows PC — portable EXE
+
+Download [TrackForge.exe](https://github.com/Unschoolers/track-forge/releases/latest/download/TrackForge.exe) from the latest release and run it directly on Windows 10/11 (x64). No installer, ZIP extraction, browser tab, Node.js or separate game server is needed. The game is bundled for offline racing and track editing.
+
+Windows Options → Updates provides release checks, What's New, and a Download New EXE action. Because Windows locks a running executable, close TrackForge before replacing your old EXE. No background self-modification occurs.
+
+Windows uses the system **Microsoft Edge WebView2 Runtime** (preinstalled on most supported Windows systems); it must be installed for the EXE to start. The executable is currently unsigned and may trigger a Windows SmartScreen warning. The maximized game window can be closed normally; saved tracks and progress remain in the app's Windows user profile when replacing the EXE with an update.
+
+**Nearby Races:** Windows and Android can race together over the same local Wi-Fi. Choose **LOCAL WI-FI** in Android Nearby Race; Windows uses LAN automatically. Android's original Nearby mode is still offered for wireless play without a common Wi-Fi network. See [LAN multiplayer](docs/lan-multiplayer.md). Building from source, smoke checks and the release contract are described in [Windows desktop packaging](docs/windows-desktop.md).
+
 ## Android APK
 
 Android builds bundle the production web assets for offline use at

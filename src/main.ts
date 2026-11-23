@@ -1,7 +1,10 @@
 import { Capacitor } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
+import { isPortableWindows } from '@/infrastructure/updates/windowsPortableUpdate'
 import { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { createAndroidNearby } from '@/infrastructure/multiplayer/androidNearby'
+import { createLanNearby } from '@/infrastructure/multiplayer/lanNearby'
+import { selectNearbyConnection } from '@/infrastructure/multiplayer/selectNearbyConnection'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
 import { handleBackground } from '@/application/backgroundLifecycle'
@@ -70,7 +73,8 @@ if (trackStore.list().length === 0) {
 
 const scoreStore = new BrowserScoreRepository(storage)
 const geometry = new TrackGeometryService()
-const nearbyTransport = createAndroidNearby()
+const nearbyConnection = selectNearbyConnection(createAndroidNearby(), createLanNearby())
+const nearbyTransport = nearbyConnection.transport
 const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
   (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
@@ -114,15 +118,18 @@ const controller = new AppController({
 })
 const uiHost = new DomUiHost(uiRoot, controller, {
   nearby,
+  ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),
   raceSession,
   raceControls,
   feedback,
   geometry,
   prepareRace: (track, trackGeometry, lighting) => sceneHost.prepareRace(track, trackGeometry, lighting),
   previewAudioVolume: setAudioVolume,
-  ...(Capacitor.isNativePlatform() ? { updateProvider: new GitHubUpdateProvider(
+  ...(Capacitor.isNativePlatform() || isPortableWindows() ? { updateProvider: new GitHubUpdateProvider(
     Number(import.meta.env.VITE_TRACKFORGE_BUILD_RUN),
     Number(import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT),
+    undefined,
+    isPortableWindows() ? 'windows' : 'android',
   ) } : {}),
 })
 const racePerformance = (import.meta.env.DEV || import.meta.env.VITE_TRACKFORGE_RACE_PERF === '1') &&

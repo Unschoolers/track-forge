@@ -139,6 +139,39 @@ describe('DomUiHost', () => {
     expect(check).toHaveBeenCalledOnce()
   })
 
+  it('shows Windows Updates and opens the verified EXE download without self-overwriting', async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('__TAURI__', { core: { invoke } })
+    try {
+      const { createOptionsModal } = await import('@/ui/modals/optionsModal')
+      const frame = createOptionsModal({
+        ...snapshot('home'), overlay: { type: 'options', returnTo: 'home', tab: 'updates' },
+      }, {
+        close: vi.fn(), playerName: vi.fn(), preferences: vi.fn(),
+        previewVolume: vi.fn(), setVolume: vi.fn(),
+      }, {
+        initialTab: 'updates',
+        availableUpdate: {
+          version: 'android-build-999-1',
+          url: 'https://github.com/Unschoolers/track-forge/releases/latest',
+          exeUrl: 'https://github.com/Unschoolers/track-forge/releases/download/android-build-999-1/TrackForge.exe',
+        },
+      })
+      document.body.replaceChildren(frame)
+      expect(frame.querySelector('[data-action="options-tab-updates"]')).not.toBeNull()
+      expect(frame.querySelector('[data-action="check-updates"]')).not.toBeNull()
+      expect(frame.textContent).toContain('close TrackForge')
+      expect(frame.querySelector('[data-action="download-update"]')).toBeNull()
+      frame.querySelector<HTMLButtonElement>('[data-action="download-windows-update"]')?.click()
+      await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('desktop_download_update', {
+        tag: 'android-build-999-1',
+      }))
+    } finally {
+      vi.unstubAllGlobals()
+      document.body.replaceChildren()
+    }
+  })
+
   it('keeps Home clean when no newer release is available', async () => {
     const check = vi.fn<UpdateProvider['check']>().mockResolvedValue(null)
     const { root } = setup('home', undefined, { check })

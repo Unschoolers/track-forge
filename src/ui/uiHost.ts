@@ -1,4 +1,5 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import type { NearbyConnectionModes } from '@/infrastructure/multiplayer/selectNearbyConnection'
 import { createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
 import { raceDiagnosticsFilename } from '@/infrastructure/export/raceExportName'
@@ -48,6 +49,7 @@ export interface UiControllerPort {
 
 export interface UiRuntime {
   readonly nearby?: NearbyRace | undefined
+  readonly nearbyConnections?: NearbyConnectionModes
   readonly raceSession: RaceSessionPort
   readonly raceControls: RaceControlsPort
   readonly feedback: FeedbackPort
@@ -396,7 +398,7 @@ export class DomUiHost implements UiHost {
           saveTrack: () => this.controller.dispatch({ type: 'save-nearby-track' }),
           declineTrack: () => this.controller.dispatch({ type: 'decline-nearby-track' }),
           selectCar: (car) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, car } }),
-        }, state.preferences.playerIdentity)
+        }, state.preferences.playerIdentity, this.runtime.nearbyConnections)
       }
       case 'cup':
         return createCupModal(state, {

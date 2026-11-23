@@ -11,3 +11,4 @@ coverage/
 qa/results/
 playwright-report/
 test-results/
+src-tauri/target/

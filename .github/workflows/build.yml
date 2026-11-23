@@ -66,7 +66,7 @@ jobs:
       - run: npm run test:fast -- --maxWorkers=4
       - run: npm run lint
 
-
+  # Required deterministic AI physics regression, isolated from fast test workers.
   ai-matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -77,9 +77,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # This integration test simulates 120 real races. Keep it independent
-      # from cheap component tests so Vitest's RPC worker isn't starved.
-      # It is a required release gate, not excluded or skipped.
       - run: npm run test:ai:matrix
 
   android:
@@ -150,8 +147,47 @@ jobs:
       - name: Explain build artifact
         run: printf '## Android build\n\nUnsigned QA artifact verified. Installable APKs are signed and published from main in the protected android-signing environment.\n' >> "$GITHUB_STEP_SUMMARY"
 
+
+  windows:
+    needs: web-build
+    if: needs.web-build.outputs.native != 'false'
+    runs-on: windows-latest
+    outputs:
+      exe_artifact_id: ${{ steps.exe.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.web-build.outputs.web_artifact_id }}
+          path: dist
+          merge-multiple: true
+      - name: Compile portable Windows application with embedded game assets
+        run: cargo build --manifest-path src-tauri/Cargo.toml --release
+      - name: Validate and stage standalone Windows executable
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/trackforge.exe"
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Windows executable was not produced" }
+          if ((Get-Item $exe).Length -lt 1MB) { throw "Windows executable is unexpectedly small" }
+          $magic = Get-Content -Path $exe -AsByteStream -TotalCount 2
+          if ($magic[0] -ne 0x4D -or $magic[1] -ne 0x5A) { throw "Windows executable is not a PE file" }
+          Copy-Item $exe TrackForge.exe
+      - name: Upload portable Windows executable
+        id: exe
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: trackforge-windows-${{ github.run_number }}-${{ github.run_attempt }}-${{ github.sha }}
+          path: TrackForge.exe
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+
   sign-and-release:
-    needs: [android, verify, ai-matrix]
+    needs: [android, verify, windows, ai-matrix]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
     runs-on: ubuntu-latest
@@ -180,6 +216,12 @@ jobs:
           artifact-ids: ${{ needs.android.outputs.apk_artifact_id }}
           path: unsigned-apk
           merge-multiple: true
+      - name: Download verified Windows executable
+        uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.windows.outputs.exe_artifact_id }}
+          path: windows-exe
+          merge-multiple: true
       - name: Sign with permanent identity and verify install metadata
         env:
           DEBUG_KEY_BASE64: ${{ secrets.TRACKFORGE_DEBUG_KEYSTORE_BASE64 }}
@@ -206,7 +248,7 @@ jobs:
       - name: Remove temporary signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/trackforge-signing.keystore"
-      - name: Publish APK release
+      - name: Publish Android APK and portable Windows EXE
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -231,6 +273,9 @@ jobs:
             if ! jq -e '.assets[] | select(.name == "trackforge-debug.apk")' existing-release.json > /dev/null; then
               gh release upload "$tag" trackforge-debug.apk --repo "$GH_REPO"
             fi
+            if ! jq -e '.assets[] | select(.name == "TrackForge.exe")' existing-release.json > /dev/null; then
+              gh release upload "$tag" windows-exe/TrackForge.exe --repo "$GH_REPO"
+            fi
           else
             # Notes are calculated from the previous published APK, not the last commit.
             # Conditional Android builds can skip web-only commits or several releases.
@@ -243,17 +288,47 @@ jobs:
               | sort_by(.run, .attempt) | last | .tag // empty
             ' releases.json)
             if [ -n "$previous_tag" ]; then
-              gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
-                -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" \
-                -f previous_tag_name="$previous_tag" --jq '.body' > generated-notes.md
+              for attempt in 1 2 3; do
+                if gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
+                  -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" \
+                  -f previous_tag_name="$previous_tag" --jq '.body' > generated-notes.md; then
+                  break
+                fi
+                if (( attempt == 3 )); then
+                  echo 'GitHub release-notes API failed after three attempts.' >&2
+                  exit 1
+                fi
+                sleep "$((attempt * 3))"
+              done
             else
               printf "## What's Changed\n\nFirst published Android build.\n" > generated-notes.md
             fi
             {
               cat generated-notes.md
               printf '\n### Build details\n\nTrackForge %s (Android version code %s).\n\n' "$VERSION_NAME" "$VERSION_CODE"
-              printf 'Signed with the fixed original TrackForge certificate.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+              printf 'Android APK is signed with the fixed original TrackForge certificate. Windows portable EXE is unsigned and requires WebView2. Nearby LAN multiplayer supports Windows and Android on the same local network; Android Nearby wireless mode is still available.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             } > release-notes.md
-            gh release create "$tag" trackforge-debug.apk --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge Android ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"
+            for attempt in 1 2 3; do
+              if gh release create "$tag" trackforge-debug.apk windows-exe/TrackForge.exe --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"; then
+                break
+              fi
+              # A 502 can happen after GitHub committed the release. Confirm both assets
+              # before treating it as success; partial releases remain a hard failure.
+              if gh release view "$tag" --repo "$GH_REPO" --json targetCommitish,assets > recovered-release.json 2>/dev/null; then
+                if [ "$(jq -r '.targetCommitish' recovered-release.json)" = "$GITHUB_SHA" ] &&
+                   jq -e '([.assets[].name] | index("trackforge-debug.apk") != null and index("TrackForge.exe") != null)' recovered-release.json > /dev/null; then
+                  echo "GitHub release exists with both verified artifacts after a retryable API error."
+                  break
+                fi
+                echo 'GitHub created an incomplete or mismatched release; rerun signing/publication to recover.' >&2
+                exit 1
+              fi
+              if (( attempt == 3 )); then
+                echo 'GitHub release creation failed after three attempts.' >&2
+                exit 1
+              fi
+              sleep "$((attempt * 3))"
+            done
           fi
-          printf '## APK release\n\nVersion %s (code %s).\n\n[Download this APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Android + Windows release\n\nVersion %s (Android code %s).\n\n[Download Android APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          printf '[Download Windows EXE](%s/%s/releases/download/%s/TrackForge.exe)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
