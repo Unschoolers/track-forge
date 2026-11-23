@@ -133,7 +133,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		laps: options.laps,
 		reversed: options.reversed,
 		startRatio: options.startRatio ?? 0,
-		gridPositions: options.gridPositions ?? (options.mode === 'duel' ? [3, 0, 1, 2] : undefined),
+		gridPositions: options.gridPositions ?? (options.mode === 'duel' ? [2, 0, 1, 3] : undefined),
 	})
 	const duelOpponentId = created.vehicles[1]?.id
 	if (options.mode === 'duel' && !duelOpponentId)

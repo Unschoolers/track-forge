@@ -109,7 +109,10 @@ export function stepAiVehicle(
   // Only human vehicles can demand a full overtake or emergency braking.
   // AI-to-AI sprites are non-colliding in Arcade: a compact awareness bubble
   // is enough, with a tiny straight-only courtesy nudge below.
-  const relaxedAiRivals = handling === 'arcade' && aiAiTrafficMode !== 'legacy'
+  // Authored racing lines already include their own traffic-facing lane
+  // decisions; preserve that proven behaviour on curated circuits.
+  const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
+    aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, relevantTraffic, difficulty, deltaSeconds,
@@ -205,7 +208,7 @@ export function stepAiVehicle(
   // Hard makes no deliberate AI↔AI dodges: its sprites may overlap without
   // physical contact. Normal/Easy retain the small courtesy adjustment.
   const lane = ai.targetLane + ai.mistakeOffset + (relaxedAiRivals &&
-    difficulty !== 'hard' && ai.phase === 'follow'
+    difficulty === 'easy' && ai.phase === 'follow'
     ? aiCourtesyNudge(vehicle, traffic, bend, context.onRoad) : 0)
   const centered = lane * (1 - clamp(bend / CENTER_LINE_TURN, 0, 1))
   const inner = Math.min(vehicle.lane, centered) - LANE_CHANGE_CLEARANCE
@@ -332,6 +335,12 @@ export function stepAiVehicle(
   // line is under control. This changes the target used by braking/throttle,
   // never the tire forces, speed limit, off-road drag or recovery behavior.
   // Back out when drifting outward; do not reward unstable or off-road lines.
+  if (difficulty === 'normal' && arcade && !vehicle.racingLine && context.onRoad &&
+    Math.abs(slipAngle) < 0.08) {
+    // Blue needed one 60 Hz tick to remain within its player-relative Normal
+    // pace budget. Adjust the planned speed, never the actual tire forces.
+    curveSpeed *= 1 + (hardProfile.normalCornerTargetBonus ?? 0)
+  }
   if (difficulty === 'hard' && arcade && !vehicle.racingLine && context.onRoad) {
     const controlled = (1 - edgeRisk) *
       (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))

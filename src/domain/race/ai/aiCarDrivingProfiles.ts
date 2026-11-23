@@ -21,6 +21,8 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
+  /** Small Normal-only planned corner-speed allowance for this chassis. */
+  readonly normalCornerTargetBonus?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -34,6 +36,7 @@ export const CAR_DRIVING_PROFILES = {
     hardApexCutScale: 1,
     hardEdgeAvoidanceScale: 0.4,
     hardCornerTargetBonus: 0.08,
+    normalCornerTargetBonus: 0.003,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.

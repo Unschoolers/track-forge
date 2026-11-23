@@ -66,7 +66,7 @@ try {
       const baseline = (passingStudy ? CAR_PASSING_POLICIES : CAR_DRIVING_PROFILES)[task.car]
       if (!baseline) throw new Error(`Unknown car ${task.car}`)
       const policy = { ...baseline, ...task.changes }
-      const trialGrid = task.mode === 'duel' ? [3, 0, 1, 2] : scenario.gridPositions
+      const trialGrid = task.mode === 'duel' ? [2, 0, 1, 3] : scenario.gridPositions
       const run = runLaneCheck({
         path: entry.path, trackName: entry.trackName,
         seed: task.seed, car: task.playerCar ?? task.car, difficulty: task.difficulty,
