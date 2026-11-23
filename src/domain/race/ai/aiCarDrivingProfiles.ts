@@ -12,15 +12,17 @@ export interface CarDrivingProfile {
   readonly hardReaction: number
   readonly hardSteerGain: number
   readonly hardCornerReserve: number
+  readonly hardLookAheadSamples: number
 }
 
 export const CAR_DRIVING_PROFILES = {
-  // Blue's balanced chassis needs earlier, firmer steering. Keeping the old
-  // weak Hard steer response cost time through successive Kids Room corners.
+  // Blue's stronger steering is a mixed-track regression: the fast Kids Room
+  // line loses more time in Pine Hairpins. Tune its preview before turn-in.
   blue: {
-    hardReaction: 12,
-    hardSteerGain: 2.95,
+    hardReaction: 8,
+    hardSteerGain: 2.22,
     hardCornerReserve: 0,
+    hardLookAheadSamples: 4,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
@@ -28,6 +30,7 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 8,
     hardSteerGain: 2.22,
     hardCornerReserve: 0,
+    hardLookAheadSamples: 4,
   },
   // Green rotates easily on street/dirt. A small planned apex reserve reduces
   // excessive sliding, but a full 6% reserve cost measurable lap time.
@@ -35,6 +38,7 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 10,
     hardSteerGain: 2.42,
     hardCornerReserve: 0.035,
+    hardLookAheadSamples: 4,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
