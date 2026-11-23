@@ -100,8 +100,9 @@ export function stepAiVehicle(
   const roadOffset =
     (vehicle.x - context.nearest.point.x) * context.normal.x +
     (vehicle.y - context.nearest.point.y) * context.normal.y
+  const lateralVelocity = vehicle.vx * context.normal.x + vehicle.vy * context.normal.y
   const corner = planCornerTactics(path, context.nearest.index, reversed,
-    vehicle.speed, slipAngle, roadOffset, ROAD_GEOMETRY.onRoadRadius)
+    vehicle.speed, slipAngle, roadOffset, ROAD_GEOMETRY.onRoadRadius, lateralVelocity)
   let sweep = arcadePavement ? sweepingPavementAllowance(path, context.nearest.index, reversed) : 0
   let racingPace = arcadePavement ? racingPavementAllowance(path, context.nearest.index, reversed) : 0
   if (sweep > 0 || racingPace > 0) {
@@ -181,7 +182,8 @@ export function stepAiVehicle(
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
-    (arcade && !vehicle.racingLine && context.onRoad ? corner.headingLead : 0)
+    (arcade && !vehicle.racingLine && context.onRoad ? corner.headingLead : 0) +
+    (arcade && !vehicle.racingLine ? corner.edgeCorrection : 0)
   // Drift-aware countersteering follows the velocity vector without deleting
   // slip: the tire model still determines whether the car keeps sliding.
   const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
