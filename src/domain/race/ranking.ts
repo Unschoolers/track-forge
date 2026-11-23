@@ -14,8 +14,8 @@ export function raceProgress(
     ? startPathIndex - vehicle.pathIndex
     : vehicle.pathIndex - startPathIndex
   let progress = ((offset % length) + length) % length
-  // Before reaching the first checkpoint, the last quarter is behind the line.
-  if (vehicle.nextSector === 1 && progress >= length * 0.75) progress -= length
+  // A car on its grid approach is behind the line, not almost one lap ahead.
+  if (vehicle.nextSector === 1 && progress >= length - 12) progress -= length
   return vehicle.lap * length + progress
 }
 
