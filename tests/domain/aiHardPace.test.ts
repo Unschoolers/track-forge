@@ -39,25 +39,43 @@ it.each([false, true])('keeps Hard traffic on the hairpin circuit in reverse=%s'
 
 
 // Research-only sweep for #257; remove after selecting a stable setting.
-it('calibrates Hard steering response on Pine Hairpins', () => {
+it('calibrates Hard pursuit and steering on Pine Hairpins', () => {
   const { track } = requireFixture(OFFICIAL_CIRCUITS.find(({ track }) => track.name === 'Pine Hairpins'))
   const path = prepareLanePath(track)
-  const mutable = AI_DRIVING_TUNING as unknown as { HARD_ARCADE_REACTION: number }
-  const initial = mutable.HARD_ARCADE_REACTION
+  const mutable = AI_DRIVING_TUNING as unknown as {
+    HARD_ARCADE_REACTION: number
+    HARD_ARCADE_STEER_GAIN: number
+    HARD_EXTRA_LOOKAHEAD_SAMPLES: number
+  }
+  const initial = { ...mutable }
+  const candidates: { reaction: number, gain: number, lookAhead: number }[] = []
+  for (const lookAhead of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+    candidates.push({ reaction: 8, gain: 2.42, lookAhead })
+  }
+  for (const gain of [1.8, 2.05, 2.22, 2.32, 2.55, 2.7, 2.9, 3.1]) {
+    candidates.push({ reaction: 8, gain, lookAhead: 4 })
+  }
+  for (const gain of [2.22, 2.55, 2.8]) {
+    for (const lookAhead of [0, 1, 2, 3, 5, 6]) {
+      candidates.push({ reaction: 8, gain, lookAhead })
+    }
+  }
   const outcomes: unknown[] = []
   try {
-    for (const response of [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 24]) {
-      mutable.HARD_ARCADE_REACTION = response
+    for (const candidate of candidates) {
+      mutable.HARD_ARCADE_REACTION = candidate.reaction
+      mutable.HARD_ARCADE_STEER_GAIN = candidate.gain
+      mutable.HARD_EXTRA_LOOKAHEAD_SAMPLES = candidate.lookAhead
       const run = runLaneCheck({
         path, trackName: track.name, seed: 11, difficulty: 'hard', car: 'blue',
         mode: 'solo', handling: 'arcade', reversed: false, seconds: 45, laps: 1,
       })
       const vehicle = requireFixture(run.vehicles[0])
-      outcomes.push({ response, time: vehicle.finishedAt, recoveries: vehicle.recoveries,
-        stopped: run.stoppedReason })
+      outcomes.push({ ...candidate, time: vehicle.finishedAt,
+        recoveries: vehicle.recoveries, stopped: run.stoppedReason })
     }
   } finally {
-    mutable.HARD_ARCADE_REACTION = initial
+    Object.assign(mutable, initial)
   }
-  console.info('HARD_REACTION_SWEEP', JSON.stringify(outcomes))
-}, 30000)
+  console.info('HARD_PURSUIT_SWEEP', JSON.stringify(outcomes))
+}, 60000)

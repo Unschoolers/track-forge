@@ -92,7 +92,8 @@ export function stepAiVehicle(
   // Authored racing lines and Simulation retain their original policy.
   const tuning = handling === 'arcade' && !vehicle.racingLine
     ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
-        reaction: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_REACTION : ARCADE_STEERING.reaction }
+        reaction: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_REACTION : ARCADE_STEERING.reaction,
+        steerGain: difficulty === 'hard' ? AI_DRIVING_TUNING.HARD_ARCADE_STEER_GAIN : ARCADE_STEERING.steerGain }
     : DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
@@ -135,7 +136,9 @@ export function stepAiVehicle(
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
-  const hardLookAhead = drivingDifficulty === 'hard' ? HARD_LOOKAHEAD_SAMPLES : 0
+  const hardLookAhead = drivingDifficulty === 'hard'
+    ? (difficulty === 'hard' && arcade ? AI_DRIVING_TUNING.HARD_EXTRA_LOOKAHEAD_SAMPLES : HARD_LOOKAHEAD_SAMPLES)
+    : 0
   const lookAheadSamples = Math.round(
     context.onRoad
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)
