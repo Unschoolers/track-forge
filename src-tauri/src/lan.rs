@@ -146,7 +146,9 @@ fn add_peer(
     });
     {
         let mut guard = lock(&state)?;
-        if guard.generation != generation || guard.peers.len() >= MAX_GUESTS + usize::from(!hosting) {
+        if guard.generation != generation ||
+            (hosting && guard.locked.load(Ordering::SeqCst)) ||
+            guard.peers.len() >= MAX_GUESTS + usize::from(!hosting) {
             return Err("LAN room is no longer accepting connections".into());
         }
         guard.peers.insert(id.clone(), Arc::clone(&peer));
@@ -291,24 +293,33 @@ pub fn lan_scan(app: AppHandle, manager: State<'_, LanManager>) -> Result<(), St
                 }
                 last_broadcast = Instant::now();
             }
-            if let Ok((size, SocketAddr::V4(address))) = socket.recv_from(&mut buffer) {
-                let Ok(message) = std::str::from_utf8(&buffer[..size]) else { continue };
-                if let Some(remaining) = message.strip_prefix(DISCOVERY_PREFIX) {
-                    if let Some((port, room)) = remaining.split_once('|') {
-                        if port.parse::<u16>().ok() == Some(RACE_PORT)
-                            && room.len() <= 48 && (room.starts_with("Room ") || room.starts_with("Track "))
-                        {
-                            let id = format!("{}:{}", address.ip(), RACE_PORT);
-                            let first = !discovered.contains_key(&id);
-                            discovered.insert(id.clone(), (room.to_owned(), Instant::now()));
-                            if let Ok(mut guard) = state.lock() {
-                                if guard.generation == generation {
-                                    guard.discovered.insert(id.clone(), room.to_owned());
-                                    if first { notify(&app, "found", &id, Some(("name", room.to_owned()))); }
+            match socket.recv_from(&mut buffer) {
+                Ok((size, SocketAddr::V4(address))) => {
+                    let Ok(message) = std::str::from_utf8(&buffer[..size]) else { continue };
+                    if let Some(remaining) = message.strip_prefix(DISCOVERY_PREFIX) {
+                        if let Some((port, room)) = remaining.split_once('|') {
+                            if port.parse::<u16>().ok() == Some(RACE_PORT)
+                                && room.len() <= 48 && (room.starts_with("Room ") || room.starts_with("Track "))
+                            {
+                                let id = format!("{}:{}", address.ip(), RACE_PORT);
+                                let first = !discovered.contains_key(&id);
+                                discovered.insert(id.clone(), (room.to_owned(), Instant::now()));
+                                if let Ok(mut guard) = state.lock() {
+                                    if guard.generation == generation {
+                                        guard.discovered.insert(id.clone(), room.to_owned());
+                                        if first { notify(&app, "found", &id, Some(("name", room.to_owned()))); }
+                                    }
                                 }
                             }
                         }
                     }
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock ||
+                    error.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(error) => {
+                    notify(&app, "error", "", Some(("message", format!("LAN discovery receive failed: {error}"))));
+                    break;
                 }
             }
             let expired: Vec<_> = discovered.iter()
