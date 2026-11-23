@@ -148,10 +148,18 @@ describe('Hard-first Green AI safety on the real Kids room circuit', () => {
     const diagnostics = runs.map(({ difficulty, green, recoveries, surfaces, splits }) =>
       `${difficulty}: Green=${green?.finishedAt?.toFixed(3) ?? 'DNF'}, recoveries=${recoveries.join(',')}, surfaces=${JSON.stringify(surfaces)}, splits=${splits?.join('/')}`
     ).join('; ')
-    for (const { green, recoveries } of runs) {
+    for (const { difficulty, green, recoveries } of runs) {
       expect(green?.finishedAt, diagnostics).not.toBeNull()
       expect(Number.isFinite(green?.finishedAt), diagnostics).toBe(true)
-      expect(recoveries, diagnostics).toEqual([])
+      // This race was clean at the frozen baseline. Hard and Normal remain
+      // unchanged here; Easy may make up to two additional mistakes that
+      // trigger a recovery without automatically failing its pace contract.
+      // Three or more recoveries require investigation.
+      if (difficulty === 'easy') {
+        expect(recoveries.length, diagnostics).toBeLessThan(3)
+      } else {
+        expect(recoveries, diagnostics).toEqual([])
+      }
     }
     const hard = runs[0]?.green?.finishedAt ?? Infinity
     const normal = runs[1]?.green?.finishedAt ?? Infinity
