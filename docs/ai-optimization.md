@@ -106,3 +106,42 @@ matrix, candidate rejections and per-track details. The CI workflow uploads
 summary/JSONL/Parquet files together as a downloadable artifact.
 If the physics, road compilation or AI profiles change, **run new experiments**;
 do not compare different physics revisions as if equivalent.
+
+
+## Kids Room Hard replay-grid investigation (2026-11-23)
+
+The exported live Hard race finished Green human 72.98s, Green AI
+74.80s, Blue AI 82.88s and Red AI 95.28s. Red recovered off-road
+at 37.27s; Green AI recovered at 58.58s during a prolonged passing
+attempt. The human driver manually recovered once as well. These are
+observations, **not** equivalent to deterministic AI-only runs.
+
+The optimizer now includes a separate **Kids Room replay grid**
+scenario with start pads `[3,1,0,2]`. This reproduces Red's pace
+and two recoveries in a four-AI Hard run (Red rival under a Green
+driver slot: **96.267s, two recoveries**).
+
+Two surface-braking experiments were evaluated and rejected: the
+first removed Red's recoveries but slowed its race to **100.017s**
+and broke existing pace gates. Distance-integrated braking still
+failed existing race and benchmark gates.
+
+A proposed Hard-only early abandonment of hopeless passes improved
+Red's replay-grid time from 96.267s to **95.283s**. However,
+cross-track comparisons detected an additional Yellow Hard recovery
+on Desert sand (one → two) under both seeds. The fix was
+**reverted**, not silently accepted. The patch did not resolve
+Green's real-world player-relative passing incident.
+
+**No production AI driving-policy change was accepted in this
+investigation.** Only the diagnostic scenario and the difficulty
+specific QA acceptance policy are retained. Hard remains a strict
+safety gate. Normal/Easy may have deliberate errors; on Easy,
+one or two more recoveries versus the *same seeded* baseline
+are tolerated if the race still finishes and the route/state
+remain valid. Three or more extra recoveries require investigation.
+See `qa/optimization/recoveryPolicy.mjs` and its boundary tests.
+
+Revisit Red's ice→street speed prediction and Green's player-relative
+passing with bounded **before/after cross-track comparisons**, rather
+than accepting a local win that adds Hard-mode recoveries elsewhere.
