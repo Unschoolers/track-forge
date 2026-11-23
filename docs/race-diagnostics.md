@@ -1,0 +1,45 @@
+# Race diagnostics: reusable AI analysis
+
+Use this whenever a player exports a `.trackforge.json` track or `trackforge-race-*.json` replay. Keep the evidence, branch and test seeds with the issue. No code edits to the user-authored track are needed.
+
+## Inspect the original telemetry
+
+```bash
+npm run qa:race -- track path/to/Roundabout.trackforge.json
+npm run qa:race -- stats path/to/trackforge-race-Roundabout-Hard.json
+npm run qa:race -- stats path/to/race.json --json
+npm run qa:race -- stats path/to/race.json --full
+npm run qa:race -- compare path/to/Normal.json path/to/Hard.json
+npm run qa:race:test
+```
+
+`stats` gives **each car separately** (including player Red and AI Red): mean and peak speed; braking, grass and curb time; surface-specific mean speeds; severe steering reversal counts; recoveries; gates; exact-tick events; and repeated incidents grouped by *generated road sample index*. Recoveries are always individual events with a time and index. For cross-lap comparison, a hotspot groups the same road-index range independently of lap number.
+
+By default, time-weighted stats **stop at the player's recorded finish**. Rivals may not have completed two laps in the exported replay; their `finishTime` is explicitly `null`. Use `--full` to inspect the recording tail, not to invent missing finish times. Braking and surface seconds are estimated from the exported frame cadence; event counts use exact recorded event ticks. A partial or damaged export fails with a clear error.
+
+`track` prints a deterministic geometry/terrain fingerprint, road point count, surface/structure breakdown, terrain cell counts, bounds, checkpoints and scenery count. The fingerprint ignores track names, versions, decoration and terrain cell ordering, so it can check whether a replay and an independently uploaded track use the same *road and terrain*. It does **not** assert identical scenery or checkpoints.
+
+`compare` matches car color **and player/AI role** (not changing grid slot). It warns about different geometry, difficulty, handling, grid, laps, mode and player car. It does not treat a human four-car time as directly equivalent to a seeded AI solo time.
+
+## Simulate a supplied track, with exactly the authored geometry
+
+```bash
+npm run qa:race -- simulate path/to/Roundabout.trackforge.json --car all --mode solo --difficulty hard
+npm run qa:race -- simulate path/to/Roundabout.trackforge.json --car red --mode traffic --difficulty hard --grid 2,1,0,3 --start 0.7746478873239436
+npm run qa:race -- simulate path/to/trackforge-race-Roundabout-Hard.json
+npm run qa:race -- simulate path/to/Roundabout.trackforge.json --car yellow --seed 4331
+```
+
+The simulator emits a machine-readable line prefixed `TRACKFORGE_AI_DIAGNOSTIC`. Use this to compare individual AI finish times, recoveries, off-road seconds and failures on identical track/cars/settings. When passed a **race replay**, the command defaults to its player car, difficulty, grid, start and handling; that slot is AI-controlled for this diagnostic. When passed a **track file**, it defaults to four single-car simulations. Override as needed with `--car`, `--mode`, `--seed`, `--laps`, `--start`, `--grid` and `--seconds`. These are deterministic simulations, **not** exact replays of human input or multiplayer network traffic.
+
+The simulator uses actual exported road controls and terrain cells, but the lane-check harness currently does **not** recreate authored scenery colliders, all user checkpoints, or live opponent/player inputs. Do not claim a simulated time is directly comparable to a user's race without recording these differences. For production regressions keep a compact, versioned fixture such as `tests/domain/roundaboutDiagnostic.test.ts` and fixed seeds, and verify on other tracks.
+
+## Investigation loop
+
+1. Check the track fingerprint and setup/version; label live traffic vs AI solo explicitly.
+2. Run `stats` on the player and AI replay; examine repeated recoveries, road-index hotspots, braking/grass and sector crossing times.
+3. Reproduce with `simulate` on the same track, mode, grid and seed; test other colors using solo mode (or substitute the AI-controlled player car).
+4. Tune **driver strategy only**, per car in `src/domain/race/ai/aiCarDrivingProfiles.ts`; never grant AI-only engine, steering friction, or brake power. A fast lap with automatic recovery is a regression.
+5. Run `npm run qa:race:test`, the targeted AI tests, lane QA, typecheck and cross-track regression runs before claiming a gain.
+
+Sources: `qa/race-analysis/{summary.mjs,cli.mjs,simulateTrack.test.ts}`; pure analyzer tests `qa/race-analysis/summary.check.mjs`.
