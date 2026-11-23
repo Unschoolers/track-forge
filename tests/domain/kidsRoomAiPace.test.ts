@@ -184,3 +184,45 @@ trafficSweep('measures Green Hard line speed and recoveries against real AI traf
   console.log('AI_GREEN_TRAFFIC_SWEEP ' + JSON.stringify(results))
   expect(results).toHaveLength(cases.length)
 }, 120_000)
+
+trafficSweep('checks Green Hard traffic-safe steering and throttle strategies', () => {
+  const strategies: readonly { label: string, changes: Partial<CarDrivingProfile> }[] = [
+    { label: 'safe-current', changes: {} },
+    { label: 'edge0.1', changes: { hardEdgeAvoidanceScale: 0.1 } },
+    { label: 'edge0.3', changes: { hardEdgeAvoidanceScale: 0.3 } },
+    { label: 'edge0.35', changes: { hardEdgeAvoidanceScale: 0.35 } },
+    { label: 'edge0.45', changes: { hardEdgeAvoidanceScale: 0.45 } },
+    { label: 'edge0.4-gain2.5', changes: { hardSteerGain: 2.5 } },
+    { label: 'edge0.4-gain2.8', changes: { hardSteerGain: 2.8 } },
+    { label: 'edge0.4-gain3.0', changes: { hardSteerGain: 3 } },
+    { label: 'edge0.4-gain3.4', changes: { hardSteerGain: 3.4 } },
+    { label: 'edge0.4-preview4', changes: { hardLookAheadSamples: 4 } },
+    { label: 'edge0.4-preview6', changes: { hardLookAheadSamples: 6 } },
+    { label: 'edge0.4-preview10', changes: { hardLookAheadSamples: 10 } },
+    { label: 'edge0.4-preview12', changes: { hardLookAheadSamples: 12 } },
+    { label: 'edge0.4-bonus0.25', changes: { hardCornerTargetBonus: 0.25 } },
+    { label: 'edge0.4-bonus0.35', changes: { hardCornerTargetBonus: 0.35 } },
+    { label: 'edge0.4-bonus0.4', changes: { hardCornerTargetBonus: 0.4 } },
+    { label: 'edge0.4-brake4', changes: { hardBrakeOverspeedTolerance: 4 } },
+    { label: 'edge0.4-brake8', changes: { hardBrakeOverspeedTolerance: 8 } },
+    { label: 'edge0.4-brake16', changes: { hardBrakeOverspeedTolerance: 16 } },
+    { label: 'edge0.4-gain3-preview10', changes: { hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'edge0.4-gain3-preview10-bonus0.35', changes: { hardSteerGain: 3, hardLookAheadSamples: 10, hardCornerTargetBonus: 0.35 } },
+    { label: 'edge0.4-gain3-preview10-brake8', changes: { hardSteerGain: 3, hardLookAheadSamples: 10, hardBrakeOverspeedTolerance: 8 } },
+    { label: 'edge0.4-bonus0.35-brake8', changes: { hardCornerTargetBonus: 0.35, hardBrakeOverspeedTolerance: 8 } },
+    { label: 'edge0.1-gain3-preview10', changes: { hardEdgeAvoidanceScale: 0.1, hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'edge0.25-gain3-preview10', changes: { hardEdgeAvoidanceScale: 0.25, hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'edge0.3-gain3-preview10', changes: { hardEdgeAvoidanceScale: 0.3, hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'edge0.4-react16', changes: { hardReaction: 16 } },
+    { label: 'edge0.4-react8', changes: { hardReaction: 8 } },
+  ]
+  const results = strategies.map(({ label, changes }) => {
+    const result = raceRivals(1, 'hard', 'red', {
+      ...CAR_DRIVING_PROFILES.green, ...changes,
+    })
+    return { label, green: result.opponents.find(v => v.car === 'green')?.finishedAt,
+      recoveries: result.recoveries }
+  })
+  console.log('AI_GREEN_TRAFFIC_TUNING ' + JSON.stringify(results))
+  expect(results).toHaveLength(strategies.length)
+}, 120_000)
