@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/270-hard-ai-tuning
+      - fix/273-hard-ai-human-pace
 
 permissions:
   contents: read
