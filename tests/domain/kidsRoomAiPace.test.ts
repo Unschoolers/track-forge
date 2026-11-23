@@ -39,6 +39,7 @@ function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'norm
   // The player's stationary test vehicle must not obstruct the grid. Measure real rival AI on its own.
   let race: RaceState = { ...starting, phase: 'running', countdown: 0,
     vehicles: starting.vehicles.filter(vehicle => !vehicle.player) }
+  const recentAiTransitions = new Map<string, string[]>()
   const recoveries: string[] = []
   const splits = new Map<string, string[]>()
   const surfaces = new Map<string, Record<string, number>>()
@@ -51,6 +52,16 @@ function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'norm
       random,
     )
     race = stepped.state
+    for (const current of race.vehicles) {
+      const previous = before.vehicles.find(vehicle => vehicle.id === current.id)
+      if (current.ai && previous?.ai && (current.ai.phase !== previous.ai.phase ||
+        current.ai.targetLane !== previous.ai.targetLane)) {
+        const transitions = recentAiTransitions.get(current.id) ?? []
+        transitions.push(`${race.elapsed.toFixed(1)}s:${previous.ai.phase}/${previous.ai.targetLane} -> ${current.ai.phase}/${current.ai.targetLane}`)
+        if (transitions.length > 12) transitions.shift()
+        recentAiTransitions.set(current.id, transitions)
+      }
+    }
     for (const event of stepped.events) {
       if (event.type === 'gate-crossed' && event.vehicleId !== 'player') {
         const times = splits.get(event.vehicleId) ?? []
@@ -62,7 +73,7 @@ function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'norm
         const prior = before.vehicles.find(candidate => candidate.id === event.vehicleId)
         const point = race.path.points[event.pathIndex]
         const distance = point ? Math.hypot((prior?.x ?? 0) - point.x, (prior?.y ?? 0) - point.y) : NaN
-        recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, reason=${event.reason}, x=${event.x.toFixed(0)}, y=${event.y.toFixed(0)}, index=${event.pathIndex}, surface=${point?.surface ?? '?'}, speed=${prior?.speed.toFixed(0) ?? '?'}, slip=${prior?.slip.toFixed(0) ?? '?'}, yaw=${prior?.yawRate.toFixed(2) ?? '?'}, offset=${distance.toFixed(0)}`)
+        recoveries.push(`${vehicle?.car ?? event.vehicleId}@${race.elapsed.toFixed(1)}s, reason=${event.reason}, x=${event.x.toFixed(0)}, y=${event.y.toFixed(0)}, index=${event.pathIndex}, surface=${point?.surface ?? '?'}, speed=${prior?.speed.toFixed(0) ?? '?'}, slip=${prior?.slip.toFixed(0) ?? '?'}, yaw=${prior?.yawRate.toFixed(2) ?? '?'}, offset=${distance.toFixed(0)}, ai=${prior?.ai?.phase}/${prior?.ai?.targetLane}, transitions=${recentAiTransitions.get(event.vehicleId)?.join(' | ')}`)
       }
     }
     if (tick % 60 === 0) {
