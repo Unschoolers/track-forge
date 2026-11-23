@@ -162,8 +162,8 @@ function addSplitsDetails(frame: ModalFrame, result: RaceResult, container: HTML
   const hint = element('p', 'results-splits-instruction')
   list.append(...splits.map((split, index) => {
     const label = result.routeKind === 'point-to-point'
-      ? (split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`)
-      : `LAP ${split.lap + 1} · ${split.gate === 4 ? 'FINISH' : `CHECKPOINT ${split.gate}`}`
+      ? (split.gate === (result.finishGate ?? 4) ? 'FINISH' : `CHECKPOINT ${split.gate}`)
+      : `LAP ${split.lap + 1} · ${split.gate === (result.finishGate ?? 4) ? 'FINISH' : `CHECKPOINT ${split.gate}`}`
     const segment = split.time - (splits[index - 1]?.time ?? 0)
     const row = element('div', 'results-splits-detail-row')
     row.append(
