@@ -74,6 +74,7 @@ public class LanRacePlugin extends Plugin {
         volatile boolean acceptedHere;
         volatile boolean acceptedThere;
         volatile boolean connected;
+        volatile boolean connectedNotified;
         Peer(Socket socket, ArrayDeque<String> handshake) throws IOException {
             this.socket = socket;
             this.handshake = handshake;
@@ -184,7 +185,10 @@ public class LanRacePlugin extends Plugin {
             if (discovery != null) discovery.close();
             server = null;
             discovery = null;
-            for (Peer peer : peers.values()) peer.close();
+            for (Peer peer : peers.values()) {
+                trace(peer.handshake, "local_stop");
+                peer.close();
+            }
             peers.clear();
             discovered.clear();
             if (wifiDiscoveryLock != null) {
@@ -206,7 +210,10 @@ public class LanRacePlugin extends Plugin {
                     if (buffer.size() >= MAX_FRAME - 1) { reason = "invalid_frame_length"; return; }
                     buffer.write(ch);
                 }
-                if (ch == -1) break;
+                if (ch == -1) {
+                    if (buffer.size() != 0) reason = "invalid_frame_length";
+                    break;
+                }
                 JSONObject packet = new JSONObject(new String(buffer.toByteArray(), StandardCharsets.UTF_8));
                 String type = packet.optString("t", "");
                 switch (type) {
@@ -221,7 +228,7 @@ public class LanRacePlugin extends Plugin {
                     }
                     case "reject" -> { reason = "remote_reject"; return; }
                     case "data" -> {
-                        if (!peer.connected) maybeConnected(id, peer);
+                        if (!peer.connectedNotified) maybeConnected(id, peer);
                         if (!peer.connected) { reason = "data_before_pairing"; return; }
                         String encoded = packet.optString("d", "");
                         byte[] data = Base64.decode(encoded, Base64.DEFAULT);
@@ -252,6 +259,7 @@ public class LanRacePlugin extends Plugin {
                 peer.connected = true;
                 trace(peer.handshake, "connected");
                 emit("connected", id, null, null);
+                peer.connectedNotified = true;
             }
         }
     }
