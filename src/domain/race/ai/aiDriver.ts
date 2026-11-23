@@ -102,8 +102,10 @@ export function stepAiVehicle(
   const roadOffset =
     (vehicle.x - context.nearest.point.x) * context.normal.x +
     (vehicle.y - context.nearest.point.y) * context.normal.y
+  const lateralVelocity = vehicle.vx * context.normal.x +
+    vehicle.vy * context.normal.y
   const corner = planCornerTactics(path, context.nearest.index, reversed,
-    vehicle.speed, slipAngle, roadOffset, ROAD_GEOMETRY.onRoadRadius)
+    vehicle.speed, slipAngle, roadOffset, ROAD_GEOMETRY.onRoadRadius, lateralVelocity)
   let sweep = arcadePavement ? sweepingPavementAllowance(path, context.nearest.index, reversed) : 0
   let racingPace = arcadePavement ? racingPavementAllowance(path, context.nearest.index, reversed) : 0
   if (sweep > 0 || racingPace > 0) {
@@ -258,9 +260,11 @@ export function stepAiVehicle(
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / throttleWindow, 0, 1)
   const settledSlide = arcade && !vehicle.racingLine && context.onRoad &&
     Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.5 && !curveBraking
-  const plannedThrottle = settledSlide
+  // A car still sliding toward the outside must complete its rotation
+  // before applying exit power. In a clean line traction remains at 1.
+  const plannedThrottle = (settledSlide
     ? Math.max(curveThrottle, corner.exitThrottle)
-    : curveThrottle
+    : curveThrottle) * (arcade && !vehicle.racingLine ? corner.exitTraction : 1)
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && plannedThrottle === 1 &&
     vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015
