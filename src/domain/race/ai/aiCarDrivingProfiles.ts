@@ -21,6 +21,8 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
+  /** Allow this chassis to abandon a lost pass at this multiple of overtake range. */
+  readonly lostPassAbortDistanceScale?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -43,6 +45,9 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.01,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
+    // The fast, low-grip Red loses more by staying on the outside after its
+    // target escapes than by safely returning to its normal racing line.
+    lostPassAbortDistanceScale: 1,
   },
   // Green rotates easily on street/dirt. With its longer preview it can
   // stay on line with a small Hard apex speed reserve.
