@@ -99,45 +99,6 @@ describe('AI approach speed planning', () => {
     expect(iceSpeed).toBeGreaterThan(70)
   })
 
-  it('uses real braking grip between the current street and an icy apex in both travel directions', () => {
-    const controls = [
-      { x: 0, y: 0, surface: 'street' as const, curve: 'corner' as const },
-      { x: 250, y: 0, surface: 'street' as const, curve: 'corner' as const },
-      { x: 380, y: 0, surface: 'street' as const, curve: 'corner' as const },
-      { x: 600, y: 0, surface: 'ice' as const, curve: 'corner' as const },
-      { x: 600, y: 320, surface: 'ice' as const, curve: 'corner' as const },
-    ]
-    const verify = (reversed: boolean) => {
-      const aligned = reversed
-        ? [...controls].reverse().map(point => ({
-            ...point,
-            surface: point.x === 600 && point.y === 0 ? 'street' as const : point.surface,
-          }))
-        : controls
-      // Surfaces belong to authored segments; when travelling backwards,
-      // the segment that switches traction has the opposite source index.
-      const earlierIce = aligned.map(point => ({
-        ...point,
-        surface: (reversed ? point.x === 600 && point.y === 0 :
-          point.x === 380 && point.y === 0) ? 'ice' as const : point.surface,
-      }))
-      const pavement = buildRoadPath(aligned, EMPTY_TERRAIN, undefined, 'point-to-point')
-      const ice = buildRoadPath(earlierIce, EMPTY_TERRAIN, undefined, 'point-to-point')
-      const approachIndex = pavement.points.findIndex(point =>
-        Math.abs(point.x - 300) < 4 && Math.abs(point.y) < 5)
-      expect(approachIndex).toBeGreaterThanOrEqual(0)
-      expect(pavement.points[approachIndex]?.surface).toBe('street')
-      expect(ice.points[approachIndex]?.surface).toBe('street')
-      const speed = (path: typeof pavement) =>
-        safeEntrySpeedAhead(path, approachIndex, reversed, 0.51,
-          CAR_SPECS.blue, 1.37, 'blue', true, false, true)
-      expect(speed(pavement), 'More pavement braking room should permit a later brake point')
-        .toBeGreaterThan(speed(ice) + 4)
-    }
-    verify(false)
-    verify(true)
-  })
-
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)

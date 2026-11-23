@@ -191,9 +191,21 @@ export function stepAiVehicle(
   const sideslip = drivingDifficulty === 'hard' && vehicle.speed > SIDESLIP_MIN_SPEED
     ? slipAngle * (arcade && !vehicle.racingLine ? corner.sideslipGain : SIDESLIP_CORRECTION_GAIN)
     : 0
+  // Track the rotation the *road* calls for instead of damping all yaw.
+  // A neutral yaw damper slows legitimate turn-in and makes the AI rely on
+  // full braking to follow a bend. Curvature feed-forward lets the tires
+  // initiate the turn while body-slip correction still controls real drifts.
+  // The edge reserve withdraws feed-forward when recovering a wide line.
+  const roadYaw = arcade && !vehicle.racingLine && context.onRoad
+    ? clamp(vehicle.speed * turnAmountAt(path,
+        context.nearest.index + direction * 6, 6) * direction / 72, -1.8, 1.8)
+    : 0
+  const roadYawReserve = clamp(
+    (ROAD_GEOMETRY.onRoadRadius * 0.75 - context.nearest.distance) /
+      (ROAD_GEOMETRY.onRoadRadius * 0.45), 0, 1)
   const desiredSteer = clamp(
     wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
-      vehicle.yawRate * 0.38,
+      (vehicle.yawRate - roadYaw * roadYawReserve * 0.65) * 0.38,
     -1,
     1,
   )
