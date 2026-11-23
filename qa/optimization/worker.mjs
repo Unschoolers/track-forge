@@ -1,4 +1,4 @@
-import { parentPort, workerData } from 'node:worker_threads'
+import { parentPort, workerData, threadId } from 'node:worker_threads'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,7 +12,9 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 
 const server = await createServer({
   root, configFile: resolve(root, 'vite.config.ts'),
-  server: { middlewareMode: true, hmr: false, watch: null },
+  // Vite SSR loaders in separate threads otherwise contend for its default
+  // HMR WebSocket port, even with a headless middleware host.
+  server: { middlewareMode: true, hmr: { port: 26000 + threadId }, watch: null },
   appType: 'custom', logLevel: 'error',
 })
 try {
@@ -60,7 +62,7 @@ try {
       const policy = { ...baseline, ...task.changes }
       const run = runLaneCheck({
         path: entry.path, trackName: entry.trackName,
-        seed: task.seed, car: task.car, difficulty: task.difficulty,
+        seed: task.seed, car: task.playerCar ?? task.car, difficulty: task.difficulty,
         reversed: scenario.reverse, handling: 'arcade',
         mode: task.mode, startRatio: scenario.startRatio,
         ...(scenario.gridPositions ? { gridPositions: scenario.gridPositions } : {}),
@@ -69,14 +71,24 @@ try {
       })
       const exported = projectTrial(run, {
         candidateId: task.candidateId, scenarioId: scenario.id,
-        driverCar: task.car, seed: task.seed, difficulty: task.difficulty,
+        driverCar: task.playerCar ?? task.car, tunedCar: task.car,
+        gridPositions: scenario.gridPositions?.join(',') ?? null,
+        seed: task.seed, difficulty: task.difficulty,
         mode: task.mode, startRatio: scenario.startRatio,
         trackFingerprint: entry.fingerprint,
         physicsRevision: workerData.physicsRevision,
       }, { telemetry: task.telemetry === true })
+      // A tuned car can be a *rival*, not only the AI-driven player slot.
+      // Using the first vehicle exclusively missed the historical Kids Room
+      // recovery regression when Green was racing behind a Red player.
+      const focus = (task.playerCar ?? task.car) === task.car
+        ? run.vehicles[0]
+        : run.vehicles.find(vehicle => vehicle.car === task.car)
+      if (!focus) throw new Error('Tuned rival absent from simulation')
       port.postMessage({
         type: 'result', id,
         result: {
+          focusVehicleId: focus.vehicleId,
           ...exported,
           driverVehicleId: run.vehicles[0]?.vehicleId ?? null,
           secondsSimulated: run.simulatedSeconds,
