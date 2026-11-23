@@ -111,13 +111,11 @@ export function stepAiVehicle(
   // is enough, with a tiny straight-only courtesy nudge below.
   // Authored racing lines already include their own traffic-facing lane
   // decisions; preserve that proven behaviour on curated circuits.
-  // Red's medium/far-back grid rivals carry more speed into the third
-  // hairpin than their lane entry permits. They retain proven defensive
-  // following. Red's player-mirror and every other chassis use compact
-  // AI traffic; no track-name branches or modified physical tire grip.
-  const defensiveRed = vehicle.car === 'red' &&
-    (vehicle.ai?.personality === 'steady' ||
-      vehicle.ai?.personality === 'opportunist')
+  // Red is the fastest/lowest-grip chassis and still needs its established
+  // defensive traffic decisions to stay on-road in all four Hard grids.
+  // Other chassis benefit safely from compact non-colliding AI clearance;
+  // Red can be migrated when a dedicated corner-entry controller is proven.
+  const defensiveRed = vehicle.car === 'red'
   const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
     !defensiveRed && aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
