@@ -108,9 +108,18 @@ describe('AI approach speed planning', () => {
       { x: 600, y: 320, surface: 'ice' as const, curve: 'corner' as const },
     ]
     const verify = (reversed: boolean) => {
-      const aligned = reversed ? [...controls].reverse() : controls
+      const aligned = reversed
+        ? [...controls].reverse().map(point => ({
+            ...point,
+            surface: point.x === 600 && point.y === 0 ? 'street' as const : point.surface,
+          }))
+        : controls
+      // Surfaces belong to authored segments; when travelling backwards,
+      // the segment that switches traction has the opposite source index.
       const earlierIce = aligned.map(point => ({
-        ...point, surface: point.x >= 380 ? 'ice' as const : point.surface,
+        ...point,
+        surface: (reversed ? point.x === 600 && point.y === 0 :
+          point.x === 380 && point.y === 0) ? 'ice' as const : point.surface,
       }))
       const pavement = buildRoadPath(aligned, EMPTY_TERRAIN, undefined, 'point-to-point')
       const ice = buildRoadPath(earlierIce, EMPTY_TERRAIN, undefined, 'point-to-point')
