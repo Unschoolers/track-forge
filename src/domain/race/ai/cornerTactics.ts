@@ -11,8 +11,6 @@ export interface CornerTactics {
   readonly turnSign: number
   /** Small early turn-in correction, never a replacement for lane following. */
   readonly headingLead: number
-  /** Steering correction toward the road before outward drift reaches the verge. */
-  readonly edgeCorrection: number
   readonly pursuitScale: number
   readonly drifting: boolean
   readonly sideslipGain: number
@@ -33,7 +31,6 @@ export function planCornerTactics(
   slipAngle: number,
   roadOffset: number,
   roadRadius: number,
-  lateralVelocity = 0,
 ): CornerTactics {
   const direction = reversed ? -1 : 1
   const past = turnAmountAt(path, index - direction * 12, 6) * direction
@@ -61,13 +58,6 @@ export function planCornerTactics(
   const headingLead = phase === 'approach'
     ? sign * Math.min(0.13, bend * 0.23) * (1 - edge)
     : 0
-  const projectedOffset = roadOffset + lateralVelocity * 0.28
-  const warningOffset = roadRadius * 0.52
-  const edgeStrength = clamp((Math.abs(projectedOffset) - warningOffset) /
-    Math.max(1, roadRadius - warningOffset), 0, 1)
-  const edgeCorrection = edgeStrength === 0
-    ? 0
-    : -Math.sign(projectedOffset) * direction * edgeStrength * 0.26
   // Preserve a substantial pursuit horizon at speed; choking the target to
   // a handful of samples makes heavy cars oscillate rather than rotate.
   const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
@@ -81,5 +71,5 @@ export function planCornerTactics(
   const exitThrottle = phase === 'exit' && drifting
     ? clamp(0.28 + (0.19 - Math.abs(peakNext)) * 1.5, 0.28, 0.52)
     : 0
-  return { phase, bend, turnSign: sign, headingLead, edgeCorrection, pursuitScale, drifting, sideslipGain, exitThrottle }
+  return { phase, bend, turnSign: sign, headingLead, pursuitScale, drifting, sideslipGain, exitThrottle }
 }
