@@ -41,6 +41,7 @@ import {
   type GhostStore,
 } from '@/application/race/ghostReplay'
 import { LapTiming } from '@/application/race/lapTiming'
+import { penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 import { GhostRecording } from '@/application/race/ghostRecording'
 import { RaceDiagnosticsRecording, type RaceDiagnosticsReport } from '@/application/race/raceDiagnostics'
 import { createRaceResult, toRaceStanding } from '@/application/race/raceResultRecorder'
@@ -430,7 +431,7 @@ export class RaceSession implements RaceSessionPort {
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
       if (track && setup && setup.mode !== 'nearby' && player && this.dependencies.ghostStore &&
           result.outcome === 'finished' && result.playerTime !== null) {
-        const frames = this.recording?.finish(player, result.playerTime)
+        const frames = this.recording?.finish(player, resultState.elapsed)
         if (frames) {
           const previous = this.dependencies.ghostStore.load(track, setup)
           const saved = this.dependencies.ghostStore.record(track, setup, result.playerTime, frames, this.timing.complete(setup.laps))
@@ -540,7 +541,7 @@ export class RaceSession implements RaceSessionPort {
     const nearbyPosition = setup?.mode === 'nearby' && player
       ? this.dependencies.nearby?.livePosition?.(player, state) : null
     const latestSplit = this.timing.accepted.at(-1)
-    const elapsed = result?.playerTime ?? state.elapsed
+    const elapsed = result?.playerTime ?? (player ? penalizedRaceTime(state.elapsed, player) : state.elapsed)
     return {
       runId: this.runId,
       track,
@@ -548,7 +549,7 @@ export class RaceSession implements RaceSessionPort {
       state,
       standings,
       result,
-      ghost: setup?.mode === 'ghost' && this.bestGhost ? ghostPoseAt(this.bestGhost, state.elapsed) : null,
+      ghost: setup?.mode === 'ghost' && this.bestGhost ? ghostPoseAt(this.bestGhost, elapsed) : null,
       ...(setup?.mode === 'ghost' && this.bestGhost ? { ghostTime: this.bestGhost.time } : {}),
       telemetry: {
         routeKind: normalizeRouteKind(track?.routeKind),

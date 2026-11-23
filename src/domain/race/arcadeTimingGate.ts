@@ -2,7 +2,7 @@ import { ROAD_GEOMETRY } from '@/domain/config'
 import { crossesRoadGate, passedPendingCheckpoint, timingGateCrossingRadius } from '@/domain/race/progress'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 
-const MISSED_GATE_GRACE_SECONDS = 5
+const MISSED_GATE_GRACE_SECONDS = 2
 
 /** A sustained position beyond a circuit gate also counts as a miss.
  * The small direction-aware window avoids mistaking a crossing-road index

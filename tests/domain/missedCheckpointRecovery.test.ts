@@ -26,7 +26,7 @@ describe('missed timing gate recovery', () => {
     const result = advanceArcadeTimingGate(race, before, after, 6, false, () => false)
 
     expect(result.vehicle.nextSector).toBe(1)
-    expect(result.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+    expect(result.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 2 })
   })
 
   it('starts recovery when the stage finish is bypassed beyond the painted line', () => {
@@ -45,7 +45,7 @@ describe('missed timing gate recovery', () => {
 
     const result = advanceArcadeTimingGate(race, before, after, 6, false, () => false)
     expect(result.vehicle.finishedAt).toBeNull()
-    expect(result.missedCheckpoint).toMatchObject({ gate: 4, remainingSeconds: 5 })
+    expect(result.missedCheckpoint).toMatchObject({ gate: 4, remainingSeconds: 2 })
   })
 
   it.each([false, true])('detects a bypass on a circuit in both directions (reversed=%s)', reversed => {
@@ -77,7 +77,7 @@ describe('missed timing gate recovery', () => {
     expect(crossesRoadGate(path, afterGate, later, gatePosition, Infinity, reversed)).toBe(false)
     const missed = advanceArcadeTimingGate(race, afterGate, later, 6, false, () => false)
     expect(missed.vehicle.nextSector).toBe(1)
-    expect(missed.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 5 })
+    expect(missed.missedCheckpoint).toMatchObject({ gate: 1, remainingSeconds: 2 })
 
     // Brief reacquisition of the wrong road arm must not fabricate a miss.
     const changingArms = advanceArcadeTimingGate(

@@ -54,6 +54,10 @@ export interface RaceVehicle {
   readonly nextSector: 1 | 2 | 3 | 4
   readonly lap: number
   readonly recoveryCheckpoint?: number | null
+  /** Cumulative race-time penalty, independent of simulation elapsed. */
+  readonly recoveryPenaltySeconds?: number
+  /** Seconds since a player fell off elevated road support; clears after recovery. */
+  readonly bridgeFallSeconds?: number | undefined
   readonly damage: number
   readonly damageLimit: number
   readonly damageCooldown: number

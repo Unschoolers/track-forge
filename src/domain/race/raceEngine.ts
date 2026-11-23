@@ -22,6 +22,8 @@ import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import { resetRaceVehicle, recoverRacePlayer, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
 import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
+import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
+import { addRecoveryTimePenalty, penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
 
 // Preserve existing engine imports after moving recovery rules to their owner.
@@ -208,10 +210,13 @@ function advanceRace(
     const usesCheckpoints = prepared.player && Boolean(state.recoveryCheckpoints?.length)
     const onRoadBefore = previous && (state.routeKind === 'point-to-point' || usesCheckpoints)
       ? raceVehicleContext(state, previous).onRoad : false
-    const withPath = {
-      ...prepared,
-      pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance,
-    }
+    const withPath = previous
+      ? trackBridgeFall(
+          previous,
+          { ...prepared, pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance },
+          context.onRoad, context.structureRunId, context.surfaceHeight, dt,
+        )
+      : { ...prepared, pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance }
     let updated: RaceVehicle
     if (vehicle.player && previous &&
         (state.routeKind === 'point-to-point' || (arcade && state.path.closed))) {
@@ -242,7 +247,8 @@ function advanceRace(
       updated = { ...updated, pathIndex: context.nearest.index, pathDistance: context.nearest.point.distance,
         recoveryAnchorIndex, recoveryReacquiredIndex }
     }
-    if (updated.player && context.onRoad && updated.grounded && !unrelatedArm &&
+    if (updated.player && updated.bridgeFallSeconds === undefined && context.onRoad &&
+        updated.grounded && !unrelatedArm &&
         isSafeRoadRecoverySample(state.path, context.nearest.index)) {
       updated = { ...updated, lastRoadContactIndex: context.nearest.index }
     }
@@ -250,13 +256,16 @@ function advanceRace(
       const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, onRoadBefore && context.onRoad)
       updated = { ...updated, recoveryCheckpoint: checkpoint }
     }
-    const playerStuck = updated.player && updated.stuckDuration > 0.65
+    const playerStuck = updated.player && updated.bridgeFallSeconds === undefined &&
+      updated.stuckDuration > 0.65
+    const bridgeFallExpired = updated.player &&
+      (updated.bridgeFallSeconds ?? 0) >= BRIDGE_FALL_RESPAWN_SECONDS
     const rivalBelowDeck = !updated.player && !context.onRoad &&
       context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
     const lostRival = !updated.player && updated.grounded &&
       (rivalBelowDeck || context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
         (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated)))
-    if (playerStuck || lostRival) {
+    if (playerStuck || bridgeFallExpired || lostRival) {
       const candidate = previous && (rivalBelowDeck || updated.player || state.routeKind === 'point-to-point')
         ? restoreFrameProgress({ ...updated, pathIndex: previous.pathIndex }, previous)
         : updated
@@ -306,6 +315,10 @@ function advanceRace(
       terrainMaterial: context.terrainMaterial,
       safeAboveWater: context.safeAboveWater,
     })
+    // A bridge plunge (including into water) gets the full two-second
+    // recovery window rather than teleporting as soon as it hits the surface.
+    if (vehicle.player && vehicle.bridgeFallSeconds !== undefined &&
+        vehicle.bridgeFallSeconds < BRIDGE_FALL_RESPAWN_SECONDS) return vehicle
     const previous = state.vehicles[index]
     const sceneryHit = !arcade && vehicle.player && previous && state.sceneryColliders &&
       !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
@@ -397,6 +410,20 @@ function advanceRace(
   for (const collision of collisionFrame.events) {
     events.push({ type: 'collision', ...collision })
   }
+  // A recovery costs the recovered car 100 ms, once per tick even when
+  // two physical triggers (e.g. falling into water while stuck) coincide.
+  // Keep the simulation clock unchanged; official finish and gate times
+  // include this car's accumulated penalty.
+  const recoveredIds = new Set(events.flatMap(event =>
+    event.type === 'vehicle-recovered' ? [event.vehicleId] : [],
+  ))
+  vehicles = vehicles.map((vehicle, index) => {
+    const prior = state.vehicles[index]
+    const adjusted = recoveredIds.has(vehicle.id) ? addRecoveryTimePenalty(vehicle) : vehicle
+    return prior?.finishedAt === null && adjusted.finishedAt !== null
+      ? { ...adjusted, finishedAt: penalizedRaceTime(adjusted.finishedAt, adjusted) }
+      : adjusted
+  })
   let player = vehicles.find((vehicle) => vehicle.player)
   const playerContext = player
     ? raceVehicleContext(state, player)
@@ -405,6 +432,7 @@ function advanceRace(
     player !== undefined &&
     playerContext !== undefined &&
     !(arcade && player.waterRecoveryProtected) &&
+    (player.bridgeFallSeconds === undefined || player.bridgeFallSeconds >= BRIDGE_FALL_RESPAWN_SECONDS) &&
     hasVehicleWaterContact({
       grounded: player.grounded,
       terrainMaterial: playerContext.terrainMaterial,
@@ -432,7 +460,7 @@ function advanceRace(
       }
       const endGate = vehicle.lap > previous.lap ? 4 : vehicle.nextSector - 1
       for (let gate = previous.nextSector; gate <= endGate; gate++) {
-        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate: gate as 1 | 2 | 3 | 4, lap: previous.lap, time: elapsed })
+        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate: gate as 1 | 2 | 3 | 4, lap: previous.lap, time: penalizedRaceTime(elapsed, vehicle) })
       }
     }
     if (previous.finishedAt === null && vehicle.finishedAt !== null) {
