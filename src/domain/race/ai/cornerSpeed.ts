@@ -9,7 +9,10 @@ const SHARP_BEND_SAFETY_BASE = 0.32
 const SHARP_BEND_SAFETY_GAIN = 1.25
 const SHARP_BEND_SAFETY_MAX = 0.9
 
-const BRAKE_LOOKAHEAD = [0, 6, 12, 20, 30, 42, 58, 78, 100]
+// A sharp apex can fit entirely between the old sparse samples, and icy
+// approaches need a longer physical stopping distance than dry asphalt.
+// Four road samples (~24 world units) is cheap with cached turn geometry.
+const BRAKE_LOOKAHEAD = Array.from({ length: 41 }, (_, index) => index * 4)
 const BRAKE_TRACTION = VEHICLE_DYNAMICS_TUNING.forces.gravityAcceleration *
   VEHICLE_DYNAMICS_TUNING.forces.brakeGripUsage
 const PAVEMENT_PREVIEW = [0, 6, 12, 20, 30, 39, 48, 58]
