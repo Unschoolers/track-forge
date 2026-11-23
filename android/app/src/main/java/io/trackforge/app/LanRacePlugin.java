@@ -137,7 +137,7 @@ public class LanRacePlugin extends Plugin {
                 }
             }
         } catch (IOException | JSONException | IllegalArgumentException exception) {
-            // Invalid/dropped peer link is a real disconnect, never a silent success.
+            android.util.Log.w("TrackForgeLan", "LAN peer connection ended: " + id, exception);
         } finally {
             peer.close();
             synchronized (gate) {
@@ -150,9 +150,11 @@ public class LanRacePlugin extends Plugin {
     }
 
     private void maybeConnected(String id, Peer peer) {
-        if (peer.acceptedHere && peer.acceptedThere && !peer.connected) {
-            peer.connected = true;
-            emit("connected", id, null, null);
+        synchronized (peer) {
+            if (peer.acceptedHere && peer.acceptedThere && !peer.connected) {
+                peer.connected = true;
+                emit("connected", id, null, null);
+            }
         }
     }
 
