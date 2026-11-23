@@ -161,6 +161,23 @@ describe('vehicle physics', () => {
     expect(arcade.speed).toBeGreaterThan(0)
   })
 
+  it('lets an AI trail-brake proportionally while human brakes remain unchanged', () => {
+    const initial = { ...vehicle('green'), player: false, angle: 0,
+      vx: 185, vy: 7, speed: Math.hypot(185, 7) }
+    const context = { ...getVehicleStepContext(path, initial), surface: 'street' as const, grade: 0 }
+    const input = { steering: 0.8, throttle: 0, braking: true }
+    const dt = 1 / 60
+    const coasting = stepVehicle(initial, { ...input, braking: false }, context, dt, 'arcade')
+    const partial = stepVehicle(initial, { ...input, brakePressure: 0.3 }, context, dt, 'arcade')
+    const full = stepVehicle(initial, input, context, dt, 'arcade')
+    expect(full.speed).toBeLessThan(partial.speed)
+    expect(partial.speed).toBeLessThan(coasting.speed)
+    expect(Math.abs(partial.yawRate)).toBeGreaterThan(Math.abs(full.yawRate))
+    const human = { ...initial, player: true }
+    expect(stepVehicle(human, { ...input, brakePressure: 0 }, context, dt, 'arcade'))
+      .toEqual(stepVehicle(human, input, context, dt, 'arcade'))
+  })
+
   it('trims speed on the first Arcade brake frame instead of applying full force', () => {
     const initial = { ...vehicle(), angle: 0, vx: 180, vy: 0, speed: 180 }
     const context = { ...getVehicleStepContext(path, initial), surface: 'street' as const, grade: 0 }

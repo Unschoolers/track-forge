@@ -264,8 +264,16 @@ export function stepAiVehicle(
   const apexBrakeMargin = arcade && !vehicle.racingLine && context.onRoad &&
     context.surface === 'street' && (corner.phase === 'turn' || corner.phase === 'exit')
       ? 7 : 3
-  const curveBraking = vehicle.speed > curveSpeed +
-    Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
+  const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting && arcade ? 7 : 3)
+  const curveOverspeed = vehicle.speed - curveSpeed
+  const curveBraking = curveOverspeed > curveBrakeThreshold
+  // The former all-or-nothing AI brake rapidly toggled full force in bends,
+  // spending lateral tire grip on tiny speed corrections. Modulate pressure
+  // by the actual overspeed; reserve full brakes for sharp approaches,
+  // emergencies, and genuine off-road recovery. Tire physics is unchanged.
+  const cornerBrakePressure = curveBraking
+    ? clamp((curveOverspeed - curveBrakeThreshold + 4) / 18, 0.22, 1)
+    : 0
   // Ease off on approach so the tires can turn without repeated hard braking.
   const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
@@ -303,6 +311,9 @@ export function stepAiVehicle(
         (recovering &&
           context.nearest.distance > 72 &&
           vehicle.speed > 90),
+      brakePressure: emergency || (recovering &&
+        context.nearest.distance > 72 && vehicle.speed > 90)
+        ? 1 : cornerBrakePressure,
     },
     context,
     deltaSeconds,

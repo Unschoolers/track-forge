@@ -60,7 +60,8 @@ export function stepVehicle(
         0,
         1,
       )
-    : Number(input.braking)
+    : vehicle.player ? Number(input.braking)
+      : clamp(input.brakePressure ?? Number(input.braking), 0, 1)
   const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
   const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
   const car = CAR_SPECS[vehicle.car]

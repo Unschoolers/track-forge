@@ -111,4 +111,6 @@ export interface DriverInput {
   readonly steering: number
   readonly throttle: number
   readonly braking: boolean
+  /** AI-only proportional service brake. Player controls retain their own brake timing. */
+  readonly brakePressure?: number
 }
