@@ -34,3 +34,16 @@ export function selectScenarios(ids, available = STUDY_SCENARIOS) {
     throw new Error('Duplicate scenario')
   return selected
 }
+
+/** Choose representative calibration circuits while retaining holdout tracks.
+ * All other selected circuits remain independent validation scenarios.
+ */
+export function selectCalibration(ids, scenarios = STUDY_SCENARIOS) {
+  const picked = ids?.length
+    ? selectScenarios(ids, scenarios)
+    : scenarios.filter(scenario => scenario.group === 'calibration')
+  if (picked.length < 2) throw new Error('Choose at least two calibration circuits')
+  if (picked.length >= scenarios.length)
+    throw new Error('At least one independent holdout circuit is required')
+  return picked
+}
