@@ -52,7 +52,10 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.035,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.35,
-    hardEdgeAvoidanceScale: 0.4,
+    // Validated on Desert sand, Kids Room, Pine Hairpins, Meadow Loop:
+    // preserve forward pursuit preview near ordinary road edges without
+    // overriding real tire grip, corner/braking safety, or recovery rules.
+    hardEdgeAvoidanceScale: 0.25,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
