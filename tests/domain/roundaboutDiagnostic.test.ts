@@ -189,3 +189,72 @@ profileSweep('measures all four colors and sweeps Red through the western hairpi
   console.log('AI_RED_ROUNDABOUT_SWEEP ' + JSON.stringify(results))
   expect(results.length).toBe(cases.length + 1)
 }, 180_000)
+
+
+// Opt-in comparison of the proposed *individual* Hard driving profiles in
+// two real exported physical grids. Do not accept a fast solo lap if it adds
+// hairpin recoveries in traffic or makes another car slower.
+profileSweep('compares four-car Hard candidates on both replay starting grids', () => {
+  const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
+  const carIds = ['red', 'blue', 'green', 'yellow'] as const
+  const originals = Object.fromEntries(carIds.map(car => [car, profiles[car]])) as
+    Record<CarId, CarDrivingProfile>
+  const candidates: readonly {
+    label: string
+    changes: Partial<Record<CarId, Partial<CarDrivingProfile>>>
+  }[] = [
+    { label: 'current', changes: {} },
+    { label: 'red-reserve018', changes: { red: { hardCornerReserve: 0.18 } } },
+    { label: 'red-reserve022', changes: { red: { hardCornerReserve: 0.22 } } },
+    { label: 'blue-edge0-corner006', changes: {
+      blue: { hardEdgeAvoidanceScale: 0, hardCornerTargetBonus: 0.06 },
+    } },
+    { label: 'green-reaction12', changes: { green: { hardReaction: 12 } } },
+    { label: 'yellow-gain3-preview12', changes: {
+      yellow: { hardSteerGain: 3, hardLookAheadSamples: 12 },
+    } },
+    { label: 'combined-safe-candidates', changes: {
+      red: { hardCornerReserve: 0.22 },
+      blue: { hardEdgeAvoidanceScale: 0, hardCornerTargetBonus: 0.06 },
+      green: { hardReaction: 12 },
+      yellow: { hardSteerGain: 3, hardLookAheadSamples: 12 },
+    } },
+  ]
+  const situations = [
+    { grid: [2, 1, 0, 3], car: 'red' },
+    { grid: [2, 3, 1, 0], car: 'red' },
+    { grid: [2, 3, 1, 0], car: 'yellow' },
+  ] as const
+  const outcomes: unknown[] = []
+  try {
+    for (const candidate of candidates) {
+      for (const car of carIds) {
+        profiles[car] = { ...originals[car], ...candidate.changes[car] }
+      }
+      for (const situation of situations) {
+        for (const seed of [1, 4331]) {
+          const run = runLaneCheck({
+            path, trackName: 'Roundabout', seed, difficulty: 'hard',
+            mode: 'traffic', car: situation.car, handling: 'arcade',
+            gridPositions: situation.grid,
+            reversed: false, startRatio: 0.7746478873239436,
+            laps: 2, seconds: 110,
+          })
+          outcomes.push({
+            label: candidate.label, grid: situation.grid, player: situation.car,
+            seed, stopped: run.stoppedReason,
+            cars: run.vehicles.map(vehicle => ({
+              id: vehicle.vehicleId, car: vehicle.car,
+              time: vehicle.finishedAt, recoveries: vehicle.recoveries,
+              offroad: Number(vehicle.offRoadSeconds.toFixed(3)),
+            })),
+          })
+        }
+      }
+    }
+  } finally {
+    for (const car of carIds) profiles[car] = originals[car]
+  }
+  console.log('AI_HARD_CROSS_TRACK_CANDIDATES ' + JSON.stringify(outcomes))
+  expect(outcomes).toHaveLength(candidates.length * situations.length * 2)
+}, 180_000)
