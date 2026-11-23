@@ -63,8 +63,24 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test -- --maxWorkers=4
+      - run: npm run test:fast -- --maxWorkers=4
       - run: npm run lint
+
+
+  ai-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # This integration test simulates 120 real races. Keep it independent
+      # from cheap component tests so Vitest's RPC worker isn't starved.
+      # It is a required release gate, not excluded or skipped.
+      - run: npm run test:ai:matrix
 
   android:
     needs: web-build
@@ -135,7 +151,7 @@ jobs:
         run: printf '## Android build\n\nUnsigned QA artifact verified. Installable APKs are signed and published from main in the protected android-signing environment.\n' >> "$GITHUB_STEP_SUMMARY"
 
   sign-and-release:
-    needs: [android, verify]
+    needs: [android, verify, ai-matrix]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
     runs-on: ubuntu-latest
