@@ -71,12 +71,12 @@ if (args.help) {
   }
   // Real moving opponent, intentionally slower, so every chassis gets
   // a meaningful chance to overtake during calibration (especially Yellow).
-  const duelOpponentPace = 0.8
-  function trial(car, scenario, seed, mode, candidate, playerCar = car, focusRole = 'player', opponentCar, opponentPace) {
+  const duelOpponentSpeedLimit = 220
+  function trial(car, scenario, seed, mode, candidate, playerCar = car, focusRole = 'player', opponentCar, opponentSpeedLimit) {
     return {
       car, playerCar, focusRole, scenarioId: scenario.id, seed, mode, difficulty: 'hard',
       policyKind: args.focus, ...(opponentCar ? { opponentCar } : {}),
-      ...(opponentPace !== undefined ? { duelOpponentPace: opponentPace } : {}),
+      ...(opponentSpeedLimit !== undefined ? { duelOpponentSpeedLimit: opponentSpeedLimit } : {}),
       candidateId: candidate.id, changes: candidate.changes,
     }
   }
@@ -95,7 +95,7 @@ if (args.help) {
       args.focus === 'passing' ? 'duel' : 'solo', candidate,
       candidate.car, 'player',
       args.focus === 'passing' ? duelOpponents[candidate.car] : undefined,
-      args.focus === 'passing' ? duelOpponentPace : undefined,
+      args.focus === 'passing' ? duelOpponentSpeedLimit : undefined,
     )
     const baselineTasks = baselines.flatMap(base =>
       calibration.map(scenario => screeningTask(base, scenario)))
@@ -132,24 +132,24 @@ if (args.help) {
         { scenario, seed, mode: 'solo', playerCar: car, focusRole: 'player' },
         ...(args.focus === 'passing' ? [{
           scenario, seed, mode: 'duel', playerCar: car, focusRole: 'player',
-          opponentCar: duelOpponents[car], duelOpponentPace,
+          opponentCar: duelOpponents[car], duelOpponentSpeedLimit,
         }] : []),
         { scenario, seed, mode: 'traffic', playerCar: car, focusRole: 'player' },
         { scenario, seed, mode: 'traffic', playerCar: opponents[car], focusRole: 'rival' },
       ]))
 
     const baseMore = baselines.flatMap(base => allCasesFor(base.car)
-      .map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentPace }) => trial(base.car, scenario, seed, mode, base, playerCar, focusRole, opponentCar, duelOpponentPace))
+      .map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit }) => trial(base.car, scenario, seed, mode, base, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit))
       .filter(task => !cache.has(`${task.candidateId}/${trialKey(task)}`)))
     await batch(baseMore, 'full-field baselines')
     const finalistTasks = shortlisted.flatMap(candidate => allCasesFor(candidate.car)
-      .map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentPace }) => trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole, opponentCar, duelOpponentPace))
+      .map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit }) => trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit))
       .filter(task => !cache.has(`${task.candidateId}/${trialKey(task)}`)))
     await batch(finalistTasks, 'cross-track solo + traffic validation')
 
     const validation = shortlisted.map(candidate => {
-      const pairs = allCasesFor(candidate.car).map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentPace }) => {
-        const task = trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole, opponentCar, duelOpponentPace)
+      const pairs = allCasesFor(candidate.car).map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit }) => {
+        const task = trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit)
         return [get(`base-${candidate.car}`, task), get(candidate.id, task)]
       })
       return { ...candidate, score: assessCandidate(pairs, {
@@ -175,13 +175,13 @@ if (args.help) {
         }
       })(),
     }))
-    const matrix = args.cars.flatMap(car => allCasesFor(car).map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentPace }) => {
-      const task = trial(car, scenario, seed, mode, { id: `base-${car}`, changes: {} }, playerCar, focusRole, opponentCar, duelOpponentPace)
+    const matrix = args.cars.flatMap(car => allCasesFor(car).map(({ scenario, seed, mode, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit }) => {
+      const task = trial(car, scenario, seed, mode, { id: `base-${car}`, changes: {} }, playerCar, focusRole, opponentCar, duelOpponentSpeedLimit)
       const run = get(`base-${car}`, task)
       const driver = run.rows.find(row => row.vehicle_id === run.focusVehicleId)
       if (!driver) throw new Error('Missing baseline driver row')
       return { car, playerCar, focusRole, opponentCar: opponentCar ?? null,
-        duelOpponentPace: duelOpponentPace ?? null,
+        duelOpponentSpeedLimit: duelOpponentSpeedLimit ?? null,
         scenarioId: scenario.id, seed, mode,
         seconds: driver.finished_seconds, recoveries: driver.recoveries }
     }))
