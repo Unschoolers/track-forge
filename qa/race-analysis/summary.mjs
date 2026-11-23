@@ -87,9 +87,11 @@ export function summarizeRace(exported, options = {}) {
   const end = options.full ? last : Math.min(last, exported.result?.playerTime ?? last)
   assert(finite(end) && end > 0, 'invalid observation end')
   const statsById = new Map()
-  for (const v of frames[0].vehicles ?? []) {
-    assert(typeof v.id === 'string' && typeof v.car === 'string', 'invalid vehicle')
-    assert(!statsById.has(v.id), 'duplicate vehicle')
+  assert(Array.isArray(frames[0]?.vehicles), 'missing vehicles in frame 0')
+  for (const v of frames[0].vehicles) {
+    assert(v && typeof v.id === 'string' && v.id.length > 0 &&
+      typeof v.car === 'string' && v.car.length > 0, 'invalid vehicle in frame 0')
+    assert(!statsById.has(v.id), 'duplicate vehicle ' + v.id + ' in frame 0')
     statsById.set(v.id, {
       id: v.id, car: v.car, player: v.player === true,
       seconds: 0, speedIntegral: 0, maxSpeed: 0, brake: 0, grass: 0,
@@ -98,15 +100,40 @@ export function summarizeRace(exported, options = {}) {
     })
   }
   assert(statsById.size > 0, 'no vehicles')
+  // Every frame must contain exactly the same racer identities. Without this
+  // check, absent samples or invalid speeds silently undercount elapsed time,
+  // grass, braking and slip while still presenting plausible statistics.
+  for (const [index, frame] of frames.entries()) {
+    assert(frame && finite(frame.t), 'invalid timestamp at frame ' + index)
+    if (index > 0) {
+      assert(frame.t >= frames[index - 1].t, 'nonmonotonic telemetry at frame ' + (index - 1))
+    }
+    assert(Array.isArray(frame.vehicles), 'missing vehicles in frame ' + index)
+    const seen = new Set()
+    for (const v of frame.vehicles) {
+      assert(v && typeof v.id === 'string' && v.id.length > 0,
+        'invalid vehicle in frame ' + index)
+      assert(!seen.has(v.id), 'duplicate vehicle ' + v.id + ' in frame ' + index)
+      const initial = statsById.get(v.id)
+      assert(initial, 'unexpected vehicle ' + v.id + ' in frame ' + index)
+      assert(v.car === initial.car && (v.player === true) === initial.player,
+        'changed vehicle identity ' + v.id + ' in frame ' + index)
+      assert(finite(v.speed), 'invalid speed for vehicle ' + v.id + ' in frame ' + index)
+      assert(v.finishedAt === null || (finite(v.finishedAt) && v.finishedAt >= 0),
+        'invalid finish time for vehicle ' + v.id + ' in frame ' + index)
+      seen.add(v.id)
+    }
+    for (const id of statsById.keys()) {
+      assert(seen.has(id), 'missing vehicle ' + id + ' in frame ' + index)
+    }
+  }
   for (let i = 0; i < frames.length - 1; i++) {
     const frame = frames[i], next = frames[i + 1]
-    assert(finite(frame.t) && finite(next.t) && next.t >= frame.t,
-      'nonmonotonic telemetry at frame ' + i)
     const dt = Math.max(0, Math.min(next.t, end) - Math.min(frame.t, end))
     if (!dt) continue
-    for (const v of frame.vehicles ?? []) {
+    for (const v of frame.vehicles) {
       const s = statsById.get(v.id)
-      if (!s || !finite(v.speed) || (v.finishedAt !== null && v.finishedAt <= frame.t)) continue
+      if (v.finishedAt !== null && v.finishedAt <= frame.t) continue
       s.seconds += dt
       s.speedIntegral += v.speed * dt
       s.maxSpeed = Math.max(s.maxSpeed, v.speed)
