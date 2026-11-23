@@ -30,6 +30,8 @@ export interface RoadGeometry {
   readonly onRoadRadius: number
   /** Half of the visible checkpoint stripe; shared with gate collision tests. */
   readonly checkpointHalfWidth: number
+  /** World-space forgiveness beyond the timing gate collision width. */
+  readonly checkpointGrace: number
   readonly curbInner: number
   readonly curbOuter: number
   readonly curbDetectInner: number
@@ -122,6 +124,7 @@ export const ROAD_GEOMETRY: RoadGeometry = {
   surfaceWidth: 72,
   onRoadRadius: 42,
   checkpointHalfWidth: 34,
+  checkpointGrace: 5,
   // Curbs are road furniture: keep the whole strip inside the 36-unit
   // asphalt radius instead of painting and detecting it in the verge.
   curbInner: 26.5,
