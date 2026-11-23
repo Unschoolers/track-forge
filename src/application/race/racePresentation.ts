@@ -9,6 +9,18 @@ function blendAngle(from: number, to: number, fraction: number): number {
   return from + shortestTurn * fraction
 }
 
+function mustSnap(
+  before: RaceVehicle | undefined,
+  vehicle: RaceVehicle,
+  discontinuities: ReadonlySet<string>,
+): boolean {
+  return !before || discontinuities.has(vehicle.id) ||
+    before.finishedAt !== vehicle.finishedAt ||
+    // Guard non-event teleports and stale state without inventing physics.
+    Math.hypot(vehicle.x - before.x, vehicle.y - before.y) >
+      Math.max(30, Math.max(Math.abs(before.speed), Math.abs(vehicle.speed)) / 24)
+}
+
 /**
  * Render-only pose interpolation. Physics, race timing, checkpoint checks and
  * network packets must continue to consume the authoritative fixed-step state.
@@ -26,12 +38,8 @@ export function interpolateRaceState(
   const oldVehicles = new Map(previous.vehicles.map((vehicle) => [vehicle.id, vehicle]))
   const vehicles = current.vehicles.map((vehicle): RaceVehicle => {
     const before = oldVehicles.get(vehicle.id)
-    if (!before || discontinuities.has(vehicle.id) ||
-      before.finishedAt !== vehicle.finishedAt ||
-      // Guard non-event teleports and stale state without inventing physics.
-      Math.hypot(vehicle.x - before.x, vehicle.y - before.y) >
-        Math.max(30, Math.max(Math.abs(before.speed), Math.abs(vehicle.speed)) / 24)
-    ) return vehicle
+    if (mustSnap(before, vehicle, discontinuities)) return vehicle
+    if (!before) return vehicle
     return {
       ...vehicle,
       x: blend(before.x, vehicle.x, alpha),
@@ -42,7 +50,8 @@ export function interpolateRaceState(
   })
 
   const player = vehicles.find((vehicle) => vehicle.player)
-  const playerRecovered = player !== undefined && discontinuities.has(player.id)
+  const playerRecovered = player !== undefined &&
+    mustSnap(oldVehicles.get(player.id), player, discontinuities)
   const oldHints = previous.cameraHints
   const hints = current.cameraHints
   const oldPreview = oldHints.preview
