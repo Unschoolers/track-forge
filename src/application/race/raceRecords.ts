@@ -7,7 +7,7 @@ import { normalizeTrackEnvironmentId, sceneryKindBelongsToEnvironment } from '@/
 /** Versioned, deterministic race-affecting content; metadata and authoring IDs are excluded. */
 export function courseIdentity(track: Track): string {
   const environment = normalizeTrackEnvironmentId(track.environmentId)
-  const canonical = JSON.stringify([1,
+  const canonical = JSON.stringify([2,
     track.points.map((p) => [p.x, p.y, p.surface, p.curve ?? 'smooth', p.tension ?? 0.5, p.structure ?? 'surface']),
     track.trees.map((tree) => [tree.x, tree.y]),
     [track.terrain.cellSize, [...track.terrain.cells].sort((a, b) => a.column - b.column || a.row - b.row || a.kind.localeCompare(b.kind)).map((cell) => [cell.column, cell.row, cell.kind])],
@@ -26,7 +26,7 @@ export function courseIdentity(track: Track): string {
     first = Math.imul(first ^ code, 0x01000193)
     second = Math.imul(second ^ code, 0x01000193)
   }
-  return `${normalizeRouteKind(track.routeKind) === 'circuit' ? 'v2' : 'v2:point-to-point'}:${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
+  return `${normalizeRouteKind(track.routeKind) === 'circuit' ? 'v3' : 'v3:point-to-point'}:${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
 }
 
 export function raceCategory(track: Track, setup: RaceSetup): ScoreCategory {
