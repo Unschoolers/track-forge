@@ -63,7 +63,10 @@ appRoot.replaceChildren(gameContainer, uiRoot)
 const storage = new BrowserStorage()
 const trackStore = new BrowserTrackRepository(storage)
 // Remove only the untouched legacy starter. Never erase a player-edited copy.
-const originalStarter = createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0)
+const { recoveryCheckpoints: _unusedMarkers, autoCheckpoints: _unusedAuto, ...originalStarter } =
+  createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0)
+void _unusedMarkers
+void _unusedAuto
 for (const track of trackStore.list()) {
   if ((track.id === SYSTEM_STARTER_TRACK_ID || track.id.startsWith('starter-')) &&
       track.name === originalStarter.name &&
