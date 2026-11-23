@@ -6,7 +6,7 @@ import { runLaneCheck } from '../../qa/lanes/simulation'
 
 // Deterministic SOLO AI comparison: no overtaking/traffic/grid interference.
 // Identical path, start ratio, handling, seeds and vehicle specs across commits.
-// Creator references (4-car live races) are Red 82.100 s, Green 71.383 s,
+// Creator references (4-car live races) are Red 82.100 s, Green 68.883 s,
 // Blue 79.967 s, and Yellow 72.117 s. Not directly solo-comparable.
 // Times here describe AI solo drives, NOT the four-car live race times.
 const reference = JSON.parse(
@@ -60,7 +60,7 @@ describe('Kids Room deterministic all-car three-difficulty AI pace benchmark', (
     console.log('AI_PACE_MATRIX ' + JSON.stringify({
       track: track.name, handling: 'arcade', laps: 2,
       startRatio, seeds, type: 'solo AI, no opponents',
-      humanReferences: { redBest: 82.09999999999663, greenBest: 71.38333333333057,
+      humanReferences: { redBest: 82.09999999999663, greenBest: 68.88333333333057,
         blueBest: 79.96666666666341, yellowBest: 72.11666666666386 },
       matrix,
     }))
