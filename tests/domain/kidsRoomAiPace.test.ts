@@ -68,7 +68,7 @@ function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'norm
     if (tick % 60 === 0) {
       for (const vehicle of race.vehicles.filter(vehicle => !vehicle.player && vehicle.finishedAt === null)) {
         const stats = surfaces.get(vehicle.id) ?? {}
-        const surface = race.path.points[vehicle.pathIndex]?.surface ?? 'unknown'
+        const surface = vehicle.currentSurface ?? 'unknown'
         stats[surface] = (stats[surface] ?? 0) + 1
         surfaces.set(vehicle.id, stats)
       }
@@ -141,10 +141,12 @@ describe('Hard-first Green AI difficulty ordering on the real Kids room circuit'
       // Red occupies the human slot; Green remains a real AI on the original grid.
       const result = raceRivals(seed, difficulty, 'red')
       const green = result.opponents.find(vehicle => vehicle.car === 'green')
-      return { difficulty, green, recoveries: result.recoveries }
+      return { difficulty, green, recoveries: result.recoveries,
+        surfaces: green ? result.surfaces.get(green.id) : undefined,
+        splits: green ? result.splits.get(green.id) : undefined }
     })
-    const diagnostics = runs.map(({ difficulty, green, recoveries }) =>
-      `${difficulty}: Green=${green?.finishedAt?.toFixed(3) ?? 'DNF'}, recoveries=${recoveries.join(',')}`
+    const diagnostics = runs.map(({ difficulty, green, recoveries, surfaces, splits }) =>
+      `${difficulty}: Green=${green?.finishedAt?.toFixed(3) ?? 'DNF'}, recoveries=${recoveries.join(',')}, surfaces=${JSON.stringify(surfaces)}, splits=${splits?.join('/')}`
     ).join('; ')
     for (const { green, recoveries } of runs) {
       expect(green?.finishedAt, diagnostics).not.toBeNull()
