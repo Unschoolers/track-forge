@@ -17,6 +17,15 @@ export const STUDY_SCENARIOS = [
     laps: 2, seconds: 145, group: 'validation',
   },
   {
+    // Real 2026-11-23 Kids Room Hard race: Green player, Green/Blue/Red
+    // rivals, start pads 3/1/0/2. Same road as the canonical fixture,
+    // separate grid because overtakes depend on the physical start order.
+    id: 'kids-room-replay-grid', file: 'tests/fixtures/kidsRoomAi.trackforge.json',
+    reverse: false, startRatio: 0.21932299012693934,
+    laps: 2, seconds: 145, gridPositions: [3, 1, 0, 2],
+    group: 'validation',
+  },
+  {
     id: 'meadow-loop', officialName: 'Meadow Loop',
     reverse: false, startRatio: 0,
     laps: 2, seconds: 70, group: 'validation',
