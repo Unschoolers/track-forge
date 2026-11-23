@@ -99,6 +99,23 @@ describe('AI approach speed planning', () => {
     expect(iceSpeed).toBeGreaterThan(70)
   })
 
+  it('respects lateral tire capacity without granting extra ice or chicane grip', () => {
+    const sharp = buildRoadPath([
+      { x: 0, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 220, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 270, y: 165, surface: 'street', curve: 'smooth' },
+      { x: 330, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 530, y: 0, surface: 'street', curve: 'smooth' },
+    ], EMPTY_TERRAIN, undefined, 'point-to-point')
+    const ice = { ...sharp, points: sharp.points.map(point => ({ ...point, surface: 'ice' as const })) }
+    const sample = sharp.points.findIndex(point => point.distance > 180)
+    const speed = (track: typeof sharp, handling: 'arcade' | 'simulation') =>
+      safeEntrySpeedAhead(track, sample, false, 0.75,
+        CAR_SPECS.green, 1, 'green', true, false, true, handling)
+    expect(speed(ice, 'arcade')).toBe(speed(ice, 'simulation'))
+    expect(speed(sharp, 'arcade')).toBeGreaterThanOrEqual(speed(sharp, 'simulation'))
+  })
+
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)

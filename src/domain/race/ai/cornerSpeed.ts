@@ -1,6 +1,6 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
-import { VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
+import { ARCADE_DYNAMICS_TUNING, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -147,6 +147,7 @@ export function safeEntrySpeedAhead(
   useSharpBendSafety = false,
   fastCorners = false,
   useChassisYawSafety = true,
+  handling: 'arcade' | 'simulation' = 'simulation',
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -181,11 +182,30 @@ export function safeEntrySpeedAhead(
       SHARP_BEND_SAFETY_BASE + bend * SHARP_BEND_SAFETY_GAIN, 0, SHARP_BEND_SAFETY_MAX,
     )
     const effectiveSafety = useSharpBendSafety ? Math.max(cornerSafety, sharpBendSafety) : cornerSafety
-    const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
+    const heuristicApex = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
       (cornerBaseline - bend * (fastCorners ? 600 : 350) * effectiveSafety) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
       70, straightSpeed,
     ))
+    // turnAmountAt() measures the change of heading over 12 path samples,
+    // approximately 72 world units. On a sustained asphalt bend that gives
+    // curvature ≈ turn / 72, then a lateral-grip speed envelope sqrt(a/k).
+    // Keep 22% of tire authority for steering corrections and real drifts.
+    // A chicane must settle yaw in the other direction, so never apply the
+    // sustained-corner uplift to a nearby reversal or to loose surfaces.
+    const turn = turnAmountAt(path, index, 6)
+    const isReversal = Math.abs(turn) > 0.045 &&
+      [-24, -12, 12, 24, 36].some(offset => {
+        const nearby = turnAmountAt(path, index + direction * offset, 6)
+        return turn * nearby < 0 && Math.abs(nearby) > 0.045
+      })
+    const lateralAcceleration = ARCADE_DYNAMICS_TUNING.forces.gravityAcceleration *
+      ARCADE_DYNAMICS_TUNING.forces.lateralGripScale * grip
+    const physicalApex = handling === 'arcade' && point.surface === 'street' &&
+      bend >= 0.08 && bend < 0.9 && !isReversal
+        ? Math.sqrt(lateralAcceleration * 72 / bend) * 0.78 * turningPace
+        : 0
+    const apexSpeed = Math.max(heuristicApex, Math.min(surfaceMax, physicalApex))
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
