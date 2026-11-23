@@ -23,6 +23,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Race analysis unit checks
+        run: npm run qa:race:test
+      - name: Typed analyzer and AI compilation
+        run: npm run typecheck
+      - name: Exported-track simulation smoke test
+        run: npm run qa:race -- simulate tests/fixtures/kidsRoomAi.trackforge.json --car blue --mode solo --difficulty hard --seed 1 --laps 2 --seconds 120
       - name: Kids Room all cars and difficulties, plus Pine and policy regressions
         run: npx vitest run tests/domain/kidsRoomAiBenchmark.test.ts tests/domain/kidsRoomAiPace.test.ts tests/domain/aiHardPace.test.ts tests/domain/aiDifficultyPolicy.test.ts --reporter=verbose
       - name: Diagnostic car-specific Hard profile sweep
@@ -37,5 +43,3 @@ jobs:
         run: npx vitest run tests/domain --maxWorkers=4
       - name: Lane checker
         run: npm run qa:lanes -- --scenario all --mode both --seeds 1 --fail-on-regressions
-      - name: Typecheck
-        run: npm run typecheck
