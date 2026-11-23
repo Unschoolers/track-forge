@@ -1,5 +1,5 @@
-import { DIFFICULTY_SPECS } from '@/domain/config'
-import type { DifficultyId } from '@/domain/model'
+import { CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
+import type { CarId, DifficultyId } from '@/domain/model'
 
 type Handling = 'arcade' | 'simulation'
 
@@ -31,9 +31,22 @@ export function aiSteeringDifficulty(
   return handling === 'arcade' || hasAuthoredLine ? 'hard' : difficulty
 }
 
-/** The corner-speed reserve for non-authored Arcade rivals only. */
-export function arcadeCornerMargin(difficulty: DifficultyId): number {
-  return AI_PACE_POLICY[difficulty].arcadeCornerMargin
+/**
+ * Lower difficulties carry an explicit corner-speed reserve. Hard stays the
+ * fastest safe controller: a highly responsive chassis needs a small apex
+ * reserve to avoid losing more time to excessive slip or offroad recoveries.
+ * This modifies only the AI's speed *target*, not physical grip or brakes.
+ */
+export function arcadeCornerMargin(difficulty: DifficultyId, car?: CarId): number {
+  if (difficulty !== 'hard' || !car) {
+    return AI_PACE_POLICY[difficulty].arcadeCornerMargin
+  }
+  const spec = CAR_SPECS[car]
+  const yawResponse = Math.sqrt(
+    (spec.steer / CAR_SPECS.blue.steer) *
+    (CAR_SPECS.blue.yawInertia / Math.max(1, spec.yawInertia)),
+  )
+  return Math.min(0.06, Math.max(0, (yawResponse - 1) * 0.12))
 }
 
 /** Émile-specific racing-line speed ratios, independent of line geometry. */
