@@ -45,8 +45,14 @@ export function planCornerTactics(
   const atApex = Math.abs(near) > 0.029 &&
     Math.abs(near) >= Math.abs(past) * 0.85 &&
     Math.abs(near) >= Math.abs(peakNext) * 0.85
-  const exiting = Math.abs(near) > 0.025 && !atApex &&
-    Math.abs(peakNext) < Math.abs(near) * 0.62
+  // On very sharp corners all rotation can be concentrated at a single
+  // path sample. The previous turn still matters after the instantaneous
+  // apex: this is the exit phase, not another straight to attack at full gas.
+  const exiting = !atApex && (
+    (Math.abs(near) > 0.025 && Math.abs(peakNext) < Math.abs(near) * 0.62) ||
+    (Math.abs(past) > 0.055 && Math.abs(near) < Math.abs(past) * 0.5 &&
+      Math.abs(peakNext) < Math.abs(past) * 0.5)
+  )
   const phase: CornerPhase = atApex ? 'turn'
     : approaching ? 'approach'
     : exiting ? 'exit'
@@ -63,7 +69,9 @@ export function planCornerTactics(
   const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
     : phase === 'approach' && bend > 0.15 ? 0.96 : 1
   const drifting = Math.abs(slipAngle) > 0.075 &&
-    speed > 65 && Math.abs(near) > 0.035 && Math.abs(roadOffset) < roadRadius * 0.75
+    speed > 65 && (Math.abs(near) > 0.035 ||
+      (exiting && Math.abs(past) > 0.055)) &&
+    Math.abs(roadOffset) < roadRadius * 0.75
   // Controlled countersteering limits spin without suppressing lateral slip.
   const sideslipGain = drifting ? 0.92 : 0.65
   // When the road is opening, feed in power progressively. The friction
