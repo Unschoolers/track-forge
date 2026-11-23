@@ -33,7 +33,7 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
     const adjacentAi = observation(rival, 4, 9)
     const humanAhead = observation(player, 35)
     const aiOnly = compactAiTraffic({ ahead: distantAi, nearby: [distantAi, closeAi, adjacentAi] })
-    expect(aiOnly.ahead).toBeNull()
+    expect(aiOnly.ahead).toBe(closeAi)
     expect(aiOnly.nearby).toEqual([closeAi])
 
     const mixed = compactAiTraffic({ ahead: humanAhead,
@@ -50,7 +50,8 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
     const ai = observation(rival, 30)
     const humanAhead = observation(player, 30)
     const aroundAi = compactAiTraffic({ ahead: ai, nearby: [ai] })
-    expect(advancePassingState(driver, aiState, aroundAi, 'hard', 0.05).phase).toBe('follow')
+    expect(advancePassingState(driver, aiState,
+      { ...aroundAi, ahead: null }, 'hard', 0.05).phase).toBe('follow')
     const aroundPlayer = compactAiTraffic({ ahead: humanAhead, nearby: [humanAhead] })
     expect(advancePassingState(driver, aiState, aroundPlayer, 'hard', 0.05).phase).toBe('passing')
   })
