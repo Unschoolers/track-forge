@@ -87,7 +87,7 @@ export function planCornerTactics(
       (exiting && Math.abs(past) > 0.055)) &&
     Math.abs(roadOffset) < roadRadius * 0.75
   // Controlled countersteering limits spin without suppressing lateral slip.
-  const sideslipGain = drifting ? 0.72 : 0.65
+  const sideslipGain = drifting ? 0.84 : 0.65
   // When the road is opening, feed in power progressively. The friction
   // circle and chassis physics still decide whether the tires can take it.
   const exitThrottle = phase === 'exit' && drifting

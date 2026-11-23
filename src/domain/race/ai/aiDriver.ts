@@ -91,7 +91,7 @@ export function stepAiVehicle(
   // Authored racing lines and Simulation retain their original policy.
   const tuning = handling === 'arcade' && !vehicle.racingLine
     ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
-        reaction: difficulty === 'hard' ? 12 : ARCADE_STEERING.reaction }
+        reaction: difficulty === 'hard' ? 16 : ARCADE_STEERING.reaction }
     : DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
