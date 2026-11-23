@@ -21,7 +21,7 @@ cargo build --manifest-path src-tauri/Cargo.toml --release
 ./src-tauri/target/release/trackforge.exe
 ```
 
-The executable contains the web assets from the current `dist/` at the moment Rust compiles. Rebuild with `cargo clean --manifest-path src-tauri/Cargo.toml` if a local edit to the Vite assets does not cause Rust's build script to rerun. For regular CI builds this is naturally a fresh checkout/cache-validation boundary.
+The executable contains the web assets from the current `dist/` at the moment Rust compiles. The Rust build script watches `../dist` and re-embeds the game after rebuilding Vite assets.
 
 ## CD and verification
 
