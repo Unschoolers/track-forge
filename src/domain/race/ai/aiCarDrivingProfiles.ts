@@ -52,7 +52,10 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.035,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.35,
-    hardEdgeAvoidanceScale: 0.4,
+    // Preserve forward preview on fast, controlled road-edge approaches.
+    // A longer target is quicker on Desert sand and official circuits, while
+    // the shared road-edge / slip guards still protect against real drift.
+    hardEdgeAvoidanceScale: 0.2,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
