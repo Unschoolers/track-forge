@@ -1,45 +1,46 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
-import { crossesRoadGate, passedPendingCheckpoint, timingGateCrossingRadius } from '@/domain/race/progress'
+import { crossesRoadGate, timingGateCrossingRadius } from '@/domain/race/progress'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 
 const MISSED_GATE_GRACE_SECONDS = 2
 
-/** A sustained position beyond a circuit gate also counts as a miss.
- * The small direction-aware window avoids mistaking a crossing-road index
- * jump or the starting grid just behind Start for skipped progress.
- */
-function passedCircuitGateByProgress(
-  count: number,
-  startIndex: number,
-  reversed: boolean,
-  gate: RaceVehicle['nextSector'],
-  previousIndex: number,
-  currentIndex: number,
-): boolean {
-  const wrap = (value: number): number => ((value % count) + count) % count
-  const direction = reversed ? -1 : 1
-  const before = wrap(direction * (previousIndex - startIndex))
-  const after = wrap(direction * (currentIndex - startIndex))
-  const window = Math.max(2, Math.min(12, Math.floor(count / 16)))
-  const progress = wrap(after - before)
-  const startApproach = Math.max(window, Math.floor(count / 8))
-  if (progress > window) return false
-  const tolerance = Math.min(2, window / 2)
-  if (gate === 4) {
-    return before > count - window && after > tolerance && after < window
-  }
-  return after > count * gate / 4 + tolerance && after < count - startApproach
+/** 1..N are editor-authored checkpoints; N+1 is the actual start/finish line. */
+export function finishGateNumber(race: Pick<RaceState, 'timingGates'>): number {
+  return (race.timingGates?.length ?? 0) + 1
 }
 
-/** A route-index jump can lead the visible car by several samples near
- * bends and intersections. Never announce a missed checkpoint until the
- * chassis is clearly past its physical plane, not merely past its index.
- */
+export function pendingTimingGateIndex(
+  race: Pick<RaceState, 'path' | 'startPathIndex' | 'timingGates'>,
+  gate: number,
+): number {
+  return race.timingGates?.[gate - 1] ??
+    (race.path.closed ? race.startPathIndex : race.path.points.length - 1)
+}
+
+function directedProgress(index: number, count: number, start: number, reversed: boolean): number {
+  const value = (reversed ? start - index : index - start) % count
+  return (value + count) % count
+}
+
+/** Do not equate a large nearest-road jump with passing a checkpoint. */
+function passedCircuitGateByProgress(
+  count: number, startIndex: number, reversed: boolean,
+  gateIndex: number, finish: boolean, previousIndex: number, currentIndex: number,
+): boolean {
+  const before = directedProgress(previousIndex, count, startIndex, reversed)
+  const after = directedProgress(currentIndex, count, startIndex, reversed)
+  const advance = (after - before + count) % count
+  const window = Math.max(2, Math.min(12, Math.floor(count / 16)))
+  if (advance === 0 || advance > window) return false
+  const tolerance = Math.min(2, window / 2)
+  if (finish) return before > count - window && after > tolerance && after < window
+  const required = directedProgress(gateIndex, count, startIndex, reversed)
+  return before <= required + tolerance && after > required + tolerance && after < count - tolerance
+}
+
 function clearlyBeyondGate(
-  path: RaceState['path'],
-  position: number,
-  vehicle: Pick<RaceVehicle, 'x' | 'y'>,
-  reversed: boolean,
+  path: RaceState['path'], position: number,
+  vehicle: Pick<RaceVehicle, 'x' | 'y'>, reversed: boolean,
 ): boolean {
   const count = path.points.length
   const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(position))
@@ -57,10 +58,6 @@ function clearlyBeyondGate(
   return (reversed ? -forward : forward) > 12
 }
 
-/** Open routes cannot advance to a road sample *after* Finish.
- * Detect a car that has gone beyond the finish plane without crossing
- * its painted stripe; the driver still has time to turn back and retry.
- */
 function passedStageFinish(path: RaceState['path'], vehicle: RaceVehicle): boolean {
   const last = path.points.length - 1
   const a = path.points[last - 1]
@@ -83,42 +80,28 @@ export function advanceArcadeTimingGate(
   const { path, startPathIndex, reversed, missedCheckpoint } = race
   const count = path.points.length
   const gate = previous.nextSector
-  const direction = reversed ? -1 : 1
-  // Award timing at the gate line, since path sampling alone can round ahead.
-  const position = path.closed
-    ? ((startPathIndex + direction * count * gate / 4) % count + count) % count
-    : (count - 1) * gate / 4
-  if (count < 2 || previous.finishedAt !== null) {
-    return { vehicle, missedCheckpoint }
-  }
+  const finish = gate === finishGateNumber(race)
+  const position = pendingTimingGateIndex(race, gate)
+  if (count < 2 || previous.finishedAt !== null) return { vehicle, missedCheckpoint }
   const crossedLine = crossesRoadGate(path, previous, vehicle, position, Infinity, reversed)
-  // The line check alone misses cars that go around a gate and only regain
-  // a followed road index after its stripe. Use route progress as a second
-  // signal, without letting a nearby crossing arm or the start grid count.
   const passedGate = path.closed
     ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
-      passedCircuitGateByProgress(count, startPathIndex, reversed, gate, previous.pathIndex, vehicle.pathIndex)
-    : gate === 4 ? passedStageFinish(path, vehicle) : passedPendingCheckpoint(path, vehicle)
-  // Open-stage finish bypass already checks the actual finish plane.
-  // Do not apply the circuit/index-jump clearance rule twice at the finish.
-  const confirmedBypass = passedGate && (!path.closed && gate === 4 ||
+      passedCircuitGateByProgress(count, startPathIndex, reversed, position, finish, previous.pathIndex, vehicle.pathIndex)
+    : finish ? passedStageFinish(path, vehicle) : previous.pathIndex <= position + 2 && vehicle.pathIndex > position + 2
+  const confirmedBypass = passedGate && (!path.closed && finish ||
     clearlyBeyondGate(path, position, vehicle, reversed))
-  if (!crossedLine && !confirmedBypass) {
-    return { vehicle, missedCheckpoint }
-  }
-  // Require the swept path to pass near the stripe, with a small edge
-  // allowance even if one frame is classified off-road.
+  if (!crossedLine && !confirmedBypass) return { vehicle, missedCheckpoint }
+
   const crossingRadius = timingGateCrossingRadius(ROAD_GEOMETRY.onRoadRadius, onRoad && wasOnRoad())
-  if (crossedLine &&
-      crossesRoadGate(path, previous, vehicle, position, crossingRadius, reversed)) {
-    if (gate === 4) {
+  if (crossedLine && crossesRoadGate(path, previous, vehicle, position, crossingRadius, reversed)) {
+    if (finish) {
       const lap = previous.lap + 1
       return {
         vehicle: { ...vehicle, lap, nextSector: 1, finishedAt: lap >= race.totalLaps ? elapsed : null },
         missedCheckpoint: undefined,
       }
     }
-    return { vehicle: { ...vehicle, nextSector: (gate + 1) as 2 | 3 | 4 }, missedCheckpoint: undefined }
+    return { vehicle: { ...vehicle, nextSector: gate + 1 }, missedCheckpoint: undefined }
   }
   if (missedCheckpoint) return { vehicle, missedCheckpoint }
 
@@ -136,4 +119,3 @@ export function advanceArcadeTimingGate(
     },
   }
 }
-
