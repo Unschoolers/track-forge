@@ -150,7 +150,7 @@ export function stepAiVehicle(
   // A long pursuit chord across a tight switchback can skip the asphalt
   // altogether. Aim at the bend before it becomes a shortcut through the verge.
   // Authored racing lines retain their intentional pursuit geometry.
-  const cornerLookaheadLimit = arcade && !vehicle.racingLine
+  const cornerLookaheadLimit = arcade && !vehicle.racingLine && bend >= 0.1
     ? clamp(Math.round(20 - bend * 45), 7, 20)
     : Number.POSITIVE_INFINITY
   const pursuitSamples = Math.max(1, Math.min(cornerLookaheadLimit, Math.round(
