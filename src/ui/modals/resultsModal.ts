@@ -85,7 +85,7 @@ export function createResultsModal(
     panel.hidden = true
     panel.append(
       element('p', 'modal-subtitle', 'ADVANCED · ALL-CAR RACE REPLAY'),
-      element('p', 'modal-subtitle', 'Includes the track, player, rivals and AI telemetry.'),
+      element('p', 'modal-subtitle', 'Includes track, all cars, 60 Hz driving inputs and tire grip.'),
       button('EXPORT RACE FILE', 'export-race-diagnostics', actions.exportRace, 'button button-primary'),
       button('CLOSE', 'close-race-diagnostics', () => { panel.hidden = true }),
     )
