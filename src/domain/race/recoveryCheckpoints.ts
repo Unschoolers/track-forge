@@ -1,9 +1,9 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
-import { crossesRoadGate, lastSampleBeforeCheckpoint } from '@/domain/race/progress'
+import { crossesRoadGate } from '@/domain/race/progress'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 
-export type RecoveryCourse = Pick<RaceState, 'path' | 'routeKind' | 'startPathIndex' | 'reversed' | 'recoveryCheckpoints'>
+export type RecoveryCourse = Pick<RaceState, 'path' | 'routeKind' | 'startPathIndex' | 'reversed' | 'recoveryCheckpoints' | 'timingGates'>
 
 /** Distance travelled in route order, wrapping only on closed circuits. */
 export function forwardRecoveryDistance(
@@ -12,6 +12,14 @@ export function forwardRecoveryDistance(
   if (count <= 0) return 0
   const distance = (reversed ? -1 : 1) * (to - from)
   return closed ? ((distance % count) + count) % count : distance
+}
+
+/** Distance of the next authored timing gate; the final boundary is the finish line. */
+export function pendingGateProgress(course: RecoveryCourse, gate: number): number {
+  const count = course.path.points.length
+  const index = course.timingGates?.[gate - 1]
+  if (index === undefined) return course.path.closed ? count : Math.max(0, count - 1)
+  return forwardRecoveryDistance(course.startPathIndex, index, count, course.reversed, course.path.closed)
 }
 
 export function reachedRecoveryCheckpoint(
@@ -23,7 +31,7 @@ export function reachedRecoveryCheckpoint(
   const last = previous.lap === vehicle.lap ? previous.recoveryCheckpoint ?? null : null
   if (!race.recoveryCheckpoints?.length || vehicle.finishedAt !== null) return last
   const length = race.path.points.length
-  const nextRequiredGate = (race.path.closed ? length : length - 1) * vehicle.nextSector / 4
+  const nextRequiredGate = pendingGateProgress(race, vehicle.nextSector)
   let checkpoint = last
   let furthest = -1
   for (const index of race.recoveryCheckpoints) {
@@ -55,7 +63,7 @@ export function missedGateRecoveryTarget(
   const count = path.points.length
   if (count < 2) return undefined
   const samples = path.closed ? count : count - 1
-  const gateProgress = samples * gate / 4
+  const gateProgress = pendingGateProgress(course, gate)
   const spacing = path.totalLength / samples
   const clearance = Math.max(1, Math.ceil(ROAD_GEOMETRY.onRoadRadius / Math.max(spacing, 1)))
   const approach = Math.max(0, Math.floor(gateProgress - clearance))
@@ -81,7 +89,7 @@ function safePreGateSample(course: RecoveryCourse, vehicle: RaceVehicle, index: 
   const progress = path.closed
     ? forwardRecoveryDistance(startPathIndex, index, count, reversed, true)
     : index
-  const nextGate = (path.closed ? count : count - 1) * vehicle.nextSector / 4
+  const nextGate = pendingGateProgress(course, vehicle.nextSector)
   return progress < nextGate && isSafeRoadRecoverySample(path, index)
 }
 
@@ -112,7 +120,7 @@ export function planMissedCheckpointRecovery(
   const count = course.path.points.length
   if (count === 0) return undefined
   const previousGate = vehicle.nextSector - 1
-  const progress = Math.floor((course.path.closed ? count : count - 1) * previousGate / 4)
+  const progress = previousGate === 0 ? 0 : Math.floor(pendingGateProgress(course, previousGate))
   const target = course.path.closed
     ? ((course.startPathIndex + (course.reversed ? -1 : 1) * progress) % count + count) % count
     : progress
@@ -130,11 +138,7 @@ export function safeFallbackRecoveryTarget(course: RecoveryCourse, vehicle: Race
   if (!count) return undefined
   const direction = reversed ? -1 : 1
   const wrap = (index: number) => ((index % count) + count) % count
-  const last = path.closed
-    ? Math.ceil(count * vehicle.nextSector / 4) - 1
-    : course.routeKind === 'point-to-point'
-      ? lastSampleBeforeCheckpoint(path, vehicle.nextSector)
-      : count - 1
+  const last = Math.max(0, Math.ceil(pendingGateProgress(course, vehicle.nextSector)) - 1)
   const fromStart = path.closed
     ? forwardRecoveryDistance(startPathIndex, vehicle.recoveryAnchorIndex ?? vehicle.pathIndex, count, reversed, true)
     : (vehicle.recoveryAnchorIndex ?? vehicle.pathIndex)
