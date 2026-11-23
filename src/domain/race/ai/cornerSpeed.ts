@@ -33,6 +33,21 @@ const MIN_PAVED_SAMPLE_FRACTION = 0.95
 const RACING_PAVEMENT_FULL_PACE_TURN = 0.5
 const RACING_PAVEMENT_BASE_PACE_TURN = 0.57
 
+/** The actual stopping force for a car on one sample of the road. */
+function sampleBrakeDeceleration(
+  surfaceId: RoadPath['points'][number]['surface'],
+  car: Pick<CarPhysicsSpec, 'grip' | 'brake'>,
+  carId: CarId,
+): number {
+  const surface = SURFACE_SPECS[surfaceId]
+  const terrain = VEHICLE_TERRAIN_SPECS[carId][surfaceId]
+  return Math.min(
+    95 * car.brake * surface.brake * terrain.brake,
+    car.grip * surface.grip * terrain.grip * BRAKE_TRACTION,
+  ) * VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale *
+    CAR_SPECS[carId].brakingTractionScale
+}
+
 /** Fraction of extra pavement pace a sweeping approach can support. */
 export function sweepingPavementAllowance(path: RoadPath, index: number, reversed: boolean): number {
   let preview = pavementPreviewByPath.get(path)
@@ -150,8 +165,6 @@ export function safeEntrySpeedAhead(
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
-  const at = path.points[((nearestIndex % count) + count) % count]
-  if (!at) return 225
   const direction = reversed ? -1 : 1
   const cornerBaseline = fastCorners ? 270 : 225
   const straightSpeed = car.max * pace
@@ -163,7 +176,28 @@ export function safeEntrySpeedAhead(
   )
   const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
+  let brakingWork = 0
+  let previousStep = 0
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
+    // The road ahead has its own tire grip. The old formula applied the
+    // destination's (often icy) brake traction to the *entire* approach,
+    // causing an AI to brake unnecessarily early on preceding pavement.
+    // Integrate the locally available deceleration along the real arc length.
+    // Each step is visited once, not once per candidate apex (~200 samples).
+    for (let offset = previousStep; offset < step; offset++) {
+      const fromRaw = nearestIndex + direction * offset
+      const toRaw = fromRaw + direction
+      if (!path.closed && (toRaw < 0 || toRaw >= count || fromRaw < 0 || fromRaw >= count)) break
+      const from = path.points[((fromRaw % count) + count) % count]
+      const to = path.points[((toRaw % count) + count) % count]
+      if (!from || !to) continue
+      const arc = direction * (to.distance - from.distance)
+      const length = arc >= 0 ? arc : path.totalLength + arc
+      const fromBrake = sampleBrakeDeceleration(from.surface, car, carId)
+      const toBrake = sampleBrakeDeceleration(to.surface, car, carId)
+      brakingWork += 0.5 * (fromBrake + toBrake) * length
+    }
+    previousStep = step
     const raw = nearestIndex + direction * step
     if (!path.closed && (raw < 0 || raw >= count)) break
     const index = ((raw % count) + count) % count
@@ -186,13 +220,8 @@ export function safeEntrySpeedAhead(
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
       70, straightSpeed,
     ))
-    let distance = direction * (point.distance - at.distance)
-    if (path.closed && distance < 0) distance += path.totalLength
-    distance = Math.max(0, distance)
-    const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
-      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
     const corneringPace = 1 - (1 - turningPace) * clamp(bend / 0.1, 0, 1)
-    const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * brakeDeceleration * distance)
+    const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * brakingWork)
     allowed = Math.min(allowed, entrySpeed)
   }
   return allowed

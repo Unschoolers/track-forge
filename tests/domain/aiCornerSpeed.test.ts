@@ -99,6 +99,35 @@ describe('AI approach speed planning', () => {
     expect(iceSpeed).toBeGreaterThan(70)
   })
 
+  it('uses real braking grip along mixed-surface approaches in both travel directions', () => {
+    const forward = [
+      { x: 0, y: 0, surface: 'street' as const, curve: 'corner' as const },
+      { x: 550, y: 0, surface: 'street' as const, curve: 'corner' as const },
+      { x: 1_050, y: 0, surface: 'ice' as const, curve: 'corner' as const },
+      { x: 1_050, y: 400, surface: 'ice' as const, curve: 'corner' as const },
+    ]
+    const reverse = forward.toReversed().map(point => ({
+      ...point, surface: point.x < 1000 ? 'street' as const : 'ice' as const,
+    }))
+    const makePath = (controls: typeof forward) =>
+      buildRoadPath(controls, EMPTY_TERRAIN, undefined, 'point-to-point')
+    const check = (controls: typeof forward, backwards: boolean) => {
+      const mixed = makePath(controls)
+      const allIce = makePath(controls.map(point => ({ ...point, surface: 'ice' as const })))
+      const index = backwards ? mixed.points.length - 20 : 20
+      const planned = (road: typeof mixed) =>
+        safeEntrySpeedAhead(road, index, backwards, 0.51,
+          CAR_SPECS.blue, 1.37, 'blue', true, false, true)
+      const mixedSpeed = planned(mixed)
+      const icySpeed = planned(allIce)
+      expect(Number.isFinite(mixedSpeed)).toBe(true)
+      expect(mixedSpeed, 'Pavement approach should use more braking force than continuous ice')
+        .toBeGreaterThan(icySpeed)
+    }
+    check(forward, false)
+    check(reverse, true)
+  })
+
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)

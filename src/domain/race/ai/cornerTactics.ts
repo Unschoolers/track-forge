@@ -72,15 +72,12 @@ export function planCornerTactics(
   // corner is still unwinding. A simple pursuit chord reacts too late for
   // heavier chassis, especially at a quick right-to-left transition.
   const approachLead = phase === 'approach'
-    // High-speed chassis rotate with measurable delay. Aim into the upcoming
-    // bend slightly earlier, then stop leading when the road edge approaches.
-    ? sign * Math.min(0.13 + 0.06 * clamp((speed - 90) / 160, 0, 1),
-      bend * (0.23 + 0.09 * clamp((speed - 90) / 160, 0, 1)))
+    ? sign * Math.min(0.13, bend * 0.23)
     : 0
   const reversalLead = reversal
     ? Math.sign(peakNext) * Math.min(0.15, Math.abs(peakNext) * 0.45)
     : 0
-  const headingLead = clamp(approachLead + reversalLead, -0.25, 0.25) * (1 - edge)
+  const headingLead = clamp(approachLead + reversalLead, -0.22, 0.22) * (1 - edge)
   // Preserve a substantial pursuit horizon at speed; choking the target to
   // a handful of samples makes heavy cars oscillate rather than rotate.
   const pursuitScale = phase === 'turn' && bend > 0.17 ? 0.92
