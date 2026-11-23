@@ -2,7 +2,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::{Shutdown, SocketAddr, TcpListener, TcpStream, UdpSocket},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -31,6 +31,7 @@ pub struct LanManager {
 struct LanState {
     generation: u64,
     cancelled: Arc<AtomicBool>,
+    locked: Arc<AtomicBool>,
     workers: Vec<JoinHandle<()>>,
     peers: HashMap<String, Arc<Peer>>,
     discovered: HashMap<String, String>,
@@ -54,7 +55,9 @@ fn notify(app: &AppHandle, event_type: &str, id: &str, extra: Option<(&str, Stri
     if let Some((key, value)) = extra {
         event[key] = json!(value);
     }
-    let _ = app.emit(EVENT, event);
+    if let Err(error) = app.emit(EVENT, event) {
+        eprintln!("TrackForge LAN event dispatch failed: {error}");
+    }
 }
 
 fn write_frame(peer: &Peer, frame: Value) -> Result<(), String> {
@@ -168,6 +171,7 @@ fn stop_inner(manager: &LanManager) -> Result<(), String> {
         let mut guard = lock(&manager.state)?;
         guard.generation = guard.generation.wrapping_add(1);
         guard.cancelled.store(true, Ordering::SeqCst);
+        guard.locked.store(true, Ordering::SeqCst);
         for peer in guard.peers.values() {
             if let Ok(writer) = peer.writer.lock() {
                 let _ = writer.shutdown(Shutdown::Both);
@@ -189,6 +193,7 @@ fn begin(manager: &LanManager, mode: &'static str) -> Result<(u64, Arc<AtomicBoo
     let mut guard = lock(&manager.state)?;
     guard.mode = mode;
     guard.cancelled = Arc::new(AtomicBool::new(false));
+    guard.locked = Arc::new(AtomicBool::new(false));
     Ok((guard.generation, Arc::clone(&guard.cancelled)))
 }
 
@@ -210,14 +215,18 @@ pub fn lan_host(
     discovery.set_read_timeout(Some(Duration::from_millis(250))).map_err(|e| e.to_string())?;
 
     let discovery_cancel = Arc::clone(&cancelled);
+    let discovery_locked = Arc::clone(&lock(&manager.state)?.locked);
     let room_name = name;
     let discovery_worker = thread::spawn(move || {
         let mut request = [0u8; 128];
         while !discovery_cancel.load(Ordering::SeqCst) {
             match discovery.recv_from(&mut request) {
                 Ok((count, address)) if &request[..count] == DISCOVERY_REQUEST => {
+                    if discovery_locked.load(Ordering::SeqCst) { continue; }
                     let answer = format!("{DISCOVERY_PREFIX}{RACE_PORT}|{room_name}");
-                    let _ = discovery.send_to(answer.as_bytes(), address);
+                    if let Err(error) = discovery.send_to(answer.as_bytes(), address) {
+                        eprintln!("TrackForge LAN discovery reply failed: {error}");
+                    }
                 }
                 Ok(_) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {}
@@ -226,11 +235,16 @@ pub fn lan_host(
         }
     });
     let server_cancel = Arc::clone(&cancelled);
+    let server_locked = Arc::clone(&lock(&manager.state)?.locked);
     let state = Arc::clone(&manager.state);
     let server_worker = thread::spawn(move || {
         while !server_cancel.load(Ordering::SeqCst) {
             match listener.accept() {
                 Ok((stream, _address)) => {
+                    if server_locked.load(Ordering::SeqCst) {
+                        let _ = stream.shutdown(Shutdown::Both);
+                        continue;
+                    }
                     let id = {
                         let Ok(mut guard) = state.lock() else { break };
                         guard.next_peer += 1;
@@ -365,10 +379,10 @@ pub fn lan_send(manager: State<'_, LanManager>, ids: Vec<String>, data: String) 
 
 #[tauri::command]
 pub fn lan_lock(manager: State<'_, LanManager>) -> Result<(), String> {
-    // Existing TCP links stay alive; stop only room advertisements.
+    // Keep existing peers for the next cup round, reject new joins and stop discovery replies.
     let guard = lock(&manager.state)?;
     if guard.mode != "hosting" { return Err("Not hosting LAN race".into()); }
-    // New joins after starting are not allowed. Lobby capacity is enforced in application protocol.
+    guard.locked.store(true, Ordering::SeqCst);
     Ok(())
 }
 
