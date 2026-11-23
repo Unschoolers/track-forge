@@ -65,9 +65,9 @@ if (args.help) {
     if (!found) throw new Error(`Missing matched trial: ${candidateId} / ${trialKey(task)}`)
     return found.result
   }
-  function trial(car, scenario, seed, mode, candidate, playerCar = car) {
+  function trial(car, scenario, seed, mode, candidate, playerCar = car, focusRole = 'player') {
     return {
-      car, playerCar, scenarioId: scenario.id, seed, mode, difficulty: 'hard',
+      car, playerCar, focusRole, scenarioId: scenario.id, seed, mode, difficulty: 'hard',
       candidateId: candidate.id, changes: candidate.changes,
     }
   }
@@ -106,26 +106,28 @@ if (args.help) {
 
     // Validation includes the *calibration* circuits under traffic plus
     // held-out scenarios, two deterministic seeds, and identical rival grids.
-    const opponents = { red: 'green', green: 'red', blue: 'red', yellow: 'green' }
+    // Hard mirrors the player car and omits one other colour. Yellow can
+    // only appear as a rival when Yellow occupies the player slot.
+    const opponents = { red: 'green', green: 'red', blue: 'red', yellow: 'yellow' }
     const allCasesFor = car => scenarios.flatMap(scenario =>
       args.seeds.flatMap(seed => [
-        { scenario, seed, mode: 'solo', playerCar: car },
-        { scenario, seed, mode: 'traffic', playerCar: car },
-        { scenario, seed, mode: 'traffic', playerCar: opponents[car] },
+        { scenario, seed, mode: 'solo', playerCar: car, focusRole: 'player' },
+        { scenario, seed, mode: 'traffic', playerCar: car, focusRole: 'player' },
+        { scenario, seed, mode: 'traffic', playerCar: opponents[car], focusRole: 'rival' },
       ]))
 
     const baseMore = baselines.flatMap(base => allCasesFor(base.car)
-      .map(({ scenario, seed, mode, playerCar }) => trial(base.car, scenario, seed, mode, base, playerCar))
+      .map(({ scenario, seed, mode, playerCar, focusRole }) => trial(base.car, scenario, seed, mode, base, playerCar, focusRole))
       .filter(task => !cache.has(`${task.candidateId}/${trialKey(task)}`)))
     await batch(baseMore, 'full-field baselines')
     const finalistTasks = shortlisted.flatMap(candidate => allCasesFor(candidate.car)
-      .map(({ scenario, seed, mode, playerCar }) => trial(candidate.car, scenario, seed, mode, candidate, playerCar))
+      .map(({ scenario, seed, mode, playerCar, focusRole }) => trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole))
       .filter(task => !cache.has(`${task.candidateId}/${trialKey(task)}`)))
     await batch(finalistTasks, 'cross-track solo + traffic validation')
 
     const validation = shortlisted.map(candidate => {
-      const pairs = allCasesFor(candidate.car).map(({ scenario, seed, mode, playerCar }) => {
-        const task = trial(candidate.car, scenario, seed, mode, candidate, playerCar)
+      const pairs = allCasesFor(candidate.car).map(({ scenario, seed, mode, playerCar, focusRole }) => {
+        const task = trial(candidate.car, scenario, seed, mode, candidate, playerCar, focusRole)
         return [get(`base-${candidate.car}`, task), get(candidate.id, task)]
       })
       return { ...candidate, score: assessCandidate(pairs, {
@@ -151,12 +153,12 @@ if (args.help) {
         }
       })(),
     }))
-    const matrix = args.cars.flatMap(car => allCasesFor(car).map(({ scenario, seed, mode, playerCar }) => {
-      const task = trial(car, scenario, seed, mode, { id: `base-${car}`, changes: {} }, playerCar)
+    const matrix = args.cars.flatMap(car => allCasesFor(car).map(({ scenario, seed, mode, playerCar, focusRole }) => {
+      const task = trial(car, scenario, seed, mode, { id: `base-${car}`, changes: {} }, playerCar, focusRole)
       const run = get(`base-${car}`, task)
       const driver = run.rows.find(row => row.vehicle_id === run.focusVehicleId)
       if (!driver) throw new Error('Missing baseline driver row')
-      return { car, playerCar, scenarioId: scenario.id, seed, mode,
+      return { car, playerCar, focusRole, scenarioId: scenario.id, seed, mode,
         seconds: driver.finished_seconds, recoveries: driver.recoveries }
     }))
     const result = {
