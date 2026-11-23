@@ -51,13 +51,8 @@ export function advancePassingState(
     const passElapsed = (ai.passElapsed ?? 0) + deltaSeconds
     const target = traffic.nearby.find((entry) => entry.vehicle.id === ai.passTargetId)
     const targetClear = !target || target.signedDistance < -tuning.completionDistance
-    // Don't spend eight seconds on an outside line when the target has
-    // accelerated away. Abandon only after a sustained attempt with a real
-    // forward gap, and never merge back into an occupied base lane.
-    const targetPullingAway = target && passElapsed >= 2 &&
-      target.signedDistance > Math.max(tuning.completionDistance * 2, tuning.triggerDistance * 0.65) &&
-      target.vehicle.speed > vehicle.speed + 2
-    const clear = destinationClear && (targetClear || passElapsed > 8 || targetPullingAway)
+    // A stuck pass eventually aborts, but never enters an occupied lane.
+    const clear = destinationClear && (targetClear || passElapsed > 8)
     const clearTime = clear ? ai.clearTime + deltaSeconds : 0
     if (holdRemaining <= 0 && clearTime >= 0.25) {
       return {
