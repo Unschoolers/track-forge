@@ -22,15 +22,11 @@ def convert(folder: Path) -> None:
                 print(f"skip {name}: missing or empty")
                 continue
             destination = folder / f"{name}.parquet"
-            # Source and destination are passed as bound arguments to avoid SQL
-            # string interpolation of paths; COPY needs a literal filename.
-            db.execute(
-                "CREATE OR REPLACE TEMP VIEW input AS "
-                "SELECT * FROM read_json_auto(?, format='newline_delimited')",
-                [str(source)],
+            # Relation API accepts paths directly; no SQL interpolation or
+            # database schema, and no in-memory Pandas materialization.
+            db.read_json(str(source), format="newline_delimited").write_parquet(
+                str(destination), compression="zstd"
             )
-            escaped = str(destination).replace("'", "''")
-            db.execute(f"COPY input TO '{escaped}' (FORMAT PARQUET, COMPRESSION ZSTD)")
             print(f"wrote {destination}")
     finally:
         db.close()
