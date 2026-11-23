@@ -275,18 +275,47 @@ jobs:
               | sort_by(.run, .attempt) | last | .tag // empty
             ' releases.json)
             if [ -n "$previous_tag" ]; then
-              gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
-                -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" \
-                -f previous_tag_name="$previous_tag" --jq '.body' > generated-notes.md
+              for attempt in 1 2 3; do
+                if gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
+                  -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" \
+                  -f previous_tag_name="$previous_tag" --jq '.body' > generated-notes.md; then
+                  break
+                fi
+                if (( attempt == 3 )); then
+                  echo 'GitHub release-notes API failed after three attempts.' >&2
+                  exit 1
+                fi
+                sleep "$((attempt * 3))"
+              done
             else
               printf "## What's Changed\n\nFirst published Android build.\n" > generated-notes.md
             fi
             {
               cat generated-notes.md
               printf '\n### Build details\n\nTrackForge %s (Android version code %s).\n\n' "$VERSION_NAME" "$VERSION_CODE"
-              printf 'Android APK is signed with the fixed original TrackForge certificate. Windows portable EXE is unsigned and requires WebView2. Nearby multiplayer is currently Android-only.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+              printf 'Android APK is signed with the fixed original TrackForge certificate. Windows portable EXE is unsigned and requires WebView2. Nearby LAN multiplayer supports Windows and Android on the same local network; Android Nearby wireless mode is still available.\n\nCommit: `%s`.\n\nVerified build: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             } > release-notes.md
-            gh release create "$tag" trackforge-debug.apk windows-exe/TrackForge.exe --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"
+            for attempt in 1 2 3; do
+              if gh release create "$tag" trackforge-debug.apk windows-exe/TrackForge.exe --repo "$GH_REPO" --target "$GITHUB_SHA" --title "TrackForge ${VERSION_NAME}" --notes-file release-notes.md "${latest[@]}"; then
+                break
+              fi
+              # A 502 can happen after GitHub committed the release. Confirm both assets
+              # before treating it as success; partial releases remain a hard failure.
+              if gh release view "$tag" --repo "$GH_REPO" --json targetCommitish,assets > recovered-release.json 2>/dev/null; then
+                if [ "$(jq -r '.targetCommitish' recovered-release.json)" = "$GITHUB_SHA" ] &&
+                   jq -e '([.assets[].name] | index("trackforge-debug.apk") != null and index("TrackForge.exe") != null)' recovered-release.json > /dev/null; then
+                  echo "GitHub release exists with both verified artifacts after a retryable API error."
+                  break
+                fi
+                echo 'GitHub created an incomplete or mismatched release; rerun signing/publication to recover.' >&2
+                exit 1
+              fi
+              if (( attempt == 3 )); then
+                echo 'GitHub release creation failed after three attempts.' >&2
+                exit 1
+              fi
+              sleep "$((attempt * 3))"
+            done
           fi
           printf '## Android + Windows release\n\nVersion %s (Android code %s).\n\n[Download Android APK](%s/%s/releases/download/%s/trackforge-debug.apk)\n' "$VERSION_NAME" "$VERSION_CODE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
           printf '[Download Windows EXE](%s/%s/releases/download/%s/TrackForge.exe)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> "$GITHUB_STEP_SUMMARY"
