@@ -1,6 +1,6 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
-import { VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
+import { ARCADE_DYNAMICS_TUNING, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -147,6 +147,7 @@ export function safeEntrySpeedAhead(
   useSharpBendSafety = false,
   fastCorners = false,
   useChassisYawSafety = true,
+  handling: 'arcade' | 'simulation' = 'simulation',
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -181,11 +182,22 @@ export function safeEntrySpeedAhead(
       SHARP_BEND_SAFETY_BASE + bend * SHARP_BEND_SAFETY_GAIN, 0, SHARP_BEND_SAFETY_MAX,
     )
     const effectiveSafety = useSharpBendSafety ? Math.max(cornerSafety, sharpBendSafety) : cornerSafety
-    const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
+    const heuristicApex = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
       (cornerBaseline - bend * (fastCorners ? 600 : 350) * effectiveSafety) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
       70, straightSpeed,
     ))
+    // Arcade can carry a controlled drift through a bend. The old heuristic
+    // pinned even high-grip chassis to 70 on tight pavement, far below the
+    // actual tire lateral-acceleration envelope. Recover some of that reserve
+    // while keeping ~28% traction for settling/countersteer. This is a speed
+    // *plan*, not a physics override: the same tire forces still govern motion.
+    const lateralAcceleration = ARCADE_DYNAMICS_TUNING.forces.gravityAcceleration *
+      ARCADE_DYNAMICS_TUNING.forces.lateralGripScale * grip
+    const physicalApex = handling === 'arcade' && point.surface === 'street' && bend > 0.012
+      ? Math.sqrt(lateralAcceleration * 36 / bend) * 0.72
+      : 0
+    const apexSpeed = Math.max(heuristicApex, Math.min(surfaceMax, physicalApex))
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
