@@ -44,8 +44,8 @@ export const CAR_DRIVING_PROFILES = {
   // controller; its terrain advantages remain exclusively in physics.
   yellow: {
     hardReaction: 8,
-    hardSteerGain: 2.22,
+    hardSteerGain: 2.7,
     hardCornerReserve: 0,
-    hardLookAheadSamples: 4,
+    hardLookAheadSamples: 10,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
