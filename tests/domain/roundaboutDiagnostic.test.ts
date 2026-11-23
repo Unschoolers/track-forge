@@ -52,6 +52,8 @@ it.each([1, 4331, 98765])('keeps Green on the Roundabout course through both lap
 // Opt-in diagnostic: reproduce Blue's twice-per-race off-road recovery from the
 // real Normal Roundabout replay, then exercise Hard candidate driving profiles
 // in 4-car traffic. Keep published tests independent of profile mutations.
+// Exported hard race physical slots, rather than a generic seed's 0-1-2-3 order.
+const replayGrid = [2, 1, 0, 3] as const
 const profileSweep = process.env.AI_ROUNDABOUT_SWEEP === '1' ? it : it.skip
 profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy', () => {
   const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
@@ -75,6 +77,7 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
         const run = runLaneCheck({
           path, trackName: 'Roundabout', seed, difficulty: 'hard',
           mode: 'traffic', car: 'red', handling: 'arcade',
+          gridPositions: replayGrid,
           reversed: false, startRatio: 0.7746478873239436,
           laps: 2, seconds: 110,
         })
@@ -89,6 +92,7 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
       const run = runLaneCheck({
         path, trackName: 'Roundabout', seed, difficulty: 'normal',
         mode: 'traffic', car: 'red', handling: 'arcade',
+          gridPositions: replayGrid,
         reversed: false, startRatio: 0.7746478873239436,
         laps: 2, seconds: 110,
       })
@@ -103,3 +107,85 @@ profileSweep('logs Roundabout Blue traffic pace and hairpin safety by strategy',
   console.log('AI_ROUNDABOUT_SWEEP ' + JSON.stringify(results))
   expect(results.length).toBe(cases.length * 2 + 2)
 }, 120_000)
+
+/**
+ * Opt-in diagnostic on the real creator track and physical starting grid.
+ * On Hard, Red/Red/Blue/Green race in the exported replay; switching the
+ * simulated player to Yellow includes Yellow as an AI-driven fourth chassis.
+ */
+profileSweep('measures all four colors and sweeps Red through the western hairpin', () => {
+  const profiles = CAR_DRIVING_PROFILES as Record<CarId, CarDrivingProfile>
+  const original = profiles.red
+  const cases: readonly { label: string, changes: Partial<CarDrivingProfile> }[] = [
+    { label: 'current', changes: {  } },
+    { label: 'reserve0.04', changes: { hardCornerReserve: 0.04 } },
+    { label: 'reserve0.07', changes: { hardCornerReserve: 0.07 } },
+    { label: 'reserve0.1', changes: { hardCornerReserve: 0.1 } },
+    { label: 'reserve0.14', changes: { hardCornerReserve: 0.14 } },
+    { label: 'reserve0.18', changes: { hardCornerReserve: 0.18 } },
+    { label: 'reserve0.22', changes: { hardCornerReserve: 0.22 } },
+    { label: 'reserve0-bonus0', changes: { hardCornerReserve: 0, hardCornerTargetBonus: 0 } },
+    { label: 'reserve0.02-bonus0', changes: { hardCornerReserve: 0.02, hardCornerTargetBonus: 0 } },
+    { label: 'reserve0.04-bonus0', changes: { hardCornerReserve: 0.04, hardCornerTargetBonus: 0 } },
+    { label: 'reserve0.07-bonus0', changes: { hardCornerReserve: 0.07, hardCornerTargetBonus: 0 } },
+    { label: 'reserve0.1-bonus0', changes: { hardCornerReserve: 0.1, hardCornerTargetBonus: 0 } },
+    { label: 'preview6-reserve07', changes: { hardCornerReserve: 0.07, hardLookAheadSamples: 6 } },
+    { label: 'preview8-reserve07', changes: { hardCornerReserve: 0.07, hardLookAheadSamples: 8 } },
+    { label: 'preview12-reserve07', changes: { hardCornerReserve: 0.07, hardLookAheadSamples: 12 } },
+    { label: 'preview14-reserve07', changes: { hardCornerReserve: 0.07, hardLookAheadSamples: 14 } },
+    { label: 'preview16-reserve07', changes: { hardCornerReserve: 0.07, hardLookAheadSamples: 16 } },
+    { label: 'preview20-reserve07', changes: { hardCornerReserve: 0.07, hardLookAheadSamples: 20 } },
+    { label: 'gain1.9-reserve07', changes: { hardCornerReserve: 0.07, hardSteerGain: 1.9 } },
+    { label: 'gain2.05-reserve07', changes: { hardCornerReserve: 0.07, hardSteerGain: 2.05 } },
+    { label: 'gain2.35-reserve07', changes: { hardCornerReserve: 0.07, hardSteerGain: 2.35 } },
+    { label: 'gain2.5-reserve07', changes: { hardCornerReserve: 0.07, hardSteerGain: 2.5 } },
+    { label: 'gain2.7-reserve07', changes: { hardCornerReserve: 0.07, hardSteerGain: 2.7 } },
+    { label: 'reaction6-reserve07', changes: { hardCornerReserve: 0.07, hardReaction: 6 } },
+    { label: 'reaction8-reserve07', changes: { hardCornerReserve: 0.07, hardReaction: 8 } },
+    { label: 'reaction10-reserve07', changes: { hardCornerReserve: 0.07, hardReaction: 10 } },
+    { label: 'reaction14-reserve07', changes: { hardCornerReserve: 0.07, hardReaction: 14 } },
+    { label: 'reaction16-reserve07', changes: { hardCornerReserve: 0.07, hardReaction: 16 } },
+  ]
+  const results: unknown[] = []
+  const run = (car: CarId) => runLaneCheck({
+    path, trackName: 'Roundabout', seed: 1, difficulty: 'hard',
+    mode: 'traffic', car, handling: 'arcade',
+    gridPositions: replayGrid,
+    reversed: false, startRatio: 0.7746478873239436,
+    laps: 2, seconds: 110,
+  })
+  try {
+    for (const { label, changes } of cases) {
+      profiles.red = { ...original, ...changes }
+      const simulation = run('red')
+      results.push({
+        label,
+        vehicles: simulation.vehicles.map(v => ({
+          car: v.car, id: v.vehicleId, time: v.finishedAt,
+          recoveries: v.recoveries, offroad: v.offRoadSeconds,
+          maxLaneError: v.maxLaneError,
+        })),
+        recoveries: simulation.issues
+          .filter(issue => issue.code === 'recovery')
+          .map(issue => ({ id: issue.vehicleId, time: issue.time, index: issue.pathIndex })),
+      })
+    }
+    profiles.red = original
+    const yellow = run('yellow')
+    results.push({
+      label: 'yellow-grid',
+      vehicles: yellow.vehicles.map(v => ({
+        car: v.car, id: v.vehicleId, time: v.finishedAt,
+        recoveries: v.recoveries, offroad: v.offRoadSeconds,
+        maxLaneError: v.maxLaneError,
+      })),
+      recoveries: yellow.issues
+        .filter(issue => issue.code === 'recovery')
+        .map(issue => ({ id: issue.vehicleId, time: issue.time, index: issue.pathIndex })),
+    })
+  } finally {
+    profiles.red = original
+  }
+  console.log('AI_RED_ROUNDABOUT_SWEEP ' + JSON.stringify(results))
+  expect(results.length).toBe(cases.length + 1)
+}, 180_000)
