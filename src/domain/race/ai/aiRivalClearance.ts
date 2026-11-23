@@ -11,16 +11,19 @@ import type { TrafficState } from '@/domain/race/ai/traffic'
  * Simulation mode with physical collisions intentionally uses the original
  * full traffic model.
  */
-const AI_NEAR_DISTANCE = 10
+const AI_NEAR_DISTANCE = 16
 const AI_NEAR_LANE_GAP = 7
 
 export function compactAiTraffic(traffic: TrafficState): TrafficState {
+  // Full player interaction takes priority. Keep only a small AI
+  // proximity cue for following and emergency speed, never for full passing.
+  const humanAhead = traffic.nearby.find(({ vehicle, signedDistance, laneGap }) =>
+    vehicle.player && signedDistance >= 0 && laneGap <= 20)
+  const dotAhead = traffic.nearby.find(({ vehicle, signedDistance, laneGap }) =>
+    !vehicle.player && signedDistance >= 0 &&
+    signedDistance < AI_NEAR_DISTANCE && laneGap < AI_NEAR_LANE_GAP)
   return {
-    // The raw "ahead" can be a nearer AI sprite masking a human farther
-    // up the same lane. Search the complete traffic list for the human;
-    // preserving player challenges is as important as softening AI rivals.
-    ahead: traffic.nearby.find(({ vehicle, signedDistance, laneGap }) =>
-      vehicle.player && signedDistance >= 0 && laneGap <= 20) ?? null,
+    ahead: humanAhead ?? dotAhead ?? null,
     nearby: traffic.nearby.filter(({ vehicle, signedDistance, laneGap }) =>
       vehicle.player || (Math.abs(signedDistance) < AI_NEAR_DISTANCE &&
         laneGap < AI_NEAR_LANE_GAP)),
