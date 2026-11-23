@@ -1,0 +1,33 @@
+name: Issue 270 Hard AI branch QA
+
+on:
+  push:
+    branches:
+      - fix/270-hard-ai-tuning
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-270-hard-ai-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Kids Room all cars and difficulties, plus Pine and policy regressions
+        run: npx vitest run tests/domain/kidsRoomAiBenchmark.test.ts tests/domain/kidsRoomAiPace.test.ts tests/domain/aiHardPace.test.ts tests/domain/aiDifficultyPolicy.test.ts --reporter=verbose
+      - name: All domain regression tests
+        run: npx vitest run tests/domain --maxWorkers=4
+      - name: Lane checker
+        run: npm run qa:lanes -- --scenario all --mode both --seeds 1 --fail-on-regressions
+      - name: Typecheck
+        run: npm run typecheck
