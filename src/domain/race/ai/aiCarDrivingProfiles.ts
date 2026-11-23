@@ -45,7 +45,7 @@ export const CAR_DRIVING_PROFILES = {
   // Green rotates easily on street/dirt. With its longer preview it can
   // stay on line with a small Hard apex speed reserve.
   green: {
-    hardReaction: 10,
+    hardReaction: 12,
     hardSteerGain: 2.7,
     hardCornerReserve: 0.035,
     hardLookAheadSamples: 8,
@@ -55,9 +55,9 @@ export const CAR_DRIVING_PROFILES = {
   // controller; its terrain advantages remain exclusively in physics.
   yellow: {
     hardReaction: 12,
-    hardSteerGain: 3.2,
+    hardSteerGain: 3,
     hardCornerReserve: 0,
-    hardLookAheadSamples: 10,
+    hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
