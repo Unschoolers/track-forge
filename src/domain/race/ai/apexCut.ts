@@ -20,35 +20,39 @@ export function plannedApexCut(
   car: CarId,
   currentRoadOffset: number,
   currentLateralVelocity: number,
+  speed = 100,
 ): Vector2 {
   const none = { x: 0, y: 0 }
   if (difficulty === 'easy' || path.points.length < 8) return none
   const count = path.points.length
   if (!path.closed && (targetIndex < 4 || targetIndex >= count - 4)) return none
   const point = path.points[targetIndex]
-  if (!point || point.structure !== 'surface' || point.surface === 'ice') return none
+  if (!point || point.structure !== 'surface' || point.surface !== 'street' ||
+      speed > (difficulty === 'hard' ? 200 : 175)) return none
 
   // The inside must be established at the prospective apex, not inferred
   // from the car's current normal, which can face another way in a hairpin.
   const direction = reversed ? -1 : 1
   const signedBend = turnAmountAt(path, targetIndex, 6) * direction
   const bend = Math.abs(signedBend)
-  if (bend < 0.055) return none
+  // A 90° hairpin isn't a curb cut; it's a forced off-road excursion.
+  // Only consider sustained, medium-curvature bends that can be rejoined.
+  if (bend < 0.045 || bend > 0.19) return none
 
   // A chicane calls for centering and rotating for the second turn. Cutting
   // the first apex while the road reverses leads directly off the next arm.
   const before = turnAmountAt(path, targetIndex - direction * 12, 6) * direction
   const after = turnAmountAt(path, targetIndex + direction * 12, 6) * direction
-  if ((before * signedBend < 0 && Math.abs(before) > 0.055) ||
-      (after * signedBend < 0 && Math.abs(after) > 0.055)) return none
+  if (before * signedBend <= 0 || after * signedBend <= 0 ||
+      Math.abs(before) < 0.025 || Math.abs(after) < 0.025) return none
 
   // Favor cars built for grass/dirt rather than overriding chassis identity.
   const capability = car === 'red' ? 0.55 : car === 'blue' ? 0.9 : 1
-  const cornerStrength = clamp((bend - 0.055) / 0.18, 0, 1)
+  const cornerStrength = clamp((bend - 0.04) / 0.065, 0, 1)
   const width = ROAD_GEOMETRY.onRoadRadius
   // At the center of the apex this targets up to 8-12 units of shoulder
   // beyond the on-road radius, well inside the ordinary AI recovery distance.
-  const maximumCut = width + (difficulty === 'hard' ? 12 : 8)
+  const maximumCut = width + (difficulty === 'hard' ? 6 : 3)
   const offset = maximumCut * cornerStrength * capability
   if (offset < 7) return none
 
