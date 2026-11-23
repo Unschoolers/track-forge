@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
+import { isPortableWindows } from '@/infrastructure/updates/windowsPortableUpdate'
 import { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { createAndroidNearby } from '@/infrastructure/multiplayer/androidNearby'
 import { createLanNearby } from '@/infrastructure/multiplayer/lanNearby'
@@ -124,9 +125,11 @@ const uiHost = new DomUiHost(uiRoot, controller, {
   geometry,
   prepareRace: (track, trackGeometry, lighting) => sceneHost.prepareRace(track, trackGeometry, lighting),
   previewAudioVolume: setAudioVolume,
-  ...(Capacitor.isNativePlatform() ? { updateProvider: new GitHubUpdateProvider(
+  ...(Capacitor.isNativePlatform() || isPortableWindows() ? { updateProvider: new GitHubUpdateProvider(
     Number(import.meta.env.VITE_TRACKFORGE_BUILD_RUN),
     Number(import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT),
+    undefined,
+    isPortableWindows() ? 'windows' : 'android',
   ) } : {}),
 })
 const racePerformance = (import.meta.env.DEV || import.meta.env.VITE_TRACKFORGE_RACE_PERF === '1') &&
