@@ -142,3 +142,50 @@ python3 qa/optimization/to_parquet.py qa/results/passing
 The passing profile defaults retain the previous live behavior across all
 four cars until a measured, safe, cross-track candidate is accepted. A
 candidate recommendation is **not** automatically written to production.
+
+## Figure-eight four-colour benchmark (2026-11-23)
+
+The actual live replay is `trackforge-race-Figure-eight-2026-11-23T19-52-49-541Z.json`.
+The benchmark fixture `figureEightRaceAi.trackforge.json` preserves its 19 control
+points, full water terrain, overpass structures, starting ratio and direction.
+The older `figureEight.trackforge.json` has different geometry at points
+11–16 and **cannot** be used for like-for-like race analysis. Cosmetic trees
+and scenery are excluded from the headless lane-geometry fixture.
+
+Hard / Arcade / forward / 2 laps / grid `[0,2,3,1]`.
+Human Green 40.367 s; AI Green 41.083 s, Blue 41.917 s, Red 44.117 s.
+Live AI passing durations: Green 5.35s, Blue 16.55s (2 attempts),
+Red 8.30s. No automatic recoveries; Red went off pavement onto grass
+briefly without resetting. The Hard player-selected Green mirror means
+Yellow is absent from the exported race, not skipped from simulations.
+
+The parallel 4-colour driving and passing studies now include
+`figure-eight-replay` as a calibration scenario while keeping Kids
+Room and Meadow Loop as holdout tracks. The initial study completed
+396 driving and 330 passing trials, and **no candidate met the
+full-field Hard safety/performance gate**. Some Blue/Green candidate
+lap-time gains caused recoveries or excessive slowdowns elsewhere.
+
+### Calibrated passing opportunities
+
+A Yellow-versus-Green duel at equal AI pace contained zero attempts
+because Green is inherently quicker. It is invalid to conclude from
+such a duel that Yellow has no passing problem: in the actual Figure-eight
+full-field simulation Yellow tried to pass six times, spending 24.8s
+in the passing state. Passing calibration now uses a **real independently
+AI-driven moving opponent** with `duelOpponentPace = 0.8`, rather
+than a stationary obstacle or a rival which the car cannot catch.
+The pace override is legal only for a duel, is race-local, and is
+recorded in comparison metadata and Parquet. Full-field traffic
+validation always uses real unmodified opponents.
+
+For local replication:
+```sh
+npm run qa:optimize -- --focus driving --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization
+npm run qa:optimize -- --focus passing --workers 2 --trials 8 --seeds 1,4331 --out qa/results/passing
+```
+
+Note: the current Hard AI baseline produces identical outcomes for seeds
+1 and 4331 on all scenario/vehicle configurations. They still independently
+exercise the test harness; do not claim increased stochastic coverage
+until a Hard policy actually consumes random decisions.
