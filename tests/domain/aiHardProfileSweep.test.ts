@@ -21,37 +21,78 @@ if (!pine) throw new Error('Missing Pine Hairpins')
 const pinePath = prepareLanePath(pine.track)
 
 type ProfileEdit = { readonly label: string, readonly changes: Partial<CarDrivingProfile> }
-const cases: Readonly<Record<'blue' | 'green', readonly ProfileEdit[]>> = {
+const cases: Readonly<Record<CarId, readonly ProfileEdit[]>> = {
   blue: [
     { label: 'current', changes: {} },
-    { label: 'preview-6', changes: { hardLookAheadSamples: 6 } },
-    { label: 'preview-8', changes: { hardLookAheadSamples: 8 } },
-    { label: 'preview-12', changes: { hardLookAheadSamples: 12 } },
-    { label: 'gain-2.32', changes: { hardSteerGain: 2.32 } },
-    { label: 'gain-2.42', changes: { hardSteerGain: 2.42 } },
-    { label: 'gain-2.55', changes: { hardSteerGain: 2.55 } },
-    { label: 'reaction-10', changes: { hardReaction: 10 } },
-    { label: 'reserve-0.025', changes: { hardCornerReserve: 0.025 } },
-    { label: 'reserve-0.05', changes: { hardCornerReserve: 0.05 } },
-    { label: 'reserve-0.08', changes: { hardCornerReserve: 0.08 } },
-    { label: 'gain-2.42-preview-8', changes: { hardSteerGain: 2.42, hardLookAheadSamples: 8 } },
+    { label: 'normal-steering-preview4', changes: { hardReaction: 10, hardSteerGain: 2.42, hardLookAheadSamples: 4 } },
+    { label: 'normal-steering-preview6', changes: { hardReaction: 10, hardSteerGain: 2.42, hardLookAheadSamples: 6 } },
+    { label: 'normal-steering-preview8', changes: { hardReaction: 10, hardSteerGain: 2.42, hardLookAheadSamples: 8 } },
+    { label: 'normal-steering-preview10', changes: { hardReaction: 10, hardSteerGain: 2.42, hardLookAheadSamples: 10 } },
+    { label: 'gain255-preview4', changes: { hardSteerGain: 2.55, hardLookAheadSamples: 4 } },
+    { label: 'gain255-preview6', changes: { hardSteerGain: 2.55, hardLookAheadSamples: 6 } },
+    { label: 'gain255-preview8', changes: { hardSteerGain: 2.55, hardLookAheadSamples: 8 } },
+    { label: 'gain255-preview10', changes: { hardSteerGain: 2.55, hardLookAheadSamples: 10 } },
+    { label: 'gain255-preview12', changes: { hardSteerGain: 2.55, hardLookAheadSamples: 12 } },
+    { label: 'reaction12-gain242-preview4', changes: { hardReaction: 12, hardSteerGain: 2.42, hardLookAheadSamples: 4 } },
+    { label: 'reaction12-gain242-preview8', changes: { hardReaction: 12, hardSteerGain: 2.42, hardLookAheadSamples: 8 } },
+    { label: 'reaction12-gain255-preview8', changes: { hardReaction: 12, hardSteerGain: 2.55, hardLookAheadSamples: 8 } },
+    { label: 'reaction10-gain27-preview8', changes: { hardReaction: 10, hardSteerGain: 2.7, hardLookAheadSamples: 8 } },
+    { label: 'reaction15-gain3-preview4', changes: { hardReaction: 15, hardSteerGain: 3, hardLookAheadSamples: 4 } },
+    { label: 'gain242-reserve001-preview10', changes: { hardSteerGain: 2.42, hardCornerReserve: 0.01 } },
   ],
   green: [
     { label: 'current', changes: {} },
-    { label: 'reserve-0', changes: { hardCornerReserve: 0 } },
-    { label: 'reserve-0.01', changes: { hardCornerReserve: 0.01 } },
-    { label: 'reserve-0.03', changes: { hardCornerReserve: 0.03 } },
-    { label: 'reserve-0.04', changes: { hardCornerReserve: 0.04 } },
-    { label: 'gain-2.5', changes: { hardSteerGain: 2.5 } },
-    { label: 'gain-2.6', changes: { hardSteerGain: 2.6 } },
-    { label: 'preview-6', changes: { hardLookAheadSamples: 6 } },
-    { label: 'preview-8', changes: { hardLookAheadSamples: 8 } },
+    { label: 'preview8-reserve0', changes: { hardCornerReserve: 0 } },
+    { label: 'preview8-reserve001', changes: { hardCornerReserve: 0.01 } },
+    { label: 'preview8-reserve0035', changes: { hardCornerReserve: 0.035 } },
+    { label: 'preview8-reserve005', changes: { hardCornerReserve: 0.05 } },
+    { label: 'preview6-reserve001', changes: { hardLookAheadSamples: 6, hardCornerReserve: 0.01 } },
+    { label: 'preview10', changes: { hardLookAheadSamples: 10 } },
+    { label: 'preview12', changes: { hardLookAheadSamples: 12 } },
+    { label: 'preview8-gain23', changes: { hardSteerGain: 2.3 } },
+    { label: 'preview8-gain25', changes: { hardSteerGain: 2.5 } },
+    { label: 'preview8-gain26', changes: { hardSteerGain: 2.6 } },
+    { label: 'preview8-gain27', changes: { hardSteerGain: 2.7 } },
+    { label: 'preview8-reaction8', changes: { hardReaction: 8 } },
+    { label: 'preview8-reaction12', changes: { hardReaction: 12 } },
+    { label: 'preview8-gain26-reserve001', changes: { hardSteerGain: 2.6, hardCornerReserve: 0.01 } },
+  ],
+  red: [
+    { label: 'current', changes: {} },
+    { label: 'preview6', changes: { hardLookAheadSamples: 6 } },
+    { label: 'preview8', changes: { hardLookAheadSamples: 8 } },
+    { label: 'preview10', changes: { hardLookAheadSamples: 10 } },
+    { label: 'preview12', changes: { hardLookAheadSamples: 12 } },
+    { label: 'gain242', changes: { hardSteerGain: 2.42 } },
+    { label: 'gain26', changes: { hardSteerGain: 2.6 } },
+    { label: 'gain28', changes: { hardSteerGain: 2.8 } },
+    { label: 'reaction10', changes: { hardReaction: 10 } },
+    { label: 'reaction12', changes: { hardReaction: 12 } },
+    { label: 'reaction10-gain242-preview8', changes: { hardReaction: 10, hardSteerGain: 2.42, hardLookAheadSamples: 8 } },
+    { label: 'reaction10-gain26-preview8', changes: { hardReaction: 10, hardSteerGain: 2.6, hardLookAheadSamples: 8 } },
+    { label: 'reserve002', changes: { hardCornerReserve: 0.02 } },
+    { label: 'reserve005', changes: { hardCornerReserve: 0.05 } },
+  ],
+  yellow: [
+    { label: 'current', changes: {} },
+    { label: 'preview8', changes: { hardLookAheadSamples: 8 } },
+    { label: 'preview12', changes: { hardLookAheadSamples: 12 } },
+    { label: 'preview14', changes: { hardLookAheadSamples: 14 } },
+    { label: 'gain28', changes: { hardSteerGain: 2.8 } },
+    { label: 'gain3', changes: { hardSteerGain: 3 } },
+    { label: 'gain32', changes: { hardSteerGain: 3.2 } },
+    { label: 'reaction10', changes: { hardReaction: 10 } },
+    { label: 'reaction12', changes: { hardReaction: 12 } },
+    { label: 'reserve002', changes: { hardCornerReserve: 0.02 } },
+    { label: 'gain3-preview8', changes: { hardSteerGain: 3, hardLookAheadSamples: 8 } },
+    { label: 'gain3-preview12', changes: { hardSteerGain: 3, hardLookAheadSamples: 12 } },
+    { label: 'gain27-reaction12-preview10', changes: { hardReaction: 12 } },
   ],
 }
 
 sweep('measures bounded car-specific Hard controller candidates on Kids Room and Pine', () => {
   const outcomes: Record<string, unknown[]> = {}
-  for (const car of ['blue', 'green'] as const) {
+  for (const car of ['blue', 'green', 'red', 'yellow'] as const) {
     const original = profiles[car]
     const results: unknown[] = []
     try {
@@ -86,4 +127,6 @@ sweep('measures bounded car-specific Hard controller candidates on Kids Room and
   console.log('AI_PROFILE_SWEEP ' + JSON.stringify(outcomes))
   expect(outcomes.blue).toHaveLength(cases.blue.length)
   expect(outcomes.green).toHaveLength(cases.green.length)
+  expect(outcomes.red).toHaveLength(cases.red.length)
+  expect(outcomes.yellow).toHaveLength(cases.yellow.length)
 }, 300_000)
