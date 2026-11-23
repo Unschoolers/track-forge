@@ -47,6 +47,7 @@ const {
   RACING_PAVEMENT_EDGE_LIMIT,
   RACING_PAVEMENT_HEADING_MARGIN,
   RACING_PAVEMENT_HEADING_LIMIT,
+  ARCADE_STEERING,
 } = AI_DRIVING_TUNING
 
 function advanceMistake(
@@ -84,7 +85,13 @@ export function stepAiVehicle(
   // Arcade shares steering technique across difficulties. Traffic decisions
   // and driver mistakes still use the selected difficulty.
   const drivingDifficulty = aiSteeringDifficulty(difficulty, handling, Boolean(vehicle.racingLine))
-  const tuning = DIFFICULTY_SPECS[drivingDifficulty]
+  // Arcade drivers share steering technique across difficulty levels.
+  // Stronger but slower-changing steering follows the next bend without the
+  // instant counter-corrections that previously made the car over-brake.
+  // Authored racing lines and Simulation retain their original policy.
+  const tuning = handling === 'arcade' && !vehicle.racingLine
+    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING }
+    : DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   ai = advancePassingState(vehicle, ai, traffic, difficulty, deltaSeconds)
