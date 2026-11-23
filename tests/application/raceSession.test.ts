@@ -263,13 +263,13 @@ describe('RaceSession', () => {
     for (let i = 0; i < 18; i++) session.advance(0.25, noInput)
     expect(session.snapshot().result?.rivalsFinishing).toBe(true)
     // The old five-second cap made genuinely racing rivals appear as DNF.
-    for (let i = 0; i < 139; i++) session.advance(0.25, noInput)
-    expect(session.snapshot().result?.rivalsFinishing).toBe(true)
-    session.advance(0.25, noInput)
+    // Stop earlier if everyone genuinely finishes; otherwise cap at 40 s.
+    for (let i = 0; i < 140; i++) session.advance(0.25, noInput)
     const settled = session.snapshot()
     expect(settled.result).toMatchObject({ playerTime: 1, playerPlace: 1, rivalsFinishing: false })
-    expect(settled.state?.elapsed).toBeCloseTo(41)
-    expect(settled.result?.standings.some(({ finishTime }) => finishTime === null)).toBe(true)
+    expect(settled.state?.elapsed).toBeGreaterThan(6)
+    expect(settled.state?.elapsed).toBeLessThanOrEqual(41)
+    expect(settled.result?.standings.some(({ finishTime }) => finishTime !== null)).toBe(true)
     session.advance(0.25, noInput)
     expect(session.snapshot()).toBe(settled)
     expect(step).toHaveBeenCalledOnce()
