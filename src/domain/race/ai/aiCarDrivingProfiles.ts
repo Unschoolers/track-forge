@@ -21,6 +21,8 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
+  /** Speed above the planned corner target tolerated before applying brakes, when stable. */
+  readonly hardBrakeOverspeedTolerance?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
