@@ -17,6 +17,16 @@ export const STUDY_SCENARIOS = [
     laps: 2, seconds: 145, group: 'validation',
   },
   {
+    // The creator's Hard 2026-11-23 replay has this *same* track revision,
+    // but uses different physical start slots than the existing QA scenario.
+    // Retain both: one to reproduce the new live race grid and one to guard
+    // the previous fixed-grid baseline.
+    id: 'kids-room-replay', file: 'tests/fixtures/kidsRoomAi.trackforge.json',
+    reverse: false, startRatio: 0.21932299012693934,
+    gridPositions: [3, 1, 0, 2],
+    laps: 2, seconds: 145, group: 'validation',
+  },
+  {
     id: 'meadow-loop', officialName: 'Meadow Loop',
     reverse: false, startRatio: 0,
     laps: 2, seconds: 70, group: 'validation',
