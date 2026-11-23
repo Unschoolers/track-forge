@@ -111,8 +111,14 @@ export function stepAiVehicle(
   // is enough, with a tiny straight-only courtesy nudge below.
   // Authored racing lines already include their own traffic-facing lane
   // decisions; preserve that proven behaviour on curated circuits.
+  // Opportunist Red starts farther back and its aggressive low-grip
+  // corner entry is not yet safe without defensive following. Preserve
+  // its proven lane-clearance decisions until it has a clean grid replay.
+  // Other chassis and Red personalities use compact dot-sized clearance.
+  const defensiveRed = vehicle.car === 'red' &&
+    vehicle.ai?.personality === 'opportunist'
   const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
-    aiAiTrafficMode !== 'legacy'
+    !defensiveRed && aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   // An AI dot may influence short-range speed, but only the player
