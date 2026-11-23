@@ -90,7 +90,8 @@ export function stepAiVehicle(
   // instant counter-corrections that previously made the car over-brake.
   // Authored racing lines and Simulation retain their original policy.
   const tuning = handling === 'arcade' && !vehicle.racingLine
-    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING }
+    ? { ...DIFFICULTY_SPECS[drivingDifficulty], ...ARCADE_STEERING,
+        reaction: difficulty === 'hard' ? 12 : ARCADE_STEERING.reaction }
     : DIFFICULTY_SPECS[drivingDifficulty]
   const car = CAR_SPECS[vehicle.car]
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
