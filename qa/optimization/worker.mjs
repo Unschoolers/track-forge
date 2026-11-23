@@ -72,6 +72,7 @@ try {
       const exported = projectTrial(run, {
         candidateId: task.candidateId, scenarioId: scenario.id,
         driverCar: task.playerCar ?? task.car, tunedCar: task.car,
+        focusRole: task.focusRole ?? 'player',
         gridPositions: scenario.gridPositions?.join(',') ?? null,
         seed: task.seed, difficulty: task.difficulty,
         mode: task.mode, startRatio: scenario.startRatio,
@@ -81,10 +82,12 @@ try {
       // A tuned car can be a *rival*, not only the AI-driven player slot.
       // Using the first vehicle exclusively missed the historical Kids Room
       // recovery regression when Green was racing behind a Red player.
-      const focus = (task.playerCar ?? task.car) === task.car
-        ? run.vehicles[0]
-        : run.vehicles.find(vehicle => vehicle.car === task.car)
-      if (!focus) throw new Error('Tuned rival absent from simulation')
+      const focus = task.focusRole === 'rival'
+        ? run.vehicles.find(vehicle => vehicle.car === task.car &&
+            vehicle.vehicleId !== run.vehicles[0]?.vehicleId)
+        : run.vehicles[0]
+      if (!focus || focus.car !== task.car)
+        throw new Error(`Tuned ${task.car} ${task.focusRole ?? 'player'} absent from simulation`)
       port.postMessage({
         type: 'result', id,
         result: {
