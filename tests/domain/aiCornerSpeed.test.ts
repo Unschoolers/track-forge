@@ -99,6 +99,31 @@ describe('AI approach speed planning', () => {
     expect(iceSpeed).toBeGreaterThan(70)
   })
 
+  it('uses tire lateral authority for a faster controlled arcade apex without raising ice grip', () => {
+    const sweeping = buildRoadPath([
+      { x: 0, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 400, y: 0, surface: 'street', curve: 'smooth' },
+      { x: 650, y: 240, surface: 'street', curve: 'smooth' },
+      { x: 1000, y: 240, surface: 'street', curve: 'smooth' },
+    ], EMPTY_TERRAIN, undefined, 'point-to-point')
+    const speeds = sweeping.points.map((_point, i) => ({
+      standard: safeEntrySpeedAhead(sweeping, i, false, 0.75,
+        CAR_SPECS.blue, 1, 'blue', true, false, true, 'simulation'),
+      arcade: safeEntrySpeedAhead(sweeping, i, false, 0.75,
+        CAR_SPECS.blue, 1, 'blue', true, false, true, 'arcade'),
+    }))
+    expect(Math.max(...speeds.map(pair => pair.arcade - pair.standard))).toBeGreaterThan(5)
+    expect(speeds.every(pair => pair.arcade <= CAR_SPECS.blue.max)).toBe(true)
+    const icy = { ...sweeping, points: sweeping.points.map(point => ({
+      ...point, surface: 'ice' as const,
+    })) }
+    const index = sweeping.points.findIndex(point => point.distance > 280)
+    expect(safeEntrySpeedAhead(icy, index, false, 0.75, CAR_SPECS.red,
+      1, 'red', true, false, true, 'arcade')).toBe(
+      safeEntrySpeedAhead(icy, index, false, 0.75, CAR_SPECS.red,
+        1, 'red', true, false, true, 'simulation'))
+  })
+
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)
