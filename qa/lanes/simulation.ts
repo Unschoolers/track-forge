@@ -132,12 +132,13 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		startRatio: options.startRatio ?? 0,
 		gridPositions: options.gridPositions ?? (options.mode === 'duel' ? [3, 0, 1, 2] : undefined),
 	})
-	if (options.mode === 'duel' && !created.vehicles[1])
+	const duelOpponentId = created.vehicles[1]?.id
+	if (options.mode === 'duel' && !duelOpponentId)
 		throw new Error('Duel opponent missing from race grid')
 	let race: RaceState = {
 		...created,
 		...(options.duelOpponentSpeedLimit !== undefined ? {
-			aiVehicleSpeedLimits: { [created.vehicles[1]!.id]: options.duelOpponentSpeedLimit },
+			aiVehicleSpeedLimits: { [duelOpponentId ?? 'missing-duel-opponent']: options.duelOpponentSpeedLimit },
 		} : {}),
 		...(options.aiProfileOverrides ? { aiProfileOverrides: options.aiProfileOverrides } : {}),
 		...(options.aiPassingPolicyOverrides ? { aiPassingPolicyOverrides: options.aiPassingPolicyOverrides } : {}),
