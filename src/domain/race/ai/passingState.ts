@@ -1,4 +1,5 @@
 import { AI_OVERTAKE } from '@/domain/config'
+import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { DifficultyId } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { AiDriverState } from '@/domain/race/ai/aiState'
@@ -51,11 +52,13 @@ export function advancePassingState(
     const passElapsed = (ai.passElapsed ?? 0) + deltaSeconds
     const target = traffic.nearby.find((entry) => entry.vehicle.id === ai.passTargetId)
     const targetClear = !target || target.signedDistance < -tuning.completionDistance
-    // Don't spend eight seconds in an outside lane chasing a car that has
-    // pulled beyond passing range. Keep the normal lane hold and require a
-    // clear base lane before abandoning the attempt.
-    const targetLost = target !== undefined && target.signedDistance > tuning.triggerDistance
-    // The time limit still covers stalled passes with a target in range.
+    // Red's high straight-line speed and limited grip make a futile, wide
+    // pass costly. Only its calibrated profile opts into an early abort.
+    // Keep the lane hold and clear base-lane requirement for every car.
+    const abortScale = CAR_DRIVING_PROFILES[vehicle.car].lostPassAbortDistanceScale
+    const targetLost = abortScale !== undefined && target !== undefined &&
+      target.signedDistance > tuning.triggerDistance * abortScale
+    // Other cars retain the stable eight-second fallback until calibrated.
     const clear = destinationClear && (targetClear || targetLost || passElapsed > 8)
     const clearTime = clear ? ai.clearTime + deltaSeconds : 0
     if (holdRemaining <= 0 && clearTime >= 0.25) {
