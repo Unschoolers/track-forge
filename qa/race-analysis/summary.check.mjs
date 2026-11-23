@@ -102,3 +102,38 @@ test('malformed exports cause actionable failures, never silent fallback', () =>
   assert.throws(() => summarizeRace(broken), /nonmonotonic/)
   assert.throws(() => groupHotspots([], 0), /hotspotBin/)
 })
+
+test('rejects missing vehicle samples rather than reporting partial statistics', () => {
+  const missingMidRace = replay()
+  missingMidRace.frames[1].vehicles.splice(1, 1)
+  assert.throws(() => summarizeRace(missingMidRace), /missing vehicle ai-2 in frame 1/)
+
+  // The default report observes until 1.5s, but the later frames must still
+  // be complete: --full and future comparisons must never trust damaged data.
+  const missingAfterFinish = replay()
+  missingAfterFinish.frames[2].vehicles = missingAfterFinish.frames[2].vehicles.slice(0, 1)
+  assert.throws(() => summarizeRace(missingAfterFinish), /missing vehicle ai-2 in frame 2/)
+  assert.throws(() => summarizeRace(missingAfterFinish, { full: true }), /missing vehicle ai-2 in frame 2/)
+})
+
+test('rejects duplicate, unexpected, replaced and non-finite vehicle telemetry', () => {
+  const duplicate = replay()
+  duplicate.frames[1].vehicles.push({ ...duplicate.frames[1].vehicles[0] })
+  assert.throws(() => summarizeRace(duplicate), /duplicate vehicle player in frame 1/)
+
+  const unexpected = replay()
+  unexpected.frames[1].vehicles[1].id = 'unknown'
+  assert.throws(() => summarizeRace(unexpected), /unexpected vehicle unknown in frame 1/)
+
+  const replaced = replay()
+  replaced.frames[1].vehicles[1].car = 'green'
+  assert.throws(() => summarizeRace(replaced), /changed vehicle identity ai-2 in frame 1/)
+
+  const missingFrameArray = replay()
+  delete missingFrameArray.frames[1].vehicles
+  assert.throws(() => summarizeRace(missingFrameArray), /missing vehicles in frame 1/)
+
+  const nonfinite = replay()
+  nonfinite.frames[1].vehicles[0].speed = Number.NaN
+  assert.throws(() => summarizeRace(nonfinite), /invalid speed for vehicle player in frame 1/)
+})
