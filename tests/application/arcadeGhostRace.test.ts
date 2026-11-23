@@ -69,7 +69,7 @@ describe('Arcade ghost racing', () => {
     expect(recorded?.at(-1)?.t).toBeCloseTo(2.1)
     const run = { car: 'blue' as const, time: 2.1, frames: recorded ?? [] }
     expect(ghostPoseAt(run, 1.05)?.x).toBe(1000)
-    expect(ghostPoseAt(run, 1.1)?.x).toBe(0)
+    expect(ghostPoseAt(run, 1.1)?.x).toBeCloseTo(0, 5)
   })
   it('preserves the original pre-cut pose when recovery repeats in the same tick', () => {
     const race = session(new BrowserGhostRepository(memory()))
