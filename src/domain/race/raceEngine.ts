@@ -315,6 +315,9 @@ function advanceRace(
       terrainMaterial: context.terrainMaterial,
       safeAboveWater: context.safeAboveWater,
     })
+    // A bridge plunge (including into water) gets the full two-second
+    // recovery window rather than teleporting as soon as it hits the surface.
+    if (vehicle.player && vehicle.bridgeFallSeconds !== undefined) return vehicle
     const previous = state.vehicles[index]
     const sceneryHit = !arcade && vehicle.player && previous && state.sceneryColliders &&
       !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
@@ -428,6 +431,7 @@ function advanceRace(
     player !== undefined &&
     playerContext !== undefined &&
     !(arcade && player.waterRecoveryProtected) &&
+    player.bridgeFallSeconds === undefined &&
     hasVehicleWaterContact({
       grounded: player.grounded,
       terrainMaterial: playerContext.terrainMaterial,
