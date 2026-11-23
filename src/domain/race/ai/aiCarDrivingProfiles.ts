@@ -37,7 +37,7 @@ export const CAR_DRIVING_PROFILES = {
   red: {
     hardReaction: 12,
     hardSteerGain: 2.22,
-    hardCornerReserve: 0.06,
+    hardCornerReserve: 0.02,
     hardLookAheadSamples: 10,
   },
   // Green rotates easily on street/dirt. With its longer preview it can
@@ -47,6 +47,7 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 2.7,
     hardCornerReserve: 0,
     hardLookAheadSamples: 8,
+    hardCornerTargetBonus: 0.3,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
@@ -55,5 +56,6 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 3.2,
     hardCornerReserve: 0,
     hardLookAheadSamples: 10,
+    hardCornerTargetBonus: 0.3,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
