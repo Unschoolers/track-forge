@@ -264,8 +264,17 @@ export function stepAiVehicle(
   ) * cornerPace
   const practicedSpeedRatio = vehicle.racingLine?.speedRatio ?? 1
   let curveSpeed = practicedSpeedRatio < 1 ? Math.min(cornerTarget, car.max) * practicedSpeedRatio : cornerTarget
+  // A tight pavement hairpin may need more entry caution than an ordinary
+  // corner. Reserve it for high-curvature approaches so a low-grip chassis
+  // keeps its pace on sweeping and mixed-surface bends. Speed target only;
+  // the existing physical brakes and tires still do the work.
+  const hairpinSharpness = clamp((bend - 0.16) / 0.12, 0, 1)
+  const hairpinReserve = difficulty === 'hard' && arcade && !vehicle.racingLine &&
+    context.surface === 'street'
+      ? (hardProfile.hardHairpinReserve ?? 0) * hairpinSharpness ** 2
+      : 0
   const cornerMargin = arcade && !vehicle.racingLine
-    ? arcadeCornerMargin(difficulty, vehicle.car) : 0
+    ? arcadeCornerMargin(difficulty, vehicle.car) + hairpinReserve : 0
   if (cornerMargin > 0 && context.surface !== 'grass') {
     // Add grip reserve as a bend approaches while allowing full speed on straights.
     const bendWeight = clamp((bend - 0.02) / 0.18, 0, 1)
