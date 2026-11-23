@@ -28,6 +28,31 @@ for a broken or uncompetitive Hard lap.
    finish times, not just field averages, and make sure a tuned Normal
    cannot mask Hard regressions. Preserve other cars' handling identities.
 
+## Recovery acceptance by difficulty
+
+Hard is the precision target: **zero avoidable automatic recoveries** in
+the matched racing scenarios, while preserving actual tire physics. Normal
+and Easy intentionally have nonzero random driver mistakes; their mistakes
+are not themselves defects, and a slower lap does not automatically mean
+a regression.
+
+Compare recovery counts using the **same track, car, seed, grid, difficulty
+and race length**. For Easy, **+1 or +2 recoveries over the seeded baseline
+are acceptable** if the cars still finish and checkpoint/path/state safety
+remains intact. **+3 or more** must be flagged for investigation rather than
+silently approved. Normal is not required to have zero *baseline* recoveries,
+but new ones still require review until a separate tolerance is established.
+No difficulty may skip checkpoints, create invalid states, or fail to finish
+because its random-mistake budget increased. Never count collision/route
+errors as ordinary allowed driving mistakes.
+
+The offline evaluator implements these thresholds in
+`qa/optimization/recoveryPolicy.mjs`; all currently scheduled optimization
+studies tune **Hard only**, so their existing safety gate remains strict.
+Where a specific existing race test demands zero recoveries for a known
+historically clean Easy track, preserve that scenario-level expectation unless
+the authored test is deliberately updated with a recorded comparable baseline.
+
 ## Green on Kids room: explicit regression contract
 
 - **Source:** `tests/fixtures/kidsRoomAi.trackforge.json` captures the
