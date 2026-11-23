@@ -208,6 +208,10 @@ const cases: Readonly<Record<CarId, readonly ProfileEdit[]>> = {
     { label: 'reaction10-gain26-preview8', changes: { hardReaction: 10, hardSteerGain: 2.6, hardLookAheadSamples: 8 } },
     { label: 'reserve002', changes: { hardCornerReserve: 0.02 } },
     { label: 'reserve005', changes: { hardCornerReserve: 0.05 } },
+    { label: 'hairpin010', changes: { hardHairpinReserve: 0.1 } },
+    { label: 'hairpin016', changes: { hardHairpinReserve: 0.16 } },
+    { label: 'hairpin022', changes: { hardHairpinReserve: 0.22 } },
+    { label: 'hairpin028', changes: { hardHairpinReserve: 0.28 } },
     { label: 'roundabout-safe-reserve018', changes: { hardCornerReserve: 0.18 } },
     { label: 'roundabout-safe-reserve022', changes: { hardCornerReserve: 0.22 } },
 
