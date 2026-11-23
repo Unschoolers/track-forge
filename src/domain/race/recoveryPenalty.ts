@@ -12,6 +12,5 @@ export function addRecoveryTimePenalty(vehicle: RaceVehicle): RaceVehicle {
   return {
     ...vehicle,
     recoveryPenaltySeconds: (vehicle.recoveryPenaltySeconds ?? 0) + RECOVERY_TIME_PENALTY_SECONDS,
-    finishedAt: vehicle.finishedAt === null ? null : vehicle.finishedAt + RECOVERY_TIME_PENALTY_SECONDS,
   }
 }
