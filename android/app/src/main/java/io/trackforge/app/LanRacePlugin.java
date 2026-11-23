@@ -445,11 +445,25 @@ public class LanRacePlugin extends Plugin {
         synchronized (gate) { peer = peers.get(id); }
         if (peer == null) { call.reject("LAN player disconnected"); return; }
         try {
-            peer.send(frame(accepted ? "accept" : "reject"));
             if (accepted) {
-                peer.acceptedHere = true;
-                maybeConnected(id, peer);
-            } else peer.close();
+                // The remote ACCEPT can arrive while Android is still writing ours.
+                // Mark local acceptance under the same send monitor so that an
+                // early remote ACK cannot cause a race packet to precede our ACK.
+                synchronized (peer) {
+                    peer.acceptedHere = true;
+                    try {
+                        peer.send(frame("accept"));
+                    } catch (IOException exception) {
+                        peer.acceptedHere = false;
+                        peer.close();
+                        throw exception;
+                    }
+                    maybeConnected(id, peer);
+                }
+            } else {
+                peer.send(frame("reject"));
+                peer.close();
+            }
             call.resolve();
         } catch (IOException exception) { call.reject("LAN pairing failed: " + exception.getMessage()); }
     }
