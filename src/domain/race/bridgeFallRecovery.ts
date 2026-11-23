@@ -19,7 +19,7 @@ export function trackBridgeFall(
       ? current : { ...current, bridgeFallSeconds: undefined }
   }
   const leftRaisedSupport = previous.structureRunId !== null &&
-    previous.grounded && !onRoad &&
+    previous.grounded && (!onRoad || structureRunId !== previous.structureRunId) &&
     (!current.grounded || current.z > surfaceHeight + SUPPORT_HEIGHT_EPSILON)
   if (!leftRaisedSupport && previous.bridgeFallSeconds === undefined) return current
   return {
