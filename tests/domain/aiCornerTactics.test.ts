@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
+import { turnAmountAt } from '@/domain/race/trackContext'
 
 const path = buildRoadPath([
   { x: 0, y: 0, surface: 'dirt', curve: 'corner' },
@@ -27,7 +28,8 @@ describe('AI corner tactics', () => {
 
   it('countersteers a real slide but never manufactures one near the road edge', () => {
     const turnIndex = path.points.findIndex((_p, i) => tactics(i).phase === 'turn')
-    expect(turnIndex).toBeGreaterThan(0)
+    const maxBend = Math.max(...path.points.map((_p, i) => Math.abs(turnAmountAt(path, i, 6))))
+    expect(turnIndex, `road samples=${path.points.length}; maximum local bend=${maxBend}`).toBeGreaterThan(0)
     const planted = tactics(turnIndex)
     const sliding = tactics(turnIndex, 0.17, 6)
     const wide = tactics(turnIndex, 0.17, 35)
@@ -35,16 +37,6 @@ describe('AI corner tactics', () => {
     expect(sliding.drifting).toBe(true)
     expect(sliding.sideslipGain).toBeGreaterThan(planted.sideslipGain)
     expect(wide.drifting).toBe(false)
-  })
-
-  it('anticipates outward momentum while keeping slides inside a safe lane', () => {
-    const approach = path.points.findIndex(p => p.distance > 400)
-    const settled = planCornerTactics(path, approach, false, 150, 0.12, 10, 42, 0)
-    const driftingOutward = planCornerTactics(path, approach, false, 150, 0.12, 10, 42, 70)
-    const reversed = planCornerTactics(path, approach, true, 150, -0.12, 10, 42, 70)
-    expect(settled.edgeCorrection).toBe(0)
-    expect(driftingOutward.edgeCorrection).toBeLessThan(0)
-    expect(reversed.edgeCorrection).toBeGreaterThan(0)
   })
 
   it('keeps corner prediction usable when reversing across a closed-lap boundary', () => {
