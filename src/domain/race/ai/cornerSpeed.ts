@@ -185,10 +185,17 @@ export function safeEntrySpeedAhead(
       SHARP_BEND_SAFETY_BASE + bend * SHARP_BEND_SAFETY_GAIN, 0, SHARP_BEND_SAFETY_MAX,
     )
     const effectiveSafety = useSharpBendSafety ? Math.max(cornerSafety, sharpBendSafety) : cornerSafety
+    // Green's very quick-yaw, high-grip chassis can safely retain a little
+    // more speed at the tightest dirt/pavement apexes. Keep the historical
+    // minimum on ice and for less responsive cars; this is a target speed,
+    // never a physics or traction exemption.
+    const nimbleGrip = Math.max(0, steeringResponse - 1) *
+      clamp((grip - 0.75) / 0.2, 0, 1)
+    const apexMinimum = 70 + Math.min(14, nimbleGrip * 35)
     const apexSpeed = bend < 0.001 ? surfaceMax : Math.min(surfaceMax, clamp(
       (cornerBaseline - bend * (fastCorners ? 600 : 350) * effectiveSafety) * Math.sqrt(grip) +
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
-      70, straightSpeed,
+      apexMinimum, straightSpeed,
     ))
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
