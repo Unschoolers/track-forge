@@ -251,7 +251,12 @@ pub fn lan_host(
                         format!("peer-{}", guard.next_peer)
                     };
                     if let Err(message) = add_peer(app.clone(), Arc::clone(&state), generation, id, stream, true) {
-                        notify(&app, "error", "", Some(("message", message)));
+                        // A full/locked room is not a failure for existing racers.
+                        if message == "LAN room is no longer accepting connections" {
+                            eprintln!("TrackForge LAN rejected additional player: {message}");
+                        } else {
+                            notify(&app, "error", "", Some(("message", message)));
+                        }
                     }
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => thread::sleep(Duration::from_millis(35)),
