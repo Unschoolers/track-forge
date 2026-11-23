@@ -70,6 +70,22 @@ fn write_frame(peer: &Peer, frame: Value) -> Result<(), String> {
     writer.write_all(&line).map_err(|e| format!("LAN send failed: {e}"))
 }
 
+
+/** Mark local acceptance while holding the TCP send lock. A remote ACCEPT
+ * may arrive immediately, triggering game packets from another thread.
+ * Those packets must never overtake our outbound ACCEPT frame.
+ */
+fn write_accept_frame(peer: &Peer) -> Result<(), String> {
+    let mut writer = lock(&peer.writer)?;
+    peer.accepted_here.store(true, Ordering::SeqCst);
+    if let Err(error) = writer.write_all(b"{\"t\":\"accept\"}\n") {
+        peer.accepted_here.store(false, Ordering::SeqCst);
+        let _ = writer.shutdown(Shutdown::Both);
+        return Err(format!("LAN pairing accept failed: {error}"));
+    }
+    Ok(())
+}
+
 fn mark_connected(app: &AppHandle, peer: &Peer, id: &str) {
     if peer.accepted_here.load(Ordering::SeqCst)
         && peer.accepted_there.load(Ordering::SeqCst)
@@ -430,8 +446,7 @@ pub fn lan_respond(
         if let Ok(writer) = peer.writer.lock() { let _ = writer.shutdown(Shutdown::Both); }
         return result;
     }
-    write_frame(&peer, json!({"t":"accept"}))?;
-    peer.accepted_here.store(true, Ordering::SeqCst);
+    write_accept_frame(&peer)?;
     mark_connected(&app, &peer, &id);
     Ok(())
 }
@@ -472,4 +487,26 @@ pub fn lan_diagnostics(manager: State<'_, LanManager>) -> Result<Value, String> 
     let guard = lock(&manager.state)?;
     Ok(json!({"transport":"tcp-lan","mode":guard.mode,"connected":guard.peers.values()
         .filter(|p| p.connected.load(Ordering::SeqCst)).count(),"discovered":guard.discovered.len()}))
+}
+
+#[cfg(test)]
+mod pairing_order_tests {
+    use super::*;
+    #[test]
+    fn sends_accept_only_after_marking_local_side_accepted() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let sender = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (receiver, _) = listener.accept().unwrap();
+        let peer = Peer {
+            writer: Mutex::new(sender),
+            accepted_here: AtomicBool::new(false),
+            accepted_there: AtomicBool::new(true),
+            connected: AtomicBool::new(false),
+        };
+        write_accept_frame(&peer).unwrap();
+        assert!(peer.accepted_here.load(Ordering::SeqCst));
+        let mut incoming = String::new();
+        BufReader::new(receiver).read_line(&mut incoming).unwrap();
+        assert_eq!(incoming, "{\"t\":\"accept\"}\n");
+    }
 }

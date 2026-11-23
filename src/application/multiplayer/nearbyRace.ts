@@ -544,7 +544,24 @@ export class NearbyRace {
         if (incomingGuest || invitedHost) {
           this.pendingPairs.add(event.id)
           this.record('pairing_auto_accept')
-          this.perform('respond', () => this.transport.respond(event.id, true), this.generation)
+          this.perform('respond', async () => {
+            // On LAN, a guest can disappear between the incoming pairing
+            // event and the queued host acceptance command. This is a
+            // per-peer failure, not a reason to close the host's entire room.
+            if (this.role === 'host' && !this.pendingPairs.has(event.id)) {
+              this.record('pairing_peer_left', { stage: 'before_accept' })
+              return
+            }
+            try {
+              await this.transport.respond(event.id, true)
+            } catch (error: unknown) {
+              if (this.role === 'host' && !this.pendingPairs.has(event.id)) {
+                this.record('pairing_peer_left', { stage: 'during_accept', error: this.errorKind(error) })
+                return
+              }
+              throw error
+            }
+          }, this.generation)
           this.changed()
         } else {
           void this.transport.respond(event.id, false).catch((error: unknown) => {
