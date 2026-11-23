@@ -106,3 +106,39 @@ matrix, candidate rejections and per-track details. The CI workflow uploads
 summary/JSONL/Parquet files together as a downloadable artifact.
 If the physics, road compilation or AI profiles change, **run new experiments**;
 do not compare different physics revisions as if equivalent.
+
+## Independent driving line and overtaking experiments
+
+Track Forge deliberately tests two different capabilities rather than
+optimizing them with the same metric:
+
+- **Driving** (`--focus driving`, default): each car runs alone in the real
+  60 Hz simulator to tune steering, braking, corner anticipation and pace,
+  then validates the candidates with rivals.
+- **Passing** (`--focus passing`): a named car chases one independently
+  AI-driven opponent. The deterministic two-car grid is
+  `[3,0,1,2]` (car behind, rival ahead). The simulator uses real vehicle
+  movement and the same engine/collisions, never a stationary test obstacle.
+  Screen pass decisions and lane rejoining in duels, then validate the
+  survivor in solo races and full-field traffic on held-out tracks/seeds.
+- **Isolation**: passing decisions are in
+  `src/domain/race/ai/aiCarPassingPolicies.ts`, independent from
+  `aiCarDrivingProfiles.ts`. Overrides are race-local, keyed by car ID:
+  changing Red's passing settings does **not** affect Yellow's solo run.
+  A full-field Yellow result may still change indirectly because opponents
+  physically interact; those changes belong to traffic regression checks.
+- **Measurements**: `runs.jsonl` / Parquet includes
+  `policy_kind`, `duel_opponent_car`, `pass_attempts` and
+  `passing_seconds`. These prevent confusing a fast solo line with a
+  good pass. Per-trial IDs distinguish duel, solo and full-race configurations.
+
+Try both independent searches (each is bounded and parallel):
+```sh
+npm run qa:optimize -- --focus driving --workers 2 --trials 14 --seeds 1,4331
+npm run qa:optimize -- --focus passing --workers 2 --trials 8 --seeds 1,4331 \
+  --out qa/results/passing
+python3 qa/optimization/to_parquet.py qa/results/passing
+```
+The passing profile defaults retain the previous live behavior across all
+four cars until a measured, safe, cross-track candidate is accepted. A
+candidate recommendation is **not** automatically written to production.
