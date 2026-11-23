@@ -118,7 +118,9 @@ describe('render-only race interpolation', () => {
     if (!initial) throw new Error('Expected countdown to complete')
     const initialX = playerOf(initial)
     session.advance(1 / 60, { steering: 0, throttle: 1, braking: false })
-    expect(playerOf(session.presentationState()!).x).toBeCloseTo(initialX.x)
+    const firstFrame = session.presentationState()
+    if (!firstFrame) throw new Error('Expected first presentation frame')
+    expect(playerOf(firstFrame).x).toBeCloseTo(initialX.x)
     session.advance(1 / 120, { steering: 0, throttle: 1, braking: false })
     const authoritative = session.snapshot().state
     const painted = session.presentationState()
