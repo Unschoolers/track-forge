@@ -135,11 +135,14 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	const duelOpponentId = created.vehicles[1]?.id
 	if (options.mode === 'duel' && !duelOpponentId)
 		throw new Error('Duel opponent missing from race grid')
+	let duelSpeedLimits: Readonly<Record<string, number>> | undefined
+	if (options.duelOpponentSpeedLimit !== undefined) {
+		if (!duelOpponentId) throw new Error('Duel speed limit requires a rival')
+		duelSpeedLimits = { [duelOpponentId]: options.duelOpponentSpeedLimit }
+	}
 	let race: RaceState = {
 		...created,
-		...(options.duelOpponentSpeedLimit !== undefined ? {
-			aiVehicleSpeedLimits: { [duelOpponentId ?? 'missing-duel-opponent']: options.duelOpponentSpeedLimit },
-		} : {}),
+		...(duelSpeedLimits ? { aiVehicleSpeedLimits: duelSpeedLimits } : {}),
 		...(options.aiProfileOverrides ? { aiProfileOverrides: options.aiProfileOverrides } : {}),
 		...(options.aiPassingPolicyOverrides ? { aiPassingPolicyOverrides: options.aiPassingPolicyOverrides } : {}),
 		phase: 'running',
