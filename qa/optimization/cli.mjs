@@ -4,7 +4,7 @@ import { availableParallelism } from 'node:os'
 import { resolve } from 'node:path'
 import { SimulationPool } from './pool.mjs'
 import { generateCandidates, DEFAULT_CARS } from './candidates.mjs'
-import { STUDY_SCENARIOS, selectScenarios } from './scenarios.mjs'
+import { STUDY_SCENARIOS, selectScenarios, selectCalibration } from './scenarios.mjs'
 import { trialKey, assessCandidate } from './score.mjs'
 import { jsonLines } from './records.mjs'
 
@@ -18,6 +18,7 @@ function options(args) {
   const trials = Number(take('trials', 14))
   const seeds = take('seeds', '1,4331').split(',').map(Number)
   const out = resolve(take('out', 'qa/results/optimization'))
+  const calibrationIds = take('calibrate', '').split(',').filter(Boolean)
   if (args.includes('--help')) return { help: true }
   if (cars.some(car => !DEFAULT_CARS.includes(car)) || new Set(cars).size !== cars.length || !cars.length)
     throw new Error('Invalid --cars: expected unique red,green,blue,yellow')
@@ -27,7 +28,7 @@ function options(args) {
     throw new Error('--trials must be 1..100 per car')
   if (!seeds.length || seeds.some(x => !Number.isInteger(x) || x < 0 || x > 0xffffffff))
     throw new Error('--seeds requires nonnegative integers')
-  return { cars, workers, trials, seeds, out,
+  return { cars, workers, trials, seeds, out, calibrationIds,
     sampleTelemetry: !args.includes('--no-telemetry') }
 }
 
@@ -35,10 +36,10 @@ const args = options(process.argv.slice(2))
 if (args.help) {
   console.log('Usage: npm run qa:optimize -- [--cars red,green,blue,yellow]' +
     ' [--workers 2] [--trials 14] [--seeds 1,4331]' +
-    ' [--out qa/results/optimization] [--no-telemetry]')
+    ' [--calibrate kids-room,pine-hairpins] [--out qa/results/optimization] [--no-telemetry]')
 } else {
   const scenarios = selectScenarios(STUDY_SCENARIOS.map(x => x.id))
-  const calibration = scenarios.filter(x => x.group === 'calibration')
+  const calibration = selectCalibration(args.calibrationIds, scenarios)
   const physicsRevision = process.env.GITHUB_SHA ?? 'local'
   const pool = new SimulationPool({
     workers: args.workers, scenarios, physicsRevision,
@@ -164,6 +165,7 @@ if (args.help) {
     const result = {
       schemaVersion: 1,
       physicsRevision, cars: args.cars, seeds: args.seeds,
+      calibrationScenarioIds: calibration.map(scenario => scenario.id),
       workers: args.workers, trialsPerCar: args.trials,
       scenarios, baselineMatrix: matrix, candidates: reports,
       recommendation: best ? {
