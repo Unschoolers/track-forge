@@ -164,6 +164,16 @@ const cases: Readonly<Record<CarId, readonly ProfileEdit[]>> = {
   green: [
     { label: 'current', changes: {} },
     // Human Green pace challenge: evaluate combined steering and legal entry targets.
+    { label: 'challenge-brake-tolerance2', changes: { hardBrakeOverspeedTolerance: 2 } },
+    { label: 'challenge-brake-tolerance4', changes: { hardBrakeOverspeedTolerance: 4 } },
+    { label: 'challenge-brake-tolerance6', changes: { hardBrakeOverspeedTolerance: 6 } },
+    { label: 'challenge-brake-tolerance8', changes: { hardBrakeOverspeedTolerance: 8 } },
+    { label: 'challenge-brake-tolerance12', changes: { hardBrakeOverspeedTolerance: 12 } },
+    { label: 'challenge-brake-tolerance16', changes: { hardBrakeOverspeedTolerance: 16 } },
+    { label: 'challenge-brake4-gain30-preview10', changes: { hardBrakeOverspeedTolerance: 4, hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'challenge-brake6-gain30-preview10', changes: { hardBrakeOverspeedTolerance: 6, hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'challenge-brake8-gain30-preview10', changes: { hardBrakeOverspeedTolerance: 8, hardSteerGain: 3, hardLookAheadSamples: 10 } },
+    { label: 'challenge-brake12-gain30-preview10', changes: { hardBrakeOverspeedTolerance: 12, hardSteerGain: 3, hardLookAheadSamples: 10 } },
     { label: 'challenge-gain30', changes: { hardSteerGain: 3 } },
     { label: 'challenge-gain34', changes: { hardSteerGain: 3.4 } },
     { label: 'challenge-gain30-preview6', changes: { hardSteerGain: 3, hardLookAheadSamples: 6 } },
