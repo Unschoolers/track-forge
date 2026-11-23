@@ -71,16 +71,16 @@ describe('Independent passing policy contracts', () => {
     }
     expect(() => runLaneCheck({
       ...base, mode: 'duel', duelOpponentCar: 'green',
-      duelOpponentPace: 0.8,
+      duelOpponentSpeedLimit: 220,
     })).not.toThrow()
-    for (const pace of [0, 0.49, 1.26, Number.NaN, Number.POSITIVE_INFINITY]) {
+    for (const pace of [0, 99, 351, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(() => runLaneCheck({
         ...base, mode: 'duel', duelOpponentCar: 'green',
-        duelOpponentPace: pace,
+        duelOpponentSpeedLimit: pace,
       })).toThrow(/Invalid lane simulation options/)
     }
     expect(() => runLaneCheck({
-      ...base, mode: 'solo', duelOpponentPace: 0.8,
+      ...base, mode: 'solo', duelOpponentSpeedLimit: 220,
     })).toThrow(/Invalid lane simulation options/)
   }, 30000)
 
