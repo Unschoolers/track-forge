@@ -164,6 +164,21 @@ const cases: Readonly<Record<CarId, readonly ProfileEdit[]>> = {
   green: [
     { label: 'current', changes: {} },
     // Human Green pace challenge: evaluate combined steering and legal entry targets.
+    // Test legitimate road-line choices without modifying grip, speed or checkpoints.
+    { label: 'challenge-edge0', changes: { hardEdgeAvoidanceScale: 0 } },
+    { label: 'challenge-edge025', changes: { hardEdgeAvoidanceScale: 0.25 } },
+    { label: 'challenge-edge05', changes: { hardEdgeAvoidanceScale: 0.5 } },
+    { label: 'challenge-edge075', changes: { hardEdgeAvoidanceScale: 0.75 } },
+    { label: 'challenge-apex0', changes: { hardApexCutScale: 0 } },
+    { label: 'challenge-apex05', changes: { hardApexCutScale: 0.5 } },
+    { label: 'challenge-apex15', changes: { hardApexCutScale: 1.5 } },
+    { label: 'challenge-apex2', changes: { hardApexCutScale: 2 } },
+    { label: 'challenge-edge025-apex15', changes: { hardEdgeAvoidanceScale: 0.25, hardApexCutScale: 1.5 } },
+    { label: 'challenge-edge05-apex15', changes: { hardEdgeAvoidanceScale: 0.5, hardApexCutScale: 1.5 } },
+    { label: 'challenge-gain30-preview10-edge025', changes: { hardSteerGain: 3, hardLookAheadSamples: 10, hardEdgeAvoidanceScale: 0.25 } },
+    { label: 'challenge-gain30-preview10-apex15', changes: { hardSteerGain: 3, hardLookAheadSamples: 10, hardApexCutScale: 1.5 } },
+    { label: 'challenge-gain30-preview10-edge025-apex15', changes: { hardSteerGain: 3, hardLookAheadSamples: 10, hardEdgeAvoidanceScale: 0.25, hardApexCutScale: 1.5 } },
+    { label: 'challenge-brake16-gain30-preview10', changes: { hardBrakeOverspeedTolerance: 16, hardSteerGain: 3, hardLookAheadSamples: 10 } },
     { label: 'challenge-brake-tolerance2', changes: { hardBrakeOverspeedTolerance: 2 } },
     { label: 'challenge-brake-tolerance4', changes: { hardBrakeOverspeedTolerance: 4 } },
     { label: 'challenge-brake-tolerance6', changes: { hardBrakeOverspeedTolerance: 6 } },
