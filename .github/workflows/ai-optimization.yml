@@ -1,0 +1,56 @@
+name: AI optimization lab
+
+on:
+  pull_request:
+    paths:
+      - 'qa/optimization/**'
+      - 'tests/fixtures/desertSandAi.trackforge.json'
+      - 'docs/ai-optimization.md'
+      - '.github/workflows/ai-optimization.yml'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+      - run: npm run qa:optimize:test
+
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run four-car parallel AI optimization study
+        run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Convert study tables to Parquet (offline analysis only)
+        run: |
+          python3 -m pip install --quiet 'duckdb>=1.4,<2'
+          python3 qa/optimization/to_parquet.py qa/results/optimization
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: ai-optimization-${{ github.sha }}
+          path: qa/results/optimization/
+          if-no-files-found: warn
+          retention-days: 14
