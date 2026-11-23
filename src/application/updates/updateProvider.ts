@@ -2,7 +2,8 @@
 export interface UpdateInfo {
   readonly version: string
   readonly url: string
-  readonly apkUrl: string
+  readonly apkUrl?: string
+  readonly exeUrl?: string
 }
 export interface UpdateProvider {
   check(): Promise<UpdateInfo | null>
@@ -85,6 +86,7 @@ export class GitHubUpdateProvider implements UpdateProvider {
     private readonly run: number,
     private readonly attempt: number,
     private readonly fetchRelease: typeof fetch = (...args) => globalThis.fetch(...args),
+    private readonly platform: 'android' | 'windows' = 'android',
   ) {}
 
   private installedVersion(): string {
@@ -108,14 +110,17 @@ export class GitHubUpdateProvider implements UpdateProvider {
     const release = await this.getJson(`${RELEASES_API}/latest`)
     if (!isGithubRelease(release)) throw new Error('Invalid update response.')
     if (!isNewerRelease(release.tag_name, this.run, this.attempt)) return null
-    const apkUrl = `https://github.com/Unschoolers/track-forge/releases/download/${release.tag_name}/trackforge-debug.apk`
+    const assetName = this.platform === 'windows' ? 'TrackForge.exe' : 'trackforge-debug.apk'
+    const downloadUrl = `https://github.com/Unschoolers/track-forge/releases/download/${release.tag_name}/${assetName}`
     if (!('assets' in release) || !Array.isArray(release.assets) ||
       !release.assets.some((asset: unknown) => asset && typeof asset === 'object' &&
-        'name' in asset && asset.name === 'trackforge-debug.apk' &&
-        'browser_download_url' in asset && asset.browser_download_url === apkUrl)) {
-      throw new Error('The latest release has no verified APK download.')
+        'name' in asset && asset.name === assetName &&
+        'browser_download_url' in asset && asset.browser_download_url === downloadUrl)) {
+      throw new Error(`The latest release has no verified ${this.platform === 'windows' ? 'EXE' : 'APK'} download.`)
     }
-    return { version: release.tag_name, url: RELEASES_PAGE, apkUrl }
+    return this.platform === 'windows'
+      ? { version: release.tag_name, url: RELEASES_PAGE, exeUrl: downloadUrl }
+      : { version: release.tag_name, url: RELEASES_PAGE, apkUrl: downloadUrl }
   }
 
   /** Collect every published build after the installed APK, up to the selected update. */

@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod lan;
+mod desktop_update;
 
 fn main() {
     tauri::Builder::default()
@@ -14,6 +15,7 @@ fn main() {
             lan::lan_send,
             lan::lan_stop,
             lan::lan_diagnostics,
+            desktop_update::desktop_download_update,
         ])
         .run(tauri::generate_context!())
         .expect("TrackForge desktop application failed to start");
