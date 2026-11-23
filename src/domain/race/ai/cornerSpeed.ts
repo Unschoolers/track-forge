@@ -187,15 +187,22 @@ export function safeEntrySpeedAhead(
         Math.max(0, straightSpeed - cornerBaseline) * Math.exp(-bend * (fastCorners ? 1.5 : 20)),
       70, straightSpeed,
     ))
-    // Arcade can carry a controlled drift through a bend. The old heuristic
-    // pinned even high-grip chassis to 70 on tight pavement, far below the
-    // actual tire lateral-acceleration envelope. Recover some of that reserve
-    // while keeping ~28% traction for settling/countersteer. This is a speed
-    // *plan*, not a physics override: the same tire forces still govern motion.
+    // A sustained pavement corner can use more of the real lateral tire
+    // budget than the old arbitrary 70-unit heuristic. A reversing S-bend
+    // cannot: yaw must settle before changing sign, especially on a heavy
+    // chassis. Keep that physical reserve rather than granting extra grip.
+    const signedTurn = turnAmountAt(path, index, 6)
+    const previousTurn = turnAmountAt(path, index - direction * 30, 6)
+    const followingTurn = turnAmountAt(path, index + direction * 30, 6)
+    const reversesSoon = bend > 0.05 && (
+      (signedTurn * previousTurn < 0 && Math.abs(previousTurn) > 0.08) ||
+      (signedTurn * followingTurn < 0 && Math.abs(followingTurn) > 0.08)
+    )
     const lateralAcceleration = ARCADE_DYNAMICS_TUNING.forces.gravityAcceleration *
       ARCADE_DYNAMICS_TUNING.forces.lateralGripScale * grip
+    const tractionReserve = reversesSoon ? 0.60 : 0.80
     const physicalApex = handling === 'arcade' && point.surface === 'street' && bend > 0.012
-      ? Math.sqrt(lateralAcceleration * 36 / bend) * 0.72
+      ? Math.sqrt(lateralAcceleration * 36 / bend) * tractionReserve * turningPace
       : 0
     const apexSpeed = Math.max(heuristicApex, Math.min(surfaceMax, physicalApex))
     let distance = direction * (point.distance - at.distance)
