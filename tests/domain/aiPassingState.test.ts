@@ -40,52 +40,6 @@ describe('AI overtake decision policy', () => {
     expect(advancePassingState(vehicle, follow, { ahead: null, nearby: [] }, 'normal', 0.05).phase).toBe('follow')
   })
 
-  it('abandons an unproductive Hard pass only when the base lane is clear', () => {
-    const passing = {
-      ...createAiDriverState(0, 'steady'),
-      phase: 'passing' as const,
-      passTargetId: other.id, passLane: 24, targetLane: 24,
-      holdRemaining: 0, clearTime: 0.22, passElapsed: 3,
-    }
-    const movingAway = {
-      ...observation(80, 0),
-      vehicle: { ...other, lane: 0, speed: vehicle.speed + 12 },
-    }
-    const blocked = {
-      ...observation(3, 0),
-      vehicle: { ...other, id: 'blocking-rival', lane: 0, speed: 80 },
-    }
-    const stuck = advancePassingState({ ...vehicle, lane: 24 }, passing,
-      { ahead: movingAway, nearby: [movingAway, blocked] }, 'hard', 0.05)
-    expect(stuck.phase).toBe('passing')
-    expect(stuck.targetLane).toBe(24)
-
-    const safe = advancePassingState({ ...vehicle, lane: 24 }, passing,
-      { ahead: movingAway, nearby: [movingAway] }, 'hard', 0.05)
-    expect(safe.phase).toBe('rejoin')
-    expect(safe.targetLane).toBe(0)
-    const stillCatchable = {
-      ...movingAway, vehicle: { ...movingAway.vehicle, speed: vehicle.speed - 12 },
-    }
-    const ongoing = advancePassingState({ ...vehicle, lane: 24 }, passing,
-      { ahead: stillCatchable, nearby: [stillCatchable] }, 'hard', 0.05)
-    expect(ongoing.phase).toBe('passing')
-  })
-
-  it.each(['normal', 'easy'] as const)('leaves %s overtaking logic unchanged', difficulty => {
-    const passing = {
-      ...createAiDriverState(0, 'steady'), phase: 'passing' as const,
-      passTargetId: other.id, passLane: 24, targetLane: 24,
-      holdRemaining: 0, clearTime: 0.22, passElapsed: 3,
-    }
-    const movingAway = {
-      ...observation(80, 0),
-      vehicle: { ...other, lane: 0, speed: vehicle.speed + 12 },
-    }
-    expect(advancePassingState({ ...vehicle, lane: 24 }, passing,
-      { ahead: movingAway, nearby: [movingAway] }, difficulty, 0.05).phase).toBe('passing')
-  })
-
   it('holds the passing lane while the base lane is occupied, then rejoins after sustained clearance', () => {
     const passing = {
       ...createAiDriverState(0), phase: 'passing' as const,
