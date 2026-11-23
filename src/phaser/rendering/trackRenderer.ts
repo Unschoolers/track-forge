@@ -50,11 +50,18 @@ export function renderRecoveryCheckpoints(
     if (length < 0.001) continue
     const x = -(after.y - point.y) / length * ROAD_GEOMETRY.checkpointHalfWidth
     const y = (after.x - point.x) / length * ROAD_GEOMETRY.checkpointHalfWidth
-    graphics.lineStyle(editorZoom ? 5 / editorZoom : 7, 0x66d9ff, 1)
+    // Author-owned checkpoints use a bright transverse stripe with visible endpoints.
+    // No implicit race gates are painted anywhere.
+    graphics.lineStyle(editorZoom ? 6 / editorZoom : 8, 0x66d9ff, 1)
     graphics.beginPath()
     graphics.moveTo(point.x - x, point.y - y)
     graphics.lineTo(point.x + x, point.y + y)
     graphics.strokePath()
+    if (!editorZoom) {
+      graphics.fillStyle(0xffffff, 1)
+      graphics.fillCircle(point.x - x, point.y - y, 5)
+      graphics.fillCircle(point.x + x, point.y + y, 5)
+    }
     if (editorZoom) {
       const scale = 1 / Math.max(0.01, editorZoom)
       graphics.fillStyle(0x112c3d, 1)
