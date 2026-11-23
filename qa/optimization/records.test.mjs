@@ -42,3 +42,19 @@ test('invalid measurements fail loudly', () => {
   }, meta), /Invalid finish time/)
   assert.throws(() => projectTrial(run, { ...meta, seed: -2 }), /Invalid trial/)
 })
+
+test('passing diagnostics quantify actual two-car activity separately from lap time', () => {
+  const samples = [
+    { ...run.samples[0], time: 0, phase: 'follow' },
+    { ...run.samples[0], time: 0.1, phase: 'passing' },
+    { ...run.samples[0], time: 0.2, phase: 'passing' },
+    { ...run.samples[0], time: 0.3, phase: 'rejoin' },
+    { ...run.samples[0], time: 0.4, phase: 'passing' },
+    { ...run.samples[0], time: 0.5, phase: 'follow' },
+  ]
+  const row = projectTrial({ ...run, samples }, { ...meta, mode: 'duel', opponentCar: 'yellow', policyKind: 'passing' }).rows[0]
+  assert.equal(row.policy_kind, 'passing')
+  assert.equal(row.duel_opponent_car, 'yellow')
+  assert.equal(row.pass_attempts, 2)
+  assert.equal(row.passing_seconds, 0.3)
+})
