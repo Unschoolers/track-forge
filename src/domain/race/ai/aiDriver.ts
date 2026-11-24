@@ -15,7 +15,7 @@ import {
   turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
-import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
+import { correctionBrakePressure, racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
@@ -115,8 +115,7 @@ export function stepAiVehicle(
   // defensive traffic decisions to stay on-road in all four Hard grids.
   // Other chassis benefit safely from compact non-colliding AI clearance;
   // Red can be migrated when a dedicated corner-entry controller is proven.
-  const defensiveChassis = vehicle.car === 'red' ||
-    (vehicle.car === 'green' && difficulty === 'hard')
+  const defensiveChassis = vehicle.car === 'red'
   const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
     !defensiveChassis && aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
@@ -375,6 +374,8 @@ export function stepAiVehicle(
     ? clamp((curveOverspeed - curveBrakeThreshold + 4) / 18, 0.22, 1)
     : 0
   // Ease off on approach so the tires can turn without repeated hard braking.
+  const plannedBrakePressure = vehicle.racingLine ? cornerBrakePressure
+    : correctionBrakePressure(car, context.surface, cornerBrakePressure)
   const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
     : CORNER_THROTTLE_WINDOW
@@ -424,7 +425,7 @@ export function stepAiVehicle(
           vehicle.speed > 90),
       brakePressure: emergency || (recovering &&
         context.nearest.distance > 72 && vehicle.speed > 90)
-        ? 1 : cornerBrakePressure,
+        ? 1 : plannedBrakePressure,
     },
     context,
     deltaSeconds,

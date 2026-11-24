@@ -1,5 +1,5 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
-import type { CarId } from '@/domain/model'
+import type { CarId, SurfaceId } from '@/domain/model'
 import { brakingTractionForSurface, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
@@ -137,6 +137,17 @@ function supportsWidePursuit(path: RoadPath): boolean {
 }
 
 /**
+ * Translate a small speed correction into a brake-pedal command. A stronger
+ * service brake needs less pressure for the same correction. Blend back to
+ * full pressure for severe overspeed; emergency braking bypasses this helper.
+ */
+export function correctionBrakePressure(car: CarPhysicsSpec, surface: SurfaceId | 'grass', pressure: number): number {
+  const multiplier = brakingTractionForSurface(car, surface) / car.brakingTractionScale
+  if (multiplier <= 1) return pressure
+  return pressure * (1 / multiplier + (1 - 1 / multiplier) * pressure ** 2)
+}
+
+/**
  * Predict a safe entry speed through the next bends. For every sampled apex,
  * allow only the speed that could still brake down to its corner speed.
  * Distances are actual path arc-lengths, including reverse/wrap races.
@@ -151,7 +162,7 @@ export function safeEntrySpeedAhead(
   carId: CarId = 'blue',
   useSharpBendSafety = false,
   fastCorners = false,
-  useChassisYawSafety = true,
+  useAutomaticCornerPlanning = true,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -170,7 +181,7 @@ export function safeEntrySpeedAhead(
   // can rotate through an apex more quickly, but only when the CURRENT
   // surface has enough real tire grip to support it. This deliberately gives
   // no bonus on ice and does not change car physics or surface speed limits.
-  const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
+  const turningPace = useAutomaticCornerPlanning ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
     const raw = nearestIndex + direction * step
@@ -205,9 +216,23 @@ export function safeEntrySpeedAhead(
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
+    // Peak pavement service-brake force is not a cornering capability.
+    // Red needs time to release the brake and rotate before a tight apex.
+    // Keep its proven approach budget through technical bends/transitions;
+    // exploit the added straight-line braking capacity on gentle paved sweeps.
+    const chassis = CAR_SPECS[carId]
+    const serviceTraction = brakingTractionForSurface(chassis, point.surface)
+    const extraBrakeAllowance = serviceTraction > chassis.brakingTractionScale
+      ? (1 - clamp((bend - 0.045) / 0.10, 0, 1)) *
+        sweepingPavementAllowance(path, nearestIndex, reversed)
+      : 0
+    // Authored racing lines already own their approach and brake timing.
+    const plannedBrakeTraction = useAutomaticCornerPlanning
+      ? chassis.brakingTractionScale + (serviceTraction - chassis.brakingTractionScale) * extraBrakeAllowance
+      : serviceTraction
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
-      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * brakingTractionForSurface(CAR_SPECS[carId], point.surface)
-    const agileGripBonus = useChassisYawSafety
+      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * plannedBrakeTraction
+    const agileGripBonus = useAutomaticCornerPlanning
       ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
         clamp((grip - 0.75) / 0.2, 0, 1)
       : 0

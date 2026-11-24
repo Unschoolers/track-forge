@@ -6,6 +6,7 @@ import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { advancePassingState } from '@/domain/race/ai/passingState'
+import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { aiCourtesyNudge, compactAiTraffic } from '@/domain/race/ai/aiRivalClearance'
 import type { TrafficObservation, TrafficState } from '@/domain/race/ai/traffic'
 
@@ -54,6 +55,19 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
       { ...aroundAi, ahead: null }, 'hard', 0.05).phase).toBe('follow')
     const aroundPlayer = compactAiTraffic({ ahead: humanAhead, nearby: [humanAhead] })
     expect(advancePassingState(driver, aiState, aroundPlayer, 'hard', 0.05).phase).toBe('passing')
+  })
+  it('keeps Hard Green on its racing line around slower AI but passes a human', () => {
+    const green = { ...driver, car: 'green' as const, ai: createAiDriverState(0, 'opportunist') }
+    for (const speed of [50, 80, 120]) {
+      const slowerAi = observation({ ...rival, speed }, 30)
+      const slowerHuman = observation({ ...player, speed }, 30)
+      const aroundAi = stepAiVehicle(green, path, { ahead: slowerAi, nearby: [slowerAi] },
+        'hard', 1 / 60, undefined, false, Infinity, 'arcade')
+      const aroundHuman = stepAiVehicle(green, path, { ahead: slowerHuman, nearby: [slowerHuman] },
+        'hard', 1 / 60, undefined, false, Infinity, 'arcade')
+      expect(aroundAi.ai?.phase).toBe('follow')
+      expect(aroundHuman.ai?.phase).toBe('passing')
+    }
   })
   it('nudges at most four units on a straight and never into a tight corner or near the player', () => {
     const ahead = observation(rival, 9)

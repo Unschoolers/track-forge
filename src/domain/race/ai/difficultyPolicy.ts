@@ -39,10 +39,11 @@ export function aiSteeringDifficulty(
  * This modifies only the AI's speed *target*, not physical grip or brakes.
  */
 export function arcadeCornerMargin(difficulty: DifficultyId, car?: CarId, hardProfile?: CarDrivingProfile): number {
-  if (difficulty !== 'hard' || !car) {
-    return AI_PACE_POLICY[difficulty].arcadeCornerMargin
+  const profile: CarDrivingProfile | undefined = car ? hardProfile ?? CAR_DRIVING_PROFILES[car] : undefined
+  if (difficulty !== 'hard' || !profile) {
+    return AI_PACE_POLICY[difficulty].arcadeCornerMargin * (profile?.lowerDifficultyReserveScale ?? 1)
   }
-  return (hardProfile ?? CAR_DRIVING_PROFILES[car]).hardCornerReserve
+  return profile.hardCornerReserve
 }
 
 /** Émile-specific racing-line speed ratios, independent of line geometry. */
