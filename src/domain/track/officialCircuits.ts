@@ -1,6 +1,7 @@
 import { asTrackId, type SurfaceId, type Track, type TrackPoint } from '@/domain/model'
-import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import type { SceneryPropKind, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { ROAD_GEOMETRY } from '@/domain/config'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
@@ -9,21 +10,36 @@ import { TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
 function officialTrack(
   id: string, name: string, environmentId: TrackEnvironmentId,
   radiusX: number, radiusY: number, wobble: number,
-  scenery: readonly SceneryProp[], dirtIndices: readonly number[] = [],
+  sceneryKinds: readonly SceneryPropKind[], dirtIndices: readonly number[] = [],
 ): Track {
-  // 24 equally spaced authored segments (plus their closing vertex) gives
-  // two markers at the same ten-control-point cadence as the editor.
+  // Larger, forgiving bends yield about a 30-second Blue Arcade lap at 60 Hz.
+  // Keep 24 authored segments and two checkpoint markers, as in the editor.
+  const lapScale = 3.0
   const points: TrackPoint[] = Array.from({ length: 25 }, (_, index) => {
     const angle = index / 24 * Math.PI * 2
     const shape = 1 + wobble * Math.sin(angle * 3) + wobble * 0.4 * Math.cos(angle * 2)
     return {
       id: `${id}-${index}`,
-      x: Math.round(Math.cos(angle) * radiusX * shape),
-      y: Math.round(Math.sin(angle) * radiusY * shape),
+      x: Math.round(Math.cos(angle) * radiusX * lapScale * shape),
+      y: Math.round(Math.sin(angle) * radiusY * lapScale * shape),
       surface: (dirtIndices.includes(index) ? 'dirt' : 'street') as SurfaceId,
       curve: 'smooth',
       tension: 0.5,
     }
+  })
+  // Place scenery just outside the track rather than stranded at its centre
+  // when the circuit is scaled for proper lap times.
+  const scenery = sceneryKinds.map((kind, index) => {
+    const vertex = Math.floor((index + 0.5) * 24 / sceneryKinds.length) % 24
+    const point = points[vertex]!
+    const before = points[(vertex + 23) % 24]!
+    const after = points[(vertex + 1) % 24]!
+    const dx = after.x - before.x
+    const dy = after.y - before.y
+    const length = Math.hypot(dx, dy)
+    const offset = ROAD_GEOMETRY.edgeWidth / 2 + 100 + (index % 2) * 35
+    return { kind, x: Math.round(point.x + dy / length * offset),
+      y: Math.round(point.y - dx / length * offset) }
   })
   const path = buildRoadPath(points, EMPTY_TERRAIN)
   const recoveryCheckpoints = [9, 19].map(index => {
@@ -48,32 +64,32 @@ function officialTrack(
 export const OFFICIAL_CIRCUITS = [
   {
     track: officialTrack('official-city-sprint', 'City Sprint', 'cityscape', 660, 410, 0.04, [
-      { kind: 'city-bus-stop', x: 40, y: -80 },
-      { kind: 'city-trash-bin', x: -160, y: 10 },
-      { kind: 'city-house', x: 870, y: -120 },
-      { kind: 'city-building', x: -920, y: 190 },
-      { kind: 'city-trash-bin', x: 190, y: 80 },
+      'city-bus-stop',
+      'city-trash-bin',
+      'city-house',
+      'city-building',
+      'city-trash-bin',
     ]),
     target: 30,
   },
   {
     track: officialTrack('official-desert-sweep', 'Desert Sweep', 'desert', 720, 400, 0.045, [
-      { kind: 'desert-cactus', x: -200, y: -20 },
-      { kind: 'desert-boulder', x: 180, y: 60 },
-      { kind: 'desert-rock-spire', x: -960, y: -110 },
-      { kind: 'desert-rock-cluster', x: 910, y: 110 },
-      { kind: 'desert-cactus', x: 20, y: 130 },
+      'desert-cactus',
+      'desert-boulder',
+      'desert-rock-spire',
+      'desert-rock-cluster',
+      'desert-cactus',
     ], [5, 6, 7, 8]),
     target: 30,
   },
   {
     track: officialTrack('official-toy-box', 'Toy Box Dash', 'kids-room', 640, 450, 0.055, [
-      { kind: 'kids-blocks', x: -210, y: -25 },
-      { kind: 'kids-teddy', x: 180, y: 30 },
-      { kind: 'kids-dinosaur', x: 930, y: 20 },
-      { kind: 'kids-book', x: 20, y: -95 },
-      { kind: 'kids-crayons', x: -910, y: 75 },
-      { kind: 'kids-top', x: 40, y: 120 },
+      'kids-blocks',
+      'kids-teddy',
+      'kids-dinosaur',
+      'kids-book',
+      'kids-crayons',
+      'kids-top',
     ]),
     target: 30,
   },
