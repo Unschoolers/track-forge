@@ -67,7 +67,21 @@ function replaceRecords(current, indices, replacement) {
 }
 function candidateEdits(car, current) {
   const base = { ...pool.baselineProfiles[car], ...current }
-  const variants = [...proposals, ...generateCandidates(car, base, 14).map(x => x.changes)]
+  // Target the observed wide entry/exit and Normal reverse traffic failures.
+  // These are driver-policy controls, not track or checkpoint exceptions.
+  const targeted = car === 'yellow' ? [
+    ...[0, 0.25, 0.5, 0.75].map(hardApexCutScale => ({ hardApexCutScale })),
+    ...[0.05, 0.1, 0.15, 0.2].map(hardHairpinReserve => ({ hardHairpinReserve })),
+    ...[0.2, 0.3, 0.4].flatMap(hardCornerTargetBonus => [
+      { hardCornerTargetBonus, hardApexCutScale: 0.5 },
+      { hardCornerTargetBonus, hardLookAheadSamples: 9 },
+    ]),
+    ...[0.8, 0.9, 1].map(technicalCornerPursuitScale => ({ technicalCornerPursuitScale, hardApexCutScale: 0 })),
+  ] : car === 'green' ? [
+    ...[0.98, 1, 1.05, 1.1, 1.2].map(lowerDifficultyReserveScale => ({ lowerDifficultyReserveScale })),
+    ...[0.92, 0.96, 0.98].map(technicalCornerPaceScale => ({ technicalCornerPaceScale })),
+  ] : []
+  const variants = [...targeted, ...proposals, ...generateCandidates(car, base, 14).map(x => x.changes)]
   // First pass uses bounded coarse values; subsequent passes refine the
   // accepted combination rather than resetting unrelated parameters.
   if (Object.keys(current).length) {
@@ -100,11 +114,28 @@ try {
   if (!verifyOnly) {
     crossBaseline = await simulate(validation, {}, 'cross-track-baseline')
     crossCurrent = crossBaseline
+    // Resume the last measured, cross-track-safe lab result, but revalidate
+    // against the original checked-in profiles on this exact revision.
+    const seed = {
+      yellow: { technicalCornerPaceScale: 0.95 },
+      red: { technicalCornerPursuitScale: 0.85 },
+      blue: { hardCornerTargetBonus: 0.12 },
+    }
+    const seedMatrix = await simulate(matrix, seed, 'resume-seed')
+    const seedCross = await simulate(validation, seed, 'resume-cross')
+    if (noNewDebt(baseline, seedMatrix) &&
+        compareReliability(metrics(seedMatrix), baselineMetrics) < 0 &&
+        crossTrackRegressions(crossBaseline, seedCross).length === 0) {
+      Object.assign(profiles, seed)
+      current = seedMatrix
+      crossCurrent = seedCross
+      console.log('RELIABILITY_RESUME ' + JSON.stringify({ profiles, metrics: metrics(current) }))
+    }
     // Every accepted coordinate is cross-validated BEFORE committing it.
     // Run a second pass automatically if the first one leaves recovery debt.
     for (let round = 1; round <= 2; round++) {
       let changed = false
-      for (const car of ['yellow', 'red', 'green', 'blue']) {
+      for (const car of ['yellow', 'green', 'red', 'blue']) {
         const indices = affected(current, car)
         const crossIndices = affected(crossCurrent, car)
         const cases = indices.map(i => matrix[i])
