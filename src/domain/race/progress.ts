@@ -13,7 +13,7 @@ export function updateProgress(
   reversed = false,
   timingGates: readonly number[] = [],
   closed = true,
-  physicalGateEligible = true,
+  physicalFinishEligible = true,
 ): RaceVehicle {
   if (pathLength <= 1 || vehicle.finishedAt !== null) return vehicle
   const directed = (index: number): number => closed
@@ -22,7 +22,7 @@ export function updateProgress(
   const before = directed(vehicle.pathIndex)
   const after = directed(nextPathIndex)
   const travel = closed ? (after - before + pathLength) % pathLength : after - before
-  if (travel < 0 || travel > pathLength / 2 || !physicalGateEligible) {
+  if (travel < 0 || travel > pathLength / 2) {
     return { ...vehicle, pathIndex: nextPathIndex }
   }
 
@@ -48,8 +48,12 @@ export function updateProgress(
   // physical gate plane in advanceArcadeTimingGate).
   const aiAtStageFinish = !closed && finish &&
     before >= pathLength - 4 && after >= pathLength - 3
-  if (finish && (crossedStart || aiAtStageFinish ||
-      (!closed && before < pathLength - 1 && after >= pathLength - 1))) {
+  // AI checkpoint ordering follows the authored road samples. Finish is
+  // stricter: being far outside the drivable road cannot create a phantom
+  // completed lap from a nearest-index jump.
+  if (finish && physicalFinishEligible &&
+      (crossedStart || aiAtStageFinish ||
+       (!closed && before < pathLength - 1 && after >= pathLength - 1))) {
     const lap = vehicle.lap + 1
     return { ...vehicle, pathIndex: nextPathIndex, nextSector: 1, lap,
       finishedAt: lap >= totalLaps ? elapsed : null }
