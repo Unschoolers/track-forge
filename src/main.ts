@@ -12,10 +12,8 @@ import { handleAndroidBack } from '@/application/androidBackNavigation'
 import { audioVolumes, musicGain, type AudioVolumeSetting } from '@/application/audioVolume'
 import { createApplication } from '@/app/createApplication'
 import { AppController } from '@/application/appController'
-import { asTrackId } from '@/domain/model'
-import { createStarterTrack } from '@/domain/track/starterTrack'
 import { SYSTEM_STARTER_TRACK_ID } from '@/domain/track/trackCreator'
-import { courseIdentity } from '@/application/race/raceRecords'
+import { isUntouchedLegacyStarter } from '@/migrations/legacyStarterIdentity'
 // TEMPORARY one-time release migration: delete this import and startup call together.
 import { migrateTrackCreatorCredits } from '@/migrations/migration_track_creator_v1'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
@@ -62,15 +60,9 @@ appRoot.replaceChildren(gameContainer, uiRoot)
 
 const storage = new BrowserStorage()
 const trackStore = new BrowserTrackRepository(storage)
-// Remove only the untouched legacy starter. Never erase a player-edited copy.
-const { recoveryCheckpoints: _unusedMarkers, autoCheckpoints: _unusedAuto, ...originalStarter } =
-  createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0)
-void _unusedMarkers
-void _unusedAuto
+// Retire untouched system copies only. Never erase changed art or track data.
 for (const track of trackStore.list()) {
-  if ((track.id === SYSTEM_STARTER_TRACK_ID || track.id.startsWith('starter-')) &&
-      track.name === originalStarter.name &&
-      courseIdentity(track) === courseIdentity(originalStarter) &&
+  if (isUntouchedLegacyStarter(track) &&
       (track.origin === 'seeded' || track.id === SYSTEM_STARTER_TRACK_ID)) {
     if (!trackStore.remove(track.id)) console.error('Could not remove the retired starter circuit.')
   }
