@@ -1,6 +1,6 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
-import { VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
+import { brakingTractionForSurface, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -206,7 +206,7 @@ export function safeEntrySpeedAhead(
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
-      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * CAR_SPECS[carId].brakingTractionScale
+      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * brakingTractionForSurface(CAR_SPECS[carId], point.surface)
     const agileGripBonus = useChassisYawSafety
       ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
         clamp((grip - 0.75) / 0.2, 0, 1)
