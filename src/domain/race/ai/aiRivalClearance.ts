@@ -8,8 +8,8 @@ import type { TrafficState } from '@/domain/race/ai/traffic'
  * provoke dangerous lane changes and emergency braking. Human cars keep
  * the full traffic model and overtaking behavior.
  *
- * Simulation mode with physical collisions intentionally uses the original
- * full traffic model.
+ * This is a driving-policy rule for all race styles, not a change to the
+ * physical collision or damage rules.
  */
 const AI_NEAR_DISTANCE = 16
 const AI_NEAR_LANE_GAP = 7
