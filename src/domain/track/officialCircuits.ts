@@ -17,7 +17,7 @@ function officialTrack(
   const lapScale = 3.0
   const points: TrackPoint[] = Array.from({ length: 25 }, (_, index) => {
     const angle = index / 24 * Math.PI * 2
-    const shape = 1 + wobble * Math.sin(angle * 3) + wobble * 0.4 * Math.cos(angle * 2)
+    const shape = 2.45 * (1 + wobble * Math.sin(angle * 3) + wobble * 0.4 * Math.cos(angle * 2))
     return {
       id: `${id}-${index}`,
       x: Math.round(Math.cos(angle) * radiusX * lapScale * shape),
@@ -53,7 +53,7 @@ function officialTrack(
     points,
     environmentId,
     trees: [],
-    scenery,
+    scenery: scenery.map(prop => ({ ...prop, x: prop.x * 2.45, y: prop.y * 2.45 })),
     recoveryCheckpoints,
     autoCheckpoints: true,
     origin: 'seeded',
