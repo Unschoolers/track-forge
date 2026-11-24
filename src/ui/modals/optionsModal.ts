@@ -146,7 +146,7 @@ export function createOptionsModal(
       ),
     )
     const handling = element('section', 'setup-section')
-    handling.append(element('h3', 'setup-label', 'DRIVING STYLE'))
+    handling.append(element('h3', 'setup-label', 'DRIVING CONTROLS & RULES'))
     const handlingRow = element('div', 'choice-row')
     for (const mode of ['arcade', 'simulation'] as const) {
       const selected = (state.preferences.handling ?? 'arcade') === mode
@@ -161,7 +161,7 @@ export function createOptionsModal(
     }
     handling.append(
       handlingRow,
-      element('p', 'modal-subtitle', 'Arcade accelerates automatically. Simulation: hold GAS or W / ↑ to accelerate. Focused pedals: hold Space or Enter.'),
+      element('p', 'modal-subtitle', 'Both styles use the same Arcade car physics. Arcade accelerates automatically; Simulation uses manual throttle and collision rules. Hold GAS or W / ↑ to accelerate. Focused pedals: hold Space or Enter.'),
     )
     const raceLength = element('section', 'setup-section')
     raceLength.append(element('h3', 'setup-label', 'RACE LENGTH'))

@@ -46,6 +46,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 ## Shared invariants to protect
 
+- **One vehicle physics profile:** all race styles use the Arcade tuning in `vehiclePhysicsConfig.ts`, including progressive human brake pressure. Driving controls, AI decision policies, collision and recovery rules may vary by race style, but never select a second tire-force or steering model. Preserve legacy handling identifiers for saved scores and ghosts; do not merge historically different records.
 - **One geometric truth:** road/terrain height, structures, crossings, checkpoint locations and nearest-path context must agree between editor, AI, physics and rendering. Prefer the existing `TrackGeometryService`, `roadSurface` and terrain authorities.
 - **No track-specific gameplay exceptions:** AI, physics, progress and difficulty must derive decisions from shared geometry, road/terrain surfaces, vehicle properties and race settings. Never recognize a particular circuit by name, ID, export hash or hand-authored segment index to apply different steering, speed, grip, checkpoints or racing-line rules. Named tracks are allowed as **test fixtures**, never production behavior switches. If a layout exposes a weakness, fix the generic rule and protect it with seeded regressions.
 - **Determinism:** fixed input/tick/randomness should yield reproducible simulation and comparable AI results. Inject clock and random source at appropriate boundaries.
