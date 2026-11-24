@@ -41,7 +41,6 @@ import {
   type GhostStore,
 } from '@/application/race/ghostReplay'
 import { LapTiming } from '@/application/race/lapTiming'
-import { penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 import { GhostRecording } from '@/application/race/ghostRecording'
 import { interpolateRaceState } from '@/application/race/racePresentation'
 import { RaceDiagnosticsRecording, type RaceDiagnosticsReport } from '@/application/race/raceDiagnostics'
@@ -398,6 +397,9 @@ export class RaceSession implements RaceSessionPort {
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
       const player = state.vehicles.find((vehicle) => vehicle.player)
+      if (player?.manualRecoveryUntilTick === state.tick && state.phase === 'running') {
+        this.dependencies.feedback.handle({ type: 'countdown', cue: 'go' })
+      }
       if (before && player && player.lap === before.lap && player.nextSector < before.nextSector) {
         this.timing.abandonLap(player.lap)
       }
@@ -577,7 +579,7 @@ export class RaceSession implements RaceSessionPort {
     const nearbyPosition = setup?.mode === 'nearby' && player
       ? this.dependencies.nearby?.livePosition?.(player, state) : null
     const latestSplit = this.timing.accepted.at(-1)
-    const elapsed = result?.playerTime ?? (player ? penalizedRaceTime(state.elapsed, player) : state.elapsed)
+    const elapsed = result?.playerTime ?? state.elapsed
     return {
       runId: this.runId,
       track,
