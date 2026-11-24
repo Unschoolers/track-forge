@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { assert, describe, expect, it, vi } from 'vitest'
-import { NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import { LOBBY_DELIVERY_TIMEOUT_MS, NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import { decodePoseBatch, Packet, POSE_BYTES } from '@/application/multiplayer/raceWire'
 import { decodeControl, encodeControl } from '@/application/multiplayer/controlProtocol'
 import { RaceSession } from '@/application/race/raceSession'
@@ -20,6 +20,71 @@ async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): P
 }
 
 describe('Nearby Arcade', () => {
+  it.each(['roster', 'choice', 'acknowledgement'] as const)('bounds a stalled %s without imposing a deadline on human choice', async kind => {
+    let stall = false
+    let blocked = false
+    let release: (() => void) | undefined
+    const delayed = new Promise<void>(resolve => { release = resolve })
+    const network = new NearbyNetwork((sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      // Simulate a native send reporting success but never delivering the latest consent.
+      return stall && kind === 'acknowledgement' && sender === 'guest' && recipient === 'host' &&
+        message?.type === 'ready' && message.accepted ? new Uint8Array([255]) : bytes
+    }, async (sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (!stall) return
+      if ((kind === 'roster' && sender === 'host' && recipient === 'guest' &&
+          message?.type === 'lobby' && message.players.every(player => player.accepted)) ||
+          (kind === 'choice' && sender === 'guest' && recipient === 'host' &&
+          message?.type === 'ready' && message.accepted)) {
+        blocked = true
+        await delayed
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const started = vi.fn()
+    host.onStart(started)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(host.snapshot().phase).toBe('lobby')
+      expect(guest.snapshot().phase).toBe('lobby')
+
+      stall = true
+      guest.setLobbyReady(true)
+      if (kind === 'roster') host.setLobbyReady(true)
+      await vi.advanceTimersByTimeAsync(0)
+      if (kind !== 'acknowledgement') expect(blocked).toBe(true)
+      expect(started).not.toHaveBeenCalled()
+
+      if (kind === 'roster') {
+        await vi.advanceTimersByTimeAsync(LOBBY_DELIVERY_TIMEOUT_MS + 500)
+        expect(host.snapshot()).toMatchObject({ phase: 'idle', error: 'Could not update a connected player’s lobby.' })
+        expect((await host.diagnostics()).lastFailure).toMatchObject({ source: 'lobby_roster' })
+      } else {
+        await vi.advanceTimersByTimeAsync(kind === 'choice' ? LOBBY_DELIVERY_TIMEOUT_MS : 30_000)
+        expect(guest.snapshot().phase).toBe('idle')
+        expect(guest.snapshot().error).toContain(kind === 'choice' ? 'message could not be sent' : 'did not confirm')
+      }
+      expect(started).not.toHaveBeenCalled()
+    } finally {
+      host.destroy()
+      guest.destroy()
+      release?.()
+      vi.useRealTimers()
+    }
+  })
+
   it('waits for final roster delivery before staging and reconciles a departing ready player', async () => {
     let depart: (() => void) | undefined
     let failed = false
