@@ -3,8 +3,11 @@ import type { CarId } from '@/domain/model'
 import type { RaceStepResult } from '@/domain/race/raceEngine'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
+import { pendingTimingGateIndex } from '@/domain/race/arcadeTimingGate'
+import { roadGateCrossingFraction } from '@/domain/race/progress'
 
 export type LaneIssueCode =
+	| 'missed-gate'
 	| 'off-road'
 	| 'lane-deviation'
 	| 'wrong-way'
@@ -298,6 +301,20 @@ export class LaneMonitor {
 				'Moving against race direction for at least 0.75 s',
 			)
 			const before = previous.vehicles.find((v) => v.id === vehicle.id)
+			const missed = vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint
+			const priorMiss = before?.player ? previous.missedCheckpoint : before?.missedCheckpoint
+			if (before && missed && priorMiss?.gate !== missed.gate) {
+				const gateIndex = pendingTimingGateIndex(race, missed.gate)
+				const crossing = roadGateCrossingFraction(race.path, before, vehicle, gateIndex, Infinity, race.reversed)
+				const gateSample = race.path.points[Math.floor(gateIndex)]
+				const afterSample = race.path.points[(Math.floor(gateIndex) + 1) % race.path.points.length]
+				const geometry = gateSample && afterSample ? { a: { x: gateSample.x, y: gateSample.y }, b: { x: afterSample.x, y: afterSample.y } } : null
+				this.issues.push({ ...sample, code: 'missed-gate', severity: 'warning', detail: JSON.stringify({
+					gate: missed.gate, gateIndex, crossing, geometry, onRoad: context.onRoad,
+					before: { x: before.x, y: before.y, z: before.z, pathIndex: before.pathIndex, speed: before.speed },
+					after: { x: vehicle.x, y: vehicle.y, z: vehicle.z, pathIndex: vehicle.pathIndex, speed: vehicle.speed },
+				}) })
+			}
 			const previousDistance =
 				before && race.path.points[before.pathIndex]?.distance
 			const distance = race.path.points[vehicle.pathIndex]?.distance

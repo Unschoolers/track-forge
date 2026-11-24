@@ -25,9 +25,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Focused vehicle physics and car identity contracts
-        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts tests/domain/raceCameraContinuity.test.ts tests/domain/reverseRace.test.ts tests/domain/aiDifficultyPolicy.test.ts tests/domain/aiCompactRivalClearance.test.ts tests/domain/checkpointProgressJitter.test.ts tests/domain/diagonalGates.test.ts tests/domain/openRaceGateIntegration.test.ts tests/domain/sharedTimingGate.test.ts --maxWorkers=2
+        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts tests/domain/raceCameraContinuity.test.ts tests/domain/reverseRace.test.ts tests/domain/aiDifficultyPolicy.test.ts tests/domain/aiCompactRivalClearance.test.ts tests/domain/checkpointProgressJitter.test.ts tests/domain/diagonalGates.test.ts tests/domain/openRaceGateIntegration.test.ts tests/domain/sharedTimingGate.test.ts tests/domain/raceSimulation.test.ts tests/application/raceSession.test.ts --maxWorkers=2
       - run: npm run qa:optimize:test
+      - name: Hairpin checkpoint diagnostics
+        if: '!cancelled()'
+        run: npm run qa:lanes -- --scenario hairpin --difficulty all --mode both --car all --seeds 1 --fail-on-regressions
       - name: Recalibrate AI against main with full steering gain
+        if: '!cancelled()'
         shell: bash
         run: |
           set -euo pipefail
@@ -49,7 +53,7 @@ jobs:
           AI_BENCHMARK=1 npx --no-install vitest run qa/lanes/emileRecovery.benchmark.ts --maxWorkers=2
           npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay,emile --seeds 1 --workers 2 --trials 14 --no-telemetry --reference "$report/before/baseline-results.json" --gameplay-improvement --out "$report/after"
       - name: Production Émile balance guard
-        if: success()
+        if: '!cancelled()'
         run: npx --no-install vitest run tests/domain/emileHardRace.test.ts --maxWorkers=2
       - name: Publish quick experiment results
         if: always()

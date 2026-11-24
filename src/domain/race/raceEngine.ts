@@ -225,13 +225,21 @@ function advanceRace(
     const lostRival = !updated.player && updated.finishedAt === null && updated.grounded &&
       (rivalBelowDeck || offRoadRecovery.expired)
     if (playerStuck || bridgeFallExpired || lostRival) {
-      const candidate = previous && (rivalBelowDeck || updated.player || state.routeKind === 'point-to-point')
-        ? restoreFrameProgress({ ...updated, pathIndex: previous.pathIndex }, previous)
+      // Roll back timing before selecting the respawn target, not afterwards.
+      // Otherwise a gate crossed in the recovery frame can leave the rival
+      // past the now-pending stripe even though the final event pass revokes it.
+      const candidate = previous
+        ? restoreFrameProgress({
+            ...updated,
+            pathIndex: rivalBelowDeck || updated.player || state.routeKind === 'point-to-point'
+              ? previous.pathIndex : updated.pathIndex,
+            ...(updated.player ? {} : { missedCheckpoint: updated.missedCheckpoint ?? previous.missedCheckpoint }),
+          }, previous)
         : updated
-      const pending = updated.player ? missedCheckpoint : updated.missedCheckpoint
-      const reset = rivalBelowDeck && !pending
+      const pending = candidate.player ? missedCheckpoint ?? state.missedCheckpoint : candidate.missedCheckpoint
+      const reset = rivalBelowDeck && !pending && !state.timingGates?.length
         ? resetVehicleToTrack(candidate, state.path, { pathIndex: candidate.pathIndex, reversed: state.reversed })
-        : resetRaceVehicle(candidate, { ...state, missedCheckpoint })
+        : resetRaceVehicle(candidate, { ...state, missedCheckpoint: pending })
       if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',

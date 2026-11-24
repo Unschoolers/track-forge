@@ -176,8 +176,11 @@ describe('race simulation', () => {
       ...race,
       phase: 'running' as const,
       vehicles: race.vehicles.map((vehicle, index) => {
-        const point = requireFixture(path.points[40 + index * 10])
-        return { ...vehicle, x: point.x, y: point.y, pathIndex: 0 }
+        const pointIndex = 40 + index * 10
+        const point = requireFixture(path.points[pointIndex])
+        // Local projection lag, not a teleport across an unpassed gate.
+        const nextSector = (race.timingGates ?? []).filter(gate => gate < pointIndex).length + 1
+        return { ...vehicle, x: point.x, y: point.y, pathIndex: pointIndex - 3, nextSector }
       }),
     }
 
@@ -188,8 +191,8 @@ describe('race simulation', () => {
       { next: () => 0.5 },
     )
 
-    expect(stepped.state.vehicles.every((vehicle) => vehicle.pathIndex > 20))
-      .toBe(true)
+    expect(stepped.state.vehicles.map(vehicle => vehicle.pathIndex)).toEqual([40, 50, 60, 70])
+    expect(stepped.events.some(event => event.type === 'vehicle-recovered')).toBe(false)
   })
 
   it('applies vertical gravity to player and AI vehicles in one common pass', () => {
