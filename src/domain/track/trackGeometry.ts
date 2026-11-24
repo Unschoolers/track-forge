@@ -19,12 +19,6 @@ export interface RoadRibbonSample {
   readonly surface: SurfaceId
 }
 
-export interface TrackGate {
-  readonly order: 1 | 2 | 3
-  readonly distance: number
-  readonly ratio: number
-}
-
 export interface ResolvedTrackStart {
   readonly distance: number
   readonly ratio: number
@@ -40,7 +34,6 @@ export interface TrackGeometry {
   readonly crossings: readonly TrackCrossing[]
   readonly start: ResolvedTrackStart
   readonly finish?: ResolvedTrackStart
-  readonly sectors: readonly TrackGate[]
 }
 
 function normalize(vector: Vector2): Vector2 {
@@ -92,14 +85,6 @@ export function buildTrackGeometry(
     center: { x: 0, y: 0, surface: 'street', distance: 0, segment: 0 },
     tangent: { x: 1, y: 0 },
   }
-  const sectors = ([1, 2, 3] as const).map((order) => {
-    const sectorRatio = pointToPoint ? order / 4 : (ratio + order / 4) % 1
-    return {
-      order,
-      ratio: sectorRatio,
-      distance: path.totalLength * sectorRatio,
-    }
-  })
   return {
     path,
     ribbon,
@@ -118,7 +103,6 @@ export function buildTrackGeometry(
       position: { x: ribbon[ribbon.length - 1]!.center.x, y: ribbon[ribbon.length - 1]!.center.y },
       tangent: ribbon[ribbon.length - 1]!.tangent,
     } } : {}),
-    sectors,
   }
 }
 
