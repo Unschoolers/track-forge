@@ -16,17 +16,21 @@ export function populateNearbyLobby(frame: ModalFrame, nearby: NearbyRace, snaps
   ]
   const rosterPanel = element('section', 'setup-section nearby-lobby-roster')
   const heading = element('div', 'nearby-lobby-roster-header')
-  const accepted = snapshot.lobbyPlayers.filter(player => player.accepted).length
-  const count = element('span', 'nearby-lobby-count', accepted + '/' + snapshot.lobbyPlayers.length + ' READY')
-  count.setAttribute('role', 'status')
-  heading.append(element('h3', 'setup-label', 'PLAYERS'), count)
-  const roster = element('ol', 'nearby-lobby-players')
-  for (const player of snapshot.lobbyPlayers) {
+  const players = snapshot.lobbyPlayers.map(player => {
     const local = player.slot === localSlot
     const car = local ? snapshot.localCar : player.car
     const status = local && snapshot.unlockPending ? 'updating'
       : local && snapshot.readyPending ? 'confirming'
       : player.accepted ? 'ready' : car ? 'choosing' : 'loading'
+    return { player, local, car, status } as const
+  })
+  const accepted = players.filter(player => player.status === 'ready').length
+  const count = element('span', 'nearby-lobby-count', accepted + '/' + players.length + ' READY')
+  count.setAttribute('role', 'status')
+  count.dataset.pending = String(snapshot.readyPending || snapshot.unlockPending)
+  heading.append(element('h3', 'setup-label', 'PLAYERS'), count)
+  const roster = element('ol', 'nearby-lobby-players')
+  for (const { player, local, car, status } of players) {
     const row = element('li', 'nearby-lobby-player' + (local ? ' player' : ''))
     row.dataset.slot = String(player.slot)
     row.dataset.status = status
