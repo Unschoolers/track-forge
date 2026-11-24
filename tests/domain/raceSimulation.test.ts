@@ -315,7 +315,7 @@ describe('race simulation', () => {
     for (const [start, reversed] of [[0, false], [1, false], [length - 2, true]] as const) {
       const indexAt = (offset: number) => (start + (reversed ? -offset : offset) + length) % length
       const behind = { ...first, pathIndex: indexAt(-2) }
-      const crossed = updateProgress({ ...second, pathIndex: indexAt(-1) }, indexAt(1), length, 1, 3, start, reversed)
+      const crossed = updateProgress({ ...second, pathIndex: indexAt(-1) }, indexAt(1), length, 1, 3, start, reversed, authoredGates)
       expect(crossed.lap).toBe(0)
       expect(rankVehicles([behind, crossed], length, start, reversed).map(({ id }) => id)).toEqual([second.id, first.id])
       const earlier = { ...first, pathIndex: indexAt(2) }
