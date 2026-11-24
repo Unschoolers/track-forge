@@ -30,7 +30,14 @@ export function updateProgress(
   const distance = closed
     ? (required - before + pathLength) % pathLength || (finish ? pathLength : 0)
     : required - before
-  if (distance <= 0 || distance > travel) return { ...vehicle, pathIndex: nextPathIndex }
+  // AI on a point-to-point course brakes at its final drivable sample.
+  // Its nearest-path index may never reach the terminal endpoint exactly,
+  // even when all authored checkpoints were passed in sequence. Only the
+  // AI index-based progress adapter uses this tolerance; player Finish stays
+  // a strict physical-line crossing in advanceArcadeTimingGate.
+  const aiAtStageFinish = !closed && finish &&
+    before >= pathLength - 3 && after >= pathLength - 2
+  if (!aiAtStageFinish && (distance <= 0 || distance > travel)) return { ...vehicle, pathIndex: nextPathIndex }
   if (finish) {
     const lap = vehicle.lap + 1
     return { ...vehicle, pathIndex: nextPathIndex, nextSector: 1, lap,
