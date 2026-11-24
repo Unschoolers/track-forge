@@ -134,6 +134,7 @@ export class NearbyRace {
       phase: this.phase, purpose: this.purpose, role: this.role,
       error: this.error, room: this.room, track: this.course?.track.name,
       lighting: this.course?.lighting ?? null,
+      lobbyTrack: this.phase === 'lobby' ? this.course?.track : undefined,
       incomingTrack: this.share.incoming?.name ?? null, sharedCount: this.share.sharedCount,
       shareStatus: this.share.status,
       rooms: [...this.rooms], players: this.phase === 'lobby' && this.role === 'guest' ? this.lobbyPlayers().length : 1 + this.guests.size,
