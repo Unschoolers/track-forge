@@ -100,6 +100,7 @@ describe('road branch continuity', () => {
           points,
           trees: [],
           terrain: EMPTY_TERRAIN,
+          recoveryCheckpoints: [0.5],
           lighting: 'day',
           createdAt: 1,
           updatedAt: 1,
@@ -470,7 +471,7 @@ describe('road branch continuity', () => {
       )
       const index = bridge.points.findIndex((point) => point.x >= 16)
       const point = requireFixture(bridge.points[index])
-      const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
+      const base = createRace({
         path: bridge,
         playerCar: 'blue',
         difficulty: 'normal',
@@ -529,7 +530,7 @@ describe('road branch continuity', () => {
     )
     const index = bridge.points.findIndex((point) => point.x >= 16)
     const point = requireFixture(bridge.points[index])
-    const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
+    const base = createRace({
       path: bridge,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -579,7 +580,7 @@ describe('road branch continuity', () => {
     )
     const index = bridge.points.findIndex((point) => point.x >= 16)
     const point = requireFixture(bridge.points[index])
-    const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
+    const base = createRace({
       path: bridge,
       playerCar: 'blue',
       difficulty: 'normal',
