@@ -4,11 +4,12 @@ import { solveCollisionFrame } from '@/domain/race/collisions'
 import { lastRoadRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
 import { hitScenery } from '@/domain/race/sceneryCollisions'
 import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateProgress } from '@/domain/race/progress'
-import type {
-  DriverInput,
-  RaceOutcome,
-  RaceState,
-  RaceVehicle,
+import {
+  manualRecoveryTicksRemaining,
+  type DriverInput,
+  type RaceOutcome,
+  type RaceState,
+  type RaceVehicle,
 } from '@/domain/race/raceState'
 import {
   buildRaceCameraHints,
@@ -20,10 +21,9 @@ import { advanceRaceEffects } from '@/domain/race/effects'
 import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
-import { resetRaceVehicle, recoverRacePlayer, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
+import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
 import { advanceArcadeTimingGate, finishGateNumber } from '@/domain/race/arcadeTimingGate'
 import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
-import { addRecoveryTimePenalty, penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
 
 // Preserve existing engine imports after moving recovery rules to their owner.
@@ -84,6 +84,8 @@ export interface RaceTickInput {
   readonly controls: Readonly<Record<string, DriverInput | undefined>>
   /** Apply manual recovery for the primary car before advancing this tick. */
   readonly recoverPlayer?: boolean
+  /** Explicit manual recovery requests for any controlled vehicle. */
+  readonly recoverVehicleIds?: readonly string[]
 }
 
 export interface RaceStepResult {
@@ -134,7 +136,8 @@ export function stepRaceTick(
   if (input.tick !== expectedTick) {
     throw new RangeError(`Expected race tick ${expectedTick}, received ${input.tick}`)
   }
-  const beforeStep = input.recoverPlayer ? recoverRacePlayer(state) : state
+  let beforeStep = input.recoverPlayer ? recoverRacePlayer(state) : state
+  for (const id of input.recoverVehicleIds ?? []) beforeStep = recoverRaceVehicle(beforeStep, id)
   return advanceRace(beforeStep, NEUTRAL_INPUT, RACE_TICK_SECONDS, random, input.controls)
 }
 
@@ -153,8 +156,9 @@ function advanceRace(
   const events: RaceEvent[] = []
   const arcade = !('handling' in state) || state.handling !== 'simulation'
   let missedCheckpoint = state.missedCheckpoint
+  const held = new Set(state.vehicles.filter(vehicle => manualRecoveryTicksRemaining(vehicle, state.tick) > 0).map(vehicle => vehicle.id))
   const moved = state.vehicles.map((vehicle) => {
-    if (vehicle.finishedAt !== null) return vehicle
+    if (vehicle.finishedAt !== null || held.has(vehicle.id)) return vehicle
     const directInput = controls && controlsForVehicle(controls, vehicle.id)
     const input = directInput ?? (vehicle.player ? playerInput : undefined)
     return advanceVehicle(vehicle, state, input, dt, random,
@@ -176,6 +180,7 @@ function advanceRace(
     })
   }
   const progressed = barrierFrame.vehicles.map((vehicle, index) => {
+    if (held.has(vehicle.id)) return state.vehicles[index] ?? vehicle
     const context = raceVehicleContext(state, vehicle)
     const previous = state.vehicles[index]
     const stuckInput = vehicle.player && elapsed > 1.1 && vehicle.speed < 13 && !vehicle.wrecked
@@ -294,10 +299,11 @@ function advanceRace(
     progressed,
     state.activeContacts,
     dt,
+    held,
   )
   let vehicles = collisionFrame.vehicles.map((collided, index) => {
     const prior = state.vehicles[index]
-    if (prior && !prior.player && prior.finishedAt !== null) return prior
+    if (prior && (held.has(prior.id) || (!prior.player && prior.finishedAt !== null))) return prior
     const context = raceVehicleContext(state, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     const usesCheckpoints = vehicle.player && Boolean(state.recoveryCheckpoints?.length)
@@ -402,20 +408,6 @@ function advanceRace(
   for (const collision of collisionFrame.events) {
     events.push({ type: 'collision', ...collision })
   }
-  // A recovery costs the recovered car 100 ms, once per tick even when
-  // two physical triggers (e.g. falling into water while stuck) coincide.
-  // Keep the simulation clock unchanged; official finish and gate times
-  // include this car's accumulated penalty.
-  const recoveredIds = new Set(events.flatMap(event =>
-    event.type === 'vehicle-recovered' ? [event.vehicleId] : [],
-  ))
-  vehicles = vehicles.map((vehicle, index) => {
-    const prior = state.vehicles[index]
-    const adjusted = recoveredIds.has(vehicle.id) ? addRecoveryTimePenalty(vehicle) : vehicle
-    return prior?.finishedAt === null && adjusted.finishedAt !== null
-      ? { ...adjusted, finishedAt: penalizedRaceTime(adjusted.finishedAt, adjusted) }
-      : adjusted
-  })
   let player = vehicles.find((vehicle) => vehicle.player)
   const playerContext = player
     ? raceVehicleContext(state, player)
@@ -452,7 +444,7 @@ function advanceRace(
       }
       const endGate = vehicle.lap > previous.lap ? finishGateNumber(state) : vehicle.nextSector - 1
       for (let gate = previous.nextSector; gate <= endGate; gate++) {
-        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate, lap: previous.lap, time: penalizedRaceTime(elapsed, vehicle) })
+        events.push({ type: 'gate-crossed', vehicleId: vehicle.id, gate, lap: previous.lap, time: elapsed })
       }
     }
     if (previous.finishedAt === null && vehicle.finishedAt !== null) {
