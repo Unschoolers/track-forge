@@ -10,6 +10,7 @@ import type { VehicleStepContext } from '@/domain/race/trackContext'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
+  type CarPhysicsSpec,
   ARCADE_BRAKE_TIMING,
   ARCADE_DYNAMICS_TUNING,
   VEHICLE_DYNAMICS_TUNING,
@@ -64,7 +65,7 @@ export function stepVehicle(
       : clamp(input.brakePressure ?? Number(input.braking), 0, 1)
   const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
   const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
-  const car = CAR_SPECS[vehicle.car]
+  const car: CarPhysicsSpec = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
   const damageRatio = vehicle.player
@@ -124,6 +125,8 @@ export function stepVehicle(
       cornerStiffness: car.cornerStiffness,
       brakeForce: car.brakeForce,
       brakingTractionScale: car.brakingTractionScale,
+      brakingStabilityBoost: (car.brakingStabilityBoost ?? 0) *
+        Math.min(1, surfaceGrip * surfaceGrip),
       recovery: car.recovery,
       // Strong stability is a dry-road trait, not an ice/gravel cheat.
       lateralStability: 1 + (car.lateralStability - 1) *
