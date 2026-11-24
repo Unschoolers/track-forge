@@ -876,14 +876,14 @@ describe('AppController', () => {
 })
 
 describe('scenery persistence', () => {
-  it('saves appearance before switching and preserves race revision until a road edit', () => {
+  it('saves scenery changes as race-affecting edits and preserves road revision increments', () => {
     const original = createStarterTrack(asTrackId('first'), 1)
     const { controller, trackStore } = setup(original)
     const other = createStarterTrack(asTrackId('second'), 2)
     trackStore.tracks.set(other.id, other)
     controller.dispatch({ type: 'editor', command: { type: 'set-environment', environmentId: 'cityscape' } })
     controller.dispatch({ type: 'editor', command: { type: 'add-scenery-prop', prop: { kind: 'city-house', x: 100, y: 100 } } })
-    expect(controller.snapshot().currentTrack?.raceRevision).toBe(original.raceRevision ?? original.updatedAt)
+    expect(controller.snapshot().currentTrack?.raceRevision).toBeGreaterThan(original.raceRevision ?? original.updatedAt)
     controller.dispatch({ type: 'select-track-for-edit', id: other.id })
     controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
     expect(trackStore.find(original.id)?.scenery).toEqual([{ kind: 'city-house', x: 100, y: 100 }])
