@@ -22,9 +22,10 @@ function stoppingDistance(car: CarId): number {
 }
 
 describe('car roles', () => {
-  it('lets the braking specialist stop shortest from the same street speed', () => {
+  it('lets the pavement specialist stop shortest from the same street speed', () => {
     const distances = Object.fromEntries(CAR_IDS.map(car => [car, stoppingDistance(car)])) as Record<CarId, number>
-    expect(distances.yellow).toBeLessThan(Math.min(distances.blue, distances.red, distances.green))
+    expect(distances.red).toBeLessThan(distances.yellow)
+    expect(distances.yellow).toBeLessThan(Math.min(distances.blue, distances.green))
   })
 })
 
