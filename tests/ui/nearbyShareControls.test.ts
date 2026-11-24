@@ -65,6 +65,47 @@ describe('Nearby sharing and rematch controls', () => {
     expect(setLobbyReady).toHaveBeenCalledWith(true)
   })
 
+  it.each([
+    { role: 'host', localReady: true, readyPending: false, unlockPending: false, status: 'ready', label: 'CANCEL READY', disabled: false },
+    { role: 'guest', localReady: true, readyPending: true, unlockPending: false, status: 'confirming', label: 'CANCEL READY', disabled: false },
+    { role: 'guest', localReady: false, readyPending: false, unlockPending: true, status: 'updating', label: 'UPDATING…', disabled: true },
+  ] as const)('distinguishes $status and keeps locked cars immutable', state => {
+    const localSlot = state.role === 'host' ? 0 : 1
+    const setLobbyReady = vi.fn()
+    const selectLobbyCar = vi.fn()
+    const nearby = {
+      snapshot: () => ({
+        phase: 'lobby', purpose: 'race', track: 'Figure eight', lighting: 'night', laps: 2,
+        localCar: 'red', ...state,
+        lobbyPlayers: Array.from({ length: 8 }, (_, slot) => ({
+          slot, car: slot === 7 ? null : slot === localSlot ? 'red' : 'green',
+          name: 'Racer ' + slot, accepted: slot !== 7 && (slot !== localSlot || state.status === 'ready'), choice: 1,
+        })),
+      }),
+      localSlot: () => localSlot, selectLobbyCar, setLobbyReady,
+    } as unknown as NearbyRace
+    const modal = createNearbyRaceModal(nearby, 'blue', {
+      close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+      downloadDiagnostics: vi.fn(async () => true),
+    })
+    expect(modal.classList.contains('nearby-lobby-modal')).toBe(true)
+    expect(modal.querySelector('.nearby-lobby-course')?.textContent).toContain('2 laps · Night race')
+    expect(modal.querySelectorAll('.nearby-lobby-player')).toHaveLength(8)
+    expect(modal.querySelector('.nearby-lobby-player.player')?.getAttribute('data-status')).toBe(state.status)
+    expect(modal.querySelector('[data-slot="7"]')?.getAttribute('data-status')).toBe('loading')
+    expect(modal.querySelectorAll('.nearby-lobby-picker .car-choice:disabled')).toHaveLength(4)
+    expect(modal.querySelector('.nearby-lobby-feedback')?.getAttribute('data-ready')).toBe(String(state.status === 'ready'))
+    const ready = modal.querySelector<HTMLButtonElement>('[data-action="nearby-ready"]')
+    expect(ready?.textContent).toBe(state.label)
+    expect(ready?.disabled).toBe(state.disabled)
+    modal.querySelector<HTMLButtonElement>('[data-action="car-green"]')?.click()
+    expect(selectLobbyCar).not.toHaveBeenCalled()
+    ready?.click()
+    if (state.disabled) expect(setLobbyReady).not.toHaveBeenCalled()
+    else expect(setLobbyReady).toHaveBeenCalledWith(false)
+  })
+
   it('shows host-selectable Day/Night choices for normal races and Cups', async () => {
     const nearby = new NearbyRace(transport, () => true)
     const actions = {
