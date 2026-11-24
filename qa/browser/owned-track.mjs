@@ -18,7 +18,7 @@ export async function seedOwnedTrack(page) {
       name, version: 8, origin: 'local',
       lighting: 'day', environmentId: 'cityscape',
       createdAt: 1, updatedAt: 1, routeKind: 'circuit',
-      points, trees: [], scenery: [], terrain: { cellSize: 32, cells: [] },
+      points, recoveryCheckpoints: [0.25, 0.55, 0.8], trees: [], scenery: [], terrain: { cellSize: 32, cells: [] },
     }]))
     localStorage.setItem('trackforge-library-v1-migrated', '1')
   }, OWNED_TRACK_NAME)
