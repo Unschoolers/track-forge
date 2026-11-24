@@ -11,8 +11,7 @@ import { decodeProgress, Packet, RemoteGhost } from './raceWire'
 import { NearbyProgressSync } from './nearbyProgressSync'
 import { awardNearbyCupRound, nearbyCupStandings } from './nearbyCupScoring'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
-import { NearbyNetworkTelemetry } from './nearbyNetworkTelemetry'
-import { NearbyReplayTrace, type NearbyTraceRival } from './nearbyReplayTrace'
+import { NearbyRaceDiagnostics } from './nearbyRaceDiagnostics'
 import { packTrack, TrackReceiver } from './trackTransfer'
 import { DEFAULT_PLAYER_IDENTITY, normalizePlayerIdentity, type PlayerIdentity } from './playerIdentity'
 import { randomGridPositions } from '@/domain/race/startGrid'
@@ -108,14 +107,7 @@ export class NearbyRace {
   private scoredCupIndex = -1
   private readonly cupPoints = new Map<number, number>()
   private readonly share = new NearbyTrackShare()
-  private readonly timeline: Record<string, unknown>[] = []
-  private diagnosticStart = 0
-  private diagnosticStartedAtUtc: string | null = null
-  private networkTelemetry = new NearbyNetworkTelemetry()
-  private readonly replayTrace = new NearbyReplayTrace()
-  private lastRaceDiagnostics: Record<string, unknown> | null = null
-  private lastFailure: Record<string, unknown> | null = null
-  private static readonly TIMELINE_LIMIT = 100
+  private readonly diagnostic: NearbyRaceDiagnostics
   private readonly operations = new NearbyOperationQueue()
   private get generation(): number { return this.operations.generation }
   private error: string | null = null
@@ -147,8 +139,15 @@ export class NearbyRace {
     private readonly validateTrack: (track: Track) => boolean,
     private readonly now = () => performance.now(),
   ) {
+    this.diagnostic = new NearbyRaceDiagnostics(this.now, () => ({
+      phase: this.phase, purpose: this.purpose, role: this.role, round: this.round,
+      cupTotal: this.cupTotal, cupIndex: this.cupIndex, slot: this.slot, hostId: this.hostId,
+      course: this.course, localCar: this.localCar, localIdentity: this.localIdentity,
+      localDisplayName: this.localDisplayName, rooms: this.rooms.size, pendingPairs: this.pendingPairs.size,
+      guests: this.guests, racers: this.racers, lobby: this.lobby, progressSync: this.progressSync,
+    }))
     this.poseSync = new NearbyPoseSync((ids, bytes) => transport.send(ids, bytes), this.now,
-      (slot, sequence, accepted, at) => this.networkTelemetry.recordPose(slot, sequence, accepted, at))
+      (slot, sequence, accepted, at) => this.diagnostic.recordPose(slot, sequence, accepted, at))
     this.progressSync = new NearbyProgressSync((ids, bytes) => transport.send(ids, bytes), this.now)
     this.unsubscribe = transport.subscribe((event) => this.onEvent(event))
   }
@@ -178,20 +177,11 @@ export class NearbyRace {
   }
 
   async diagnostics(): Promise<Record<string, unknown>> {
-    const report: Record<string, unknown> = {
-      version: 2,
-      exportedAtUtc: new Date().toISOString(),
-      startedAtUtc: this.diagnosticStartedAtUtc,
-      role: this.role,
-      phase: this.phase,
-      counts: this.diagnosticCounts(),
-      timeline: this.timeline.map((entry) => ({ ...entry })),
+    const report = this.diagnostic.report({
       poseCounts: this.poseSync.counts,
       progressSendFailures: this.progressSync.failedSends,
       targetPoseHz: this.poseSync.targetPoseHz,
-      race: this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics,
-      lastFailure: this.lastFailure && { ...this.lastFailure },
-    }
+    })
     if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
     try {
       return { ...report, native: { status: 'available', report: await this.transport.diagnostics() } }
@@ -416,9 +406,7 @@ export class NearbyRace {
   }
 
   private clearRound(): void {
-    this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
-    this.replayTrace.reset()
-    this.networkTelemetry = new NearbyNetworkTelemetry()
+    this.diagnostic.finishRound()
     this.lobby.reset()
     this.rosterDelivery.reset()
     this.armed.clear()
@@ -491,7 +479,7 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle, state?: RaceState): void {
     if (this.phase !== 'racing') return
-    if (state) this.captureTraceFrame(vehicle, state)
+    if (state) this.diagnostic.captureTraceFrame(vehicle, state)
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
     if (state) this.progressSync.update(this.slot, raceProgress(
@@ -502,32 +490,7 @@ export class NearbyRace {
 
   /** The finishing sample remains available after the room stops sending poses. */
   captureFinalFrame(vehicle: RaceVehicle, state: RaceState): void {
-    if (this.phase === 'racing') this.captureTraceFrame(vehicle, state, true)
-  }
-
-  private captureTraceFrame(vehicle: RaceVehicle, state: RaceState, force = false): void {
-    const now = this.now()
-    if (!this.replayTrace.shouldRecord(now, force)) return
-    const rivals: NearbyTraceRival[] = []
-    for (const [slot, racer] of this.racers) {
-      if (slot === this.slot) continue
-      const pose = racer.left ? null : racer.ghost.pose(now)
-      rivals.push(pose ? {
-        slot, car: racer.ghost.car, visible: true,
-        x: pose.x, y: pose.y, z: pose.z, angle: pose.angle,
-        observedAtMs: pose.t, progress: this.progressSync.latest(slot),
-      } : { slot, car: racer.ghost.car, visible: false })
-    }
-    this.replayTrace.record(now, {
-      elapsed: state.elapsed,
-      local: {
-        slot: this.slot, car: vehicle.car, x: vehicle.x, y: vehicle.y, z: vehicle.z,
-        angle: vehicle.angle, lap: vehicle.lap, sector: vehicle.nextSector,
-        pathIndex: vehicle.pathIndex, speed: vehicle.speed,
-      },
-      rivals,
-      ...(state.missedCheckpoint ? { missedGate: state.missedCheckpoint.gate } : {}),
-    }, force)
+    if (this.phase === 'racing') this.diagnostic.captureTraceFrame(vehicle, state, true)
   }
 
   /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
@@ -702,8 +665,7 @@ export class NearbyRace {
       case 'packet': this.receive(event.id, event.bytes); break
       case 'error':
         if (event.id && event.id !== this.hostId) {
-          this.lastFailure = { source: 'peer_event', error: 'flow_error', phase: this.phase, counts: this.diagnosticCounts() }
-          this.record('failure', { source: 'peer_event', error: 'flow_error' })
+          this.diagnostic.failure('peer_event', 'flow_error')
           this.pendingPairs.delete(event.id)
           this.error = event.message
           this.changed()
@@ -723,7 +685,7 @@ export class NearbyRace {
       if (packet && racer && packet.slot !== this.slot && !racer.left &&
           racer.time === undefined && (fromHost || guestSlot === packet.slot)) {
         const accepted = this.progressSync.receive(packet)
-        this.networkTelemetry.recordProgress(packet.slot, packet.sequence, accepted, this.now())
+        this.diagnostic.recordProgress(packet.slot, packet.sequence, accepted, this.now())
         if (accepted && !fromHost) this.progressSync.relay(bytes, this.endpoints(id))
       }
       return
@@ -1001,13 +963,7 @@ export class NearbyRace {
   }
 
   private begin(phase: Phase): number {
-    this.timeline.length = 0
-    this.diagnosticStart = this.now()
-    this.diagnosticStartedAtUtc = new Date().toISOString()
-    this.lastRaceDiagnostics = null
-    this.replayTrace.reset()
-    this.networkTelemetry = new NearbyNetworkTelemetry()
-    this.lastFailure = null
+    this.diagnostic.begin()
     this.poseSync.resetCounts()
     this.error = null
     this.setPhase(phase)
@@ -1037,15 +993,13 @@ export class NearbyRace {
   }
 
   private fail(message: string, source = 'flow', error?: unknown): void {
-    this.lastFailure = { source, error: error === undefined ? 'flow_error' : this.errorKind(error), phase: this.phase, counts: this.diagnosticCounts() }
-    this.record('failure', { source, error: this.lastFailure.error })
+    this.diagnostic.failure(source, error === undefined ? 'flow_error' : this.errorKind(error))
     this.reset(message)
     this.queueStop()
   }
 
   private reset(error: string | null): void {
-    this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
-    this.replayTrace.reset()
+    this.diagnostic.finishRoom()
     this.operations.invalidate()
     this.clearTimeout()
     this.course = null
@@ -1079,64 +1033,6 @@ export class NearbyRace {
     this.setPhase('idle')
   }
 
-  /** Materialize diagnostics only when exported or leaving a race. Never in the render loop. */
-  private captureRaceDiagnostics(): Record<string, unknown> | null {
-    if (this.purpose !== 'race' || (!this.course && !this.racers.size && !this.lobby.peerCount)) return null
-    const now = this.now()
-    const slots = new Set<number>([this.slot])
-    for (const slot of this.guests.values()) slots.add(slot)
-    if (this.role === 'guest' && this.hostId) slots.add(0)
-    for (const slot of this.racers.keys()) slots.add(slot)
-    const streams = this.networkTelemetry.snapshot(now, this.diagnosticStart)
-    const readyBySlot = new Map<number, { car: CarId; identity: PlayerIdentity; name?: string }>()
-    for (const [endpoint, slot] of this.guests) {
-      const ready = this.lobby.peer(endpoint)
-      if (ready) readyBySlot.set(slot, ready)
-    }
-    return {
-      round: this.round, cupIndex: this.cupTotal ? this.cupIndex : null,
-      elapsedMs: Math.round(Math.max(0, now - this.diagnosticStart)),
-      localSlot: this.slot,
-      track: this.course ? {
-        id: this.course.track.id, name: this.course.track.name,
-        revision: this.course.track.raceRevision ?? null,
-        routeKind: normalizeRouteKind(this.course.track.routeKind),
-        pointCount: this.course.track.points?.length ?? null,
-        trackShapeValid: Array.isArray(this.course.track.points),
-        lighting: this.course.lighting, laps: this.course.laps,
-      } : null,
-      /** User-requested export: compact control geometry + observed car positions.
-       * No endpoint IDs, raw Nearby payloads, or player names in the trace.
-       */
-      trace: {
-        ...this.replayTrace.snapshot(),
-        // Diagnostics also run on a failed/unvalidated room setup, so the
-        // authored point list must not be assumed valid at this boundary.
-        controlPoints: this.course && Array.isArray(this.course.track.points)
-          ? this.course.track.points.map(point => [point.x, point.y]) : [],
-      },
-      players: [...slots].sort((a, b) => a - b).map(slot => {
-        const racer = this.racers.get(slot)
-        const prepared = readyBySlot.get(slot)
-        const local = slot === this.slot
-        const identity = racer?.identity ?? prepared?.identity ?? (local ? this.localIdentity : null)
-        return {
-          id: `slot-${slot}`, slot, local,
-          // A slot is stable across devices within a race. Raw Nearby endpoint
-          // identifiers and pairing codes are intentionally not exported.
-          connectionRole: local ? 'local' : slot === 0 ? 'host' : 'guest',
-          name: racer?.name ?? prepared?.name ?? (local ? this.localDisplayName : undefined) ?? null,
-          car: racer?.ghost.car ?? prepared?.car ?? (local ? (this.role === 'host' ? this.course?.car ?? this.localCar : this.localCar) : null),
-          icon: identity?.icon ?? null, color: identity?.color ?? null,
-          finishedSeconds: racer?.time ?? null,
-          finished: typeof racer?.time === 'number',
-          left: racer?.left ?? false,
-          receive: streams[slot],
-        }
-      }),
-    }
-  }
-
   private armTimeout(message: string, duration = 30_000): void {
     this.clearTimeout()
     this.timeout = setTimeout(() => this.fail(message), duration)
@@ -1144,11 +1040,6 @@ export class NearbyRace {
 
   private clearTimeout(): void { clearTimeout(this.timeout) }
   private changed(): void { this.changes.publish() }
-  private diagnosticCounts() {
-    return { rooms: this.rooms.size, pendingPairs: this.pendingPairs.size,
-      guests: this.guests.size, ready: this.lobby.peerCount, racers: this.racers.size }
-  }
-
   private errorKind(error: unknown): string {
     // Arbitrary exception text can contain endpoint IDs, room names or track data.
     if (error instanceof LobbyDeliveryTimeoutError) return 'lobby_delivery_timeout'
@@ -1156,9 +1047,7 @@ export class NearbyRace {
   }
 
   private record(event: string, details: Record<string, unknown> = {}): void {
-    this.timeline.push({ atMs: Math.max(0, Math.round(this.now() - this.diagnosticStart)), event,
-      phase: this.phase, counts: this.diagnosticCounts(), ...details })
-    if (this.timeline.length > NearbyRace.TIMELINE_LIMIT) this.timeline.shift()
+    this.diagnostic.record(event, details)
   }
 
   private setPhase(phase: Phase): void {
