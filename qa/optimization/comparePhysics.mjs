@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
+import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview } from './score.mjs'
 
 const [beforePath, afterPath, ...flags] = process.argv.slice(2)
+const reviewIndex = flags.indexOf('--timing-review')
+const timingReview = reviewIndex < 0 ? null : JSON.parse(readFileSync(flags.splice(reviewIndex, 2)[1], 'utf8'))
 if (flags.some(flag => flag !== '--gameplay-improvement')) throw new Error('Unknown physics comparison option')
 if (!beforePath || !afterPath) throw new Error('Usage: comparePhysics.mjs BEFORE AFTER')
 const before = JSON.parse(readFileSync(beforePath, 'utf8'))
@@ -18,7 +20,7 @@ const comparisons = records(afterPath).map(({ task, result }) => {
   const old = baseline.get(id)
   if (!old || seen.has(id)) throw new Error('Unmatched or duplicate trial: ' + id)
   seen.add(id)
-  const pair = evaluatePair(old, result, PHYSICS_ACCEPTANCE)
+  const pair = applyTimingReview(evaluatePair(old, result, PHYSICS_ACCEPTANCE), task, timingReview, before.physicsRevision)
   return { ...pair, regression: !pair.eligible }
 })
 if (seen.size !== baseline.size || baseline.size !== original.length || baseline.size === 0)
@@ -26,7 +28,8 @@ if (seen.size !== baseline.size || baseline.size !== original.length || baseline
 const regressions = comparisons.filter(row => row.regression)
 const acceptance = assessFleet(comparisons, { gameplayImprovement: flags.includes('--gameplay-improvement') })
 const summary = { beforeRevision: before.physicsRevision, afterRevision: after.physicsRevision,
-  policy: PHYSICS_ACCEPTANCE, acceptance, comparisons, regressions }
+  policy: PHYSICS_ACCEPTANCE, acceptance, comparisons, regressions,
+  timingReviews: comparisons.filter(row => row.timingReview) }
 writeFileSync(join(dirname(afterPath), 'physics-comparison.json'), JSON.stringify(summary, null, 2))
 for (const car of [...new Set(comparisons.map(row => row.car))]) {
   const rows = comparisons.filter(row => row.car === car)
@@ -38,6 +41,7 @@ for (const car of [...new Set(comparisons.map(row => row.car))]) {
     regressions: rows.filter(row => row.regression).length }))
 }
 console.log('FLEET_ACCEPTANCE ' + JSON.stringify(acceptance))
+for (const row of summary.timingReviews) console.log('APPROVED_TIMING_REVIEW ' + JSON.stringify(row))
 if (!acceptance.eligible) {
   console.error(JSON.stringify(regressions))
   process.exitCode = 1

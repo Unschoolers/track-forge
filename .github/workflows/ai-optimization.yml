@@ -71,10 +71,13 @@ jobs:
       - name: Report matched physics comparison
         env:
           GAMEPLAY_IMPROVEMENT: ${{ contains(github.event.pull_request.labels.*.name, 'gameplay-improvement') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if test -f qa/results/optimization/baseline/summary.json; then
             flags=()
             if [[ "$GAMEPLAY_IMPROVEMENT" == true ]]; then flags+=(--gameplay-improvement); fi
+            review="qa/optimization/reviews/pr-${PR_NUMBER}.json"
+            if [[ -f "$review" ]]; then flags+=(--timing-review "$review"); fi
             node qa/optimization/comparePhysics.mjs qa/results/optimization/baseline/summary.json qa/results/optimization/summary.json "${flags[@]}"
           fi
       - uses: actions/setup-python@v6

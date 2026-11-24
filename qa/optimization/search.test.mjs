@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateCandidates } from './candidates.mjs'
-import { assessCandidate, evaluatePair, trialKey, compareScores, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
+import { assessCandidate, evaluatePair, trialKey, compareScores, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview } from './score.mjs'
 
 test('candidate enumeration stays bounded and deterministic', () => {
   const base = { hardCornerTargetBonus: 0.04, hardSteerGain: 2.22,
@@ -133,4 +133,23 @@ test('fleet acceptance rewards the net result, not a perfect time on every car',
   assert.equal(assessFleet([make('red', 0.05)]).decision, 'no-benefit')
   assert.equal(assessFleet([...fleet, make('yellow', -1.1, 0, false, true)], { gameplayImprovement: true }).decision, 'manual-review')
   assert.equal(assessFleet([...fleet, make('yellow', 2, -1, true)], { gameplayImprovement: true }).decision, 'reject')
+})
+
+test('explicit timing review is scoped to exact baseline and trial and cannot waive hard failures', () => {
+  const task = { car: 'red', playerCar: 'green', focusRole: 'rival', scenarioId: 'course', seed: 1, difficulty: 'hard', mode: 'traffic' }
+  const row = { eligible: false, hardFailure: false, requiresReview: true, gainSeconds: -1.5, before: 60.4, recoveriesBefore: 0, recoveriesAfter: 0, recoveriesReduced: 0, reasons: ['manual review required'] }
+  const review = { baselineRevision: 'old', reason: 'Reviewed pace tradeoff', approvals: [{ trial: trialKey(task), beforeSeconds: 60.4, maxSlowdownSeconds: 1.52 }] }
+  const approved = applyTimingReview(row, task, review, 'old')
+  assert.equal(approved.eligible, true)
+  assert.equal(approved.requiresReview, false)
+  assert.equal(approved.timingReview.approved, true)
+  assert.deepEqual(approved.reasons, row.reasons)
+  for (const rejected of [
+    applyTimingReview(row, { ...task, seed: 2 }, review, 'old'),
+    applyTimingReview(row, task, review, 'other'),
+    applyTimingReview({ ...row, hardFailure: true }, task, review, 'old'),
+    applyTimingReview({ ...row, gainSeconds: -1.53 }, task, review, 'old'),
+    applyTimingReview({ ...row, before: 59 }, task, review, 'old'),
+    applyTimingReview({ ...row, recoveriesAfter: 1 }, task, review, 'old'),
+  ]) assert.equal(rejected.eligible, false)
 })

@@ -97,6 +97,26 @@ export function evaluatePair(baseline, candidate, { maxSlowdownSeconds = 1, allo
   }
 }
 
+/**
+ * A reviewed timing-only regression may pass the release comparison.
+ * Never use a review to select tuning candidates or suppress engine errors.
+ * Bind the review to a frozen baseline and exact matched trial identity.
+ */
+export function applyTimingReview(pair, task, review, baselineRevision) {
+  if (!pair.requiresReview || pair.hardFailure || !review ||
+      review.baselineRevision !== baselineRevision || pair.gainSeconds === null) return pair
+  const approval = review.approvals.find(entry => entry.trial === trialKey(task))
+  if (!approval || !Number.isFinite(approval.maxSlowdownSeconds) ||
+      !Number.isFinite(approval.beforeSeconds) ||
+      Math.abs(pair.before - approval.beforeSeconds) > EPSILON ||
+      -pair.gainSeconds > approval.maxSlowdownSeconds + EPSILON ||
+      pair.recoveriesAfter !== 0 || pair.recoveriesBefore !== 0 ||
+      pair.recoveriesReduced < 0) return pair
+  return { ...pair, eligible: true, requiresReview: false, timingReview: {
+    approved: true, reason: review.reason, maxSlowdownSeconds: approval.maxSlowdownSeconds,
+  } }
+}
+
 /** Give each car equal weight, regardless of its number of matched trials. */
 export function assessFleet(comparisons, { gameplayImprovement = false, requireBenefit = true } = {}) {
   if (!comparisons.length) throw new Error('No comparison trials')
