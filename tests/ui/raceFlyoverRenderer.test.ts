@@ -7,7 +7,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { createRaceFlyoverRenderer } from '@/ui/components/raceFlyoverRenderer'
-import { createRaceFlyover } from '@/ui/components/raceFlyover'
+import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/raceFlyover'
 import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 
 function canvas() {
@@ -36,7 +36,7 @@ describe('race flyover renderer', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('advances the preview at twice wall-clock speed and freezes when paused', () => {
+  it('cycles from default double speed to quadruple speed, pause and back', () => {
     let scheduled: FrameRequestCallback | undefined
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
       scheduled = callback
@@ -46,7 +46,7 @@ describe('race flyover renderer', () => {
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
     const track = createStarterTrack(asTrackId('playback'), 1)
     const geometry = new TrackGeometryService().get(track)
-    const playback = { elapsedSeconds: 0, playing: true }
+    const playback: RaceFlyoverPlayback = { elapsedSeconds: 0 }
     const view = createRaceFlyover(track, geometry, 'blue', 'day', true, playback)
     try {
       const preview = view.element.querySelector('canvas')!
@@ -60,15 +60,30 @@ describe('race flyover renderer', () => {
         scheduled = undefined
         callback(at)
       }
+      const toggle = view.element.querySelector('button')!
+      expect(toggle.getAttribute('aria-label')).toBe('Double flyover speed')
+      expect(toggle.textContent).toBe('2×')
       frame(0)
       frame(50)
       expect(playback.elapsedSeconds).toBeCloseTo(0.1)
+      toggle.click()
+      expect(playback.speed).toBe(4)
+      expect(toggle.getAttribute('aria-label')).toBe('Pause flyover')
       frame(100)
-      expect(playback.elapsedSeconds).toBeCloseTo(0.2)
-      view.element.querySelector('button')!.click()
       frame(150)
-      expect(playback.elapsedSeconds).toBeCloseTo(0.2)
+      expect(playback.elapsedSeconds).toBeCloseTo(0.3)
+      toggle.click()
+      expect(playback.speed).toBe(0)
+      expect(toggle.getAttribute('aria-label')).toBe('Play flyover')
+      frame(200)
+      expect(playback.elapsedSeconds).toBeCloseTo(0.3)
       expect(scheduled).toBeUndefined()
+      toggle.click()
+      expect(playback.speed).toBe(2)
+      expect(toggle.getAttribute('aria-label')).toBe('Double flyover speed')
+      frame(250)
+      frame(300)
+      expect(playback.elapsedSeconds).toBeCloseTo(0.4)
     } finally {
       view.destroy()
       view.element.remove()
