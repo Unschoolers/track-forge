@@ -7,7 +7,7 @@ export const STUDY_SCENARIOS = [
     group: 'calibration',
   },
   {
-    id: 'pine-hairpins', officialName: 'Pine Hairpins',
+    id: 'pine-hairpins', file: 'tests/fixtures/pineHairpinsAi.trackforge.json',
     reverse: false, startRatio: 0,
     laps: 1, seconds: 80, group: 'calibration',
   },
@@ -26,7 +26,7 @@ export const STUDY_SCENARIOS = [
     laps: 2, seconds: 145, group: 'validation',
   },
   {
-    id: 'meadow-loop', officialName: 'Meadow Loop',
+    id: 'meadow-loop', file: 'tests/fixtures/meadowLoopAi.trackforge.json',
     reverse: false, startRatio: 0,
     laps: 2, seconds: 70, group: 'validation',
   },
