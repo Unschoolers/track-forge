@@ -25,6 +25,9 @@ export interface CarDrivingProfile {
   readonly normalCornerTargetBonus?: number
   /** Scale the shared difficulty reserve for this chassis. */
   readonly lowerDifficultyReserveScale?: number
+  /** Curvature-weighted pace and pursuit reserves across all difficulties. */
+  readonly technicalCornerPaceScale?: number
+  readonly technicalCornerPursuitScale?: number
 }
 
 export const CAR_DRIVING_PROFILES = {

@@ -17,7 +17,7 @@ import {
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { planAiSpeed } from '@/domain/race/ai/aiSpeedPlan'
-import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
+import { planCornerTactics, technicalCornerScale } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
@@ -173,7 +173,7 @@ export function stepAiVehicle(
   const pursuitSamples = Math.max(1, Math.round(
     (lookAheadSamples + extraSamples) *
       (1 - 0.5 * edgeRisk * (difficulty === 'hard' ? hardProfile.hardEdgeAvoidanceScale ?? 1 : 1)) *
-      corner.pursuitScale,
+      corner.pursuitScale * technicalCornerScale(corner.bend, hardProfile.technicalCornerPursuitScale),
   ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed

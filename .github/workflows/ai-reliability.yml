@@ -1,0 +1,31 @@
+name: AI reliability experiment
+on:
+  push:
+    branches: ['lab/315-hairpin-ai-recoveries']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ai-reliability-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  reliability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install vitest run tests/domain/technicalCornerScale.test.ts tests/domain/aiHardPace.test.ts tests/domain/emileHardRace.test.ts --maxWorkers=2
+      - run: npm run qa:optimize:test
+      - name: Recovery-first per-car search and combined six-track validation
+        run: node qa/optimization/reliability.mjs
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: reliability-${{ github.sha }}
+          path: qa/results/reliability/
+          if-no-files-found: warn
