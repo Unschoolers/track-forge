@@ -55,7 +55,7 @@ describe('actual street-to-dirt driving on the creator Speed straight', () => {
         x: (last.x - first.x) / directionLength,
         y: (last.y - first.y) / directionLength,
       }
-      const starter = createRace({
+      const starter = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path, routeKind: scenario.routeKind,
         playerCar: 'blue', difficulty: 'normal', laps: 1, handling,
       }).vehicles[0]

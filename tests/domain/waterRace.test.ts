@@ -28,7 +28,7 @@ const dryLoop = [
 
 function runningRace(): RaceState {
   return {
-    ...createRace({
+    ...createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path: buildRoadPath(dryLoop, water),
       playerCar: 'blue',
       difficulty: 'normal',
@@ -66,7 +66,7 @@ function roadBoundaryRace() {
     water,
   )
   return {
-    ...createRace({
+    ...createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -95,7 +95,7 @@ function hillWaterBoundaryRace() {
     },
   )
   return {
-    ...createRace({
+    ...createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -151,7 +151,7 @@ describe('water race contact', () => {
         column: index % 17 - 8, row: Math.floor(index / 17) - 8, kind: 'water' as const,
       })),
     })
-    const initial = createRace({ path, playerCar: 'blue', difficulty: 'normal',
+    const initial = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal',
       laps: 10, handling: 'arcade' })
     const player = requireFixture(initial.vehicles[0])
     expect(findNearestSafeTrackIndex(path, player)).toBeUndefined()
@@ -464,7 +464,7 @@ describe('water race contact', () => {
     const position = path.points[pathIndex]
     if (!position) throw new Error('Expected over-water deck sample')
     const deck = path.roadSurface.at(pathIndex, position)
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -697,7 +697,7 @@ describe('water race contact', () => {
       water,
     )
     const initial = {
-      ...createRace({
+      ...createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path,
         playerCar: 'blue',
         difficulty: 'normal',
