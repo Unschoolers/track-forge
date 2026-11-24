@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CAR_SPECS } from '@/domain/config'
-import { VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
+import { steeringLimitAtSpeed, VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
 import { createRace } from '@/domain/race/raceFactory'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -20,6 +20,32 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('Arcade steering authority', () => {
+  it.each([
+    ['red', 2.28, 40],
+    ['blue', 2.72, 40],
+    ['yellow', 2.46, 40],
+    ['green', 3.2, 3.2 * 0.235 * 180 / Math.PI],
+  ] as const)('preserves %s high-speed steering while setting low-speed lock', (car, originalRack, lowDegrees) => {
+    const race = createRace({ path, playerCar: car, difficulty: 'normal', laps: 1 })
+    const vehicle = race.vehicles[0]
+    if (!vehicle) throw new Error('Missing vehicle')
+    const context = getVehicleStepContext(path, vehicle)
+    stepVehicle(vehicle, { steering: 1, throttle: 1, braking: false }, context, 1 / 60)
+    const params = vi.mocked(stepVehicleDynamics).mock.lastCall?.[2]
+    if (!params) throw new Error('Missing dynamics parameters')
+    const angle = (ratio: number) => steeringLimitAtSpeed(
+      params.maxSteerAngle,
+      ratio,
+      VEHICLE_DYNAMICS_TUNING.steering.highSpeedReduction,
+      params.lowSpeedSteerAngle,
+    ) * 180 / Math.PI
+    const originalHighDegrees = originalRack * 0.235 * 0.69 * 180 / Math.PI
+    expect(angle(0)).toBeCloseTo(lowDegrees, 8)
+    expect(angle(0.5)).toBeCloseTo((lowDegrees + originalHighDegrees) / 2, 8)
+    expect(angle(1)).toBeCloseTo(originalHighDegrees, 8)
+    expect(angle(1.2)).toBeCloseTo(originalHighDegrees, 8)
+  })
+
   it('always passes the same Arcade steering-angle scale to the dynamics integrator', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
     const vehicle = race.vehicles[0]
