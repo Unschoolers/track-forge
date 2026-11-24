@@ -87,6 +87,11 @@ it('lets AI finish at the last driveable sample only after its authored gates', 
   expect(gates.length).toBeGreaterThan(0)
   const rival = { ...player, player: false, pathIndex: last - 2, nextSector: gates.length + 1 }
   const finished = updateProgress(rival, last - 2, path.points.length, 12, 1, 0, false, gates, false)
+  console.log('STAGE_FINISH_DEBUG', JSON.stringify({
+    count: path.points.length, open: path.closed === false,
+    gates, before: rival.pathIndex, sector: rival.nextSector,
+    initialFinished: rival.finishedAt, after: finished,
+  }))
   expect(finished).toMatchObject({ lap: 1, finishedAt: 12, nextSector: 1 })
   expect(updateProgress({ ...rival, nextSector: 1 }, last - 2, path.points.length, 12, 1, 0, false, gates, false))
     .toMatchObject({ lap: 0, finishedAt: null })
