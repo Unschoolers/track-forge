@@ -356,7 +356,8 @@ describe('RaceSession', () => {
       ...track,
       routeKind: 'point-to-point' as const,
       points: [0, 600, 1200].map((x) => ({ x, y: 0, surface: 'street' as const })),
-      recoveryCheckpoints: [0.1],
+      // The simulated bypass starts just before the authored gate at x=300.
+      recoveryCheckpoints: [0.25],
     }
     const step: RaceStep = (state, input, dt, random) => {
       if (state.tick !== 0) return stepRace(state, input, dt, random)
