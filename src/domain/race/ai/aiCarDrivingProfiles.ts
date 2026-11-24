@@ -23,6 +23,8 @@ export interface CarDrivingProfile {
   readonly hardCornerTargetBonus?: number
   /** Small Normal-only planned corner-speed allowance for this chassis. */
   readonly normalCornerTargetBonus?: number
+  /** Scale the shared difficulty reserve for this chassis. */
+  readonly lowerDifficultyReserveScale?: number
 }
 
 export const CAR_DRIVING_PROFILES = {
@@ -46,6 +48,9 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.01,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
+    // The revised brake controller already reserves more corner-entry time.
+    // Scale the additional Easy/Normal reserve so it does not double-count it.
+    lowerDifficultyReserveScale: 0.45,
   },
   // Green rotates easily on street/dirt. With its longer preview it can
   // stay on line with a small Hard apex speed reserve.
