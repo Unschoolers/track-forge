@@ -21,7 +21,7 @@ const accelerate = { steering: 0, throttle: 1, braking: false }
 const coast = { steering: 0, throttle: 0, braking: false }
 
 function startingGrid() {
-  return createRace({
+  return createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
     path,
     routeKind: 'point-to-point',
     handling: 'simulation',

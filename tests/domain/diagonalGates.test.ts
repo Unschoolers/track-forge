@@ -35,7 +35,7 @@ function crossing(path: RoadPath, index: number, lateralOffset: number) {
 describe('diagonal checkpoint crossing', () => {
   it.each([1, -1])('accepts the painted timing gate when the edge changes on-road classification (slope %s)', slope => {
     const path = diagonalPath(slope)
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const player = race.vehicles[0]!
     const gate = (path.points.length - 1) / 4
     const { before, after } = crossing(path, gate, 28)
@@ -67,7 +67,7 @@ describe('diagonal checkpoint crossing', () => {
 
   it.each([1, -1])('records a diagonal recovery checkpoint with a valid swept crossing (slope %s)', slope => {
     const path = diagonalPath(slope)
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const player = race.vehicles[0]!
     const index = Math.floor((path.points.length - 1) * 0.15)
     const { before, after } = crossing(path, index, 28)
@@ -87,7 +87,7 @@ describe('diagonal checkpoint crossing', () => {
   })
   it('forgives a near-edge stage finish but does not finish a wider bypass', () => {
     const path = diagonalPath(1)
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const player = race.vehicles[0]!
     const finish = path.points.length - 1
     const run = (offset: number) => {
@@ -117,7 +117,7 @@ describe('diagonal checkpoint crossing', () => {
         }),
       },
     }
-    const race = createRace({ path: base, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: base, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const player = race.vehicles[0]!
     const gate = (base.points.length - 1) / 4
     const { before, after } = crossing(base, gate, 0)

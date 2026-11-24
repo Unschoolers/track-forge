@@ -24,13 +24,13 @@ const path = buildRoadPath(track.points, track.terrain)
 
 describe('race simulation', () => {
   it('creates a deterministic four-car starting grid', () => {
-    const first = createRace({
+    const first = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'green',
       difficulty: 'hard',
       laps: 3,
     })
-    const second = createRace({
+    const second = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'green',
       difficulty: 'hard',
@@ -52,7 +52,7 @@ describe('race simulation', () => {
   })
 
   it('accelerates, steers, and brakes according to car and surface tuning', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'red',
       difficulty: 'normal',
@@ -104,7 +104,7 @@ describe('race simulation', () => {
 
   it('tracks forward lap crossings and finish time', () => {
     const vehicle = requireFixture(
-      createRace({
+      createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path,
         playerCar: 'blue',
         difficulty: 'normal',
@@ -124,7 +124,7 @@ describe('race simulation', () => {
 
   it('does not count a backward start-line wrap', () => {
     const vehicle = requireFixture(
-      createRace({
+      createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path,
         playerCar: 'blue',
         difficulty: 'normal',
@@ -146,7 +146,7 @@ describe('race simulation', () => {
 
   it('rejects a shortcut across the start line before all sectors', () => {
     const vehicle = requireFixture(
-      createRace({
+      createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path,
         playerCar: 'blue',
         difficulty: 'normal',
@@ -169,7 +169,7 @@ describe('race simulation', () => {
   })
 
   it('updates every vehicle from its post-movement nearest path point', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -196,7 +196,7 @@ describe('race simulation', () => {
   })
 
   it('applies vertical gravity to player and AI vehicles in one common pass', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -230,7 +230,7 @@ describe('race simulation', () => {
   })
 
   it('turns a hard player landing into bounded camera shake', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -274,7 +274,7 @@ describe('race simulation', () => {
   })
 
   it('ranks finishers first and preserves grid order through ties', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -293,14 +293,14 @@ describe('race simulation', () => {
 
   it('preserves the physical starting grid in both directions', () => {
     for (const [startRatio, reversed] of [[0, false], [0.35, false], [0.35, true]] as const) {
-      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3, startRatio, reversed })
+      const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3, startRatio, reversed })
       expect(rankVehicles(race.vehicles, path.points.length, race.startPathIndex, reversed).map(({ id }) => id))
         .toEqual(race.vehicles.map(({ id }) => id))
     }
   })
 
   it('orders grid cars around the first crossing and the relocated seam in both directions', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const [first, second] = race.vehicles.map(requireFixture)
     const length = path.points.length
     if (!first || !second) throw new Error('Missing grid cars')
@@ -317,7 +317,7 @@ describe('race simulation', () => {
   })
 
   it('orders finish times before progress and resolves equal finishes by grid order', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const [first, second, third, fourth] = race.vehicles.map(requireFixture)
     if (!first || !second || !third || !fourth) throw new Error('Missing grid cars')
     const vehicles = [
@@ -330,7 +330,7 @@ describe('race simulation', () => {
   })
 
   it('lets parked cars gently separate without damage', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 0, speed: 0 }
     const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
     const frame = solveCollisionFrame([player, rival], [], 1 / 60)
@@ -340,7 +340,7 @@ describe('race simulation', () => {
   })
 
   it('does not damage during a fast tangential graze without normal closing speed', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 110, speed: 110 }
     const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
     const frame = solveCollisionFrame([player, rival], [], 1 / 60)
@@ -352,7 +352,7 @@ describe('race simulation', () => {
   })
 
   it('separates overlapping cars and applies bounded damage', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -373,7 +373,7 @@ describe('race simulation', () => {
   it.each([false, true])(
     'removes a finished opponent from contact without removing its standing (opponent first: %s)',
     (opponentFirst) => {
-      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+      const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
       const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
       const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0, finishedAt: 0, lap: 3 }
       const pair = opponentFirst ? [rival, player] : [player, rival]
@@ -392,7 +392,7 @@ describe('race simulation', () => {
   )
 
   it('continues to collide with an unfinished opponent', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
     const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0 }
 
@@ -407,7 +407,7 @@ describe('race simulation', () => {
   })
 
   it('keeps an earlier finisher in the running race and standings without affecting the player', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = requireFixture(race.vehicles[0])
     const rival = { ...requireFixture(race.vehicles[1]), x: player.x + 1, y: player.y, z: player.z, finishedAt: 12, lap: 3 }
     const running = { ...race, phase: 'running' as const, vehicles: [player, rival], activeContacts: [`${player.id}:${rival.id}`] }
@@ -426,7 +426,7 @@ describe('race simulation', () => {
   })
 
   it('removes an opponent from contact on the frame it finishes', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
     const point = requireFixture(path.points[0])
     const player = { ...requireFixture(race.vehicles[0]), x: point.x, y: point.y, z: 0, pathIndex: 0 }
     const rival = {
@@ -454,7 +454,7 @@ describe('race simulation', () => {
   })
 
   it('does not collide cars travelling on different crossing levels', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',
@@ -504,7 +504,7 @@ describe('race simulation', () => {
     const center = requireFixture(bridgePath.points[deckIndex])
     const airborne = {
       ...requireFixture(
-        createRace({
+        createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
           path,
           playerCar: 'blue',
           difficulty: 'normal',
@@ -564,7 +564,7 @@ describe('race simulation', () => {
     const center = requireFixture(bridgePath.points[deckIndex])
     const vehicle = {
       ...requireFixture(
-        createRace({
+        createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
           path,
           playerCar: 'blue',
           difficulty: 'normal',
@@ -607,7 +607,7 @@ describe('race simulation', () => {
     const center = requireFixture(bridgePath.points[0])
     const vehicle = {
       ...requireFixture(
-        createRace({
+        createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
           path: bridgePath,
           playerCar: 'blue',
           difficulty: 'normal',
@@ -634,7 +634,7 @@ describe('race simulation', () => {
   })
 
   it('damages only the player once per contact and honors cooldown', () => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path,
       playerCar: 'blue',
       difficulty: 'normal',

@@ -10,7 +10,7 @@ import { requireFixture } from '../fixtures/requireFixture'
 
 const track = createStarterTrack(asTrackId('open-race'), 1)
 const path = buildRoadPath(track.points, track.terrain, undefined, 'point-to-point')
-const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 3, startRatio: 0.5, reversed: true, routeKind: 'point-to-point' })
+const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'red', difficulty: 'normal', laps: 3, startRatio: 0.5, reversed: true, routeKind: 'point-to-point' })
 const player = requireFixture(race.vehicles[0])
 const last = path.points.length - 1
 
