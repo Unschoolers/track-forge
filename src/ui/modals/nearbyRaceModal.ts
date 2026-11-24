@@ -10,7 +10,7 @@ import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
 import { DEFAULT_PLAYER_IDENTITY, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
-import { createTopperMarker, createTopperSelector } from '@/ui/components/playerTopperPicker'
+import { createTopperMarker } from '@/ui/components/playerTopperPicker'
 
 function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string | undefined; readonly local: boolean }): string {
   return racer.name ? `${racer.name}${racer.local ? ' (You)' : ''}` : racer.local ? 'You' : `Player ${racer.slot + 1}`
@@ -18,17 +18,18 @@ function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string
 
 export function createNearbyRaceModal(
   nearby: NearbyRace,
-  car: CarId,
+  _car: CarId,
   actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
     saveTrack: () => void; declineTrack: () => void; connectByIp: (ip: string) => void;
     selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
   },
-  identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
+  _identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
   connections?: NearbyConnectionModes,
 ): HTMLElement {
   const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
-  const cup = nearby.snapshot().cup
-  const frame = createModalFrame(cup ? 'Nearby Cup' : 'Nearby Race',
+  const snapshot = nearby.snapshot()
+  const cup = snapshot.cup
+  const frame = createModalFrame(phase === 'lobby' ? 'Race Lobby' : cup ? 'Nearby Cup' : 'Nearby Race',
     room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
     actions.close, 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
@@ -65,9 +66,6 @@ export function createNearbyRaceModal(
         frame.body.append(section)
       }
       frame.body.append(
-        createCarPicker(car, actions.selectCar),
-        createTopperSelector(identity, false),
-        element('p', 'modal-subtitle', 'Change your topper in Options → Profile.'),
         button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
         button('HOST CUP', 'nearby-host-cup', actions.configureCup, 'button'),
         button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),
@@ -101,7 +99,7 @@ export function createNearbyRaceModal(
         }
         lightingSection.append(choices)
         frame.body.append(lightingSection)
-        const start = button('START RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
+        const start = button('PREPARE RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
         start.disabled = !canStart
         if (!canStart) frame.body.append(element('p', 'modal-subtitle',
           players > 1 ? 'Connecting players…' : 'Waiting for at least one nearby player to join.'))
@@ -142,6 +140,29 @@ export function createNearbyRaceModal(
           : 'Waiting for the track…'
         : 'Waiting for the host to start the race.'))
       break
+    case 'lobby': {
+      frame.body.append(element('h3', 'results-heading', track ?? 'Next race'))
+      frame.body.append(element('p', 'modal-subtitle', `${snapshot.laps ?? 1} lap${snapshot.laps === 1 ? '' : 's'}${cup ? ` · Cup ${cup.index + 1}/${cup.total}` : ''}`))
+      frame.body.append(createCarPicker(snapshot.localCar, car => nearby.selectLobbyCar(car), {
+        disabled: snapshot.unlockPending || (snapshot.role === 'guest' && snapshot.localReady),
+      }))
+      const roster = element('ol', 'scoreboard')
+      roster.setAttribute('aria-live', 'polite')
+      for (const player of snapshot.lobbyPlayers) {
+        const row = element('li', `scoreboard-row${player.slot === nearby.localSlot() ? ' player' : ''}`)
+        const label = nearbyRacerLabel({ slot: player.slot, name: player.name ?? undefined, local: player.slot === nearby.localSlot() })
+        row.append(element('strong', undefined, `${label}${player.slot === 0 ? ' · Host' : ''}${player.car ? ` · ${CAR_SPECS[player.car].name}` : ''}`),
+          element('span', undefined, player.accepted ? 'READY' : player.car ? 'CHOOSING…' : 'LOADING…'))
+        roster.append(row)
+      }
+      frame.body.append(element('h3', 'setup-label', `PLAYERS · ${snapshot.lobbyPlayers.filter(player => player.accepted).length}/${snapshot.lobbyPlayers.length} READY`), roster)
+      const ready = button(snapshot.unlockPending ? 'UPDATING…' : snapshot.localReady ? 'CANCEL READY' : 'I’M READY', 'nearby-ready',
+        () => nearby.setLobbyReady(!snapshot.localReady), snapshot.localReady ? 'button' : 'button button-primary')
+      ready.disabled = snapshot.unlockPending
+      frame.footer.append(ready)
+      frame.body.append(element('p', 'modal-subtitle', 'The race starts when everyone is ready.'))
+      break
+    }
     case 'preparing':
       frame.body.append(element('p', 'modal-subtitle', purpose === 'share' ? 'Receiving and checking the track…' : 'Sharing the track with all players…'))
       break
@@ -158,8 +179,12 @@ export function createNearbyRaceModal(
       frame.body.append(element('p', 'modal-subtitle', 'Loading everyone into the race…'))
       break
   }
-  frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
-  frame.footer.append(button('BACK', 'nearby-back', actions.close, 'button'))
+  if (phase === 'idle') {
+    const details = element('details')
+    details.append(element('summary', 'modal-subtitle', 'Diagnostics'), createDiagnosticsControl(actions.downloadDiagnostics))
+    frame.body.append(details)
+  } else if (phase !== 'lobby') frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
+  frame.footer.append(button(phase === 'lobby' ? 'LEAVE ROOM' : 'BACK', 'nearby-back', actions.close, 'button'))
   return frame.overlay
 }
 

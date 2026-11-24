@@ -164,6 +164,10 @@ export class AppController {
         return
       }
       const status = dependencies.nearby?.snapshot()
+      if (status?.phase === 'lobby' && this.state.mode === 'race' && this.beforeNearbyTrack !== undefined && this.state.overlay.type === 'results') {
+        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        return
+      }
       if (status?.phase !== 'idle' || !status.error || this.state.mode !== 'race' ||
           this.beforeNearbyTrack === undefined) return
       if (this.state.overlay.type === 'results') {
@@ -173,7 +177,7 @@ export class AppController {
       }
     })
     this.unsubscribeRace = dependencies.raceSession.subscribe((snapshot) => {
-      if (!snapshot.result || this.state.mode !== 'race') return
+      if (!snapshot.result || this.state.mode !== 'race' || this.state.overlay.type === 'nearby') return
       if (this.state.overlay.type === 'results') {
         const { cup } = this.state
         const { standings } = snapshot.result
@@ -693,6 +697,7 @@ export class AppController {
     if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'nearby') {
       if (this.dependencies.nearby?.selectNextTrack(track)) {
         this.update({ ...this.state, overlay: { type: 'results' }, notice: null })
+        this.dependencies.nearby.start()
       }
       return
     }

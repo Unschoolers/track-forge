@@ -6,15 +6,24 @@ import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export const MAX_PLAYERS = NEARBY_START_GRID_SIZE
 /** Breaking change to compact pose/progress epochs. Enforce before any race starts. */
-export const NEARBY_WIRE_PROTOCOL_VERSION = 3
+export const NEARBY_WIRE_PROTOCOL_VERSION = 4
 // Eight fully named players may exceed 1 KiB in UTF-8 (24 Unicode letters each).
 const MAX_CONTROL_BYTES = 2048
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
+export interface LobbyPlayer {
+  readonly slot: number
+  readonly car: CarId | null
+  readonly name: string | null
+  readonly accepted: boolean
+  readonly choice: number
+}
+
 export type Control =
   | { type: 'prepare'; slot: number; laps: number; lighting: LightingMode; round?: number; protocolVersion?: number; cupIndex?: number; cupTotal?: number }
-  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number; protocolVersion?: number; name?: string }
+  | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number; protocolVersion?: number; name?: string; accepted?: boolean; choice?: number }
+  | { type: 'lobby'; round: number; revision: number; players: LobbyPlayer[] }
   | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number; names?: (string | null)[] }
   | { type: 'armed'; round?: number }
   | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number; round?: number }
@@ -79,6 +88,27 @@ function validCupMetadata(index: unknown, total: unknown): boolean {
       Number.isInteger(index) && (index as number) >= 0 && (index as number) < (total as number))
 }
 
+function validChoice(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+function validLobbyPlayers(value: unknown): value is LobbyPlayer[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_PLAYERS) return false
+  const slots = new Set<number>()
+  for (const entry of value as unknown[]) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
+    const player = entry as Record<string, unknown>
+    if (typeof player.slot !== 'number' || !Number.isInteger(player.slot) ||
+        player.slot < 0 || player.slot >= MAX_PLAYERS || slots.has(player.slot) ||
+        (player.car !== null && !isCar(player.car)) ||
+        (player.name !== null && (typeof player.name !== 'string' || normalizeDisplayName(player.name) !== player.name)) ||
+        typeof player.accepted !== 'boolean' || (player.accepted && player.car === null) ||
+        !validChoice(player.choice)) return false
+    slots.add(player.slot)
+  }
+  return slots.has(0)
+}
+
 function isControl(value: unknown): value is Control {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const message = value as Record<string, unknown>
@@ -98,7 +128,11 @@ function isControl(value: unknown): value is Control {
     case 'ready':
       return isCar(message.car) && isPlayerIdentity(message.identity) &&
         validProtocolVersion(message.protocolVersion) &&
-        (message.name === undefined || normalizeDisplayName(message.name) === message.name)
+        (message.name === undefined || normalizeDisplayName(message.name) === message.name) &&
+        ((message.accepted === undefined && message.choice === undefined) ||
+          (typeof message.accepted === 'boolean' && validChoice(message.choice)))
+    case 'lobby':
+      return message.round !== undefined && validChoice(message.revision) && validLobbyPlayers(message.players)
     case 'lineup': {
       const cars = message.cars
       const identities = message.identities

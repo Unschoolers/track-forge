@@ -24,6 +24,30 @@ const result: RaceResult = {
 }
 
 describe('Nearby sharing and rematch controls', () => {
+  it('shows car specifications and explicit consent in the race lobby', () => {
+    const selectLobbyCar = vi.fn()
+    const setLobbyReady = vi.fn()
+    const nearby = {
+      snapshot: () => ({ phase: 'lobby', role: 'host', purpose: 'race', track: 'Figure eight', laps: 2,
+        localCar: 'red', localReady: false, unlockPending: false, error: null,
+        lobbyPlayers: [{ slot: 0, car: 'red', name: 'Host', accepted: false, choice: 0 },
+          { slot: 1, car: 'green', name: 'Guest', accepted: true, choice: 1 }] }),
+      localSlot: () => 0, selectLobbyCar, setLobbyReady,
+    } as unknown as NearbyRace
+    const modal = createNearbyRaceModal(nearby, 'blue', {
+      close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+      downloadDiagnostics: vi.fn(async () => true),
+    })
+    expect(modal.textContent).toContain('1/2 READY')
+    expect(modal.querySelector('.car-summary-title')?.textContent).toContain('Red')
+    expect(modal.querySelectorAll('.car-stat')).toHaveLength(4)
+    modal.querySelector<HTMLButtonElement>('[data-action="car-green"]')?.click()
+    expect(selectLobbyCar).toHaveBeenCalledWith('green')
+    modal.querySelector<HTMLButtonElement>('[data-action="nearby-ready"]')?.click()
+    expect(setLobbyReady).toHaveBeenCalledWith(true)
+  })
+
   it('shows host-selectable Day/Night choices for normal races and Cups', async () => {
     const nearby = new NearbyRace(transport, () => true)
     const actions = {

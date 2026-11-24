@@ -17,7 +17,7 @@ const lineup: Control = { type: 'lineup', cars: [...cars], identities, names, po
 describe('nearby eight-player control protocol', () => {
   it('round-trips an eight-player lobby and validates unique starting positions', () => {
     expect(MAX_PLAYERS).toBe(8)
-    expect(NEARBY_WIRE_PROTOCOL_VERSION).toBe(3)
+    expect(NEARBY_WIRE_PROTOCOL_VERSION).toBe(4)
     expect(validLineupPositions(cars, positions)).toBe(true)
     expect(decodeControl(encodeControl(lineup))).toEqual(lineup)
     expect(decodeControl(packet({ ...lineup, positions: [0, 0, 2, 3, 4, 5, 6, 7] }))).toBeNull()
@@ -57,6 +57,8 @@ describe('nearby eight-player control protocol', () => {
     const msgs: Control[] = [
       { type: 'prepare', slot: 7, laps: 2, lighting: 'night', protocolVersion: 3 },
       { type: 'ready', car: 'green', identity, protocolVersion: 3, name: 'Racer 8' },
+      { type: 'ready', car: 'red', identity, protocolVersion: 4, accepted: false, choice: 2, round: 9 },
+      { type: 'lobby', round: 9, revision: 2, players: [{ slot: 0, car: 'blue', name: null, accepted: true, choice: 1 }, { slot: 1, car: null, name: null, accepted: false, choice: 0 }] },
       { type: 'armed', round: 9 },
       { type: 'start', cars: [...cars], delay: 1000, readyAge: 20, round: 9 },
       { type: 'finish', slot: 7, time: 43.2, round: 9 },
@@ -80,6 +82,8 @@ describe('nearby eight-player control protocol', () => {
     expect(decodeControl(new Uint8Array([Packet.Control]))).toBeNull()
     expect(decodeControl(new Uint8Array([Packet.Pose, 123]))).toBeNull()
     expect(decodeControl(packet({ type: 'unknown' }))).toBeNull()
+    expect(decodeControl(packet({ type: 'ready', car: 'red', identity, accepted: true, choice: -1 }))).toBeNull()
+    expect(decodeControl(packet({ type: 'lobby', round: 0, revision: 1, players: [{ slot: 0, car: null, name: null, accepted: true, choice: 0 }] }))).toBeNull()
     expect(decodeControl(packet(null))).toBeNull()
     expect(decodeControl(new Uint8Array(2049))).toBeNull()
   })

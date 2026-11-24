@@ -389,7 +389,7 @@ export class DomUiHost implements UiHost {
         const nearby = this.runtime.nearby
         if (!nearby) return undefined
         return createNearbyRaceModal(nearby, state.preferences.car, {
-          close,
+          close: state.mode === 'race' ? () => this.controller.dispatch({ type: 'leave-nearby' }) : close,
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
           chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' }),
           configureCup: () => this.controller.dispatch({ type: 'open-cup' }),

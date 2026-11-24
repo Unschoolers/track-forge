@@ -40,6 +40,7 @@ function carSilhouette(car: CarId): SVGSVGElement {
 export function createCarPicker(
   selected: CarId,
   select: (car: CarId) => void,
+  options: { disabled?: boolean } = {},
 ): HTMLElement {
   const section = element('section', 'setup-section')
   section.append(element('h3', 'setup-label', 'CHOOSE YOUR CAR'))
@@ -52,6 +53,7 @@ export function createCarPicker(
       () => select(car),
       `car-choice${car === selected ? ' active' : ''}`,
     )
+    choice.disabled = options.disabled ?? false
     choice.prepend(carSilhouette(car))
     choice.dataset.car = car
     choice.style.setProperty('--car-color', spec.color)

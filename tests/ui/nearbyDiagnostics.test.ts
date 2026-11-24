@@ -41,7 +41,7 @@ it('offers a diagnostic download after Nearby hosting fails and allows retrying 
   nearby.destroy()
 })
 
-it('shows the saved topper in Nearby without duplicate customization controls', () => {
+it('keeps the entry menu free of car and topper details', () => {
   const transport: NearbyTransport = {
     subscribe: () => () => undefined,
     host: vi.fn(), scan: vi.fn(), connect: vi.fn(), respond: vi.fn(),
@@ -54,9 +54,10 @@ it('shows the saved topper in Nearby without duplicate customization controls', 
   }
   const identity = { icon: 'crown', color: 'gold' } as const
   const modal = createNearbyRaceModal(nearby, 'blue', actions, identity)
-  expect(modal.textContent).toContain('Your topper')
-  expect(modal.textContent).toContain('crown / gold')
-  expect(modal.textContent).toContain('Options → Profile')
+  expect(modal.textContent).not.toContain('Your topper')
+  expect(modal.textContent).not.toContain('Options → Profile')
+  expect(modal.querySelector('.car-picker')).toBeNull()
+  expect(modal.querySelector('.car-stats')).toBeNull()
   expect(modal.querySelector('[data-action="nearby-customize-topper"]')).toBeNull()
   expect(modal.querySelector('[data-action^="nearby-topper-icon-"]')).toBeNull()
   expect(modal.querySelector('[data-action^="nearby-topper-color-"]')).toBeNull()

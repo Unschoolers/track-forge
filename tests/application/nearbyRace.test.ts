@@ -82,7 +82,76 @@ class NearbyNetwork {
   }
 }
 
+async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): Promise<void> {
+  host.start()
+  await vi.waitFor(() => {
+    expect(host.snapshot().phase).toBe('lobby')
+    for (const guest of guests) expect(guest.snapshot().phase).toBe('lobby')
+  }, { interval: 5 })
+  for (const guest of guests) guest.setLobbyReady(true)
+  host.setLobbyReady(true)
+}
+
 describe('Nearby Arcade', () => {
+  it('requires consent every round, permits car changes and rejects stale readiness', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const hostStarts: NearbyStart[] = []
+    const guestStarts: NearbyStart[] = []
+    host.onStart(start => hostStarts.push(start))
+    guest.onStart(start => guestStarts.push(start))
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      host.selectLobbyCar('green')
+      guest.selectLobbyCar('yellow')
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(host.snapshot().lobbyPlayers.find(p => p.slot === 1)?.accepted).toBe(true), { interval: 5 })
+      expect(hostStarts).toHaveLength(0)
+      guest.setLobbyReady(false)
+      await vi.waitFor(() => expect(guest.snapshot().unlockPending).toBe(false), { interval: 5 })
+      guest.selectLobbyCar('blue')
+      host.setLobbyReady(true)
+      expect(hostStarts).toHaveLength(0)
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
+      expect(hostStarts[0]?.car).toBe('green')
+      expect(guestStarts[0]?.car).toBe('blue')
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('racing'), { interval: 5 })
+      host.finish(40)
+      guest.finish(39)
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      expect(host.snapshot()).toMatchObject({ localCar: 'green', localReady: false })
+      expect(guest.snapshot()).toMatchObject({ localCar: 'blue', localReady: false })
+      const oldConsent = network.packets.find(p => {
+        const control = decodeControl(p.bytes)
+        return p.from === 'guest' && control?.type === 'ready' && control.accepted
+      })
+      assert(oldConsent)
+      await network.endpoint('guest').send(['host'], oldConsent.bytes)
+      host.setLobbyReady(true)
+      expect(hostStarts).toHaveLength(1)
+      guest.selectLobbyCar('red')
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(2), { interval: 5 })
+      expect(guestStarts[1]?.car).toBe('red')
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
   it('lets the host override lighting for a Cup session without changing saved tracks', async () => {
     const network = new NearbyNetwork()
     const host = new NearbyRace(network.endpoint('host'), () => true)
@@ -106,7 +175,7 @@ describe('Nearby Arcade', () => {
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
       expect(guest.setLighting('day')).toBe(false)
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(hostStarts).toHaveLength(1), { interval: 5 })
       expect(hostStarts[0]?.lighting).toBe('night')
       expect(guestStarts[0]?.lighting).toBe('night')
@@ -116,7 +185,7 @@ describe('Nearby Arcade', () => {
       host.finish(40)
       guest.finish(38)
       await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(guestStarts).toHaveLength(2), { interval: 5 })
       expect(hostStarts[1]?.lighting).toBe('night')
       expect(guestStarts[1]?.lighting).toBe('night')
@@ -151,7 +220,7 @@ describe('Nearby Arcade', () => {
         }, { interval: 5 })
       }
       expect(host.snapshot().players).toBe(8)
-      host.start()
+      await readyEveryone(host, devices.slice(1))
       await vi.waitFor(() => expect(starts.size).toBe(8), { interval: 5 })
       expect([...starts.values()].map(start => start.gridSlot).sort((a,b)=>a-b))
         .toEqual([0,1,2,3,4,5,6,7])
@@ -229,7 +298,7 @@ describe('Nearby Arcade', () => {
         expect(guest.snapshot()).not.toHaveProperty('pairing')
       }
 
-      host.start()
+      await readyEveryone(host, devices.slice(1))
       await vi.waitFor(() => expect(starts.size).toBe(4), { interval: 5 })
       for (const { name, device, car } of setups) {
         const start = starts.get(name)
@@ -428,7 +497,7 @@ describe('Nearby Arcade', () => {
         device.connect('host')
         await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
       }
-      host.start()
+      await readyEveryone(host, participants.slice(1).map(({ device }) => device))
       await vi.waitFor(() => expect(starts.size).toBe(count), { interval: 5 })
       expect([...starts.values()].map(({ gridSlot }) => gridSlot).sort()).toEqual(
         Array.from({ length: count }, (_, index) => index),
@@ -581,7 +650,7 @@ describe('Nearby track sharing and rematches', () => {
       await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
       expect(guest.snapshot().cup).toMatchObject({ index: 0, total: 2 })
       host.sceneReady()
@@ -593,7 +662,7 @@ describe('Nearby track sharing and rematches', () => {
       expect(host.cupStandings()).toEqual([{ slot: 1, points: 10 }, { slot: 0, points: 6 }])
       expect(guest.cupStandings()).toEqual(host.cupStandings())
       expect(host.selectNextTrack(nextTrack)).toBe(false) // Host cannot override the Cup schedule.
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => {
         expect(hostStarts).toHaveLength(2)
         expect(guestStarts).toHaveLength(2)
@@ -634,7 +703,7 @@ describe('Nearby track sharing and rematches', () => {
       await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
       host.sceneReady()
       guest.sceneReady()
@@ -647,7 +716,7 @@ describe('Nearby track sharing and rematches', () => {
       const nextTrack = { ...track, name: 'Changed circuit', raceRevision: track.updatedAt + 1 }
       expect(host.selectNextTrack(nextTrack)).toBe(true)
       expect(host.snapshot().track).toBe('Changed circuit')
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => {
         expect(hostStarts).toHaveLength(2)
         expect(guestStarts).toHaveLength(2)
