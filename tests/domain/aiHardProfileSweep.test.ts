@@ -311,7 +311,7 @@ sweep('measures bounded car-specific Hard controller candidates on Kids Room and
         })
         const kidsVehicle = kidsRun.vehicles[0]
         const pineRun = runLaneCheck({
-          path: pinePath, trackName: pine.track.name, car, seed: 11,
+          path: pinePath, trackName: hairpin.name, car, seed: 11,
           aiProfileOverrides: { [car]: profile },
           difficulty: 'hard', handling: 'arcade', mode: 'solo',
           reversed: false, laps: 1, seconds: 75,
