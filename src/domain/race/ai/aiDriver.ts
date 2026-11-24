@@ -86,7 +86,7 @@ export function stepAiVehicle(
   catchUp?: SpeedAssist,
   hardProfileOverride?: CarDrivingProfile,
   passingPolicyOverride?: CarPassingPolicy,
-  /** Test-only compatibility switch; Arcade defaults to compact AI rivals. */
+  /** Test-only comparison switch; all production AI rivals use compact clearance. */
   aiAiTrafficMode: 'legacy' | 'compact' = 'compact',
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
@@ -106,18 +106,10 @@ export function stepAiVehicle(
         reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
         steerGain: difficulty === 'hard' ? hardProfile.hardSteerGain : ARCADE_STEERING.steerGain }
     : DIFFICULTY_SPECS[drivingDifficulty]
-  // Only human vehicles can demand a full overtake or emergency braking.
-  // AI-to-AI sprites are non-colliding in Arcade: a compact awareness bubble
-  // is enough, with a tiny straight-only courtesy nudge below.
-  // Authored racing lines already include their own traffic-facing lane
-  // decisions; preserve that proven behaviour on curated circuits.
-  // Red is the fastest/lowest-grip chassis and still needs its established
-  // defensive traffic decisions to stay on-road in all four Hard grids.
-  // Other chassis benefit safely from compact non-colliding AI clearance;
-  // Red can be migrated when a dedicated corner-entry controller is proven.
-  const defensiveChassis = vehicle.car === 'red'
-  const relaxedAiRivals = handling === 'arcade' && !vehicle.racingLine &&
-    !defensiveChassis && aiAiTrafficMode !== 'legacy'
+  // Every AI uses the same compact rival envelope. Only human-driven
+  // vehicles warrant full avoidance and overtaking maneuvers. The legacy
+  // switch is restricted to offline comparison runs.
+  const relaxedAiRivals = aiAiTrafficMode !== 'legacy'
   const relevantTraffic = relaxedAiRivals ? compactAiTraffic(traffic) : traffic
   let ai = vehicle.ai ?? createAiDriverState(vehicle.lane)
   // An AI dot may influence short-range speed, but only the player
