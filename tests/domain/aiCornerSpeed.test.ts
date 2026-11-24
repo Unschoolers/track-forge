@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { CAR_SPECS } from '@/domain/config'
-import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
+import { correctionBrakePressure, racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 
 const path = buildRoadPath([
   { x: 0, y: 0, surface: 'street', curve: 'corner' },
@@ -13,6 +13,22 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('AI approach speed planning', () => {
+  it('uses finer Red pavement brake corrections without limiting full service brakes', () => {
+    const red = CAR_SPECS.red
+    const light = correctionBrakePressure(red, 'street', 0.25)
+    expect(light).toBeGreaterThanOrEqual(0.25 / 1.5)
+    expect(light).toBeLessThan(0.25)
+    expect(correctionBrakePressure(red, 'street', 0)).toBe(0)
+    expect(correctionBrakePressure(red, 'street', 1)).toBeCloseTo(1, 12)
+    for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
+      for (const surface of ['street', 'dirt', 'ice', 'grass'] as const) {
+        if (car === 'red' && surface === 'street') continue
+        expect(correctionBrakePressure(CAR_SPECS[car], surface, 0.25)).toBe(0.25)
+      }
+    }
+  })
+
+
   it('allows more pace on open pavement and backs off for sharp corners', () => {
     const straight = path.points.findIndex((point) => point.distance > 80)
     const approach = path.points.findIndex((point) => point.distance > 460)
