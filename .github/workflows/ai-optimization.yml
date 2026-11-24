@@ -54,10 +54,11 @@ jobs:
           fi
           baseline="$RUNNER_TEMP/trackforge-physics-baseline"
           git worktree add --detach "$baseline" "$BASE_SHA"
+          cp qa/optimization/cli.mjs qa/optimization/score.mjs "$baseline/qa/optimization/"
           (
             cd "$baseline"
             npm ci
-            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/optimization/baseline"
+            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --baseline-only --no-telemetry --workers 2 --trials 1 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/optimization/baseline"
           )
       - name: Run four-car parallel AI optimization study
         run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization

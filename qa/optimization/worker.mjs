@@ -66,6 +66,11 @@ try {
       const baseline = (passingStudy ? CAR_PASSING_POLICIES : CAR_DRIVING_PROFILES)[task.car]
       if (!baseline) throw new Error(`Unknown car ${task.car}`)
       const policy = { ...baseline, ...task.changes }
+      const drivingOverrides = task.profileOverrides ? Object.fromEntries(Object.entries(task.profileOverrides).map(([car, changes]) => {
+        if (!CAR_DRIVING_PROFILES[car]) throw new Error(`Unknown override car ${car}`)
+        return [car, { ...CAR_DRIVING_PROFILES[car], ...changes }]
+      })) : { [task.car]: policy }
+      if (passingStudy && task.profileOverrides) throw new Error('Combined overrides are driving-only')
       const trialGrid = task.mode === 'duel' ? [2, 0, 1, 3] : scenario.gridPositions
       const run = runLaneCheck({
         path: entry.path, trackName: entry.trackName,
@@ -82,7 +87,7 @@ try {
         laps: scenario.laps, seconds: scenario.seconds,
         ...(passingStudy
           ? { aiPassingPolicyOverrides: { [task.car]: policy } }
-          : { aiProfileOverrides: { [task.car]: policy } }),
+          : { aiProfileOverrides: drivingOverrides }),
       })
       const exported = projectTrial(run, {
         candidateId: task.candidateId, scenarioId: scenario.id,
