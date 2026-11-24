@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs'
-import { compareRaces, summarizeRace, summarizeTrack } from './summary.mjs'
+import { compareRaces, replayRuleset, summarizeRace, summarizeTrack } from './summary.mjs'
 
 function usage() {
   console.error('Usage:\n' +
@@ -26,6 +26,24 @@ if (command === 'simulate') {
   if (!file || file.startsWith('--')) {
     usage()
   } else {
+    // Simulation is a fresh run of the current engine, never a reenactment
+    // of the historical ruleset. Surface that distinction for old exports.
+    let inputError
+    try {
+      const input = readJson(file)
+      if (input?.format === 'trackforge-race-replay') {
+        const ruleset = replayRuleset(input)
+        if (ruleset === 'simulation') {
+          console.warn('WARNING: legacy Simulation replay; simulate uses the current Arcade ruleset, not the original physics.')
+        }
+      }
+    } catch (error) {
+      inputError = error instanceof Error ? error.message : String(error)
+    }
+    if (inputError) {
+      console.error(inputError)
+      process.exit(1)
+    }
     const { spawnSync } = await import('node:child_process')
     const { resolve } = await import('node:path')
     const { fileURLToPath } = await import('node:url')
@@ -71,13 +89,14 @@ if (command === 'simulate') {
         console.log(JSON.stringify(data, null, 2))
       } else if (command === 'stats') {
         console.log(data.track.name + ' · ' + data.setup.difficulty + ' · ' +
-          data.observationType + ' ' +
+          data.ruleset + ' · replay v' + data.formatVersion + ' · ' + data.observationType + ' ' +
           data.observationEnd + 's')
         console.log('Geometry fingerprint: ' + data.track.fingerprint)
         console.table(data.vehicles.map((v) => ({
           car: v.car, id: v.id, avg: v.averageSpeed, max: v.maxSpeed,
           braking: v.brakingSeconds, grass: v.grassSeconds,
           curbs: v.events['curb-hit'] ?? 0, recoveries: v.recoveries.length,
+          ...(data.ruleset === 'simulation' ? { collisions: v.events.collision ?? 0, barriers: v.events['barrier-collision'] ?? 0 } : {}),
           lap: v.completedLaps,
           finish: v.finishTime === null ? 'not finished in export' : v.finishTime.toFixed(3) + 's',
         })))
