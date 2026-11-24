@@ -251,7 +251,7 @@ function advanceRace(
       (updated.bridgeFallSeconds ?? 0) >= BRIDGE_FALL_RESPAWN_SECONDS
     const rivalBelowDeck = !updated.player && !context.onRoad &&
       context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
-    const lostRival = !updated.player && updated.grounded &&
+    const lostRival = !updated.player && updated.finishedAt === null && updated.grounded &&
       (rivalBelowDeck || context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
         (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated, state.timingGates)))
     if (playerStuck || bridgeFallExpired || lostRival) {
