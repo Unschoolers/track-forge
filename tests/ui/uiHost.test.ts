@@ -296,6 +296,14 @@ describe('DomUiHost', () => {
       expect(preview?.dataset.car).toBe('red')
       expect(preview?.dataset.lighting).toBe('night')
       expect(preview?.getAttribute('aria-label')).toContain(proposed.name)
+      const diagnostics = root.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')!
+      const body = root.querySelector<HTMLElement>('.nearby-lobby-modal .modal-body')!
+      diagnostics.open = true
+      body.scrollTop = 80
+      update(overlay)
+      expect(root.querySelector('.nearby-lobby-diagnostics')).toBe(diagnostics)
+      expect(diagnostics.open).toBe(true)
+      expect(root.querySelector('.nearby-lobby-modal .modal-body')?.scrollTop).toBe(80)
       lobby.lobbyPlayers[0]!.accepted = true
       update(overlay)
       expect(root.querySelector('.race-flyover')).toBe(preview)
