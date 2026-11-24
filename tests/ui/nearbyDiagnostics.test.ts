@@ -25,9 +25,9 @@ it('offers a diagnostic download after Nearby hosting fails and allows retrying 
   const download = vi.fn<() => Promise<boolean>>()
     .mockRejectedValueOnce(new Error('Storage unavailable'))
     .mockResolvedValueOnce(true)
-  const view = createNearbyRaceModal(nearby, 'blue', {
+  const view = createNearbyRaceModal(nearby, {
     close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
-    selectCar: vi.fn(), downloadDiagnostics: download,
+    downloadDiagnostics: download,
   })
   const button = view.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')
   expect(button?.textContent).toBe('DOWNLOAD DIAGNOSTICS')
@@ -49,11 +49,10 @@ it('keeps the entry menu free of car and topper details', () => {
   }
   const nearby = new NearbyRace(transport, () => true)
   const actions = {
-    close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+    close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
     downloadDiagnostics: vi.fn(async () => true),
   }
-  const identity = { icon: 'crown', color: 'gold' } as const
-  const modal = createNearbyRaceModal(nearby, 'blue', actions, identity)
+  const modal = createNearbyRaceModal(nearby, actions)
   expect(modal.textContent).not.toContain('Your topper')
   expect(modal.textContent).not.toContain('Options → Profile')
   expect(modal.querySelector('.car-picker')).toBeNull()

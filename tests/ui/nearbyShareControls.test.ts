@@ -51,9 +51,9 @@ describe('Nearby sharing and rematch controls', () => {
           { slot: 1, car: 'green', name: 'Guest', accepted: true, choice: 1 }] }),
       localSlot: () => 0, selectLobbyCar, setLobbyReady,
     } as unknown as NearbyRace
-    const modal = createNearbyRaceModal(nearby, 'blue', {
+    const modal = createNearbyRaceModal(nearby, {
       close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
-      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
       downloadDiagnostics: vi.fn(async () => true),
     })
     expect(modal.textContent).toContain('1/2 READY')
@@ -84,9 +84,9 @@ describe('Nearby sharing and rematch controls', () => {
       }),
       localSlot: () => localSlot, selectLobbyCar, setLobbyReady,
     } as unknown as NearbyRace
-    const modal = createNearbyRaceModal(nearby, 'blue', {
+    const modal = createNearbyRaceModal(nearby, {
       close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
-      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
       downloadDiagnostics: vi.fn(async () => true),
     })
     expect(modal.classList.contains('nearby-lobby-modal')).toBe(true)
@@ -110,13 +110,13 @@ describe('Nearby sharing and rematch controls', () => {
     const nearby = new NearbyRace(transport, () => true)
     const actions = {
       close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
-      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
       downloadDiagnostics: vi.fn(async () => true),
     }
     try {
       nearby.host({ track: nearbyTrack, car: 'blue', laps: 2, lighting: 'day' })
       await vi.waitFor(() => expect(nearby.snapshot().phase).toBe('hosting'))
-      const modal = createNearbyRaceModal(nearby, 'blue', actions)
+      const modal = createNearbyRaceModal(nearby, actions)
       const day = modal.querySelector<HTMLButtonElement>('[data-action="nearby-lighting-day"]')
       const night = modal.querySelector<HTMLButtonElement>('[data-action="nearby-lighting-night"]')
       expect(day?.getAttribute('aria-pressed')).toBe('true')
@@ -126,7 +126,7 @@ describe('Nearby sharing and rematch controls', () => {
       nearby.close()
       nearby.hostCup([nearbyTrack, nearbyTrack], 'blue', 2)
       await vi.waitFor(() => expect(nearby.snapshot().phase).toBe('hosting'))
-      const cup = createNearbyRaceModal(nearby, 'blue', actions)
+      const cup = createNearbyRaceModal(nearby, actions)
       expect(cup.textContent).toContain('CUP LIGHTING')
       cup.querySelector<HTMLButtonElement>('[data-action="nearby-lighting-night"]')?.click()
       expect(nearby.snapshot().lighting).toBe('night')
@@ -141,9 +141,9 @@ describe('Nearby sharing and rematch controls', () => {
     const chooseTrack = vi.fn()
     const configureCup = vi.fn()
     try {
-      const modal = createNearbyRaceModal(nearby, 'blue', {
+      const modal = createNearbyRaceModal(nearby, {
         close: vi.fn(), chooseTrack, configureCup, scan: vi.fn(), scanTracks,
-        saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), selectCar: vi.fn(),
+        saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
         downloadDiagnostics: vi.fn(async () => true),
       })
       const host = modal.querySelector<HTMLButtonElement>('[data-action="nearby-choose-track"]')

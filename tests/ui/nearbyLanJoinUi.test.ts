@@ -26,7 +26,7 @@ function setup() {
   const actions = {
     close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(),
     scanTracks: vi.fn(), saveTrack: vi.fn(), declineTrack: vi.fn(),
-    selectCar: vi.fn(), downloadDiagnostics: vi.fn(async () => true), connectByIp: vi.fn(),
+    downloadDiagnostics: vi.fn(async () => true), connectByIp: vi.fn(),
   }
   return { race, modes, actions }
 }
@@ -35,7 +35,7 @@ describe('LAN room discovery fallback UI', () => {
   it('lets players enter a host IP when no broadcast rooms are found', () => {
     const { race, modes, actions } = setup()
     race.scan('blue')
-    const modal = createNearbyRaceModal(race, 'blue', actions, undefined, modes)
+    const modal = createNearbyRaceModal(race, actions, modes)
     expect(modal.textContent).toContain('CAN’T SEE THE HOST? JOIN BY IP')
     const input = modal.querySelector<HTMLInputElement>('input[aria-label="LAN host IPv4 address"]')
     expect(input?.getAttribute('placeholder')).toBe('192.168.1.20')

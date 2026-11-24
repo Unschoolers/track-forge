@@ -392,7 +392,7 @@ export class DomUiHost implements UiHost {
           stay: close,
           leave: () => this.controller.dispatch({ type: 'leave-nearby' }),
         })
-        return createNearbyRaceModal(nearby, state.preferences.car, {
+        return createNearbyRaceModal(nearby, {
           close,
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
           chooseTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' }),
@@ -402,8 +402,7 @@ export class DomUiHost implements UiHost {
           scanTracks: () => this.controller.dispatch({ type: 'scan-nearby-track' }),
           saveTrack: () => this.controller.dispatch({ type: 'save-nearby-track' }),
           declineTrack: () => this.controller.dispatch({ type: 'decline-nearby-track' }),
-          selectCar: (car) => this.controller.dispatch({ type: 'set-preferences', preferences: { ...state.preferences, car } }),
-        }, state.preferences.playerIdentity, this.runtime.nearbyConnections)
+        }, this.runtime.nearbyConnections)
       }
       case 'cup':
         return createCupModal(state, {

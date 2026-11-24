@@ -4,12 +4,10 @@ import { MAX_PLAYERS } from '@/application/multiplayer/controlProtocol'
 import type { RaceResult } from '@/application/race/raceSession'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 import { CAR_SPECS } from '@/domain/config'
-import type { CarId } from '@/domain/model'
 import { populateNearbyLobby } from '@/ui/components/nearbyLobbyPanel'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
-import { DEFAULT_PLAYER_IDENTITY, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { createTopperMarker } from '@/ui/components/playerTopperPicker'
 
 function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string | undefined; readonly local: boolean }): string {
@@ -34,16 +32,14 @@ export function createNearbyLeaveConfirmation(
 
 export function createNearbyRaceModal(
   nearby: NearbyRace,
-  _car: CarId,
   actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
     saveTrack: () => void; declineTrack: () => void; connectByIp: (ip: string) => void;
-    selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
+    downloadDiagnostics: () => Promise<boolean>;
   },
-  _identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
   connections?: NearbyConnectionModes,
 ): HTMLElement {
-  const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
   const snapshot = nearby.snapshot()
+  const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = snapshot
   const cup = snapshot.cup
   const frame = createModalFrame(phase === 'lobby' ? 'Race Lobby' : cup ? 'Nearby Cup' : 'Nearby Race',
     room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
