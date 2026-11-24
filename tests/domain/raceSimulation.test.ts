@@ -9,6 +9,7 @@ import {
   solveCollisions,
 } from '@/domain/race/collisions'
 import { updateProgress } from '@/domain/race/progress'
+import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import { stepPlayer } from '@/domain/race/vehiclePhysics'
 import { stepRace } from '@/domain/race/raceEngine'
 import { rankVehicles } from '@/domain/race/ranking'
