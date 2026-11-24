@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-// QA code, test fixtures and documentation do not ship in the application.
-const nonProductPath = /^(?:tests\/|qa\/|docs\/|README\.md$|playwright\.(?:mobile|production)\.config\.mjs$|android\/app\/src\/(?:test|androidTest)\/|src-tauri\/tests\/)/
+// QA code, test fixtures, CI orchestration and documentation do not ship in the application.
+const nonProductPath = /^(?:tests\/|qa\/|docs\/|README\.md$|playwright\.(?:mobile|production)\.config\.mjs$|android\/app\/src\/(?:test|androidTest)\/|src-tauri\/tests\/|\.github\/workflows\/|scripts\/android-ci-native-required\.mjs$)/
 
 // Only paths known to contain web content, tests, or documentation may skip
 // native verification on PRs. Unknown paths intentionally require it.
@@ -61,7 +61,7 @@ export function buildPolicy(eventName, baseSha, diff = execFileSync) {
   if (eventName !== 'push') throw new Error('Unsupported build event: ' + eventName)
   const paths = changedPaths(baseSha, diff)
   const release = requiresRelease(paths)
-  return { native: release || paths.some(path => /^(?:android\/|src-tauri\/)/.test(path)), release }
+  return { native: release || paths.some(path => /^(?:android\/|src-tauri\/|\.github\/workflows\/|scripts\/android-ci-native-required\.mjs$)/.test(path)), release }
 }
 
 if (process.argv[1]?.endsWith('/android-ci-native-required.mjs')) {
