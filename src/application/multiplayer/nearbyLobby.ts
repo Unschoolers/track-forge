@@ -16,6 +16,7 @@ export class NearbyLobby {
   private accepted = false
   private choice = 0
   private revision = 0
+  private readonly pendingRosters = new Set<number>()
   private remote: LobbyPlayer[] = []
   private unlocking = false
   private transferComplete = false
@@ -34,6 +35,7 @@ export class NearbyLobby {
     this.accepted = false
     this.choice = 0
     this.revision = 0
+    this.pendingRosters.clear()
     this.remote = []
     this.unlocking = false
     this.transferComplete = false
@@ -49,7 +51,17 @@ export class NearbyLobby {
     return this.accepted && !this.remote.some(player => player.slot === slot && player.choice === this.choice && player.accepted)
   }
 
-  nextRevision(): number { return ++this.revision }
+  beginRoster(): number {
+    const revision = ++this.revision
+    this.pendingRosters.add(revision)
+    return revision
+  }
+
+  finishRoster(revision: number): void { this.pendingRosters.delete(revision) }
+
+  acknowledgedChoice(slot: number, choice: number): boolean {
+    return this.remote.some(player => player.slot === slot && player.choice >= choice)
+  }
 
   receiveChoice(id: string, choice: PeerChoice): boolean {
     const previous = this.peers.get(id)
@@ -71,7 +83,7 @@ export class NearbyLobby {
   completeTransfer(): void { this.transferComplete = true }
 
   canStage(guests: ReadonlyMap<string, number>): boolean {
-    return this.transferComplete && this.accepted && guests.size > 0 &&
+    return this.transferComplete && this.pendingRosters.size === 0 && this.accepted && guests.size > 0 &&
       [...guests.keys()].every(id => this.peers.get(id)?.accepted === true)
   }
 

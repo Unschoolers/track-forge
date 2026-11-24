@@ -20,6 +20,101 @@ async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): P
 }
 
 describe('Nearby Arcade', () => {
+  it('waits for final roster delivery before staging and reconciles a departing ready player', async () => {
+    let depart: (() => void) | undefined
+    let failed = false
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (sender === 'host' && recipient === 'leaver' && message?.type === 'lobby' &&
+          message.players.length === 3 && message.players.every(player => player.accepted) && !failed) {
+        failed = true
+        setTimeout(() => depart?.(), 30)
+        throw new Error('Final roster recipient disconnected')
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const leaver = new NearbyRace(network.endpoint('leaver'), () => true)
+    depart = () => leaver.close()
+    const started = vi.fn()
+    host.onStart(started)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const device of [guest, leaver]) {
+        device.scan('red')
+        await vi.waitFor(() => expect(device.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        device.connect('host')
+        await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
+      }
+      await vi.waitFor(() => expect(host.snapshot().players).toBe(3), { interval: 5 })
+      await readyEveryone(host, [guest, leaver])
+      await vi.waitFor(() => expect(failed).toBe(true), { interval: 5 })
+      expect(started).not.toHaveBeenCalled()
+      await vi.waitFor(() => {
+        expect(host.snapshot().phase).toBe('staging')
+        expect(guest.snapshot().phase).toBe('staging')
+      }, { interval: 5 })
+      expect(host.standings()).toHaveLength(2)
+      expect(started).toHaveBeenCalledOnce()
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+    } finally {
+      host.destroy()
+      guest.destroy()
+      leaver.destroy()
+    }
+  })
+
+  it.each(['superseded', 'current'] as const)('handles a late %s readiness delivery failure', async kind => {
+    let rejectChoice: (reason: Error) => void = () => { throw new Error('Choice not sent') }
+    const delayed = new Promise<void>((_resolve, reject) => { rejectChoice = reject })
+    let pending = false
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (sender === 'guest' && recipient === 'host' && message?.type === 'ready' && message.choice === 1) {
+        pending = true
+        await delayed
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      guest.selectLobbyCar('yellow')
+      await vi.waitFor(() => expect(pending).toBe(true), { interval: 5 })
+      if (kind === 'superseded') {
+        guest.selectLobbyCar('green')
+        await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers.find(player => player.slot === 1)?.car).toBe('green'), { interval: 5 })
+      }
+      rejectChoice(new Error('Delayed native failure'))
+      if (kind === 'current') {
+        await vi.waitFor(() => expect(guest.snapshot().phase).toBe('idle'), { interval: 5 })
+        expect(guest.snapshot().error).toContain('message could not be sent')
+      } else {
+        await vi.waitFor(async () => {
+          const report = await guest.diagnostics()
+          expect(report.timeline).toEqual(expect.arrayContaining([expect.objectContaining({ event: 'lobby_choice_delivery_obsolete' })]))
+        }, { interval: 5 })
+        expect(guest.snapshot()).toMatchObject({ phase: 'lobby', localCar: 'green', error: null })
+        guest.setLobbyReady(true)
+        host.setLobbyReady(true)
+        await vi.waitFor(() => expect(guest.snapshot().phase).toBe('staging'), { interval: 5 })
+      }
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
   it.each(['roster', 'track'] as const)('keeps remaining players when a %s send fails before the disconnect event', async kind => {
     let depart: (() => void) | undefined
     let triggered = false

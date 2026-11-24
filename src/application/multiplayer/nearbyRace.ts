@@ -359,9 +359,14 @@ export class NearbyRace {
   private publishLobby(): void {
     const active = this.generation
     const round = this.round
-    const bytes = encodeControl({ type: 'lobby', round, revision: this.lobby.nextRevision(), players: this.lobbyPlayers() })
+    const revision = this.lobby.beginRoster()
+    const bytes = encodeControl({ type: 'lobby', round, revision, players: this.lobbyPlayers() })
     const ids = [...this.lobby.peerIds()].filter(id => this.guests.has(id))
-    void Promise.all(ids.map(id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'))).catch((error: unknown) => {
+    void Promise.all(ids.map(id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'))).then(() => {
+      if (!this.currentLobby(active, round)) return
+      this.lobby.finishRoster(revision)
+      this.startHost()
+    }).catch((error: unknown) => {
       if (this.currentLobby(active, round)) this.fail('Could not update a connected player’s lobby.', 'lobby_roster', error)
     })
     this.changed()
@@ -937,6 +942,14 @@ export class NearbyRace {
     }).catch((error: unknown) => {
       this.record('control', { kind: message.type, result: 'failed', error: this.errorKind(error) })
       if (active !== this.generation) return
+      if (message.type === 'ready' && message.choice !== undefined &&
+          (message.round !== this.round || this.phase !== 'lobby' ||
+           message.choice < this.lobby.localChoice || this.lobby.acknowledgedChoice(this.slot, message.choice))) {
+        // A newer choice has its own reliable delivery result; a host acknowledgement
+        // or a committed lineup is stronger evidence than a late native send failure.
+        this.record('lobby_choice_delivery_obsolete', { round: message.round, choice: message.choice })
+        return
+      }
       if (message.type === 'finish' || message.type === 'left') {
         this.error = 'A player did not receive the latest race result.'
         this.changed()
