@@ -24,7 +24,7 @@ test('previews every track and shares a saved track without selecting it', async
   await expect(saved.locator('.track-preview .track-preview-route')).toBeVisible()
   await expect(official.locator('.track-preview .track-preview-route')).toBeAttached()
   expect(await picker.locator('.track-card').count()).toBe(await picker.locator('.track-preview').count())
-  await expect(picker.getByRole('button', { name: 'Share Starter Circuit', exact: true })).toHaveCount(0)
+  await expect(picker.getByRole('button', { name: 'Share City Sprint', exact: true })).toHaveCount(0)
   await saved.locator('..').locator('summary.track-menu-trigger').click()
   const share = picker.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true })
   await expect(share).toHaveText('SHARE')
