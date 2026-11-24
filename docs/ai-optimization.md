@@ -189,3 +189,14 @@ Note: the current Hard AI baseline produces identical outcomes for seeds
 1 and 4331 on all scenario/vehicle configurations. They still independently
 exercise the test harness; do not claim increased stochastic coverage
 until a Hard policy actually consumes random decisions.
+
+### Red terrain and steering physics validation
+
+A player-facing handling adjustment increases Red's steering range and ice grip,
+retains its existing ice stopping-distance target, and improves grass recovery
+acceleration without raising the grass speed target. Run the existing driving
+and passing optimization studies on this physics revision before promoting any
+new AI policy. Compare solo and traffic baseline matrices with the previous
+physics revision, including recovery counts; policy optimization itself must
+not alter physical vehicle parameters. The creator Turn fixture's component
+regressions also measure actual velocity direction on ice under braking.
