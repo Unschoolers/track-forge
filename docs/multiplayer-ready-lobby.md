@@ -5,3 +5,5 @@ Every new race, retry, changed circuit and Cup round is proposed by the host. Th
 Protocol v4: ready messages carry accepted and a monotonically increasing choice counter per round; host roster messages carry a revision. Older clients fail the existing version gate. Pose/progress packet formats do not change. Only the host proposes a course, owns roster membership and stages the lineup. Stale round/revision packets must not unlock or start a race.
 
 Validation: multiplayer component/in-memory network tests, control decoder, application navigation, mobile UI and full CI. Real Android and Windows device pairing and multi-round readiness remain device QA requirements.
+
+Lobby navigation: Close, Back and Escape use the same controller-owned leave confirmation for connected races, including rematches and Cup rounds. Stay (or dismiss the confirmation) retains the connection, selected car and consent; only explicit Leave disconnects. Hosting warns that leaving closes the room for everyone. An incoming race start or disconnect supersedes the confirmation rather than trapping the player in a stale dialog.
