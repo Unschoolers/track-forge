@@ -14,6 +14,7 @@ test('persists an open route and displays its ordered finish splits', async ({ p
         { x: 600, y: 0, surface: 'street' },
         { x: 1_200, y: 0, surface: 'street' },
       ],
+      recoveryCheckpoints: [0.25, 0.5, 0.75],
       trees: [], terrain: { cellSize: 32, cells: [] },
     }]))
     localStorage.setItem('trackforge-library-v1-migrated', '1')
