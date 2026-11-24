@@ -17,7 +17,7 @@ import { RaceSession, type RaceSessionPort } from '@/application/race/raceSessio
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
-import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import { NearbyRace, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 
 class TrackMemory implements TrackStore {
   readonly tracks = new Map<TrackId, Track>()
@@ -148,6 +148,57 @@ describe('AppController', () => {
       nearby.start()
       controller.dispatch({ type: 'start-race' })
       expect(raceSession.start).not.toHaveBeenCalled()
+    } finally {
+      controller.destroy()
+    }
+  })
+
+  it.each(['home', 'rematch'] as const)('requires explicit confirmation to leave a %s lobby', (entry) => {
+    const transport: NearbyTransport = {
+      subscribe: () => () => undefined, host: async () => undefined,
+      scan: async () => undefined, connect: async () => undefined,
+      respond: async () => undefined, lock: async () => undefined,
+      send: async () => undefined, stop: async () => undefined,
+    }
+    const nearby = new NearbyRace(transport, () => true)
+    const track = createStarterTrack(asTrackId('starter'), 1)
+    let start: ((race: NearbyStart) => void) | undefined
+    vi.spyOn(nearby, 'onStart').mockImplementation(listener => {
+      start = listener
+      return () => undefined
+    })
+    const original = nearby.snapshot()
+    vi.spyOn(nearby, 'snapshot').mockReturnValue({
+      ...original, phase: 'lobby', purpose: 'race', role: 'host',
+      localCar: 'green', localReady: true,
+    })
+    const close = vi.spyOn(nearby, 'close')
+    const { controller, raceSession } = setup(track, false, undefined, nearby)
+    try {
+      controller.dispatch({ type: 'open-nearby' })
+      if (entry === 'rematch') {
+        if (!start) throw new Error('Missing start subscription')
+        start({ track, car: 'green', laps: 2, lighting: 'day', gridSlot: 0 })
+        expect(controller.snapshot().mode).toBe('race')
+        controller.dispatch({ type: 'open-nearby' })
+      }
+
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay).toEqual({ type: 'nearby', confirmLeave: true })
+      expect(close).not.toHaveBeenCalled()
+      expect(raceSession.stop).not.toHaveBeenCalled()
+
+      // Back / Escape in the confirmation means Stay, not Leave.
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay).toEqual({ type: 'nearby' })
+      expect(close).not.toHaveBeenCalled()
+      expect(nearby.snapshot()).toMatchObject({ localCar: 'green', localReady: true })
+
+      controller.dispatch({ type: 'close-overlay' })
+      controller.dispatch({ type: 'leave-nearby' })
+      expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'none' } })
+      expect(close).toHaveBeenCalledOnce()
+      if (entry === 'rematch') expect(raceSession.stop).toHaveBeenCalledOnce()
     } finally {
       controller.destroy()
     }
