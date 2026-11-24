@@ -135,10 +135,10 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     expect(green).toBeLessThan(blue * 0.94)
   })
 
-  it('gives Red race-car brakes on pavement without overtaking Yellow\'s 5/5 brakes', () => {
+  it('gives Red the strongest pavement brakes while Yellow stays the all-terrain braking specialist', () => {
     const red = stoppingDistance('red', handling)
     expect(red).toBeLessThan(stoppingDistance('blue', handling) * 0.97)
-    expect(red).toBeGreaterThan(stoppingDistance('yellow', handling) * 1.05)
+    expect(red).toBeLessThan(stoppingDistance('yellow', handling) * 0.85)
   })
 
   it('makes Yellow feel more planted than balanced Blue in the same paved corner', () => {
