@@ -65,7 +65,7 @@ describe('straight-line rival pace', () => {
   it.each(configurations)('matches the player in the same car on %s / %s / %s',
     (difficulty, handling, surface) => {
       const path = straightCircuit(surface)
-      const race = createRace({ path, difficulty, handling, playerCar: 'red', laps: 1 })
+      const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, difficulty, handling, playerCar: 'red', laps: 1 })
       const [player, rival] = race.vehicles
       const sideBySide: RaceState = {
         ...race, phase: 'running',
@@ -87,7 +87,7 @@ describe('rival catch-up', () => {
   const path: RoadPath = straightCircuit('street')
 
   function arranged(reversed = false, otherDistance = 700, playerSpeed = 300): RaceState {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path, reversed, difficulty: 'hard', handling: 'arcade', playerCar: 'blue', laps: 2,
       startRatio: 1_040 / path.totalLength,
     })
