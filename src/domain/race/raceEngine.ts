@@ -230,7 +230,9 @@ function advanceRace(
         withPath, progressIndex, state.path.points.length, elapsed,
         state.totalLaps, state.startPathIndex, state.reversed,
         state.timingGates ?? [], state.path.closed,
-        context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace,
+        // Match the AI's existing off-road reset boundary so a drivable
+        // near-edge path does not permanently strand a mandatory gate.
+        context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius + 30,
       )
     }
     if (vehicle.player && state.path.closed) {
