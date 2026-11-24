@@ -230,6 +230,7 @@ function advanceRace(
         withPath, progressIndex, state.path.points.length, elapsed,
         state.totalLaps, state.startPathIndex, state.reversed,
         state.timingGates ?? [], state.path.closed,
+        context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace,
       )
     }
     if (vehicle.player && state.path.closed) {
