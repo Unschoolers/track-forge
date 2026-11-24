@@ -1,5 +1,5 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
-import type { CarId } from '@/domain/model'
+import type { CarId, SurfaceId } from '@/domain/model'
 import { brakingTractionForSurface, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
@@ -134,6 +134,17 @@ function supportsWidePursuit(path: RoadPath): boolean {
     sharpSamples / count <= MAX_SHARP_SAMPLE_FRACTION
   smoothRoadByPath.set(path, supportsWide)
   return supportsWide
+}
+
+/**
+ * Translate a small speed correction into a brake-pedal command. A stronger
+ * service brake needs less pressure for the same correction. Blend back to
+ * full pressure for severe overspeed; emergency braking bypasses this helper.
+ */
+export function correctionBrakePressure(car: CarPhysicsSpec, surface: SurfaceId | 'grass', pressure: number): number {
+  const multiplier = brakingTractionForSurface(car, surface) / car.brakingTractionScale
+  if (multiplier <= 1) return pressure
+  return pressure * (1 / multiplier + (1 - 1 / multiplier) * pressure ** 2)
 }
 
 /**
