@@ -37,13 +37,14 @@ export function createNearbyRaceModal(
     downloadDiagnostics: () => Promise<boolean>;
   },
   connections?: NearbyConnectionModes,
+  preview?: HTMLElement,
 ): HTMLElement {
   const snapshot = nearby.snapshot()
   const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = snapshot
   const cup = snapshot.cup
   const frame = createModalFrame(phase === 'lobby' ? 'Race Lobby' : cup ? 'Nearby Cup' : 'Nearby Race',
-    room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
-    actions.close, phase === 'lobby' ? 'nearby-race-modal nearby-lobby-modal' : 'nearby-race-modal')
+    phase === 'lobby' ? [track ?? 'Next race', room].filter(Boolean).join(' · ') : room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
+    actions.close, phase === 'lobby' ? 'nearby-race-modal nearby-lobby-modal race-preparation-modal' : 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
     const message = element('p', 'modal-subtitle', error)
@@ -153,7 +154,7 @@ export function createNearbyRaceModal(
         : 'Waiting for the host to start the race.'))
       break
     case 'lobby':
-      populateNearbyLobby(frame, nearby, snapshot)
+      populateNearbyLobby(frame, nearby, snapshot, preview)
       break
     case 'preparing':
       frame.body.append(element('p', 'modal-subtitle', purpose === 'share' ? 'Receiving and checking the track…' : 'Sharing the track with all players…'))
