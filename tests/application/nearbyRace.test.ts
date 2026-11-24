@@ -15,7 +15,8 @@ class NearbyNetwork {
   private readonly pairs = new Map<string, Set<string>>()
   private readonly connections = new Map<string, Set<string>>()
 
-  constructor(private readonly rewritePacket?: (sender: string, recipient: string, bytes: Uint8Array) => Uint8Array) {}
+  constructor(private readonly rewritePacket?: (sender: string, recipient: string, bytes: Uint8Array) => Uint8Array,
+    private readonly beforeSend?: (sender: string, recipient: string, bytes: Uint8Array) => Promise<void>) {}
 
   endpoint(id: string): NearbyTransport {
     return {
@@ -54,6 +55,7 @@ class NearbyNetwork {
       send: async (ids, bytes) => {
         this.packets.push({ from: id, to: [...ids], bytes })
         for (const remote of ids) {
+          if (this.beforeSend) await this.beforeSend(id, remote, bytes)
           if (!this.connections.get(id)?.has(remote)) throw new Error('Unknown connection')
           const delivered = this.rewritePacket?.(id, remote, bytes) ?? bytes
           this.emit(remote, { type: 'packet', id, bytes: new Uint8Array(delivered) })
@@ -93,6 +95,78 @@ async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): P
 }
 
 describe('Nearby Arcade', () => {
+  it.each(['roster', 'track'] as const)('keeps remaining players when a %s send fails before the disconnect event', async kind => {
+    let depart: (() => void) | undefined
+    let triggered = false
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      const target = kind === 'track' ? bytes[0] === Packet.Track : decodeControl(bytes)?.type === 'lobby'
+      if (sender === 'host' && recipient === 'leaver' && target && !triggered) {
+        triggered = true
+        // Native rejects the pending send before delivering onDisconnected.
+        setTimeout(() => depart?.(), 15)
+        throw new Error('Peer disconnected during delivery')
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const leaver = new NearbyRace(network.endpoint('leaver'), () => true)
+    depart = () => leaver.close()
+    const started = vi.fn()
+    host.onStart(started)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const device of [guest, leaver]) {
+        device.scan('red')
+        await vi.waitFor(() => expect(device.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        device.connect('host')
+        await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
+      }
+      await vi.waitFor(() => expect(host.snapshot().players).toBe(3), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => {
+        expect(triggered).toBe(true)
+        expect(host.snapshot().players).toBe(2)
+        expect(guest.snapshot().lobbyPlayers).toHaveLength(2)
+      }, { interval: 5 })
+      expect(host.snapshot().error).toBeNull()
+      host.setLobbyReady(true)
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(started).toHaveBeenCalledOnce(), { interval: 5 })
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      expect(host.standings()).toHaveLength(2)
+    } finally {
+      host.destroy()
+      guest.destroy()
+      leaver.destroy()
+    }
+  })
+
+  it('reports a genuine reliable delivery error when the peer remains connected', async () => {
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      if (sender === 'host' && recipient === 'guest' && bytes[0] === Packet.Track) throw new Error('Track delivery failed')
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('idle'), { interval: 5, timeout: 2000 })
+      expect(host.snapshot().error).toContain('Track delivery failed')
+      expect((await host.diagnostics()).lastFailure).toMatchObject({ source: 'prepare' })
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
   it('requires consent every round, permits car changes and rejects stale readiness', async () => {
     const network = new NearbyNetwork()
     const host = new NearbyRace(network.endpoint('host'), () => true)

@@ -110,6 +110,7 @@ export class NearbyRace {
   private lobbyRevision = 0
   private remoteLobby: LobbyPlayer[] = []
   private unlockPending = false
+  private transferComplete = false
   private readonly armed = new Map<string, number>()
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
@@ -364,6 +365,7 @@ export class NearbyRace {
     this.lobbyRevision = 0
     this.remoteLobby = []
     this.unlockPending = false
+    this.transferComplete = false
   }
 
   private lobbyPlayers(): LobbyPlayer[] {
@@ -386,8 +388,12 @@ export class NearbyRace {
   }
 
   private publishLobby(): void {
-    this.sendControl([...this.ready.keys()].filter(id => this.guests.has(id)), {
-      type: 'lobby', round: this.round, revision: ++this.lobbyRevision, players: this.lobbyPlayers(),
+    const active = this.generation
+    const round = this.round
+    const bytes = encodeControl({ type: 'lobby', round, revision: ++this.lobbyRevision, players: this.lobbyPlayers() })
+    const ids = [...this.ready.keys()].filter(id => this.guests.has(id))
+    void Promise.all(ids.map(id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'))).catch((error: unknown) => {
+      if (this.currentLobby(active, round)) this.fail('Could not update a connected player’s lobby.', 'lobby_roster', error)
     })
     this.changed()
   }
@@ -418,24 +424,61 @@ export class NearbyRace {
     this.progressSync.reset()
   }
 
+  private currentLobby(active: number, round: number): boolean {
+    return active === this.generation && round === this.round && this.phase === 'lobby'
+  }
+
+  /** Native send rejection can precede its disconnect callback. Allow that
+   * callback to settle before classifying a failed delivery as a live-peer error.
+   * Never drop a still-connected peer's control or track packet silently.
+   */
+  private async deliverLobbyPeer(
+    id: string, bytes: Uint8Array, active: number, round: number, kind: 'roster' | 'prepare' | 'track',
+  ): Promise<void> {
+    if (!this.currentLobby(active, round) || !this.guests.has(id)) return
+    try {
+      await this.transport.send([id], bytes)
+    } catch (error: unknown) {
+      this.record('lobby_delivery_failed', { kind, error: this.errorKind(error) })
+      if (!this.currentLobby(active, round) || !this.guests.has(id)) return
+      await new Promise<void>(resolve => {
+        const finish = () => { clearTimeout(timer); unsubscribe(); resolve() }
+        const unsubscribe = this.subscribe(() => {
+          if (!this.currentLobby(active, round) || !this.guests.has(id)) finish()
+        })
+        const timer = setTimeout(finish, 500)
+      })
+      if (!this.currentLobby(active, round) || !this.guests.has(id)) {
+        this.record('lobby_delivery_obsolete', { kind })
+        return
+      }
+      throw error
+    }
+  }
+
   private async prepareGuests(course: Course, active: number, lock: boolean): Promise<void> {
+    const round = this.round
     if (lock) {
       this.record('transfer', { stage: 'lock' })
       await this.transport.lock()
     }
+    if (!this.currentLobby(active, round)) return
     const chunks = await packTrack(course.track)
+    if (!this.currentLobby(active, round)) return
     this.record('transfer', { stage: 'packed', chunks: chunks.length, bytes: chunks.reduce((sum, chunk) => sum + chunk.length, 0), recipients: this.guests.size })
-    if (active !== this.generation) return
-    const guests = [...this.guests]
-    await Promise.all(guests.map(([id, slot]) =>
-      this.transport.send([id], encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round: this.round,
+    await Promise.all([...this.guests].map(([id, slot]) =>
+      this.deliverLobbyPeer(id, encodeControl({ type: 'prepare', slot, laps: course.laps, lighting: course.lighting, round,
         protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION,
-        ...(this.cupTotal ? { cupIndex: this.cupIndex, cupTotal: this.cupTotal } : {}) }))))
+        ...(this.cupTotal ? { cupIndex: this.cupIndex, cupTotal: this.cupTotal } : {}) }), active, round, 'prepare')))
     for (const chunk of chunks) {
-      if (active !== this.generation) return
-      await this.transport.send(guests.map(([id]) => id), chunk)
+      if (!this.currentLobby(active, round)) return
+      // Membership is live; each peer's reliable delivery has its own outcome.
+      await Promise.all([...this.guests.keys()].map(id => this.deliverLobbyPeer(id, chunk, active, round, 'track')))
     }
-    this.record('transfer', { stage: 'sent', chunks: chunks.length, recipients: guests.length })
+    if (!this.currentLobby(active, round)) return
+    this.record('transfer', { stage: 'sent', chunks: chunks.length, recipients: this.guests.size })
+    this.transferComplete = true
+    this.startHost()
   }
 
   update(vehicle: RaceVehicle, state?: RaceState): void {
@@ -800,7 +843,7 @@ export class NearbyRace {
   }
 
   private startHost(): void {
-    if (!this.course || this.phase !== 'lobby' || !this.localAccepted || !this.guests.size ||
+    if (!this.course || this.phase !== 'lobby' || !this.transferComplete || !this.localAccepted || !this.guests.size ||
         this.ready.size !== this.guests.size || [...this.ready.values()].some(player => !player.accepted)) return
     const cars: (CarId | null)[] = Array(MAX_PLAYERS).fill(null)
     const identities: (PlayerIdentity | null)[] = Array(MAX_PLAYERS).fill(null)
