@@ -23,8 +23,8 @@ const racer = (id, car, player, speed, braking, surface = 'street') => ({
 })
 function replay() {
   return {
-    format: 'trackforge-race-replay', formatVersion: 2, track: track().track,
-    setup: { difficulty: 'hard', car: 'red', laps: 2,
+    format: 'trackforge-race-replay', formatVersion: 1, track: track().track,
+    setup: { difficulty: 'hard', handling: 'arcade', car: 'red', laps: 2,
       mode: 'normal', gridPositions: [2, 1, 0, 3] },
     result: {
       playerTime: 1.5,
@@ -138,33 +138,29 @@ test('rejects duplicate, unexpected, replaced and non-finite vehicle telemetry',
   assert.throws(() => summarizeRace(nonfinite), /invalid speed for vehicle player in frame 1/)
 })
 
-test('v1 Arcade telemetry remains readable and compares against v2 without changing measured values', () => {
+test('old and new v1 Arcade telemetry compare without changing measured values', () => {
   const current = replay()
-  const legacy = structuredClone(current)
-  legacy.formatVersion = 1
-  legacy.setup.handling = 'arcade'
-  const original = structuredClone(legacy)
-  const oldStats = summarizeRace(legacy)
+  const historical = structuredClone(current)
+  // Handling was optional in older v1 exports. Arcade was the default.
+  delete historical.setup.handling
+  const original = structuredClone(historical)
+  const oldStats = summarizeRace(historical)
   const newStats = summarizeRace(current)
   assert.equal(oldStats.formatVersion, 1)
-  assert.equal(newStats.formatVersion, 2)
+  assert.equal(newStats.formatVersion, 1)
   assert.equal(oldStats.ruleset, 'arcade')
   assert.equal(newStats.ruleset, 'arcade')
   assert.deepEqual(oldStats.vehicles, newStats.vehicles)
   assert.deepEqual(oldStats.hotspots, newStats.hotspots)
-  assert.deepEqual(legacy, original)
-  const compared = compareRaces(legacy, current)
-  assert.equal(compared.warnings.length, 1)
-  assert.match(compared.warnings[0], /Different replay format versions/)
-  assert.equal(compared.first.formatVersion, 1)
-  assert.equal(compared.second.formatVersion, 2)
+  assert.deepEqual(historical, original)
+  const compared = compareRaces(historical, current)
+  assert.deepEqual(compared.warnings, [])
   for (const row of compared.comparisons) {
     assert.equal(row.averageSpeedDelta, 0)
     assert.equal(row.grassSecondsDelta, 0)
     assert.equal(row.finishTimeBefore, row.finishTimeAfter)
   }
-  delete legacy.setup.handling
-  assert.equal(summarizeRace(legacy).ruleset, 'arcade')
+  assert.throws(() => summarizeRace({ ...current, formatVersion: 2 }), /formatVersion/)
 })
 
 test('legacy Simulation collisions remain attributable and cross-ruleset comparisons warn', () => {
