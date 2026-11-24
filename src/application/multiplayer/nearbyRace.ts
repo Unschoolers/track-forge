@@ -1,6 +1,7 @@
 import { EventBus } from '@/application/eventBus'
 import { NearbyOperationQueue } from './nearbyOperationQueue'
 import { NearbyTrackShare } from './nearbyTrackShare'
+import { NearbyLobby } from './nearbyLobby'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track } from '@/domain/model'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
@@ -104,13 +105,7 @@ export class NearbyRace {
   private readonly rooms = new Map<string, string>()
   private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
-  private readonly ready = new Map<string, { car: CarId; identity: PlayerIdentity; name?: string; receivedAt: number; accepted: boolean; choice: number }>()
-  private localAccepted = false
-  private localChoice = 0
-  private lobbyRevision = 0
-  private remoteLobby: LobbyPlayer[] = []
-  private unlockPending = false
-  private transferComplete = false
+  private readonly lobby = new NearbyLobby()
   private readonly armed = new Map<string, number>()
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
@@ -142,9 +137,8 @@ export class NearbyRace {
       incomingTrack: this.share.incoming?.name ?? null, sharedCount: this.share.sharedCount,
       shareStatus: this.share.status,
       rooms: [...this.rooms], players: this.phase === 'lobby' && this.role === 'guest' ? this.lobbyPlayers().length : 1 + this.guests.size,
-      localCar: this.localCar, localReady: this.localAccepted, unlockPending: this.unlockPending,
-      readyPending: this.phase === 'lobby' && this.role === 'guest' && this.localAccepted &&
-        !this.remoteLobby.some(player => player.slot === this.slot && player.choice === this.localChoice && player.accepted),
+      localCar: this.localCar, localReady: this.lobby.localAccepted, unlockPending: this.lobby.unlockPending,
+      readyPending: this.phase === 'lobby' && this.role === 'guest' && this.lobby.readyPending(this.slot),
       lobbyPlayers: this.phase === 'lobby' ? this.lobbyPlayers() : [],
       laps: this.course?.laps ?? null,
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
@@ -328,7 +322,7 @@ export class NearbyRace {
     }
     const course = this.course
     const active = this.generation
-    this.resetLobby()
+    this.lobby.reset()
     this.setPhase('lobby')
     this.armTimeout('A player did not load the track in time.')
     void this.prepareGuests(course, active, first).catch((error: unknown) => {
@@ -338,18 +332,16 @@ export class NearbyRace {
 
   /** Once a round is proposed, the host owns the track and players own their consent. */
   selectLobbyCar(car: CarId): void {
-    if (this.phase !== 'lobby' || this.unlockPending || !CAR_IDS.includes(car) || car === this.localCar) return
-    if (this.localAccepted) return
+    if (this.phase !== 'lobby' || this.lobby.unlockPending || !CAR_IDS.includes(car) || car === this.localCar) return
+    if (this.lobby.localAccepted) return
     this.localCar = car
     if (this.course) this.course = { ...this.course, car }
     this.setLobbyReady(false)
   }
 
   setLobbyReady(accepted: boolean): void {
-    if (this.phase !== 'lobby' || this.unlockPending || !this.course) return
-    if (this.role === 'guest' && !accepted && this.localAccepted) this.unlockPending = true
-    this.localAccepted = accepted
-    this.localChoice++
+    if (this.phase !== 'lobby' || this.lobby.unlockPending || !this.course) return
+    this.lobby.setLocalReady(accepted, this.role === 'guest')
     if (this.role === 'host') {
       this.publishLobby()
       this.startHost()
@@ -359,39 +351,15 @@ export class NearbyRace {
     }
   }
 
-  private resetLobby(): void {
-    this.localAccepted = false
-    this.localChoice = 0
-    this.lobbyRevision = 0
-    this.remoteLobby = []
-    this.unlockPending = false
-    this.transferComplete = false
-  }
-
   private lobbyPlayers(): LobbyPlayer[] {
-    if (this.role === 'guest') {
-      return this.remoteLobby.length ? this.remoteLobby : [{
-        slot: this.slot, car: this.localCar, name: this.localDisplayName ?? null,
-        accepted: false, choice: this.localChoice,
-      }]
-    }
-    const players: LobbyPlayer[] = [{
-      slot: 0, car: this.localCar, name: this.localDisplayName ?? null,
-      accepted: this.localAccepted, choice: this.localChoice,
-    }]
-    for (const [id, slot] of this.guests) {
-      const player = this.ready.get(id)
-      players.push({ slot, car: player?.car ?? null, name: player?.name ?? null,
-        accepted: player?.accepted ?? false, choice: player?.choice ?? 0 })
-    }
-    return players.sort((a, b) => a.slot - b.slot)
+    return this.lobby.players(this.role === 'guest', this.slot, this.localCar, this.localDisplayName, this.guests)
   }
 
   private publishLobby(): void {
     const active = this.generation
     const round = this.round
-    const bytes = encodeControl({ type: 'lobby', round, revision: ++this.lobbyRevision, players: this.lobbyPlayers() })
-    const ids = [...this.ready.keys()].filter(id => this.guests.has(id))
+    const bytes = encodeControl({ type: 'lobby', round, revision: this.lobby.nextRevision(), players: this.lobbyPlayers() })
+    const ids = [...this.lobby.peerIds()].filter(id => this.guests.has(id))
     void Promise.all(ids.map(id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'))).catch((error: unknown) => {
       if (this.currentLobby(active, round)) this.fail('Could not update a connected player’s lobby.', 'lobby_roster', error)
     })
@@ -402,7 +370,7 @@ export class NearbyRace {
     if (!this.hostId) return
     this.sendControl([this.hostId], {
       type: 'ready', car: this.localCar, identity: this.localIdentity, round: this.round,
-      protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION, accepted: this.localAccepted, choice: this.localChoice,
+      protocolVersion: NEARBY_WIRE_PROTOCOL_VERSION, accepted: this.lobby.localAccepted, choice: this.lobby.localChoice,
       ...(this.localDisplayName ? { name: this.localDisplayName } : {}),
     })
   }
@@ -411,8 +379,7 @@ export class NearbyRace {
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.replayTrace.reset()
     this.networkTelemetry = new NearbyNetworkTelemetry()
-    this.ready.clear()
-    this.resetLobby()
+    this.lobby.reset()
     this.armed.clear()
     this.racers.clear()
     this.lineup = null
@@ -477,7 +444,7 @@ export class NearbyRace {
     }
     if (!this.currentLobby(active, round)) return
     this.record('transfer', { stage: 'sent', chunks: chunks.length, recipients: this.guests.size })
-    this.transferComplete = true
+    this.lobby.completeTransfer()
     this.startHost()
   }
 
@@ -802,25 +769,18 @@ export class NearbyRace {
         this.fail(INCOMPATIBLE_RACE_VERSION, 'protocol')
         return
       }
-      const previous = this.ready.get(id)
-      if (previous && message.choice <= previous.choice) return
-      this.ready.set(id, { car: message.car, identity: message.identity,
-        ...(message.name ? { name: message.name } : {}), receivedAt: this.now(),
-        accepted: message.accepted, choice: message.choice })
-      if (this.ready.size === this.guests.size) this.clearTimeout()
+      if (!this.lobby.receiveChoice(id, { car: message.car, identity: message.identity,
+        ...(message.name ? { name: message.name } : {}),
+        accepted: message.accepted, choice: message.choice })) return
+      if (this.lobby.peerCount === this.guests.size) this.clearTimeout()
       this.publishLobby()
       this.startHost()
     } else if (fromHost && this.phase === 'lobby' && message.type === 'lobby' &&
-        incomingRound === this.round && message.revision > this.lobbyRevision) {
-      const local = message.players.find(player => player.slot === this.slot)
-      if (!local) return
-      this.lobbyRevision = message.revision
-      this.remoteLobby = message.players
-      if (this.unlockPending && local.choice === this.localChoice && !local.accepted) this.unlockPending = false
-      this.changed()
+        incomingRound === this.round) {
+      if (this.lobby.receiveRoster(message.revision, message.players, this.slot)) this.changed()
     } else if (fromHost && this.phase === 'lobby' && message.type === 'lineup' &&
         incomingRound === this.round && this.course &&
-        (this.localAccepted || this.unlockPending) && message.cars[0] && message.cars[this.slot] === this.localCar) {
+        (this.lobby.localAccepted || this.lobby.unlockPending) && message.cars[0] && message.cars[this.slot] === this.localCar) {
       this.stage(this.course, message.cars, message.identities, message.positions, message.names)
     } else if (guestSlot !== undefined && this.phase === 'staging' &&
         message.type === 'armed' && incomingRound === this.round) {
@@ -843,8 +803,7 @@ export class NearbyRace {
   }
 
   private startHost(): void {
-    if (!this.course || this.phase !== 'lobby' || !this.transferComplete || !this.localAccepted || !this.guests.size ||
-        this.ready.size !== this.guests.size || [...this.ready.values()].some(player => !player.accepted)) return
+    if (!this.course || this.phase !== 'lobby' || !this.lobby.canStage(this.guests)) return
     const cars: (CarId | null)[] = Array(MAX_PLAYERS).fill(null)
     const identities: (PlayerIdentity | null)[] = Array(MAX_PLAYERS).fill(null)
     const names: (string | null)[] = Array(MAX_PLAYERS).fill(null)
@@ -852,7 +811,7 @@ export class NearbyRace {
     identities[0] = this.localIdentity
     names[0] = this.localDisplayName ?? null
     for (const [id, slot] of this.guests) {
-      const guest = this.ready.get(id)
+      const guest = this.lobby.peer(id)
       if (!guest) return
       cars[slot] = guest.car
       identities[slot] = guest.identity
@@ -943,9 +902,9 @@ export class NearbyRace {
     if (slot !== undefined) {
       if (this.phase === 'preparing' || this.phase === 'staging') { this.fail('A player left while the race was loading.'); return }
       if (this.phase === 'lobby') {
-        this.ready.delete(id)
+        this.lobby.removePeer(id)
         if (!this.guests.size) { this.fail('All other players left the room.'); return }
-        if (this.ready.size === this.guests.size) this.clearTimeout()
+        if (this.lobby.peerCount === this.guests.size) this.clearTimeout()
         this.publishLobby()
         this.startHost()
         return
@@ -1047,8 +1006,7 @@ export class NearbyRace {
     this.rooms.clear()
     this.pendingPairs.clear()
     this.guests.clear()
-    this.ready.clear()
-    this.resetLobby()
+    this.lobby.reset()
     this.armed.clear()
     this.localSceneReady = false
     this.lineup = null
@@ -1065,7 +1023,7 @@ export class NearbyRace {
 
   /** Materialize diagnostics only when exported or leaving a race. Never in the render loop. */
   private captureRaceDiagnostics(): Record<string, unknown> | null {
-    if (this.purpose !== 'race' || (!this.course && !this.racers.size && !this.ready.size)) return null
+    if (this.purpose !== 'race' || (!this.course && !this.racers.size && !this.lobby.peerCount)) return null
     const now = this.now()
     const slots = new Set<number>([this.slot])
     for (const slot of this.guests.values()) slots.add(slot)
@@ -1074,7 +1032,7 @@ export class NearbyRace {
     const streams = this.networkTelemetry.snapshot(now, this.diagnosticStart)
     const readyBySlot = new Map<number, { car: CarId; identity: PlayerIdentity; name?: string }>()
     for (const [endpoint, slot] of this.guests) {
-      const ready = this.ready.get(endpoint)
+      const ready = this.lobby.peer(endpoint)
       if (ready) readyBySlot.set(slot, ready)
     }
     return {
@@ -1130,7 +1088,7 @@ export class NearbyRace {
   private changed(): void { this.changes.publish() }
   private diagnosticCounts() {
     return { rooms: this.rooms.size, pendingPairs: this.pendingPairs.size,
-      guests: this.guests.size, ready: this.ready.size, racers: this.racers.size }
+      guests: this.guests.size, ready: this.lobby.peerCount, racers: this.racers.size }
   }
 
   private errorKind(error: unknown): string {
