@@ -142,6 +142,8 @@ export class NearbyRace {
       shareStatus: this.share.status,
       rooms: [...this.rooms], players: this.phase === 'lobby' && this.role === 'guest' ? this.lobbyPlayers().length : 1 + this.guests.size,
       localCar: this.localCar, localReady: this.localAccepted, unlockPending: this.unlockPending,
+      readyPending: this.phase === 'lobby' && this.role === 'guest' && this.localAccepted &&
+        !this.remoteLobby.some(player => player.slot === this.slot && player.choice === this.localChoice && player.accepted),
       lobbyPlayers: this.phase === 'lobby' ? this.lobbyPlayers() : [],
       laps: this.course?.laps ?? null,
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
@@ -336,7 +338,7 @@ export class NearbyRace {
   /** Once a round is proposed, the host owns the track and players own their consent. */
   selectLobbyCar(car: CarId): void {
     if (this.phase !== 'lobby' || this.unlockPending || !CAR_IDS.includes(car) || car === this.localCar) return
-    if (this.role === 'guest' && this.localAccepted) return
+    if (this.localAccepted) return
     this.localCar = car
     if (this.course) this.course = { ...this.course, car }
     this.setLobbyReady(false)
@@ -368,7 +370,7 @@ export class NearbyRace {
     if (this.role === 'guest') {
       return this.remoteLobby.length ? this.remoteLobby : [{
         slot: this.slot, car: this.localCar, name: this.localDisplayName ?? null,
-        accepted: this.localAccepted, choice: this.localChoice,
+        accepted: false, choice: this.localChoice,
       }]
     }
     const players: LobbyPlayer[] = [{
