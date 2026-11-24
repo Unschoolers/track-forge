@@ -52,6 +52,7 @@ export function createTrackLibraryModal(
     throw new Error('Track library requires a track-library overlay')
   }
   const race = state.overlay.purpose !== 'edit'
+  const racePicker = state.overlay.purpose === 'race'
   const nearbySelection = state.overlay.purpose === 'nearby'
   const nearbyHosting = state.overlay.purpose === 'nearby-host'
   const cupSelection = state.overlay.purpose === 'cup'
@@ -112,7 +113,7 @@ export function createTrackLibraryModal(
       trigger.setAttribute('aria-label', `More actions for ${track.name}`)
       trigger.title = `More actions for ${track.name}`
       const menu = element('div', 'track-card-menu')
-      if (state.overlay.purpose === 'race') {
+      if (racePicker) {
         const edit = iconAction('EDIT', 'edit', `edit-${track.id}`, () => { options.open = false; actions.selectForEdit(track.id) })
         edit.setAttribute('aria-label', `Edit ${track.name}`)
         menu.append(edit)
