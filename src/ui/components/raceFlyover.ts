@@ -4,11 +4,13 @@ import { createRaceFlyoverRenderer } from '@/ui/components/raceFlyoverRenderer'
 import { button, element } from '@/ui/dom'
 
 const FRAME_INTERVAL_MS = 32
-const PLAYBACK_SPEED = 2
+const DEFAULT_SPEED = 2
+const FAST_SPEED = 4
+type PlaybackSpeed = 0 | typeof DEFAULT_SPEED | typeof FAST_SPEED
 
 export interface RaceFlyoverPlayback {
   elapsedSeconds: number
-  playing?: boolean
+  speed?: PlaybackSpeed
 }
 
 export function createRaceFlyover(
@@ -27,13 +29,13 @@ export function createRaceFlyover(
   canvas.dataset.lighting = lighting
   const paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost)
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-  let playing = playback.playing ?? !motion?.matches
+  let speed: PlaybackSpeed = playback.speed ?? (motion?.matches ? 0 : DEFAULT_SPEED)
   let visible = true
   let frame: number | undefined
   let lastFrame: number | undefined
   const toggle = button('', 'toggle-race-flyover', () => {
-    playback.playing = !playing
-    setPlaying(playback.playing)
+    playback.speed = speed === 0 ? DEFAULT_SPEED : speed === DEFAULT_SPEED ? FAST_SPEED : 0
+    setSpeed(playback.speed)
   }, 'race-flyover-toggle')
   panel.append(canvas, toggle)
 
@@ -50,18 +52,18 @@ export function createRaceFlyover(
     const context = canvas.getContext('2d')
     if (!context) return
     const dt = lastFrame === undefined ? 0 : now - lastFrame
-    if (lastFrame === undefined || dt >= FRAME_INTERVAL_MS || !playing) {
+    if (lastFrame === undefined || dt >= FRAME_INTERVAL_MS || speed === 0) {
       const pixelRatio = Math.min(2, window.devicePixelRatio || 1)
       const pixelWidth = Math.round(width * pixelRatio)
       const pixelHeight = Math.round(height * pixelRatio)
       if (canvas.width !== pixelWidth) canvas.width = pixelWidth
       if (canvas.height !== pixelHeight) canvas.height = pixelHeight
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-      if (playing) playback.elapsedSeconds += Math.min(dt, 100) * PLAYBACK_SPEED / 1000
+      playback.elapsedSeconds += Math.min(dt, 100) * speed / 1000
       paint(context, width, height, playback.elapsedSeconds)
       lastFrame = now
     }
-    if (playing) schedule()
+    if (speed !== 0) schedule()
   }
 
   function refresh(): void {
@@ -71,18 +73,21 @@ export function createRaceFlyover(
     schedule()
   }
 
-  function setPlaying(value: boolean): void {
-    playing = value
-    const label = playing ? 'Pause flyover' : 'Play flyover'
+  function setSpeed(value: PlaybackSpeed): void {
+    speed = value
+    const label = speed === 0 ? 'Play flyover'
+      : speed === DEFAULT_SPEED ? 'Double flyover speed' : 'Pause flyover'
     toggle.setAttribute('aria-label', label)
     toggle.title = label
-    toggle.classList.toggle('playing', playing)
+    toggle.textContent = speed === DEFAULT_SPEED ? '2×' : ''
+    toggle.classList.toggle('speed-up', speed === DEFAULT_SPEED)
+    toggle.classList.toggle('playing', speed === FAST_SPEED)
     refresh()
   }
 
   const onMotionChange = () => {
-    delete playback.playing
-    setPlaying(!motion?.matches)
+    delete playback.speed
+    setSpeed(motion?.matches ? 0 : DEFAULT_SPEED)
   }
   const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(refresh)
   const intersection = typeof IntersectionObserver === 'undefined' ? undefined : new IntersectionObserver(([entry]) => {
@@ -93,7 +98,7 @@ export function createRaceFlyover(
   intersection?.observe(canvas)
   motion?.addEventListener('change', onMotionChange)
   document.addEventListener('visibilitychange', refresh)
-  setPlaying(playing)
+  setSpeed(speed)
   return {
     element: panel,
     destroy(): void {
