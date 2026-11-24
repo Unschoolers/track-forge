@@ -7,6 +7,12 @@ import { validateTrack } from '@/domain/track/trackValidation'
 
 export const SCENARIO_IDS = ['starter', 'hairpin', 'bridge'] as const
 
+// This is QA-only metadata, not a production fallback for checkpoint-free tracks.
+const markersByPath = new WeakMap<RoadPath, readonly number[]>()
+export function authoredCheckpointsForPath(path: RoadPath): readonly number[] {
+  return markersByPath.get(path) ?? []
+}
+
 /** Bound compilation work before expanding externally supplied geometry. */
 export function prepareLanePath(track: Track): RoadPath {
 	if (track.points.length > 2000)
@@ -32,6 +38,7 @@ export function prepareLanePath(track: Track): RoadPath {
 	const path = buildRoadPath(track.points, track.terrain)
 	const validation = validateTrack(track, path.totalLength)
 	if (!validation.ready) throw new Error(`${track.name}: ${validation.message}`)
+	markersByPath.set(path, track.recoveryCheckpoints ?? [])
 	return path
 }
 
