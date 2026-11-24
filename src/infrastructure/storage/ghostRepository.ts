@@ -11,6 +11,7 @@ import {
 } from '@/application/race/ghostReplay'
 
 const STORAGE_KEY = 'trackforge-ghost-runs-v2'
+const LEGACY_STORAGE_KEY = 'trackforge-ghost-runs-v1'
 const MAX_RUNS = 20
 
 function validRun(value: unknown): value is GhostRun {
@@ -39,12 +40,52 @@ function validRun(value: unknown): value is GhostRun {
 export class BrowserGhostRepository implements GhostStore {
   constructor(private readonly storage: KeyValueStore) {}
 
-  private all(): Record<string, GhostRun> {
+  private readBank(key: string): Record<string, unknown> {
     try {
-      const parsed: unknown = JSON.parse(this.storage.get(STORAGE_KEY) ?? '{}')
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-      return Object.fromEntries(Object.entries(parsed).filter(([, run]) => validRun(run)))
+      const parsed: unknown = JSON.parse(this.storage.get(key) ?? '{}')
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown> : {}
     } catch { return {} }
+  }
+
+  private write(runs: Record<string, GhostRun>): boolean {
+    return this.storage.set(STORAGE_KEY, JSON.stringify({ version: 2, runs }))
+  }
+
+  private all(): { runs: Record<string, GhostRun>; migrationPending: boolean } {
+    const current = this.readBank(STORAGE_KEY)
+    if (current.version === 2 && current.runs && typeof current.runs === 'object' &&
+        !Array.isArray(current.runs)) {
+      return { runs: Object.fromEntries(Object.entries(current.runs).filter(([, run]) => validRun(run))), migrationPending: false }
+    }
+
+    const legacy = this.readBank(LEGACY_STORAGE_KEY)
+    const merged = new Map<string, GhostRun>()
+    for (const [key, run] of Object.entries(legacy)) {
+      // Remove only the terminal Arcade ruleset component. Track IDs, revision,
+      // direction and point-to-point prefix must be preserved verbatim.
+      if (!validRun(run) || !key.endsWith('|arcade')) continue
+      const newKey = key.slice(0, -'|arcade'.length)
+      const [lapsText, car, direction] = newKey.split('|').reverse()
+      const laps = Number(lapsText)
+      if (car !== run.car || !Number.isSafeInteger(laps) || laps < 1 ||
+          String(laps) !== lapsText || (direction !== 'forward' && direction !== 'reverse')) continue
+      merged.set(newKey, run)
+    }
+    for (const [key, run] of Object.entries(current)) {
+      if (!validRun(run)) continue
+      const previous = merged.get(key)
+      if (!previous || run.time <= previous.time) {
+        merged.delete(key)
+        merged.set(key, run)
+      }
+    }
+    const runs = Object.fromEntries(merged)
+    // Preserve the complete migrated bank; do not evict ghosts to force
+    // migration into a full storage quota. The original bank stays intact.
+    const migrationPending = Object.keys(legacy).length > 0 && !this.write(runs)
+    if (migrationPending) console.warn('Track Forge: ghost migration not yet persisted.')
+    return { runs, migrationPending }
   }
 
   availability(track: Track, setup: GhostSetup): GhostAvailability {
@@ -52,7 +93,7 @@ export class BrowserGhostRepository implements GhostStore {
     const suffix = `|${setup.car}|${setup.laps}`
     const prefix = `${key.slice(0, -suffix.length)}|`
     let best: { setup: GhostSetup; differences: number; time: number } | undefined
-    for (const [candidateKey, run] of Object.entries(this.all()).slice(-MAX_RUNS)) {
+    for (const [candidateKey, run] of Object.entries(this.all().runs)) {
       if (!candidateKey.startsWith(prefix)) continue
       const parts = candidateKey.slice(prefix.length).split('|')
       const [car, lapsText] = parts
@@ -70,22 +111,25 @@ export class BrowserGhostRepository implements GhostStore {
   }
 
   load(track: Track, setup: GhostSetup): GhostRun | null {
-    return this.all()[ghostRaceKey(track, setup)] ?? null
+    return this.all().runs[ghostRaceKey(track, setup)] ?? null
   }
 
   record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[], splits?: readonly number[]): boolean {
     const run = { car: setup.car, time, frames, ...(splits ? { splits } : {}) }
     if (!validRun(run)) return false
-    const all = this.all()
+    const { runs: all, migrationPending } = this.all()
+    const previousCount = Object.keys(all).length
     const key = ghostRaceKey(track, setup)
     if (all[key] && all[key].time <= time) return false
     delete all[key]
     all[key] = run
-    const recent = Object.entries(all).slice(-MAX_RUNS)
+    // During migration never trade an existing ghost for a successful write.
+    if (migrationPending) return this.write(all)
+    const recent = Object.entries(all).slice(-Math.max(MAX_RUNS, previousCount))
     // Keep the new best, evicting older combinations if this device is full.
     while (recent.length > 0) {
       try {
-        if (this.storage.set(STORAGE_KEY, JSON.stringify(Object.fromEntries(recent)))) return true
+        if (this.write(Object.fromEntries(recent))) return true
       } catch { /* Retry a smaller replay bank. */ }
       recent.shift()
     }
