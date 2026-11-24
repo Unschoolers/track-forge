@@ -22,7 +22,7 @@ jobs:
       - run: npx --no-install vitest run tests/domain/technicalCornerScale.test.ts tests/domain/aiHardPace.test.ts tests/domain/emileHardRace.test.ts --maxWorkers=2
       - run: npm run qa:optimize:test
       - name: Recovery-first per-car search and combined six-track validation
-        run: node qa/optimization/reliability.mjs --repair-promoted
+        run: node qa/optimization/reliability.mjs --verify-only
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:

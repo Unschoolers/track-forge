@@ -45,7 +45,7 @@ export const CAR_DRIVING_PROFILES = {
     hardLookAheadSamples: 10,
     hardApexCutScale: 1,
     hardEdgeAvoidanceScale: 0.4,
-    hardCornerTargetBonus: 0.08,
+    hardCornerTargetBonus: 0.12,
     normalCornerTargetBonus: 0.006,
     lowerDifficultyReserveScale: 0.98,
   },
@@ -57,6 +57,7 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.01,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
+    technicalCornerPursuitByDifficulty: { hard: 0.85 },
     // The revised brake controller already reserves more corner-entry time.
     // Scale the additional Easy/Normal reserve so it does not double-count it.
     lowerDifficultyReserveScale: 0.45,
@@ -74,6 +75,8 @@ export const CAR_DRIVING_PROFILES = {
     // overriding real tire grip, corner/braking safety, or recovery rules.
     hardEdgeAvoidanceScale: 0.25,
     lowerDifficultyReserveScale: 0.97,
+    technicalCornerPaceByDifficulty: { easy: 1, normal: 1 },
+    technicalCornerPursuitByDifficulty: { easy: 0.8, normal: 0.85 },
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
@@ -81,8 +84,12 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 12,
     hardSteerGain: 3,
     hardCornerReserve: 0,
-    hardLookAheadSamples: 12,
+    hardLookAheadSamples: 8,
     hardCornerTargetBonus: 0.45,
+    hardHairpinReserve: 0.05,
+    hardEdgeAvoidanceScale: 0.4,
+    technicalCornerPaceByDifficulty: { hard: 0.95, normal: 1 },
+    technicalCornerPursuitByDifficulty: { normal: 0.85 },
     lowerDifficultyReserveScale: 0.9,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
