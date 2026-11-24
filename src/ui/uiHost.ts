@@ -4,7 +4,7 @@ import { createNearbyLeaveConfirmation, createNearbyRaceMenu, createNearbyRaceMo
 import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
 import { raceDiagnosticsFilename } from '@/infrastructure/export/raceExportName'
 import { formatRaceTime } from '@/ui/format'
-import type { LightingMode, Track, TrackId } from '@/domain/model'
+import type { LightingMode, Track } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type {
   AppCommand,
