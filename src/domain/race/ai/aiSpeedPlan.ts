@@ -40,7 +40,6 @@ interface SpeedPlanContext {
   readonly sweep: number
   readonly basePace: number
   readonly racingPace: number
-  readonly authoredCornerPace: number | undefined
   readonly slipAngle: number
   readonly roadOffset: number
   readonly lateralVelocity: number
@@ -52,7 +51,7 @@ interface SpeedPlanContext {
 export function planAiSpeed({
   vehicle, path, relevantTraffic, difficulty, reversed, direction, tuning,
   hardProfile, ai, context, corner, arcadePavement, bend, sweep, basePace,
-  racingPace, authoredCornerPace, slipAngle, roadOffset, lateralVelocity, edgeRisk, catchUp,
+  racingPace, slipAngle, roadOffset, lateralVelocity, edgeRisk, catchUp,
 }: SpeedPlanContext): { input: Pick<DriverInput, 'throttle' | 'braking' | 'brakePressure'>; speedAssist: SpeedAssist | undefined } {
   const car = CAR_SPECS[vehicle.car]
   const ahead = relevantTraffic.ahead
@@ -71,28 +70,26 @@ export function planAiSpeed({
     nearbyTurn += Math.abs(turnAmountAt(path, context.nearest.index + direction * sample, 6))
   }
   const fastCorners = nearbyTurn < 1.15
-  const cornerPace = authoredCornerPace ?? (arcadePavement
+  const cornerPace = arcadePavement
     ? (HARD_PAVEMENT_CORNER_PACE + sweep * SWEEP_CORNER_PACE) * basePace +
-      (RACING_PAVEMENT_CORNER_PACE + sweep * RACING_PAVEMENT_SWEEP_PACE) * racingPace : 1)
+      (RACING_PAVEMENT_CORNER_PACE + sweep * RACING_PAVEMENT_SWEEP_PACE) * racingPace : 1
   // Brake for the tightest upcoming bend, not just one moving pursuit point.
   const cornerTarget = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
     car, tuning.pace * vehicle.aiPace, vehicle.car, true, fastCorners,
-    !vehicle.racingLine,
+    true,
   ) * cornerPace
-  const practicedSpeedRatio = vehicle.racingLine?.speedRatio ?? 1
-  let curveSpeed = practicedSpeedRatio < 1 ? Math.min(cornerTarget, car.max) * practicedSpeedRatio : cornerTarget
+  let curveSpeed = cornerTarget
   // A tight pavement hairpin may need more entry caution than an ordinary
   // corner. Reserve it for high-curvature approaches so a low-grip chassis
   // keeps its pace on sweeping and mixed-surface bends. Speed target only;
   // the existing physical brakes and tires still do the work.
   const hairpinSharpness = clamp((bend - 0.16) / 0.12, 0, 1)
-  const hairpinReserve = difficulty === 'hard' && !vehicle.racingLine &&
+  const hairpinReserve = difficulty === 'hard' &&
     context.surface === 'street'
       ? (hardProfile.hardHairpinReserve ?? 0) * hairpinSharpness ** 2
       : 0
-  const cornerMargin = !vehicle.racingLine
-    ? arcadeCornerMargin(difficulty, vehicle.car, hardProfile) + hairpinReserve : 0
+  const cornerMargin = arcadeCornerMargin(difficulty, vehicle.car, hardProfile) + hairpinReserve
   if (cornerMargin > 0 && context.surface !== 'grass') {
     // Add grip reserve as a bend approaches while allowing full speed on straights.
     const bendWeight = clamp((bend - 0.02) / 0.18, 0, 1)
@@ -108,7 +105,7 @@ export function planAiSpeed({
   }
   // Passing at the outside edge consumes cornering room. Hold a little
   // extra reserve in bends instead of assuming the centerline racing pace.
-  if (ai.phase === 'passing' && !vehicle.racingLine) {
+  if (ai.phase === 'passing') {
     curveSpeed *= 1 - 0.14 * clamp(bend / 0.12, 0, 1)
   }
   // A faster straight-line chassis with weak grip needs extra entry margin.
@@ -119,7 +116,7 @@ export function planAiSpeed({
   // *extra* low-grip entry margin while aligned on a non-icy road. The tires
   // still supply every newton of braking/turning force; unstable or wide
   // entries retain the full conservative margin.
-  const stableLateBrake = difficulty === 'hard' && !vehicle.racingLine &&
+  const stableLateBrake = difficulty === 'hard' &&
     context.onRoad && context.surface !== 'ice' &&
     Math.abs(slipAngle) < 0.085 &&
     Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.45 &&
@@ -134,13 +131,13 @@ export function planAiSpeed({
   // line is under control. This changes the target used by braking/throttle,
   // never the tire forces, speed limit, off-road drag or recovery behavior.
   // Back out when drifting outward; do not reward unstable or off-road lines.
-  if (difficulty === 'normal' && !vehicle.racingLine && context.onRoad &&
+  if (difficulty === 'normal' && context.onRoad &&
     Math.abs(slipAngle) < 0.08) {
     // Blue needed one 60 Hz tick to remain within its player-relative Normal
     // pace budget. Adjust the planned speed, never the actual tire forces.
     curveSpeed *= 1 + (hardProfile.normalCornerTargetBonus ?? 0)
   }
-  if (difficulty === 'hard' && !vehicle.racingLine && context.onRoad) {
+  if (difficulty === 'hard' && context.onRoad) {
     const controlled = (1 - edgeRisk) *
       (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))
     curveSpeed *= 1 + (hardProfile.hardCornerTargetBonus ?? 0) * controlled
@@ -149,7 +146,7 @@ export function planAiSpeed({
   // the chassis. Finish the heavy braking on approach, then release it
   // progressively through a stable pavement apex. Emergency/traffic braking
   // still overrides this margin, and loose surfaces keep the conservative rule.
-  const apexBrakeMargin = !vehicle.racingLine && context.onRoad &&
+  const apexBrakeMargin = context.onRoad &&
     context.surface === 'street' && (corner.phase === 'turn' || corner.phase === 'exit')
       ? 7 : 3
   const curveBrakeThreshold = Math.max(apexBrakeMargin, corner.drifting ? 7 : 3)
@@ -163,20 +160,19 @@ export function planAiSpeed({
     ? clamp((curveOverspeed - curveBrakeThreshold + 4) / 18, 0.22, 1)
     : 0
   // Ease off on approach so the tires can turn without repeated hard braking.
-  const plannedBrakePressure = vehicle.racingLine ? cornerBrakePressure
-    : correctionBrakePressure(car, context.surface, cornerBrakePressure)
+  const plannedBrakePressure = correctionBrakePressure(car, context.surface, cornerBrakePressure)
   const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
     : CORNER_THROTTLE_WINDOW
   const curveThrottle = clamp((curveSpeed + 2 - vehicle.speed) / throttleWindow, 0, 1)
-  const settledSlide = !vehicle.racingLine && context.onRoad &&
+  const settledSlide = context.onRoad &&
     Math.abs(roadOffset) < ROAD_GEOMETRY.onRoadRadius * 0.5 && !curveBraking
   // A car still sliding toward the outside must complete its rotation
   // before applying exit power. In a clean line traction remains at 1.
   // Quick-turning, high-grip cars may use a modest exit throttle floor once
   // the chassis and velocity are aligned inside the road. Do not push through
   // a reversal, ice, active brake demand, or an outward slide.
-  const cleanCornerExit = difficulty === 'hard' && !vehicle.racingLine &&
+  const cleanCornerExit = difficulty === 'hard' &&
     corner.phase === 'exit' && !corner.reversal && !corner.drifting &&
     context.onRoad && context.surface !== 'ice' && !curveBraking &&
     Math.abs(slipAngle) < 0.055 &&
@@ -186,7 +182,7 @@ export function planAiSpeed({
     : 0
   const plannedThrottle = (settledSlide
     ? Math.max(curveThrottle, corner.exitThrottle, exitPowerFloor)
-    : curveThrottle) * (!vehicle.racingLine ? corner.exitTraction : 1)
+    : curveThrottle) * corner.exitTraction
   const recovering = !context.onRoad
   const speedAssist = catchUp && !recovering && !emergency && !following && plannedThrottle === 1 &&
     vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015

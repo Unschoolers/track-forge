@@ -30,6 +30,11 @@ export const STUDY_SCENARIOS = [
     reverse: false, startRatio: 0,
     laps: 2, seconds: 70, group: 'validation',
   },
+  {
+    id: 'emile', file: 'tests/fixtures/emile.trackforge.json',
+    reverse: false, startRatio: 0,
+    laps: 2, seconds: 120, group: 'validation',
+  },
 ]
 
 export function selectScenarios(ids, available = STUDY_SCENARIOS) {

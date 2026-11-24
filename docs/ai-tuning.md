@@ -3,22 +3,16 @@
 **Architecture invariant:** no track-specific AI rules. A track's geometry, local surfaces, crossing structure and its validated race options are inputs; its name, saved ID, content hash and manually indexed segment list must not select a dedicated racing line, handling rule, speed bonus or difficulty. Use real tracks only as deterministic regression fixtures. See [architecture](architecture.md#shared-invariants-to-protect).
 
 
-Only the policy selection changed in this refactor; no pace, handling, or racing
-line parameters were retuned.
+All courses use the same dynamic racing-line planner with per-car driving profiles.
 
 | Concern | Authority |
 | --- | --- |
 | Driver difficulty behavior and UI descriptions | `src/domain/config.ts` — `DIFFICULTY_SPECS` |
 | Per-difficulty overtaking behavior | `src/domain/config.ts` — `AI_OVERTAKE` |
-| Which driver technique, rival pace, Arcade corner reserve, and authored-line speed ratio to use | `src/domain/race/ai/difficultyPolicy.ts` |
-| Émile's per-car authored geometry, lane offsets and corner notes | `src/domain/race/ai/emileRacingLines.ts` |
+| Which driver technique, rival pace, Arcade corner reserve to use | `src/domain/race/ai/difficultyPolicy.ts` |
 | Physical car response and surfaces | `src/domain/race/vehiclePhysicsConfig.ts` |
 
-Arcade selects Hard steering technique regardless of the chosen opponent
-difficulty. Authored racing lines also select Hard steering technique in
-Simulation; the selected difficulty still controls mistakes, overtaking, and
-the authored line's speed ratio. Non-authored Arcade rivals use the shared
-difficulty-specific corner reserve; authored lines override that reserve.
+Arcade uses the shared steering controller for every course. Per-car profiles calibrate Hard; difficulty-specific corner reserves, mistakes and overtaking control lower difficulties.
 
 When changing AI balance, first update the owning data or policy, then run
 `tests/domain/aiDifficultyPolicy.test.ts`, the relevant car-handling tests,

@@ -1,5 +1,4 @@
-import { EMILE_COURSE, EMILE_RACING_LINES } from '@/domain/race/ai/emileRacingLines'
-import { authoredLineSpeedRatio, raceRivalPace } from '@/domain/race/ai/difficultyPolicy'
+import { raceRivalPace } from '@/domain/race/ai/difficultyPolicy'
 import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -11,7 +10,6 @@ import { EXTRA_NEARBY_GRID, validNearbyGridPositions } from '@/domain/race/start
 import type { Vector2 } from '@/domain/model'
 
 export interface CreateRaceOptions {
-  readonly courseIdentity?: string | undefined
   readonly path: RoadPath
   readonly routeKind?: RouteKind
   readonly recoveryCheckpoints?: readonly number[] | undefined
@@ -120,9 +118,6 @@ export function createRace(options: CreateRaceOptions): RaceState {
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
       : CAR_IDS.filter((car) => car !== options.playerCar)
 
-  const emile = options.courseIdentity === EMILE_COURSE &&
-    !options.reversed &&
-    options.routeKind !== 'point-to-point'
   const open = options.routeKind === 'point-to-point'
   const startDistance =
     options.path.totalLength *
@@ -162,15 +157,10 @@ export function createRace(options: CreateRaceOptions): RaceState {
       position,
     )
     const car = index === 0 ? options.playerCar : (aiCars[index - 1] ?? 'blue')
-    const racingLine = emile && index > 0 ? {
-      sections: EMILE_RACING_LINES[car],
-      speedRatio: authoredLineSpeedRatio(options.difficulty),
-    } : undefined
     return {
       id: index === 0 ? 'player' : `ai-${index}`,
       car,
       player: index === 0,
-      ...(racingLine ? { racingLine } : {}),
       ...position,
       angle: Math.atan2(placement.tangent.y, placement.tangent.x),
       vx: 0,

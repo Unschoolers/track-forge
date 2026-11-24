@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'qa/optimization/**'
+      - 'src/domain/race/ai/**'
+      - 'src/domain/race/raceFactory.ts'
       - 'src/domain/race/vehicleDynamics.ts'
       - 'src/domain/race/vehiclePhysicsConfig.ts'
       - 'src/domain/race/vehiclePhysics.ts'
@@ -51,12 +53,12 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --no-tags origin "$BASE_SHA"
-          if git diff --quiet "$BASE_SHA" HEAD -- src/domain/race/vehicleDynamics.ts src/domain/race/vehiclePhysicsConfig.ts src/domain/race/vehiclePhysics.ts src/domain/race/raceRecovery.ts src/domain/race/raceEngine.ts; then
+          if git diff --quiet "$BASE_SHA" HEAD -- src/domain/race/vehicleDynamics.ts src/domain/race/vehiclePhysicsConfig.ts src/domain/race/vehiclePhysics.ts src/domain/race/raceRecovery.ts src/domain/race/raceEngine.ts src/domain/race/ai src/domain/race/raceFactory.ts; then
             exit 0
           fi
           baseline="$RUNNER_TEMP/trackforge-physics-baseline"
           git worktree add --detach "$baseline" "$BASE_SHA"
-          cp qa/optimization/cli.mjs qa/optimization/score.mjs "$baseline/qa/optimization/"
+          cp qa/optimization/cli.mjs qa/optimization/score.mjs qa/optimization/scenarios.mjs "$baseline/qa/optimization/"
           (
             cd "$baseline"
             npm ci

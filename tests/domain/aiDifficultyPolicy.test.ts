@@ -5,10 +5,8 @@ import { asTrackId, type DifficultyId } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import { EMILE_COURSE } from '@/domain/race/ai/emileRacingLines'
 import {
   arcadeCornerMargin,
-  authoredLineSpeedRatio,
   raceRivalPace,
 } from '@/domain/race/ai/difficultyPolicy'
 
@@ -29,10 +27,7 @@ describe('AI difficulty policy', () => {
     expect(signatures.size).toBe(4)
   })
 
-  it('keeps authored-line speed targets and non-authored Arcade corner reserves ordered', () => {
-    expect(authoredLineSpeedRatio('hard')).toBe(1)
-    expect(authoredLineSpeedRatio('hard')).toBeGreaterThan(authoredLineSpeedRatio('normal'))
-    expect(authoredLineSpeedRatio('normal')).toBeGreaterThan(authoredLineSpeedRatio('easy'))
+  it('keeps Arcade corner reserves ordered', () => {
     expect(arcadeCornerMargin('hard')).toBe(0)
     expect(arcadeCornerMargin('hard', 'blue')).toBe(0)
     expect(arcadeCornerMargin('hard', 'red')).toBeGreaterThan(0)
@@ -61,13 +56,12 @@ describe('AI difficulty policy', () => {
     expect(raceRivalPace(2)).toBe(DIFFICULTY_SPECS.hard.aiPaces[2])
   })
 
-  it('wires the chosen pace and authored racing line into race initialization, not the car physics specs', () => {
+  it('wires the chosen pace into race initialization, not the car physics specs', () => {
     const starter = createStarterTrack(asTrackId('ai-policy'), 1)
     const path = buildRoadPath(starter.points, starter.terrain)
     for (const difficulty of difficulties) {
       const race = createRace({
         path,
-        courseIdentity: EMILE_COURSE,
         playerCar: 'blue',
         difficulty,
         laps: 1,
@@ -76,7 +70,6 @@ describe('AI difficulty policy', () => {
       expect(rivals).toHaveLength(3)
       for (const [index, rival] of rivals.entries()) {
         expect(rival.aiPace).toBe(raceRivalPace(index))
-        expect(rival.racingLine?.speedRatio).toBe(authoredLineSpeedRatio(difficulty))
       }
     }
   })
