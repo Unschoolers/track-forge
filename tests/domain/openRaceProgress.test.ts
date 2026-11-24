@@ -4,7 +4,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { resetRaceVehicle } from '@/domain/race/raceEngine'
-import { updateOpenRouteProgress } from '@/domain/race/progress'
+import { updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
 import { rankVehicles } from '@/domain/race/ranking'
 import { requireFixture } from '../fixtures/requireFixture'
 
@@ -79,4 +79,17 @@ it('requires an on-road physical crossing and allows recovery before a missed ga
   expect(recovered.pathIndex).toBeLessThan(last / 4)
   expect(updateOpenRouteProgress(before, after, path, after.pathIndex, 3, true, true, 42, race.timingGates).nextSector).toBe(2)
   expect(cross({ ...player, grounded: false }, 1).nextSector).toBe(2)
+})
+
+it('lets AI finish at the last driveable sample only after its authored gates', () => {
+  const last = path.points.length - 1
+  const gates = race.timingGates ?? []
+  expect(gates.length).toBeGreaterThan(0)
+  const rival = { ...player, player: false, pathIndex: last - 2, nextSector: gates.length + 1 }
+  const finished = updateProgress(rival, last - 2, path.points.length, 12, 1, 0, false, gates, false)
+  expect(finished).toMatchObject({ lap: 1, finishedAt: 12, nextSector: 1 })
+  expect(updateProgress({ ...rival, nextSector: 1 }, last - 2, path.points.length, 12, 1, 0, false, gates, false))
+    .toMatchObject({ lap: 0, finishedAt: null })
+  expect(updateProgress({ ...rival, pathIndex: last - 5 }, last - 4, path.points.length, 12, 1, 0, false, gates, false))
+    .toMatchObject({ lap: 0, finishedAt: null })
 })
