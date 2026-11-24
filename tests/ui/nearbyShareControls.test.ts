@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import type { RaceResult } from '@/application/race/raceSession'
 import { asTrackId } from '@/domain/model'
-import { createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
+import { createNearbyLeaveConfirmation, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { nearbyTrack } from '../fixtures/nearbyRace'
 
 const transport: NearbyTransport = {
@@ -24,6 +24,23 @@ const result: RaceResult = {
 }
 
 describe('Nearby sharing and rematch controls', () => {
+  it.each(['host', 'guest'] as const)('makes staying the safe default for a %s leaving the lobby', role => {
+    const actions = { stay: vi.fn(), leave: vi.fn() }
+    const confirmation = createNearbyLeaveConfirmation(role, actions)
+    expect(confirmation.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Leave room?')
+    expect(confirmation.textContent).toContain(role === 'host' ? 'close the room for everyone' : 'disconnect from the room')
+    const stay = confirmation.querySelector<HTMLButtonElement>('[data-action="nearby-stay"]')
+    const leave = confirmation.querySelector<HTMLButtonElement>('[data-action="nearby-confirm-leave"]')
+    expect(stay?.classList.contains('button-primary')).toBe(true)
+    expect(leave?.classList.contains('button-danger')).toBe(true)
+    stay?.click()
+    confirmation.querySelector<HTMLButtonElement>('[data-action="close-dialog"]')?.click()
+    expect(actions.stay).toHaveBeenCalledTimes(2)
+    expect(actions.leave).not.toHaveBeenCalled()
+    leave?.click()
+    expect(actions.leave).toHaveBeenCalledOnce()
+  })
+
   it('shows car specifications and explicit consent in the race lobby', () => {
     const selectLobbyCar = vi.fn()
     const setLobbyReady = vi.fn()
