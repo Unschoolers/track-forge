@@ -15,8 +15,8 @@ type Handling = 'arcade' | 'simulation'
  * DIFFICULTY_SPECS remains the authority for core driver characteristics.
  */
 const AI_PACE_POLICY = {
-  easy: { arcadeCornerMargin: 0.21, authoredLineSpeedRatio: 0.86 },
-  normal: { arcadeCornerMargin: 0.12, authoredLineSpeedRatio: 0.908 },
+  easy: { arcadeCornerMargin: 0.16, authoredLineSpeedRatio: 0.86 },
+  normal: { arcadeCornerMargin: 0.08, authoredLineSpeedRatio: 0.908 },
   hard: { arcadeCornerMargin: 0, authoredLineSpeedRatio: 1 },
 } as const satisfies Record<DifficultyId, {
   readonly arcadeCornerMargin: number
