@@ -5,7 +5,7 @@ import type { RaceResult } from '@/application/race/raceSession'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 import { CAR_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
-import { createCarPicker } from '@/ui/components/carPicker'
+import { populateNearbyLobby } from '@/ui/components/nearbyLobbyPanel'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
@@ -47,7 +47,7 @@ export function createNearbyRaceModal(
   const cup = snapshot.cup
   const frame = createModalFrame(phase === 'lobby' ? 'Race Lobby' : cup ? 'Nearby Cup' : 'Nearby Race',
     room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
-    actions.close, 'nearby-race-modal')
+    actions.close, phase === 'lobby' ? 'nearby-race-modal nearby-lobby-modal' : 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
     const message = element('p', 'modal-subtitle', error)
@@ -156,31 +156,9 @@ export function createNearbyRaceModal(
           : 'Waiting for the track…'
         : 'Waiting for the host to start the race.'))
       break
-    case 'lobby': {
-      frame.body.append(element('h3', 'results-heading', track ?? 'Next race'))
-      frame.body.append(element('p', 'modal-subtitle', `${snapshot.laps ?? 1} lap${snapshot.laps === 1 ? '' : 's'}${cup ? ` · Cup ${cup.index + 1}/${cup.total}` : ''}`))
-      frame.body.append(createCarPicker(snapshot.localCar, car => nearby.selectLobbyCar(car), {
-        disabled: snapshot.unlockPending || (snapshot.role === 'guest' && snapshot.localReady),
-      }))
-      const roster = element('ol', 'scoreboard')
-      roster.setAttribute('aria-live', 'polite')
-      for (const player of snapshot.lobbyPlayers) {
-        const row = element('li', `scoreboard-row${player.slot === nearby.localSlot() ? ' player' : ''}`)
-        const label = nearbyRacerLabel({ slot: player.slot, name: player.name ?? undefined, local: player.slot === nearby.localSlot() })
-        row.append(element('strong', undefined, `${label}${player.slot === 0 ? ' · Host' : ''}${player.car ? ` · ${CAR_SPECS[player.car].name}` : ''}`),
-          element('span', undefined, player.accepted ? 'READY' : player.car ? 'CHOOSING…' : 'LOADING…'))
-        roster.append(row)
-      }
-      frame.body.append(element('h3', 'setup-label', `PLAYERS · ${snapshot.lobbyPlayers.filter(player => player.accepted).length}/${snapshot.lobbyPlayers.length} READY`), roster)
-      const ready = button(snapshot.unlockPending ? 'UPDATING…' : snapshot.localReady ? 'CANCEL READY' : 'I’M READY', 'nearby-ready',
-        () => nearby.setLobbyReady(!snapshot.localReady), snapshot.localReady ? 'button' : 'button button-primary')
-      ready.disabled = snapshot.unlockPending
-      frame.footer.append(ready)
-      frame.body.append(element('p', 'modal-subtitle', snapshot.localReady && snapshot.role === 'guest'
-        ? 'Cancel Ready to change your car, until the host locks the lineup.'
-        : 'The race starts when everyone is ready.'))
+    case 'lobby':
+      populateNearbyLobby(frame, nearby, snapshot)
       break
-    }
     case 'preparing':
       frame.body.append(element('p', 'modal-subtitle', purpose === 'share' ? 'Receiving and checking the track…' : 'Sharing the track with all players…'))
       break
