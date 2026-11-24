@@ -59,6 +59,24 @@ export interface NearbyStart extends Course {
 
 type Phase = 'idle' | 'opening' | 'hosting' | 'scanning' | 'connecting' | 'waiting' | 'preparing' | 'lobby' | 'share-review' | 'staging' | 'racing'
 type Purpose = 'race' | 'share'
+// Network operations have a finite deadline; human car selection does not.
+export const LOBBY_DELIVERY_TIMEOUT_MS = 10_000
+const LOBBY_ACK_TIMEOUT_MS = 30_000
+
+async function withLobbyDeliveryDeadline(operation: Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('Lobby delivery timed out.')), LOBBY_DELIVERY_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 const INCOMPATIBLE_RACE_VERSION = 'Multiplayer version mismatch. Update Track Forge on every device.'
 /** No DNS, public addresses, loopback, multicast or metacharacters from untrusted input. */
 export function validLanIp(ip: string): boolean {
@@ -350,6 +368,9 @@ export class NearbyRace {
       this.publishLobby()
       this.startHost()
     } else {
+      if (this.lobby.readyPending(this.slot) || this.lobby.unlockPending) {
+        this.armTimeout('The host did not confirm your lobby readiness.', LOBBY_ACK_TIMEOUT_MS)
+      }
       this.sendLobbyChoice()
       this.changed()
     }
@@ -418,7 +439,7 @@ export class NearbyRace {
   ): Promise<void> {
     if (!this.currentLobby(active, round) || !this.guests.has(id)) return
     try {
-      await this.transport.send([id], bytes)
+      await withLobbyDeliveryDeadline(this.transport.send([id], bytes))
     } catch (error: unknown) {
       this.record('lobby_delivery_failed', { kind, error: this.errorKind(error) })
       if (!this.currentLobby(active, round) || !this.guests.has(id)) return
@@ -441,7 +462,7 @@ export class NearbyRace {
     const round = this.round
     if (lock) {
       this.record('transfer', { stage: 'lock' })
-      await this.transport.lock()
+      await withLobbyDeliveryDeadline(this.transport.lock())
     }
     if (!this.currentLobby(active, round)) return
     const chunks = await packTrack(course.track)
@@ -791,7 +812,10 @@ export class NearbyRace {
       this.startHost()
     } else if (fromHost && this.phase === 'lobby' && message.type === 'lobby' &&
         incomingRound === this.round) {
-      if (this.lobby.receiveRoster(message.revision, message.players, this.slot)) this.changed()
+      if (this.lobby.receiveRoster(message.revision, message.players, this.slot)) {
+        if (!this.lobby.readyPending(this.slot) && !this.lobby.unlockPending) this.clearTimeout()
+        this.changed()
+      }
     } else if (fromHost && this.phase === 'lobby' && message.type === 'lineup' &&
         incomingRound === this.round && this.course &&
         (this.lobby.localAccepted || this.lobby.unlockPending) && message.cars[0] && message.cars[this.slot] === this.localCar) {
@@ -946,7 +970,9 @@ export class NearbyRace {
     if (!ids.length) return
     const active = this.generation
     this.record('control', { kind: message.type, result: 'started', recipients: ids.length })
-    void this.transport.send(ids, encodeControl(message)).then(() => {
+    const delivery = this.transport.send(ids, encodeControl(message))
+    const bounded = message.type === 'ready' ? withLobbyDeliveryDeadline(delivery) : delivery
+    void bounded.then(() => {
       if (active === this.generation) this.record('control', { kind: message.type, result: 'succeeded', recipients: ids.length })
     }).catch((error: unknown) => {
       this.record('control', { kind: message.type, result: 'failed', error: this.errorKind(error) })
@@ -1103,9 +1129,9 @@ export class NearbyRace {
     }
   }
 
-  private armTimeout(message: string): void {
+  private armTimeout(message: string, duration = 30_000): void {
     this.clearTimeout()
-    this.timeout = setTimeout(() => this.fail(message), 30_000)
+    this.timeout = setTimeout(() => this.fail(message), duration)
   }
 
   private clearTimeout(): void { clearTimeout(this.timeout) }
