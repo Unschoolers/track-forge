@@ -37,30 +37,30 @@ describe('diagonal checkpoint crossing', () => {
     const path = diagonalPath(slope)
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
     const player = race.vehicles[0]!
-    const gate = (path.points.length - 1) / 4
+    const gate = race.timingGates?.[0] ?? -1
     const { before, after } = crossing(path, gate, 28)
     const result = updateOpenRouteProgress(
       { ...player, ...before }, { ...player, ...after },
-      path, after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius,
+      path, after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(result.nextSector).toBe(2)
 
     const nearEdge = crossing(path, gate, ROAD_GEOMETRY.checkpointHalfWidth + 3)
     const forgiven = updateOpenRouteProgress(
       { ...player, ...nearEdge.before }, { ...player, ...nearEdge.after },
-      path, nearEdge.after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius,
+      path, nearEdge.after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(forgiven.nextSector).toBe(2)
 
     const outside = crossing(path, gate, ROAD_GEOMETRY.checkpointHalfWidth + ROAD_GEOMETRY.checkpointGrace + 4)
     const bypass = updateOpenRouteProgress(
       { ...player, ...outside.before }, { ...player, ...outside.after },
-      path, outside.after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius,
+      path, outside.after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(bypass.nextSector).toBe(1)
     const backwards = updateOpenRouteProgress(
       { ...player, ...after }, { ...player, ...before },
-      path, before.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius,
+      path, before.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(backwards.nextSector).toBe(1)
   })
@@ -95,7 +95,7 @@ describe('diagonal checkpoint crossing', () => {
       return updateOpenRouteProgress(
         { ...player, ...before, nextSector: 4 },
         { ...player, ...after, nextSector: 4 },
-        path, after.pathIndex, 15, false, false, ROAD_GEOMETRY.onRoadRadius,
+        path, after.pathIndex, 15, false, false, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
       )
     }
 
@@ -123,12 +123,12 @@ describe('diagonal checkpoint crossing', () => {
     const { before, after } = crossing(base, gate, 0)
     const under = updateOpenRouteProgress(
       { ...player, ...before, z: 0 }, { ...player, ...after, z: 0 },
-      bridge, after.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius,
+      bridge, after.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(under.nextSector).toBe(1)
     const over = updateOpenRouteProgress(
       { ...player, ...before, z: 24 }, { ...player, ...after, z: 24 },
-      bridge, after.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius,
+      bridge, after.pathIndex, 12, false, false, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(over.nextSector).toBe(2)
   })
