@@ -5,13 +5,14 @@ import type { CarId } from '@/domain/model'
 import { CAR_DRIVING_PROFILES } from '@/domain/race/ai/aiCarDrivingProfiles'
 import { CAR_PASSING_POLICIES } from '@/domain/race/ai/aiCarPassingPolicies'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
+import { createLaneScenarios, decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 
 type Scenario = {
   name: string
   file?: string
   official?: string
+  qa?: string
   startRatio: number
   reversed: boolean
   laps: number
@@ -27,14 +28,15 @@ const scenarios: readonly Scenario[] = [
     gridPositions: [1, 3, 0, 2] },
   { name: 'Kids Room', file: 'tests/fixtures/kidsRoomAi.trackforge.json',
     startRatio: 0.21932299012693934, reversed: false, laps: 2, seconds: 145 },
-  { name: 'Pine Hairpins', official: 'Pine Hairpins',
+  { name: 'Hairpin circuit', qa: 'hairpin',
     startRatio: 0, reversed: false, laps: 1, seconds: 80 },
-  { name: 'Meadow Loop', official: 'Meadow Loop',
+  { name: 'City Sprint', official: 'City Sprint',
     startRatio: 0, reversed: false, laps: 2, seconds: 70 },
 ]
 const pathCache = scenarios.map(scenario => {
   const track = scenario.file
     ? decodeTrackInput(JSON.parse(readFileSync(scenario.file, 'utf8')))[0]
+    : scenario.qa ? createLaneScenarios().find(entry => entry.id === scenario.qa)
     : OFFICIAL_CIRCUITS.find(entry => entry.track.name === scenario.official)?.track
   if (!track) throw new Error(`Missing ${scenario.name} track`)
   return prepareLanePath(track)
