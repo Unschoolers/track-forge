@@ -27,7 +27,6 @@ export interface VehicleDynamicsParameters {
   readonly cornerStiffness: number
   readonly brakeForce: number
   readonly brakingTractionScale?: number
-  readonly brakingStabilityBoost?: number
   /** Chassis-specific lateral stability, supplied with surface traction blending. */
   readonly lateralStability?: number
   readonly recovery: number
@@ -190,13 +189,12 @@ export function stepVehicleDynamics(
     0,
     tuning.forces.maximumBrakeUsage,
   )
-  const brakingStabilityBoost = Math.max(0, finiteOr(parameters.brakingStabilityBoost ?? 0))
-  const lateralBudget = Math.min(1, Math.sqrt(
+  const lateralBudget = Math.sqrt(
     Math.max(
       tuning.forces.minimumLateralBudget,
       1 - brakeUsage * brakeUsage,
     ),
-  ) * (1 + pressure * brakingStabilityBoost * 0.55))
+  )
   const frontCapacity =
     lateralGripAcceleration * frontLoad * lateralBudget
   const rearCapacity =
@@ -283,7 +281,7 @@ export function stepVehicleDynamics(
     1 -
     Math.abs(steeringInput) *
       (1 - clamp(tuning.stability.steeringRetention, 0, 1))
-  const brakingStability = 1 - pressure * (1 - clamp(tuning.stability.brakingRetention + brakingStabilityBoost, 0, 1))
+  const brakingStability = 1 - pressure * (1 - clamp(tuning.stability.brakingRetention, 0, 1))
   const lateralStability =
     Math.max(0, tuning.stability.lateralDamping) *
     Math.max(0, finiteOr(parameters.lateralStability ?? 1, 1)) *
