@@ -15,7 +15,7 @@ import {
   turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
-import { racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
+import { correctionBrakePressure, racingPavementAllowance, safeEntrySpeedAhead, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { aiSteeringDifficulty, arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
 import { planCornerTactics } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
@@ -424,7 +424,7 @@ export function stepAiVehicle(
           vehicle.speed > 90),
       brakePressure: emergency || (recovering &&
         context.nearest.distance > 72 && vehicle.speed > 90)
-        ? 1 : cornerBrakePressure,
+        ? 1 : correctionBrakePressure(car, context.surface, cornerBrakePressure),
     },
     context,
     deltaSeconds,
