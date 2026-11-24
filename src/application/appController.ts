@@ -166,7 +166,10 @@ export class AppController {
         return
       }
       if (this.state.overlay.type === 'nearby') {
-        this.update({ ...this.state })
+        // A failed/disconnected initial lobby must not keep a stale confirmation.
+        this.update(status?.phase === 'idle' && this.state.overlay.confirmLeave
+          ? { ...this.state, overlay: { type: 'nearby' } }
+          : { ...this.state })
         return
       }
       if (status?.phase === 'lobby' && this.state.mode === 'race' && this.beforeNearbyTrack !== undefined && this.state.overlay.type === 'results') {
@@ -354,6 +357,8 @@ export class AppController {
       case 'leave-nearby':
         if (this.state.mode === 'race' && this.beforeNearbyTrack !== undefined) {
           this.dispatch({ type: 'go-home' })
+        } else if (this.state.overlay.type === 'nearby' && this.state.overlay.confirmLeave) {
+          this.update({ ...this.state, overlay: { type: 'none' }, notice: null })
         }
         break
       case 'pause-race':
@@ -823,9 +828,21 @@ export class AppController {
       this.editorExitFlow.resolve('cancel')
       return
     }
-    if (overlay.type === 'nearby' && this.state.mode === 'race' && this.beforeNearbyTrack !== undefined) {
-      this.dispatch({ type: 'leave-nearby' })
-      return
+    if (overlay.type === 'nearby') {
+      // All dismiss paths (including platform Back/Escape) share this policy.
+      // Keep the overlay type unchanged so update() does not close the room.
+      if (overlay.confirmLeave) {
+        this.update({ ...this.state, overlay: { type: 'nearby' } })
+        return
+      }
+      const status = this.dependencies.nearby?.snapshot()
+      const connectedRace = status?.purpose === 'race' &&
+        (status.phase === 'hosting' || status.phase === 'waiting' ||
+          status.phase === 'preparing' || status.phase === 'lobby' || status.phase === 'staging')
+      if (connectedRace || (this.state.mode === 'race' && this.beforeNearbyTrack !== undefined)) {
+        this.update({ ...this.state, overlay: { type: 'nearby', confirmLeave: true } })
+        return
+      }
     }
     if (overlay.type === 'cup-final' || overlay.type === 'results') {
       this.dispatch({ type: 'go-home' })
