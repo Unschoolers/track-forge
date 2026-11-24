@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
-// QA code, test fixtures and documentation do not ship in the application.
-const nonProductPath = /^(?:tests\/|qa\/|docs\/|README\.md$|playwright\.(?:mobile|production)\.config\.mjs$|android\/app\/src\/(?:test|androidTest)\/|src-tauri\/tests\/)/
+// QA code, test fixtures, CI orchestration and documentation do not ship in the application.
+const nonProductPath = /^(?:tests\/|qa\/|docs\/|README\.md$|playwright\.(?:mobile|production)\.config\.mjs$|android\/app\/src\/(?:test|androidTest)\/|src-tauri\/tests\/|\.github\/workflows\/|scripts\/android-ci-native-required\.mjs$)/
 
 // Only paths known to contain web content, tests, or documentation may skip
 // native verification on PRs. Unknown paths intentionally require it.
@@ -34,6 +35,22 @@ export function nativeRequired(eventName, baseSha, diff = execFileSync) {
   }
 }
 
+// GitHub compare responses expose at most 300 changed files. Do not promote an
+// older release if the comparison may be truncated or the commits diverged.
+export function onlyNonProductChanges(comparison) {
+  if (comparison?.status !== 'ahead' || !Array.isArray(comparison.files) || comparison.files.length >= 300) return false
+  const paths = []
+  for (const file of comparison.files) {
+    if (typeof file.filename !== 'string' || !file.filename) return false
+    paths.push(file.filename)
+    if (file.status === 'renamed') {
+      if (typeof file.previous_filename !== 'string' || !file.previous_filename) return false
+      paths.push(file.previous_filename)
+    }
+  }
+  return !requiresRelease(paths)
+}
+
 // Publication is a separate decision from verification. An uncertain push
 // must fail visibly rather than accidentally publishing a test-only change.
 export function buildPolicy(eventName, baseSha, diff = execFileSync) {
@@ -44,10 +61,14 @@ export function buildPolicy(eventName, baseSha, diff = execFileSync) {
   if (eventName !== 'push') throw new Error('Unsupported build event: ' + eventName)
   const paths = changedPaths(baseSha, diff)
   const release = requiresRelease(paths)
-  return { native: release || paths.some(path => /^(?:android\/|src-tauri\/)/.test(path)), release }
+  return { native: release || paths.some(path => /^(?:android\/|src-tauri\/|\.github\/workflows\/|scripts\/android-ci-native-required\.mjs$)/.test(path)), release }
 }
 
 if (process.argv[1]?.endsWith('/android-ci-native-required.mjs')) {
-  const policy = buildPolicy(process.env.EVENT_NAME, process.env.BASE_SHA)
-  console.log(`native=${policy.native}\nrelease=${policy.release}`)
+  if (process.argv[2] === 'compare') {
+    console.log(onlyNonProductChanges(JSON.parse(readFileSync(process.argv[3], 'utf8'))))
+  } else {
+    const policy = buildPolicy(process.env.EVENT_NAME, process.env.BASE_SHA)
+    console.log(`native=${policy.native}\nrelease=${policy.release}`)
+  }
 }
