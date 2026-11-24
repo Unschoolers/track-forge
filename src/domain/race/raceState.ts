@@ -56,8 +56,8 @@ export interface RaceVehicle {
   readonly nextSector: number
   readonly lap: number
   readonly recoveryCheckpoint?: number | null
-  /** Cumulative race-time penalty, independent of simulation elapsed. */
-  readonly recoveryPenaltySeconds?: number
+  /** Manual recovery releases controls after this running simulation tick. */
+  readonly manualRecoveryUntilTick?: number
   /** Seconds since a player fell off elevated road support; clears after recovery. */
   readonly bridgeFallSeconds?: number | undefined
   readonly damage: number
@@ -71,6 +71,12 @@ export interface RaceVehicle {
   readonly finishedAt: number | null
   /** Arcade fallback: suppress repeat water resets until safe grounded support. */
   readonly waterRecoveryProtected?: boolean
+}
+
+export const MANUAL_RECOVERY_TICKS = 30
+
+export function manualRecoveryTicksRemaining(vehicle: RaceVehicle | undefined, tick: number): number {
+  return Math.max(0, (vehicle?.manualRecoveryUntilTick ?? tick) - tick)
 }
 
 export interface RaceCameraHints {
