@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede stale PR runs, not a release build when a test-only commit lands.
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   web-build:
@@ -200,6 +201,9 @@ jobs:
     needs: [web-build, android, verify, windows, ai-matrix]
     if: github.ref == 'refs/heads/main' && needs.web-build.outputs.release == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
+    concurrency:
+      group: android-release-main
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -272,7 +276,15 @@ jobs:
           highest_build=$(jq -r '[.[][] | select(.draft == false) | .tag_name | capture("^android-build-(?<run>[0-9]+)-[0-9]+$")? | .run | tonumber] | max // 0' releases.json)
           main_sha=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
           latest=(--latest=false)
-          if (( BUILD_RUN >= highest_build )) && [ "$GITHUB_SHA" = "$main_sha" ]; then
+          current_product=false
+          if [ "$GITHUB_SHA" = "$main_sha" ]; then
+            current_product=true
+          elif gh api "repos/$GH_REPO/compare/$GITHUB_SHA...$main_sha" > "$RUNNER_TEMP/main-comparison.json"; then
+            current_product=$(node scripts/android-ci-native-required.mjs compare "$RUNNER_TEMP/main-comparison.json")
+          else
+            echo '::warning::Could not verify whether main advanced only through test/documentation changes. Publishing this verified build without promoting it to latest.'
+          fi
+          if (( BUILD_RUN >= highest_build )) && [ "$current_product" = true ]; then
             latest=(--latest)
           fi
           if gh release view "$tag" --repo "$GH_REPO" --json targetCommitish,assets > existing-release.json 2>/dev/null; then
