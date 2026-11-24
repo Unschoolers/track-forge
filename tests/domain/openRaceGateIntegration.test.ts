@@ -72,7 +72,7 @@ it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, fre
   expect(resetCar.pathIndex).toBeLessThan(gateIndex)
   expect(resetCar.x).toBeCloseTo(path.points[resetCar.pathIndex]!.x)
   expect(resetCar.lap).toBe(player.lap)
-  expect(resetCar.recoveryPenaltySeconds).toBeCloseTo(0.1)
+  expect(resetCar.manualRecoveryUntilTick).toBeUndefined()
   expect(recovered.state.vehicles[0]!.nextSector).toBe(1)
   expect(recovered.state.elapsed).toBeCloseTo(missed.state.elapsed + 2)
 })
