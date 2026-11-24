@@ -206,7 +206,7 @@ export const CAR_PHYSICS_SPECS = {
     // High-speed pavement specialist: visibly quicker than Blue on a straight.
     max: 337,
     accel: 230,
-    steer: 2.28,
+    steer: 2.6,
     grip: 0.79,
     brake: 0.83,
     steerLoss: 0.118,
@@ -220,7 +220,8 @@ export const CAR_PHYSICS_SPECS = {
     // Race-grade service brakes without granting Red more cornering grip.
     brakingTractionScale: 1.38,
     pavementBrakeMultiplier: 1.5,
-    iceBrakeMultiplier: 1.9877,
+    // Preserve the 250-unit ice stopping target with the improved ice grip.
+    iceBrakeMultiplier: 1.5268,
     lateralStability: 0.9,
     recovery: 1.25,
   },
@@ -296,9 +297,9 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
   red: {
     street: DEFAULT_TERRAIN,
     dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.75, drag: 1.55 },
-    ice: { max: 0.95, accel: 0.84, grip: 0.76, brake: 0.78, drag: 1.2 },
-    // The pavement specialist pays extra for grass shortcuts; street is unchanged.
-    grass: { max: 0.51, accel: 0.40, grip: 0.57, brake: 0.72, drag: 2.35 },
+    ice: { max: 0.95, accel: 0.84, grip: 1, brake: 0.78, drag: 1.2 },
+    // Keep the low grass speed target but let Red recover from a mistake sooner.
+    grass: { max: 0.51, accel: 0.7, grip: 0.57, brake: 0.72, drag: 1.6 },
   },
   green: {
     street: DEFAULT_TERRAIN,
