@@ -18,7 +18,8 @@ import type { CarId, SurfaceId } from '@/domain/model'
  */
 
 /**
- * Shared model constants. Tune these first when changing the overall handling
+ * Single production Arcade physics profile, independent of race rules.
+ * Tune these first when changing the overall handling
  * character; car and surface records below should express relative identity.
  */
 export interface VehicleDynamicsTuning {
@@ -135,7 +136,7 @@ export const VEHICLE_DYNAMICS_TUNING = {
     referenceMass: 1_250,
     // TrackForge compresses real corner radii into a small top-down playfield.
     // Lateral authority therefore needs an arcade scale above physical 1g.
-    lateralGripScale: 2.55,
+    lateralGripScale: 3.1,
     brakeGripUsage: 0.92,
     brakingTractionScale: 1.12,
     minimumLateralBudget: 0.04,
@@ -145,18 +146,18 @@ export const VEHICLE_DYNAMICS_TUNING = {
     maximumGrade: 0.6,
   },
   steering: {
-    maximumAngleScale: 0.18,
-    highSpeedReduction: 0.48,
+    maximumAngleScale: 0.235,
+    highSpeedReduction: 0.31,
     minimumTireSpeed: 12,
     fullTireResponseSpeed: 26,
   },
   stability: {
-    lateralDamping: 7.2,
-    steeringRetention: 0.58,
-    brakingRetention: 0.34,
+    lateralDamping: 9.6,
+    steeringRetention: 0.76,
+    brakingRetention: 0.28,
     lowSpeedSettling: 5.5,
     yawSteeringInfluence: 0.62,
-    yawNeutralInfluence: 0.38,
+    yawNeutralInfluence: 0.56,
   },
   loadTransfer: {
     minimumFrontLoad: 0.34,
@@ -174,28 +175,6 @@ export const VEHICLE_DYNAMICS_TUNING = {
     maximumGripLoss: 0.035,
   },
 } as const satisfies VehicleDynamicsTuning
-
-// Arcade uses the same deterministic bicycle integrator with a forgiving
-// grip and steering profile; the existing profile remains Simulation mode.
-export const ARCADE_DYNAMICS_TUNING: VehicleDynamicsTuning = {
-  ...VEHICLE_DYNAMICS_TUNING,
-  forces: {
-    ...VEHICLE_DYNAMICS_TUNING.forces,
-    lateralGripScale: 3.1,
-  },
-  steering: {
-    ...VEHICLE_DYNAMICS_TUNING.steering,
-    maximumAngleScale: 0.235,
-    highSpeedReduction: 0.31,
-  },
-  stability: {
-    ...VEHICLE_DYNAMICS_TUNING.stability,
-    lateralDamping: 9.6,
-    steeringRetention: 0.76,
-    brakingRetention: 0.28,
-    yawNeutralInfluence: 0.56,
-  },
-}
 
 export const ARCADE_BRAKE_TIMING = { pressSeconds: 0.15, releaseSeconds: 0.1 } as const
 
