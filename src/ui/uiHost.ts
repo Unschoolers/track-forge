@@ -608,6 +608,8 @@ export class DomUiHost implements UiHost {
           },
           save: () =>
             this.controller.dispatch({ type: 'save-current-track' }),
+          race: () =>
+            this.controller.dispatch({ type: 'race-current-track' }),
           saveAs: () =>
             this.controller.dispatch({ type: 'open-track-name', purpose: 'save-as' }),
           rename: () =>

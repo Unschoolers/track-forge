@@ -5,6 +5,7 @@ export function requiresEditorExitConfirmation(command: AppCommand): boolean {
   switch (command.type) {
     case 'go-home':
     case 'start-race':
+    case 'race-current-track':
     case 'race-again':
     case 'select-track':
     case 'select-track-for-edit':

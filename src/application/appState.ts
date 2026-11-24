@@ -108,6 +108,7 @@ export interface EditorUiState {
 export type AppCommand =
   | { readonly type: 'go-home' }
   | { readonly type: 'open-editor' }
+  | { readonly type: 'race-current-track' }
   | { readonly type: 'start-race' }
   | { readonly type: 'open-nearby' }
   | { readonly type: 'send-nearby-track'; readonly track: Track }

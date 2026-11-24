@@ -8,6 +8,7 @@ describe('editor exit command policy', () => {
     const commands: AppCommand[] = [
       { type: 'go-home' },
       { type: 'start-race' },
+      { type: 'race-current-track' },
       { type: 'race-again' },
       { type: 'select-track', id: asTrackId('next') },
       { type: 'select-track-for-edit', id: asTrackId('next') },

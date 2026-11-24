@@ -480,6 +480,84 @@ describe('AppController', () => {
   })
 
 
+  it('opens race setup from a saved editor track and Back returns to editing', () => {
+    const { controller, trackStore, raceSession } = setup()
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'open-editor-menu' })
+    controller.dispatch({ type: 'race-current-track' })
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'editor', overlay: { type: 'race-setup' }, currentTrack: { id: 'starter' },
+    })
+    expect(trackStore.save).not.toHaveBeenCalled()
+    expect(raceSession.start).not.toHaveBeenCalled()
+    controller.dispatch({ type: 'close-overlay' })
+    expect(controller.snapshot()).toMatchObject({ mode: 'editor', overlay: { type: 'none' } })
+  })
+
+  it.each(['save', 'save-as', 'discard', 'cancel'] as const)(
+    'editor Race requests a save and handles %s without losing unsaved work',
+    choice => {
+      const { controller, trackStore, raceSession } = setup()
+      controller.dispatch({ type: 'open-editor' })
+      controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+      controller.dispatch({ type: 'open-editor-menu' })
+      controller.dispatch({ type: 'race-current-track' })
+      expect(controller.snapshot()).toMatchObject({
+        mode: 'editor', overlay: { type: 'editor-exit' },
+      })
+      expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
+      expect(raceSession.start).not.toHaveBeenCalled()
+
+      controller.dispatch({ type: 'resolve-editor-exit', choice })
+      if (choice === 'save-as') {
+        expect(controller.snapshot().overlay).toMatchObject({ type: 'track-name', purpose: 'save-as' })
+        controller.dispatch({ type: 'save-as-track', name: 'Race Copy' })
+      }
+      if (choice === 'cancel') {
+        expect(controller.snapshot()).toMatchObject({ mode: 'editor', overlay: { type: 'none' } })
+        expect(controller.snapshot().editor.trees).toContainEqual({ x: 4, y: 5 })
+        expect(trackStore.save).not.toHaveBeenCalled()
+        return
+      }
+      expect(controller.snapshot()).toMatchObject({
+        mode: 'editor', overlay: { type: 'race-setup' },
+        currentTrack: { id: choice === 'save-as' ? 'created' : 'starter' },
+      })
+      const saved = trackStore.find(asTrackId(choice === 'save-as' ? 'created' : 'starter'))
+      expect(saved?.trees.some(tree => tree.x === 4 && tree.y === 5)).toBe(choice !== 'discard')
+      if (choice === 'save-as') {
+        expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
+      }
+      expect(raceSession.start).not.toHaveBeenCalled()
+    },
+  )
+
+  it('keeps the editor and its draft if saving before Race fails', () => {
+    const { controller, trackStore } = setup()
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } })
+    controller.dispatch({ type: 'race-current-track' })
+    trackStore.save.mockReturnValueOnce(false)
+    controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'editor', overlay: { type: 'editor-exit' }, notice: 'Save unavailable.',
+    })
+    expect(controller.snapshot().editor.trees).toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('keeps an incomplete track editable when Race is chosen from the editor menu', () => {
+    const incomplete = { ...createStarterTrack(asTrackId('incomplete'), 1), recoveryCheckpoints: [] }
+    const { controller, raceSession } = setup(incomplete)
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'open-editor-menu' })
+    controller.dispatch({ type: 'race-current-track' })
+    expect(controller.snapshot()).toMatchObject({
+      mode: 'editor', overlay: { type: 'none' },
+      notice: expect.stringContaining('Add a checkpoint'),
+    })
+    expect(raceSession.start).not.toHaveBeenCalled()
+  })
+
   it('edits only a draft until Save, and never autosaves on destroy', () => {
     const { controller, trackStore } = setup()
     controller.dispatch({ type: 'open-editor' })

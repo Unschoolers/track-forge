@@ -211,6 +211,12 @@ export class AppController {
           notice: null,
         })
         break
+      case 'race-current-track':
+        if (this.state.mode === 'editor' && this.state.currentTrack) {
+          // Resolve the ID now, after any Save As, not before the save dialog.
+          this.selectTrackForRace(this.state.currentTrack.id)
+        }
+        break
       case 'open-editor':
         if (this.state.currentTrack && isSeededTrack(this.state.currentTrack)) {
           const copy = this.library.forkSeededForEdit(this.state.currentTrack, this.creator())
@@ -762,7 +768,11 @@ export class AppController {
       this.dependencies.geometry.get(track).path.totalLength,
     )
     if (!validation.ready) {
-      this.update({ ...this.state, notice: validation.message })
+      this.update({
+        ...this.state,
+        ...(this.state.mode === 'editor' ? { overlay: { type: 'none' as const } } : {}),
+        notice: validation.message,
+      })
       return
     }
     if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'cup') {
@@ -934,7 +944,10 @@ export class AppController {
     if (overlay.type === 'race-setup') {
       this.update({
         ...this.state,
-        overlay: { type: 'track-library', purpose: 'race' },
+        // A quick race started from the editor returns there, not to the picker.
+        overlay: this.state.mode === 'editor'
+          ? { type: 'none' }
+          : { type: 'track-library', purpose: 'race' },
         notice: null,
       })
       return
