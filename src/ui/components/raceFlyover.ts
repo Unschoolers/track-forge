@@ -104,3 +104,53 @@ export function createRaceFlyover(
     },
   }
 }
+
+
+/** Retain the canvas, prepared materials and observers across unrelated UI renders. */
+export class RaceFlyoverLifecycle {
+  private key: string | undefined
+  private playback: RaceFlyoverPlayback = { elapsedSeconds: 0 }
+  private current: {
+    track: Track; geometry: TrackGeometry; car: CarId; lighting: LightingMode; ghost: boolean
+    view: ReturnType<typeof createRaceFlyover>
+  } | undefined
+  private used = false
+
+  begin(key: string | undefined): void {
+    this.used = false
+    if (key !== this.key) {
+      this.release()
+      this.key = key
+      this.playback = { elapsedSeconds: 0 }
+    }
+  }
+
+  get(track: Track, geometry: TrackGeometry, car: CarId, lighting: LightingMode, ghost: boolean): HTMLElement {
+    this.used = true
+    const current = this.current
+    if (current && current.track === track && current.geometry === geometry &&
+        current.car === car && current.lighting === lighting && current.ghost === ghost) {
+      return current.view.element
+    }
+    this.release()
+    const view = createRaceFlyover(track, geometry, car, lighting, ghost, this.playback)
+    this.current = { track, geometry, car, lighting, ghost, view }
+    return view.element
+  }
+
+  end(): void {
+    if (!this.used) this.release()
+  }
+
+  destroy(): void {
+    this.release()
+    this.key = undefined
+    this.playback = { elapsedSeconds: 0 }
+    this.used = false
+  }
+
+  private release(): void {
+    this.current?.view.destroy()
+    this.current = undefined
+  }
+}
