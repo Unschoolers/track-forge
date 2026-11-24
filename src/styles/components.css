@@ -135,6 +135,8 @@
 .race-flyover { display: block; width: 100%; height: clamp(7.5rem, 35vw, 10rem); }
 .race-flyover-toggle { position: absolute; right: .35rem; bottom: .35rem; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #ffffff40; border-radius: var(--radius-sm); background: #0d151ccf; color: #f4f7fb; cursor: pointer; }
 .race-flyover-toggle::before { width: 0; height: 0; margin-left: 2px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 9px solid currentColor; content: ''; }
+.race-flyover-toggle.speed-up { font: inherit; font-size: .9rem; font-weight: 800; }
+.race-flyover-toggle.speed-up::before { content: none; }
 .race-flyover-toggle.playing::before { width: 9px; height: 12px; margin-left: 0; border: solid currentColor; border-width: 0 3px; }
 .choice-row { display: flex; gap: .45rem; }
 .setup-choice { flex: 1; min-height: 44px; padding: .4rem; }
