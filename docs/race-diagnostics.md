@@ -19,7 +19,7 @@ By default, time-weighted stats **stop at the player's recorded finish**. Rivals
 
 `track` prints a deterministic geometry/terrain fingerprint, road point count, surface/structure breakdown, terrain cell counts, bounds, checkpoints and scenery count. The fingerprint ignores track names, versions, decoration and terrain cell ordering, so it can check whether a replay and an independently uploaded track use the same *road and terrain*. It does **not** assert identical scenery or checkpoints.
 
-`stats` and `compare` accept both replay format versions 1 and 2 without modifying the source files. The summary identifies the recorded ruleset and format version, preserving historical Simulation collision incidents. `compare` matches car color **and player/AI role** (not changing grid slot). It warns about different geometry, difficulty, ruleset, grid, laps, mode and player car, and flags mixed replay versions because the physics may differ. It does not treat a human four-car time as directly equivalent to a seeded AI solo time.
+`stats` and `compare` accept replay format version 1 without modifying the source files. The summary identifies the recorded ruleset and format version, preserving historical Simulation collision incidents. `compare` matches car color **and player/AI role** (not changing grid slot). It warns about different geometry, difficulty, ruleset, grid, laps, mode and player car. It does not treat a human four-car time as directly equivalent to a seeded AI solo time.
 
 ## Simulate a supplied track, with exactly the authored geometry
 
