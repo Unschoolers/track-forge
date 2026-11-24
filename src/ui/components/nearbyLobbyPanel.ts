@@ -1,29 +1,20 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { CAR_SPECS } from '@/domain/config'
-import { createCarPicker } from '@/ui/components/carPicker'
+import { populateRacePreparation } from '@/ui/components/racePreparationLayout'
 import { button, element } from '@/ui/dom'
 import type { ModalFrame } from '@/ui/modals/modalFrame'
 
 type LobbySnapshot = ReturnType<NearbyRace['snapshot']>
 
-export function populateNearbyLobby(frame: ModalFrame, nearby: NearbyRace, snapshot: LobbySnapshot): void {
+export function populateNearbyLobby(frame: ModalFrame, nearby: NearbyRace, snapshot: LobbySnapshot, preview?: HTMLElement): void {
   const localSlot = nearby.localSlot()
-  const header = element('div', 'nearby-lobby-course')
   const laps = snapshot.laps ?? 1
   const metadata = [
-    laps + (laps === 1 ? ' lap' : ' laps'),
+    snapshot.lobbyTrack?.routeKind === 'point-to-point' ? 'Single run' : laps + (laps === 1 ? ' lap' : ' laps'),
     snapshot.lighting === 'night' ? 'Night race' : 'Day race',
     ...(snapshot.cup ? ['Cup ' + (snapshot.cup.index + 1) + '/' + snapshot.cup.total] : []),
   ]
-  header.append(element('h3', 'nearby-lobby-track', snapshot.track ?? 'Next race'),
-    element('p', 'modal-subtitle', metadata.join(' · ')))
-
-  const columns = element('div', 'nearby-lobby-columns')
-  const picker = createCarPicker(snapshot.localCar, car => nearby.selectLobbyCar(car), {
-    disabled: snapshot.unlockPending || snapshot.localReady,
-  })
-  picker.classList.add('nearby-lobby-picker')
-  const rosterPanel = element('section', 'nearby-lobby-roster')
+  const rosterPanel = element('section', 'setup-section nearby-lobby-roster')
   const heading = element('div', 'nearby-lobby-roster-header')
   const accepted = snapshot.lobbyPlayers.filter(player => player.accepted).length
   const count = element('span', 'nearby-lobby-count', accepted + '/' + snapshot.lobbyPlayers.length + ' READY')
@@ -57,8 +48,14 @@ export function populateNearbyLobby(frame: ModalFrame, nearby: NearbyRace, snaps
     roster.append(row)
   }
   rosterPanel.append(heading, roster)
-  columns.append(picker, rosterPanel)
-  frame.body.append(header, columns)
+  populateRacePreparation(frame.body, {
+    car: snapshot.localCar,
+    selectCar: car => nearby.selectLobbyCar(car),
+    carLocked: snapshot.unlockPending || snapshot.localReady,
+    preview,
+    metadata: metadata.join(' · '),
+    sections: [rosterPanel],
+  })
 
   const message = snapshot.unlockPending ? 'Waiting for the host to unlock your car.'
     : snapshot.readyPending ? 'Confirming your readiness with the host…'
