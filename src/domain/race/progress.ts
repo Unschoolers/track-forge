@@ -13,6 +13,7 @@ export function updateProgress(
   reversed = false,
   timingGates: readonly number[] = [],
   closed = true,
+  physicalGateEligible = true,
 ): RaceVehicle {
   if (pathLength <= 1 || vehicle.finishedAt !== null) return vehicle
   const directed = (index: number): number => closed
@@ -21,7 +22,9 @@ export function updateProgress(
   const before = directed(vehicle.pathIndex)
   const after = directed(nextPathIndex)
   const travel = closed ? (after - before + pathLength) % pathLength : after - before
-  if (travel < 0 || travel > pathLength / 2) return { ...vehicle, pathIndex: nextPathIndex }
+  if (travel < 0 || travel > pathLength / 2 || !physicalGateEligible) {
+    return { ...vehicle, pathIndex: nextPathIndex }
+  }
 
   // A 60 Hz tick can cross several tightly spaced authored gates. Consume
   // every gate encountered along the same bounded forward road movement,
