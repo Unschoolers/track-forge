@@ -17,7 +17,7 @@ import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
-import { createRaceFlyover, type RaceFlyoverPlayback } from '@/ui/components/raceFlyover'
+import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
@@ -64,8 +64,7 @@ export class DomUiHost implements UiHost {
   private screenCleanup: (() => void) | undefined
   private overlayCleanup: (() => void) | undefined
   private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
-  private flyoverKey: string | undefined
-  private flyoverPlayback: RaceFlyoverPlayback = { elapsedSeconds: 0 }
+  private readonly flyover = new RaceFlyoverLifecycle()
   private mounted = false
   private readonly dialogs = new DialogController()
   private readonly environment: UiEnvironment
@@ -108,7 +107,7 @@ export class DomUiHost implements UiHost {
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
     this.cancelRacePreparation()
-    this.flyoverKey = undefined
+    this.flyover.destroy()
     this.dialogs.destroy()
     this.updateCheckGeneration++
     this.updateCheckPending = false
@@ -256,10 +255,7 @@ export class DomUiHost implements UiHost {
     const lobbyTrack = state.overlay.type === 'nearby' ? this.runtime.nearby?.snapshot().lobbyTrack : undefined
     const flyoverKey = isRaceSetup && state.currentTrack ? 'solo:' + state.currentTrack.id
       : lobbyTrack ? 'nearby:' + lobbyTrack.id : undefined
-    if (flyoverKey !== this.flyoverKey) {
-      this.flyoverKey = flyoverKey
-      this.flyoverPlayback = { elapsedSeconds: 0 }
-    }
+    this.flyover.begin(flyoverKey)
     const home = () => this.controller.dispatch({ type: 'go-home' })
     this.dialogs.beforeRender(this.root, state.overlay)
     const openLibrary = (purpose: 'edit' | 'race') =>
@@ -365,6 +361,7 @@ export class DomUiHost implements UiHost {
       ? this.root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop
       : undefined
     const overlay = this.renderOverlay(state)
+    this.flyover.end()
     const nodes: Node[] = [screen]
     if (overlay) nodes.push(overlay)
     if (state.notice && state.overlay.type !== 'track-name' && state.overlay.type !== 'editor-exit') {
@@ -398,9 +395,8 @@ export class DomUiHost implements UiHost {
         const track = lobby.lobbyTrack
         const geometry = track && this.runtime.geometry.get(track)
         const flyover = track && geometry && geometry.path.points.length > 1
-          ? createRaceFlyover(track, geometry, lobby.localCar, lobby.lighting ?? track.lighting, false, this.flyoverPlayback)
+          ? this.flyover.get(track, geometry, lobby.localCar, lobby.lighting ?? track.lighting, false)
           : undefined
-        this.overlayCleanup = flyover?.destroy
         return createNearbyRaceModal(nearby, {
           close,
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
@@ -411,7 +407,7 @@ export class DomUiHost implements UiHost {
           scanTracks: () => this.controller.dispatch({ type: 'scan-nearby-track' }),
           saveTrack: () => this.controller.dispatch({ type: 'save-nearby-track' }),
           declineTrack: () => this.controller.dispatch({ type: 'decline-nearby-track' }),
-        }, this.runtime.nearbyConnections, flyover?.element)
+        }, this.runtime.nearbyConnections, flyover)
       }
       case 'cup':
         return createCupModal(state, {
@@ -528,16 +524,14 @@ export class DomUiHost implements UiHost {
         const ghostTime = availability.kind === 'exact' ? availability.time : null
         const geometry = currentTrack && this.runtime.geometry.get(currentTrack)
         const flyover = currentTrack && geometry && geometry.path.points.length > 1
-          ? createRaceFlyover(
+          ? this.flyover.get(
               currentTrack,
               geometry,
               preferences.car,
               lighting,
               preferences.raceMode === 'ghost' && ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0,
-              this.flyoverPlayback,
             )
           : undefined
-        this.overlayCleanup = flyover?.destroy
         if (currentTrack && geometry && flyover && !this.racePreparation) {
           const cancel = this.runtime.prepareRace?.(currentTrack, geometry, lighting)
           if (cancel) this.racePreparation = { track: currentTrack, lighting, cancel }
@@ -553,7 +547,7 @@ export class DomUiHost implements UiHost {
             }),
           start: () =>
             this.controller.dispatch({ type: 'start-race' }),
-        }, availability, flyover?.element)
+        }, availability, flyover)
       }
       case 'options':
         return createOptionsModal(state, {
