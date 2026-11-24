@@ -1,9 +1,10 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import { CupFlow } from '@/application/race/cupFlow'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal, promotedTimeMedal } from '@/application/race/raceRecords'
 import { collectTrackScores } from '@/application/race/trackScoreCollection'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, recordCupResult, retryCupRace, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
+import { DEFAULT_CUP_TRACK_IDS, recordCupResult, retryCupRace } from '@/application/race/circuitCup'
 import type {
   CupStore,
   LastRace,
@@ -61,7 +62,7 @@ export class AppController {
   private readonly now: () => number
   private readonly library: TrackLibraryService
   private state: AppSnapshot
-  private preCupTrack: Track | null = null
+  private readonly cupFlow: CupFlow
   private pendingCreatorId: string | undefined
   private readonly editorSession: EditorSession
   private pendingEditorExit: AppCommand | null = null
@@ -120,6 +121,17 @@ export class AppController {
       scoresByTrack: this.scoresForTracks(tracks),
       notice: null,
     }
+    this.cupFlow = new CupFlow({
+      snapshot: () => this.state,
+      update: (state) => this.update(state),
+      tracks: () => this.library.list(),
+      librarySnapshot: () => this.librarySnapshot(),
+      goHome: () => this.dispatch({ type: 'go-home' }),
+      cupStore: dependencies.cupStore,
+      nearby: dependencies.nearby,
+      raceSession: dependencies.raceSession,
+      geometry: dependencies.geometry,
+    })
     dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
     dependencies.nearby?.setDisplayName(this.state.preferences.displayName)
     this.unsubscribeNearbyStart = dependencies.nearby?.onStart(({ track, car, laps, lighting, gridSlot, startsAt }) => {
@@ -156,7 +168,7 @@ export class AppController {
         const { standings } = snapshot.result
         if (cup?.rounds[cup.index]?.some((driver, index) => driver.id !== standings[index]?.id)) {
           const updated = recordCupResult(retryCupRace(cup), standings)
-          const { progress, notice } = this.persistCup(updated)
+          const { progress, notice } = this.cupFlow.persistCup(updated)
           this.update({ ...this.state, cup: updated, cupProgress: progress, notice })
         }
         return
@@ -170,7 +182,7 @@ export class AppController {
       const track = this.state.currentTrack
       const previousMedal = track ? timeMedal(track, this.state.scoresByTrack[track.id] ?? []) : null
       const earnedMedal = track ? timeMedal(track, scores[track.id] ?? []) : null
-      const savedCup = cup ? this.persistCup(cup) : null
+      const savedCup = cup ? this.cupFlow.persistCup(cup) : null
       this.update({
         ...this.state,
         paused: true,
@@ -204,7 +216,7 @@ export class AppController {
           ...this.state,
           mode: 'home',
           raceAgainTrackName: this.resolveLastRace()?.track.name,
-          currentTrack: this.state.cup ? this.preCupTrack : this.state.currentTrack,
+          currentTrack: this.state.cup ? this.cupFlow.previousTrack : this.state.currentTrack,
           cup: null,
           paused: false,
           overlay: { type: 'none' },
@@ -227,74 +239,14 @@ export class AppController {
         this.update({ ...this.state, cup: null, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
         break
       case 'open-cup':
-        if (this.state.mode === 'home' &&
-            (this.state.overlay.type === 'none' ||
-              (this.state.overlay.type === 'nearby' && this.dependencies.nearby?.snapshot().phase === 'idle'))) {
-          this.update({ ...this.state, overlay: { type: 'cup',
-            ...(this.state.overlay.type === 'nearby' ? { returnTo: 'nearby' as const } : {}) }, notice: null })
-        }
-        break
       case 'cup-add-track':
-        if (this.state.overlay.type === 'cup' &&
-            (this.state.cupProgress?.lineup?.length ?? DEFAULT_CUP_TRACK_IDS.length) < 12) {
-          this.update({ ...this.state, overlay: { type: 'track-library', purpose: 'cup' }, ...this.librarySnapshot(), notice: null })
-        }
-        break
-      case 'cup-remove-track': {
-        if (this.state.overlay.type !== 'cup') break
-        const lineup = removeCupTrack(this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS, command.index)
-        if (lineup) this.setCupLineup(lineup)
-        break
-      }
-      case 'cup-move-track': {
-        if (this.state.overlay.type !== 'cup') break
-        const lineup = moveCupTrack(this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS, command.index, command.direction)
-        if (lineup) this.setCupLineup(lineup)
-        break
-      }
-      case 'start-cup': {
-        if (this.state.overlay.type !== 'cup') break
-        const ids = this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS
-        if (!this.validateCupTracks(ids)) break
-        this.preCupTrack = this.state.currentTrack
-        this.launchCupRace(createCup(this.state.preferences.car, this.state.preferences.difficulty, ids))
-        break
-      }
-      case 'host-nearby-cup': {
-        const nearby = this.dependencies.nearby
-        if (this.state.overlay.type !== 'cup' || !nearby || nearby.snapshot().phase !== 'idle') break
-        const ids = this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS
-        if (!this.validateCupTracks(ids)) break
-        const tracks = ids.map(id => this.cupTrack(id)).filter((track): track is Track => !!track)
-        nearby.hostCup(tracks, this.state.preferences.car, this.state.preferences.raceLaps ?? 2)
-        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
-        break
-      }
-      case 'resume-cup': {
-        const cup = this.state.cupProgress?.checkpoint
-        if (!cup) break
-        this.preCupTrack = this.state.currentTrack
-        if (!this.validateCupTracks(cupTrackIds(cup))) break
-        if (cup.rounds.length > cup.index && cup.index === cupRoundCount(cup) - 1) {
-          this.update({ ...this.state, cup, overlay: { type: 'cup-final' } })
-        } else {
-          this.launchCupRace(cup.rounds.length > cup.index ? advanceCup(cup) : cup)
-        }
-        break
-      }
+      case 'cup-remove-track':
+      case 'cup-move-track':
+      case 'start-cup':
+      case 'host-nearby-cup':
+      case 'resume-cup':
       case 'next-cup-race':
-        if (this.state.cup && (this.state.overlay.type === 'results' || this.state.overlay.type === 'cup-final')) {
-          if (this.state.cup.index === cupRoundCount(this.state.cup) - 1) {
-            const placement = cupStandings(this.state.cup).findIndex((driver) => driver.id === 'player') + 1
-            const previous = this.state.cupProgress?.bestPlacement ?? null
-            const progress = { checkpoint: null, bestPlacement: placement > 0 ? Math.min(previous ?? placement, placement) : previous, lineup: this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS }
-            const notice = this.saveCupProgress(progress)
-            this.dispatch({ type: 'go-home' })
-            this.update({ ...this.state, cupProgress: progress, notice })
-          } else {
-            this.launchCupRace(advanceCup(this.state.cup))
-          }
-        }
+        this.cupFlow.dispatch(command)
         break
       case 'set-race-lighting':
         if (this.state.overlay.type === 'race-setup') this.update({ ...this.state, raceLighting: command.lighting })
@@ -421,7 +373,7 @@ export class AppController {
       case 'restart-race':
         if (this.state.mode === 'race' && this.beforeNearbyTrack === undefined) {
           const cup = this.state.cup ? retryCupRace(this.state.cup) : null
-          const savedCup = cup ? this.persistCup(cup) : null
+          const savedCup = cup ? this.cupFlow.persistCup(cup) : null
           this.dependencies.raceSession.restart()
           this.update({
             ...this.state,
@@ -601,60 +553,6 @@ export class AppController {
     this.dependencies.raceSession.destroy()
   }
 
-  private saveCupProgress(progress: CupProgress): string | null {
-    return this.dependencies.cupStore?.save(progress) === false
-      ? 'Cup progress could not be saved on this device.'
-      : null
-  }
-
-  private persistCup(checkpoint: CircuitCup): { progress: CupProgress; notice: string | null } {
-    const progress = { checkpoint, bestPlacement: this.state.cupProgress?.bestPlacement ?? null,
-      lineup: this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS }
-    return { progress, notice: this.saveCupProgress(progress) }
-  }
-
-  private setCupLineup(lineup: readonly string[]): void {
-    const progress: CupProgress = { ...this.state.cupProgress, checkpoint: this.state.cupProgress?.checkpoint ?? null,
-      bestPlacement: this.state.cupProgress?.bestPlacement ?? null, lineup }
-    const notice = this.saveCupProgress(progress)
-    this.update({ ...this.state, cupProgress: progress, notice })
-  }
-
-  private cupTrack(id: string): Track | undefined {
-    return OFFICIAL_CIRCUITS.find(({ track }) => track.id === id)?.track ??
-      this.library.list().find(track => track.id === id)
-  }
-
-  private validateCupTracks(ids: readonly string[]): boolean {
-    if (!validCupLineup(ids) || !ids.length || !ids.every(id => {
-      const track = this.cupTrack(id)
-      return track && validateTrack(track, this.dependencies.geometry.get(track).path.totalLength).ready
-    })) {
-      this.update({ ...this.state, notice: 'A Cup track is missing or not race-ready. Edit your lineup.' })
-      return false
-    }
-    return true
-  }
-
-  private launchCupRace(cup: CircuitCup): void {
-    const id = cupTrackIds(cup)[cup.index]
-    const track = id && this.cupTrack(id)
-    if (!track) {
-      this.update({ ...this.state, notice: 'The next Cup track is unavailable.' })
-      return
-    }
-    this.dependencies.raceSession.start(track, {
-      car: cup.car,
-      difficulty: cup.difficulty,
-      laps: 1,
-
-      mode: 'normal',
-      gridPositions: cupGridPositions(cup),
-    })
-    const { progress, notice } = this.persistCup(cup)
-    this.update({ ...this.state, cup, cupProgress: progress, currentTrack: track, mode: 'race', paused: false, overlay: { type: 'none' }, notice })
-  }
-
   private rememberRace(): void {
     if (!this.dependencies.lastRaceStore) return
     const { track, setup } = this.dependencies.raceSession.snapshot()
@@ -780,7 +678,7 @@ export class AppController {
       if (lineup.length >= 12) {
         this.update({ ...this.state, overlay: { type: 'cup' }, notice: 'Cup is limited to 12 races.' })
       } else {
-        this.setCupLineup([...lineup, track.id])
+        this.cupFlow.setCupLineup([...lineup, track.id])
         this.update({ ...this.state, overlay: { type: 'cup' } })
       }
       return
