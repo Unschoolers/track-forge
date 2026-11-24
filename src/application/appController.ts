@@ -944,7 +944,10 @@ export class AppController {
     if (overlay.type === 'race-setup') {
       this.update({
         ...this.state,
-        overlay: { type: 'track-library', purpose: 'race' },
+        // A quick race started from the editor returns there, not to the picker.
+        overlay: this.state.mode === 'editor'
+          ? { type: 'none' }
+          : { type: 'track-library', purpose: 'race' },
         notice: null,
       })
       return
