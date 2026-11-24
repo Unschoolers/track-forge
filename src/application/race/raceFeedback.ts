@@ -39,7 +39,7 @@ export function routeRaceFeedback(
         feedback.handle({ type: 'landing', strength: peakLanding })
       }
       const rival = state.vehicles
-        .filter((vehicle) => !vehicle.player && !vehicle.wrecked && vehicle.finishedAt === null)
+        .filter((vehicle) => !vehicle.player && vehicle.finishedAt === null)
         .map((vehicle) => ({ vehicle, distance: Math.hypot(vehicle.x - player.x, vehicle.y - player.y) }))
         .sort((a, b) => a.distance - b.distance)[0]
       const dx = (rival?.vehicle.x ?? player.x) - player.x
@@ -56,16 +56,6 @@ export function routeRaceFeedback(
         feedback.handle({
           type: 'curb',
           speed: event.speed,
-        })
-      } else if (
-        (event.type === 'collision' &&
-          (event.leftId === 'player' || event.rightId === 'player')) ||
-        (event.type === 'barrier-collision' &&
-          event.vehicleId === 'player')
-      ) {
-        feedback.handle({
-          type: 'collision',
-          strength: event.strength,
         })
       }
     }

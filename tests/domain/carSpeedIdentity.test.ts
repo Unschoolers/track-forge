@@ -31,7 +31,6 @@ type Surface = 'street' | 'dirt'
 function drive(
   car: CarId,
   surface: Surface,
-  handling: 'arcade' | 'simulation',
   seconds: number,
 ): { readonly vehicle: RaceVehicle; readonly distance: number } {
   const fixture = physicsPlayer(car)
@@ -66,7 +65,6 @@ function drive(
       { steering: 0, throttle: 1, braking: false },
       context,
       dt,
-      handling,
     )
   }
   return {
@@ -85,12 +83,12 @@ describe('creator Speed fixture', () => {
   })
 })
 
-describe.each(['arcade', 'simulation'] as const)('%s speed specialties on the Speed track', handling => {
+describe('Car speed specialties on the Speed track', () => {
   it('makes Red clearly fastest on a long paved straight, followed by Blue', () => {
-    const red = drive('red', 'street', handling, 8)
-    const blue = drive('blue', 'street', handling, 8)
-    const green = drive('green', 'street', handling, 8)
-    const yellow = drive('yellow', 'street', handling, 8)
+    const red = drive('red', 'street', 8)
+    const blue = drive('blue', 'street', 8)
+    const green = drive('green', 'street', 8)
+    const yellow = drive('yellow', 'street', 8)
     expect(red.vehicle.speed).toBeGreaterThan(blue.vehicle.speed * 1.07)
     expect(blue.vehicle.speed).toBeGreaterThan(green.vehicle.speed)
     expect(green.vehicle.speed).toBeGreaterThan(yellow.vehicle.speed)
@@ -98,19 +96,19 @@ describe.each(['arcade', 'simulation'] as const)('%s speed specialties on the Sp
   })
 
   it('keeps the heavy Yellow slower off the line without making Green sluggish', () => {
-    const red = drive('red', 'street', handling, 1.5)
-    const blue = drive('blue', 'street', handling, 1.5)
-    const green = drive('green', 'street', handling, 1.5)
-    const yellow = drive('yellow', 'street', handling, 1.5)
+    const red = drive('red', 'street', 1.5)
+    const blue = drive('blue', 'street', 1.5)
+    const green = drive('green', 'street', 1.5)
+    const yellow = drive('yellow', 'street', 1.5)
     expect(red.distance).toBeGreaterThan(blue.distance)
     expect(green.distance).toBeGreaterThan(yellow.distance * 1.15)
     expect(blue.distance).toBeGreaterThan(yellow.distance * 1.1)
   })
 
   it('gives the off-road Yellow and versatile Green a speed advantage over Red on dirt', () => {
-    const yellow = drive('yellow', 'dirt', handling, 8)
-    const green = drive('green', 'dirt', handling, 8)
-    const red = drive('red', 'dirt', handling, 8)
+    const yellow = drive('yellow', 'dirt', 8)
+    const green = drive('green', 'dirt', 8)
+    const red = drive('red', 'dirt', 8)
     expect(yellow.vehicle.speed).toBeGreaterThan(red.vehicle.speed * 1.15)
     expect(green.vehicle.speed).toBeGreaterThan(red.vehicle.speed * 1.1)
   })

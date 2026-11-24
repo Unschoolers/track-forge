@@ -13,7 +13,6 @@ export type LaneIssueCode =
 	| 'invalid-state'
 	| 'invalid-lane'
 	| 'recovery'
-	| 'collision'
 	| 'timeout'
 
 export interface LaneLocation {
@@ -198,25 +197,6 @@ export class LaneMonitor {
 						recoveries: observation.metrics.recoveries + 1,
 					}
 					observation.lastProgressTime = race.elapsed
-				}
-			} else if (
-				event.type === 'collision' ||
-				event.type === 'barrier-collision'
-			) {
-				const ids =
-					event.type === 'collision'
-						? [event.leftId, event.rightId]
-						: [event.vehicleId]
-				for (const id of ids) {
-					if (alreadyFinished.has(id)) continue
-					const vehicle = race.vehicles.find((v) => v.id === id)
-					if (vehicle)
-						this.issues.push({
-							...this.location(race, vehicle),
-							code: 'collision',
-							severity: 'warning',
-							detail: `${event.type}, strength ${event.strength.toFixed(1)}`,
-						})
 				}
 			}
 		}

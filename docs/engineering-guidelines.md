@@ -35,7 +35,7 @@ The north star is **clear behavior, a maintainable change surface, and predictab
 
 - Prefer stable, deterministic domain calculations. Keep the 60 Hz physics contract independent of draw FPS and QA speedup.
 - AI balancing is a behavioral problem: measure distance/progress, time, recovery and lane safety across cars, difficulties, reverse routes and varied track shapes. A selected course may be a **calibration fixture**, but must never be a production condition: no `track.name`, `track.id`, course-identity hash or fixed segment-number branches deciding driving behavior. Do not tune only to a screenshot or track. See [architecture invariants](architecture.md#shared-invariants-to-protect).
-- Car control and effects must preserve simultaneous touch gestures and cancel/release behavior. Validate both arcade and simulation modes.
+- Car control and effects must preserve simultaneous touch gestures and cancel/release behavior. Validate both auto-accelerate and manual pedal controls.
 - Editor tools should provide feedback, stable camera behavior, reversible gestures, and no surprising mutations. Reject invalid geometry rather than silently repairing creator intent.
 - Use change-aware rendering and cached geometry, bounded caches, culling and explicit teardown. Do not allocate large meshes, rescan complete paths or regenerate stable textures every frame.
 - Prefer existing presentation components and CSS tokens over per-dialog copies. Keep labels visible, touch targets generous, focus states clear, and safe-area constraints respected.

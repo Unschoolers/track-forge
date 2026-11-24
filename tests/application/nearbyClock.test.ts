@@ -5,7 +5,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 
 const track = createStarterTrack(asTrackId('nearby-clock'), 1)
 const setup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 1,
-  mode: 'nearby' as const, handling: 'arcade' as const }
+  mode: 'nearby' as const }
 const coast = { steering: 0, throttle: 0, braking: false }
 
 function sessionWithClock(readClock: () => number) {

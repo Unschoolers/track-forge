@@ -23,14 +23,11 @@ describe('AI lane simulations', () => {
 		expect(run.stoppedReason).toBe('finished')
 		expect(run.issues.filter((issue) => issue.code === 'path-jump')).toEqual([])
 	})
-	it.each([
-		['arcade', false], ['arcade', true],
-		['simulation', false], ['simulation', true],
-	] as const)('finishes hairpin traffic without route jumps (%s, reverse=%s)', (handling, reversed) => {
+	it.each([false, true] as const)('finishes hairpin traffic without route jumps (reverse=%s)', (reversed) => {
 		const track = requireFixture(createLaneScenarios().find((track) => track.id === 'hairpin'))
 		const run = runLaneCheck({
 			path: prepareLanePath(track), trackName: track.name, seed: 1,
-			difficulty: 'normal', handling, reversed, seconds: 60,
+			difficulty: 'normal', reversed, seconds: 60,
 			laps: 1, mode: 'traffic', car: 'blue',
 		})
 		expect(run.stoppedReason).toBe('finished')

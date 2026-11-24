@@ -268,7 +268,7 @@ describe('AppController', () => {
     trackStore.tracks.set(track.id, track)
     const scoreStore: ScoreStore = { forTrack: () => [], record: () => true, removeTrack: () => true }
     const session = new RaceSession({ scoreStore, random: { next: () => 0.5 }, feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() } })
-    const lastRaceStore = { load: () => ({ trackId: track.id, course: courseIdentity(track), setup: { car: 'blue' as const, difficulty: 'normal' as const, laps: 2, handling: 'arcade' as const, mode: 'normal' as const, lighting: 'night' as const } }), save: () => true }
+    const lastRaceStore = { load: () => ({ trackId: track.id, course: courseIdentity(track), setup: { car: 'blue' as const, difficulty: 'normal' as const, laps: 2, mode: 'normal' as const, lighting: 'night' as const } }), save: () => true }
     const controller = new AppController({ trackStore, scoreStore, lastRaceStore, preferencesStore: { load: () => preferences, save: () => true }, raceSession: session, geometry: new TrackGeometryService() })
     expect(controller.snapshot().raceAgainTrackName).toBe(track.name)
     trackStore.remove(track.id)
@@ -286,7 +286,7 @@ describe('AppController', () => {
     const resumed = setup(undefined, false, store)
     resumed.controller.dispatch({ type: 'resume-cup' })
     expect(resumed.raceSession.start).toHaveBeenCalledWith(CUP_CIRCUITS[0]?.track, expect.objectContaining({ car: 'blue', difficulty: 'normal' }))
-    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
+    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, lap: 1 }]
     let cup = recordCupResult(createCup(), standings)
     store.save({ checkpoint: cup, bestPlacement: null })
     const afterScore = setup(undefined, false, store)
@@ -324,7 +324,7 @@ describe('AppController', () => {
     controller.dispatch({ type: 'open-cup' })
     controller.dispatch({ type: 'start-cup' })
     expect(controller.snapshot()).toMatchObject({ mode: 'race', cup: { index: 0 }, currentTrack: { id: 'official-city-sprint' } })
-    expect(raceSession.snapshot().setup).toMatchObject({ mode: 'normal', handling: 'arcade', laps: 1 })
+    expect(raceSession.snapshot().setup).toMatchObject({ mode: 'normal', laps: 1 })
     finish()
     const first = controller.snapshot().cup
     expect(first?.rounds).toHaveLength(1)
@@ -369,7 +369,7 @@ describe('AppController', () => {
     expect(listener).toHaveBeenCalledTimes(3)
     expect(raceSession.start).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Starter Circuit' }),
-      expect.objectContaining({ car: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade' }),
+      expect.objectContaining({ car: 'blue', difficulty: 'normal', laps: 2 }),
     )
     expect(raceSession.setPaused).toHaveBeenCalledWith(true)
     unsubscribe()
@@ -456,7 +456,7 @@ describe('AppController', () => {
     const { controller, raceSession } = setup()
     controller.dispatch({ type: 'start-race' })
     const activeTrack = createStarterTrack(asTrackId('active'), 2)
-    const activeSetup = { car: 'red' as const, difficulty: 'hard' as const, laps: 3, handling: 'simulation' as const, mode: 'normal' as const }
+    const activeSetup = { car: 'red' as const, difficulty: 'hard' as const, laps: 3, mode: 'normal' as const }
     vi.mocked(raceSession.snapshot).mockReturnValue({ track: activeTrack, setup: activeSetup } as ReturnType<RaceSessionPort['snapshot']>)
     raceSession.ghostTime = vi.fn(() => 100)
     controller.dispatch({ type: 'race-best-ghost' })
@@ -795,12 +795,12 @@ describe('AppController', () => {
 
     controller.dispatch({ type: 'open-options', returnTo: 'race-setup' })
     controller.dispatch({ type: 'set-preferences', preferences: {
-      ...controller.snapshot().preferences, raceLaps: 3, handling: 'simulation',
+      ...controller.snapshot().preferences, raceLaps: 3, pedalMode: 'manual',
     } })
     controller.dispatch({ type: 'close-overlay' })
     expect(controller.snapshot()).toMatchObject({
       overlay: { type: 'race-setup' }, currentTrack: { id: 'ready' },
-      preferences: { raceLaps: 3, handling: 'simulation' },
+      preferences: { raceLaps: 3 },
     })
     controller.dispatch({ type: 'close-overlay' })
     expect(controller.snapshot().overlay).toEqual({ type: 'track-library', purpose: 'race' })

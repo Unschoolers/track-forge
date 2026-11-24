@@ -40,7 +40,6 @@ describe('Kids Room deterministic all-car three-difficulty AI pace benchmark', (
             seed,
             difficulty,
             car: car as CarId,
-            handling: 'arcade',
             mode: 'solo',
             reversed: false,
             startRatio,
@@ -58,7 +57,7 @@ describe('Kids Room deterministic all-car three-difficulty AI pace benchmark', (
     // Search CI job logs for the single-line JSON: read on the baseline commit
     // and the final tuning commit and compare the *same* 12 cases.
     console.log('AI_PACE_MATRIX ' + JSON.stringify({
-      track: track.name, handling: 'arcade', laps: 2,
+      track: track.name, laps: 2,
       startRatio, seeds, type: 'solo AI, no opponents',
       humanReferences: { redBest: 82.09999999999663, greenBest: 68.88333333333057,
         blueBest: 79.96666666666341, yellowBest: 72.11666666666386 },

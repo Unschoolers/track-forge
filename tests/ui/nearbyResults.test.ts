@@ -22,7 +22,7 @@ function setup(outcome: RaceResult['outcome'] = 'finished') {
   const result: RaceResult = {
     outcome, mode: 'nearby', trackId: 'sample' as RaceResult['trackId'],
     trackName: 'Test Rally', playerPlace: 1, playerTime: local.time ?? null,
-    playerWrecked: outcome === 'wrecked', newRecord: false, standings: [], highScores: [],
+    newRecord: false, standings: [], highScores: [],
   }
   const modal = createNearbyRaceResults(nearby, result, {
     leave: () => undefined, race: () => undefined, selectTrack: () => undefined,
@@ -56,10 +56,10 @@ describe('nearby race result celebration', () => {
   })
 
   it('does not award a medal when the local player fails to finish', () => {
-    const { view, rival, update, cleanup } = setup('wrecked')
+    const { view, rival, update, cleanup } = setup('water')
     rival.time = 40
     update()
-    expect(view.querySelector('.modal-title')?.textContent).toBe('WRECKED')
+    expect(view.querySelector('.modal-title')?.textContent).toBe('SUNK')
     expect(view.querySelector('[data-medal]')).toBeNull()
     cleanup()
   })

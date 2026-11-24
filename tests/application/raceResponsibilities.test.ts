@@ -42,7 +42,7 @@ describe('race result recorder', () => {
       state: finishedState(), track, setup, terminalReason: undefined,
       scoreStore: scores, now: () => 123456, splits, bestGhostTime: undefined,
     })
-    expect(result).toMatchObject({ outcome: 'finished', playerTime: 42, newRecord: true, playerWrecked: false })
+    expect(result).toMatchObject({ outcome: 'finished', playerTime: 42, newRecord: true })
     expect(records).toHaveLength(1)
     expect(records[0]).toMatchObject({ time: 42, recordedAt: 123456, car: 'blue', difficulty: 'normal' })
     expect(result?.highScores).toHaveLength(1)
@@ -79,7 +79,7 @@ describe('race result recorder', () => {
   })
 })
 
-it('routes only player collision/curb events and tracks the nearest rival for feedback', () => {
+it('routes only player curb events and tracks the nearest rival for feedback', () => {
   const state = finishedState()
   const player = state.vehicles[0]
   const rival = state.vehicles[1]
@@ -91,14 +91,10 @@ it('routes only player collision/curb events and tracks the nearest rival for fe
   routeRaceFeedback(feedback, { ...state, vehicles }, [
     { type: 'curb-hit', vehicleId: 'ai-1', speed: 50 },
     { type: 'curb-hit', vehicleId: player.id, speed: 40 },
-    { type: 'collision', leftId: player.id, rightId: rival.id, strength: 0.8 },
-    { type: 'barrier-collision', vehicleId: rival.id, strength: 0.2 },
   ], { throttle: 1, steering: 0.3, braking: false }, 0.4)
   const messages = report.mock.calls.map(([event]) => event)
   expect(messages).toContainEqual(expect.objectContaining({ type: 'rival', proximity: 0.8 }))
   expect(messages).toContainEqual({ type: 'curb', speed: 40 })
-  expect(messages).toContainEqual({ type: 'collision', strength: 0.8 })
   expect(messages).toContainEqual({ type: 'landing', strength: 0.4 })
   expect(messages.filter((event) => event.type === 'curb')).toHaveLength(1)
-  expect(messages.filter((event) => event.type === 'collision')).toHaveLength(1)
 })

@@ -30,7 +30,7 @@ function raceRivals(seed: number, difficulty: 'easy' | 'normal' | 'hard' = 'norm
     scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
     feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
   })
-  session.start(kidsRoom, { car: playerCar, difficulty, laps: 2, handling: 'arcade' })
+  session.start(kidsRoom, { car: playerCar, difficulty, laps: 2 })
   const starting = session.snapshot().state
   session.destroy()
   if (!starting) throw new Error('Missing Kids room race state')

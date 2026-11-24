@@ -79,7 +79,6 @@ export interface DifficultySpec {
   readonly cornerSafety: number
   readonly lookAhead: number
   readonly steerGain: number
-  readonly damageLimit: number
   readonly avoidance: number
   readonly followDistance: number
   readonly description: string
@@ -248,11 +247,10 @@ export const DIFFICULTY_SPECS = {
     cornerSafety: 0.92,
     lookAhead: 2,
     steerGain: 1.62,
-    damageLimit: 10,
     avoidance: 1,
     followDistance: 34,
     description:
-      'Competitive but forgiving opponents. Your vehicle can survive 10 distinct impacts.',
+      'Competitive but forgiving opponents.',
   },
   normal: {
     name: 'Medium',
@@ -264,11 +262,10 @@ export const DIFFICULTY_SPECS = {
     cornerSafety: 0.75,
     lookAhead: 0,
     steerGain: 1.76,
-    damageLimit: 5,
     avoidance: 1.12,
     followDistance: 39,
     description:
-      'Fast, accurate opponents. Your vehicle can survive 5 distinct impacts.',
+      'Fast, accurate opponents.',
   },
   hard: {
     name: 'Hard',
@@ -280,13 +277,12 @@ export const DIFFICULTY_SPECS = {
     cornerSafety: 0.51,
     lookAhead: -2,
     steerGain: 2.05,
-    damageLimit: 3,
     avoidance: 1.3,
     followDistance: 42,
     mirrorRival: true,
     aiPaces: [1.012, 1.006, 1],
     description:
-      'Rivals brake later and take corners more aggressively. Only 3 impacts will wreck you.',
+      'Rivals brake later and take corners more aggressively.',
   },
 } as const satisfies Record<DifficultyId, DifficultySpec>
 

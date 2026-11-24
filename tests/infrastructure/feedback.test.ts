@@ -33,7 +33,7 @@ describe('feedback adapters', () => {
     }
     const createSink = vi.fn(() => sink)
     const audio = new WebAudioAdapter(createSink, true)
-    audio.handle({ type: 'collision', strength: 0.8 })
+    audio.handle({ type: 'countdown', cue: 'go' })
     expect(createSink).not.toHaveBeenCalled()
     expect(sink.play).not.toHaveBeenCalled()
 
@@ -50,17 +50,17 @@ describe('feedback adapters', () => {
     })
     audio.handle({ type: 'surface', surface: 'dirt', speedRatio: 0.6 })
     audio.handle({ type: 'tire-slip', strength: 0.4 })
-    audio.handle({ type: 'collision', strength: 0.8 })
+    audio.handle({ type: 'countdown', cue: 'go' })
     expect(sink.setEngine).toHaveBeenCalledWith('green', 0.7, 1, 0.6)
     expect(sink.setSurface).toHaveBeenCalledWith('dirt', 0.6)
     expect(sink.setSlip).toHaveBeenCalledWith(0.4, undefined, undefined)
     audio.handle({ type: 'landing', strength: 0.8 })
     expect(sink.playLanding).toHaveBeenCalledWith(0.8)
     expect(sink.play).toHaveBeenCalledWith(
-      90,
-      0.12,
+      880,
+      0.22,
       expect.any(Number),
-      'sawtooth',
+      'sine',
     )
     audio.setEnabled(false)
     expect(sink.silenceContinuous).toHaveBeenCalledOnce()
@@ -111,8 +111,8 @@ describe('feedback adapters', () => {
 
     expect(() =>
       new HapticsAdapter(undefined, true).handle({
-        type: 'collision',
-        strength: 1,
+        type: 'curb',
+        speed: 100,
       }),
     ).not.toThrow()
     haptics.destroy()

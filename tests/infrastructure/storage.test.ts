@@ -10,7 +10,6 @@ import { BrowserScoreRepository } from '@/infrastructure/storage/scoreRepository
 import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
 import type { KeyValueStore } from '@/application/ports/storage'
 import {
-  legacyScore,
   legacyTrack,
 } from '../fixtures/legacyStorage'
 
@@ -360,45 +359,6 @@ describe('BrowserTrackRepository', () => {
 })
 
 describe('score and preference repositories', () => {
-  it('merges legacy scores and normalizes their recorded date', () => {
-    const storage = new MemoryStore()
-    const trackId = asTrackId('legacy-harbor')
-    storage.values.set(
-      'trackforge-highscores-v1',
-      JSON.stringify({ [trackId]: [legacyScore] }),
-    )
-    storage.values.set(
-      'trackforge-highscores-v2',
-      JSON.stringify({
-        [trackId]: [
-          {
-            time: 45,
-            car: 'blue',
-            difficulty: 'normal',
-            recordedAt: 400,
-          },
-        ],
-      }),
-    )
-    const scores = new BrowserScoreRepository(storage)
-
-    expect(scores.forTrack(trackId)).toEqual([
-      {
-        time: 42.5,
-        car: 'green',
-        difficulty: 'hard',
-        recordedAt: 300,
-      },
-      {
-        time: 45,
-        car: 'blue',
-        difficulty: 'normal',
-        recordedAt: 400,
-      },
-    ])
-    expect(scores.forTrack(trackId)).toHaveLength(2)
-  })
-
   it('keeps the five fastest finite scores per track', () => {
     const storage = new MemoryStore()
     const scores = new BrowserScoreRepository(storage)
@@ -425,7 +385,7 @@ describe('score and preference repositories', () => {
     for (const laps of [1, 3]) {
       for (const time of [1, 2, 3, 4, 5, 6]) {
         scores.record(trackId, { time, car: 'blue', difficulty: 'normal', recordedAt: time,
-          category: { course: 'course', laps, handling: 'arcade', mode: 'normal' } })
+          category: { course: 'course', laps, mode: 'normal' } })
       }
     }
     scores.record(trackId, { time: 0.5, car: 'blue', difficulty: 'normal', recordedAt: 1 })
@@ -447,19 +407,6 @@ describe('score and preference repositories', () => {
     expect(preferences.load().raceLaps).toBe(2)
     expect(preferences.save({ ...preferences.load(), raceLaps: 3 })).toBe(true)
     expect(preferences.load().raceLaps).toBe(3)
-  })
-
-  it('defaults upgraded installations to Arcade and persists Simulation explicitly', () => {
-    const storage = new MemoryStore()
-    const preferences = new BrowserPreferencesRepository(storage)
-    expect(preferences.load().handling).toBe('arcade')
-    expect(preferences.save({ ...preferences.load(), handling: 'simulation' })).toBe(true)
-    expect(preferences.load().handling).toBe('simulation')
-    expect(storage.values.get('trackforge-handling-mode')).toBe('simulation')
-    // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
-    storage.values.delete('trackforge-preferences-snapshot-v1')
-    storage.values.set('trackforge-handling-mode', 'invalid')
-    expect(preferences.load().handling).toBe('arcade')
   })
 
   it('defaults legacy and malformed steering sensitivity and persists each option', () => {

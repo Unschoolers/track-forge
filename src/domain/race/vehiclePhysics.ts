@@ -32,12 +32,10 @@ export function stepVehicle(
   input: DriverInput,
   context: VehicleStepContext,
   deltaSeconds: number,
-  // Legacy handling argument describes race rules, not vehicle physics.
-  _handling: 'arcade' | 'simulation' = 'arcade',
   speedLimit = Number.POSITIVE_INFINITY,
   speedAssist?: SpeedAssist,
 ): RaceVehicle {
-  if (vehicle.wrecked || vehicle.finishedAt !== null) {
+  if (vehicle.finishedAt !== null) {
     return {
       ...vehicle,
       vx: 0,
@@ -67,25 +65,8 @@ export function stepVehicle(
   const car = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
-  const damageRatio = vehicle.player
-    ? clamp(vehicle.damage / Math.max(1, vehicle.damageLimit), 0, 1)
-    : 0
-  const condition = {
-    max:
-      1 -
-      damageRatio *
-        VEHICLE_DYNAMICS_TUNING.damage.maximumSpeedLoss,
-    accel:
-      1 -
-      damageRatio *
-        VEHICLE_DYNAMICS_TUNING.damage.maximumAccelerationLoss,
-    grip:
-      1 -
-      damageRatio *
-        VEHICLE_DYNAMICS_TUNING.damage.maximumGripLoss,
-  }
   const physicsSpeedLimit = vehicle.player ? Number.POSITIVE_INFINITY : speedLimit
-  const stockMaxSpeed = car.max * surface.max * terrain.max * condition.max
+  const stockMaxSpeed = car.max * surface.max * terrain.max
   const engineSpeed = speedAssist
     ? Math.max(stockMaxSpeed, Math.min(stockMaxSpeed * speedAssist.multiplier, speedAssist.ceiling))
     : stockMaxSpeed
@@ -131,14 +112,12 @@ export function stepVehicle(
       engineAcceleration:
         car.accel *
         surface.accel *
-        terrain.accel *
-        condition.accel,
+        terrain.accel,
       maxSteerAngle:
         car.steer * tuning.steering.maximumAngleScale,
       grip:
         car.grip *
-        surfaceGrip *
-        condition.grip,
+        surfaceGrip,
       brakeGrip: car.brake * surface.brake * terrain.brake,
       rollingResistance:
         (context.onRoad

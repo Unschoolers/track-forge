@@ -4,21 +4,11 @@ import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
-import {
-  solveCollisionFrame,
-  solveCollisions,
-} from '@/domain/race/collisions'
 import { updateProgress } from '@/domain/race/progress'
 import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import { stepPlayer } from '@/domain/race/vehiclePhysics'
 import { stepRace } from '@/domain/race/raceEngine'
 import { rankVehicles } from '@/domain/race/ranking'
-import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
-import {
-  VERTICAL_DYNAMICS,
-  WORLD_ELEVATION,
-} from '@/domain/config'
-import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
 const track = createStarterTrack(asTrackId('starter'), 1)
 const path = buildRoadPath(track.points, track.terrain)
@@ -44,7 +34,6 @@ describe('race simulation', () => {
       player: true,
       car: 'green',
       lap: 0,
-      damageLimit: 3,
       z: 0,
       verticalVelocity: 0,
       grounded: true,
@@ -337,89 +326,12 @@ describe('race simulation', () => {
     expect(rankVehicles(vehicles, path.points.length).map(({ id }) => id)).toEqual([third.id, first.id, second.id, fourth.id])
   })
 
-  it('lets parked cars gently separate without damage', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 0, speed: 0 }
-    const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
-    const frame = solveCollisionFrame([player, rival], [], 1 / 60)
-    expect(frame.vehicles[0]?.damage).toBe(0)
-    expect(frame.events).toEqual([])
-    expect(frame.vehicles[0]?.x).toBeLessThan(player.x)
-  })
-
-  it('does not damage during a fast tangential graze without normal closing speed', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 0, vy: 110, speed: 110 }
-    const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, vy: 0, speed: 0 }
-    const frame = solveCollisionFrame([player, rival], [], 1 / 60)
-    expect(frame.events).toEqual([])
-    expect(frame.vehicles[0]?.damage).toBe(0)
-    for (const vehicle of frame.vehicles) {
-      expect(vehicle.speed).toBeCloseTo(Math.hypot(vehicle.vx, vehicle.vy), 5)
-    }
-  })
-
-  it('separates overlapping cars and applies bounded damage', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path,
-      playerCar: 'blue',
-      difficulty: 'normal',
-      laps: 3,
-    })
-    const [first, second] = race.vehicles
-    const collided = solveCollisions([
-      { ...requireFixture(first), x: 0, y: 0, vx: 100, vy: 0, speed: 100 },
-      { ...requireFixture(second), x: 1, y: 0, vx: 20, vy: 0, speed: 20 },
-    ])
-    const collidedFirst = requireFixture(collided[0])
-    const collidedSecond = requireFixture(collided[1])
-
-    expect(Math.abs(collidedFirst.x - collidedSecond.x)).toBeGreaterThan(10)
-    expect(collidedFirst.damage + collidedSecond.damage).toBeGreaterThan(0)
-  })
-
-  it.each([false, true])(
-    'removes a finished opponent from contact without removing its standing (opponent first: %s)',
-    (opponentFirst) => {
-      const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-      const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
-      const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0, finishedAt: 0, lap: 3 }
-      const pair = opponentFirst ? [rival, player] : [player, rival]
-      const previousContact = opponentFirst ? `${rival.id}:${player.id}` : `${player.id}:${rival.id}`
-
-      const frame = solveCollisionFrame(pair, [], 0)
-      const held = solveCollisionFrame(pair, [previousContact], 0)
-
-      expect(frame.vehicles).toEqual(pair)
-      expect(frame.activeContacts).toEqual([])
-      expect(frame.events).toEqual([])
-      expect(held.vehicles).toEqual(pair)
-      expect(held.activeContacts).toEqual([])
-      expect(rankVehicles(frame.vehicles, path.points.length)[0]).toEqual(rival)
-    },
-  )
-
-  it('continues to collide with an unfinished opponent', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
-    const player = { ...requireFixture(race.vehicles[0]), x: 0, y: 0, vx: 100, speed: 100 }
-    const rival = { ...requireFixture(race.vehicles[1]), x: 1, y: 0, vx: 0, speed: 0 }
-
-    const frame = solveCollisionFrame([player, rival], [], 0)
-
-    expect(frame.vehicles[0]).toMatchObject({ damage: 1 })
-    expect(frame.vehicles[0]?.x).toBeLessThan(player.x)
-    expect(frame.vehicles[0]?.vx).toBeLessThan(player.vx)
-    expect(frame.vehicles[1]?.x).toBeGreaterThan(rival.x)
-    expect(frame.activeContacts).toEqual([`${player.id}:${rival.id}`])
-    expect(frame.events).toHaveLength(1)
-  })
-
   it('keeps an earlier finisher in the running race and standings without affecting the player', () => {
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = requireFixture(race.vehicles[0])
     const rival = { ...requireFixture(race.vehicles[1]), x: player.x + 1, y: player.y, z: player.z, finishedAt: 12, lap: 3 }
-    const running = { ...race, phase: 'running' as const, vehicles: [player, rival], activeContacts: [`${player.id}:${rival.id}`] }
-    const withoutRival = { ...running, vehicles: [player], activeContacts: [] }
+    const running = { ...race, phase: 'running' as const, vehicles: [player, rival] }
+    const withoutRival = { ...running, vehicles: [player] }
     const input = { steering: 0, throttle: 1, braking: false }
 
     const observed = stepRace(running, input, 0.05, { next: () => 0.5 })
@@ -428,266 +340,8 @@ describe('race simulation', () => {
     expect(observed.state.phase).toBe('running')
     expect(observed.state.vehicles[0]).toEqual(clear.state.vehicles[0])
     expect(observed.state.vehicles[1]).toMatchObject({ id: rival.id, finishedAt: 12, lap: 3 })
-    expect(observed.state.activeContacts).toEqual([])
-    expect(observed.events.filter(({ type }) => type === 'collision' || type === 'vehicle-finished')).toEqual([])
+
+    expect(observed.events.filter(({ type }) => type === 'vehicle-finished')).toEqual([])
     expect(rankVehicles(observed.state.vehicles, path.points.length)[0]).toMatchObject({ id: rival.id, finishedAt: 12 })
-  })
-
-  it('removes an opponent from contact on the frame it finishes', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
-    const point = requireFixture(path.points[0])
-    const player = { ...requireFixture(race.vehicles[0]), x: point.x, y: point.y, z: 0, pathIndex: 0 }
-    const rival = {
-      ...requireFixture(race.vehicles[1]),
-      x: point.x - 1,
-      y: point.y,
-      z: 0,
-      pathIndex: path.points.length - 2,
-      nextSector: 4 as const,
-      vx: 0,
-      vy: 0,
-      speed: 0,
-    }
-    const running = { ...race, phase: 'running' as const, elapsed: 12, vehicles: [player, rival] }
-    const input = { steering: 0, throttle: 0, braking: false }
-
-    const observed = stepRace(running, input, 0.001, { next: () => 0.5 })
-    const clear = stepRace({ ...running, vehicles: [player] }, input, 0.001, { next: () => 0.5 })
-
-    expect(observed.state.vehicles[0]).toEqual(clear.state.vehicles[0])
-    expect(observed.state.vehicles[1]).toMatchObject({ id: rival.id, lap: 1, finishedAt: 12.001 })
-    expect(observed.events).toContainEqual({ type: 'vehicle-finished', vehicleId: rival.id, time: 12.001 })
-    expect(observed.events.some(({ type }) => type === 'collision')).toBe(false)
-    expect(observed.state.phase).toBe('running')
-  })
-
-  it('does not collide cars travelling on different crossing levels', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path,
-      playerCar: 'blue',
-      difficulty: 'normal',
-      laps: 3,
-    })
-    const lower = {
-      ...requireFixture(race.vehicles[0]),
-      x: 0,
-      y: 0,
-      z: 0,
-    }
-    const upper = {
-      ...requireFixture(race.vehicles[1]),
-      x: 0,
-      y: 0,
-      z: WORLD_ELEVATION.levelHeight,
-      grounded: false,
-    }
-
-    const frame = solveCollisionFrame([lower, upper], [], 0.016)
-
-    expect(frame.events).toEqual([])
-    expect(frame.vehicles.map(({ x, y }) => ({ x, y }))).toEqual([
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-    ])
-  })
-
-  it('allows an airborne vehicle above the wall to leave a bridge', () => {
-    const bridgePath = buildRoadPath(
-      [
-        {
-          id: 'bridge',
-          x: 0,
-          y: 0,
-          surface: 'street',
-          structure: 'overpass',
-        },
-        { id: 'landing', x: 500, y: 0, surface: 'street' },
-        { id: 'end', x: 900, y: 0, surface: 'street' },
-      ],
-      EMPTY_TERRAIN,
-    )
-    const deckIndex = bridgePath.points.findIndex(
-      (point) => point.distance >= 240,
-    )
-    const center = requireFixture(bridgePath.points[deckIndex])
-    const airborne = {
-      ...requireFixture(
-        createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-          path,
-          playerCar: 'blue',
-          difficulty: 'normal',
-          laps: 3,
-        }).vehicles[0],
-      ),
-      x: center.x,
-      y: center.y,
-      pathIndex: deckIndex,
-      z:
-        WORLD_ELEVATION.levelHeight +
-        VERTICAL_DYNAMICS.bridgeWallHeight +
-        0.1,
-      grounded: false,
-      contactLoad: 0,
-    }
-    const moved = {
-      ...airborne,
-      y: center.y + 52,
-      vy: 80,
-      speed: 80,
-    }
-
-    const frame = solveBridgeBarrierFrame(
-      [airborne],
-      [moved],
-      bridgePath,
-      [],
-    )
-
-    expect(frame.vehicles[0]).toMatchObject({
-      y: moved.y,
-      vy: moved.vy,
-      speed: moved.speed,
-    })
-    expect(frame.events).toEqual([])
-  })
-
-  it('keeps a vehicle inside a long elevated road section', () => {
-    const bridgePath = buildRoadPath(
-      [
-        {
-          id: 'bridge',
-          x: 0,
-          y: 0,
-          surface: 'street',
-          structure: 'overpass',
-        },
-        { id: 'landing', x: 500, y: 0, surface: 'street' },
-        { id: 'end', x: 900, y: 0, surface: 'street' },
-      ],
-      EMPTY_TERRAIN,
-    )
-    const deckIndex = bridgePath.points.findIndex(
-      (point) => point.distance >= 240,
-    )
-    const center = requireFixture(bridgePath.points[deckIndex])
-    const vehicle = {
-      ...requireFixture(
-        createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-          path,
-          playerCar: 'blue',
-          difficulty: 'normal',
-          laps: 3,
-        }).vehicles[0],
-      ),
-      x: center.x,
-      y: center.y,
-      pathIndex: deckIndex,
-    }
-    const frame = solveBridgeBarrierFrame(
-      [vehicle],
-      [{ ...vehicle, y: center.y + 52, vy: 80, speed: 80 }],
-      bridgePath,
-      [],
-    )
-
-    expect(frame.vehicles[0]?.y).toBeLessThan(center.y + 36)
-    expect(frame.vehicles[0]?.speed).toBeLessThan(80)
-    expect(frame.events).toHaveLength(1)
-  })
-
-  it('keeps the bridge barrier continuous at an all-overpass loop seam', () => {
-    const bridgePath = buildRoadPath(
-      [
-        { id: 'a', x: 0, y: 0, surface: 'street', structure: 'overpass' },
-        { id: 'b', x: 300, y: 0, surface: 'street', structure: 'overpass' },
-        { id: 'c', x: 300, y: 300, surface: 'street', structure: 'overpass' },
-        { id: 'd', x: 0, y: 300, surface: 'street', structure: 'overpass' },
-        {
-          id: 'a-close',
-          x: 0,
-          y: 0,
-          surface: 'street',
-          structure: 'overpass',
-        },
-      ],
-      EMPTY_TERRAIN,
-    )
-    const center = requireFixture(bridgePath.points[0])
-    const vehicle = {
-      ...requireFixture(
-        createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-          path: bridgePath,
-          playerCar: 'blue',
-          difficulty: 'normal',
-          laps: 3,
-        }).vehicles[0],
-      ),
-      x: center.x,
-      y: center.y,
-      pathIndex: 0,
-      z: WORLD_ELEVATION.levelHeight,
-      grounded: true,
-    }
-    const frame = solveBridgeBarrierFrame(
-      [vehicle],
-      [{ ...vehicle, y: center.y + 100, vy: 80, speed: 80 }],
-      bridgePath,
-      [],
-    )
-
-    expect(frame.events).toHaveLength(1)
-    expect(frame.activeContacts[0]).toContain(
-      bridgePath.roadSurface.at(0).structureRunId,
-    )
-  })
-
-  it('damages only the player once per contact and honors cooldown', () => {
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path,
-      playerCar: 'blue',
-      difficulty: 'normal',
-      laps: 3,
-    })
-    const player = {
-      ...requireFixture(race.vehicles[0]),
-      x: 0,
-      y: 0,
-      vx: 100,
-      speed: 100,
-    }
-    const ai = {
-      ...requireFixture(race.vehicles[1]),
-      x: 1,
-      y: 0,
-      vx: 0,
-      speed: 0,
-    }
-    const first = solveCollisionFrame([player, ai], [], 0.1)
-    expect(first.vehicles[0]).toMatchObject({
-      damage: 1,
-      damageCooldown: 0.55,
-    })
-    expect(first.vehicles[1]?.damage).toBe(0)
-    expect(first.events).toHaveLength(1)
-
-    const held = solveCollisionFrame(
-      first.vehicles.map((vehicle) => ({ ...vehicle, x: vehicle.player ? 0 : 1 })),
-      first.activeContacts,
-      1,
-    )
-    expect(held.vehicles[0]?.damage).toBe(1)
-    expect(held.events).toHaveLength(0)
-
-    const distinct = solveCollisionFrame(
-      held.vehicles.map((vehicle) => ({
-        ...vehicle,
-        x: vehicle.player ? 0 : 1,
-        vx: vehicle.player ? 100 : 0,
-        speed: vehicle.player ? 100 : 0,
-      })),
-      [],
-      0,
-    )
-    expect(distinct.vehicles[0]?.damage).toBe(2)
   })
 })

@@ -17,7 +17,6 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
   const category = rawCategory && typeof rawCategory === 'object' ? rawCategory as Record<string, unknown> : undefined
   const validCategory = category && typeof category.course === 'string' && category.course.length > 0 &&
     typeof category.laps === 'number' && Number.isInteger(category.laps) && category.laps > 0 &&
-    (category.handling === 'arcade' || category.handling === 'simulation') &&
     (category.mode === 'normal' || category.mode === 'ghost' || category.mode === 'time-trial')
   return typeof item.time === 'number' &&
     Number.isFinite(item.time) && item.time > 0 &&
@@ -28,7 +27,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
       (typeof item.date === 'number' && Number.isFinite(item.date)))
     ? {
         time: item.time,
-        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, handling: category.handling as 'arcade' | 'simulation', mode: category.mode as 'normal' | 'ghost' | 'time-trial', ...(category.routeKind === 'point-to-point' ? { routeKind: 'point-to-point' as const } : {}) } } : {}),
+        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, mode: category.mode as 'normal' | 'ghost' | 'time-trial', ...(category.routeKind === 'point-to-point' ? { routeKind: 'point-to-point' as const } : {}) } } : {}),
         car: item.car,
         difficulty: item.difficulty,
         recordedAt:
@@ -40,7 +39,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
 }
 
 function categoryKey(score: ScoreEntry): string {
-  return score.category ? JSON.stringify([score.category.course, score.category.routeKind ?? 'circuit', score.category.laps, score.category.handling, score.category.mode, score.car, score.difficulty]) : 'legacy'
+  return score.category ? JSON.stringify([score.category.course, score.category.routeKind ?? 'circuit', score.category.laps, score.category.mode, score.car, score.difficulty]) : 'legacy'
 }
 
 /** Retain the five best scores per category with one accounting pass. */
@@ -86,18 +85,7 @@ export class BrowserScoreRepository implements ScoreStore {
   }
 
   private read(): Record<string, unknown> {
-    const current = this.parseRecord(this.storage.get(STORAGE_KEYS.scores))
-    if (this.storage.get(STORAGE_KEYS.scoreMigration) === '1') {
-      return current
-    }
-    const legacy = this.parseRecord(
-      this.storage.get(STORAGE_KEYS.legacyScores),
-    )
-    const merged = this.mergeRecords(legacy, current)
-    if (this.storage.set(STORAGE_KEYS.scores, JSON.stringify(merged))) {
-      this.storage.set(STORAGE_KEYS.scoreMigration, '1')
-    }
-    return merged
+    return this.parseRecord(this.storage.get(STORAGE_KEYS.scores))
   }
 
   private parseRecord(value: string | null): Record<string, unknown> {
@@ -111,39 +99,5 @@ export class BrowserScoreRepository implements ScoreStore {
     } catch {
       return {}
     }
-  }
-
-  private mergeRecords(
-    legacy: Record<string, unknown>,
-    current: Record<string, unknown>,
-  ): Record<string, readonly ScoreEntry[]> {
-    const merged: Record<string, readonly ScoreEntry[]> = {}
-    for (const trackId of new Set([
-      ...Object.keys(legacy),
-      ...Object.keys(current),
-    ])) {
-      const legacyScores = Array.isArray(legacy[trackId])
-        ? legacy[trackId]
-        : []
-      const currentScores = Array.isArray(current[trackId])
-        ? current[trackId]
-        : []
-      const unique = new Map<string, ScoreEntry>()
-      for (const raw of [...legacyScores, ...currentScores]) {
-        const score = decodeScore(raw)
-        if (!score) continue
-        const identity = [
-          score.time,
-          score.car,
-          score.difficulty,
-          score.recordedAt,
-          categoryKey(score),
-        ].join(':')
-        unique.set(identity, score)
-      }
-      const scores = bestScores([...unique.values()])
-      if (scores.length > 0) merged[trackId] = scores
-    }
-    return merged
   }
 }

@@ -11,9 +11,6 @@ describe('vehicle physics configuration', () => {
   it('exposes every horizontal and vertical tuning family in one module', () => {
     expect(VEHICLE_DYNAMICS_TUNING.stability.lateralDamping).toBeGreaterThan(0)
     expect(
-      VEHICLE_DYNAMICS_TUNING.damage.maximumGripLoss,
-    ).toBeGreaterThan(0)
-    expect(
       VEHICLE_DYNAMICS_TUNING.forces.maximumContactLoad,
     ).toBeGreaterThan(1)
     expect(CAR_PHYSICS_SPECS.blue.mass).toBeGreaterThan(0)

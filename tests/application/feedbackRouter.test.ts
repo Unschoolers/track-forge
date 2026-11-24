@@ -21,7 +21,7 @@ describe('FeedbackRouter', () => {
     router.unlock()
     router.unlock()
     router.setChannels({ audio: false, haptics: true })
-    router.handle({ type: 'collision', strength: 80 })
+    router.handle({ type: 'curb', speed: 80 })
     router.silenceContinuous()
 
     expect(audio.unlock).toHaveBeenCalledOnce()
@@ -29,12 +29,12 @@ describe('FeedbackRouter', () => {
     expect(audio.setEnabled).toHaveBeenCalledWith(false)
     expect(haptics.setEnabled).toHaveBeenCalledWith(true)
     expect(audio.handle).toHaveBeenCalledWith({
-      type: 'collision',
-      strength: 80,
+      type: 'curb',
+      speed: 80,
     })
     expect(haptics.handle).toHaveBeenCalledWith({
-      type: 'collision',
-      strength: 80,
+      type: 'curb',
+      speed: 80,
     })
     expect(audio.silenceContinuous).toHaveBeenCalledOnce()
     expect(haptics.silenceContinuous).toHaveBeenCalledOnce()

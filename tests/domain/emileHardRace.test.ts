@@ -53,7 +53,7 @@ function raceSeed(seed: number, laps = 1, difficulty: DifficultyId = 'hard', pla
 		scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
 		feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
 	})
-	session.start(track, { car: playerCar, difficulty, laps, handling: 'arcade' })
+	session.start(track, { car: playerCar, difficulty, laps })
 	const initial = session.snapshot().state
 	session.destroy()
 	if (!initial) throw new Error('Missing Émile race')

@@ -7,7 +7,6 @@ import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { EMILE_COURSE } from '@/domain/race/ai/emileRacingLines'
 import {
-  aiSteeringDifficulty,
   arcadeCornerMargin,
   authoredLineSpeedRatio,
   raceRivalPace,
@@ -28,12 +27,6 @@ describe('AI difficulty policy', () => {
       signatures.add(JSON.stringify(profile))
     }
     expect(signatures.size).toBe(4)
-  })
-
-  it.each(difficulties)('uses Hard technique for %s Arcade or authored-line AI without overwriting the chosen difficulty', difficulty => {
-    expect(aiSteeringDifficulty(difficulty, 'arcade', false)).toBe('hard')
-    expect(aiSteeringDifficulty(difficulty, 'simulation', true)).toBe('hard')
-    expect(aiSteeringDifficulty(difficulty, 'simulation', false)).toBe(difficulty)
   })
 
   it('keeps authored-line speed targets and non-authored Arcade corner reserves ordered', () => {
@@ -62,14 +55,10 @@ describe('AI difficulty policy', () => {
     }
   })
 
-  it('reuses the Hard grid-rival pacing in Arcade but retains the simulation fallback', () => {
-    for (const difficulty of difficulties) {
-      expect(raceRivalPace(difficulty, 'arcade', 0)).toBe(DIFFICULTY_SPECS.hard.aiPaces[0])
-      expect(raceRivalPace(difficulty, undefined, 1)).toBe(DIFFICULTY_SPECS.hard.aiPaces[1])
-    }
-    expect(raceRivalPace('normal', 'simulation', 0)).toBe(0.985)
-    expect(raceRivalPace('easy', 'simulation', 1)).toBe(0.977)
-    expect(raceRivalPace('hard', 'simulation', 2)).toBe(DIFFICULTY_SPECS.hard.aiPaces[2])
+  it('uses the same Hard grid-rival pacing', () => {
+    expect(raceRivalPace(0)).toBe(DIFFICULTY_SPECS.hard.aiPaces[0])
+    expect(raceRivalPace(1)).toBe(DIFFICULTY_SPECS.hard.aiPaces[1])
+    expect(raceRivalPace(2)).toBe(DIFFICULTY_SPECS.hard.aiPaces[2])
   })
 
   it('wires the chosen pace and authored racing line into race initialization, not the car physics specs', () => {
@@ -81,13 +70,12 @@ describe('AI difficulty policy', () => {
         courseIdentity: EMILE_COURSE,
         playerCar: 'blue',
         difficulty,
-        handling: 'arcade',
         laps: 1,
       })
       const rivals = race.vehicles.filter(vehicle => !vehicle.player)
       expect(rivals).toHaveLength(3)
       for (const [index, rival] of rivals.entries()) {
-        expect(rival.aiPace).toBe(raceRivalPace(difficulty, 'arcade', index))
+        expect(rival.aiPace).toBe(raceRivalPace(index))
         expect(rival.racingLine?.speedRatio).toBe(authoredLineSpeedRatio(difficulty))
       }
     }

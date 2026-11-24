@@ -8,7 +8,7 @@ import type { RaceStep } from '@/domain/race/raceEngine'
 import type { KeyValueStore } from '@/application/ports/storage'
 
 const track = createStarterTrack(asTrackId('ghost-track'), 42)
-const setup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 1, handling: 'arcade' as const }
+const setup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 1 }
 const frames: GhostFrame[] = [
   { t: 0, x: 0, y: 0, z: 0, angle: Math.PI - 0.1, structureRunId: null },
   { t: 1, x: 20, y: 0, z: 10, angle: -Math.PI + 0.1, structureRunId: 'bridge' },
@@ -30,39 +30,10 @@ describe('personal-best ghost replay', () => {
     const store = new BrowserGhostRepository(storage)
     const invalid = times.map((t) => ({ ...frames[0]!, t }))
     expect(store.record(track, setup, 1, invalid)).toBe(false)
-    storage.set('trackforge-ghost-runs-v1', JSON.stringify({
+    storage.set('trackforge-ghost-runs-v2', JSON.stringify({
       [ghostRaceKey(track, setup)]: { car: 'blue', time: 1, frames: invalid },
     }))
     expect(store.load(track, setup)).toBeNull()
-  })
-
-  it.each(['off-road', 'water'] as const)('does not store a finish after a short automatic player %s recovery', (reason) => {
-    const store = new BrowserGhostRepository(memory())
-    const step: RaceStep = (state) => {
-      const player = state.vehicles.find((vehicle) => vehicle.player)!
-      return {
-        state: { ...state, phase: 'finished', elapsed: 1,
-          vehicles: [{ ...player, x: player.x + 20, finishedAt: 1 }] },
-        events: [
-          { type: 'vehicle-recovered', vehicleId: player.id, reason,
-            x: player.x, y: player.y, pathIndex: player.pathIndex },
-          { type: 'race-finished', reason: 'finished' },
-        ],
-      }
-    }
-    const session = new RaceSession({
-      ghostStore: store,
-      scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
-      random: { next: () => 0.5 },
-      feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
-      step,
-    })
-    const simulation = { ...setup, handling: 'simulation' as const }
-    session.start(track, simulation)
-    session.advance(4, { steering: 0, throttle: 1, braking: false })
-    expect(session.snapshot().result?.outcome).toBe('finished')
-    expect(store.load(track, simulation)).toBeNull()
-    session.destroy()
   })
 
   it('interpolates position and wrapped heading, then disappears after finishing', () => {
@@ -80,7 +51,6 @@ describe('personal-best ghost replay', () => {
     expect(store.load(track, setup)?.time).toBe(1)
     expect(store.load({ ...track, updatedAt: track.updatedAt + 1 }, setup)).toBeNull()
     expect(store.load(track, { ...setup, laps: 2 })).toBeNull()
-    expect(ghostRaceKey(track, setup)).not.toBe(ghostRaceKey(track, { ...setup, handling: 'simulation' }))
   })
   it('classifies valid ghosts for the same layout and chooses the closest, then fastest setup', () => {
     const storage = memory()
@@ -88,14 +58,14 @@ describe('personal-best ghost replay', () => {
     const run = (car: string, time: number) => ({ car, time, frames: [frames[0], { ...frames[1], t: time }] })
     const green = { ...setup, car: 'green' as const }
     const red = { ...setup, car: 'red' as const }
-    storage.set('trackforge-ghost-runs-v1', JSON.stringify({
+    storage.set('trackforge-ghost-runs-v2', JSON.stringify({
       [ghostRaceKey({ ...track, updatedAt: track.updatedAt + 1 }, setup)]: run('blue', 0.5),
       [ghostRaceKey({ ...track, start: { ...track.start!, reversed: true } }, setup)]: run('blue', 0.5),
       [ghostRaceKey(track, green)]: run('green', 2),
       [ghostRaceKey(track, red)]: run('red', 1),
       [ghostRaceKey(track, setup)]: { car: 'blue', time: 1, frames: [] },
     }))
-    expect(store.availability(track, setup)).toEqual({ kind: 'different-setup', setup: { car: 'red', laps: 1, handling: 'arcade' } })
+    expect(store.availability(track, setup)).toEqual({ kind: 'different-setup', setup: { car: 'red', laps: 1 } })
     expect(store.availability({ ...track, updatedAt: track.updatedAt + 2 }, setup)).toEqual({ kind: 'none' })
     expect(store.record(track, setup, 1, frames)).toBe(true)
     expect(store.availability(track, setup)).toEqual({ kind: 'exact', time: 1 })

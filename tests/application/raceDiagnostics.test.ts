@@ -7,10 +7,10 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 
 const track = createStarterTrack(asTrackId('replay-example'), 2)
-const setup: RaceSetup = { car: 'red', difficulty: 'hard', laps: 2, handling: 'arcade', mode: 'normal' }
+const setup: RaceSetup = { car: 'red', difficulty: 'hard', laps: 2, mode: 'normal' }
 const result: RaceResult = {
   outcome: 'finished', trackId: track.id, trackName: track.name, playerPlace: 1,
-  playerTime: 42, playerWrecked: false, newRecord: true, standings: [], highScores: [],
+  playerTime: 42, newRecord: true, standings: [], highScores: [],
 }
 const initial = createRace({
   path: new TrackGeometryService().get(track).path,

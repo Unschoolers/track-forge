@@ -57,7 +57,7 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
     expect(advancePassingState(driver, aiState, aroundPlayer, 'hard', 0.05).phase).toBe('passing')
   })
   it.each(['red', 'blue', 'green', 'yellow'] as const)('uses compact rivals for %s in every driving style and difficulty', car => {
-    for (const handling of ['arcade', 'simulation'] as const) {
+    {
       for (const difficulty of ['easy', 'normal', 'hard'] as const) {
         for (const racingLine of [undefined, { sections: [], speedRatio: 1 }]) {
           const aiDriver = { ...driver, car, ...(racingLine ? { racingLine } : {}), ai: createAiDriverState(0, 'opportunist') }
@@ -65,9 +65,9 @@ describe('Arcade non-colliding AI cars have point-sized traffic awareness', () =
             const slowerAi = observation({ ...rival, speed }, 30)
             const slowerHuman = observation({ ...player, speed }, 30)
             const aroundAi = stepAiVehicle(aiDriver, path, { ahead: slowerAi, nearby: [slowerAi] },
-              difficulty, 1 / 60, undefined, false, Infinity, handling)
+              difficulty, 1 / 60, undefined, false, Infinity)
             const aroundHuman = stepAiVehicle(aiDriver, path, { ahead: slowerHuman, nearby: [slowerHuman] },
-              difficulty, 1 / 60, undefined, false, Infinity, handling)
+              difficulty, 1 / 60, undefined, false, Infinity)
             expect(aroundAi.ai?.phase).toBe('follow')
             expect(aroundHuman.ai?.phase).toBe('passing')
           }

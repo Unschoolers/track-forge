@@ -24,9 +24,7 @@ export function updateStandings(list: HTMLElement, standings: readonly RaceStand
   for (const standing of standings) {
     const item = element('li', 'scoreboard-row')
     if (standing.player) item.classList.add('player')
-    const outcome = standing.wrecked
-      ? 'WRECKED'
-      : standing.finishTime === null
+    const outcome = standing.finishTime === null
         ? rivalsFinishing && !standing.player ? 'RACING…' : 'UNFINISHED'
         : formatRaceTime(standing.finishTime)
     item.append(

@@ -25,8 +25,6 @@ export function createResultsModal(
   const timeTrial = result.mode === 'time-trial'
   const headline = result.outcome === 'water'
     ? 'SUNK'
-    : result.outcome === 'wrecked'
-      ? 'WRECKED'
       : result.ghostTime !== undefined && result.playerTime !== null
         ? Math.abs(result.playerTime - result.ghostTime) < 0.0005 ? 'GHOST TIED'
           : result.playerTime < result.ghostTime ? 'GHOST BEATEN' : 'GHOST WINS'

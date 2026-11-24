@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { BrowserScoreRepository } from '@/infrastructure/storage/scoreRepository'
-import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 import { asTrackId } from '@/domain/model'
 
 describe('score time validity', () => {
   it('never records zero or negative race times as leaderboard records', () => {
-    const values = new Map<string, string>([[STORAGE_KEYS.scoreMigration, '1']])
+    const values = new Map<string, string>()
     const repository = new BrowserScoreRepository({
       get: key => values.get(key) ?? null,
       set: (key, value) => { values.set(key, value); return true },

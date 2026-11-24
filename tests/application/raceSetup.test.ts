@@ -6,16 +6,15 @@ import { raceSetupFromPreferences, withFreshStartGrid } from '@/application/race
 
 const track = createStarterTrack(asTrackId('race-setup'), 1)
 const prefs: Preferences = {
-  car: 'green', difficulty: 'hard', handling: 'simulation', raceLaps: 3,
+  car: 'green', difficulty: 'hard', raceLaps: 3,
   raceMode: 'normal', audioEnabled: true, hapticsEnabled: true, dynamicZoomEnabled: true,
 }
 
 describe('race setup policies', () => {
-  it('keeps user car, handling, laps and lighting while randomizing a normal circuit grid', () => {
+  it('keeps user car, laps and lighting while randomizing a normal circuit grid', () => {
     const setup = raceSetupFromPreferences(track, prefs, 'night', () => 0)
     expect(setup).toEqual({
-      car: 'green', difficulty: 'hard', laps: 3, handling: 'simulation',
-      mode: 'normal', lighting: 'night', gridPositions: [1, 2, 3, 0],
+      car: 'green', difficulty: 'hard', laps: 3, mode: 'normal', lighting: 'night', gridPositions: [1, 2, 3, 0],
     })
     expect(prefs.raceLaps).toBe(3)
   })

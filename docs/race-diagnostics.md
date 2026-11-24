@@ -30,7 +30,7 @@ npm run qa:race -- simulate path/to/trackforge-race-Roundabout-Hard.json
 npm run qa:race -- simulate path/to/Roundabout.trackforge.json --car yellow --seed 4331
 ```
 
-The simulator emits a machine-readable line prefixed `TRACKFORGE_AI_DIAGNOSTIC`. Use this to compare individual AI finish times, recoveries, off-road seconds and failures on identical track/cars/settings. When passed a **race replay**, the command defaults to its player car, difficulty, grid, start and handling; that slot is AI-controlled for this diagnostic. When passed a **track file**, it defaults to four single-car simulations. Override as needed with `--car`, `--mode`, `--seed`, `--laps`, `--start`, `--grid` and `--seconds`. These are deterministic simulations, **not** exact replays of human input or multiplayer network traffic.
+The simulator emits a machine-readable line prefixed `TRACKFORGE_AI_DIAGNOSTIC`. Use this to compare individual AI finish times, recoveries, off-road seconds and failures on identical track/cars/settings. When passed a **race replay**, the command defaults to its player car, difficulty, grid, and start; that slot is AI-controlled for this diagnostic. When passed a **track file**, it defaults to four single-car simulations. Override as needed with `--car`, `--mode`, `--seed`, `--laps`, `--start`, `--grid` and `--seconds`. These are deterministic simulations, **not** exact replays of human input or multiplayer network traffic.
 
 The start ratio is inferred from the first recorded player road distance
 when a replay does not explicitly save it. If this cannot be recovered, use

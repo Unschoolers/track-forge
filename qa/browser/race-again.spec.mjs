@@ -21,7 +21,7 @@ test('Race Again restores the original night race setup after reload', async ({ 
     page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup),
   ).toMatchObject({
     car: original.car, lighting: original.lighting,
-    difficulty: original.difficulty, handling: original.handling,
+    difficulty: original.difficulty,
     laps: original.laps, mode: original.mode,
   })
   // Race Again is a new race (not Retry), so its grid can be reshuffled.

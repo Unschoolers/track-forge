@@ -10,7 +10,7 @@ import type { KeyValueStore } from '@/application/ports/storage'
 import type { RaceStep } from '@/domain/race/raceEngine'
 
 const track = createStarterTrack(asTrackId('arcade-ghost'), 1)
-const setup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 1, handling: 'arcade' as const }
+const setup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 1 }
 const input = { steering: 0, throttle: 1, braking: false }
 function memory(): KeyValueStore {
   const data = new Map<string, string>()
@@ -59,7 +59,7 @@ describe('Arcade ghost racing', () => {
     if (!source) throw new Error('Missing player')
     const before = { ...source, x: 1000 }
     const after = { ...before, x: 0, speed: 0 }
-    const recorder = new GhostRecording(before, true)
+    const recorder = new GhostRecording(before)
     recorder.sample(before, 0.9)
     recorder.recover(before, after, 1)
     recorder.sample(after, 1.25)
@@ -78,7 +78,7 @@ describe('Arcade ghost racing', () => {
     if (!source) throw new Error('Missing player')
     const before = { ...source, x: 1000, y: 0 }
     const after = { ...before, x: 0 }
-    const recorder = new GhostRecording(before, true)
+    const recorder = new GhostRecording(before)
     recorder.sample(before, 0.9)
     recorder.recover(before, after, 1)
     recorder.recover(after, after, 1)
@@ -94,7 +94,7 @@ describe('Arcade ghost racing', () => {
     if (!source) throw new Error('Missing player')
     const before = { ...source, x: 0, y: 0 }
     const after = { ...before, x: 1000 }
-    const recorder = new GhostRecording(before, true)
+    const recorder = new GhostRecording(before)
     recorder.sample(before, 0.2)
     recorder.recover(before, after, 1)
     for (let index = 1; index <= 3300; index++) recorder.sample(after, 1 + index * 0.2)
@@ -172,14 +172,14 @@ describe('Arcade ghost racing', () => {
     expect(saved?.frames[0]?.t).toBe(0)
     expect(saved?.frames.at(-1)?.t).toBeCloseTo(360)
   })
-  it('records five-minute Simulation runs within the replay budget', () => {
+  it('records five-minute runs within the replay budget', () => {
     const store = new BrowserGhostRepository(memory())
     const race = session(store, finishAt(300))
-    const simulation = { ...setup, handling: 'simulation' as const }
-    race.start(track, simulation)
+    const manual = setup
+    race.start(track, manual)
     race.advance(3.7, input)
     for (let frame = 0; frame < 300 * 60 + 1; frame++) race.advance(1 / 60, input)
-    const saved = store.load(track, simulation)
+    const saved = store.load(track, manual)
     expect(saved).not.toBeNull()
     expect(saved!.frames.length).toBeLessThanOrEqual(MAX_GHOST_FRAMES)
     expect(saved!.frames.at(-1)?.t).toBeCloseTo(300)
@@ -217,7 +217,7 @@ describe('Arcade ghost racing', () => {
     const store = new BrowserGhostRepository({ ...data,
       set: (key, value) => value.length <= quota && data.set(key, value) })
     expect(store.record(track, setup, 1, frames)).toBe(true)
-    quota = (data.get('trackforge-ghost-runs-v1')?.length ?? 0) + 20
+    quota = (data.get('trackforge-ghost-runs-v2')?.length ?? 0) + 20
     const other = { ...track, id: asTrackId('another-ghost') }
     expect(store.record(other, setup, 1, frames)).toBe(true)
     expect(store.load(other, setup)?.time).toBe(1)

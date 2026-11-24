@@ -99,7 +99,6 @@ describe('AI race integration', () => {
           ...player,
           x: 10_000,
           y: 10_000,
-          wrecked: true,
         },
         ai,
       ],

@@ -46,9 +46,9 @@ describe('actual street-to-dirt driving on the creator Speed straight', () => {
     expect(after?.surface).toBe('dirt')
   })
 
-  it.each(['simulation', 'arcade'] as const)(
-    '%s follows the path and applies dirt traction after physically crossing its boundary',
-    handling => {
+  it(
+    'Car follows the path and applies dirt traction after physically crossing its boundary',
+    () => {
       if (!before || !after) throw new Error('Missing surface transition samples')
       const startIndex = dirtIndex - 18
       const directionLength = Math.hypot(last.x - first.x, last.y - first.y)
@@ -58,7 +58,7 @@ describe('actual street-to-dirt driving on the creator Speed straight', () => {
       }
       const starter = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path, routeKind: scenario.routeKind,
-        playerCar: 'blue', difficulty: 'normal', laps: 1, handling,
+        playerCar: 'blue', difficulty: 'normal', laps: 1,
       }).vehicles[0]
       if (!starter) throw new Error('Missing blue race vehicle')
       let vehicle: RaceVehicle = {
@@ -86,7 +86,6 @@ describe('actual street-to-dirt driving on the creator Speed straight', () => {
             { steering: 0, throttle: 0, braking: false },
             context,
             dt,
-            handling,
           ),
           pathIndex: context.nearest.index,
         }

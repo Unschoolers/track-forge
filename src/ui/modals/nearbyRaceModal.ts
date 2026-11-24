@@ -208,7 +208,7 @@ export function createNearbyRaceResults(
       ? medalForFinish('finished', place) : null
     const headline = complete
       ? typeof localTime !== 'number'
-        ? result.outcome === 'water' ? 'SUNK' : result.outcome === 'wrecked' ? 'WRECKED' : 'DID NOT FINISH'
+        ? result.outcome === 'water' ? 'SUNK' : 'DID NOT FINISH'
         : place === 1 ? 'VICTORY!' : `FINISHED ${place}${ordinalSuffix(place)}`
       : snapshot.cup ? 'NEARBY CUP RESULTS' : 'NEARBY RACE RESULTS'
     if (title && title.textContent !== headline) {

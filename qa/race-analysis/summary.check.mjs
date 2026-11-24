@@ -23,8 +23,8 @@ const racer = (id, car, player, speed, braking, surface = 'street') => ({
 })
 function replay() {
   return {
-    format: 'trackforge-race-replay', formatVersion: 1, track: track().track,
-    setup: { difficulty: 'hard', handling: 'arcade', car: 'red', laps: 2,
+    format: 'trackforge-race-replay', formatVersion: 2, track: track().track,
+    setup: { difficulty: 'hard', car: 'red', laps: 2,
       mode: 'normal', gridPositions: [2, 1, 0, 3] },
     result: {
       playerTime: 1.5,
@@ -96,7 +96,7 @@ test('comparison matches same AI color even if it changes grid slot', () => {
 })
 test('malformed exports cause actionable failures, never silent fallback', () => {
   assert.throws(() => summarizeRace({ ...replay(), events: null }), /missing events/)
-  assert.throws(() => summarizeRace({ ...replay(), formatVersion: 2 }), /formatVersion/)
+  assert.throws(() => summarizeRace({ ...replay(), formatVersion: 3 }), /formatVersion/)
   const broken = replay()
   broken.frames[1].t = -1
   assert.throws(() => summarizeRace(broken), /nonmonotonic/)

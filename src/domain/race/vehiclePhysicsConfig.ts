@@ -69,11 +69,6 @@ export interface VehicleDynamicsTuning {
     readonly aerodynamicBase: number
     readonly steeringDragScale: number
   }
-  readonly damage: {
-    readonly maximumSpeedLoss: number
-    readonly maximumAccelerationLoss: number
-    readonly maximumGripLoss: number
-  }
 }
 
 export interface CarPhysicsSpec {
@@ -172,11 +167,6 @@ export const VEHICLE_DYNAMICS_TUNING = {
     offroadRolling: 7.5,
     aerodynamicBase: 8.5,
     steeringDragScale: 22,
-  },
-  damage: {
-    maximumSpeedLoss: 0.07,
-    maximumAccelerationLoss: 0.09,
-    maximumGripLoss: 0.035,
   },
 } as const satisfies VehicleDynamicsTuning
 

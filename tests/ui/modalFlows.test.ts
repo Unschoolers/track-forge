@@ -362,7 +362,7 @@ describe('modal application flows', () => {
     update(state({ type: 'options', returnTo: 'race-setup' }))
     expect(root.textContent).toContain('AI DIFFICULTY')
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
-    for (const action of ['difficulty-hard', 'laps-3', 'handling-simulation']) {
+    for (const action of ['difficulty-hard', 'laps-3']) {
       expect(root.querySelector(`[data-action="${action}"]`)).not.toBeNull()
     }
     root.querySelector<HTMLButtonElement>('[data-action="difficulty-hard"]')?.click()
@@ -443,7 +443,7 @@ describe('modal application flows', () => {
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
     expect(root.querySelector('[data-action="options-tab-race"]')).toBeNull()
     expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
-    expect(root.querySelector('[data-action="handling-simulation"]')).toBeNull()
+    expect(root.querySelector('[data-action="pedalMode-manual"]')).toBeNull()
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
   })
 
@@ -466,14 +466,15 @@ describe('modal application flows', () => {
   it('retains the selected option focus and scroll position through a preferences update', () => {
     const initial = state({ type: 'options', returnTo: 'race-setup' })
     const { root, update, host } = setup(initial)
-    root.querySelector<HTMLButtonElement>('[data-action="handling-simulation"]')?.focus()
+    root.querySelector<HTMLButtonElement>('[data-action="options-tab-controls"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="pedalMode-manual"]')?.focus()
     const body = root.querySelector<HTMLElement>('.modal-body')
     if (!body) throw new Error('Missing options body')
     body.scrollTop = 150
 
-    update({ ...initial, preferences: { ...initial.preferences, handling: 'simulation' } })
+    update({ ...initial, preferences: { ...initial.preferences, pedalMode: 'manual' } })
 
-    expect(document.activeElement?.getAttribute('data-action')).toBe('handling-simulation')
+    expect(document.activeElement?.getAttribute('data-action')).toBe('pedalMode-manual')
     expect(root.querySelector<HTMLElement>('.modal-body')?.scrollTop).toBe(150)
     update(state({ type: 'race-setup' }))
     expect(document.activeElement?.getAttribute('data-action')).toBe('setup-options')

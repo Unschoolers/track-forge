@@ -183,7 +183,7 @@ export function renderVehicles(
       (1 + lift - 0.12 * Math.abs(pitch)) * VEHICLE_VISUAL_SCALE,
       (1 + lift + 0.1 * Math.max(impact * 0.55, compression)) * VEHICLE_VISUAL_SCALE,
     )
-    drawVehicleBody(graphics, vehicle.car, vehicle.braking, vehicle.wrecked ? 0.55 : 1)
+    drawVehicleBody(graphics, vehicle.car, vehicle.braking, 1)
     graphics.restore()
   }
 }

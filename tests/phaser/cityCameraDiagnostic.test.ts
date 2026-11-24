@@ -56,7 +56,7 @@ it('marks the player through City Harbor decks without marking supported ramp tr
   const decks = presentation.filter((primitive): primitive is BridgePolygonPrimitive => primitive.kind === 'edge')
   const covered = getBridgeDeckOcclusion(geometry)
   expect(buildBridgePresentation(geometry)).toBe(presentation)
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade' })
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
   const p = path.points[150]!
   const q = path.points[151]!
   const angle = Math.atan2(q.y - p.y, q.x - p.x)

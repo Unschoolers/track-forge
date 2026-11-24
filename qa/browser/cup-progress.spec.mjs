@@ -15,7 +15,7 @@ test('resumes an unfinished Arcade Cup round after closing the game', async ({ p
   await page.getByRole('button', { name: 'RESUME CUP', exact: true }).click()
   await expect(page.locator('[data-race-countdown]')).toBeVisible()
   const state = await page.evaluate(() => window.__trackForgeQa.snapshot().race)
-  expect(state.setup).toMatchObject({ handling: 'arcade', mode: 'normal', laps: 1 })
+  expect(state.setup).toMatchObject({ mode: 'normal', laps: 1 })
 })
 
 test('restores and completes a scored Cup after a reload', async ({ page }) => {

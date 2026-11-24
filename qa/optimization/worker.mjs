@@ -70,7 +70,7 @@ try {
       const run = runLaneCheck({
         path: entry.path, trackName: entry.trackName,
         seed: task.seed, car: task.playerCar ?? task.car, difficulty: task.difficulty,
-        reversed: scenario.reverse, handling: 'arcade',
+        reversed: scenario.reverse,
         // Passing policy trials use AI-controlled rivals as reproducible
         // stand-ins for a human obstacle. Production AI↔AI traffic remains
         // compact; this legacy mode is confined to these offline studies.

@@ -5,7 +5,6 @@ import type { RaceVehicle } from '@/domain/race/raceState'
 export interface GhostSetup {
   readonly car: CarId
   readonly laps: number
-  readonly handling?: 'arcade' | 'simulation'
 }
 export type GhostAvailability =
   | { readonly kind: 'exact'; readonly time: number }
@@ -48,7 +47,7 @@ export function ghostRaceKey(track: Track, setup: GhostSetup): string {
     ...(open ? ['point-to-point'] : []),
     track.id, track.raceRevision ?? track.updatedAt, open ? 0 : track.start?.ratio ?? 0,
     !open && track.start?.reversed ? 'reverse' : 'forward',
-    setup.car, setup.laps, setup.handling ?? 'arcade',
+    setup.car, setup.laps,
   ].join('|')
 }
 

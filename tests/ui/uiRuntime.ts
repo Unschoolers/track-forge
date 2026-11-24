@@ -24,8 +24,6 @@ export function createUiRuntime(): UiRuntime {
           vehicleCount: 4,
           lap: 0,
           totalLaps: 3,
-          damage: 0,
-          damageLimit: 5,
         },
         standings: [],
         result: null,

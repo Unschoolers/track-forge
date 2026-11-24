@@ -16,30 +16,6 @@ export function raceVehicleContext(race: RaceState, vehicle: RaceVehicle, previo
   return getVehicleStepContext(race.path, vehicle, previous, radius)
 }
 
-function aiRampSpeedLimit(
-  race: RaceState,
-  vehicle: RaceVehicle,
-  startIndex: number,
-): number {
-  // Arcade rivals carry their pace over climbs just like the player.
-  if (vehicle.racingLine || (race.handling ?? 'arcade') === 'arcade') {
-    return Number.POSITIVE_INFINITY
-  }
-  // Anticipate climbs in the travel direction; descents keep their speed.
-  const lookAhead = Math.min(40, Math.max(12, Math.ceil(vehicle.speed / 6)))
-  if (gradeForTravel(race.path.roadSurface.gradeAt(startIndex), race.reversed) < -0.025) {
-    return Number.POSITIVE_INFINITY
-  }
-  for (let offset = 0; offset <= lookAhead; offset++) {
-    const index = startIndex + offset * (race.reversed ? -1 : 1)
-    if (!race.path.closed && (index < 0 || index >= race.path.points.length)) continue
-    if (gradeForTravel(race.path.roadSurface.gradeAt(index), race.reversed) > 0.025) {
-      return 110
-    }
-  }
-  return Number.POSITIVE_INFINITY
-}
-
 export function advanceVehicle(
   vehicle: RaceVehicle,
   race: RaceState,
@@ -56,7 +32,6 @@ export function advanceVehicle(
       input,
       previousContext,
       deltaSeconds,
-      race.handling ?? 'arcade',
     )
   } else {
     moved = stepAiVehicle(
@@ -67,9 +42,7 @@ export function advanceVehicle(
       deltaSeconds,
       random,
       race.reversed,
-      Math.min(aiRampSpeedLimit(race, vehicle, previousContext.nearest.index),
-        race.aiVehicleSpeedLimits?.[vehicle.id] ?? Number.POSITIVE_INFINITY),
-      race.handling ?? 'arcade',
+      race.aiVehicleSpeedLimits?.[vehicle.id] ?? Number.POSITIVE_INFINITY,
       catchUp,
       race.aiProfileOverrides?.[vehicle.car],
       race.aiPassingPolicyOverrides?.[vehicle.car],

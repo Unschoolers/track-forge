@@ -69,15 +69,14 @@ export function createRaceSetupModal(
   const description = element('p', 'modal-subtitle', ghostAvailable
     ? `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; ${openRoute ? 'Race AI' : 'Normal Race'} has AI opponents.`
     : ghost.kind === 'different-setup'
-      ? `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${openRoute ? 'single run' : `${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'}`} · ${ghost.setup.handling === 'simulation' ? 'Simulation' : 'Arcade'}.`
+      ? `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${openRoute ? 'single run' : `${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'}`}.`
       : 'Finish a race on this layout to save a ghost.')
   description.id = 'ghost-availability'
   mode.append(modeRow, description)
   frame.body.append(mode)
   const laps = state.preferences.raceLaps ?? 2
-  const style = state.preferences.handling === 'simulation' ? 'Simulation' : 'Arcade'
   const lightLabel = lighting === 'night' ? 'Night' : 'Day'
-  frame.body.append(element('p', 'modal-subtitle', `${style} · ${DIFFICULTY_SPECS[state.preferences.difficulty].name} · ${openRoute ? 'Single run' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`} · ${lightLabel}`))
+  frame.body.append(element('p', 'modal-subtitle', `${DIFFICULTY_SPECS[state.preferences.difficulty].name} · ${openRoute ? 'Single run' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`} · ${lightLabel}`))
   frame.footer.append(
     button('BACK', 'setup-back', actions.close, 'button'),
     button('OPTIONS', 'setup-options', actions.options, 'button'),

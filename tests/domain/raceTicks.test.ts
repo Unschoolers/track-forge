@@ -24,7 +24,6 @@ function startingGrid() {
   return createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
     path,
     routeKind: 'point-to-point',
-    handling: 'simulation',
     playerCar: 'blue',
     difficulty: 'normal',
     laps: 1,

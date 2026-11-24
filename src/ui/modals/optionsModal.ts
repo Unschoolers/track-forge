@@ -145,24 +145,6 @@ export function createOptionsModal(
         DIFFICULTY_SPECS[state.preferences.difficulty].description,
       ),
     )
-    const handling = element('section', 'setup-section')
-    handling.append(element('h3', 'setup-label', 'DRIVING CONTROLS & RULES'))
-    const handlingRow = element('div', 'choice-row')
-    for (const mode of ['arcade', 'simulation'] as const) {
-      const selected = (state.preferences.handling ?? 'arcade') === mode
-      const choice = button(
-        mode.toUpperCase(),
-        `handling-${mode}`,
-        () => actions.preferences({ ...state.preferences, handling: mode }),
-        `setup-choice${selected ? ' active' : ''}`,
-      )
-      choice.setAttribute('aria-pressed', String(selected))
-      handlingRow.append(choice)
-    }
-    handling.append(
-      handlingRow,
-      element('p', 'modal-subtitle', 'Both styles use the same Arcade car physics. Arcade accelerates automatically; Simulation uses manual throttle and collision rules. Hold GAS or W / ↑ to accelerate. Focused pedals: hold Space or Enter.'),
-    )
     const raceLength = element('section', 'setup-section')
     raceLength.append(element('h3', 'setup-label', 'RACE LENGTH'))
     const raceLengthRow = element('div', 'choice-row')
@@ -180,7 +162,7 @@ export function createOptionsModal(
       raceLengthRow.append(choice)
     }
     raceLength.append(...(openRoute ? [element('p', 'modal-subtitle', 'Single run · no laps')] : [raceLengthRow]))
-    raceSettings.append(difficulty, raceLength, handling)
+    raceSettings.append(difficulty, raceLength)
     frame.body.append(raceSettings)
     capture('race', raceStart)
   }
@@ -200,7 +182,7 @@ export function createOptionsModal(
   frame.body.append(
     createToggleRow(
       'Haptics',
-      'Surface, curb, and collision vibration.',
+      'Surface and curb vibration.',
       state.preferences.hapticsEnabled,
       'toggle-haptics',
       () =>
@@ -224,7 +206,7 @@ export function createOptionsModal(
   )
   capture('display', displayStart)
   const controlsStart = frame.body.children.length
-  const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize'>(
+  const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize' | 'pedalMode'>(
     title: string, key: K, values: readonly NonNullable<AppSnapshot['preferences'][K]>[], fallback: NonNullable<AppSnapshot['preferences'][K]>,
   ): void => {
     const section = element('section', 'setup-section')
@@ -234,13 +216,15 @@ export function createOptionsModal(
     row.setAttribute('aria-label', title)
     for (const value of values) {
       const selected = (state.preferences[key] ?? fallback) === value
-      const choice = button(value.toUpperCase(), `${key}-${value}`, () => actions.preferences({ ...state.preferences, [key]: value }), `setup-choice${selected ? ' active' : ''}`)
+      const label = key === 'pedalMode' ? value === 'auto' ? 'AUTO-ACCELERATE' : 'MANUAL PEDALS' : value.toUpperCase()
+      const choice = button(label, `${key}-${value}`, () => actions.preferences({ ...state.preferences, [key]: value }), `setup-choice${selected ? ' active' : ''}`)
       choice.setAttribute('aria-pressed', String(selected))
       row.append(choice)
     }
     section.append(row)
     frame.body.append(section)
   }
+  controlChoices('Pedals', 'pedalMode', ['auto', 'manual'], 'auto')
   controlChoices('Steering layout', 'steeringLayout', ['drag', 'buttons'], 'drag')
   controlChoices('Steering hand', 'steeringHand', ['left', 'right'], 'left')
   controlChoices('Control size', 'controlSize', ['standard', 'large'], 'standard')

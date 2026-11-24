@@ -2,8 +2,6 @@ import { DIFFICULTY_SPECS } from '@/domain/config'
 import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { CarId, DifficultyId } from '@/domain/model'
 
-type Handling = 'arcade' | 'simulation'
-
 /**
  * Hard-first tuning contract (docs/ai-difficulty-tuning.md):
  * calibrate the physically safe Hard controller before adjusting Normal/Easy.
@@ -22,15 +20,6 @@ const AI_PACE_POLICY = {
   readonly arcadeCornerMargin: number
   readonly authoredLineSpeedRatio: number
 }>
-
-/** Arcade and authored lines retain Hard steering technique on all levels. */
-export function aiSteeringDifficulty(
-  difficulty: DifficultyId,
-  handling: Handling,
-  hasAuthoredLine: boolean,
-): DifficultyId {
-  return handling === 'arcade' || hasAuthoredLine ? 'hard' : difficulty
-}
 
 /**
  * Lower difficulties carry an explicit corner-speed reserve. Hard stays the
@@ -55,12 +44,6 @@ export function authoredLineSpeedRatio(difficulty: DifficultyId): number {
  * Grid-rival pace is deliberately chosen independently of steering technique:
  * Arcade's historical baseline uses Hard's three distinct rival pace values.
  */
-export function raceRivalPace(
-  difficulty: DifficultyId,
-  handling: Handling | undefined,
-  rivalIndex: number,
-): number {
-  const pace = DIFFICULTY_SPECS[(handling ?? 'arcade') === 'arcade' ? 'hard' : difficulty]
-  return (('aiPaces' in pace ? pace.aiPaces[rivalIndex] : undefined) ??
-    (0.985 - rivalIndex * 0.008))
+export function raceRivalPace(rivalIndex: number): number {
+  return DIFFICULTY_SPECS.hard.aiPaces[rivalIndex] ?? (0.985 - rivalIndex * 0.008)
 }

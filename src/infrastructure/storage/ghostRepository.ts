@@ -10,7 +10,7 @@ import {
   type GhostStore,
 } from '@/application/race/ghostReplay'
 
-const STORAGE_KEY = 'trackforge-ghost-runs-v1'
+const STORAGE_KEY = 'trackforge-ghost-runs-v2'
 const MAX_RUNS = 20
 
 function validRun(value: unknown): value is GhostRun {
@@ -35,7 +35,7 @@ function validRun(value: unknown): value is GhostRun {
   )
 }
 
-/** Best ghost for each exact car, track revision, direction, laps and handling. */
+/** Best ghost for each exact car, track revision, direction and laps. */
 export class BrowserGhostRepository implements GhostStore {
   constructor(private readonly storage: KeyValueStore) {}
 
@@ -49,20 +49,18 @@ export class BrowserGhostRepository implements GhostStore {
 
   availability(track: Track, setup: GhostSetup): GhostAvailability {
     const key = ghostRaceKey(track, setup)
-    const suffix = `|${setup.car}|${setup.laps}|${setup.handling ?? 'arcade'}`
+    const suffix = `|${setup.car}|${setup.laps}`
     const prefix = `${key.slice(0, -suffix.length)}|`
     let best: { setup: GhostSetup; differences: number; time: number } | undefined
     for (const [candidateKey, run] of Object.entries(this.all()).slice(-MAX_RUNS)) {
       if (!candidateKey.startsWith(prefix)) continue
       const parts = candidateKey.slice(prefix.length).split('|')
-      const [car, lapsText, handling] = parts
+      const [car, lapsText] = parts
       const laps = Number(lapsText)
-      if (parts.length !== 3 || !['blue', 'red', 'green', 'yellow'].includes(car ?? '') ||
-          car !== run.car || !Number.isSafeInteger(laps) || laps < 1 || String(laps) !== lapsText ||
-          (handling !== 'arcade' && handling !== 'simulation')) continue
-      const candidate: GhostSetup = { car: run.car, laps, handling }
-      const differences = Number(candidate.car !== setup.car) + Number(laps !== setup.laps) +
-        Number(handling !== (setup.handling ?? 'arcade'))
+      if (parts.length !== 2 || !['blue', 'red', 'green', 'yellow'].includes(car ?? '') ||
+          car !== run.car || !Number.isSafeInteger(laps) || laps < 1 || String(laps) !== lapsText) continue
+      const candidate: GhostSetup = { car: run.car, laps }
+      const differences = Number(candidate.car !== setup.car) + Number(laps !== setup.laps)
       if (differences === 0) return { kind: 'exact', time: run.time }
       if (!best || differences < best.differences || (differences === best.differences && run.time < best.time)) {
         best = { setup: candidate, differences, time: run.time }

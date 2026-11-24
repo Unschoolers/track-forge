@@ -10,8 +10,7 @@ it('completes an authored hairpin cleanly on Normal and Hard', () => {
   for (const difficulty of ['normal', 'hard'] as const) {
     const run = runLaneCheck({
       path, trackName: track.name, seed: 11,
-      difficulty, car: 'blue', mode: 'solo', handling: 'arcade',
-      reversed: false, seconds: 45, laps: 1,
+      difficulty, car: 'blue', mode: 'solo', reversed: false, seconds: 45, laps: 1,
     })
 
     expect(run.stoppedReason).toBe('finished')
@@ -26,8 +25,7 @@ it.each([false, true])('keeps Hard traffic on the hairpin circuit in reverse=%s'
   const track = requireFixture(createLaneScenarios().find(({ id }) => id === 'hairpin'))
   const run = runLaneCheck({
     path: prepareLanePath(track), trackName: track.name, seed: 1,
-    difficulty: 'hard', car: 'blue', mode: 'traffic', handling: 'simulation',
-    reversed, seconds: 45, laps: 1,
+    difficulty: 'hard', car: 'blue', mode: 'traffic', reversed, seconds: 45, laps: 1,
   })
   expect(run.stoppedReason).toBe('finished')
   expect(run.vehicles.reduce((total, vehicle) => total + vehicle.recoveries, 0)).toBeLessThanOrEqual(3)

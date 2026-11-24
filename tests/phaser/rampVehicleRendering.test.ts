@@ -216,7 +216,7 @@ describe('ramp vehicle rendering', () => {
 
   it('keeps the player body on top of overlapping rivals on an elevated deck', () => {
     const path = buildRoadPath(track.points, track.terrain)
-    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade' })
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
     const index = path.points.findIndex((point, i) =>
       point.structure === 'overpass' &&
       path.roadSurface.at(i).structureHeight > 23.99 &&

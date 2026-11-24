@@ -45,7 +45,6 @@ for (const reversed of [false, true]) {
       }]))
       localStorage.setItem('trackforge-library-v1-migrated', '1')
       localStorage.setItem('trackforge-last-car', 'blue')
-      localStorage.setItem('trackforge-handling-mode', 'arcade')
     }, reversed)
     await page.goto('/?qa')
     await enterTrackForge(page)

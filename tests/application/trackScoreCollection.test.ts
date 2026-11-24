@@ -7,7 +7,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 const local = createStarterTrack(asTrackId('same-id'), 1)
 const official = { ...local, routeKind: 'point-to-point' as const }
 const circuit: ScoreEntry = { car: 'blue', difficulty: 'normal', recordedAt: 1, time: 20,
-  category: { course: 'v2:test', laps: 2, handling: 'arcade', mode: 'normal', routeKind: 'circuit' } }
+  category: { course: 'v2:test', laps: 2, mode: 'normal', routeKind: 'circuit' } }
 const open: ScoreEntry = { ...circuit, category: { ...circuit.category!, routeKind: 'point-to-point' } }
 
 describe('track score lookup', () => {

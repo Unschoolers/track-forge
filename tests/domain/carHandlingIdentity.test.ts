@@ -20,7 +20,6 @@ const track = decodeTrack(exported.track, 1)
 if (!track) throw new Error('Invalid Turn test track fixture')
 const path = buildRoadPath(track.points, track.terrain, Infinity, track.routeKind)
 const dt = 1 / 60
-type Handling = 'simulation' | 'arcade'
 type Surface = 'street' | 'ice' | 'dirt' | 'grass'
 
 function context(surface: Surface): VehicleStepContext {
@@ -69,32 +68,31 @@ function travel(
   initial: RaceVehicle,
   input: DriverInput,
   surface: Surface,
-  handling: Handling,
   frames: number,
 ): RaceVehicle {
   const road = context(surface)
   let vehicle = initial
   for (let frame = 0; frame < frames; frame += 1) {
-    vehicle = stepVehicle(vehicle, input, road, dt, handling)
+    vehicle = stepVehicle(vehicle, input, road, dt)
   }
   return vehicle
 }
 
-function stoppingDistance(car: CarId, handling: Handling, surface: Surface = 'street'): number {
+function stoppingDistance(car: CarId, surface: Surface = 'street'): number {
   let vehicle = makeVehicle(car, 170, 0, surface)
   const road = context(surface)
   const heading = road.tangent
   const start = { x: vehicle.x, y: vehicle.y }
   const input = { steering: 0, throttle: 0, braking: true }
   for (let frame = 0; frame < 360 && vehicle.speed > 0.5; frame += 1) {
-    vehicle = stepVehicle(vehicle, input, road, dt, handling)
+    vehicle = stepVehicle(vehicle, input, road, dt)
   }
   expect(vehicle.speed).toBeLessThan(0.5)
   return (vehicle.x - start.x) * heading.x + (vehicle.y - start.y) * heading.y
 }
 
 /** Identical effective wheel angle: compare handling rather than steering-rack gearing. */
-function cornering(car: CarId, handling: Handling, speed = 135, matchedWheelAngle = true) {
+function cornering(car: CarId, speed = 135, matchedWheelAngle = true) {
   const road = context('street')
   const steer = matchedWheelAngle
     ? 0.65 * CAR_SPECS.blue.steer / CAR_SPECS[car].steer
@@ -108,7 +106,6 @@ function cornering(car: CarId, handling: Handling, speed = 135, matchedWheelAngl
       { steering: steer, throttle: 0, braking: false },
       road,
       dt,
-      handling,
     )
     if (frame >= 10) {
       angleSum += Math.atan2(vehicle.slip, Math.max(1, vehicle.speed))
@@ -126,44 +123,44 @@ describe('creator Turn test fixture', () => {
   })
 })
 
-describe.each(['simulation', 'arcade'] as const)('%s car handling personalities', handling => {
+describe('Car handling personalities', () => {
   it('makes Yellow stop shortest on road, with meaningful advantages over Green and Blue', () => {
-    const yellow = stoppingDistance('yellow', handling)
-    const green = stoppingDistance('green', handling)
-    const blue = stoppingDistance('blue', handling)
+    const yellow = stoppingDistance('yellow')
+    const green = stoppingDistance('green')
+    const blue = stoppingDistance('blue')
     expect(yellow).toBeLessThan(blue * 0.87)
     expect(yellow).toBeLessThan(green)
     expect(green).toBeLessThan(blue * 0.94)
   })
 
   it('gives Red the strongest pavement brakes while Yellow stays the all-terrain braking specialist', () => {
-    const red = stoppingDistance('red', handling)
-    expect(red).toBeLessThan(stoppingDistance('blue', handling) * 0.97)
-    expect(red).toBeLessThan(stoppingDistance('yellow', handling) * 0.85)
+    const red = stoppingDistance('red')
+    expect(red).toBeLessThan(stoppingDistance('blue') * 0.97)
+    expect(red).toBeLessThan(stoppingDistance('yellow') * 0.85)
   })
 
   it('makes Yellow feel more planted than balanced Blue in the same paved corner', () => {
-    const yellow = cornering('yellow', handling)
-    const blue = cornering('blue', handling)
+    const yellow = cornering('yellow')
+    const blue = cornering('blue')
     expect(yellow.slipAngle).toBeLessThan(blue.slipAngle * 0.9)
     expect(yellow.yawRate).toBeGreaterThan(0.2)
   })
 
   it('gives Green less body slip at the same wheel angle than Blue', () => {
-    const green = cornering('green', handling)
-    const blue = cornering('blue', handling)
+    const green = cornering('green')
+    const blue = cornering('blue')
     expect(green.slipAngle).toBeLessThan(blue.slipAngle * 0.95)
   })
 
   it('makes Green turn faster than Blue for the same player steering input', () => {
-    const green = cornering('green', handling, 135, false)
-    const blue = cornering('blue', handling, 135, false)
+    const green = cornering('green', 135, false)
+    const blue = cornering('blue', 135, false)
     expect(green.yawRate).toBeGreaterThan(blue.yawRate * 1.05)
   })
 
   it('makes Red slide more than Blue in fast paved corners despite better braking', () => {
-    const red = cornering('red', handling, 210)
-    const blue = cornering('blue', handling, 210)
+    const red = cornering('red', 210)
+    const blue = cornering('blue', 210)
     expect(red.slipAngle).toBeGreaterThan(blue.slipAngle * 1.2)
   })
 
@@ -171,14 +168,14 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     // Dirt grip remains Red's weakness, while its brakes have a usable range.
     expect(VEHICLE_TERRAIN_SPECS.red.dirt.grip).toBeLessThan(VEHICLE_TERRAIN_SPECS.blue.dirt.grip)
     expect(VEHICLE_TERRAIN_SPECS.red.street).toEqual(VEHICLE_TERRAIN_SPECS.blue.street)
-    const red = stoppingDistance('red', handling, 'dirt')
-    const blue = stoppingDistance('blue', handling, 'dirt')
-    const green = stoppingDistance('green', handling, 'dirt')
+    const red = stoppingDistance('red', 'dirt')
+    const blue = stoppingDistance('blue', 'dirt')
+    const green = stoppingDistance('green', 'dirt')
     // Compare player-visible distance, not an exact internal tuning value:
     // Red stays meaningfully worse than Blue, but the old >20% gap is gone.
     const redToBlue = red / blue
-    expect(redToBlue, `${handling}: Red=${red.toFixed(1)}, Blue=${blue.toFixed(1)}`).toBeGreaterThan(1.08)
-    expect(redToBlue, `${handling}: Red=${red.toFixed(1)}, Blue=${blue.toFixed(1)}`).toBeLessThan(1.2)
+    expect(redToBlue, `Red=${red.toFixed(1)}, Blue=${blue.toFixed(1)}`).toBeGreaterThan(1.08)
+    expect(redToBlue, `Red=${red.toFixed(1)}, Blue=${blue.toFixed(1)}`).toBeLessThan(1.2)
     expect(green).toBeLessThan(blue)
   })
 
@@ -187,26 +184,26 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
       const initial = makeVehicle(car, 155, 32, 'street')
       const iceInitial = makeVehicle(car, 155, 32, 'ice')
       const input = { steering: 0, throttle: 0, braking: false }
-      const street = travel(initial, input, 'street', handling, 18)
-      const ice = travel(iceInitial, input, 'ice', handling, 18)
+      const street = travel(initial, input, 'street', 18)
+      const ice = travel(iceInitial, input, 'ice', 18)
       expect(street.slip, `${car} street vs ice`).toBeLessThan(ice.slip * 0.75)
     }
   })
 
   it('gives Yellow the shortest stopping distance on dirt and grass', () => {
     for (const surface of ['dirt', 'grass'] as const) {
-      const yellow = stoppingDistance('yellow', handling, surface)
+      const yellow = stoppingDistance('yellow', surface)
       for (const rival of ['blue', 'green', 'red'] as const) {
-        expect(yellow, `${surface}/${rival}`).toBeLessThan(stoppingDistance(rival, handling, surface))
+        expect(yellow, `${surface}/${rival}`).toBeLessThan(stoppingDistance(rival, surface))
       }
-      expect(yellow).toBeLessThan(stoppingDistance('blue', handling, surface) * 0.9)
+      expect(yellow).toBeLessThan(stoppingDistance('blue', surface) * 0.9)
     }
   })
 
   it('matches the four ice braking distance targets from 170 units/s', () => {
     const targets = { red: 250, blue: 235, green: 200, yellow: 150 } as const
     for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
-      const distance = stoppingDistance(car, handling, 'ice')
+      const distance = stoppingDistance(car, 'ice')
       expect(Math.abs(distance - targets[car]), car).toBeLessThan(1)
     }
   })
@@ -219,9 +216,9 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
         brakePressure: 1, surfaceGrip: spec.grip * terrain.grip }
       const road = context(surface)
       const coast = stepVehicle({ ...initial, brakePressure: 0 },
-        { steering: 0, throttle: 0, braking: false }, road, dt, handling)
+        { steering: 0, throttle: 0, braking: false }, road, dt)
       const brake = stepVehicle(initial,
-        { steering: 0, throttle: 0, braking: true }, road, dt, handling)
+        { steering: 0, throttle: 0, braking: true }, road, dt)
       const car = CAR_SPECS.red
       const forces = VEHICLE_DYNAMICS_TUNING.forces
       // Freeze the pre-upgrade service-brake scale, not the new multiplier.

@@ -127,7 +127,6 @@ export function getTrafficState(
     .filter(
       (other) =>
         other.id !== vehicle.id &&
-        !other.wrecked &&
         other.finishedAt === null &&
         (typeof path === 'number' || sharesRoad(vehicle, other, path)),
     )

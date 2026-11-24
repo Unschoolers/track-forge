@@ -53,7 +53,7 @@ export function groupHotspots(events, binSize = 50) {
   assert(Number.isInteger(binSize) && binSize > 0, 'hotspotBin must be positive')
   const groups = new Map()
   const interesting = new Set([
-    'curb-hit', 'vehicle-recovered', 'collision', 'barrier-collision', 'surface-changed',
+    'curb-hit', 'vehicle-recovered', 'surface-changed',
   ])
   for (const event of events) {
     if (!interesting.has(event.type)) continue
@@ -79,7 +79,7 @@ export function groupHotspots(events, binSize = 50) {
  */
 export function summarizeRace(exported, options = {}) {
   assert(exported?.format === 'trackforge-race-replay', 'expected trackforge-race-replay')
-  assert(exported.formatVersion === 1, 'unsupported race formatVersion')
+  assert(exported.formatVersion === 2, 'unsupported race formatVersion')
   assert(Array.isArray(exported.frames) && exported.frames.length > 0, 'missing frames')
   assert(Array.isArray(exported.events), 'missing events')
   const frames = exported.frames
@@ -215,7 +215,7 @@ export function compareRaces(before, after) {
   const a = summarizeRace(before), b = summarizeRace(after)
   const warnings = []
   if (a.track.fingerprint !== b.track.fingerprint) warnings.push('Different track geometry/terrain')
-  for (const key of ['difficulty', 'handling', 'laps', 'mode', 'car']) {
+  for (const key of ['difficulty', 'laps', 'mode', 'car']) {
     if (a.setup?.[key] !== b.setup?.[key]) warnings.push('Different ' + key)
   }
   if (JSON.stringify(a.setup?.gridPositions) !== JSON.stringify(b.setup?.gridPositions))

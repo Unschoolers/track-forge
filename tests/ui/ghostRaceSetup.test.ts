@@ -17,7 +17,7 @@ const state: AppSnapshot = {
     terrainBrush: { mode: 'raise', radius: 48 }, grid: false, cameraRequest: null,
     selectedCrossing: null, selectedPoint: null },
   preferences: { car: 'blue', difficulty: 'normal',
-    audioEnabled: true, hapticsEnabled: true, dynamicZoomEnabled: true, handling: 'arcade' },
+    audioEnabled: true, hapticsEnabled: true, dynamicZoomEnabled: true },
   scoresByTrack: {}, notice: null,
 }
 const actions = () => ({ close: vi.fn(), preferences: vi.fn(), lighting: vi.fn(), start: vi.fn(), options: vi.fn() })
@@ -32,8 +32,8 @@ describe('Ghost Race setup', () => {
     expect(modal.querySelector('[data-action="mode-normal"]')?.getAttribute('aria-pressed')).toBe('true')
   })
   it('describes a saved ghost with a different setup', () => {
-    const modal = createRaceSetupModal(state, actions(), { kind: 'different-setup', setup: { car: 'green', laps: 1, handling: 'arcade' } })
-    expect(modal.textContent).toContain('Saved ghost: Green · 1 lap · Arcade')
+    const modal = createRaceSetupModal(state, actions(), { kind: 'different-setup', setup: { car: 'green', laps: 1 } })
+    expect(modal.textContent).toContain('Saved ghost: Green · 1 lap')
     expect(modal.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')?.disabled).toBe(true)
   })
   it('offers the saved target and dispatches the selected race mode', () => {
@@ -56,7 +56,7 @@ describe('Ghost Race setup', () => {
   })
   it('offers and invokes the best ghost action when available', () => {
     const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
-      playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false, standings: [], highScores: [] }
+      playerPlace: 1, playerTime: 61, newRecord: false, standings: [], highScores: [] }
     const raceBestGhost = vi.fn()
     const modal = createResultsModal(result, { retry() {}, edit() {}, home() {}, raceBestGhost })
     modal.querySelector<HTMLButtonElement>('[data-action="race-best-ghost"]')?.click()
@@ -65,7 +65,7 @@ describe('Ghost Race setup', () => {
   })
   it('compares the finish with the original ghost instead of awarding a solo-race medal', () => {
     const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
-      playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false,
+      playerPlace: 1, playerTime: 61, newRecord: false,
       standings: [], highScores: [], ghostTime: 62.345, ghostSaved: true, savedGhostTime: 61 }
     const modal = createResultsModal(result, { retry() {}, edit() {}, home() {} })
     expect(modal.textContent).toContain('GHOST BEATEN')
@@ -93,7 +93,7 @@ describe('Ghost Race setup', () => {
   })
   it('shows cumulative checkpoint and finish times in results', () => {
     const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
-      playerPlace: 1, playerTime: 61, playerWrecked: false, newRecord: false, standings: [], highScores: [],
+      playerPlace: 1, playerTime: 61, newRecord: false, standings: [], highScores: [],
       routeKind: 'point-to-point', splits: [{ lap: 0, gate: 1, time: 15 }, { lap: 0, gate: 4, time: 61 }] }
     const modal = createResultsModal(result, { retry() {}, edit() {}, home() {} })
     document.body.append(modal)

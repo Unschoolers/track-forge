@@ -1,10 +1,9 @@
 import { EMILE_COURSE, EMILE_RACING_LINES } from '@/domain/race/ai/emileRacingLines'
 import { authoredLineSpeedRatio, raceRivalPace } from '@/domain/race/ai/difficultyPolicy'
 import { CAR_IDS, type CarId, type DifficultyId, type RouteKind } from '@/domain/model'
-import { DIFFICULTY_SPECS, ROAD_GEOMETRY } from '@/domain/config'
+import { ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
-import { buildSceneryColliders, type RecoveryScenery } from '@/domain/race/sceneryCollisions'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRaceEffectsState } from '@/domain/race/effects'
@@ -16,11 +15,9 @@ export interface CreateRaceOptions {
   readonly path: RoadPath
   readonly routeKind?: RouteKind
   readonly recoveryCheckpoints?: readonly number[] | undefined
-  readonly recoveryScenery?: RecoveryScenery | undefined
   readonly playerCar: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
-  readonly handling?: 'arcade' | 'simulation' | undefined
   readonly startRatio?: number | undefined
   readonly reversed?: boolean | undefined
   /** Vehicle index -> physical start slot, validated independently from vehicle IDs. */
@@ -118,14 +115,13 @@ function sampleOpenStart(path: RoadPath): StartGridSample {
 }
 
 export function createRace(options: CreateRaceOptions): RaceState {
-  const difficulty = DIFFICULTY_SPECS[options.difficulty]
   const aiCars: readonly CarId[] =
     options.difficulty === 'hard'
       ? [options.playerCar, ...CAR_IDS.filter((car) => car !== options.playerCar)]
       : CAR_IDS.filter((car) => car !== options.playerCar)
 
   const emile = options.courseIdentity === EMILE_COURSE &&
-    options.handling === 'arcade' && !options.reversed &&
+    !options.reversed &&
     options.routeKind !== 'point-to-point'
   const open = options.routeKind === 'point-to-point'
   const startDistance =
@@ -143,9 +139,6 @@ export function createRace(options: CreateRaceOptions): RaceState {
   const timingGates = recoveryCheckpoints
     .filter(index => index !== resolvedStartIndex && (!open || index > 0))
     .sort((a, b) => routeProgress(a) - routeProgress(b))
-  // Physical scenery never depends on whether a creator added checkpoint markers.
-  const sceneryColliders = options.recoveryScenery
-    ? buildSceneryColliders(options.recoveryScenery, options.path.terrainSurface) : undefined
   const openPlacement = open ? sampleOpenStart(options.path) : undefined
   const slots = validNearbyGridPositions(options.gridPositions) ? options.gridPositions : [0, 1, 2, 3]
   const vehicles: RaceVehicle[] = ROAD_GEOMETRY.startGrid.map((_, index) => {
@@ -192,7 +185,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
           ? null
           : createAiDriverState(ROAD_GEOMETRY.aiBaseLanes[gridSlot] ?? 0,
               (['cautious', 'steady', 'opportunist'] as const)[index - 1]),
-      aiPace: index === 0 ? 1 : raceRivalPace(options.difficulty, options.handling, index - 1),
+      aiPace: index === 0 ? 1 : raceRivalPace(index - 1),
       pathIndex: placement.pathIndex,
       ...(index === 0 ? { lastRoadContactIndex: placement.pathIndex } : {}),
       pathDistance: options.path.points[placement.pathIndex]?.distance ?? 0,
@@ -205,10 +198,6 @@ export function createRace(options: CreateRaceOptions): RaceState {
       structureRunId: roadSurface.structureRunId,
       nextSector: 1,
       lap: 0,
-      damage: 0,
-      damageLimit: index === 0 ? difficulty.damageLimit : Number.POSITIVE_INFINITY,
-      damageCooldown: 0,
-      wrecked: false,
       currentSurface: 'street',
       onCurb: false,
       stuckDuration: 0,
@@ -221,19 +210,16 @@ export function createRace(options: CreateRaceOptions): RaceState {
     routeKind: options.routeKind ?? 'circuit',
     vehicles,
     difficulty: options.difficulty,
-    handling: options.handling ?? 'simulation',
     totalLaps: open ? 1 : Math.max(1, Math.floor(options.laps)),
     startPathIndex: resolvedStartIndex,
     ...(recoveryCheckpoints.length ? { recoveryCheckpoints } : {}),
     timingGates,
-    ...(sceneryColliders?.size ? { sceneryColliders } : {}),
     reversed: open ? false : options.reversed ?? false,
     tick: 0,
     elapsed: 0,
     phase: 'countdown',
     countdown: 3.7,
     paused: false,
-    activeContacts: [],
     cameraHints: {
       target: {
         x: vehicles[0]?.x ?? 0,

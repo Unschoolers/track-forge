@@ -6,8 +6,6 @@ const PARTICLE_COLORS: Record<RaceParticleKind, number> = {
   grass: 0x89ad67,
   ice: 0xebfaff,
   'tire-smoke': 0xb9c0c8,
-  spark: 0xffb347,
-  'damage-smoke': 0x62676e,
   'speed-line': 0xe8f3ff,
   'landing-dust': 0xa6afb9,
 }

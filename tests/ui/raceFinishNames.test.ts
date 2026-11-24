@@ -9,10 +9,10 @@ import { createStandings, updateStandings } from '@/ui/components/scoreboard'
 const result: RaceResult = {
   mode: 'normal', outcome: 'finished', trackId: asTrackId('results-test'),
   trackName: 'Figure eight', playerPlace: 1, playerTime: 42,
-  playerWrecked: false, newRecord: false, highScores: [],
+  newRecord: false, highScores: [],
   standings: [
-    { id: 'player', car: 'blue', player: true, place: 1, finishTime: 42, wrecked: false, lap: 1 },
-    { id: 'ai-1', car: 'red', player: false, place: 2, finishTime: 43, wrecked: false, lap: 1 },
+    { id: 'player', car: 'blue', player: true, place: 1, finishTime: 42, lap: 1 },
+    { id: 'ai-1', car: 'red', player: false, place: 2, finishTime: 43, lap: 1 },
   ],
 }
 const actions = { retry: vi.fn(), edit: vi.fn(), home: vi.fn() }

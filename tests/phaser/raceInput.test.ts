@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { RaceInputController, inputForHandling } from '@/phaser/input/raceInput'
+import { RaceInputController, inputForPedals } from '@/phaser/input/raceInput'
 import { steeringFromDrag } from '@/phaser/input/racePointer'
 
 describe('RaceInputController', () => {
-  it('keeps automatic throttle in Arcade but uses manual throttle in Simulation', () => {
+  it('applies the selected pedal preference', () => {
     const input = new RaceInputController().snapshot()
-    expect(inputForHandling(input, 'arcade').throttle).toBe(1)
-    expect(inputForHandling(input, undefined).throttle).toBe(1)
-    expect(inputForHandling(input, 'simulation').throttle).toBe(0)
+    expect(inputForPedals(input, 'auto').throttle).toBe(1)
+    expect(inputForPedals(input, undefined).throttle).toBe(1)
+    expect(inputForPedals(input, 'manual').throttle).toBe(0)
   })
 
   it('holds throttle independently across keys and multiple pointers', () => {

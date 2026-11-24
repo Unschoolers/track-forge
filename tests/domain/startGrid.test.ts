@@ -76,7 +76,7 @@ describe('starting grids', () => {
     const standings = ['player', 'ai-1', 'ai-2', 'ai-3'].map((id, index) => ({
       id, car: (['blue', 'red', 'green', 'yellow'] as const)[index]!,
       player: id === 'player', place: index + 1, finishTime: index + 20,
-      wrecked: false, lap: 1,
+      lap: 1,
     })) satisfies RaceStanding[]
     const next = recordCupResult(first, standings)
     expect(cupGridPositions(next)).toEqual([3, 2, 1, 0])

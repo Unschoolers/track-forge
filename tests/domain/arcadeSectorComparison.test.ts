@@ -48,7 +48,6 @@ function run(
 		playerCar: 'blue',
 		difficulty: 'normal',
 		laps: 2,
-		handling: 'arcade',
 	})
 	const start = requireFixture(nearestPathPoint(road, { x: -500, y: 0 })).index
 	const point = requireFixture(road.points[start])
@@ -156,7 +155,6 @@ function runDownhill(mode: 'early' | 'unbraked' | 'late') {
 		playerCar: 'blue',
 		difficulty: 'normal',
 		laps: 2,
-		handling: 'arcade',
 	})
 	const index = ramp.points.findIndex(
 		(_, i) => ramp.roadSurface.gradeAt(i) < -0.025,

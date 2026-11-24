@@ -508,7 +508,6 @@ export class DomUiHost implements UiHost {
           car: preferences.car,
           difficulty: preferences.difficulty,
           laps: currentTrack?.routeKind === 'point-to-point' ? 1 : preferences.raceLaps ?? 2,
-          handling: preferences.handling ?? 'arcade',
         } as const
         const availability = currentTrack
           ? this.runtime.raceSession.ghostAvailability?.(currentTrack, ghostSetup) ??

@@ -151,7 +151,6 @@ test('arcade race advances and produces machine-readable driving metrics', async
   await enterRace(page)
   await expect.poll(async () => (await telemetry(page)).race.elapsed).toBeGreaterThan(0.5)
   const state = await telemetry(page)
-  expect(state.race.handling).toBe('arcade')
   expect(state.race.elapsed).toBeGreaterThan(0.5)
   expect(state.race.player.speed).toBeGreaterThan(0)
   expect(Number.isFinite(state.race.player.x)).toBe(true)
@@ -172,7 +171,6 @@ test('arcade race advances and produces machine-readable driving metrics', async
     elapsedSeconds: state.race.elapsed,
     currentSpeed: state.race.player.speed,
     currentSurface: state.race.player.surface,
-    damage: state.race.player.damage,
     frameIntervalMedianMs: sorted[Math.floor(sorted.length / 2)],
     frameIntervalP95Ms: sorted[Math.floor(sorted.length * 0.95)],
     sampledFrames: frames.length,

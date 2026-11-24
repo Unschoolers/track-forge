@@ -51,13 +51,6 @@ export function createRaceHud(
   lap.append(lapValue, timeValue, lapTimes, splitTime)
   hud.append(position, pause, lap)
 
-  const damage = element('div', 'damage-meter')
-  damage.setAttribute('role', 'progressbar')
-  damage.setAttribute('aria-label', 'Vehicle damage')
-  const damageFill = element('i', 'damage-meter-fill')
-  const damageText = element('span', 'label', '0/0')
-  damageText.dataset.raceDamage = ''
-  damage.append(damageFill, damageText)
 
   const raceBanner = element('div', 'race-event-banner')
   raceBanner.setAttribute('role', 'status')
@@ -137,7 +130,6 @@ export function createRaceHud(
   steeringHint.setAttribute('aria-hidden', 'true')
   steeringGroup.append(steering, steeringHint, steeringButtons)
   controlsBar.append(steeringGroup, pedals)
-  position.append(damage)
   screen.append(hud, raceBanner, slide, countdown, checkpointWarning, checkpointAnnouncement, controlsBar)
 
   const updateControls = (): void => {
@@ -225,7 +217,6 @@ export function createRaceHud(
   let lastRunId = raceSession.snapshot().runId
   let lastLap: number | null = null
   let bannerUntil = 0
-  let previousHandling: string | undefined
   let previousPaused: boolean | undefined
   let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
   const announce = (
@@ -253,23 +244,20 @@ export function createRaceHud(
       lastLap = null
       bannerUntil = 0
     }
-    const handling = snapshot.setup?.handling ?? 'arcade'
     const paused = snapshot.state?.paused ?? false
     const phase = snapshot.telemetry.phase
-    if ((previousHandling !== undefined && handling !== previousHandling) ||
-      (previousPaused !== undefined && paused !== previousPaused) ||
+    if ((previousPaused !== undefined && paused !== previousPaused) ||
       (previousPhase !== undefined && phase !== previousPhase && (phase === 'finished' || previousPhase === 'finished'))) {
       controls.reset()
     }
-    previousHandling = handling
     previousPaused = paused
     previousPhase = phase
     left.disabled = paused || phase === 'finished'
     right.disabled = paused || phase === 'finished'
     throttle.disabled = paused || phase === 'finished'
     brake.disabled = paused || phase === 'finished'
-    throttle.hidden = handling !== 'simulation'
-    pedals.classList.toggle('simulation', handling === 'simulation')
+    throttle.hidden = state.preferences.pedalMode !== 'manual'
+    pedals.classList.toggle('manual', state.preferences.pedalMode === 'manual')
     updateControls()
     recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused ||
       manualRecoveryTicksRemaining(snapshot.state.vehicles.find(vehicle => vehicle.player), snapshot.state.tick) > 0
@@ -355,24 +343,12 @@ export function createRaceHud(
     lapTimes.hidden = !lapTimes.textContent
     const split = telemetry.latestSplit
     const splitLabel = split && split.gate === telemetry.finishGate ? (openRoute ? 'FINISH' : `LAP ${split.lap + 1}`) : `CP ${split?.gate ?? ''}`
-    splitTime.textContent = !missed && telemetry.missedCheckpoint !== undefined
-      ? `MISSED CP ${telemetry.missedCheckpoint}`
-      : split ? `${splitLabel} ${formatRaceTime(split.time)}` : ''
+    splitTime.textContent = split ? `${splitLabel} ${formatRaceTime(split.time)}` : ''
     splitTime.hidden = !splitTime.textContent
     const delta = telemetry.ghostGap
     gap.textContent = ghostRace && delta != null
       ? `GAP ${delta >= 0 ? '+' : '−'}${formatRaceTime(Math.abs(delta))}` : ''
     gap.hidden = !gap.textContent
-    damage.hidden = handling !== 'simulation'
-    damageText.textContent = `${telemetry.damage}/${telemetry.damageLimit}`
-    const damageRatio =
-      telemetry.damageLimit > 0
-        ? telemetry.damage / telemetry.damageLimit
-        : 0
-    damageFill.style.width = `${Math.min(1, damageRatio) * 100}%`
-    damage.setAttribute('aria-valuemin', '0')
-    damage.setAttribute('aria-valuemax', String(telemetry.damageLimit))
-    damage.setAttribute('aria-valuenow', String(telemetry.damage))
     const countdownText =
       telemetry.waitingForStart
         ? 'WAIT'

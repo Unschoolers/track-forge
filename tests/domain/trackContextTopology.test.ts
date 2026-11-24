@@ -78,7 +78,6 @@ describe('road branch continuity', () => {
     const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: hairpin, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     let race = {
       ...base,
-      handling: 'arcade' as const,
       phase: 'running' as const,
       vehicles: [{ ...requireFixture(base.vehicles[0]), x: point.x, y: 15, angle: 0,
         vx: 60, vy: 0, speed: 60, pathIndex: index }],
@@ -453,72 +452,58 @@ describe('road branch continuity', () => {
     expect(reset.grounded).toBe(true)
   })
 
-  it.each([false, true])(
-    'falls below the deck onto terrain or water without snapping upward (water: %s)',
-    (water) => {
-      const terrain = water
-        ? {
-            cellSize: 32,
-            cells: [{ column: 0, row: 0, kind: 'water' as const }],
-          }
-        : EMPTY_TERRAIN
-      const bridge = buildRoadPath(
-        [
-          { x: -300, y: 16, surface: 'street', structure: 'overpass' },
-          { x: 300, y: 16, surface: 'street' },
-        ],
-        terrain,
-      )
-      const index = bridge.points.findIndex((point) => point.x >= 16)
-      const point = requireFixture(bridge.points[index])
-      const base = createRace({
-        path: bridge,
-        playerCar: 'blue',
-        difficulty: 'normal',
-        laps: 3,
-      })
-      let race = {
-        ...base,
-        phase: 'running' as const,
-        countdown: 0,
-        vehicles: [
-          {
-            ...requireFixture(base.vehicles[0]),
-            x: point.x,
-            y: point.y,
-            z: 13,
-            pathIndex: index,
-            grounded: false,
-            verticalVelocity: -1,
-            vx: 0,
-            vy: 0,
-            speed: 0,
-          },
-        ],
-      }
-      let result = stepRace(race, noInput, 1 / 60, random)
+  it('falls below the deck onto terrain without snapping upward', () => {
+    const bridge = buildRoadPath(
+      [
+        { x: -300, y: 16, surface: 'street', structure: 'overpass' },
+        { x: 300, y: 16, surface: 'street' },
+      ],
+      EMPTY_TERRAIN,
+    )
+    const index = bridge.points.findIndex((point) => point.x >= 16)
+    const point = requireFixture(bridge.points[index])
+    const base = createRace({
+      path: bridge,
+      playerCar: 'blue',
+      difficulty: 'normal',
+      laps: 3,
+    })
+    let race = {
+      ...base,
+      phase: 'running' as const,
+      countdown: 0,
+      vehicles: [
+        {
+          ...requireFixture(base.vehicles[0]),
+          x: point.x,
+          y: point.y,
+          z: 13,
+          pathIndex: index,
+          grounded: false,
+          verticalVelocity: -1,
+          vx: 0,
+          vy: 0,
+          speed: 0,
+        },
+      ],
+    }
+    let result = stepRace(race, noInput, 1 / 60, random)
+    race = result.state as typeof race
+    expect(requireFixture(race.vehicles[0]).z).toBeLessThan(13)
+    expect(requireFixture(race.vehicles[0]).grounded).toBe(false)
+    expect(race.phase).toBe('running')
+    for (
+      let frame = 0;
+      frame < 90 && !requireFixture(race.vehicles[0]).grounded;
+      frame += 1
+    ) {
+      result = stepRace(race, noInput, 1 / 60, random)
       race = result.state as typeof race
-      expect(requireFixture(race.vehicles[0]).z).toBeLessThan(13)
-      expect(requireFixture(race.vehicles[0]).grounded).toBe(false)
-      expect(race.phase).toBe('running')
-      for (
-        let frame = 0;
-        frame < 90 && !requireFixture(race.vehicles[0]).grounded;
-        frame += 1
-      ) {
-        result = stepRace(race, noInput, 1 / 60, random)
-        race = result.state as typeof race
-      }
-      expect(requireFixture(race.vehicles[0]).grounded).toBe(true)
-      expect(requireFixture(race.vehicles[0]).z).toBe(0)
-      expect(race.phase).toBe(water ? 'finished' : 'running')
-      if (water)
-        expect(result.events).toContainEqual({
-          type: 'race-finished',
-          reason: 'water',
-        })
-    },
-  )
+    }
+    expect(requireFixture(race.vehicles[0]).grounded).toBe(true)
+    expect(requireFixture(race.vehicles[0]).z).toBe(0)
+    expect(race.phase).toBe('running')
+  })
 
   it('lands on the deck when falling from above it', () => {
     const bridge = buildRoadPath(
@@ -566,55 +551,6 @@ describe('road branch continuity', () => {
     expect(requireFixture(race.vehicles[0]).z).toBe(24)
   })
 
-  it('does not treat water below a deck as safe support', () => {
-    const water = {
-      cellSize: 32,
-      cells: [{ column: 0, row: 0, kind: 'water' as const }],
-    }
-    const bridge = buildRoadPath(
-      [
-        { x: -300, y: 16, surface: 'street', structure: 'overpass' },
-        { x: 300, y: 16, surface: 'street' },
-      ],
-      water,
-    )
-    const index = bridge.points.findIndex((point) => point.x >= 16)
-    const point = requireFixture(bridge.points[index])
-    const base = createRace({
-      path: bridge,
-      playerCar: 'blue',
-      difficulty: 'normal',
-      laps: 3,
-    })
-    const player = {
-      ...requireFixture(base.vehicles[0]),
-      x: point.x,
-      y: point.y,
-      z: 0,
-      pathIndex: index,
-      grounded: true,
-      vx: 0,
-      vy: 0,
-      speed: 0,
-    }
-    const result = stepRace(
-      {
-        ...base,
-        vehicles: [player],
-        phase: 'running',
-        countdown: 0,
-      },
-      noInput,
-      1 / 60,
-      random,
-    )
-
-    expect(result.state.phase).toBe('finished')
-    expect(result.events).toContainEqual({
-      type: 'race-finished',
-      reason: 'water',
-    })
-  })
 
   it('keeps the on-road route search bounded', () => {
     const index = 6

@@ -10,7 +10,7 @@ describe('official circuit cup', () => {
   })
   it('freezes a custom lineup and advances through its exact number of rounds', () => {
     const tracks = [OFFICIAL_CIRCUITS[0]!.track.id, OFFICIAL_CIRCUITS[1]!.track.id]
-    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
+    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, lap: 1 }]
     let cup = createCup('blue', 'normal', tracks)
     expect(cupTrackIds(cup)).toEqual(tracks)
     cup = advanceCup(recordCupResult(cup, standings))
@@ -26,7 +26,7 @@ describe('official circuit cup', () => {
   })
   it('records each race only once and advances through the fixed order', () => {
     let cup = createCup()
-    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
+    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, lap: 1 }]
     cup = recordCupResult(cup, standings)
     expect(recordCupResult(cup, standings)).toEqual(cup)
     expect(cupStandings(cup)[0]?.points).toBe(10)

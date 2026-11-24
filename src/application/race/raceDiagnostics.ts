@@ -38,7 +38,6 @@ export interface DiagnosticVehicle {
   readonly lap: number
   readonly nextSector: number
   readonly finishedAt: number | null
-  readonly wrecked: boolean
   readonly currentSurface: RaceVehicle['currentSurface']
   readonly structureRunId: string | null
   readonly aiPace: number
@@ -72,7 +71,7 @@ export interface DiagnosticEvent {
 
 export interface RaceDiagnosticsReport {
   readonly format: 'trackforge-race-replay'
-  readonly formatVersion: 1
+  readonly formatVersion: 2
   readonly tickSeconds: number
   readonly sampleTicks: number
   /** 60 Hz player inputs, compacted only for unusually long races. */
@@ -128,7 +127,7 @@ export class RaceDiagnosticsRecording {
   report(track: Track, setup: RaceSetup, result: RaceResult): RaceDiagnosticsReport {
     return {
       format: 'trackforge-race-replay',
-      formatVersion: 1,
+      formatVersion: 2,
       tickSeconds: RACE_TICK_SECONDS,
       sampleTicks: this.sampleTicks,
       playerInputSampleTicks: this.playerInputSampleTicks,
@@ -184,7 +183,7 @@ export class RaceDiagnosticsRecording {
         onCurb: vehicle.onCurb,
         pathIndex: vehicle.pathIndex, pathDistance: round(vehicle.pathDistance),
         lap: vehicle.lap, nextSector: vehicle.nextSector,
-        finishedAt: vehicle.finishedAt, wrecked: vehicle.wrecked,
+        finishedAt: vehicle.finishedAt,
         currentSurface: vehicle.currentSurface, structureRunId: vehicle.structureRunId,
         aiPace: round(vehicle.aiPace),
         ai: vehicle.ai ? {

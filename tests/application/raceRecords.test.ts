@@ -27,7 +27,7 @@ describe('race record identity', () => {
     const category = raceCategory(track, setup)
     const score = { time: 10, car: setup.car, difficulty: setup.difficulty, recordedAt: 1, category }
     expect(sameCategory(score, category, setup)).toBe(true)
-    for (const changed of [{ ...setup, laps: 1 }, { ...setup, handling: 'simulation' as const }, { ...setup, mode: 'ghost' as const }, { ...setup, car: 'red' as const }, { ...setup, difficulty: 'hard' as const }]) {
+    for (const changed of [{ ...setup, laps: 1 }, { ...setup, mode: 'ghost' as const }, { ...setup, car: 'red' as const }, { ...setup, difficulty: 'hard' as const }]) {
       expect(sameCategory(score, raceCategory(track, changed), changed)).toBe(false)
     }
     expect(sameCategory({ time: 10, car: 'blue', difficulty: 'normal', recordedAt: 1 }, category, setup)).toBe(false)

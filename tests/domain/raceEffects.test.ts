@@ -25,22 +25,21 @@ function vehicles() {
     slip: index === 0 ? 55 : 0,
     braking: index === 0,
     currentSurface: index === 0 ? ('dirt' as const) : vehicle.currentSurface,
-    damage: index === 0 ? 3 : 0,
   }))
 }
 
 describe('race effects', () => {
-  it('emits surface dust, skids, brake smoke, sparks, and damage smoke', () => {
+  it('emits surface dust, skids, and brake smoke', () => {
     const next = advanceRaceEffects(
       createRaceEffectsState(),
       vehicles(),
-      [{ type: 'collision', leftId: 'player', rightId: 'ai-1', strength: 80 }],
+      [],
       0.033,
       { next: () => 0 },
     )
 
     expect(new Set(next.particles.map(({ kind }) => kind))).toEqual(
-      new Set(['dirt', 'tire-smoke', 'spark', 'damage-smoke']),
+      new Set(['dirt', 'tire-smoke']),
     )
     expect(next.skids.length).toBeGreaterThan(0)
   })
@@ -51,7 +50,7 @@ describe('race effects', () => {
       effects = advanceRaceEffects(
         effects,
         vehicles(),
-        [{ type: 'collision', leftId: 'player', rightId: 'ai-1', strength: 80 }],
+        [],
         0.001,
         { next: () => 0 },
       )
