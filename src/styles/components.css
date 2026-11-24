@@ -257,7 +257,9 @@
 .race-preparation-modal { padding-inline: max(.65rem, env(safe-area-inset-left)) max(.65rem, env(safe-area-inset-right)); }
 .race-preparation-modal .modal-card { width: min(48rem, 100%); min-width: 0; }
 .race-preparation-modal .modal-body { align-content: start; min-width: 0; }
-.race-preparation-body { display: grid; align-content: start; gap: .75rem; }
+/* Keep intrinsic row heights inside the scrolling body; never shrink the
+   overflow-hidden flyover panel to make the settings fit the viewport. */
+.race-preparation-body { display: grid; grid-auto-rows: max-content; align-content: start; gap: .75rem; }
 .race-preparation-body .race-flyover-panel { margin-bottom: 0; }
 .race-preparation-meta { margin: 0; }
 .race-preparation-sections { display: grid; align-content: start; gap: .75rem; min-width: 0; }
