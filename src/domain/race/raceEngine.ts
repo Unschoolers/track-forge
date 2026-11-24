@@ -1,7 +1,7 @@
 import type { RandomSource } from '@/domain/race/randomSource'
 import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { lastRoadRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
-import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateProgress } from '@/domain/race/progress'
+import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import {
   manualRecoveryTicksRemaining,
   type DriverInput,
@@ -18,7 +18,7 @@ import {
 import { advanceRaceEffects } from '@/domain/race/effects'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
-import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
+import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress, RECOVERY_TUNING, advanceRivalOffRoadRecovery } from '@/domain/race/raceRecovery'
 import { advanceArcadeTimingGate, finishGateNumber } from '@/domain/race/arcadeTimingGate'
 import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
@@ -149,7 +149,7 @@ function advanceRace(
       input ? undefined : rivalCatchUp(state, vehicle))
   })
   const progressed = moved.map((vehicle, index) => {
-    if (held.has(vehicle.id)) return state.vehicles[index] ?? vehicle
+    if (held.has(vehicle.id) || vehicle.finishedAt !== null) return state.vehicles[index] ?? vehicle
     const context = raceVehicleContext(state, vehicle)
     const previous = state.vehicles[index]
     const stuckInput = vehicle.player && elapsed > 1.1 && vehicle.speed < 13
@@ -182,8 +182,10 @@ function advanceRace(
     const recoveryReacquiredIndex = travelledOnNewArm ? undefined :
       vehicle.recoveryReacquiredIndex ?? (unrelatedArm ? context.nearest.index : undefined)
     const usesCheckpoints = prepared.player && Boolean(state.recoveryCheckpoints?.length)
-    const onRoadBefore = previous && (state.routeKind === 'point-to-point' || usesCheckpoints)
-      ? raceVehicleContext(state, previous).onRoad : false
+    // All drivers must supply real previous support, even when recovery
+    // markers are only recorded for the local player.
+    let previousOnRoad: boolean | undefined
+    const wasOnRoad = () => previousOnRoad ??= previous ? raceVehicleContext(state, previous).onRoad : false
     const withPath = previous
       ? trackBridgeFall(
           previous,
@@ -191,23 +193,15 @@ function advanceRace(
           context.onRoad, context.structureRunId, context.surfaceHeight, dt,
         )
       : { ...prepared, pathDistance: state.path.points[progressIndex]?.distance ?? prepared.pathDistance }
-    let updated: RaceVehicle
-    if (vehicle.player && previous) {
+    let updated: RaceVehicle = { ...withPath, pathIndex: progressIndex }
+    if (previous) {
       const progress = advanceArcadeTimingGate(
-        state, previous, { ...withPath, pathIndex: progressIndex },
-        elapsed, context.onRoad, () => onRoadBefore,
+        state, previous, updated, elapsed, context.onRoad, wasOnRoad,
       )
       updated = progress.vehicle
-      missedCheckpoint = progress.missedCheckpoint
-    } else {
-      updated = updateProgress(
-        withPath, progressIndex, state.path.points.length, elapsed,
-        state.totalLaps, state.startPathIndex, state.reversed,
-        state.timingGates ?? [], state.path.closed,
-        // Match the AI's existing off-road reset boundary so a drivable
-        // near-edge path does not permanently strand a mandatory gate.
-        context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius + 30,
-      )
+      if (vehicle.player) missedCheckpoint = progress.missedCheckpoint
+      else if (progress.missedCheckpoint || previous.missedCheckpoint)
+        updated = { ...updated, missedCheckpoint: progress.missedCheckpoint }
     }
     if (vehicle.player && state.path.closed) {
       updated = { ...updated, pathIndex: context.nearest.index, pathDistance: context.nearest.point.distance,
@@ -219,25 +213,35 @@ function advanceRace(
       updated = { ...updated, lastRoadContactIndex: context.nearest.index }
     }
     if (usesCheckpoints && previous) {
-      const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, onRoadBefore && context.onRoad)
+      const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, wasOnRoad() && context.onRoad)
       updated = { ...updated, recoveryCheckpoint: checkpoint }
     }
     const playerStuck = updated.player && updated.bridgeFallSeconds === undefined &&
-      updated.stuckDuration > 0.65
+      updated.stuckDuration >= RECOVERY_TUNING.playerStuckSeconds - 1e-9
     const bridgeFallExpired = updated.player &&
       (updated.bridgeFallSeconds ?? 0) >= BRIDGE_FALL_RESPAWN_SECONDS
     const rivalBelowDeck = !updated.player && !context.onRoad &&
       context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
+    const offRoadRecovery = advanceRivalOffRoadRecovery(updated, context, dt)
+    updated = offRoadRecovery.vehicle
     const lostRival = !updated.player && updated.finishedAt === null && updated.grounded &&
-      (rivalBelowDeck || context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
-        (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated, state.timingGates)))
+      (rivalBelowDeck || offRoadRecovery.expired)
     if (playerStuck || bridgeFallExpired || lostRival) {
-      const candidate = previous && (rivalBelowDeck || updated.player || state.routeKind === 'point-to-point')
-        ? restoreFrameProgress({ ...updated, pathIndex: previous.pathIndex }, previous)
+      // Roll back timing before selecting the respawn target, not afterwards.
+      // Otherwise a gate crossed in the recovery frame can leave the rival
+      // past the now-pending stripe even though the final event pass revokes it.
+      const candidate = previous
+        ? restoreFrameProgress({
+            ...updated,
+            pathIndex: rivalBelowDeck || updated.player || state.routeKind === 'point-to-point'
+              ? previous.pathIndex : updated.pathIndex,
+            ...(updated.player ? {} : { missedCheckpoint: updated.missedCheckpoint ?? previous.missedCheckpoint }),
+          }, previous)
         : updated
-      const reset = rivalBelowDeck
+      const pending = candidate.player ? missedCheckpoint ?? state.missedCheckpoint : candidate.missedCheckpoint
+      const reset = rivalBelowDeck && !pending && !state.timingGates?.length
         ? resetVehicleToTrack(candidate, state.path, { pathIndex: candidate.pathIndex, reversed: state.reversed })
-        : resetRaceVehicle(candidate, { ...state, missedCheckpoint })
+        : resetRaceVehicle(candidate, { ...state, missedCheckpoint: pending })
       if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: updated.id, reason: 'off-road',
@@ -292,7 +296,7 @@ function advanceRace(
         return reset
       }
     }
-    if (vehicle.player && vehicle.waterRecoveryProtected) {
+    if (vehicle.waterRecoveryProtected) {
       return vehicle.grounded && !waterContact
         ? { ...vehicle, waterRecoveryProtected: false }
         : vehicle
@@ -300,11 +304,12 @@ function advanceRace(
     if (!waterContact) {
       return vehicle
     }
-    if (vehicle.player && missedCheckpoint) {
+    const pending = vehicle.player ? missedCheckpoint : vehicle.missedCheckpoint
+    if (pending) {
       // Even an off-road/water recovery during the grace period must land
       // before the missed stripe, not at a later contact on the next lap.
       const recovering = previous ? restoreFrameProgress(vehicle, previous) : vehicle
-      const reset = resetMissedCheckpoint(recovering, { ...state, missedCheckpoint })
+      const reset = resetMissedCheckpoint(recovering, { ...state, missedCheckpoint: pending })
       if (reset === recovering) return recovering
       events.push({
         type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
@@ -317,12 +322,12 @@ function advanceRace(
       ? (lastRoadRecoveryTarget(state, vehicle) ?? safeFallbackRecoveryTarget(state, {
           ...vehicle, pathIndex: previous?.pathIndex ?? vehicle.pathIndex, nextSector: recoverySector,
         }))
-      : findNearestSafeTrackIndex(
-          state.path,
-          vehicle,
-          state.reversed,
-          state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector, state.timingGates) : undefined,
-        )
+      : state.timingGates?.length
+        ? safeFallbackRecoveryTarget(state, { ...vehicle, nextSector: recoverySector })
+        : findNearestSafeTrackIndex(
+            state.path, vehicle, state.reversed,
+            state.routeKind === 'point-to-point' ? lastSampleBeforeCheckpoint(state.path, recoverySector, state.timingGates) : undefined,
+          )
     events.push({
       type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'water',
       x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
@@ -339,28 +344,30 @@ function advanceRace(
       reversed: state.reversed,
     })
   })
-  if (missedCheckpoint) {
-    const playerIndex = vehicles.findIndex(vehicle => vehicle.player)
-    const player = vehicles[playerIndex]
-    const alreadyRecovered = player && events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === player.id)
-    if (alreadyRecovered) {
-      missedCheckpoint = undefined
-    } else if (state.missedCheckpoint && player) {
-      const remainingSeconds = Math.max(0, missedCheckpoint.remainingSeconds - dt)
-      if (remainingSeconds <= 1e-9) {
-        const recovered = resetMissedCheckpoint(player, state)
-        if (recovered !== player) {
-          vehicles[playerIndex] = recovered
-          events.push({ type: 'vehicle-recovered', vehicleId: player.id, reason: 'missed-checkpoint', x: player.x, y: player.y, pathIndex: player.pathIndex })
-          missedCheckpoint = undefined
-        } else {
-          missedCheckpoint = { ...missedCheckpoint, remainingSeconds }
-        }
-      } else {
-        missedCheckpoint = { ...missedCheckpoint, remainingSeconds }
+  // Both human and AI countdowns use the same clock and recovery target.
+  vehicles = vehicles.map((vehicle, index) => {
+    const pending = vehicle.player ? missedCheckpoint : vehicle.missedCheckpoint
+    if (!pending) return vehicle
+    const alreadyRecovered = events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id)
+    const previousPending = vehicle.player ? state.missedCheckpoint : state.vehicles[index]?.missedCheckpoint
+    const clear = (result: RaceVehicle): RaceVehicle => {
+      if (vehicle.player) { missedCheckpoint = undefined; return result }
+      return { ...result, missedCheckpoint: undefined }
+    }
+    if (alreadyRecovered) return clear(vehicle)
+    if (!previousPending || previousPending.gate !== pending.gate) return vehicle
+    const remainingSeconds = Math.max(0, pending.remainingSeconds - dt)
+    if (remainingSeconds <= 1e-9) {
+      const recovered = resetMissedCheckpoint(vehicle, { ...state, missedCheckpoint: pending })
+      if (recovered !== vehicle) {
+        events.push({ type: 'vehicle-recovered', vehicleId: vehicle.id, reason: 'missed-checkpoint', x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex })
+        return clear(recovered)
       }
     }
-  }
+    const countdown = { ...pending, remainingSeconds }
+    if (vehicle.player) { missedCheckpoint = countdown; return vehicle }
+    return { ...vehicle, missedCheckpoint: countdown }
+  })
   let player = vehicles.find((vehicle) => vehicle.player)
   const playerContext = player
     ? raceVehicleContext(state, player)

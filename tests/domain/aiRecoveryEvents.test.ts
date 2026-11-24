@@ -5,6 +5,10 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath, nearestPathPoint } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
+import { advanceRivalOffRoadRecovery, RECOVERY_TUNING } from '@/domain/race/raceRecovery'
+import { getVehicleStepContext } from '@/domain/race/trackContext'
+import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import type { RaceState } from '@/domain/race/raceState'
 import { createLaneScenarios, prepareLanePath } from '../../qa/lanes/scenarios'
 
 describe('AI recovery telemetry', () => {
@@ -101,4 +105,60 @@ describe('AI recovery telemetry', () => {
 		})
 		expect(requireFixture(result.state.vehicles[0]).x).toBeLessThan(1000)
 	})
+})
+
+describe('off-road grace period', () => {
+  const path = buildRoadPath([
+    { x: 0, y: 0, surface: 'street' },
+    { x: 1000, y: 0, surface: 'street' },
+    { x: 1000, y: 1000, surface: 'street' },
+    { x: 0, y: 1000, surface: 'street' },
+    { x: 0, y: 0, surface: 'street' },
+  ], EMPTY_TERRAIN)
+  const race = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2 })
+  const ai = requireFixture(race.vehicles[1])
+  const base = { ...ai, grounded: true, aiOffRoadSeconds: 0 }
+  const point = requireFixture(path.points[0])
+  const outside = { onRoad: false, nearest: { index: 0, point, distance: 85 } }
+  const inside = { onRoad: true, nearest: { index: 0, point, distance: 0 } }
+  it('allows 119 ticks off-road, expires at 120 and clears on return', () => {
+    let car = base
+    for (let i = 0; i < 119; i++) {
+      const result = advanceRivalOffRoadRecovery(car, outside, 1 / 60)
+      expect(result.expired).toBe(false)
+      car = { ...result.vehicle, aiOffRoadSeconds: result.vehicle.aiOffRoadSeconds ?? 0 }
+    }
+    expect(advanceRivalOffRoadRecovery(car, outside, 1 / 60).expired).toBe(true)
+    const returned = advanceRivalOffRoadRecovery(car, inside, 1 / 60)
+    expect(returned.expired).toBe(false)
+    expect(returned.vehicle.aiOffRoadSeconds).toBe(0)
+    expect(advanceRivalOffRoadRecovery(returned.vehicle, outside, 1 / 60).expired).toBe(false)
+  })
+  it('enforces 100 units as the immediate grounded hard limit, not during jumps', () => {
+    expect(advanceRivalOffRoadRecovery(base, { ...outside, nearest: { ...outside.nearest, distance: RECOVERY_TUNING.aiOffRoadDistance } }, 1 / 60).expired).toBe(false)
+    const distant = { ...outside, nearest: { ...outside.nearest, distance: 101 } }
+    expect(advanceRivalOffRoadRecovery(base, distant, 1 / 60).expired).toBe(true)
+    expect(advanceRivalOffRoadRecovery({ ...base, grounded: false }, distant, 1 / 60).expired).toBe(false)
+  })
+  it('allows a real AI to drive back from the verge without a forced respawn', () => {
+    const center = requireFixture(nearestPathPoint(path, { x: 500, y: 0 }))
+    const before = requireFixture(path.points[center.index - 2])
+    const after = requireFixture(path.points[center.index + 2])
+    const angle = Math.atan2(after.y - before.y, after.x - before.x)
+    const heading = angle - Math.PI / 2
+    const rival = { ...base, pathIndex: center.index, pathDistance: center.point.distance,
+      x: center.point.x - Math.sin(angle) * 80, y: center.point.y + Math.cos(angle) * 80,
+      angle: heading, speed: 75, vx: Math.cos(heading) * 75, vy: Math.sin(heading) * 75 }
+    let running: RaceState = { ...race, phase: 'running', vehicles: [rival] }
+    expect(getVehicleStepContext(path, rival).onRoad).toBe(false)
+    let returned = false
+    for (let i = 0; i < 120; i++) {
+      const result = stepRace(running, { steering: 0, throttle: 0, braking: false }, 1 / 60, { next: () => 0.5 })
+      expect(result.events.some(event => event.type === 'vehicle-recovered')).toBe(false)
+      running = result.state
+      if (getVehicleStepContext(path, requireFixture(running.vehicles[0])).onRoad) { returned = true; break }
+    }
+    expect(returned).toBe(true)
+    expect(running.vehicles[0]?.aiOffRoadSeconds).toBe(0)
+  })
 })

@@ -212,3 +212,21 @@ rounding them to these tolerances.
 ## AI speed-planning responsibility
 
 `aiDriver.ts` owns perception, pursuit, passing/mistakes, steering and integration; `aiSpeedPlan.ts` owns longitudinal speed requests (corner target, braking, throttle and catch-up eligibility). Both continue to use the same per-car driving profiles and existing physical tire model. A behavior-preserving extraction must retain deterministic pace, recovery and difficulty outcomes; the optimization lab and lane checker are validation tools, not permission to retune physical handling in a refactoring PR.
+
+### Low-speed steering response experiment
+
+The linear tire response below 26 game units/s is the initial comparison point. A concave response curve (`lowSpeedResponseGain: 1`) retains zero tire force at rest and the unchanged full response at 26 units/s, while preserving the per-car steering rack, grip and brake settings. This is a shared physics experiment, not an AI profile override. Run isolated vehicle dynamics tests and the existing four-car driving/passing studies; compare matched solo and traffic baselines across physics revisions before promoting any change. Do not relax existing recovery, braking, or difficulty gates.
+
+### Recovery-first acceptance (2026-11-24)
+
+For explicitly evaluated handling/physics upgrades, compare matched races against the original production physics and profiles. No vehicle may have an increased recovery count, lost finish, or unrelated simulation error. Existing recovery events remain visible as debt and may be accepted only within the matched baseline count. Use seconds rather than percentage thresholds in the optimizer and matched physics acceptance. A per-race slowdown of up to 1 second is an acceptable trade-off when aggregate fleet pace improves, recoveries decrease, or a documented gameplay improvement is explicitly approved. Treat ±0.1 seconds as neutral; measure average gain in seconds, weighting each car equally. Slower by more than 1 second requires manual review; a change with no meaningful benefit is not recommended. Rank by recovery reduction first, pace second. Player handling changes need not improve AI times. The --gameplay-improvement flag records an explicit gameplay justification; it never bypasses a safety failure or a large timing loss. Never accept an increase in another car's recoveries. Zero recoveries for every car remains the long-term target. Keep existing braking, handling, difficulty, and deterministic regression tests intact.
+
+A PR labeled `gameplay-improvement` by a reviewer can pass the fleet benefit gate based on documented player-facing evidence, but never bypass the one-second review threshold or recovery and engine safety checks. The low-speed steering lab explicitly exercises this approved handling improvement.
+
+### Explicit release timing review
+
+The default one-second review threshold remains unchanged. A user-approved timing-only tradeoff may be recorded in `qa/optimization/reviews/pr-NUMBER.json`, bound to the frozen baseline revision, exact trial identity, original finish time and maximum approved slowdown. Only the final matched PR comparison consumes it; candidate search and recovery/finish/error gates do not. The raw timing loss and review are printed and retained in the report. The approval is scoped to that PR and does not carry over to later releases.
+
+### Shared-framework pace baseline (PR #313)
+
+Owner-approved temporary performance debt is tracked in [#314](https://github.com/Unschoolers/track-forge/issues/314). Émile's Blue mirror still beats the ghost but is stamped at the measured 1853 simulation ticks (30.8833 s), rather than the desired 30.633 s. The measured Medium-to-Easy gap is 2.916%, with a temporary 2.91% floor; the 3% target remains documented and the Hard-to-Medium requirement is unchanged. The test logs outstanding target misses; no test is skipped. The matched Red review remains limited to the two approved trials. Restore the original targets through cross-track car tuning. [#315](https://github.com/Unschoolers/track-forge/issues/315) tracks the separate expanded Hairpin recovery/timeout failures, which are not timing exemptions. The required lane and optimization gates remain unchanged; the experimental matrix remains strict.

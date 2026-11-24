@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import type { TrackStart, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import { roadGateGeometry, roadGateSpan } from '@/domain/track/trackGeometry'
 import { samplePathBehindStart } from '@/domain/race/raceFactory'
 
 export interface CurbSegment {
@@ -88,20 +89,16 @@ export function buildStartLineTiles(
     0,
     path.points.findIndex((point) => point.distance >= startDistance),
   )
-  const start = path.points[index]
-  const next = path.points[(index + 1) % path.points.length]
-  if (!path.closed || !start || !next) return []
-  const dx = next.x - start.x
-  const dy = next.y - start.y
-  const length = Math.hypot(dx, dy)
-  if (length < 0.001) return []
-  const tangent = { x: dx / length, y: dy / length }
+  const gate = roadGateGeometry(path, index)
+  if (!path.closed || !gate) return []
+  const { center: start, tangent } = gate
   const normal = { x: -tangent.y, y: tangent.x }
-  const tileWidth = ROAD_GEOMETRY.surfaceWidth / 8
+  const span = roadGateSpan(path, index, ROAD_GEOMETRY.surfaceWidth / 2)
+  const tileWidth = (span.max - span.min) / 8
   const halfDepth = 5
 
   return Array.from({ length: 8 }, (_, index) => {
-    const near = -ROAD_GEOMETRY.surfaceWidth / 2 + index * tileWidth
+    const near = span.min + index * tileWidth
     const far = near + tileWidth
     const point = (across: number, along: number): Vector2 => ({
       x: start.x + normal.x * across + tangent.x * along,

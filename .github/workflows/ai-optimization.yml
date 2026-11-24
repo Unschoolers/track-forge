@@ -4,6 +4,15 @@ on:
   pull_request:
     paths:
       - 'qa/optimization/**'
+      - 'src/domain/race/ai/**'
+      - 'src/domain/race/raceFactory.ts'
+      - 'src/domain/race/vehicleDynamics.ts'
+      - 'src/domain/race/vehiclePhysicsConfig.ts'
+      - 'src/domain/race/vehiclePhysics.ts'
+      - 'src/domain/race/raceRecovery.ts'
+      - 'src/domain/race/raceEngine.ts'
+      - 'src/domain/race/arcadeTimingGate.ts'
+      - 'src/domain/race/progress.ts'
       - 'tests/fixtures/desertSandAi.trackforge.json'
       - 'docs/ai-optimization.md'
       - '.github/workflows/ai-optimization.yml'
@@ -40,8 +49,37 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Capture matched pre-change physics baseline
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags origin "$BASE_SHA"
+          if git diff --quiet "$BASE_SHA" HEAD -- src/domain/race/vehicleDynamics.ts src/domain/race/vehiclePhysicsConfig.ts src/domain/race/vehiclePhysics.ts src/domain/race/raceRecovery.ts src/domain/race/raceEngine.ts src/domain/race/ai src/domain/race/raceFactory.ts src/domain/race/arcadeTimingGate.ts src/domain/race/progress.ts; then
+            exit 0
+          fi
+          baseline="$RUNNER_TEMP/trackforge-physics-baseline"
+          git worktree add --detach "$baseline" "$BASE_SHA"
+          cp qa/optimization/cli.mjs qa/optimization/score.mjs qa/optimization/scenarios.mjs "$baseline/qa/optimization/"
+          (
+            cd "$baseline"
+            npm ci
+            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --baseline-only --no-telemetry --workers 2 --trials 1 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/optimization/baseline"
+          )
       - name: Run four-car parallel AI optimization study
         run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization
+      - name: Report matched physics comparison
+        env:
+          GAMEPLAY_IMPROVEMENT: ${{ contains(github.event.pull_request.labels.*.name, 'gameplay-improvement') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if test -f qa/results/optimization/baseline/summary.json; then
+            flags=()
+            if [[ "$GAMEPLAY_IMPROVEMENT" == true ]]; then flags+=(--gameplay-improvement); fi
+            review="qa/optimization/reviews/pr-${PR_NUMBER}.json"
+            if [[ -f "$review" ]]; then flags+=(--timing-review "$review"); fi
+            node qa/optimization/comparePhysics.mjs qa/results/optimization/baseline/summary.json qa/results/optimization/summary.json "${flags[@]}"
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'

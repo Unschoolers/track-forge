@@ -89,7 +89,7 @@ corrected that ordering. Preserve it on every new benchmark, not just one car.
   chassis response, grip, surface and braking distances; **do not** add
   track-specific, AI-only speed/physics boosts.
 - `src/domain/race/ai/difficultyPolicy.ts`: difficulty-specific corner
-  reserves and authored-line pace, with **Hard as the pace reference**.
+  reserves, with **Hard as the pace reference**.
 - `src/domain/race/ai/aiDriver.ts`: shared corner tactics; difficulty still
   affects safety, traffic and mistakes.
 - `tests/domain/kidsRoomAiPace.test.ts`: source-replay-based pace and

@@ -26,7 +26,6 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 
 const {
   HARD_LOOKAHEAD_SAMPLES,
-  SIDESLIP_CORRECTION_GAIN,
   SIDESLIP_MIN_SPEED,
   BEND_LOOKAHEAD,
   CENTER_LINE_TURN,
@@ -87,15 +86,12 @@ export function stepAiVehicle(
   // Arcade drivers share steering technique across difficulty levels.
   // Stronger but slower-changing steering follows the next bend without the
   // instant counter-corrections that previously made the car over-brake.
-  // Authored racing lines retain their original policy.
   // Each physical chassis needs its own Hard cornering technique.
   // Tuning steering *decisions* never alters the car's actual tire forces.
   const hardProfile: CarDrivingProfile = hardProfileOverride ?? CAR_DRIVING_PROFILES[vehicle.car]
-  const tuning = !vehicle.racingLine
-    ? { ...DIFFICULTY_SPECS.hard, ...ARCADE_STEERING,
+  const tuning = { ...DIFFICULTY_SPECS.hard, ...ARCADE_STEERING,
         reaction: difficulty === 'hard' ? hardProfile.hardReaction : ARCADE_STEERING.reaction,
         steerGain: difficulty === 'hard' ? hardProfile.hardSteerGain : ARCADE_STEERING.steerGain }
-    : DIFFICULTY_SPECS.hard
   // Every AI uses the same compact rival envelope. Only human-driven
   // vehicles warrant full avoidance and overtaking maneuvers. The legacy
   // switch is restricted to offline comparison runs.
@@ -112,9 +108,8 @@ export function stepAiVehicle(
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
   const context = getVehicleStepContext(path, vehicle)
-  // Carry more speed on high-grip roads. Authored lines already account for
-  // their own approach, and loose surfaces need the usual braking margin.
-  const arcadePavement = !vehicle.racingLine && context.surface === 'street'
+  // Carry more speed on high-grip roads; loose surfaces need the usual braking margin.
+  const arcadePavement = context.surface === 'street'
   const direction = reversed ? -1 : 1
   const slipAngle = vehicle.speed > SIDESLIP_MIN_SPEED
     ? wrapAngleRadians(Math.atan2(vehicle.vy, vehicle.vx) - vehicle.angle)
@@ -146,25 +141,23 @@ export function stepAiVehicle(
   // A dynamic chassis needs a speed-scaled pursuit point on the road. When an
   // AI misses the surface, shorten the target so it returns instead of drawing
   // an enormous high-speed arc around a distant point.
-  const hardLookAhead = !vehicle.racingLine && difficulty === 'hard'
+  const hardLookAhead = difficulty === 'hard'
     ? hardProfile.hardLookAheadSamples : HARD_LOOKAHEAD_SAMPLES
   const lookAheadSamples = Math.round(
     context.onRoad
       ? clamp(5 + vehicle.speed / 18 + tuning.lookAhead + hardLookAhead, 5, 22)
       : 3,
   )
-  const racingLine = context.onRoad ? vehicle.racingLine?.sections : undefined
-  const notes = racingLine?.[context.nearest.point.segment]
   const basePace = 1 - racingPace
-  const extraSamples = notes?.extraSamples ?? (arcadePavement ? Math.round(
+  const extraSamples = arcadePavement ? Math.round(
     (HARD_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * SWEEP_LOOKAHEAD_SAMPLES) * basePace +
     (RACING_PAVEMENT_LOOKAHEAD_SAMPLES + sweep * RACING_PAVEMENT_SWEEP_SAMPLES) * racingPace,
-  ) : 0)
+  ) : 0
   // Hard arcade uses a longer pursuit target and can run wide if its
   // lateral momentum carries it toward the verge. Shorten that target only
-  // when needed; never override easier drivers or authored racing lines.
+  // when needed; never override easier drivers.
   let edgeRisk = 0
-  if (difficulty === 'hard' && !vehicle.racingLine) {
+  if (difficulty === 'hard') {
     if (!context.onRoad) {
       edgeRisk = 1
     } else {
@@ -180,7 +173,7 @@ export function stepAiVehicle(
   const pursuitSamples = Math.max(1, Math.round(
     (lookAheadSamples + extraSamples) *
       (1 - 0.5 * edgeRisk * (difficulty === 'hard' ? hardProfile.hardEdgeAvoidanceScale ?? 1 : 1)) *
-      (!vehicle.racingLine ? corner.pursuitScale : 1),
+      corner.pursuitScale,
   ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
@@ -205,11 +198,10 @@ export function stepAiVehicle(
   const occupied = relevantTraffic.nearby.some((entry) =>
     Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD &&
     entry.vehicle.lane > inner && entry.vehicle.lane < outer)
-  const pursuitLane = (occupied ? lane : centered) + (racingLine?.[target.segment]?.laneOffset ?? 0)
+  const pursuitLane = occupied ? lane : centered
   // Legal shoulder cuts are a *target line*, not modified tire physics.
-  // No shortcut during overtakes, uncontrolled slides, missed road contact,
-  // or while using a track's authored racing line.
-  const cut = !vehicle.racingLine && !occupied &&
+  // No shortcut during overtakes, uncontrolled slides or missed road contact.
+  const cut = !occupied &&
     ai.phase === 'follow' && context.onRoad && vehicle.grounded &&
     context.surface === 'street' &&
     context.nearest.distance < ROAD_GEOMETRY.onRoadRadius * 0.62 &&
@@ -220,16 +212,25 @@ export function stepAiVehicle(
   // This controls an intended racing line, never the actual friction,
   // road support or checkpoint collision geometry.
   const cutScale = difficulty === 'hard' ? hardProfile.hardApexCutScale ?? 1 : 1
-  const targetX = target.x + context.normal.x * pursuitLane + cut.x * cutScale
-  const targetY = target.y + context.normal.y * pursuitLane + cut.y * cutScale
+  const terminalApproach = !path.closed && rawTargetIndex >= path.points.length - 1
+  const terminalBefore = terminalApproach ? path.points[path.points.length - 2] : undefined
+  const terminalLength = terminalBefore ? Math.hypot(target.x - terminalBefore.x, target.y - terminalBefore.y) : 0
+  // Aim beyond the physical finish plane, rather than braking/turning at its last sample.
+  const extension = terminalLength > 0 ? ROAD_GEOMETRY.onRoadRadius : 0
+  const targetX = terminalBefore && terminalLength > 0
+    ? target.x + (target.x - terminalBefore.x) / terminalLength * extension
+    : target.x + context.normal.x * pursuitLane + cut.x * cutScale
+  const targetY = terminalBefore && terminalLength > 0
+    ? target.y + (target.y - terminalBefore.y) / terminalLength * extension
+    : target.y + context.normal.y * pursuitLane + cut.y * cutScale
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +
-    (!vehicle.racingLine && context.onRoad ? corner.headingLead : 0)
+    (context.onRoad ? corner.headingLead : 0)
   // Drift-aware countersteering follows the velocity vector without deleting
   // slip: the tire model still determines whether the car keeps sliding.
   const sideslip = vehicle.speed > SIDESLIP_MIN_SPEED
-    ? slipAngle * (!vehicle.racingLine ? corner.sideslipGain : SIDESLIP_CORRECTION_GAIN)
+    ? slipAngle * corner.sideslipGain
     : 0
   const desiredSteer = clamp(
     wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
@@ -246,7 +247,7 @@ export function stepAiVehicle(
   const { input, speedAssist } = planAiSpeed({
     vehicle, path, relevantTraffic, difficulty, reversed, direction, tuning,
     hardProfile, ai, context, corner, arcadePavement, bend, sweep, basePace,
-    racingPace, authoredCornerPace: notes?.cornerPace, slipAngle, roadOffset,
+    racingPace, slipAngle, roadOffset,
     lateralVelocity, edgeRisk, catchUp,
   })
   const stepped = stepVehicle(

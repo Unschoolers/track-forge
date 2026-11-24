@@ -45,14 +45,14 @@ describe('diagonal checkpoint crossing', () => {
     )
     expect(result.nextSector).toBe(2)
 
-    const nearEdge = crossing(path, gate, ROAD_GEOMETRY.checkpointHalfWidth + 3)
+    const nearEdge = crossing(path, gate, ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace - 1)
     const forgiven = updateOpenRouteProgress(
       { ...player, ...nearEdge.before }, { ...player, ...nearEdge.after },
       path, nearEdge.after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
     )
     expect(forgiven.nextSector).toBe(2)
 
-    const outside = crossing(path, gate, ROAD_GEOMETRY.checkpointHalfWidth + ROAD_GEOMETRY.checkpointGrace + 4)
+    const outside = crossing(path, gate, ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace + 4)
     const bypass = updateOpenRouteProgress(
       { ...player, ...outside.before }, { ...player, ...outside.after },
       path, outside.after.pathIndex, 12, false, true, ROAD_GEOMETRY.onRoadRadius, race.timingGates,
@@ -99,8 +99,8 @@ describe('diagonal checkpoint crossing', () => {
       )
     }
 
-    expect(run(ROAD_GEOMETRY.checkpointHalfWidth + 3).finishedAt).toBe(15)
-    expect(run(ROAD_GEOMETRY.checkpointHalfWidth + ROAD_GEOMETRY.checkpointGrace + 4).finishedAt).toBeNull()
+    expect(run(ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace - 1).finishedAt).toBe(15)
+    expect(run(ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace + 4).finishedAt).toBeNull()
   })
 
   it('does not award a painted overpass gate to a car passing beneath it', () => {

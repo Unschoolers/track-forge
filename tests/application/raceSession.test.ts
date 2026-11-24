@@ -6,6 +6,8 @@ import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { stepRace, type RaceStep } from '@/domain/race/raceEngine'
 import type { FeedbackPort } from '@/application/ports/feedback'
+import type { RaceState } from '@/domain/race/raceState'
+import { roadGateGeometry } from '@/domain/track/trackGeometry'
 
 const track = createStarterTrack(asTrackId('session-track'), 1)
 const setup = {
@@ -14,6 +16,23 @@ const setup = {
   laps: 3,
 }
 const noInput = { steering: 0, throttle: 1, braking: false }
+
+// Physical approach on the same outgoing tangent used by the finish gate.
+function finishApproach(state: RaceState) {
+  const index = state.startPathIndex
+  const gate = roadGateGeometry(state.path, index)
+  if (!gate) throw new Error('Missing finish geometry')
+  const { center: line, tangent } = gate
+  const tx = tangent.x * (state.reversed ? -1 : 1)
+  const ty = tangent.y * (state.reversed ? -1 : 1)
+  return {
+    x: line.x - tx * 2, y: line.y - ty * 2,
+    z: state.path.roadSurface.at(index, line).height,
+    vx: tx * 240, vy: ty * 240, speed: 240, angle: Math.atan2(ty, tx),
+    pathIndex: (index + (state.reversed ? 1 : -1) + state.path.points.length) % state.path.points.length,
+    nextSector: (state.timingGates?.length ?? 0) + 1,
+  }
+}
 
 function createFeedback(): FeedbackPort {
   return {
@@ -236,10 +255,8 @@ describe('RaceSession', () => {
     const step = vi.fn<RaceStep>((state) => ({
       state: { ...state, phase: 'finished', elapsed: 1, vehicles: state.vehicles.map((vehicle) => {
         if (vehicle.player) return { ...vehicle, finishedAt: 1 }
-        const finish = state.path.points[state.startPathIndex]
-        return vehicle.id === 'ai-1' && finish ? {
-          ...vehicle, x: finish.x, y: finish.y, pathIndex: state.path.points.length - 2,
-          lap: state.totalLaps - 1, nextSector: 4,
+        return vehicle.id === 'ai-1' ? {
+          ...vehicle, ...finishApproach(state), lap: state.totalLaps - 1,
         } : vehicle
       }) },
       events: [{ type: 'race-finished', reason: 'finished' }],
@@ -540,32 +557,20 @@ describe('RaceSession', () => {
       const rival = state.vehicles[1]
       if (!point || !player || !rival) throw new Error('Missing race fixtures')
       const atLine = { x: point.x, y: point.y, z: 0, vx: 0, vy: 0, speed: 0 }
-      const beforeFinish = state.path.points[state.path.points.length - 2]
-      if (!beforeFinish) throw new Error('Missing finish approach sample')
-      const dx = point.x - beforeFinish.x
-      const dy = point.y - beforeFinish.y
-      const length = Math.hypot(dx, dy)
-      if (length < 0.001) throw new Error('Degenerate finish line')
-      const heading = { x: dx / length, y: dy / length }
-      // The player must physically cross Finish; teleporting onto its plane
-      // while stationary is not a valid lap with authored checkpoints.
-      const approachingFinish = {
-        ...atLine, x: point.x - heading.x * 2, y: point.y - heading.y * 2,
-        angle: Math.atan2(dy, dx), vx: heading.x * 240, vy: heading.y * 240, speed: 240,
-      }
+      const approachingFinish = finishApproach(state)
       const prepared = frames++ === 0
         ? {
             ...state,
             elapsed: 10,
             vehicles: [
               { ...player, ...atLine, pathIndex: 0 },
-              { ...rival, ...atLine, x: point.x - 1, pathIndex: state.path.points.length - 2, nextSector: 4 as const },
+              { ...rival, ...approachingFinish },
             ],
           }
         : {
             ...state,
             vehicles: [
-              { ...player, ...approachingFinish, pathIndex: state.path.points.length - 2, nextSector: 4 as const },
+              { ...player, ...approachingFinish },
               rival,
             ],
           }

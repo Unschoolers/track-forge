@@ -43,13 +43,69 @@ function normalize(vector: Vector2): Vector2 {
     : { x: 1, y: 0 }
 }
 
-function tangentAt(path: RoadPath, index: number): Vector2 {
+export function tangentAt(path: RoadPath, index: number): Vector2 {
   const count = path.points.length
   const current = path.points[index]
   const before = path.points[path.closed ? (index - 1 + count) % count : Math.max(0, index - 1)]
   const after = path.points[path.closed ? (index + 1) % count : Math.min(count - 1, index + 1)]
   if (!current || !before || !after) return { x: 1, y: 0 }
   return normalize({ x: after.x - before.x, y: after.y - before.y })
+}
+
+/** Gate stripes and swept timing use the road ribbon's local tangent at samples. */
+export function roadGateGeometry(path: RoadPath, position: number) {
+  const count = path.points.length
+  if (count < 2 || !Number.isFinite(position) || position < 0 || position > count - (path.closed ? 0 : 1)) return undefined
+  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(position))
+  const a = path.points[lower]
+  const b = path.points[(lower + 1) % count]
+  if (!a || !b) return undefined
+  const fraction = position - lower
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  if (Math.hypot(dx, dy) < 0.001) return undefined
+  const tangent = Number.isInteger(position)
+    ? tangentAt(path, position % count)
+    : normalize({ x: dx, y: dy })
+  return { lower, center: { x: a.x + dx * fraction, y: a.y + dy * fraction }, tangent }
+}
+
+/**
+ * The cross-section of the contiguous local road at the gate. In a sharp
+ * corner the inner verge is farther along the stripe than the nominal road
+ * radius. Intersect the same sampled road-support discs used by physics with
+ * the gate plane, stopping at the first gap in either route direction.
+ * Nearby but disconnected road arms cannot enlarge the gate.
+ */
+export function roadGateSpan(path: RoadPath, position: number, radius: number): { min: number; max: number } {
+  const geometry = roadGateGeometry(path, position)
+  let min = -radius
+  let max = radius
+  if (!geometry || !Number.isFinite(radius) || radius <= 0) return { min, max }
+  const { center, tangent } = geometry
+  const count = path.points.length
+  const lower = Math.floor(position)
+  for (const direction of [-1, 1]) {
+    const start = direction < 0 ? lower : Math.ceil(position)
+    for (let step = 0; step <= Math.min(12, count - 1); step++) {
+      const raw = start + direction * step
+      if (!path.closed && (raw < 0 || raw >= count)) break
+      const sample = path.points[((raw % count) + count) % count]
+      if (!sample) break
+      const dx = sample.x - center.x
+      const dy = sample.y - center.y
+      const along = dx * tangent.x + dy * tangent.y
+      if (Math.abs(along) > radius) break
+      const across = -dx * tangent.y + dy * tangent.x
+      const half = Math.sqrt(Math.max(0, radius * radius - along * along))
+      const left = across - half
+      const right = across + half
+      if (left > max || right < min) break
+      min = Math.min(min, left)
+      max = Math.max(max, right)
+    }
+  }
+  return { min, max }
 }
 
 function offset(point: Vector2, normal: Vector2, amount: number): Vector2 {

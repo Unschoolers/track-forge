@@ -1,14 +1,15 @@
 import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining, type RaceState, type RaceVehicle } from '@/domain/race/raceState'
 import { authoredRecoveryTarget, lastRoadRecoveryTarget, missedGateRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
-import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
+import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack, type VehicleStepContext } from '@/domain/race/trackContext'
 
 export function resetRaceVehicle(
   vehicle: RaceVehicle,
   race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
 ): RaceVehicle {
+  const pending = vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint
+  if (pending) return resetMissedCheckpoint(vehicle, { ...race, missedCheckpoint: pending })
   if (vehicle.player) {
-    if (race.missedCheckpoint) return resetMissedCheckpoint(vehicle, race)
     const pathIndex = lastRoadRecoveryTarget(race, vehicle) ??
       authoredRecoveryTarget(race, vehicle) ?? safeFallbackRecoveryTarget(race, vehicle)
     if (pathIndex === undefined) return vehicle
@@ -18,6 +19,11 @@ export function resetRaceVehicle(
     }, race.path, { pathIndex, reversed: race.reversed })
   }
   if (race.routeKind !== 'point-to-point') {
+    if (race.timingGates?.length) {
+      const pathIndex = safeFallbackRecoveryTarget(race, vehicle)
+      if (pathIndex !== undefined) return resetVehicleToTrack(vehicle, race.path, { pathIndex, reversed: race.reversed })
+      return resetMissedCheckpoint(vehicle, { ...race, missedCheckpoint: undefined })
+    }
     return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
   }
   const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector, race.timingGates)
@@ -56,7 +62,7 @@ export function resetMissedCheckpoint(
   vehicle: RaceVehicle,
   race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
 ): RaceVehicle {
-  const target = missedGateRecoveryTarget(race, race.missedCheckpoint?.gate ?? vehicle.nextSector)
+  const target = missedGateRecoveryTarget(race, (vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint ?? race.missedCheckpoint)?.gate ?? vehicle.nextSector)
   if (!target) return vehicle
   return resetVehicleToTrack(
     {
@@ -79,3 +85,26 @@ export function restoreFrameProgress(vehicle: RaceVehicle, previous: RaceVehicle
   }
 }
 
+
+/** Gameplay recovery thresholds; independent from checkpoint scoring geometry. */
+export const RECOVERY_TUNING = {
+  aiOffRoadDistance: 100,
+  aiOffRoadGraceSeconds: 2,
+  playerStuckSeconds: 2,
+} as const
+
+export function advanceRivalOffRoadRecovery(
+  vehicle: RaceVehicle,
+  context: Pick<VehicleStepContext, 'onRoad' | 'nearest'>,
+  dt: number,
+): { vehicle: RaceVehicle; expired: boolean } {
+  if (vehicle.player || vehicle.finishedAt !== null) return { vehicle, expired: false }
+  const previous = vehicle.aiOffRoadSeconds ?? 0
+  const seconds = context.onRoad ? 0 : vehicle.grounded ? previous + dt : previous
+  return {
+    vehicle: seconds === previous ? vehicle : { ...vehicle, aiOffRoadSeconds: seconds },
+    expired: vehicle.grounded && !context.onRoad &&
+      (context.nearest.distance > RECOVERY_TUNING.aiOffRoadDistance ||
+        seconds >= RECOVERY_TUNING.aiOffRoadGraceSeconds - 1e-9),
+  }
+}

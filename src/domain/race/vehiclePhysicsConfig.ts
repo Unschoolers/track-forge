@@ -47,6 +47,8 @@ export interface VehicleDynamicsTuning {
     readonly highSpeedReduction: number
     readonly minimumTireSpeed: number
     readonly fullTireResponseSpeed: number
+    /** Extra tire authority below full response speed; 0 preserves the linear curve. */
+    readonly lowSpeedResponseGain: number
   }
   readonly stability: {
     /** Settles body slip after steering release without snapping the heading. */
@@ -152,6 +154,7 @@ export const VEHICLE_DYNAMICS_TUNING = {
     highSpeedReduction: 0.31,
     minimumTireSpeed: 12,
     fullTireResponseSpeed: 26,
+    lowSpeedResponseGain: 1,
   },
   stability: {
     lateralDamping: 9.6,

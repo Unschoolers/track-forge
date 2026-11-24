@@ -123,7 +123,7 @@ export const ROAD_GEOMETRY: RoadGeometry = {
   surfaceWidth: 72,
   onRoadRadius: 42,
   checkpointHalfWidth: 34,
-  checkpointGrace: 5,
+  checkpointGrace: 10,
   // Curbs are road furniture: keep the whole strip inside the 36-unit
   // asphalt radius instead of painting and detecting it in the verge.
   curbInner: 26.5,

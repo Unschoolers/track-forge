@@ -1,6 +1,5 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
-import { courseIdentity } from '@/application/race/raceRecords'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
 import type {
@@ -221,8 +220,6 @@ export class RaceSession implements RaceSessionPort {
     this.bestGhost = nearby ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
-      courseIdentity: resolved.mode === 'normal' &&
-        routeKind === 'circuit' ? courseIdentity(track) : undefined,
       path: this.geometry.get(track).path,
       playerCar: setup.car,
       difficulty: setup.difficulty,

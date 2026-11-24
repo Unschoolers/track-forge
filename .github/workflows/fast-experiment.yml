@@ -1,0 +1,65 @@
+name: Fast experiment lab
+
+# Push experiments without opening a PR. Normal PR/release checks stay intact.
+on:
+  push:
+    branches: ['lab/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fast-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Focused vehicle physics and car identity contracts
+        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts tests/domain/raceCameraContinuity.test.ts tests/domain/reverseRace.test.ts tests/domain/aiDifficultyPolicy.test.ts tests/domain/aiCompactRivalClearance.test.ts tests/domain/checkpointProgressJitter.test.ts tests/domain/diagonalGates.test.ts tests/domain/openRaceGateIntegration.test.ts tests/domain/sharedTimingGate.test.ts tests/domain/raceSimulation.test.ts tests/application/raceSession.test.ts --maxWorkers=2
+      - run: npm run qa:optimize:test
+      - name: Hairpin checkpoint diagnostics
+        if: '!cancelled()'
+        run: npm run qa:lanes -- --scenario hairpin --difficulty all --mode both --car all --seeds 1 --fail-on-regressions
+      - name: Recalibrate AI against main with full steering gain
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          base_sha="$(git rev-parse FETCH_HEAD)"
+          baseline="$RUNNER_TEMP/trackforge-lab-baseline"
+          report="$GITHUB_WORKSPACE/qa/results/fast-lab"
+          git worktree add --detach "$baseline" "$base_sha"
+          # Use the same CLI selection logic; retain the baseline's real engine,
+          # profiles, fixtures and simulator. Never copy candidate physics.
+          cp qa/optimization/cli.mjs qa/optimization/score.mjs qa/optimization/scenarios.mjs "$baseline/qa/optimization/"
+          cp qa/lanes/emileRecovery.benchmark.ts "$baseline/qa/lanes/"
+          (
+            cd "$baseline"
+            npm ci
+            AI_BENCHMARK=1 npx --no-install vitest run qa/lanes/emileRecovery.benchmark.ts --maxWorkers=2
+            GITHUB_SHA="$base_sha" npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay,emile --seeds 1 --workers 2 --trials 1 --baseline-only --no-telemetry --out "$report/before"
+          )
+          AI_BENCHMARK=1 npx --no-install vitest run qa/lanes/emileRecovery.benchmark.ts --maxWorkers=2
+          npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay,emile --seeds 1 --workers 2 --trials 14 --no-telemetry --reference "$report/before/baseline-results.json" --gameplay-improvement --out "$report/after"
+      - name: Production Émile balance guard
+        if: '!cancelled()'
+        run: npx --no-install vitest run tests/domain/emileHardRace.test.ts --maxWorkers=2
+      - name: Publish quick experiment results
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: fast-lab-${{ github.sha }}
+          path: qa/results/fast-lab/
+          if-no-files-found: warn
+          retention-days: 7

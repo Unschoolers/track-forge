@@ -72,6 +72,42 @@ function run(
 }
 
 describe('dynamic bicycle vehicle model', () => {
+  it('increases low-speed steering authority without steering at rest or changing full-response handling', () => {
+    const baseline: VehicleDynamicsTuning = {
+      ...VEHICLE_DYNAMICS_TUNING,
+      steering: { ...VEHICLE_DYNAMICS_TUNING.steering, lowSpeedResponseGain: 0 },
+    }
+    const control = { steering: 1, throttle: 0, braking: false }
+    for (const grip of [1, 0.73, 0.34]) {
+      const parameters = { ...PARAMETERS, grip }
+      for (const speed of [5, 10, 20]) {
+        const initial = { angle: 0, vx: speed, vy: 0, yawRate: 0 }
+        const before = run(initial, control, 1, parameters, baseline)
+        const after = run(initial, control, 1, parameters)
+        expect(after.yawRate).toBeGreaterThan(before.yawRate * 1.1)
+        expect(Math.atan2(after.vy, after.vx)).toBeGreaterThan(Math.atan2(before.vy, before.vx))
+      }
+      const stopped = run({ angle: 0, vx: 0, vy: 0, yawRate: 0 }, control, 60, parameters)
+      expect(stopped.angle).toBe(0)
+      expect(stopped.speed).toBe(0)
+      const fast = { angle: 0, vx: 120, vy: 0, yawRate: 0 }
+      expect(run(fast, control, 1, parameters)).toEqual(run(fast, control, 1, parameters, baseline))
+    }
+  })
+
+  it('retains left/right symmetry and no steering authority in the air at low speed', () => {
+    const initial = { angle: 0, vx: 8, vy: 0, yawRate: 0 }
+    const right = run(initial, { steering: 1, throttle: 0, braking: false }, 12)
+    const left = run(initial, { steering: -1, throttle: 0, braking: false }, 12)
+    expect(right.angle).toBeGreaterThan(0)
+    expect(left.angle).toBeCloseTo(-right.angle, 10)
+    const airborne = stepVehicleDynamics(initial,
+      { steering: 1, throttle: 0, braking: false }, PARAMETERS,
+      { ...FLAT, contactLoad: 0 }, 1 / 60)
+    expect(airborne.yawRate).toBe(0)
+    expect(airborne.angle).toBe(0)
+  })
+
   it('reduces stopping distance by about 10% for every car, slightly more for Red', () => {
     const stoppingDistance = (carId: keyof typeof CAR_PHYSICS_SPECS, baseline: boolean): number => {
       const car = CAR_PHYSICS_SPECS[carId]

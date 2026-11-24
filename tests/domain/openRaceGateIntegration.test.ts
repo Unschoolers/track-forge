@@ -21,14 +21,17 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   if (gateIndex === undefined) throw new Error('Missing authored checkpoint')
   const gateX = path.points[gateIndex]!.x
   const player = { ...race.vehicles[0]!, x: gateX - 1, y: 80, pathIndex: Math.floor(gateIndex) }
+  // Stay outside the stripe until after crossing its plane. A diagonal
+  // segment from y=80 to y=0 would really cross inside the new gate width.
   movement.x = gateX + 1
-  movement.y = 0
+  movement.y = 80
   const initial = { ...race, phase: 'running' as const, vehicles: [player] }
   const input = { steering: 0, throttle: 0, braking: false }
   const bypass = stepRace(initial, input, 0.01, { next: () => 0.5 })
   expect(bypass.state.vehicles[0]!.nextSector).toBe(1)
   expect(bypass.events.some(e => e.type === 'gate-crossed' || e.type === 'vehicle-finished')).toBe(false)
   movement.x = gateX + 2
+  movement.y = 0
   const rejoin = stepRace(bypass.state, input, 0.01, { next: () => 0.5 })
   expect(rejoin.state.vehicles[0]!.nextSector).toBe(1)
   expect(rejoin.events.some(e => e.type === 'gate-crossed')).toBe(false)

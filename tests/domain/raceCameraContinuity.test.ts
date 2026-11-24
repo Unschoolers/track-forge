@@ -237,7 +237,7 @@ describe('race camera road continuity', () => {
     const contact = requireFixture(nearestPathPoint(path, { x: 1200, y: 0 }))
     const player = { ...requireFixture(race.vehicles[0]), x: 1800, y: 100, pathIndex: sample.index,
       lastRoadContactIndex: contact.index, nextSector: 4 as const,
-      recoveryCheckpoint: null, stuckDuration: 0.66, speed: 0, vx: 0, vy: 0 }
+      recoveryCheckpoint: null, stuckDuration: 2, speed: 0, vx: 0, vy: 0 }
     const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player], recoveryCheckpoints: [10],
       cameraHints: { ...race.cameraHints, followingOppositeTravel: true, directionChangeSeconds: 0.2 } },
       { steering: 0, throttle: 1, braking: false }, 1 / 60, { next: () => 0.5 })

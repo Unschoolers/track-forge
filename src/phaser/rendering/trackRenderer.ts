@@ -4,7 +4,7 @@ import { roadColorsForEnvironment } from '@/presentation/environments/roadMateri
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
-import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { roadGateGeometry, roadGateSpan, type TrackGeometry } from '@/domain/track/trackGeometry'
 import {
   boundsVisible,
   renderRaceRoadRibbon,
@@ -41,26 +41,24 @@ export function renderRecoveryCheckpoints(
   checkpoints: readonly number[],
   editorZoom?: number,
 ): void {
-  const count = path.points.length
   for (const index of checkpoints) {
-    const point = path.points[index]
-    const after = path.points[path.closed ? (index + 1) % count : index + 1]
-    if (!point || !after) continue
-    const length = Math.hypot(after.x - point.x, after.y - point.y)
-    if (length < 0.001) continue
-    const x = -(after.y - point.y) / length * ROAD_GEOMETRY.checkpointHalfWidth
-    const y = (after.x - point.x) / length * ROAD_GEOMETRY.checkpointHalfWidth
+    const gate = roadGateGeometry(path, index)
+    if (!gate) continue
+    const { center: point, tangent } = gate
+    const span = roadGateSpan(path, index, ROAD_GEOMETRY.checkpointHalfWidth)
+    const left = { x: point.x - tangent.y * span.min, y: point.y + tangent.x * span.min }
+    const right = { x: point.x - tangent.y * span.max, y: point.y + tangent.x * span.max }
     // Author-owned checkpoints use a bright transverse stripe with visible endpoints.
     // No implicit race gates are painted anywhere.
     graphics.lineStyle(editorZoom ? 6 / editorZoom : 8, 0x66d9ff, 1)
     graphics.beginPath()
-    graphics.moveTo(point.x - x, point.y - y)
-    graphics.lineTo(point.x + x, point.y + y)
+    graphics.moveTo(left.x, left.y)
+    graphics.lineTo(right.x, right.y)
     graphics.strokePath()
     if (!editorZoom) {
       graphics.fillStyle(0xffffff, 1)
-      graphics.fillCircle(point.x - x, point.y - y, 5)
-      graphics.fillCircle(point.x + x, point.y + y, 5)
+      graphics.fillCircle(left.x, left.y, 5)
+      graphics.fillCircle(right.x, right.y, 5)
     }
     if (editorZoom) {
       const scale = 1 / Math.max(0.01, editorZoom)

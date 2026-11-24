@@ -1,6 +1,7 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
-import { crossesRoadGate, timingGateCrossingRadius } from '@/domain/race/progress'
+import { crossesRoadGate, roadGateCrossingFraction, timingGateCrossingRadius } from '@/domain/race/progress'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
+import { roadGateGeometry } from '@/domain/track/trackGeometry'
 
 const MISSED_GATE_GRACE_SECONDS = 2
 
@@ -46,19 +47,10 @@ function clearlyBeyondGate(
   path: RaceState['path'], position: number,
   vehicle: Pick<RaceVehicle, 'x' | 'y'>, reversed: boolean,
 ): boolean {
-  const count = path.points.length
-  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(position))
-  const a = path.points[lower]
-  const b = path.points[(lower + 1) % count]
-  if (!a || !b) return false
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const length = Math.hypot(dx, dy)
-  if (length < 0.001) return false
-  const fraction = position - lower
-  const gx = a.x + dx * fraction
-  const gy = a.y + dy * fraction
-  const forward = ((vehicle.x - gx) * dx + (vehicle.y - gy) * dy) / length
+  const geometry = roadGateGeometry(path, position)
+  if (!geometry) return false
+  const { center, tangent } = geometry
+  const forward = (vehicle.x - center.x) * tangent.x + (vehicle.y - center.y) * tangent.y
   return (reversed ? -forward : forward) > 12
 }
 
@@ -81,12 +73,32 @@ export function advanceArcadeTimingGate(
   onRoad: boolean,
   wasOnRoad: () => boolean,
 ): { vehicle: RaceVehicle; missedCheckpoint: RaceState['missedCheckpoint'] } {
-  const { path, startPathIndex, reversed, missedCheckpoint } = race
+  const { path, startPathIndex, reversed } = race
+  const missedCheckpoint = previous.player ? race.missedCheckpoint : previous.missedCheckpoint
   const count = path.points.length
-  const gate = previous.nextSector
+  if (count < 2 || previous.finishedAt !== null) return { vehicle, missedCheckpoint }
+  // Sweep the same physical motion through consecutive gates in chronological
+  // order, including tightly spaced authored stripes in a single tick.
+  let gate = previous.nextSector
+  let lastCrossing = -1
+  let pending = missedCheckpoint
+  const radius = timingGateCrossingRadius(ROAD_GEOMETRY.onRoadRadius, onRoad && wasOnRoad())
+  while (gate <= finishGateNumber(race)) {
+    const finish = gate === finishGateNumber(race)
+    const position = pendingTimingGateIndex(race, gate)
+    const crossing = roadGateCrossingFraction(path, previous, vehicle, position, radius, reversed, ROAD_GEOMETRY.onRoadRadius)
+    if (crossing === undefined || crossing <= lastCrossing) break
+    lastCrossing = crossing
+    pending = undefined
+    if (finish) {
+      const lap = previous.lap + 1
+      return { vehicle: { ...vehicle, lap, nextSector: 1, finishedAt: lap >= race.totalLaps ? elapsed : null }, missedCheckpoint: undefined }
+    }
+    gate++
+  }
+  if (gate !== previous.nextSector) vehicle = { ...vehicle, nextSector: gate }
   const finish = gate === finishGateNumber(race)
   const position = pendingTimingGateIndex(race, gate)
-  if (count < 2 || previous.finishedAt !== null) return { vehicle, missedCheckpoint }
   const crossedLine = crossesRoadGate(path, previous, vehicle, position, Infinity, reversed)
   const passedGate = path.closed
     ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
@@ -94,32 +106,21 @@ export function advanceArcadeTimingGate(
     : finish ? passedStageFinish(path, vehicle) : vehicle.pathIndex > position + 2
   const confirmedBypass = passedGate && (!path.closed && finish ||
     clearlyBeyondGate(path, position, vehicle, reversed))
-  if (!crossedLine && !confirmedBypass) return { vehicle, missedCheckpoint }
+  // The infinite extension of a stripe can intersect the incoming asphalt
+  // of a sharp bend. That alone is not a missed gate while still on the road.
+  // A true off-road bypass or confirmed route progression remains a miss.
+  const crossedOutsideRoad = crossedLine && (!onRoad || !wasOnRoad())
+  if (!crossedOutsideRoad && !confirmedBypass) return { vehicle, missedCheckpoint: pending }
+  if (pending) return { vehicle, missedCheckpoint: pending }
 
-  const crossingRadius = timingGateCrossingRadius(ROAD_GEOMETRY.onRoadRadius, onRoad && wasOnRoad())
-  if (crossedLine && crossesRoadGate(path, previous, vehicle, position, crossingRadius, reversed)) {
-    if (finish) {
-      const lap = previous.lap + 1
-      return {
-        vehicle: { ...vehicle, lap, nextSector: 1, finishedAt: lap >= race.totalLaps ? elapsed : null },
-        missedCheckpoint: undefined,
-      }
-    }
-    return { vehicle: { ...vehicle, nextSector: gate + 1 }, missedCheckpoint: undefined }
-  }
-  if (missedCheckpoint) return { vehicle, missedCheckpoint }
-
-  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(position))
-  const a = path.points[lower]
-  const b = path.points[(lower + 1) % count]
-  if (!a || !b) return { vehicle, missedCheckpoint: undefined }
-  const fraction = position - lower
+  const geometry = roadGateGeometry(path, position)
+  if (!geometry) return { vehicle, missedCheckpoint: undefined }
   return {
     vehicle,
     missedCheckpoint: {
       gate,
       remainingSeconds: MISSED_GATE_GRACE_SECONDS,
-      position: { x: a.x + (b.x - a.x) * fraction, y: a.y + (b.y - a.y) * fraction },
+      position: geometry.center,
     },
   }
 }

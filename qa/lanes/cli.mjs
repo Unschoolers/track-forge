@@ -89,6 +89,9 @@ Default directions test both ways. Reports: report.html and report.json.`)
 								console.log(
 									`${runs.length}. ${label}: ${run.vehicles.filter((v) => v.finishedAt !== null).length}/${run.vehicles.length} finished, ${errors} errors, ${run.issues.length - errors} warnings`,
 								)
+								for (const issue of run.issues.filter(issue => issue.severity === 'error' || issue.code === 'missed-gate')) {
+									console.log('LANE_DIAGNOSTIC ' + JSON.stringify({ label, ...issue }))
+								}
 								if (options.failOnRegressions) {
 									const failures = laneRegressions(run, options.trackFiles.length ? undefined : track.id)
 									if (failures.length) regressions.push(`${label}: ${failures.join(', ')}`)
