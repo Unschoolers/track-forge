@@ -1,12 +1,11 @@
 // @vitest-environment node
 import { expect, it } from 'vitest'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { createLaneScenarios, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 import { requireFixture } from '../fixtures/requireFixture'
 
-it('laps Pine Hairpins faster on Hard with the same car and no traffic', () => {
-  const { track } = requireFixture(OFFICIAL_CIRCUITS.find(({ track }) => track.name === 'Pine Hairpins'))
+it('laps an authored hairpin faster on Hard with the same car and no traffic', () => {
+  const track = requireFixture(createLaneScenarios().find(({ id }) => id === 'hairpin'))
   const path = prepareLanePath(track)
   const [medium, hard] = (['normal', 'hard'] as const).map((difficulty) => {
     const run = runLaneCheck({
