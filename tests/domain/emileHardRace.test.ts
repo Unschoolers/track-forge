@@ -37,7 +37,13 @@ const BALANCE = {
 const PACE_DEBT_314 = {
   desiredBlueGhostLeadSeconds: 1,
   maxBlueMirrorSeconds: 1853 * RACE_TICK_SECONDS,
-  minMediumToEasyGap: 0.0291,
+} as const
+
+// Owner-approved #315 pace-only debt, tracked in #314. The measured gap
+// was 1.3536089% after eliminating forced Hairpin recoveries. Freeze it
+// at 1.35% (rounded down), retain the 3% target and all other gates.
+const PACE_DEBT_315 = {
+  minMediumToEasyGap: 0.0135,
 } as const
 
 function finishedTime(finishedAt: number | null, label: string): number {
@@ -170,8 +176,8 @@ describe('Émile arcade difficulty balance', () => {
 		expect(normal, times).toBeGreaterThan(hard * (1 + BALANCE.minAdjacentDifficultyGap))
 		const mediumToEasyGap = easy / normal - 1
 		if (mediumToEasyGap < BALANCE.minAdjacentDifficultyGap)
-			console.info(`PACE_DEBT #314: Medium/Easy ${(100 * mediumToEasyGap).toFixed(3)}%; target ${100 * BALANCE.minAdjacentDifficultyGap}%`)
-		expect(mediumToEasyGap, `${times}; approved #314 minimum gap`).toBeGreaterThanOrEqual(PACE_DEBT_314.minMediumToEasyGap)
+			console.info(`PACE_DEBT #315 (follow-up #314): Medium/Easy ${(100 * mediumToEasyGap).toFixed(3)}%; target ${100 * BALANCE.minAdjacentDifficultyGap}%`)
+		expect(mediumToEasyGap, `${times}; approved #315 minimum gap (follow-up #314)`).toBeGreaterThanOrEqual(PACE_DEBT_315.minMediumToEasyGap)
 		// Keep the existing broad maximum slowdowns: neither difficulty should
 		// become so uncompetitive that the race feels empty.
 		expect(hard / normal, times).toBeGreaterThan(BALANCE.minHardToMediumPaceRatio)
