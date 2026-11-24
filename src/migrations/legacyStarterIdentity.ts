@@ -9,8 +9,11 @@ void _markers
 void _auto
 // Compare canonical repository data; decoded legacy points may carry explicit
 // default curve/structure fields absent from the original generator.
-const legacy = decodeTrack(original, 0)
-if (!legacy) throw new Error('Invalid built-in legacy track fixture')
+const legacy = (() => {
+  const normalized = decodeTrack(original, 0)
+  if (!normalized) throw new Error('Invalid built-in legacy track fixture')
+  return normalized
+})()
 
 /**
  * An old bundled starter is removable only when all user-editable content
