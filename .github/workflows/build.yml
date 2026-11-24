@@ -63,6 +63,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run qa:race:test
       - run: npm run test:fast -- --maxWorkers=4
       - run: npm run lint
 
