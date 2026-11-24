@@ -29,3 +29,5 @@ The search now validates every promising coordinate against all six study tracks
 The next lab iteration revalidates the previous five-recovery candidate against the original frozen baseline before resuming. Yellow's apex-cut scale, sharp-entry reserve and preview combinations are searched first; Green's lower-difficulty reserve is searched for the remaining Normal traffic recovery. These are experimental overrides only, with unchanged production profiles and acceptance gates.
 
 The three-recovery seed is now resumed and revalidated. The next bounded Yellow search couples Hard corner target, pursuit preview and edge avoidance, plus steering gain/reaction combinations. The two forward missed gates and one traffic off-road recovery remain the target; all original matrix and cross-track gates still apply.
+
+The combined candidate at 7b349682 passed all 48 Hairpin cases with zero recoveries, DNFs or errors and all 96 matched cross-track trials with no regressions (run 45395237707). Promote exactly those four profiles and run the strict checked-in-profile matrix; required CI remains mandatory. Two pre-existing cross-track recoveries remain.
