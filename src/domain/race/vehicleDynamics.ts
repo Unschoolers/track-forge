@@ -1,5 +1,8 @@
 import type { Vector2 } from '@/domain/model'
 import {
+  LOW_SPEED_BRAKE_CORNER,
+  brakeCornerResponseAtSpeed,
+  type BrakeCornerResponse,
   VEHICLE_DYNAMICS_TUNING,
   steeringLimitAtSpeed,
   type VehicleDynamicsTuning,
@@ -28,6 +31,8 @@ export interface VehicleDynamicsParameters {
   readonly cornerStiffness: number
   readonly brakeForce: number
   readonly brakingTractionScale?: number
+  readonly lowSpeedBrakeCornerReserve?: number
+  readonly brakeCornerResponse?: BrakeCornerResponse
   /** Chassis-specific lateral stability, supplied with surface traction blending. */
   readonly lateralStability?: number
   readonly recovery: number
@@ -191,10 +196,19 @@ export function stepVehicleDynamics(
     0,
     tuning.forces.maximumBrakeUsage,
   )
+  const cornerReserve = clamp(parameters.lowSpeedBrakeCornerReserve ?? 0, 0, 1) *
+    Math.abs(steeringInput) * clamp(
+      (LOW_SPEED_BRAKE_CORNER.fadeOutSpeed - Math.abs(longitudinal)) /
+        (LOW_SPEED_BRAKE_CORNER.fadeOutSpeed - LOW_SPEED_BRAKE_CORNER.fullReserveSpeed),
+      0, 1,
+    )
+  // Arcade reserve restores lateral authority at crawl speed without changing
+  // longitudinal service brakes or high-speed cornering.
+  const cornerBrakeUsage = brakeUsage * (1 - cornerReserve)
   const lateralBudget = Math.sqrt(
     Math.max(
       tuning.forces.minimumLateralBudget,
-      1 - brakeUsage * brakeUsage,
+      1 - cornerBrakeUsage * cornerBrakeUsage,
     ),
   )
   const frontCapacity =
@@ -230,6 +244,12 @@ export function stepVehicleDynamics(
   // A concave curve gives rolling cars more authority during tight manoeuvres.
   const tireResponse = linearTireResponse * (1 +
     clamp(tuning.steering.lowSpeedResponseGain, 0, 1) * (1 - linearTireResponse))
+  // Blend the calibrated arcade tire response continuously with brake pressure
+  // and steering; neither coasting nor straight-line braking is affected.
+  const cornerResponse = parameters.brakeCornerResponse && pressure > 0 && steeringInput !== 0
+    ? 1 + (brakeCornerResponseAtSpeed(parameters.brakeCornerResponse, Math.abs(longitudinal)) - 1) *
+      pressure * Math.abs(steeringInput)
+    : 1
   const frontLateralAcceleration =
     softLimit(
       -frontSlip *
@@ -237,7 +257,7 @@ export function stepVehicleDynamics(
         lateralGripAcceleration *
         frontLoad,
       frontCapacity,
-    ) * tireResponse
+    ) * tireResponse * cornerResponse
   const rearLateralAcceleration =
     softLimit(
       -rearSlip *
@@ -245,7 +265,7 @@ export function stepVehicleDynamics(
         lateralGripAcceleration *
         rearLoad,
       rearCapacity,
-    ) * tireResponse
+    ) * tireResponse * cornerResponse
   const lateralAcceleration =
     frontLateralAcceleration + rearLateralAcceleration
   const tireYawAcceleration =

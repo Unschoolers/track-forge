@@ -225,6 +225,58 @@ describe('Car handling personalities', () => {
     }
   })
 
+  it('lets Red change its path while crawling under full braking on ice', () => {
+    const road = context('ice')
+    for (const speed of [10, 20]) {
+      for (const steering of [-1, 1]) {
+        const initial = {
+          ...makeVehicle('red', speed, 0, 'ice'),
+          brakePressure: 1,
+          surfaceGrip: SURFACE_SPECS.ice.grip * VEHICLE_TERRAIN_SPECS.red.ice.grip,
+        }
+        const result = travel(initial, { steering, throttle: 0, braking: true }, 'ice', 30)
+        const dx = result.x - initial.x
+        const dy = result.y - initial.y
+        const forward = dx * road.tangent.x + dy * road.tangent.y
+        const sideways = dx * road.normal.x + dy * road.normal.y
+        // Measure the actual trajectory, not body rotation or wheel angle.
+        expect(Math.atan2(sideways, forward) * steering).toBeGreaterThan(0.3)
+        expect(result.speed).toBeLessThan(2)
+      }
+    }
+  })
+
+  it('meets the full-brake trajectory angle targets on all three roads', () => {
+    const cars = ['red', 'blue', 'green', 'yellow'] as const
+    const caps = { street: 45, dirt: 40, ice: 35 } as const
+    const truckCaps = { street: 50, dirt: 45, ice: 40 } as const
+    for (const surface of ['street', 'dirt', 'ice'] as const) {
+      const road = context(surface)
+      for (const car of cars) {
+        for (let speed = 5; speed <= 100; speed += 1) {
+          const initial = {
+            ...makeVehicle(car, speed, 0, surface),
+            brakePressure: 1,
+            surfaceGrip: SURFACE_SPECS[surface].grip * VEHICLE_TERRAIN_SPECS[car][surface].grip,
+          }
+          const cap = car === 'yellow' ? truckCaps[surface] : caps[surface]
+          for (const steering of [-1, 1]) {
+            const result = travel(initial, { steering, throttle: 0, braking: true }, surface, 30)
+            const dx = result.x - initial.x
+            const dy = result.y - initial.y
+            const forward = dx * road.tangent.x + dy * road.tangent.y
+            const sideways = dx * road.normal.x + dy * road.normal.y
+            const angle = Math.atan2(sideways, forward) * steering * 180 / Math.PI
+            const label = `${car}/${surface}/${speed}/${steering}`
+            expect(angle, label).toBeGreaterThan(0)
+            expect(angle, label).toBeLessThanOrEqual(cap)
+            if (car === 'yellow' && speed >= 45) expect(angle, label).toBeGreaterThanOrEqual(20)
+          }
+        }
+      }
+    }
+  })
+
   it('matches the four ice braking distance targets from 170 units/s', () => {
     const targets = { red: 250, blue: 235, green: 200, yellow: 150 } as const
     for (const car of ['red', 'blue', 'green', 'yellow'] as const) {

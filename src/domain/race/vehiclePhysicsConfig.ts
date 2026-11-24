@@ -110,6 +110,8 @@ export interface SurfacePhysicsSpec {
 
 export interface TerrainPhysicsModifier extends SurfacePhysicsSpec {
   readonly drag: number
+  /** Arcade lateral reserve during very slow braking turns. */
+  readonly lowSpeedBrakeCornerReserve?: number
 }
 
 export interface VerticalDynamicsTuning {
@@ -175,6 +177,53 @@ export const VEHICLE_DYNAMICS_TUNING = {
     steeringDragScale: 22,
   },
 } as const satisfies VehicleDynamicsTuning
+
+/** Lateral tire response multipliers at 0, 15, 45 and 100 simulation units/s.
+ * The response returns to stock at 170. Applied only during simultaneous
+ * braking and steering; these are arcade calibration factors, not wheel angles.
+ */
+export type BrakeCornerResponse = readonly [number, number, number, number]
+
+export const BRAKE_CORNER_RESPONSE = {
+  red: {
+    street: [0.1, 1.125, 0.95, 1],
+    dirt: [0.9, 1.025, 0.975, 1],
+    ice: [1.175, 1.225, 1, 1],
+  },
+  blue: {
+    street: [0.325, 0.9, 1, 1.025],
+    dirt: [0.75, 1, 0.975, 1.025],
+    ice: [1.1, 1.425, 0.875, 1.05],
+  },
+  green: {
+    street: [0.195, 0.975, 1.075, 0.95],
+    dirt: [0.485, 0.68, 1.175, 0.925],
+    ice: [0.99, 1.24, 0.95, 1.025],
+  },
+  yellow: {
+    street: [0.145, 1.2, 1.65, 1.4],
+    dirt: [0.245, 0.95, 1.675, 1.525],
+    ice: [0.98, 1.75, 2.9, 3.8],
+  },
+} as const satisfies Record<CarId, Record<SurfaceId, BrakeCornerResponse>>
+
+const BRAKE_CORNER_RESPONSE_SPEED = {
+  low: 15, medium: 45, high: 100, stock: 170,
+} as const
+
+export function brakeCornerResponseAtSpeed(response: BrakeCornerResponse, speed: number): number {
+  const [crawl, low, medium, high] = response
+  const limits = BRAKE_CORNER_RESPONSE_SPEED
+  const blend = (from: number, to: number, fraction: number) => from + (to - from) * fraction
+  const v = Math.max(0, speed)
+  if (v < limits.low) return blend(crawl, low, v / limits.low)
+  if (v < limits.medium) return blend(low, medium, (v - limits.low) / (limits.medium - limits.low))
+  if (v < limits.high) return blend(medium, high, (v - limits.medium) / (limits.high - limits.medium))
+  if (v < limits.stock) return blend(high, 1, (v - limits.high) / (limits.stock - limits.high))
+  return 1
+}
+
+export const LOW_SPEED_BRAKE_CORNER = { fullReserveSpeed: 30, fadeOutSpeed: 60 } as const
 
 export const ARCADE_BRAKE_TIMING = { pressSeconds: 0.15, releaseSeconds: 0.1 } as const
 
@@ -310,7 +359,7 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
   red: {
     street: DEFAULT_TERRAIN,
     dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.75, drag: 1.55 },
-    ice: { max: 0.95, accel: 0.84, grip: 1, brake: 0.78, drag: 1.2 },
+    ice: { max: 0.95, accel: 0.84, grip: 1, brake: 0.78, drag: 1.2, lowSpeedBrakeCornerReserve: 0.1 },
     // Keep the low grass speed target but let Red recover from a mistake sooner.
     grass: { max: 0.51, accel: 0.7, grip: 0.57, brake: 0.72, drag: 1.6 },
   },
