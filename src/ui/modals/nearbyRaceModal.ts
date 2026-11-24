@@ -160,7 +160,9 @@ export function createNearbyRaceModal(
         () => nearby.setLobbyReady(!snapshot.localReady), snapshot.localReady ? 'button' : 'button button-primary')
       ready.disabled = snapshot.unlockPending
       frame.footer.append(ready)
-      frame.body.append(element('p', 'modal-subtitle', 'The race starts when everyone is ready.'))
+      frame.body.append(element('p', 'modal-subtitle', snapshot.localReady && snapshot.role === 'guest'
+        ? 'Cancel Ready to change your car, until the host locks the lineup.'
+        : 'The race starts when everyone is ready.'))
       break
     }
     case 'preparing':

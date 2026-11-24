@@ -159,11 +159,16 @@ export class AppController {
       dependencies.raceSession.scheduleNearbyStart?.(startsAt)
     })
     this.unsubscribeNearby = dependencies.nearby?.subscribe(() => {
+      const status = dependencies.nearby?.snapshot()
+      if (this.state.overlay.type === 'nearby' && this.state.mode === 'race' &&
+          status?.phase === 'idle' && status.error) {
+        this.update({ ...this.state, mode: 'home', paused: false, overlay: { type: 'none' }, notice: status.error })
+        return
+      }
       if (this.state.overlay.type === 'nearby') {
         this.update({ ...this.state })
         return
       }
-      const status = dependencies.nearby?.snapshot()
       if (status?.phase === 'lobby' && this.state.mode === 'race' && this.beforeNearbyTrack !== undefined && this.state.overlay.type === 'results') {
         this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
         return
@@ -816,6 +821,10 @@ export class AppController {
     const overlay = this.state.overlay
     if (overlay.type === 'editor-exit') {
       this.editorExitFlow.resolve('cancel')
+      return
+    }
+    if (overlay.type === 'nearby' && this.state.mode === 'race' && this.beforeNearbyTrack !== undefined) {
+      this.dispatch({ type: 'leave-nearby' })
       return
     }
     if (overlay.type === 'cup-final' || overlay.type === 'results') {
