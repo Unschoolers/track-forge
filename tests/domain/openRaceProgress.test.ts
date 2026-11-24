@@ -15,7 +15,7 @@ const player = requireFixture(race.vehicles[0])
 const last = path.points.length - 1
 
 function gateLine(gate: 1 | 2 | 3 | 4) {
-  const gatePosition = last * gate / 4
+  const gatePosition = gate === 4 ? last : requireFixture(race.timingGates?.[gate - 1])
   const lower = Math.min(last - 1, Math.floor(gatePosition))
   const a = requireFixture(path.points[lower])
   const b = requireFixture(path.points[lower + 1])
@@ -35,7 +35,7 @@ function cross(vehicle: typeof player, gate: 1 | 2 | 3 | 4, backwards = false) {
   const { before, after } = gateLine(gate)
   const from = backwards ? after : before
   const to = backwards ? before : after
-  return updateOpenRouteProgress({ ...vehicle, ...from }, { ...vehicle, ...to }, path, to.pathIndex, 12, true, true, 42)
+  return updateOpenRouteProgress({ ...vehicle, ...from }, { ...vehicle, ...to }, path, to.pathIndex, 12, true, true, 42, race.timingGates)
 }
 
 describe('point-to-point race', () => {
@@ -70,13 +70,13 @@ it('requires an on-road physical crossing and allows recovery before a missed ga
   // Off-road bypass is a shortcut only when the swept path misses the painted stripe.
   const grassBefore = { ...before, y: before.y + 80 }
   const grassAfter = { ...after, y: after.y + 80 }
-  const bypass = updateOpenRouteProgress(grassBefore, grassAfter, path, after.pathIndex, 1, false, true, 42)
+  const bypass = updateOpenRouteProgress(grassBefore, grassAfter, path, after.pathIndex, 1, false, true, 42, race.timingGates)
   expect(bypass.nextSector).toBe(1)
   expect(bypass.finishedAt).toBeNull()
-  const rejoin = updateOpenRouteProgress(bypass, bypass, path, after.pathIndex, 2, true, true, 42)
+  const rejoin = updateOpenRouteProgress(bypass, bypass, path, after.pathIndex, 2, true, true, 42, race.timingGates)
   expect(rejoin.nextSector).toBe(1)
   const recovered = resetRaceVehicle(rejoin, race)
   expect(recovered.pathIndex).toBeLessThan(last / 4)
-  expect(updateOpenRouteProgress(before, after, path, after.pathIndex, 3, true, true, 42).nextSector).toBe(2)
+  expect(updateOpenRouteProgress(before, after, path, after.pathIndex, 3, true, true, 42, race.timingGates).nextSector).toBe(2)
   expect(cross({ ...player, grounded: false }, 1).nextSector).toBe(2)
 })
