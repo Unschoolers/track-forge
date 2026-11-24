@@ -34,7 +34,9 @@ try {
   const tracks = new Map()
   for (const scenario of workerData.scenarios) {
     let track
-    if (scenario.laneScenarioId) {
+    if (scenario.track) {
+      track = decodeTrackInput(scenario.track)[0]
+    } else if (scenario.laneScenarioId) {
       track = createLaneScenarios().find(x => x.id === scenario.laneScenarioId)
     } else if (scenario.file) {
       const decoded = decodeTrackInput(JSON.parse(
@@ -51,8 +53,11 @@ try {
       fingerprint: trackFingerprint({ track }),
     })
   }
+  const playerProbes = workerData.playerProbes
+    ? (await server.ssrLoadModule('/qa/lanes/balancePlayerProbes.ts')).runPlayerBalanceMatrix()
+    : null
   port.postMessage({ type: 'ready', baselineProfiles: CAR_DRIVING_PROFILES,
-    passingProfiles: CAR_PASSING_POLICIES })
+    passingProfiles: CAR_PASSING_POLICIES, playerProbes })
 
   port.on('message', message => {
     if (message.type !== 'trial') return

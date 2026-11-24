@@ -48,3 +48,40 @@ export function selectScenarios(ids, available = STUDY_SCENARIOS) {
     throw new Error('Duplicate scenario')
   return selected
 }
+
+// Identical control points across surfaces isolate the effect of road grip.
+// The fast course has long straights and broad turns; the technical course
+// adds a sequence of tighter bends without crossings.
+const BALANCE_LAYOUTS = {
+  fast: [
+    [-320, -180], [0, -180], [320, -180], [410, -120],
+    [410, 120], [320, 180], [0, 180], [-320, 180],
+    [-410, 120], [-410, -120], [-320, -180],
+  ],
+  technical: [
+    [-300, -210], [0, -210], [260, -210], [320, -150],
+    [260, -90], [40, -90], [-40, -30], [40, 30],
+    [260, 30], [320, 90], [260, 150], [0, 150],
+    [-300, 150], [-360, 90], [-360, -150], [-300, -210],
+  ],
+}
+
+export const BALANCE_SCENARIOS = Object.entries(BALANCE_LAYOUTS).flatMap(([layout, points]) =>
+  ['street', 'dirt', 'ice'].map(surface => {
+    const id = `balance-${layout}-${surface}`
+    const scale = layout === 'fast' ? 1.8 : 1
+    return {
+      id, layout, surface, startRatio: 0, reverse: false, laps: 2, seconds: 100,
+      track: {
+        id, name: id, version: 8,
+        points: points.map(([x, y], index) => ({
+          x: x * scale, y: y * scale, surface, id: `${layout}-${index}`,
+        })),
+        trees: [], terrain: { cellSize: 32, cells: [] },
+        start: { ratio: 0, reversed: false },
+        recoveryCheckpoints: [0.25, 0.5, 0.75],
+        lighting: 'day', createdAt: 1, updatedAt: 1,
+      },
+    }
+  }),
+)

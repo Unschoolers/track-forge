@@ -6,11 +6,13 @@ import { Worker } from 'node:worker_threads'
  * simulation exception. Individual jobs never mutate shared production state.
  */
 export class SimulationPool {
-  constructor({ workers, scenarios, physicsRevision }) {
+  constructor({ workers, scenarios, physicsRevision, playerProbes = false }) {
     if (!Number.isInteger(workers) || workers < 1 || workers > 8)
       throw new Error('Workers must be between 1 and 8')
     this.size = workers
     this.data = { scenarios, physicsRevision }
+    this.measurePlayer = playerProbes
+    this.playerProbes = null
     this.entries = []
     this.queue = []
     this.running = new Map()
@@ -25,7 +27,7 @@ export class SimulationPool {
     const ready = []
     for (let i = 0; i < this.size; i++) {
       const worker = new Worker(new URL('./worker.mjs', import.meta.url), {
-        workerData: this.data,
+        workerData: { ...this.data, playerProbes: this.measurePlayer && i === 0 },
       })
       const entry = { worker, busy: false }
       this.entries.push(entry)
@@ -36,6 +38,7 @@ export class SimulationPool {
             initialized = true
             this.baselineProfiles ??= message.baselineProfiles
             this.passingProfiles ??= message.passingProfiles
+            this.playerProbes ??= message.playerProbes
             resolve()
             this.pump()
           } else if (message.type === 'fatal') {
