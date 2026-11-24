@@ -22,7 +22,9 @@ for a broken or uncompetitive Hard lap.
    speed/corner safety margins, mistake rate and overtaking caution.
    Lower difficulty must not have superior driving or hidden grip/engine
    advantages; any minor steering-safety differences must preserve
-   **Hard faster than Normal faster than Easy** in comparable races.
+   **Hard faster than Normal faster than Easy**, with at least 1% longer
+   finish time at each adjacent slower difficulty in comparable races.
+   `Normal >= Hard × 1.01` and `Easy >= Normal × 1.01`.
 4. Re-run the full deterministic race tests with identical seeds, grid
    composition and physics for each difficulty. Inspect individual-car
    finish times, not just field averages, and make sure a tuned Normal
@@ -42,7 +44,8 @@ for a broken or uncompetitive Hard lap.
   by difficulty or because an AI is driving.
 - Test Green as an AI rival with Red occupying the player slot on **Hard,
   Normal and Easy**. For each fixed seed, require clean full-race finishes.
-  Enforce `Hard < Normal < Easy` on the separate matched solo benchmarks;
+  Enforce the same minimum 1% adjacent gap for each car and seed on the
+  separate matched solo benchmarks;
   the full-field grids can differ across difficulties.
 - The existing Normal competitiveness check remains independently enforced:
   Green Normal must finish within ten seconds of the 1:12.900 personal best

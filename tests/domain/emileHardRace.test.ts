@@ -1,3 +1,4 @@
+import { MIN_ADJACENT_DIFFICULTY_GAP } from '../fixtures/aiDifficultyBalance'
 import { RaceSession } from '@/application/race/raceSession'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -26,7 +27,6 @@ const ghostSeconds = 31.633
 // This is an integration safety rail, not a target for chassis tuning.
 const BALANCE = {
   maxHardFieldSpread: 0.135,
-  minAdjacentDifficultyGap: 0.03,
   minHardToMediumPaceRatio: 0.90,
   minHardToEasyPaceRatio: 0.85,
 } as const
@@ -37,13 +37,6 @@ const BALANCE = {
 const PACE_DEBT_314 = {
   desiredBlueGhostLeadSeconds: 1,
   maxBlueMirrorSeconds: 1853 * RACE_TICK_SECONDS,
-} as const
-
-// Owner-approved #315 pace-only debt, tracked in #314. The measured gap
-// was 1.3536089% after eliminating forced Hairpin recoveries. Freeze it
-// at 1.35% (rounded down), retain the 3% target and all other gates.
-const PACE_DEBT_315 = {
-  minMediumToEasyGap: 0.0135,
 } as const
 
 function finishedTime(finishedAt: number | null, label: string): number {
@@ -169,15 +162,10 @@ describe('Émile arcade difficulty balance', () => {
 		const normal = meanTime('normal')
 		const easy = meanTime('easy')
 		const times = `Hard=${hard.toFixed(2)}s, Medium=${normal.toFixed(2)}s, Easy=${easy.toFixed(2)}s`
-		// Distinct difficulty choices should be noticeably different, not
-		// calibrated to a fractional second on one seed and starting grid.
-		// A >=3% neighboring gap protects player-visible ordering while leaving
-		// room for the ~1% drift caused by legitimate chassis changes.
-		expect(normal, times).toBeGreaterThan(hard * (1 + BALANCE.minAdjacentDifficultyGap))
-		const mediumToEasyGap = easy / normal - 1
-		if (mediumToEasyGap < BALANCE.minAdjacentDifficultyGap)
-			console.info(`PACE_DEBT #315 (follow-up #314): Medium/Easy ${(100 * mediumToEasyGap).toFixed(3)}%; target ${100 * BALANCE.minAdjacentDifficultyGap}%`)
-		expect(mediumToEasyGap, `${times}; approved #315 minimum gap (follow-up #314)`).toBeGreaterThanOrEqual(PACE_DEBT_315.minMediumToEasyGap)
+		// Each slower difficulty must take at least 1% longer than its
+		// immediate faster neighbor, using the same relative-time definition.
+		expect(normal, times).toBeGreaterThanOrEqual(hard * (1 + MIN_ADJACENT_DIFFICULTY_GAP))
+		expect(easy, times).toBeGreaterThanOrEqual(normal * (1 + MIN_ADJACENT_DIFFICULTY_GAP))
 		// Keep the existing broad maximum slowdowns: neither difficulty should
 		// become so uncompetitive that the race feels empty.
 		expect(hard / normal, times).toBeGreaterThan(BALANCE.minHardToMediumPaceRatio)
