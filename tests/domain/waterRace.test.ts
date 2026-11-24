@@ -712,14 +712,15 @@ describe('water race contact', () => {
         index === 0
           ? {
               ...vehicle,
-              x: -1,
-              y: 16,
+              x: 1,
+              y: 18,
               z: 0,
               pathIndex: path.points.length - 2,
               nextSector: 1 as const,
               vx: 0,
-              vy: 0,
-              speed: 0,
+              vy: -250,
+              speed: 250,
+              angle: -Math.PI / 2,
               grounded: true,
             }
           : index === 1
@@ -737,7 +738,7 @@ describe('water race contact', () => {
       ),
     }
 
-    const result = stepRace(state, noInput, 0.001, random)
+    const result = stepRace(state, noInput, 1 / 60, random)
     const player = result.state.vehicles.find(({ player }) => player)
 
     expect(result.state.phase).toBe('running')
