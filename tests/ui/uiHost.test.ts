@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import type { AppCommand, AppSnapshot } from '@/application/appState'
+import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import type { Preferences } from '@/application/ports/storage'
 import type { UpdateProvider } from '@/application/updates/updateProvider'
 import { createEditorState } from '@/domain/editor/editorState'
@@ -51,6 +52,7 @@ function setup(
   mode: AppSnapshot['mode'] = 'home',
   prepareRace?: UiRuntime['prepareRace'],
   updateProvider?: UpdateProvider,
+  nearby?: NearbyRace,
 ) {
   const root = document.createElement('div')
   let listener: ((value: AppSnapshot) => void) | undefined
@@ -64,7 +66,7 @@ function setup(
       }
     }),
   }
-  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}), ...(updateProvider ? { updateProvider } : {}) }
+  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}), ...(updateProvider ? { updateProvider } : {}), ...(nearby ? { nearby } : {}) }
   const geometry = vi.spyOn(runtime.geometry, 'get')
   const host = new DomUiHost(root, port, runtime)
   host.mount()
@@ -270,6 +272,36 @@ describe('DomUiHost', () => {
     host.destroy()
     expect(root.childElementCount).toBe(0)
     expect(port.subscribe).toHaveBeenCalledOnce()
+  })
+
+  it('previews the proposed multiplayer track rather than the previously selected solo track', () => {
+    const proposed = createStarterTrack(asTrackId('nearby-proposed'), 2)
+    const lobby = {
+      phase: 'lobby', purpose: 'race', role: 'guest', track: proposed.name,
+      lobbyTrack: proposed, lighting: 'night', laps: 2, localCar: 'red',
+      localReady: false, unlockPending: false, readyPending: false,
+      lobbyPlayers: [{ slot: 0, car: 'green', name: 'Host', accepted: false, choice: 0 },
+        { slot: 1, car: 'red', name: 'Guest', accepted: false, choice: 0 }],
+    }
+    const nearby = {
+      snapshot: () => lobby, localSlot: () => 1,
+      selectLobbyCar: vi.fn(), setLobbyReady: vi.fn(),
+    } as unknown as NearbyRace
+    const { root, update, host, geometry } = setup('home', undefined, undefined, nearby)
+    try {
+      const overlay = { ...snapshot('home'), overlay: { type: 'nearby' as const } }
+      update(overlay)
+      expect(geometry).toHaveBeenLastCalledWith(proposed)
+      const preview = root.querySelector<HTMLCanvasElement>('.race-flyover')
+      expect(preview?.dataset.car).toBe('red')
+      expect(preview?.dataset.lighting).toBe('night')
+      expect(preview?.getAttribute('aria-label')).toContain(proposed.name)
+      lobby.localCar = 'blue'
+      update(overlay)
+      expect(root.querySelector<HTMLCanvasElement>('.race-flyover')?.dataset.car).toBe('blue')
+      update(snapshot('home'))
+      expect(root.querySelector('.race-flyover')).toBeNull()
+    } finally { host.destroy() }
   })
 
   it('reuses setup preparation across car changes and cancels it when rendering inputs change', () => {
