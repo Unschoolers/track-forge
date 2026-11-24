@@ -89,7 +89,7 @@ if (command === 'simulate') {
         console.log(JSON.stringify(data, null, 2))
       } else if (command === 'stats') {
         console.log(data.track.name + ' · ' + data.setup.difficulty + ' · ' +
-          data.ruleset + ' · replay v' + data.formatVersion + ' · ' + data.observationType + ' ' +
+          data.ruleset + ' · ' + data.observationType + ' ' +
           data.observationEnd + 's')
         console.log('Geometry fingerprint: ' + data.track.fingerprint)
         console.table(data.vehicles.map((v) => ({
