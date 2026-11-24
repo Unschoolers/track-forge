@@ -68,7 +68,7 @@ function recoverySession() {
       ...state,
       phase: finishing ? 'finished' : 'running',
       vehicles: state.vehicles.map((vehicle) => vehicle.player
-        ? { ...vehicle, x: vehicle.x + 1000, speed: 20, lap: 1, damage: 2 }
+        ? { ...vehicle, x: vehicle.x + 1000, speed: 20, lap: 1 }
         : vehicle),
     },
     events: finishing ? [{ type: 'race-finished', reason: 'water' }] : [],
@@ -331,7 +331,7 @@ describe('race canvas steering', () => {
       const before = session.snapshot()
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'R' }))
       expect(session.snapshot().state?.vehicles[0]?.x).not.toBe(before.state?.vehicles[0]?.x)
-      expect(session.snapshot().state?.vehicles[0]).toMatchObject({ speed: 0, lap: 1, damage: 2 })
+      expect(session.snapshot().state?.vehicles[0]).toMatchObject({ speed: 0, lap: 1 })
       expect(controls.snapshot()).toMatchObject({ steering: 0, braking: false })
       expect(pad.getAttribute('aria-valuenow')).toBe('0.00')
       expect(brake.classList.contains('pressed')).toBe(false)

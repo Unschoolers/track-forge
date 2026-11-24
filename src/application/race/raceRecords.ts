@@ -31,13 +31,13 @@ export function courseIdentity(track: Track): string {
 
 export function raceCategory(track: Track, setup: RaceSetup): ScoreCategory {
   if (setup.mode === 'nearby') throw new Error('Nearby races do not have a solo score category.')
-  return { course: courseIdentity(track), laps: setup.laps, handling: setup.handling ?? 'arcade', mode: setup.mode ?? 'normal', routeKind: normalizeRouteKind(track.routeKind) }
+  return { course: courseIdentity(track), laps: setup.laps, mode: setup.mode ?? 'normal', routeKind: normalizeRouteKind(track.routeKind) }
 }
 
 export function sameCategory(score: ScoreEntry, category: ScoreCategory, setup: Pick<RaceSetup, 'car' | 'difficulty'>): boolean {
   const other = score.category
   return !!other && other.course === category.course && other.laps === category.laps &&
-    other.handling === category.handling && other.mode === category.mode &&
+    other.mode === category.mode &&
     normalizeRouteKind(other.routeKind) === normalizeRouteKind(category.routeKind) &&
     score.car === setup.car && score.difficulty === setup.difficulty
 }
@@ -47,9 +47,9 @@ export function scoreCategoryLabel(score: ScoreEntry): string {
   if (!category) return 'Legacy · settings unknown'
   if (category.routeKind === 'point-to-point') {
     const mode = category.mode === 'normal' ? 'Race AI' : category.mode === 'time-trial' ? 'Time Trial' : 'Ghost Race'
-    return `${score.car} · ${score.difficulty} · ${category.handling} · ${mode}`
+    return `${score.car} · ${score.difficulty} · ${mode}`
   }
-  return `${score.car} · ${score.difficulty} · ${category.laps} ${category.laps === 1 ? 'lap' : 'laps'} · ${category.handling} · ${category.mode}`
+  return `${score.car} · ${score.difficulty} · ${category.laps} ${category.laps === 1 ? 'lap' : 'laps'} · ${category.mode}`
 }
 
 export type TimeMedal = 'bronze' | 'silver' | 'gold'
@@ -76,7 +76,7 @@ export function timeMedal(track: Track, scores: readonly ScoreEntry[]): TimeMeda
   let best = Infinity
   for (const { time, category } of scores) {
     if (Number.isFinite(time) && time > 0 && category?.course === course &&
-      category.laps === 1 && category.handling === 'arcade') best = Math.min(best, time)
+      category.laps === 1) best = Math.min(best, time)
   }
   return best <= targets.gold ? 'gold' : best <= targets.silver ? 'silver' : best <= targets.bronze ? 'bronze' : null
 }

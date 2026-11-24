@@ -60,8 +60,7 @@ function measure(car: CarId, scenarioIndex: number, mode: 'solo' | 'duel' | 'tra
   }
   return runLaneCheck({
     path, trackName: scenario.name,
-    seed: 1, difficulty: 'hard', reversed: scenario.reversed,
-    handling: 'arcade', mode, car, seconds: scenario.seconds, laps: scenario.laps,
+    seed: 1, difficulty: 'hard', reversed: scenario.reversed, mode, car, seconds: scenario.seconds, laps: scenario.laps,
     startRatio: scenario.startRatio,
     ...(scenario.gridPositions ? { gridPositions: scenario.gridPositions } : {}),
     ...(mode === 'duel' ? {

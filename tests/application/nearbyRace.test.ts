@@ -468,7 +468,7 @@ describe('Nearby Arcade', () => {
     })
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100)
     try {
-      race.start(track, { car: 'blue', laps: 1, difficulty: 'hard', mode: 'nearby', handling: 'arcade' })
+      race.start(track, { car: 'blue', laps: 1, difficulty: 'hard', mode: 'nearby' })
       expect(race.snapshot().state?.vehicles.map((vehicle) => vehicle.car)).toEqual(['blue'])
       const input = { throttle: 1, braking: false, steering: 0 }
       clock.mockReturnValue(1000)

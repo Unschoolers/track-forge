@@ -17,7 +17,7 @@
 - A missed checkpoint starts a two-second warning and reset countdown. Manual RECOVER, RESET NOW, and automatic recovery must return to a safe approach **before that same authored gate**, preserving lap and pending checkpoint. Do not jump to a later track section.
 - Without a pending missed gate, RECOVER prefers the latest safe grounded road contact instead of jumping back to a distant checkpoint. Water and bridge recovery follow the same safe-contact constraints.
 - Recovery never adds a separate scoring surcharge; splits, results and ghosts use the actual race clock.
-- Manual recovery holds the recovered vehicle stationary for 30 running ticks (500 ms at 60 Hz). Repeated requests during the hold are ignored. Other drivers and the race clock continue normally. Automatic recovery adds no immobilization. Only the local human receives the yellow progress light, green release light, and restart sound. Held vehicles do not participate in physical collisions until released.
+- Manual recovery holds the recovered vehicle stationary for 30 running ticks (500 ms at 60 Hz). Repeated requests during the hold are ignored. Other drivers and the race clock continue normally. Automatic recovery adds no immobilization. Only the local human receives the yellow progress light, green release light, and restart sound. Missed-checkpoint recovery is automatic even when the player skips its countdown.
 
 ## Validation
 

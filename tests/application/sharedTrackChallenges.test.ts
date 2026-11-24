@@ -141,7 +141,6 @@ describe('shareable track challenges', () => {
     expect(medalForFinish('finished', 2)).toBe('SILVER')
     expect(medalForFinish('finished', 3)).toBe('BRONZE')
     expect(medalForFinish('finished', 4)).toBeNull()
-    expect(medalForFinish('wrecked', 1)).toBeNull()
   })
 })
 

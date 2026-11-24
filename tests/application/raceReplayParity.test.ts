@@ -30,7 +30,7 @@ it('replays a seeded four-car race with the same checkpoint recovery and finish 
     terrain: EMPTY_TERRAIN, trees: [], recoveryCheckpoints: [0.06],
     lighting: 'day', createdAt: 1, updatedAt: 1,
   } satisfies Track
-  const setup: RaceSetup = { mode: 'normal', car: 'blue', difficulty: 'normal', laps: 1, handling: 'arcade' }
+  const setup: RaceSetup = { mode: 'normal', car: 'blue', difficulty: 'normal', laps: 1 }
   const geometry = new TrackGeometryService()
   const liveEvents: RaceEvent[] = []
   const replayEvents: RaceEvent[] = []
@@ -55,8 +55,8 @@ it('replays a seeded four-car race with the same checkpoint recovery and finish 
   let replay: RaceState = {
     ...createRace({
       path: geometry.get(track).path, routeKind: track.routeKind,
-      playerCar: setup.car, handling: setup.handling, difficulty: setup.difficulty, laps: setup.laps,
-      recoveryCheckpoints: track.recoveryCheckpoints, recoveryScenery: track,
+      playerCar: setup.car, difficulty: setup.difficulty, laps: setup.laps,
+      recoveryCheckpoints: track.recoveryCheckpoints,
     }),
     phase: 'running',
     countdown: 0,

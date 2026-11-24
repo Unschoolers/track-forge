@@ -10,7 +10,7 @@ function memory(): KeyValueStore {
   const values = new Map<string, string>()
   return { get: (key) => values.get(key) ?? null, set: (key, value) => { values.set(key, value); return true }, remove: (key) => values.delete(key) }
 }
-const standings = [{ id: 'player', player: true, car: 'blue', place: 1, finishTime: 10, wrecked: false, lap: 1 }] as Parameters<typeof recordCupResult>[1]
+const standings = [{ id: 'player', player: true, car: 'blue', place: 1, finishTime: 10, lap: 1 }] as Parameters<typeof recordCupResult>[1]
 describe('persistent Cup progress', () => {
   it('keeps the best placement when a stored checkpoint is invalid', () => {
     const storage = memory()
@@ -41,13 +41,13 @@ describe('time medals', () => {
     const { track } = OFFICIAL_CIRCUITS[0]
     const targets = medalTargets(track)
     if (!targets) throw new Error('Missing Meadow Loop targets')
-    const category = { course: courseIdentity(track), laps: 1, handling: 'arcade', mode: 'normal' } as const
+    const category = { course: courseIdentity(track), laps: 1, mode: 'normal' } as const
     const score: ScoreEntry = { time: targets.gold, car: 'blue', difficulty: 'normal', recordedAt: 1, category }
     expect(timeMedal(track, [score])).toBe('gold')
     expect(timeMedal(track, [{ ...score, time: targets.silver }])).toBe('silver')
     expect(timeMedal(track, [{ ...score, time: targets.bronze }])).toBe('bronze')
     expect(timeMedal(track, [{ time: 8, car: 'blue', difficulty: 'normal', recordedAt: 1 }])).toBeNull()
-    for (const incompatible of [{ ...category, course: 'old' }, { ...category, laps: 2 }, { ...category, handling: 'simulation' as const }]) {
+    for (const incompatible of [{ ...category, course: 'old' }, { ...category, laps: 2 }]) {
       expect(timeMedal(track, [{ ...score, category: incompatible }])).toBeNull()
     }
   })

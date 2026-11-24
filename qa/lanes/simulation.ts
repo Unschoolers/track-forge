@@ -45,7 +45,6 @@ export interface LaneRunOptions {
 	readonly laps: number
 	readonly mode: 'solo' | 'duel' | 'traffic'
 	readonly car: CarId
-	readonly handling?: RaceState['handling']
 }
 export interface LaneRun {
 	readonly trackName: string
@@ -129,7 +128,6 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	const created = createRace({
 		path,
 		recoveryCheckpoints: authoredCheckpointsForPath(path),
-		handling: options.handling,
 		playerCar: options.car,
 		difficulty: options.difficulty,
 		laps: options.laps,
@@ -165,7 +163,6 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 					
 				} : {}),
 				player: false,
-				damageLimit: Number.POSITIVE_INFINITY,
 				ai: vehicle.ai ?? createAiDriverState(0),
 			})),
 	}

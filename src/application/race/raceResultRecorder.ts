@@ -24,17 +24,13 @@ export function createRaceResult({ track, setup, state, terminalReason, scoreSto
     if (!player) return null
     const outcome =
       terminalReason ??
-      (player.wrecked
-        ? 'wrecked'
-        : player.finishedAt !== null
-          ? 'finished'
-          : null)
+      (player.finishedAt !== null ? 'finished' : null)
     if (!outcome) return null
     if (setup.mode === 'nearby') {
       return {
         mode: 'nearby', outcome, trackId: track.id, trackName: track.name,
         playerPlace: 1, playerTime: outcome === 'finished' ? player.finishedAt : null,
-        playerWrecked: player.wrecked, newRecord: false, standings: [], highScores: [],
+        newRecord: false, standings: [], highScores: [],
       }
     }
     const category = raceCategory(track, setup)
@@ -73,7 +69,6 @@ export function createRaceResult({ track, setup, state, terminalReason, scoreSto
       trackName: track.name,
       playerPlace: ranked.indexOf(player) + 1,
       playerTime,
-      playerWrecked: player.wrecked,
       newRecord: recordCandidate && scoreSaved,
       ...(previousBestTime !== undefined ? { previousBestTime } : {}),
       ...(playerTime !== null && !scoreSaved ? { scoreSaveFailed: true } : {}),
@@ -92,7 +87,6 @@ export function toRaceStanding(vehicle: RaceVehicle, index: number): RaceStandin
       player: vehicle.player,
       place: index + 1,
       finishTime: vehicle.finishedAt,
-      wrecked: vehicle.wrecked,
       lap: vehicle.lap,
     }
   }

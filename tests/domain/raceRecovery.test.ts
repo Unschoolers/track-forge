@@ -97,62 +97,7 @@ describe('automatic player recovery', () => {
     expect(player.stuckDuration).toBeLessThan(0.6)
   })
 
-  it.each([false, true])(
-    'recovers an accelerating player pinned against a bridge wall (reversed: %s)',
-    (reversed) => {
-      const bridgePath = buildRoadPath(
-        [
-          { id: 'bridge', x: 0, y: 0, surface: 'street', structure: 'overpass' },
-          { id: 'landing', x: 500, y: 0, surface: 'street' },
-          { id: 'end', x: 900, y: 0, surface: 'street' },
-        ],
-        EMPTY_TERRAIN,
-      )
-      let race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-        path: bridgePath,
-        playerCar: 'blue',
-        difficulty: 'normal',
-        laps: 3,
-        reversed,
-      })
-      const index = bridgePath.points.findIndex((point) => point.distance >= 240)
-      const center = requireFixture(bridgePath.points[index])
-      const player = {
-        ...requireFixture(race.vehicles[0]),
-        x: center.x,
-        y: center.y + 29,
-        angle: Math.PI / 2,
-        pathIndex: index,
-        z: bridgePath.roadSurface.at(index).height,
-      }
-      race = { ...race, phase: 'running', elapsed: 2, vehicles: [player] }
 
-      let greatestStuckDuration = 0
-      for (let frame = 0; frame < 40; frame += 1) {
-        race = stepRace(
-          race,
-          { steering: 0, throttle: 1, braking: false },
-          1 / 60,
-          random,
-        ).state
-        greatestStuckDuration = Math.max(
-          greatestStuckDuration,
-          requireFixture(race.vehicles[0]).stuckDuration,
-        )
-      }
-
-      const recovered = requireFixture(race.vehicles[0])
-      const expectedAngle = reversed ? Math.PI : 0
-      const headingDifference = Math.atan2(
-        Math.sin(recovered.angle - expectedAngle),
-        Math.cos(recovered.angle - expectedAngle),
-      )
-      expect(greatestStuckDuration).toBeGreaterThan(0.6)
-      expect(recovered.stuckDuration).toBeLessThan(0.05)
-      expect(Math.abs(recovered.y - center.y)).toBeLessThan(1)
-      expect(Math.abs(headingDifference)).toBeLessThan(0.05)
-    },
-  )
 })
 
 const closeArmsPath = buildRoadPath([
@@ -178,12 +123,12 @@ describe('fallback recovery on a circuit', () => {
     const index = requireFixture(nearestPathPoint(closeArmsPath, { x, y: 0 })).index
     const player = {
       ...requireFixture(race.vehicles[0]), x, y: 100, pathIndex: index, lastRoadContactIndex: index,
-      lap: 1, nextSector: reversed ? 4 as const : 1 as const, damage: 20,
+      lap: 1, nextSector: reversed ? 4 as const : 1 as const,
     }
     const result = recoverRacePlayer({ ...race, phase: 'running', elapsed: 40, vehicles: [player] })
     expect(result.vehicles[0]).toMatchObject({
       x: expect.closeTo(x, -1), y: expect.closeTo(0),
-      nextSector: player.nextSector, lap: 1, damage: 20, finishedAt: null,
+      nextSector: player.nextSector, lap: 1, finishedAt: null,
     })
     expect(Math.cos(requireFixture(result.vehicles[0]).angle)).toBeCloseTo(reversed ? -1 : 1)
     expect(result.elapsed).toBe(40)

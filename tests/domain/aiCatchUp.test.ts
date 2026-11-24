@@ -95,7 +95,6 @@ describe('AI catch-up', () => {
 
   it.each([
     ['finished', { finishedAt: 1 }],
-    ['wrecked', { wrecked: true }],
     ['airborne', { grounded: false }],
     ['off road', { currentSurface: 'grass' as const }],
   ])('does not assist against a %s player', (_label, changes) => {
@@ -106,7 +105,6 @@ describe('AI catch-up', () => {
 
   it.each([
     ['finished', { finishedAt: 1 }],
-    ['wrecked', { wrecked: true }],
   ])('does not assist a %s rival', (_label, changes) => {
     const { race } = trailingRivals()
     const rival = { ...requireFixture(race.vehicles[2]), ...changes }

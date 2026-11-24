@@ -15,8 +15,7 @@ it('isolates AI profile candidates without changing any shared defaults', () => 
   const options = {
     path, trackName: track.name, seed: 11,
     difficulty: 'hard' as const, car: 'blue' as const,
-    mode: 'solo' as const, handling: 'arcade' as const,
-    reversed: false, laps: 1, seconds: 60,
+    mode: 'solo' as const, reversed: false, laps: 1, seconds: 60,
   }
 
   const baseline = runLaneCheck(options)

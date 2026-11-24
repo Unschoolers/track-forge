@@ -16,7 +16,7 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   const track = createStarterTrack(asTrackId('gate-test'), 1)
   const points = [0, 200, 400, 600, 800].map((x) => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const }))
   const path = buildRoadPath(points, track.terrain, undefined, 'point-to-point')
-  const race = createRace({ path, recoveryCheckpoints: [0.25, 0.5, 0.75], playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling: 'arcade' })
+  const race = createRace({ path, recoveryCheckpoints: [0.25, 0.5, 0.75], playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
   const gateIndex = race.timingGates?.[0]
   if (gateIndex === undefined) throw new Error('Missing authored checkpoint')
   const gateX = path.points[gateIndex]!.x
@@ -38,11 +38,11 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   expect(crossing.events).toContainEqual({ type: 'gate-crossed', vehicleId: 'player', gate: 1, lap: 0, time: crossing.state.elapsed })
 })
 
-it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, freezes while paused, and recovers before the gate in %s', handling => {
+it('counts down after a missed gate, freezes while paused, and recovers before the gate', () => {
   const track = createStarterTrack(asTrackId('missed-gate'), 1)
   const points = [0, 200, 400, 600, 800].map((x) => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const }))
   const path = buildRoadPath(points, track.terrain, undefined, 'point-to-point')
-  const race = createRace({ path, recoveryCheckpoints: [0.25, 0.5, 0.75], playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling })
+  const race = createRace({ path, recoveryCheckpoints: [0.25, 0.5, 0.75], playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
   const gateIndex = race.timingGates?.[0]
   if (gateIndex === undefined) throw new Error('Missing authored checkpoint')
   const lower = Math.floor(gateIndex)
@@ -80,7 +80,7 @@ it.each(['arcade', 'simulation'] as const)('counts down after a missed gate, fre
 it('clears the countdown only on a valid forward recross', () => {
   const track = createStarterTrack(asTrackId('recross-gate'), 1)
   const path = buildRoadPath([0, 200, 400, 600, 800].map(x => ({ x, y: 0, surface: 'street' as const, curve: 'corner' as const })), track.terrain, undefined, 'point-to-point')
-  const race = createRace({ path, recoveryCheckpoints: [0.25, 0.5, 0.75], playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point', handling: 'arcade' })
+  const race = createRace({ path, recoveryCheckpoints: [0.25, 0.5, 0.75], playerCar: 'red', difficulty: 'normal', laps: 1, routeKind: 'point-to-point' })
   const index = race.timingGates?.[0]
   if (index === undefined) throw new Error('Missing authored checkpoint')
   const lower = Math.floor(index)
@@ -105,7 +105,7 @@ it.each([false, true])('requires the actual circuit gate line in either directio
   const path = buildRoadPath(points, terrain)
   expect(path.closed).toBe(true)
   const authoredRatio = (0.13 + (reversed ? -0.25 : 0.25) + 1) % 1
-  const race = createRace({ path, recoveryCheckpoints: [authoredRatio], playerCar: 'blue', difficulty: 'normal', laps: 1, handling: 'arcade', startRatio: 0.13, reversed })
+  const race = createRace({ path, recoveryCheckpoints: [authoredRatio], playerCar: 'blue', difficulty: 'normal', laps: 1, startRatio: 0.13, reversed })
   const direction = reversed ? -1 : 1
   const count = path.points.length
   const position = race.timingGates?.[0]

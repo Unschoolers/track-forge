@@ -10,7 +10,6 @@ import type { AiDriverState, RacingLine } from '@/domain/race/ai/aiState'
 import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import type { RaceEffectsState } from '@/domain/race/effects'
-import type { SceneryColliders } from '@/domain/race/sceneryCollisions'
 
 export type CountdownCue = 3 | 2 | 1 | 'go'
 
@@ -60,10 +59,6 @@ export interface RaceVehicle {
   readonly manualRecoveryUntilTick?: number
   /** Seconds since a player fell off elevated road support; clears after recovery. */
   readonly bridgeFallSeconds?: number | undefined
-  readonly damage: number
-  readonly damageLimit: number
-  readonly damageCooldown: number
-  readonly wrecked: boolean
   readonly currentSurface: SurfaceId | 'grass'
   readonly surfaceGrip?: number
   readonly onCurb: boolean
@@ -107,13 +102,11 @@ export interface RaceState {
   /** Optional controlled-AI race speed caps, keyed by vehicle ID; offline duels only. */
   readonly aiVehicleSpeedLimits?: Readonly<Record<string, number>>
   readonly difficulty: DifficultyId
-  readonly handling?: 'arcade' | 'simulation'
   readonly totalLaps: number
   readonly startPathIndex: number
   readonly recoveryCheckpoints?: readonly number[]
   /** Author-placed timing checkpoint road samples, in driving order. No implicit quarters. */
   readonly timingGates?: readonly number[]
-  readonly sceneryColliders?: SceneryColliders
   readonly reversed: boolean
   /** Number of running simulation updates completed since this race started. */
   readonly tick: number
@@ -121,13 +114,12 @@ export interface RaceState {
   readonly phase: RacePhase
   readonly countdown: number
   readonly paused: boolean
-  readonly activeContacts: readonly string[]
   readonly cameraHints: RaceCameraHints
   readonly effects: RaceEffectsState
 }
 
 export type RacePhase = 'countdown' | 'running' | 'finished'
-export type RaceOutcome = 'finished' | 'wrecked' | 'water'
+export type RaceOutcome = 'finished' | 'water'
 
 export interface DriverInput {
   readonly steering: number

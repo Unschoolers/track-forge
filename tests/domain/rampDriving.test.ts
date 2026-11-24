@@ -38,7 +38,7 @@ describe('driving onto a raised road', () => {
     const next = requireFixture(path.points[startIndex + direction])
     const angle = Math.atan2(next.y - start.y, next.x - start.x)
     const speed = 190
-    const base = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, reversed, handling: 'arcade' })
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, reversed })
     let race: RaceState = {
       ...base,
       phase: 'running',
@@ -82,7 +82,7 @@ describe('driving onto a raised road', () => {
     const point = requireFixture(path.points[pathIndex])
     const position = { x: point.x, y: ROAD_GEOMETRY.onRoadRadius - 1 }
     const ramp = path.roadSurface.at(pathIndex, position)
-    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade' })
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
     let race: RaceState = {
       ...base,
       phase: 'running',
@@ -160,7 +160,7 @@ describe('driving onto a raised road', () => {
         (dt) => {
           const base = createRace({
             path, playerCar: car, difficulty: 'normal', laps: 2,
-            reversed, handling: 'arcade',
+            reversed,
           })
           const player = base.vehicles[0]
           if (!player) throw new Error('Missing player')

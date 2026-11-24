@@ -31,7 +31,7 @@ it('does not brake downhill even when another climb is inside the lookahead', ()
     .some((grade) => grade > 0.025))
   expect(index).toBeGreaterThan(0)
   const point = requireFixture(road.points[index])
-  const base = createRace({ path: road, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade', reversed })
+  const base = createRace({ path: road, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
   const vehicle = requireFixture(base.vehicles[0])
   const result = stepRace({ ...base, phase: 'running', vehicles: [{
    ...vehicle, ...point, pathIndex: index, angle: reversed ? Math.PI : 0,
@@ -41,14 +41,14 @@ it('does not brake downhill even when another climb is inside the lookahead', ()
   expect(result.state.vehicles[0]?.braking).toBe(false)
  }
 })
-it.each(['arcade', 'simulation'] as const)('does not apply uphill ramp braking while descending in %s', (handling) => {
+it('does not apply uphill ramp braking while descending', () => {
  for (const reversed of [false, true]) {
   const direction = reversed ? -1 : 1
   const index = path.points.findIndex((_point, index) =>
    path.roadSurface.gradeAt(index) * direction < -0.025)
   expect(index).toBeGreaterThan(0)
   const point = requireFixture(path.points[index])
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling, reversed })
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
   for (const vehicle of base.vehicles) {
    const state: RaceState = { ...base, phase: 'running', vehicles: [{
     ...vehicle, ...point, pathIndex: index, angle: reversed ? Math.PI : 0,
@@ -61,16 +61,15 @@ it.each(['arcade', 'simulation'] as const)('does not apply uphill ramp braking w
   }
  }
 })
-it('Arcade overlap has no collision impulse, damage, or contacts',()=>{
- const base=createRace({path,playerCar:'blue',difficulty:'normal',laps:2,handling:'arcade'})
+it('Overlapping cars retain independent momentum',()=>{
+ const base=createRace({path,playerCar:'blue',difficulty:'normal',laps:2})
  const a={...requireFixture(base.vehicles[0]),x:-400,y:0,vx:120,vy:0,speed:120,angle:0,pathIndex:50}
  const b={...a,id:'opponent',player:false,car:'red' as const}
  const race={...base,phase:'running' as const,vehicles:[a,b]}
  const together=stepRace(race,input,1/60,random)
  const alone=stepRace({...race,vehicles:[a]},input,1/60,random)
  expect(together.state.vehicles[0]).toEqual(alone.state.vehicles[0])
- expect(together.state.activeContacts).toEqual([])
- expect(together.events.some(e=>e.type==='collision'||e.type==='barrier-collision')).toBe(false)
+
 })
 function placeOnRoad(
   road: RoadPath,
@@ -104,12 +103,11 @@ function placeOnRoad(
 }
 
 it.each([
-  { handling: 'arcade', reversed: false },
-  { handling: 'arcade', reversed: true },
-  { handling: 'simulation', reversed: false },
-  { handling: 'simulation', reversed: true },
-] as const)('leaves the player brakes off on a straight climb and crest ($handling, reversed=$reversed)', ({ handling, reversed }) => {
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling, reversed })
+  { reversed: false },
+  { reversed: true },
+
+] as const)('leaves the player brakes off on a straight climb and crest (reversed=$reversed)', ({ reversed }) => {
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
   const startX = reversed ? 1200 : -200
   const start = requireFixture(nearestPathPoint(path, { x: startX, y: 0 })).index
   let race: RaceState = {
@@ -135,7 +133,7 @@ it('keeps slope gravity active while coasting without a service brake', () => {
   expect(index).toBeGreaterThan(0)
   const coast = { ...input, throttle: 0 }
   const speeds = [false, true].map((reversed) => {
-    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'simulation', reversed })
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
     const player = placeOnRoad(path, requireFixture(base.vehicles[0]), index, 180, reversed)
     const stepped = stepRace({ ...base, phase: 'running', vehicles: [player] }, coast, 0.05, random)
     const next = requireFixture(stepped.state.vehicles[0])
@@ -146,25 +144,8 @@ it('keeps slope gravity active while coasting without a service brake', () => {
   expect(requireFixture(speeds[1])).toBeGreaterThan(180)
 })
 
-it('preserves Simulation AI approach speeds on a straight ramp', () => {
-  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'simulation' })
-  const start = requireFixture(nearestPathPoint(path, { x: -200, y: 0 })).index
-  for (const source of base.vehicles.filter((vehicle) => !vehicle.player)) {
-    let race: RaceState = {
-      ...base,
-      phase: 'running',
-      vehicles: [placeOnRoad(path, source, start, 220, false)],
-    }
-    for (let frame = 0; frame < 180 && requireFixture(race.vehicles[0]).x < 20; frame += 1) {
-      race = stepRace(race, input, 1 / 60, random).state
-    }
-    expect(requireFixture(race.vehicles[0]).x).toBeGreaterThan(0)
-    expect(requireFixture(race.vehicles[0]).speed).toBeLessThan(130)
-  }
-})
-
 it.each(['easy', 'normal', 'hard'] as const)('lets %s Arcade AI carry speed onto a straight ramp', (difficulty) => {
-  const base = createRace({ path, playerCar: 'blue', difficulty, laps: 2, handling: 'arcade' })
+  const base = createRace({ path, playerCar: 'blue', difficulty, laps: 2 })
   const start = requireFixture(nearestPathPoint(path, { x: -200, y: 0 })).index
   const rival = requireFixture(base.vehicles[1])
   let race: RaceState = {
@@ -191,7 +172,7 @@ const climbingBend = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 it.each([false, true])('only brakes the Arcade player before a curve when requested (reversed=%s)', (reversed) => {
-  const base = createRace({ path: climbingBend, playerCar: 'blue', difficulty: 'normal', laps: 2, handling: 'arcade', reversed })
+  const base = createRace({ path: climbingBend, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
   const approach = reversed ? { x: 195, y: 225 } : { x: -50, y: 0 }
   const index = requireFixture(nearestPathPoint(climbingBend, approach)).index
   const player = placeOnRoad(climbingBend, requireFixture(base.vehicles[0]), index, 235, reversed)
@@ -203,7 +184,7 @@ it.each([false, true])('only brakes the Arcade player before a curve when reques
   expect(braking.speed).toBeLessThan(accelerating.speed)
 })
 it('ignores any old boost state instead of adding a speed burst',()=>{
- const base=createRace({path,playerCar:'blue',difficulty:'normal',laps:2,handling:'arcade'})
+ const base=createRace({path,playerCar:'blue',difficulty:'normal',laps:2})
  const v={...requireFixture(base.vehicles[0]),x:-600,y:0,angle:0,vx:120,vy:0,speed:120,pathIndex:requireFixture(nearestPathPoint(path,{x:-600,y:0})).index}
  const race={...base,phase:'running' as const,vehicles:[v]}
  expect(stepRace({...race,...{boostRemaining:1}},input,1/60,random).state.vehicles)

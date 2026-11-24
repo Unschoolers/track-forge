@@ -426,13 +426,6 @@ export class WebAudioAdapter implements FeedbackPort {
       this.sink.setRival?.(event.proximity, event.pan, event.speedRatio)
     } else if (event.type === 'landing') {
       this.sink.playLanding(event.strength)
-    } else if (event.type === 'collision') {
-      this.sink.play(
-        90,
-        0.12,
-        Math.min(0.12, 0.035 + event.strength / 1600),
-        'sawtooth',
-      )
     } else if (event.type === 'position-change') {
       if (event.direction === 'gain') {
         this.sink.play(660, 0.13, 0.035, 'triangle')

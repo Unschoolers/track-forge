@@ -1,4 +1,4 @@
-import { inputForHandling } from '@/phaser/input/raceInput'
+import { inputForPedals } from '@/phaser/input/raceInput'
 import { manualRecoveryTicksRemaining } from '@/domain/race/raceState'
 import { manualRecoverySignal } from '@/application/race/racePresentation'
 import Phaser from 'phaser'
@@ -208,10 +208,12 @@ export class RaceScene extends Phaser.Scene {
     const frameSeconds = Math.max(0, this.game.loop.rawDelta / 1000)
     this.raceSession.advance(
       frameSeconds,
-      inputForHandling(this.snapshot.paused ? { steering: 0, throttle: 0, braking: false } : this.controls.snapshot(), this.raceSession.snapshot().setup?.handling),
+      this.snapshot.paused
+        ? { steering: 0, throttle: 0, braking: false }
+        : inputForPedals(this.controls.snapshot(), this.snapshot.preferences.pedalMode),
     )
     benchmark?.endSimulation()
-    // Draw interpolated poses while the simulation, HUD, network and collision
+    // Draw interpolated poses while the simulation, HUD, and network
     // systems continue to use the authoritative 60 Hz state.
     const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
     if (!race) return

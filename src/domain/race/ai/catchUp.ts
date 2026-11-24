@@ -16,7 +16,7 @@ export function catchUpBonus(gapSeconds: number): number {
 /** The assist belongs to each trailing car, not the closest rival as a group. */
 export function rivalCatchUp(race: RaceState, rival: RaceVehicle): SpeedAssist | undefined {
   const player = race.vehicles.find((vehicle) => vehicle.player)
-  if (!player || rival.player || player.wrecked || rival.wrecked ||
+  if (!player || rival.player ||
     player.finishedAt !== null || rival.finishedAt !== null ||
     !player.grounded || player.currentSurface === 'grass') return undefined
 

@@ -11,13 +11,10 @@ const path = buildRoadPath([
 const random = { next: () => 0.5 }
 const coast = { throttle: 0, steering: 0, braking: false }
 
-function running(
-  handling: 'arcade' | 'simulation',
-  recoveryScenery?: Parameters<typeof createRace>[0]['recoveryScenery'],
-) {
+function running() {
   const initial = createRace({
     path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal',
-    handling, laps: 1, recoveryCheckpoints: [0.15, 0.65, 0.8], recoveryScenery,
+    laps: 1, recoveryCheckpoints: [0.15, 0.65, 0.8],
   })
   const player = requireFixture(initial.vehicles[0])
   return { ...initial, phase: 'running' as const, vehicles: [player] }
@@ -30,8 +27,8 @@ function at(x: number, speed = 0) {
 }
 
 describe('authored race recovery checkpoints', () => {
-  it.each(['arcade', 'simulation'] as const)('uses the latest safe road contact for water and manual recovery in %s', handling => {
-    const race = running(handling)
+  it('uses the latest safe road contact for water and manual recovery', () => {
+    const race = running()
     const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
     const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
     const after = requireFixture(passed.vehicles[0])
@@ -46,7 +43,7 @@ describe('authored race recovery checkpoints', () => {
   })
 
   it('recovers on safe road before the pending first timing gate', () => {
-    const race = running('simulation')
+    const race = running()
     const player = { ...requireFixture(race.vehicles[0]), ...at(610) }
     const recovered = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random)
     const resetCar = requireFixture(recovered.state.vehicles[0])
@@ -56,64 +53,5 @@ describe('authored race recovery checkpoints', () => {
     expect(resetCar.nextSector).toBe(1)
     expect(resetCar.finishedAt).toBeNull()
     expect(recovered.state.phase).toBe('running')
-  })
-
-  it('returns a wrecked player to their most recent road contact with a driveable car', () => {
-    const race = running('simulation')
-    const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
-    const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
-    const after = requireFixture(passed.vehicles[0])
-    const wrecked = { ...after, ...at(450), lastRoadContactIndex: at(450).pathIndex, nextSector: 2 as const, wrecked: true, damage: after.damageLimit }
-    const recovered = stepRace({ ...passed, vehicles: [wrecked] }, coast, 1 / 60, random)
-    expect(recovered.state.vehicles[0]).toMatchObject({ x: 450, wrecked: false, damage: 0 })
-    expect(recovered.state.phase).toBe('running')
-  })
-
-  it.each(['simulation', 'arcade'] as const)(
-    'makes scenery collision independent of recovery markers in %s',
-    handling => {
-      const scenery = { environmentId: 'desert' as const, trees: [], scenery: [
-        { kind: 'desert-cactus' as const, x: 245, y: 16 },
-      ] }
-      for (const markers of [[], [0.15, 0.4, 0.8]]) {
-        const initial = createRace({
-          path, routeKind: 'point-to-point', playerCar: 'blue',
-          difficulty: 'normal', handling, laps: 1,
-          recoveryCheckpoints: markers, recoveryScenery: scenery,
-        })
-        const state = { ...initial, phase: 'running' as const, vehicles: [requireFixture(initial.vehicles[0])] }
-        const approaching = {
-          ...requireFixture(state.vehicles[0]), ...at(229, 100),
-          lastRoadContactIndex: at(179).pathIndex,
-        }
-        const impact = stepRace({ ...state, vehicles: [approaching] }, coast, 1 / 30, random)
-        const sceneryRecoveries = impact.events.filter(
-          event => event.type === 'vehicle-recovered' && event.reason === 'scenery',
-        )
-        if (handling === 'simulation') {
-          expect(sceneryRecoveries).toHaveLength(1)
-        } else {
-          // Arcade intentionally has no physical scenery collisions.
-          expect(sceneryRecoveries).toHaveLength(0)
-        }
-      }
-    },
-  )
-
-  it('recovers after hitting visible scenery and ignores a hidden prop', () => {
-    const scenery = [{ kind: 'desert-cactus' as const, x: 245, y: 16 }]
-    for (const environmentId of ['desert', 'cityscape'] as const) {
-      const race = running('simulation', { environmentId, trees: [], scenery })
-      const player = { ...requireFixture(race.vehicles[0]), ...at(179, 100) }
-      const passed = stepRace({ ...race, vehicles: [player] }, coast, 1 / 60, random).state
-      const approaching = { ...requireFixture(passed.vehicles[0]), ...at(229, 100) }
-      const impact = stepRace({ ...passed, vehicles: [approaching] }, coast, 1 / 30, random)
-      if (environmentId === 'desert') {
-        expect(impact.state.vehicles[0]?.x).toBeGreaterThan(210)
-        expect(impact.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', reason: 'scenery' }))
-      } else {
-        expect(impact.state.vehicles[0]?.x).toBeGreaterThan(229)
-      }
-    }
   })
 })

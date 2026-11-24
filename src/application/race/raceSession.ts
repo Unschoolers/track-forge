@@ -22,7 +22,6 @@ import {
   type RaceStep,
 } from '@/domain/race/raceEngine'
 import { createRace } from '@/domain/race/raceFactory'
-import { passedPendingCheckpoint } from '@/domain/race/progress'
 import { rankVehicles, raceProgress } from '@/domain/race/ranking'
 import { countdownCue } from '@/domain/race/raceState'
 import type {
@@ -54,7 +53,6 @@ export interface RaceSetup {
   readonly car: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
-  readonly handling?: 'arcade' | 'simulation'
   readonly mode?: RaceMode
   /** Fixed for retry. New quick races get a fresh order from the controller. */
   readonly gridPositions?: readonly number[]
@@ -66,7 +64,6 @@ export interface RaceTelemetry {
   readonly routeKind?: RouteKind
   readonly routeProgress?: number
   readonly latestSplit?: RaceSplit
-  readonly missedCheckpoint?: number
   readonly finishGate?: number
   readonly phase: RacePhase
   readonly waitingForStart?: boolean
@@ -77,8 +74,6 @@ export interface RaceTelemetry {
   readonly vehicleCount: number
   readonly lap: number
   readonly totalLaps: number
-  readonly damage: number
-  readonly damageLimit: number
   readonly currentLapTime?: number | null
   readonly bestLapTime?: number | null
   readonly ghostGap?: number | null
@@ -90,7 +85,6 @@ export interface RaceStanding {
   readonly player: boolean
   readonly place: number
   readonly finishTime: number | null
-  readonly wrecked: boolean
   readonly lap: number
 }
 
@@ -104,7 +98,6 @@ export interface RaceResult {
   readonly trackName: string
   readonly playerPlace: number
   readonly playerTime: number | null
-  readonly playerWrecked: boolean
   readonly newRecord: boolean
   readonly previousBestTime?: number
   readonly scoreSaveFailed?: boolean
@@ -170,8 +163,6 @@ const EMPTY_TELEMETRY: RaceTelemetry = {
   vehicleCount: 0,
   lap: 0,
   totalLaps: 0,
-  damage: 0,
-  damageLimit: 0,
 }
 
 // Limit running catch-up to 250 ms per frame after background stalls.
@@ -231,18 +222,16 @@ export class RaceSession implements RaceSessionPort {
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
       courseIdentity: resolved.mode === 'normal' &&
-        routeKind === 'circuit' && setup.handling === 'arcade' ? courseIdentity(track) : undefined,
+        routeKind === 'circuit' ? courseIdentity(track) : undefined,
       path: this.geometry.get(track).path,
       playerCar: setup.car,
       difficulty: setup.difficulty,
       laps: setup.laps,
-      handling: setup.handling,
       startRatio: track.start?.ratio,
       reversed: routeKind === 'point-to-point' ? false : track.start?.reversed,
       routeKind,
       gridPositions: setup.gridPositions,
       recoveryCheckpoints: track.recoveryCheckpoints,
-      recoveryScenery: track,
     })
     const gatesPerLap = (created.timingGates?.length ?? 0) + 1
     this.timing = new LapTiming(
@@ -256,7 +245,7 @@ export class RaceSession implements RaceSessionPort {
       : created
     const player = state.vehicles.find((vehicle) => vehicle.player)
     this.recording = !nearby && player && this.dependencies.ghostStore
-      ? new GhostRecording(player, (setup.handling ?? 'arcade') === 'arcade') : null
+      ? new GhostRecording(player) : null
     this.diagnostics = nearby ? null : new RaceDiagnosticsRecording(state)
     this.runId += 1
     this.publish(this.buildSnapshot(track, resolved, state, null))
@@ -518,7 +507,7 @@ export class RaceSession implements RaceSessionPort {
     const rivalsFinishing = this.rivalFinishRemaining > 0
     const standingsChanged = snapshot.standings.some((standing, index) => {
       const before = result.standings[index]
-      return standing.id !== before?.id || standing.finishTime !== before.finishTime || standing.wrecked !== before.wrecked
+      return standing.id !== before?.id || standing.finishTime !== before.finishTime
     })
     this.publish(rivalsFinishing === result.rivalsFinishing && !standingsChanged
       ? snapshot
@@ -592,9 +581,6 @@ export class RaceSession implements RaceSessionPort {
       telemetry: {
         routeKind: normalizeRouteKind(track?.routeKind),
         routeProgress: player ? Math.max(0, Math.min(1, raceProgress(player, state.path.points.length, state.startPathIndex, state.reversed, normalizeRouteKind(track?.routeKind)) / Math.max(1, state.path.points.length - 1))) : 0,
-        ...(player && state.handling === 'simulation' &&
-          state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, player, state.timingGates)
-          ? { missedCheckpoint: player.nextSector } : {}),
         ...(latestSplit ? { latestSplit } : {}),
         finishGate: (state.timingGates?.length ?? 0) + 1,
         phase: state.phase,
@@ -606,8 +592,6 @@ export class RaceSession implements RaceSessionPort {
         vehicleCount: nearbyPosition?.vehicleCount ?? state.vehicles.length,
         lap: player?.lap ?? 0,
         totalLaps: state.totalLaps,
-        damage: player?.damage ?? 0,
-        damageLimit: player?.damageLimit ?? 0,
         currentLapTime: this.timing.currentLap(elapsed),
         bestLapTime: this.timing.bestLap,
         ghostGap: this.timing.gap,

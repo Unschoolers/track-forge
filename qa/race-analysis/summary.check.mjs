@@ -96,7 +96,7 @@ test('comparison matches same AI color even if it changes grid slot', () => {
 })
 test('malformed exports cause actionable failures, never silent fallback', () => {
   assert.throws(() => summarizeRace({ ...replay(), events: null }), /missing events/)
-  assert.throws(() => summarizeRace({ ...replay(), formatVersion: 2 }), /formatVersion/)
+  assert.throws(() => summarizeRace({ ...replay(), formatVersion: 3 }), /formatVersion/)
   const broken = replay()
   broken.frames[1].t = -1
   assert.throws(() => summarizeRace(broken), /nonmonotonic/)
@@ -136,4 +136,62 @@ test('rejects duplicate, unexpected, replaced and non-finite vehicle telemetry',
   const nonfinite = replay()
   nonfinite.frames[1].vehicles[0].speed = Number.NaN
   assert.throws(() => summarizeRace(nonfinite), /invalid speed for vehicle player in frame 1/)
+})
+
+test('old and new v1 Arcade telemetry compare without changing measured values', () => {
+  const current = replay()
+  const historical = structuredClone(current)
+  // Handling was optional in older v1 exports. Arcade was the default.
+  delete historical.setup.handling
+  const original = structuredClone(historical)
+  const oldStats = summarizeRace(historical)
+  const newStats = summarizeRace(current)
+  assert.equal(oldStats.formatVersion, 1)
+  assert.equal(newStats.formatVersion, 1)
+  assert.equal(oldStats.ruleset, 'arcade')
+  assert.equal(newStats.ruleset, 'arcade')
+  assert.deepEqual(oldStats.vehicles, newStats.vehicles)
+  assert.deepEqual(oldStats.hotspots, newStats.hotspots)
+  assert.deepEqual(historical, original)
+  const compared = compareRaces(historical, current)
+  assert.deepEqual(compared.warnings, [])
+  for (const row of compared.comparisons) {
+    assert.equal(row.averageSpeedDelta, 0)
+    assert.equal(row.grassSecondsDelta, 0)
+    assert.equal(row.finishTimeBefore, row.finishTimeAfter)
+  }
+  assert.throws(() => summarizeRace({ ...current, formatVersion: 2 }), /formatVersion/)
+})
+
+test('legacy Simulation collisions remain attributable and cross-ruleset comparisons warn', () => {
+  const old = replay()
+  old.formatVersion = 1
+  old.setup.handling = 'simulation'
+  old.frames[0].vehicles[0].pathIndex = 23
+  old.frames[0].vehicles[1].pathIndex = 71
+  old.events.push(
+    { t: 0.5, event: { type: 'collision', leftId: 'player', rightId: 'ai-2', strength: 20 } },
+    { t: 0.6, event: { type: 'barrier-collision', vehicleId: 'player', strength: 10 } },
+  )
+  const stats = summarizeRace(old)
+  assert.equal(stats.ruleset, 'simulation')
+  assert.equal(stats.vehicles[0].events.collision, 1)
+  assert.equal(stats.vehicles[1].events.collision, 1)
+  assert.equal(stats.vehicles[0].events['barrier-collision'], 1)
+  assert.ok(stats.hotspots.some(h => h.id === 'player' && h.counts.collision === 1 && h.pathIndexFrom === 0))
+  assert.ok(stats.hotspots.some(h => h.id === 'ai-2' && h.counts.collision === 1 && h.pathIndexFrom === 50))
+  assert.ok(compareRaces(old, replay()).warnings.some(w => w.includes('Different handling rulesets')))
+  assert.ok(compareRaces(replay(), old).warnings.some(w => w.includes('Different handling rulesets')))
+  assert.equal(compareRaces(old, structuredClone(old)).warnings.length, 0)
+})
+
+test('legacy files retain strict telemetry validation and unknown rulesets are rejected', () => {
+  const old = replay()
+  old.formatVersion = 1
+  old.setup.handling = 'simulation'
+  old.frames[1].vehicles.pop()
+  assert.throws(() => summarizeRace(old), /missing vehicle ai-2/)
+  old.setup.handling = 'unknown'
+  assert.throws(() => summarizeRace(old), /invalid legacy race handling/)
+  assert.throws(() => summarizeRace({ ...replay(), formatVersion: 0 }), /formatVersion/)
 })

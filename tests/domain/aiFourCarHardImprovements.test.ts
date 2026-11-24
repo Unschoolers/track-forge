@@ -48,7 +48,7 @@ describe('four-car race safety', () => {
       for (const mode of ['solo', 'traffic'] as const) {
         const result = runLaneCheck({
           path, trackName: scenario.name, seed: 1, difficulty: 'hard',
-          reversed: scenario.reversed, handling: 'arcade', mode, car,
+          reversed: scenario.reversed, mode, car,
           seconds: scenario.seconds, laps: scenario.laps, startRatio: scenario.startRatio,
           ...(scenario.gridPositions ? { gridPositions: scenario.gridPositions } : {}),
         })

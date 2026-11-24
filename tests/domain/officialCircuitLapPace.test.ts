@@ -12,7 +12,6 @@ describe('new official circuits at 60 Hz', () => {
       car: 'blue',
       difficulty: 'normal',
       mode: 'solo',
-      handling: 'arcade',
       seed: 1,
       reversed: false,
       laps: 1,

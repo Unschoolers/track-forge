@@ -70,10 +70,6 @@
   .race-controls[data-size='large'] { --steer-button-size: 60px; --pedal-size: 5.3125rem; }
   .recover-button { min-width: 4rem; }
 }
-.damage-meter { display: grid; grid-template-columns: minmax(1.6rem, 2.5rem) auto; align-items: center; gap: .3rem; margin-top: .2rem; }
-.damage-meter[hidden] { display: none; }
-.damage-meter::before { content: ''; grid-area: 1 / 1; height: .45rem; border-radius: 999px; background: rgb(8 11 16 / 72%); }
-.damage-meter-fill { grid-area: 1 / 1; z-index: 1; width: 0; height: .45rem; border-radius: 999px; background: linear-gradient(90deg, var(--color-accent), var(--color-danger)); transition: width 120ms linear; }
 .race-countdown { position: absolute; inset: 50% auto auto 50%; display: grid; justify-items: center; gap: .3rem; opacity: 0; translate: -50% -50%; scale: .7; color: white; font-size: clamp(4rem, 18vw, 9rem); font-weight: 1000; line-height: 1; text-shadow: 0 .4rem 1.5rem #000b; transition: 120ms ease; pointer-events: none; }
 .race-countdown.visible { opacity: 1; scale: 1; }
 .countdown-lights { display: flex; gap: .4rem; padding: .4rem .55rem; border: 1px solid #ffffff55; border-radius: 999px; background: #1d2737e8; box-shadow: 0 .25rem .8rem #0008; }

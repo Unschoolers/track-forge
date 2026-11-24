@@ -15,7 +15,6 @@ export function resetRaceVehicle(
     return resetVehicleToTrack({
       ...vehicle,
       waterRecoveryProtected: false,
-      ...(vehicle.wrecked ? { wrecked: false, damage: 0, damageCooldown: 0.55 } : {}),
     }, race.path, { pathIndex, reversed: race.reversed })
   }
   if (race.routeKind !== 'point-to-point') {
@@ -40,7 +39,8 @@ export function recoverRaceVehicle(state: RaceState, vehicleId: string): RaceSta
   const recovered = resetRaceVehicle(vehicle, state)
   if (recovered === vehicle) return state
   const vehicles = [...state.vehicles]
-  vehicles[index] = { ...recovered, manualRecoveryUntilTick: state.tick + MANUAL_RECOVERY_TICKS }
+  vehicles[index] = vehicle.player && state.missedCheckpoint
+    ? recovered : { ...recovered, manualRecoveryUntilTick: state.tick + MANUAL_RECOVERY_TICKS }
   return {
     ...state,
     vehicles,
@@ -62,7 +62,6 @@ export function resetMissedCheckpoint(
     {
       ...vehicle,
       waterRecoveryProtected: !target.safe,
-      ...(vehicle.wrecked ? { wrecked: false, damage: 0, damageCooldown: 0.55 } : {}),
     },
     race.path,
     { pathIndex: target.index, reversed: race.reversed },

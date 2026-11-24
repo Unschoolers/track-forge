@@ -69,11 +69,6 @@ export interface VehicleDynamicsTuning {
     readonly aerodynamicBase: number
     readonly steeringDragScale: number
   }
-  readonly damage: {
-    readonly maximumSpeedLoss: number
-    readonly maximumAccelerationLoss: number
-    readonly maximumGripLoss: number
-  }
 }
 
 export interface CarPhysicsSpec {
@@ -176,11 +171,6 @@ export const VEHICLE_DYNAMICS_TUNING = {
     aerodynamicBase: 8.5,
     steeringDragScale: 22,
   },
-  damage: {
-    maximumSpeedLoss: 0.07,
-    maximumAccelerationLoss: 0.09,
-    maximumGripLoss: 0.035,
-  },
 } as const satisfies VehicleDynamicsTuning
 
 export const ARCADE_BRAKE_TIMING = { pressSeconds: 0.15, releaseSeconds: 0.1 } as const
@@ -196,7 +186,7 @@ export function steeringLimitAtSpeed(
 ): number {
   const ratio = Math.max(0, Math.min(1, speedRatio))
   const reduction = Math.max(0, Math.min(1, highSpeedReduction))
-  return baseAngle * (1 - ratio * reduction) + (lowSpeedAngle - baseAngle) * (1 - ratio)
+  return baseAngle * (1 - ratio * reduction) + (lowSpeedAngle - baseAngle) * Math.max(0, 1 - ratio / 0.35)
 }
 
 export const CAR_PHYSICS_SPECS = {

@@ -33,7 +33,7 @@ import '@/styles/editor-menus.css'
 import { RaceSession } from '@/application/race/raceSession'
 import { CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { mathRandom } from '@/infrastructure/random/mathRandom'
-import { inputForHandling, RaceInputController } from '@/phaser/input/raceInput'
+import { inputForPedals, RaceInputController } from '@/phaser/input/raceInput'
 import { FeedbackRouter } from '@/application/feedback/feedbackRouter'
 import {
   BrowserToneSink,
@@ -208,7 +208,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
       if (!Number.isFinite(seconds) || seconds < 0 || seconds > 20) throw new Error('Invalid QA race interval')
       const { setup } = raceSession.snapshot()
       if (!setup || setup.mode === 'nearby') throw new Error('Start a local race before advancing QA time')
-      const input = inputForHandling({ steering: 0, throttle: 0, braking: false }, setup.handling)
+      const input = inputForPedals({ steering: 0, throttle: 0, braking: false }, controller.snapshot().preferences.pedalMode)
       // RaceSession keeps its normal fixed physics tick and caps frame catch-up at 250 ms.
       for (let remaining = seconds; remaining > 0 && !raceSession.snapshot().result; remaining -= 0.25) {
         raceSession.advance(Math.min(0.25, remaining), input)
@@ -237,7 +237,6 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
           ? {
               setup: raceSession.snapshot().setup,
               phase: race.phase,
-              handling: race.handling,
               lighting: raceSession.snapshot().setup?.lighting,
               elapsed: race.elapsed,
               paused: race.paused,
@@ -254,8 +253,6 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('qa')) {
                     x: player.x,
                     y: player.y,
                     lap: player.lap,
-                    damage: player.damage,
-                    wrecked: player.wrecked,
                     grounded: player.grounded,
                     z: player.z,
                     pathIndex: player.pathIndex,

@@ -11,7 +11,7 @@ it('uses the actual raw Phaser TimeStep delta after reset instead of its smoothe
   const TimeStep = require(`${process.cwd()}/node_modules/phaser/src/core/TimeStep.js`)
   const loop = new TimeStep({}, {})
   const advance = vi.fn()
-  const scene = { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, snapshot: {}, controller: { snapshot: () => ({}) }, raceSession: { advance, snapshot: () => ({ state: null }) }, controls: { snapshot: () => ({}) }, game: { loop } }
+  const scene = { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, snapshot: {}, controller: { snapshot: () => ({ preferences: { pedalMode: 'auto' } }) }, raceSession: { advance, snapshot: () => ({ state: null }) }, controls: { snapshot: () => ({}) }, game: { loop } }
   loop.deltaHistory = Array(10).fill(loop._target)
   loop.resetDelta()
   let time = loop.lastTime

@@ -19,8 +19,7 @@ const gridPositions = [1, 3, 0, 2] as const
 function drive(car: 'green' | 'red', difficulty: 'hard' | 'normal', seed: number, mode: 'solo' | 'traffic') {
   return runLaneCheck({
     path, trackName: track.name, seed, car, difficulty, mode,
-    reversed: true, handling: 'arcade',
-    startRatio: track.start?.ratio ?? 0, gridPositions, laps: 2, seconds: 70,
+    reversed: true, startRatio: track.start?.ratio ?? 0, gridPositions, laps: 2, seconds: 70,
   })
 }
 

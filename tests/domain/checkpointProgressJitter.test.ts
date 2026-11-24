@@ -13,7 +13,7 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 const race = createRace({
-  path, recoveryCheckpoints: [0.25], playerCar: 'blue', difficulty: 'normal', handling: 'arcade', laps: 1,
+  path, recoveryCheckpoints: [0.25], playerCar: 'blue', difficulty: 'normal', laps: 1,
 })
 const player = race.vehicles[0]
 if (!player) throw new Error('Missing player fixture')

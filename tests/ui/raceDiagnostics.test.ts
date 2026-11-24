@@ -9,7 +9,7 @@ const result: RaceResult = {
   trackId: asTrackId('diagnostics-race'),
   trackName: 'Figure eight',
   outcome: 'finished',
-  playerPlace: 1, playerTime: 40.483, playerWrecked: false, newRecord: true,
+  playerPlace: 1, playerTime: 40.483, newRecord: true,
   standings: [], highScores: [], ghostSaved: true,
 }
 

@@ -127,7 +127,7 @@ export class AppController {
           !(this.state.mode === 'race' && this.state.overlay.type === 'results')) return
       if (this.beforeNearbyTrack === undefined) this.beforeNearbyTrack = this.state.currentTrack
       dependencies.raceSession.start(track, {
-        car, laps, lighting, difficulty: this.state.preferences.difficulty, handling: 'arcade', mode: 'nearby',
+        car, laps, lighting, difficulty: this.state.preferences.difficulty, mode: 'nearby',
         gridPositions: gridPositionsForPlayer(gridSlot),
       }, startsAt)
       this.update({ ...this.state, mode: 'race', currentTrack: track, paused: false, cup: null, overlay: { type: 'none' }, notice: null })
@@ -647,7 +647,7 @@ export class AppController {
       car: cup.car,
       difficulty: cup.difficulty,
       laps: 1,
-      handling: 'arcade',
+
       mode: 'normal',
       gridPositions: cupGridPositions(cup),
     })
@@ -659,7 +659,7 @@ export class AppController {
     if (!this.dependencies.lastRaceStore) return
     const { track, setup } = this.dependencies.raceSession.snapshot()
     if (!track || !setup) return
-    this.dependencies.lastRaceStore?.save({ trackId: track.id, course: courseIdentity(track), setup: { ...setup, handling: setup.handling ?? 'arcade', mode: setup.mode ?? 'normal', lighting: setup.lighting ?? track.lighting } })
+    this.dependencies.lastRaceStore?.save({ trackId: track.id, course: courseIdentity(track), setup: { ...setup, mode: setup.mode ?? 'normal', lighting: setup.lighting ?? track.lighting } })
   }
 
   private resolveLastRace(): { race: LastRace; track: Track } | null {

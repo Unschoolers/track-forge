@@ -50,7 +50,6 @@ diagnostic('simulates exported geometry with deterministic AI driving', () => {
       const run = runLaneCheck({
         path, trackName: track.name ?? 'Exported track',
         seed, car, difficulty, mode,
-        handling: options.handling ?? exportJson.setup?.handling ?? 'arcade',
         reversed: options.reversed ?? track.start?.reversed ?? false,
         gridPositions, startRatio, laps, seconds,
       })

@@ -24,7 +24,6 @@ export function raceSetupFromPreferences(
     car: preferences.car,
     difficulty: preferences.difficulty,
     laps: open ? 1 : preferences.raceLaps ?? 2,
-    handling: preferences.handling ?? 'arcade',
     mode,
     lighting,
   }, random)

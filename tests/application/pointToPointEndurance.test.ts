@@ -61,7 +61,7 @@ it('authors, shares and completes a five-minute route in all three modes', () =>
       silenceContinuous: () => {}, destroy: () => {},
     },
   })
-  const setup: RaceSetup = { car: 'red', difficulty: 'hard', laps: 1, handling: 'arcade' }
+  const setup: RaceSetup = { car: 'red', difficulty: 'hard', laps: 1 }
   const input = { throttle: 1, steering: 0, braking: false }
   expect(session.ghostAvailability(track, setup).kind).toBe('none')
 

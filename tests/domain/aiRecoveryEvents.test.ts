@@ -13,7 +13,7 @@ describe('AI recovery telemetry', () => {
 		const path = prepareLanePath(track)
 		const crossing = requireFixture(path.crossings.find(({ upperPathIndex }) => upperPathIndex !== null))
 		const pathIndex = requireFixture(crossing.upperPathIndex)
-		const race = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2, handling: 'arcade' })
+		const race = createRace({ path, playerCar: 'blue', difficulty: 'hard', laps: 2 })
 		const rival = {
 			...requireFixture(race.vehicles[1]), ...crossing.position, pathIndex,
 			z: Math.min(crossing.firstHeight, crossing.secondHeight), lap: 1, nextSector: 3 as const,

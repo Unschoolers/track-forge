@@ -7,7 +7,6 @@ import {
   getVehicleStepContext,
   resetVehicleToTrack,
 } from '@/domain/race/trackContext'
-import type { RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 
 const track = createStarterTrack(asTrackId('physics'), 1)
@@ -86,7 +85,17 @@ describe('vehicle physics', () => {
     )
 
     expect(grass.surface).toBe('grass')
-    expect(yellow.speed).toBeGreaterThan(red.speed * 1.8)
+    expect(yellow.speed).toBeGreaterThan(red.speed)
+    // Red now accelerates out of grass more readily, but Yellow retains its
+    // sustained off-road speed advantage.
+    let redCruise = red
+    let yellowCruise = yellow
+    const accelerate = { steering: 0, throttle: 1, braking: false }
+    for (let tick = 0; tick < 480; tick++) {
+      redCruise = stepVehicle(redCruise, accelerate, grass, 1 / 60)
+      yellowCruise = stepVehicle(yellowCruise, accelerate, grass, 1 / 60)
+    }
+    expect(yellowCruise.speed).toBeGreaterThan(redCruise.speed * 1.8)
 
     const streetBase = { ...vehicle('green'), vx: 80, vy: 60, speed: 100 }
     const street = stepVehicle(
@@ -104,7 +113,7 @@ describe('vehicle physics', () => {
     expect(ice.slip).toBeGreaterThan(street.slip)
   })
 
-  it('brakes, stops wrecked vehicles, and detects eligible curbs', () => {
+  it('brakes and detects eligible curbs', () => {
     const fixture = vehicle()
     const base = {
       ...fixture,
@@ -127,14 +136,6 @@ describe('vehicle physics', () => {
     )
     expect(braking.speed).toBeLessThan(coasting.speed)
 
-    const stopped = stepVehicle(
-      { ...base, wrecked: true },
-      { steering: 1, throttle: 1, braking: false },
-      context,
-      0.1,
-    )
-    expect(stopped).toMatchObject({ speed: 0, vx: 0, vy: 0 })
-
     const curb = path.points.some((point, index) => {
       const ahead = path.points[(index + 3) % path.points.length]
       if (!ahead || point.surface !== 'street') return false
@@ -150,43 +151,21 @@ describe('vehicle physics', () => {
     expect(curb).toBe(true)
   })
 
-  it('uses identical Arcade vehicle physics across race styles, drivers and surfaces', () => {
-    for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
-      for (const surface of ['street', 'dirt', 'ice', 'grass'] as const) {
-        for (const player of [true, false]) {
-          const initial = { ...vehicle(car), player, angle: 0, vx: 130, vy: 20, speed: Math.hypot(130, 20) }
-          const context = { ...getVehicleStepContext(path, initial), surface, grade: 0, onRoad: surface !== 'grass' }
-          let arcade: RaceVehicle = initial
-          let simulation: RaceVehicle = initial
-          let implicit: RaceVehicle = initial
-          for (let frame = 0; frame < 60; frame++) {
-            const input = { steering: frame < 30 ? 0.85 : -0.45, throttle: 1, braking: frame < 20 }
-            arcade = stepVehicle(arcade, input, context, 1 / 60, 'arcade')
-            simulation = stepVehicle(simulation, input, context, 1 / 60, 'simulation')
-            implicit = stepVehicle(implicit, input, context, 1 / 60)
-            expect(simulation).toEqual(arcade)
-            expect(implicit).toEqual(arcade)
-          }
-        }
-      }
-    }
-  })
-
   it('lets an AI trail-brake proportionally while human brakes remain unchanged', () => {
     const initial = { ...vehicle('green'), player: false, angle: 0,
       vx: 185, vy: 7, speed: Math.hypot(185, 7) }
     const context = { ...getVehicleStepContext(path, initial), surface: 'street' as const, grade: 0 }
     const input = { steering: 0.8, throttle: 0, braking: true }
     const dt = 1 / 60
-    const coasting = stepVehicle(initial, { ...input, braking: false }, context, dt, 'arcade')
-    const partial = stepVehicle(initial, { ...input, brakePressure: 0.3 }, context, dt, 'arcade')
-    const full = stepVehicle(initial, input, context, dt, 'arcade')
+    const coasting = stepVehicle(initial, { ...input, braking: false }, context, dt)
+    const partial = stepVehicle(initial, { ...input, brakePressure: 0.3 }, context, dt)
+    const full = stepVehicle(initial, input, context, dt)
     expect(full.speed).toBeLessThan(partial.speed)
     expect(partial.speed).toBeLessThan(coasting.speed)
     expect(Math.abs(partial.yawRate)).toBeGreaterThan(Math.abs(full.yawRate))
     const human = { ...initial, player: true }
-    expect(stepVehicle(human, { ...input, brakePressure: 0 }, context, dt, 'arcade'))
-      .toEqual(stepVehicle(human, input, context, dt, 'arcade'))
+    expect(stepVehicle(human, { ...input, brakePressure: 0 }, context, dt))
+      .toEqual(stepVehicle(human, input, context, dt))
   })
 
   it('trims speed on the first Arcade brake frame instead of applying full force', () => {
@@ -195,9 +174,9 @@ describe('vehicle physics', () => {
     const coast = { steering: 0.7, throttle: 0, braking: false }
     const brake = { ...coast, throttle: 1, braking: true }
     const dt = 1 / 60
-    const coasting = stepVehicle(initial, coast, context, dt, 'arcade')
-    const tapping = stepVehicle(initial, brake, context, dt, 'arcade')
-    const full = stepVehicle({ ...initial, brakePressure: 1 }, brake, context, dt, 'arcade')
+    const coasting = stepVehicle(initial, coast, context, dt)
+    const tapping = stepVehicle(initial, brake, context, dt)
+    const full = stepVehicle({ ...initial, brakePressure: 1 }, brake, context, dt)
 
     expect(tapping.speed).toBeLessThan(coasting.speed)
     expect(coasting.speed - tapping.speed).toBeLessThan((coasting.speed - full.speed) * 0.4)
@@ -209,15 +188,15 @@ describe('vehicle physics', () => {
     const context = { ...getVehicleStepContext(path, car), surface: 'street' as const, grade: 0 }
     const dt = 1 / 60
     for (let step = 0; step < 240; step += 1) {
-      car = stepVehicle(car, { steering: 0, throttle: 1, braking: true }, context, dt, 'arcade')
+      car = stepVehicle(car, { steering: 0, throttle: 1, braking: true }, context, dt)
     }
     expect(car.speed).toBeLessThan(0.5)
-    const released = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
+    const released = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt)
     // Stronger sports-car launches still settle the first brake-release frame.
     expect(released.speed).toBeLessThan(1.2)
     car = released
     for (let step = 0; step < 30; step += 1) {
-      car = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
+      car = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt)
     }
     expect(car.speed).toBeGreaterThan(40)
   })

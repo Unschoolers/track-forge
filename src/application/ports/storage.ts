@@ -27,7 +27,6 @@ export interface TrackStore {
 export interface ScoreCategory {
   readonly course: string
   readonly laps: number
-  readonly handling: HandlingMode
   readonly mode: 'normal' | 'ghost' | 'time-trial'
   readonly routeKind?: RouteKind
 }
@@ -47,7 +46,7 @@ export interface ScoreStore {
   removeTrack(trackId: TrackId): boolean
 }
 
-export type HandlingMode = 'arcade' | 'simulation'
+export type PedalMode = 'auto' | 'manual'
 
 export type SteeringSensitivity = 0.75 | 1 | 1.5
 
@@ -63,7 +62,7 @@ export interface Preferences {
   readonly steeringHand?: 'left' | 'right'
   readonly controlSize?: 'standard' | 'large'
   readonly steeringSensitivity?: SteeringSensitivity
-  readonly handling?: HandlingMode
+  readonly pedalMode?: PedalMode
   readonly raceLaps?: 1 | 2 | 3
   readonly raceMode?: 'normal' | 'ghost' | 'time-trial'
   readonly playerIdentity?: PlayerIdentity

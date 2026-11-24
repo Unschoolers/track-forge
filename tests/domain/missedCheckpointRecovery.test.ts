@@ -14,8 +14,7 @@ describe('missed timing gate recovery', () => {
   it('starts recovery when a stage car rejoins past a gate without crossing its line', () => {
     const path = buildRoadPath([street(0, 16), street(1_000, 16)], EMPTY_TERRAIN, undefined, 'point-to-point')
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, routeKind: 'point-to-point', handling: 'arcade',
-      playerCar: 'blue', difficulty: 'normal', laps: 1,
+      path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal', laps: 1,
     })
     const index = lastSampleBeforeCheckpoint(path, 1, race.timingGates) + 4
     const point = path.points[index]
@@ -33,8 +32,7 @@ describe('missed timing gate recovery', () => {
   it('starts recovery when the stage finish is bypassed beyond the painted line', () => {
     const path = buildRoadPath([street(0, 16), street(1_000, 16)], EMPTY_TERRAIN, undefined, 'point-to-point')
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, routeKind: 'point-to-point', handling: 'arcade',
-      playerCar: 'blue', difficulty: 'normal', laps: 1,
+      path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal', laps: 1,
     })
     const last = path.points.length - 1
     const finish = path.points[last]
@@ -54,7 +52,7 @@ describe('missed timing gate recovery', () => {
       street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
     ], EMPTY_TERRAIN)
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, handling: 'arcade', startRatio: 0.18, reversed,
+      path, startRatio: 0.18, reversed,
       playerCar: 'blue', difficulty: 'normal', laps: 2,
     })
     expect(path.closed).toBe(true)
@@ -96,7 +94,7 @@ describe('missed timing gate recovery', () => {
       street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
     ], EMPTY_TERRAIN)
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, handling: 'arcade', startRatio: 0.18, reversed,
+      path, startRatio: 0.18, reversed,
       playerCar: 'blue', difficulty: 'normal', laps: 2,
     })
     const count = path.points.length
@@ -165,8 +163,7 @@ describe('missed timing gate recovery', () => {
   it('respawns before the finish of an open stage rather than at the endpoint', () => {
     const path = buildRoadPath([street(0, 16), street(1_000, 16)], EMPTY_TERRAIN, undefined, 'point-to-point')
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, routeKind: 'point-to-point', handling: 'arcade',
-      playerCar: 'blue', difficulty: 'normal', laps: 1,
+      path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal', laps: 1,
     })
     const last = path.points.length - 1
     const finish = path.points[last]
@@ -192,7 +189,7 @@ describe('missed timing gate recovery', () => {
       street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
     ], EMPTY_TERRAIN)
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, handling: 'arcade', startRatio: 0.18, reversed,
+      path, startRatio: 0.18, reversed,
       playerCar: 'blue', difficulty: 'normal', laps: 2,
     })
     const starting = race.vehicles[0]
@@ -236,34 +233,10 @@ describe('missed timing gate recovery', () => {
     }
   })
 
-  it('clears wreck damage without changing the pending gate on a missed-gate reset', () => {
-    const path = buildRoadPath([
-      street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
-    ], EMPTY_TERRAIN)
-    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
-    })
-    const original = race.vehicles[0]
-    if (!original) throw new Error('Missing wrecked car')
-    const vehicle = {
-      ...original, nextSector: 2 as const, lap: 1, wrecked: true, damage: 100,
-    }
-    const state = {
-      ...race, phase: 'running' as const, vehicles: [vehicle],
-      missedCheckpoint: { gate: 2 as const, remainingSeconds: 4, position: { x: 0, y: 0 } },
-    }
-    const recovered = resetRaceVehicle(vehicle, state)
-    expect(recovered.wrecked).toBe(false)
-    expect(recovered.damage).toBe(0)
-    expect(recovered.nextSector).toBe(2)
-    expect(recovered.lap).toBe(1)
-  })
-
   it.each([1, 2, 3, 4] as const)('places stage recovery before timing gate %s', gate => {
     const path = buildRoadPath([street(0, 16), street(1_000, 16)], EMPTY_TERRAIN, undefined, 'point-to-point')
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, routeKind: 'point-to-point', handling: 'arcade',
-      playerCar: 'blue', difficulty: 'normal', laps: 1,
+      path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal', laps: 1,
     })
     const last = path.points.length - 1
     const afterGate = Math.min(last, Math.ceil(last * gate / 4) + 4)
@@ -292,7 +265,7 @@ describe('missed timing gate recovery', () => {
       street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
     ], EMPTY_TERRAIN)
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
+      path, playerCar: 'blue', difficulty: 'normal', laps: 2,
     })
     const count = path.points.length
     const afterGateIndex = Math.ceil(count / 2) + 4
@@ -326,7 +299,7 @@ describe('missed timing gate recovery', () => {
       street(0, 0), street(800, 0), street(800, 800), street(0, 800), street(0, 0),
     ], EMPTY_TERRAIN)
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, handling: 'arcade', playerCar: 'blue', difficulty: 'normal', laps: 2,
+      path, playerCar: 'blue', difficulty: 'normal', laps: 2,
     })
     const count = path.points.length
     const afterGate = path.points[Math.ceil(count / 2) + 3]
@@ -362,8 +335,7 @@ describe('missed timing gate recovery', () => {
     }
     const path = buildRoadPath([street(0, 16), street(800, 16)], flooded, undefined, 'point-to-point')
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, routeKind: 'point-to-point', handling: 'arcade',
-      playerCar: 'blue', difficulty: 'normal', laps: 1,
+      path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal', laps: 1,
     })
     const player = race.vehicles[0]
     if (!player) throw new Error('Missing checkpoint fixture')

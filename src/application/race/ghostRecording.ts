@@ -4,15 +4,13 @@ import { captureGhost, MAX_GHOST_FRAMES, type GhostFrame } from './ghostReplay'
 /** Bounded replay recording, with explicit cuts for Arcade recoveries. */
 export class GhostRecording {
   private frames: GhostFrame[]
-  private valid = true
   private interval = 0.1
 
-  constructor(player: RaceVehicle, private readonly arcade: boolean) {
+  constructor(player: RaceVehicle) {
     this.frames = [captureGhost(player, 0)]
   }
 
   recover(before: RaceVehicle, after: RaceVehicle, elapsed: number): void {
-    if (!this.arcade) { this.valid = false; return }
     // Cut at the actual recovery tick; stationary samples during a manual
     // hold record the real delay without adding synthetic ghost time.
     const time = elapsed
@@ -29,20 +27,17 @@ export class GhostRecording {
   }
 
   sample(player: RaceVehicle, elapsed: number, finished = false): void {
-    if (!this.valid) return
     const time = elapsed
-    if (player.wrecked && !this.arcade) { this.valid = false; return }
     const last = this.frames.at(-1)
     if (!finished && last && time < last.t + this.interval) return
     const jumped = last !== undefined && Math.hypot(player.x - last.x, player.y - last.y) >
       Math.max(85, player.speed * Math.max(0.25, (time - last.t) * 2) + 25)
-    if (jumped && !this.arcade) { this.valid = false; return }
     this.append({ ...captureGhost(player, time), ...(jumped ? { cut: true } : {}) })
   }
 
   finish(player: RaceVehicle, time: number): readonly GhostFrame[] | null {
     this.sample(player, time, true)
-    return this.valid ? this.frames : null
+    return this.frames
   }
 
   private append(frame: GhostFrame): void {

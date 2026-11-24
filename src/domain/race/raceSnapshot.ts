@@ -16,8 +16,6 @@ export type RaceVehicleSnapshot = Pick<
   | 'pathIndex'
   | 'structureRunId'
   | 'braking'
-  | 'wrecked'
-  | 'damage'
   | 'lap'
   | 'nextSector'
   | 'finishedAt'
@@ -57,8 +55,6 @@ export function captureRaceSnapshot(state: RaceState): RaceTickSnapshot {
       pathIndex: vehicle.pathIndex,
       structureRunId: vehicle.structureRunId,
       braking: vehicle.braking,
-      wrecked: vehicle.wrecked,
-      damage: vehicle.damage,
       lap: vehicle.lap,
       nextSector: vehicle.nextSector,
       finishedAt: vehicle.finishedAt,

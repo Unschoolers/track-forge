@@ -69,7 +69,7 @@ for (const scenario of scenarios) {
         race: {
           name: trackName,
           vehicleCount: 4,
-          setup: { car: 'blue', mode: 'normal', handling: 'arcade', difficulty: 'normal', lighting: scenario.lighting },
+          setup: { car: 'blue', mode: 'normal', difficulty: 'normal', lighting: scenario.lighting },
         },
       })
       expect(metrics.startToCountdownMs).toBeGreaterThanOrEqual(0)

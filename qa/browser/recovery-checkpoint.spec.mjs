@@ -50,7 +50,7 @@ test('places a checkpoint while arcade ignores physical scenery collisions', asy
   // line when it passes the trash bin. Domain tests cover simulation impacts.
   await expect.poll(async () => {
     const race = (await qa()).race
-    return race?.phase === 'running' && race.handling === 'arcade' && race.player.y < -10
+    return race?.phase === 'running' && race.player.y < -10
   }, { timeout: 15_000 }).toBe(true)
   await page.evaluate(() => window.__trackForgeQa.advanceRace(20))
   const results = page.locator('[data-modal="results"]')

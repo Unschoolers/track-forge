@@ -54,18 +54,17 @@ function run(race: RaceState, frames: number) {
 
 describe('straight-line rival pace', () => {
   const configurations = [
-    ['easy', 'arcade', 'street'],
-    ['normal', 'arcade', 'street'],
-    ['hard', 'arcade', 'street'],
-    ['hard', 'simulation', 'street'],
-    ['easy', 'simulation', 'ice'],
-    ['hard', 'arcade', 'dirt'],
-  ] as const satisfies ReadonlyArray<readonly [DifficultyId, RaceState['handling'], SurfaceId]>
+    ['easy', 'street'],
+    ['normal', 'street'],
+    ['hard', 'street'],
 
-  it.each(configurations)('matches the player in the same car on %s / %s / %s',
-    (difficulty, handling, surface) => {
+    ['hard', 'dirt'],
+  ] as const satisfies ReadonlyArray<readonly [DifficultyId, SurfaceId]>
+
+  it.each(configurations)('matches the player in the same car on %s / %s',
+    (difficulty, surface) => {
       const path = straightCircuit(surface)
-      const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, difficulty, handling, playerCar: 'red', laps: 1 })
+      const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, difficulty, playerCar: 'red', laps: 1 })
       const [player, rival] = race.vehicles
       const sideBySide: RaceState = {
         ...race, phase: 'running',
@@ -88,7 +87,7 @@ describe('rival catch-up', () => {
 
   function arranged(reversed = false, otherDistance = 700, playerSpeed = 300): RaceState {
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
-      path, reversed, difficulty: 'hard', handling: 'arcade', playerCar: 'blue', laps: 2,
+      path, reversed, difficulty: 'hard', playerCar: 'blue', laps: 2,
       startRatio: 1_040 / path.totalLength,
     })
     const [player, rival, other] = race.vehicles

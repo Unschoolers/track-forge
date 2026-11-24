@@ -3,6 +3,7 @@ import { RACE_TICK_SECONDS } from '@/domain/race/raceEngine'
 import type { DriverInput, RaceState, RaceVehicle } from '@/domain/race/raceState'
 import type { Track } from '@/domain/model'
 import type { RaceResult, RaceSetup } from './raceSession'
+import type { ScoreCategory, ScoreEntry } from '@/application/ports/storage'
 
 /** Diagnostic replay: independent of the best-ghost record and never written to localStorage. */
 const BASE_SAMPLE_TICKS = 3 // 20 Hz positions, on the fixed 60 Hz simulation clock
@@ -38,7 +39,7 @@ export interface DiagnosticVehicle {
   readonly lap: number
   readonly nextSector: number
   readonly finishedAt: number | null
-  readonly wrecked: boolean
+  readonly wrecked: false
   readonly currentSurface: RaceVehicle['currentSurface']
   readonly structureRunId: string | null
   readonly aiPace: number
@@ -70,6 +71,16 @@ export interface DiagnosticEvent {
   readonly event: RaceEvent | { readonly type: 'manual-reset'; readonly vehicleId: string }
 }
 
+// Keep the published v1 JSON shape at this boundary only. The live race
+// model does not need the removed handling or wreck fields.
+type DiagnosticResult = Omit<RaceResult, 'standings' | 'highScores'> & {
+  readonly playerWrecked: false
+  readonly standings: readonly (RaceResult['standings'][number] & { readonly wrecked: false })[]
+  readonly highScores: readonly (Omit<ScoreEntry, 'category'> & {
+    readonly category?: ScoreCategory & { readonly handling: 'arcade' }
+  })[]
+}
+
 export interface RaceDiagnosticsReport {
   readonly format: 'trackforge-race-replay'
   readonly formatVersion: 1
@@ -79,8 +90,8 @@ export interface RaceDiagnosticsReport {
   readonly playerInputSampleTicks: number
   readonly playerControls: readonly DiagnosticControlSample[]
   readonly track: Track
-  readonly setup: RaceSetup
-  readonly result: RaceResult
+  readonly setup: RaceSetup & { readonly handling: 'arcade' }
+  readonly result: DiagnosticResult
   readonly frames: readonly DiagnosticFrame[]
   readonly events: readonly DiagnosticEvent[]
   readonly droppedEvents: number
@@ -134,8 +145,16 @@ export class RaceDiagnosticsRecording {
       playerInputSampleTicks: this.playerInputSampleTicks,
       playerControls: [...this.playerControls],
       track,
-      setup,
-      result,
+      setup: { ...setup, handling: 'arcade' },
+      result: {
+        ...result,
+        playerWrecked: false,
+        standings: result.standings.map(standing => ({ ...standing, wrecked: false })),
+        highScores: result.highScores.map(({ category, ...score }) => ({
+          ...score,
+          ...(category ? { category: { ...category, handling: 'arcade' } } : {}),
+        })),
+      },
       frames: [...this.frames],
       events: [...this.events],
       droppedEvents: this.droppedEvents,
@@ -184,7 +203,7 @@ export class RaceDiagnosticsRecording {
         onCurb: vehicle.onCurb,
         pathIndex: vehicle.pathIndex, pathDistance: round(vehicle.pathDistance),
         lap: vehicle.lap, nextSector: vehicle.nextSector,
-        finishedAt: vehicle.finishedAt, wrecked: vehicle.wrecked,
+        finishedAt: vehicle.finishedAt, wrecked: false,
         currentSurface: vehicle.currentSurface, structureRunId: vehicle.structureRunId,
         aiPace: round(vehicle.aiPace),
         ai: vehicle.ai ? {

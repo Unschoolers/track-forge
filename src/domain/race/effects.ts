@@ -7,8 +7,6 @@ export type RaceParticleKind =
   | 'grass'
   | 'ice'
   | 'tire-smoke'
-  | 'spark'
-  | 'damage-smoke'
   | 'speed-line'
   | 'landing-dust'
 
@@ -37,8 +35,6 @@ export interface RaceEffectsState {
 
 export interface RaceEffectEvent {
   readonly type: string
-  readonly leftId?: string
-  readonly rightId?: string
   readonly vehicleId?: string
   readonly strength?: number
 }
@@ -124,13 +120,6 @@ export function advanceRaceEffects(
     }
     if (
       vehicle.player &&
-      vehicle.damage / Math.max(1, vehicle.damageLimit) >= 0.5 &&
-      random.next() < 0.35
-    ) {
-      particles.push(particle('damage-smoke', vehicle, random, 0.9, 5))
-    }
-    if (
-      vehicle.player &&
       vehicle.speed > 215 &&
       random.next() < 0.45
     ) {
@@ -192,15 +181,6 @@ export function advanceRaceEffects(
         }
       }
       continue
-    }
-    if (event.type !== 'collision') continue
-    const involved = vehicles.find(
-      ({ id }) => id === event.leftId || id === event.rightId,
-    )
-    if (!involved) continue
-    const count = Math.max(3, Math.min(10, Math.round((event.strength ?? 0) / 12)))
-    for (let index = 0; index < count; index += 1) {
-      particles.push(particle('spark', involved, random, 0.35, 2.2))
     }
   }
 

@@ -39,32 +39,26 @@ describe('Arcade steering authority', () => {
       VEHICLE_DYNAMICS_TUNING.steering.highSpeedReduction,
       params.lowSpeedSteerAngle,
     ) * 180 / Math.PI
-    const originalHighDegrees = originalRack * 0.235 * 0.69 * 180 / Math.PI
+    const baseDegrees = originalRack * 0.235 * 180 / Math.PI
+    const originalHighDegrees = baseDegrees * 0.69
     expect(angle(0)).toBeCloseTo(lowDegrees, 8)
-    expect(angle(0.5)).toBeCloseTo((lowDegrees + originalHighDegrees) / 2, 8)
+    expect(angle(0.175)).toBeCloseTo(baseDegrees * (1 - 0.175 * 0.31) + (lowDegrees - baseDegrees) / 2, 8)
+    expect(angle(0.5)).toBeCloseTo(baseDegrees * (1 - 0.5 * 0.31), 8)
     expect(angle(1)).toBeCloseTo(originalHighDegrees, 8)
     expect(angle(1.2)).toBeCloseTo(originalHighDegrees, 8)
   })
 
-  it('always passes the same Arcade steering-angle scale to the dynamics integrator', () => {
+  it('actually passes the arcade steering-angle scale to the dynamics integrator', () => {
     const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
     const vehicle = race.vehicles[0]
     if (!vehicle) throw new Error('Missing vehicle')
     const context = getVehicleStepContext(path, vehicle)
     const input = { steering: 0.3, throttle: 1, braking: false }
-    stepVehicle(vehicle, input, context, 1 / 60, 'arcade')
+    stepVehicle(vehicle, input, context, 1 / 60)
     const arcade = vi.mocked(stepVehicleDynamics).mock.lastCall
     expect(arcade?.[2].maxSteerAngle).toBeCloseTo(
       CAR_SPECS.blue.steer * VEHICLE_DYNAMICS_TUNING.steering.maximumAngleScale,
     )
-    stepVehicle(vehicle, input, context, 1 / 60, 'simulation')
-    const simulation = vi.mocked(stepVehicleDynamics).mock.lastCall
-    expect(simulation?.[2].maxSteerAngle).toBeCloseTo(
-      CAR_SPECS.blue.steer * VEHICLE_DYNAMICS_TUNING.steering.maximumAngleScale,
-    )
-    expect(simulation).toEqual(arcade)
-    stepVehicle(vehicle, input, context, 1 / 60)
-    expect(vi.mocked(stepVehicleDynamics).mock.lastCall).toEqual(arcade)
     expect(VEHICLE_DYNAMICS_TUNING.steering.maximumAngleScale).toBe(0.235)
   })
 })

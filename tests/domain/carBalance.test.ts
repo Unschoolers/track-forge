@@ -55,7 +55,7 @@ describe('Red grass handling', () => {
     terrainMaterial: 'grass', safeAboveWater: false,
   }
 
-  function leavingRoad(car: CarId, handling: 'arcade' | 'simulation'): number {
+  function leavingRoad(car: CarId): number {
     const base = createRace({ path, playerCar: car, difficulty: 'normal', laps: 1 }).vehicles[0]
     if (!base) throw new Error('Missing player')
     let vehicle: RaceVehicle = {
@@ -64,16 +64,16 @@ describe('Red grass handling', () => {
     }
     for (let frame = 0; frame < 120; frame++) {
       vehicle = stepVehicle(vehicle, { steering: 0, throttle: 1, braking: false },
-        grass, 1 / 60, handling)
+        grass, 1 / 60)
     }
     return vehicle.speed
   }
 
   it('makes the street specialist markedly slower after entering grass than Blue or Yellow', () => {
-    for (const handling of ['arcade', 'simulation'] as const) {
-      const red = leavingRoad('red', handling)
-      const blue = leavingRoad('blue', handling)
-      const yellow = leavingRoad('yellow', handling)
+    {
+      const red = leavingRoad('red')
+      const blue = leavingRoad('blue')
+      const yellow = leavingRoad('yellow')
       expect(red).toBeLessThan(blue * 0.9)
       expect(red).toBeLessThan(yellow * 0.8)
     }

@@ -17,7 +17,6 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
   const category = rawCategory && typeof rawCategory === 'object' ? rawCategory as Record<string, unknown> : undefined
   const validCategory = category && typeof category.course === 'string' && category.course.length > 0 &&
     typeof category.laps === 'number' && Number.isInteger(category.laps) && category.laps > 0 &&
-    (category.handling === 'arcade' || category.handling === 'simulation') &&
     (category.mode === 'normal' || category.mode === 'ghost' || category.mode === 'time-trial')
   return typeof item.time === 'number' &&
     Number.isFinite(item.time) && item.time > 0 &&
@@ -28,7 +27,7 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
       (typeof item.date === 'number' && Number.isFinite(item.date)))
     ? {
         time: item.time,
-        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, handling: category.handling as 'arcade' | 'simulation', mode: category.mode as 'normal' | 'ghost' | 'time-trial', ...(category.routeKind === 'point-to-point' ? { routeKind: 'point-to-point' as const } : {}) } } : {}),
+        ...(validCategory ? { category: { course: category.course as string, laps: category.laps as number, mode: category.mode as 'normal' | 'ghost' | 'time-trial', ...(category.routeKind === 'point-to-point' ? { routeKind: 'point-to-point' as const } : {}) } } : {}),
         car: item.car,
         difficulty: item.difficulty,
         recordedAt:
@@ -39,8 +38,19 @@ function decodeScore(value: unknown): ScoreEntry | undefined {
     : undefined
 }
 
+// Uncategorised historical scores remain visible as legacy, not as race records.
+// Explicit Simulation records must never enter the new Arcade leaderboard.
+function decodeLegacyScore(raw: unknown): ScoreEntry | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const category = (raw as Record<string, unknown>).category
+  if (category != null && (typeof category !== 'object' ||
+      (category as Record<string, unknown>).handling !== 'arcade')) return undefined
+  const score = decodeScore(raw)
+  return category != null && !score?.category ? undefined : score
+}
+
 function categoryKey(score: ScoreEntry): string {
-  return score.category ? JSON.stringify([score.category.course, score.category.routeKind ?? 'circuit', score.category.laps, score.category.handling, score.category.mode, score.car, score.difficulty]) : 'legacy'
+  return score.category ? JSON.stringify([score.category.course, score.category.routeKind ?? 'circuit', score.category.laps, score.category.mode, score.car, score.difficulty]) : 'legacy'
 }
 
 /** Retain the five best scores per category with one accounting pass. */
@@ -76,28 +86,53 @@ export class BrowserScoreRepository implements ScoreStore {
     const all = this.read()
     // Use this same storage snapshot rather than re-reading and re-migrating it.
     all[trackId] = bestScores([...decodedScores(all[trackId]), score])
-    return this.storage.set(STORAGE_KEYS.scores, JSON.stringify(all))
+    return this.write(all)
   }
 
   removeTrack(trackId: TrackId): boolean {
     const all = this.read()
     delete all[trackId]
-    return this.storage.set(STORAGE_KEYS.scores, JSON.stringify(all))
+    return this.write(all)
+  }
+
+  // The migration flag is committed atomically with the records. A separate
+  // marker could fail after a deletion and resurrect old scores on next load.
+  private write(records: Record<string, unknown>): boolean {
+    return this.storage.set(STORAGE_KEYS.scores, JSON.stringify({ version: 3, records }))
   }
 
   private read(): Record<string, unknown> {
     const current = this.parseRecord(this.storage.get(STORAGE_KEYS.scores))
-    if (this.storage.get(STORAGE_KEYS.scoreMigration) === '1') {
-      return current
+    if (current.version === 3 && current.records && typeof current.records === 'object' &&
+        !Array.isArray(current.records)) return current.records as Record<string, unknown>
+
+    const previous = this.parseRecord(this.storage.get('trackforge-highscores-v2'))
+    // V1 scores already merged into V2 must not be reimported after deletion.
+    const oldest = this.storage.get('trackforge-highscores-v1-migrated') === '1'
+      ? {} : this.parseRecord(this.storage.get('trackforge-highscores-v1'))
+    const merged = new Map<string, ScoreEntry[]>()
+    for (const trackId of new Set([...Object.keys(oldest), ...Object.keys(previous), ...Object.keys(current)])) {
+      const unique = new Map<string, ScoreEntry>()
+      for (const [bank, legacy] of [[oldest, true], [previous, true], [current, false]] as const) {
+        const raw = bank[trackId]
+        if (!Array.isArray(raw)) continue
+        for (const item of raw) {
+          const score = legacy ? decodeLegacyScore(item) : decodeScore(item)
+          if (!score) continue
+          const identity = JSON.stringify([categoryKey(score), score.car, score.difficulty, score.time, score.recordedAt])
+          unique.set(identity, score)
+        }
+      }
+      const scores = bestScores([...unique.values()])
+      if (scores.length) merged.set(trackId, scores)
     }
-    const legacy = this.parseRecord(
-      this.storage.get(STORAGE_KEYS.legacyScores),
-    )
-    const merged = this.mergeRecords(legacy, current)
-    if (this.storage.set(STORAGE_KEYS.scores, JSON.stringify(merged))) {
-      this.storage.set(STORAGE_KEYS.scoreMigration, '1')
+    const records = Object.fromEntries(merged)
+    // Keep serving the old records if storage is full; a later access retries.
+    // Source keys are intentionally never removed.
+    if (Object.keys(previous).length || Object.keys(oldest).length) {
+      if (!this.write(records)) console.warn('Track Forge: score migration not yet persisted.')
     }
-    return merged
+    return records
   }
 
   private parseRecord(value: string | null): Record<string, unknown> {
@@ -111,39 +146,5 @@ export class BrowserScoreRepository implements ScoreStore {
     } catch {
       return {}
     }
-  }
-
-  private mergeRecords(
-    legacy: Record<string, unknown>,
-    current: Record<string, unknown>,
-  ): Record<string, readonly ScoreEntry[]> {
-    const merged: Record<string, readonly ScoreEntry[]> = {}
-    for (const trackId of new Set([
-      ...Object.keys(legacy),
-      ...Object.keys(current),
-    ])) {
-      const legacyScores = Array.isArray(legacy[trackId])
-        ? legacy[trackId]
-        : []
-      const currentScores = Array.isArray(current[trackId])
-        ? current[trackId]
-        : []
-      const unique = new Map<string, ScoreEntry>()
-      for (const raw of [...legacyScores, ...currentScores]) {
-        const score = decodeScore(raw)
-        if (!score) continue
-        const identity = [
-          score.time,
-          score.car,
-          score.difficulty,
-          score.recordedAt,
-          categoryKey(score),
-        ].join(':')
-        unique.set(identity, score)
-      }
-      const scores = bestScores([...unique.values()])
-      if (scores.length > 0) merged[trackId] = scores
-    }
-    return merged
   }
 }

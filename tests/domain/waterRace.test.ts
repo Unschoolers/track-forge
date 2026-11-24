@@ -77,67 +77,6 @@ function roadBoundaryRace() {
   }
 }
 
-function hillWaterBoundaryRace() {
-  const path = buildRoadPath(
-    [
-      { id: 'hill-water', x: -200, y: 16, surface: 'street' },
-      { id: 'east', x: 200, y: 16, surface: 'street' },
-      { id: 'south-east', x: 200, y: 216, surface: 'street' },
-      { id: 'south-west', x: -200, y: 216, surface: 'street' },
-      { id: 'close', x: -200, y: 16, surface: 'street' },
-    ],
-    {
-      cellSize: WORLD_ELEVATION.cellSize,
-      cells: [
-        { column: -1, row: 0, kind: 'hill' as const },
-        { column: 0, row: 0, kind: 'water' as const },
-      ],
-    },
-  )
-  return {
-    ...createRace({
-      path,
-      playerCar: 'blue',
-      difficulty: 'normal',
-      laps: 3,
-    }),
-    phase: 'running' as const,
-    countdown: 0,
-  }
-}
-
-function hillBoundaryCollisionState(pushedIndex: 0 | 1) {
-  const initial = hillWaterBoundaryRace()
-  const supportHeight = initial.path.terrainSurface.heightAt({
-    x: -1,
-    y: 16,
-  })
-  return {
-    initial,
-    supportHeight,
-    state: {
-      ...initial,
-      vehicles: initial.vehicles.map((vehicle, index) =>
-        index < 2
-          ? {
-              ...vehicle,
-              x: index === pushedIndex ? -1 : -2,
-              y: 16,
-              pathIndex: requireFixture(nearestPathPoint(initial.path, { x: -1, y: 16 })).index,
-              z: supportHeight,
-              vx: 0,
-              vy: 0,
-              speed: 0,
-              grounded: true,
-              verticalVelocity: 0,
-              contactLoad: 1,
-            }
-          : vehicle,
-      ),
-    },
-  }
-}
-
 describe('water race contact', () => {
   it('lets an Arcade player drive away when no safe road sample exists', () => {
     const points = Array.from({ length: 9 }, (_, index) => ({
@@ -152,7 +91,7 @@ describe('water race contact', () => {
       })),
     })
     const initial = createRace({ path, playerCar: 'blue', difficulty: 'normal',
-      laps: 10, handling: 'arcade' })
+      laps: 10 })
     const player = requireFixture(initial.vehicles[0])
     expect(findNearestSafeTrackIndex(path, player)).toBeUndefined()
     const first = stepRace({ ...initial, phase: 'running', vehicles: [player] }, noInput, 1 / 60, random)
@@ -184,7 +123,7 @@ describe('water race contact', () => {
     const initial = roadBoundaryRace()
     const player = atWater(requireFixture(initial.vehicles[0]))
     const state: RaceState = {
-      ...initial, handling: 'arcade', reversed, elapsed: 12,
+      ...initial, reversed, elapsed: 12,
       vehicles: [{ ...player, lap: 1, nextSector: 3 }],
     }
     const result = stepRace(state, noInput, 1 / 60, random)
@@ -218,7 +157,7 @@ describe('water race contact', () => {
     const initial = roadBoundaryRace()
     const pathIndex = requireFixture(nearestPathPoint(initial.path, { x: 16, y: 16 })).index
     const state: RaceState = {
-      ...initial, handling: 'arcade', totalLaps: 1, startPathIndex: pathIndex,
+      ...initial, totalLaps: 1, startPathIndex: pathIndex,
       vehicles: [{
         ...atWater(requireFixture(initial.vehicles[0])),
         pathIndex: pathIndex - 2, nextSector: 4,
@@ -237,7 +176,7 @@ describe('water race contact', () => {
   it('recovers an airborne Arcade player only after landing in water', () => {
     const initial = runningRace()
     const state: RaceState = {
-      ...initial, handling: 'arcade', vehicles: [{
+      ...initial, vehicles: [{
         ...atWater(requireFixture(initial.vehicles[0])),
         z: 0.1, grounded: false, verticalVelocity: -18, contactLoad: 0,
       }],
@@ -253,24 +192,6 @@ describe('water race contact', () => {
     }))
   })
 
-  it('ends the player race immediately and emits the terminal reason once', () => {
-    const initial = runningRace()
-    const state = {
-      ...initial,
-      vehicles: initial.vehicles.map((vehicle) =>
-        vehicle.player ? atWater(vehicle) : vehicle,
-      ),
-    }
-
-    const sunk = stepRace(state, noInput, 1 / 60, random)
-    const repeated = stepRace(sunk.state, noInput, 1 / 60, random)
-
-    expect(sunk.state.phase).toBe('finished')
-    expect(
-      sunk.events.filter((event) => event.type === 'race-finished'),
-    ).toEqual([{ type: 'race-finished', reason: 'water' }])
-    expect(repeated.events).toEqual([])
-  })
 
   it('recovers grounded AI from water without ending the player race', () => {
     const initial = roadBoundaryRace()
@@ -353,55 +274,6 @@ describe('water race contact', () => {
     ).not.toBe('water')
   })
 
-  it('does not sink an airborne vehicle until it lands in water', () => {
-    const initial = runningRace()
-    const airborne = {
-      ...atWater(initial.vehicles[0] as RaceVehicle),
-      z: 12,
-      grounded: false,
-      verticalVelocity: 0,
-      contactLoad: 0,
-    }
-    const state = {
-      ...initial,
-      vehicles: initial.vehicles.map((vehicle) =>
-        vehicle.player ? airborne : vehicle,
-      ),
-    }
-
-    const result = stepRace(state, noInput, 1 / 60, random)
-
-    expect(result.state.phase).toBe('running')
-    expect(result.state.vehicles[0]?.grounded).toBe(false)
-    expect(
-      result.events.some((event) => event.type === 'race-finished'),
-    ).toBe(false)
-
-    const landing = stepRace(
-      {
-        ...initial,
-        vehicles: initial.vehicles.map((vehicle) =>
-          vehicle.player
-            ? {
-                ...atWater(vehicle),
-                z: 0.1,
-                grounded: false,
-                verticalVelocity: -18,
-                contactLoad: 0,
-              }
-            : vehicle,
-        ),
-      },
-      noInput,
-      1 / 30,
-      random,
-    )
-    expect(landing.state.phase).toBe('finished')
-    expect(landing.events).toContainEqual({
-      type: 'race-finished',
-      reason: 'water',
-    })
-  })
 
   it('does not reset airborne AI merely passing over water', () => {
     const initial = runningRace()
@@ -527,162 +399,6 @@ describe('water race contact', () => {
       terrainMaterial: 'water',
       safeAboveWater: false,
     })
-  })
-
-  it('classifies water from the player position after collision resolution', () => {
-    const initial = roadBoundaryRace()
-    const state = {
-      ...initial,
-      vehicles: initial.vehicles.map((vehicle, index) =>
-        index === 0
-          ? {
-              ...vehicle,
-              x: -1,
-              y: 16,
-              pathIndex: requireFixture(nearestPathPoint(initial.path, { x: -1, y: 16 })).index,
-              z: 0,
-              vx: 0,
-              vy: 0,
-              speed: 0,
-              grounded: true,
-            }
-          : index === 1
-            ? {
-                ...vehicle,
-                x: -2,
-                y: 16,
-                pathIndex: requireFixture(nearestPathPoint(initial.path, { x: -2, y: 16 })).index,
-                z: 0,
-                vx: 0,
-                vy: 0,
-                speed: 0,
-                grounded: true,
-              }
-            : vehicle,
-      ),
-    }
-
-    const result = stepRace(state, noInput, 0.001, random)
-    const player = result.state.vehicles.find(({ player }) => player)
-
-    expect(player && initial.path.terrainSurface.materialAt(player)).toBe(
-      'water',
-    )
-    expect(result.state.phase).toBe('finished')
-    expect(result.events).toContainEqual({
-      type: 'race-finished',
-      reason: 'water',
-    })
-  })
-
-  it('does not classify water when collision resolution moves the player out', () => {
-    const initial = roadBoundaryRace()
-    const state = {
-      ...initial,
-      vehicles: initial.vehicles.map((vehicle, index) =>
-        index === 0
-          ? {
-              ...vehicle,
-              x: 31,
-              y: 16,
-              z: 0,
-              vx: 0,
-              vy: 0,
-              speed: 0,
-              grounded: true,
-            }
-          : index === 1
-            ? {
-                ...vehicle,
-                x: 30,
-                y: 16,
-                z: 2,
-                vx: 0,
-                vy: 0,
-                speed: 0,
-                grounded: false,
-                verticalVelocity: 10,
-                contactLoad: 0,
-              }
-            : vehicle,
-      ),
-    }
-
-    const result = stepRace(state, noInput, 0.001, random)
-    const player = result.state.vehicles.find(({ player }) => player)
-
-    expect(player && initial.path.terrainSurface.materialAt(player)).not.toBe(
-      'water',
-    )
-    expect(result.state.phase).toBe('running')
-    expect(
-      result.events.some((event) => event.type === 'race-finished'),
-    ).toBe(false)
-  })
-
-  it('becomes airborne when collision removes elevated ground support, then sinks on landing', () => {
-    const { initial, state, supportHeight } =
-      hillBoundaryCollisionState(0)
-    expect(supportHeight).toBeGreaterThan(0)
-
-    let result = stepRace(state, noInput, 0.001, random)
-    const launched = result.state.vehicles.find(({ player }) => player)
-
-    expect(
-      launched && initial.path.terrainSurface.materialAt(launched),
-    ).toBe('water')
-    expect(launched).toMatchObject({
-      grounded: false,
-      contactLoad: 0,
-    })
-    expect(launched?.z).toBeCloseTo(supportHeight)
-    expect(launched?.verticalVelocity).toBeLessThanOrEqual(0)
-    expect(result.state.phase).toBe('running')
-
-    for (
-      let frame = 0;
-      frame < 10 && result.state.phase === 'running';
-      frame += 1
-    ) {
-      result = stepRace(result.state, noInput, 0.05, random)
-    }
-    expect(result.state.phase).toBe('finished')
-    expect(result.events).toContainEqual({
-      type: 'race-finished',
-      reason: 'water',
-    })
-  })
-
-  it('uses the same post-collision support transition for AI', () => {
-    const { initial, state, supportHeight } =
-      hillBoundaryCollisionState(1)
-
-    let result = stepRace(state, noInput, 0.001, random)
-    const launched = result.state.vehicles[1]
-
-    expect(
-      launched && initial.path.terrainSurface.materialAt(launched),
-    ).toBe('water')
-    expect(launched).toMatchObject({
-      grounded: false,
-      contactLoad: 0,
-    })
-    expect(launched?.z).toBeCloseTo(supportHeight)
-    expect(launched?.verticalVelocity).toBeLessThanOrEqual(0)
-
-    for (
-      let frame = 0;
-      frame < 10 &&
-      result.state.vehicles[1]?.grounded === false;
-      frame += 1
-    ) {
-      result = stepRace(result.state, noInput, 0.05, random)
-    }
-    const recovered = result.state.vehicles[1]
-    expect(recovered?.grounded).toBe(true)
-    expect(
-      recovered && initial.path.terrainSurface.materialAt(recovered),
-    ).not.toBe('water')
   })
 
   it('does not award a same-frame finish when water recovery interrupts the crossing', () => {

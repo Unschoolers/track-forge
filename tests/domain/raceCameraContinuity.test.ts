@@ -168,7 +168,7 @@ describe('race camera road continuity', () => {
     (reversed) => {
       const path = closedHairpin()
       const index = path.points.findIndex(point => point.segment === 0 && point.x >= 432)
-      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, handling: 'simulation', reversed })
+      const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, reversed })
       const angle = reversed ? Math.PI : 0
       const player = {
         ...requireFixture(race.vehicles[0]), x: 432, y: 30, angle,
@@ -193,7 +193,7 @@ describe('race camera road continuity', () => {
 
   it('reacquires a distant road after leaving the current road on a closed circuit', () => {
     const path = closedHairpin()
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1, handling: 'simulation' })
+    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
     const destinationIndex = 262
     const destination = requireFixture(path.points[destinationIndex])
     const player = {

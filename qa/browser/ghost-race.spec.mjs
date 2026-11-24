@@ -26,9 +26,9 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await page.evaluate(() => {
     const track = JSON.parse(localStorage.getItem('trackforge-library-v2'))[0]
     const key = [track.id, track.updatedAt, track.start?.ratio ?? 0,
-      track.start?.reversed ? 'reverse' : 'forward', 'blue', 2, 'arcade'].join('|')
+      track.start?.reversed ? 'reverse' : 'forward', 'blue', 2].join('|')
     const point = track.points[0]
-    localStorage.setItem('trackforge-ghost-runs-v1', JSON.stringify({ [key]: {
+    localStorage.setItem('trackforge-ghost-runs-v2', JSON.stringify({ [key]: {
       car: 'blue', time: 60,
       frames: [0, 60].map(t => ({ t, x: point.x + t, y: point.y,
         angle: 0, z: 0, structureRunId: null })),
@@ -56,7 +56,7 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await page.locator('[data-car="red"]').click()
   await expect(ghost).toBeVisible()
   await expect(ghost).toBeDisabled()
-  await expect(page.getByText('Saved ghost: Blue · 2 laps · Arcade.')).toBeVisible()
+  await expect(page.getByText('Saved ghost: Blue · 2 laps.')).toBeVisible()
   await page.locator('[data-car="blue"]').click()
   await expect(ghost).toBeEnabled()
   await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'OPTIONS' }).click()

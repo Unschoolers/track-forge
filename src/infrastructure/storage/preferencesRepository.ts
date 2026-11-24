@@ -24,7 +24,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   steeringHand: 'left',
   controlSize: 'standard',
   steeringSensitivity: 1,
-  handling: 'arcade',
+  pedalMode: 'auto',
   raceLaps: 2,
   raceMode: 'normal',
   playerIdentity: DEFAULT_PLAYER_IDENTITY,
@@ -58,11 +58,13 @@ function parseFavoriteTrackIds(raw: string | null): readonly string[] {
 const SNAPSHOT_KEYS = [
   STORAGE_KEYS.steeringLayout, STORAGE_KEYS.steeringHand, STORAGE_KEYS.controlSize,
   STORAGE_KEYS.steeringSensitivity, STORAGE_KEYS.car, STORAGE_KEYS.difficulty,
-  STORAGE_KEYS.handling, STORAGE_KEYS.raceLaps, STORAGE_KEYS.raceMode,
+  STORAGE_KEYS.pedalMode, STORAGE_KEYS.raceLaps, STORAGE_KEYS.raceMode,
   STORAGE_KEYS.playerIdentity, STORAGE_KEYS.displayName, STORAGE_KEYS.creatorId,
   STORAGE_KEYS.favoriteTrackIds, STORAGE_KEYS.audio, STORAGE_KEYS.musicVolume,
   STORAGE_KEYS.soundEffectsVolume, STORAGE_KEYS.haptics, STORAGE_KEYS.dynamicZoom,
 ] as const
+
+const LEGACY_HANDLING_KEY = 'trackforge-handling-mode'
 
 function snapshotValues(raw: string | null): Record<string, string> | null {
   if (!raw || raw.length > 128_000) return null
@@ -73,10 +75,17 @@ function snapshotValues(raw: string | null): Record<string, string> | null {
     const values = envelope.values
     if (envelope.version !== 1 || !values || typeof values !== 'object' || Array.isArray(values)) return null
     const record = values as Record<string, unknown>
-    if (Object.keys(record).length !== SNAPSHOT_KEYS.length ||
-      !SNAPSHOT_KEYS.every(key => Object.hasOwn(record, key) &&
+    const legacy = !Object.hasOwn(record, STORAGE_KEYS.pedalMode) &&
+      Object.hasOwn(record, LEGACY_HANDLING_KEY)
+    const keys = legacy ? SNAPSHOT_KEYS.map(key =>
+      key === STORAGE_KEYS.pedalMode ? LEGACY_HANDLING_KEY : key) : SNAPSHOT_KEYS
+    if (Object.keys(record).length !== keys.length ||
+      !keys.every(key => Object.hasOwn(record, key) &&
         typeof record[key] === 'string' && (record[key] as string).length <= 4096)) return null
-    return record as Record<string, string>
+    const valid = record as Record<string, string>
+    if (!legacy) return valid
+    // The old atomic snapshot remains authoritative even if its mirrors failed.
+    return { ...valid, [STORAGE_KEYS.pedalMode]: valid[LEGACY_HANDLING_KEY] === 'simulation' ? 'manual' : 'auto' }
   } catch {
     // A corrupt snapshot is not authoritative: older installations remain readable.
     return null
@@ -97,7 +106,8 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       ? committed[key] ?? null : this.storage.get(key)
     const car = read(STORAGE_KEYS.car)
     const difficulty = read(STORAGE_KEYS.difficulty)
-    const handling = read(STORAGE_KEYS.handling)
+    const pedalMode = read(STORAGE_KEYS.pedalMode) ??
+      (read(LEGACY_HANDLING_KEY) === 'simulation' ? 'manual' : 'auto')
     const raceLaps = read(STORAGE_KEYS.raceLaps)
     const raceMode = read(STORAGE_KEYS.raceMode)
     const storedIdentity = read(STORAGE_KEYS.playerIdentity)
@@ -129,7 +139,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       difficulty: isDifficultyId(difficulty)
         ? difficulty
         : DEFAULT_PREFERENCES.difficulty,
-      handling: handling === 'simulation' ? 'simulation' : 'arcade',
+      pedalMode: pedalMode === 'manual' ? 'manual' : 'auto',
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
       raceMode: raceMode === 'ghost' || raceMode === 'time-trial' ? raceMode : 'normal',
       playerIdentity,
@@ -159,7 +169,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       [STORAGE_KEYS.steeringSensitivity]: String(preferences.steeringSensitivity ?? 1),
       [STORAGE_KEYS.car]: preferences.car,
       [STORAGE_KEYS.difficulty]: preferences.difficulty,
-      [STORAGE_KEYS.handling]: preferences.handling === 'simulation' ? 'simulation' : 'arcade',
+      [STORAGE_KEYS.pedalMode]: preferences.pedalMode === 'manual' ? 'manual' : 'auto',
       [STORAGE_KEYS.raceLaps]: String(preferences.raceLaps === 1 || preferences.raceLaps === 3 ? preferences.raceLaps : 2),
       [STORAGE_KEYS.raceMode]: preferences.raceMode ?? 'normal',
       [STORAGE_KEYS.playerIdentity]: JSON.stringify(normalizePlayerIdentity(preferences.playerIdentity)),

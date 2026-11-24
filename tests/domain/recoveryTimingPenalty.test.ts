@@ -17,7 +17,6 @@ const path = buildRoadPath([
 const start = () => {
   const race = createRace({
     path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal', laps: 1,
-    handling: 'arcade',
   })
   return { ...race, phase: 'running' as const }
 }
@@ -43,8 +42,8 @@ describe('manual recovery hold and elevated-road auto respawn', () => {
   })
 
   it('holds human and AI manual requests for exactly 30 running ticks and shows only the human signal', () => {
-    for (const handling of ['arcade', 'simulation'] as const) {
-      const initial = { ...start(), handling }
+    {
+      const initial = { ...start() }
       const player = requireFixture(initial.vehicles[0])
       const rival = requireFixture(initial.vehicles[1])
       const input = { steering: 0, throttle: 1, braking: false }

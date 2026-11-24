@@ -23,7 +23,7 @@ function race(
   const red = CAR_PASSING_POLICIES.red
   return runLaneCheck({
     path, trackName: loaded.name, car, difficulty: 'hard',
-    handling: 'arcade', seed: 4331, reversed: false,
+    seed: 4331, reversed: false,
     startRatio: 0.21932299012693934, laps: 2,
     mode, seconds: 140,
     ...(mode === 'duel' ? { duelOpponentCar: 'yellow' as const } : {}),
@@ -70,8 +70,7 @@ describe('Independent passing policy contracts', () => {
     if (!figureEight) throw new Error('Missing replay-accurate Figure-eight fixture')
     const options = {
       path: prepareLanePath(figureEight), trackName: figureEight.name,
-      car: 'yellow' as const, difficulty: 'hard' as const, handling: 'arcade' as const,
-      mode: 'duel' as const, duelOpponentCar: 'green' as const, duelOpponentSpeedLimit: 220,
+      car: 'yellow' as const, difficulty: 'hard' as const, mode: 'duel' as const, duelOpponentCar: 'green' as const, duelOpponentSpeedLimit: 220,
       seed: 1, reversed: false, startRatio: 0.32853982300884954,
       laps: 2, seconds: 100,
     }
@@ -90,8 +89,7 @@ describe('Independent passing policy contracts', () => {
   it('allows a bounded moving opponent pace only inside a duel', () => {
     const base = {
       path, trackName: loaded.name, car: 'yellow' as const,
-      difficulty: 'hard' as const, handling: 'arcade' as const,
-      seed: 1, reversed: false, laps: 1, seconds: 70,
+      difficulty: 'hard' as const, seed: 1, reversed: false, laps: 1, seconds: 70,
     }
     expect(() => runLaneCheck({
       ...base, mode: 'duel', duelOpponentCar: 'green',
@@ -111,8 +109,7 @@ describe('Independent passing policy contracts', () => {
   it('rejects a duel without a real selected rival', () => {
     expect(() => runLaneCheck({
       path, trackName: loaded.name, car: 'red', mode: 'duel',
-      seed: 1, difficulty: 'hard', handling: 'arcade',
-      reversed: false, laps: 2, seconds: 50,
+      seed: 1, difficulty: 'hard', reversed: false, laps: 2, seconds: 50,
     })).toThrow(/Invalid lane simulation options/)
   })
 })

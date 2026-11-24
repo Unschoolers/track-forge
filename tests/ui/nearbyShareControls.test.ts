@@ -20,7 +20,7 @@ const transport: NearbyTransport = {
 const result: RaceResult = {
   outcome: 'finished', trackId: asTrackId('nearby-results'),
   trackName: 'Figure eight', playerPlace: 1, playerTime: 41.5,
-  playerWrecked: false, newRecord: false, standings: [], highScores: [], mode: 'nearby',
+  newRecord: false, standings: [], highScores: [], mode: 'nearby',
 }
 
 describe('Nearby sharing and rematch controls', () => {

@@ -2,9 +2,9 @@ import { clamp } from '@/domain/geometry/math'
 import type { DriverInput } from '@/domain/race/raceState'
 import type { RaceControlsPort } from '@/application/ports/input'
 
-/** Arcade keeps its automatic throttle; Simulation uses the held input. */
-export function inputForHandling(input: DriverInput, handling: 'arcade' | 'simulation' | undefined): DriverInput {
-  return handling === 'simulation' ? input : { ...input, throttle: 1 }
+/** Apply a local pedal preference before the input reaches the race engine. */
+export function inputForPedals(input: DriverInput, pedalMode: 'auto' | 'manual' | undefined): DriverInput {
+  return pedalMode === 'manual' ? input : { ...input, throttle: 1 }
 }
 
 type PointerState =

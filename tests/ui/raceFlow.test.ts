@@ -8,7 +8,6 @@ import type {
 } from '@/application/race/raceSession'
 import { RaceSession } from '@/application/race/raceSession'
 import type { RaceStep } from '@/domain/race/raceEngine'
-import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining } from '@/domain/race/raceState'
 import type { RaceControlsPort } from '@/application/ports/input'
 import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
@@ -67,8 +66,6 @@ function raceSnapshot(
       vehicleCount: 4,
       lap: 1,
       totalLaps: 3,
-      damage: 2,
-      damageLimit: 5,
       ...overrides,
     },
     standings: [],
@@ -101,14 +98,17 @@ function pointer(type: string, id: number, x = 0): Event {
   return event
 }
 
-function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessionPort) {
+function setup(providedControls?: RaceControlsPort, providedSession?: RaceSessionPort, manual = false) {
   const root = document.createElement('div')
   document.body.append(root)
   let appListener: ((snapshot: AppSnapshot) => void) | undefined
   const raceListeners = new Set<(snapshot: RaceSessionSnapshot) => void>()
   let race = raceSnapshot()
   const controller = {
-    snapshot: () => appSnapshot(),
+    snapshot: () => {
+      const app = appSnapshot()
+      return manual ? { ...app, preferences: { ...app.preferences, pedalMode: 'manual' as const } } : app
+    },
     dispatch: vi.fn<(command: AppCommand) => void>(),
     subscribe: vi.fn((listener: (snapshot: AppSnapshot) => void) => {
       appListener = listener
@@ -185,7 +185,7 @@ function recoverySession() {
       phase: finishing ? 'finished' : 'running',
       elapsed: 23,
       vehicles: state.vehicles.map((vehicle) => vehicle.player
-        ? { ...vehicle, x: vehicle.x + 1000, y: vehicle.y + 1000, speed: 20, lap: 1, nextSector: 2, damage: 2 }
+        ? { ...vehicle, x: vehicle.x + 1000, y: vehicle.y + 1000, speed: 20, lap: 1, nextSector: 2 }
         : vehicle),
     },
     events: finishing ? [{ type: 'race-finished', reason: 'water' }] : [],
@@ -201,16 +201,15 @@ function recoverySession() {
 }
 
 describe('race UI flow', () => {
-  it('shows the missed gate countdown, recovers, and waits for the manual restart hold', () => {
+  it('shows the missed gate countdown and recovers immediately', () => {
     const controls = new RaceInputController()
-    const step: RaceStep = (state, _input, dt) => {
-      const held = manualRecoveryTicksRemaining(state.vehicles.find(vehicle => vehicle.player), state.tick) > 0
+    const step: RaceStep = (state) => {
       return {
         state: {
           ...state,
           tick: state.tick + 1,
-          elapsed: held ? state.elapsed + dt : state.elapsed || 2,
-          missedCheckpoint: held ? undefined : { gate: 1, remainingSeconds: 1.8, position: { x: 25, y: 20 } },
+          elapsed: state.elapsed || 2,
+          missedCheckpoint: { gate: 1, remainingSeconds: 1.8, position: { x: 25, y: 20 } },
         },
         events: [],
       }
@@ -221,7 +220,7 @@ describe('race UI flow', () => {
       feedback: { unlock() {}, setEnabled() {}, handle() {}, silenceContinuous() {}, destroy() {} },
       step,
     })
-    session.start(track, { car: 'blue', difficulty: 'normal', laps: 1, handling: 'arcade' })
+    session.start(track, { car: 'blue', difficulty: 'normal', laps: 1 })
     const { root } = setup(controls, session)
     const warning = requiredElement(root, '[data-checkpoint-warning]')
     expect(warning.hidden).toBe(true)
@@ -238,19 +237,6 @@ describe('race UI flow', () => {
     expect(controls.snapshot().steering).toBe(0)
     expect(session.snapshot().telemetry.elapsed).toBeCloseTo(2)
     expect(session.snapshot().state?.elapsed).toBe(2)
-
-    const recover = requiredElement(root, 'button[data-action="recover"]') as HTMLButtonElement
-    expect(recover.disabled).toBe(true)
-    for (let tick = 0; tick < MANUAL_RECOVERY_TICKS - 1; tick++) {
-      session.advance(1 / 60, controls.snapshot())
-      expect(recover.disabled).toBe(true)
-      expect(warning.hidden).toBe(true)
-    }
-    recover.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    expect(resetPlayer).toHaveBeenCalledTimes(1)
-    session.advance(1 / 60, controls.snapshot())
-    expect(recover.disabled).toBe(false)
-    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(2.5)
 
     // The next miss must also respond directly to a mobile touch down.
     // A synthesized click is not reliable if the player has another finger
@@ -301,8 +287,8 @@ describe('race UI flow', () => {
     recover.click()
     const after = session.snapshot()
     expect(after.state?.vehicles[0]?.x).not.toBe(before.state?.vehicles[0]?.x)
-    expect(after.state?.vehicles[0]).toMatchObject({ speed: 0, lap: 1, nextSector: 2, damage: 2 })
-    expect(after.telemetry).toMatchObject({ elapsed: 23, lap: 1, damage: 2 })
+    expect(after.state?.vehicles[0]).toMatchObject({ speed: 0, lap: 1, nextSector: 2 })
+    expect(after.telemetry).toMatchObject({ elapsed: 23, lap: 1 })
     expect(recover.disabled).toBe(true)
     expect(controls.snapshot()).toMatchObject({ steering: 0, braking: false })
     expect(pad.getAttribute('aria-valuenow')).toBe('0.00')
@@ -358,7 +344,6 @@ describe('race UI flow', () => {
     expect(root.querySelector('[data-race-time]')?.textContent).toBe(
       '01:05.432',
     )
-    expect(requiredElement(root, '[aria-label="Vehicle damage"]').hidden).toBe(true)
     expect(requiredElement(root, '[data-race-lap-times]').hidden).toBe(true)
 
     updateRace(
@@ -382,26 +367,6 @@ describe('race UI flow', () => {
     updateRace(raceSnapshot({ phase: 'running', elapsed: 0.05 }))
     expect(countdown.textContent).toBe('GO')
     expect(lights.dataset.signal).toBe('green')
-  })
-
-  it('shows the finished best lap and damage only where they are relevant', () => {
-    const { root, updateRace } = setup()
-    updateRace({
-      ...raceSnapshot({ currentLapTime: 9.5, bestLapTime: 15.25 }),
-      setup: { car: 'blue', difficulty: 'normal', laps: 3, handling: 'simulation' },
-    })
-    expect(requiredElement(root, '[aria-label="Vehicle damage"]').hidden).toBe(false)
-    expect(requiredElement(root, '[data-race-damage]').textContent).toBe('2/5')
-    expect(requiredElement(root, '[data-race-lap-times]').textContent).toBe('BEST 00:15.250')
-
-    updateRace({
-      ...raceSnapshot({ bestLapTime: 15.25, ghostGap: -0.42 }),
-      setup: { car: 'blue', difficulty: 'normal', laps: 3, mode: 'ghost' },
-      ghostTime: 45,
-    })
-    expect(requiredElement(root, '[aria-label="Vehicle damage"]').hidden).toBe(true)
-    expect(requiredElement(root, '[data-race-position]').textContent).toBe('00:45.000')
-    expect(requiredElement(root, '[data-race-ghost-gap]').textContent).toBe('GAP −00:00.420')
   })
 
   it('keeps the final lap notice visible when an overtake follows it', () => {
@@ -542,11 +507,11 @@ describe('race UI flow', () => {
     expect(banner.textContent).toBe('')
   })
 
-  it('exposes separate simulation pedals and releases each touch independently', () => {
+  it('exposes separate manual pedals and releases each touch independently', () => {
     const controls = new RaceInputController()
-    const { root, updateRace } = setup(controls)
+    const { root, updateRace } = setup(controls, undefined, true)
     const simulation = raceSnapshot()
-    const simulationSetup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 3, handling: 'simulation' as const }
+    const simulationSetup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 3 }
     updateRace({ ...simulation, setup: simulationSetup })
     const throttle = requiredElement(root, '[data-action="throttle"]')
     const brake = requiredElement(root, '[data-action="brake"]')
@@ -565,14 +530,13 @@ describe('race UI flow', () => {
       state: { paused: true, vehicles: [] } as unknown as RaceSessionSnapshot['state'] })
     expect(controls.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
     updateRace(raceSnapshot())
-    expect(throttle.hidden).toBe(true)
     expect(controls.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
   })
 
   it('keeps held gas through GO but clears controls on pause and resume', () => {
     const controls = new RaceInputController()
-    const { root, updateRace } = setup(controls)
-    const raceSetup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 3, handling: 'simulation' as const }
+    const { root, updateRace } = setup(controls, undefined, true)
+    const raceSetup = { car: 'blue' as const, difficulty: 'normal' as const, laps: 3 }
     const countdown = raceSnapshot({ phase: 'countdown' })
     updateRace({ ...countdown, setup: raceSetup })
     requiredElement(root, '[data-action="throttle"]').dispatchEvent(pointer('pointerdown', 51))
@@ -587,9 +551,8 @@ describe('race UI flow', () => {
 
   it('holds focused pedal with Enter or Space without sending Space to global braking', () => {
     const controls = new RaceInputController()
-    const { root, updateRace } = setup(controls)
-    const snapshot = raceSnapshot()
-    updateRace({ ...snapshot, setup: { car: 'blue', difficulty: 'normal', laps: 3, handling: 'simulation' } })
+    const { root, updateRace } = setup(controls, undefined, true)
+    updateRace(raceSnapshot())
     const throttle = requiredElement(root, '[data-action="throttle"]')
     const brake = requiredElement(root, '[data-action="brake"]')
     const globalKey = vi.fn()
@@ -834,7 +797,6 @@ describe('race UI flow', () => {
         trackName: track.name,
         playerPlace: 1,
         playerTime: 62.5,
-        playerWrecked: false,
         newRecord: true,
         standings: [
           {
@@ -843,7 +805,6 @@ describe('race UI flow', () => {
             player: true,
             place: 1,
             finishTime: 62.5,
-            wrecked: false,
             lap: 3,
           },
         ],
@@ -887,7 +848,6 @@ describe('race UI flow', () => {
         trackName: track.name,
         playerPlace: 4,
         playerTime: null,
-        playerWrecked: false,
         newRecord: false,
         standings: [],
         highScores: [],
@@ -905,11 +865,11 @@ describe('race UI flow', () => {
     const race = raceSnapshot({ phase: 'finished', elapsed: 40 })
     const result = {
       outcome: 'finished' as const, trackId: track.id, trackName: track.name, playerPlace: 1,
-      playerTime: 40, playerWrecked: false, newRecord: false, rivalsFinishing: true, highScores: [],
+      playerTime: 40, newRecord: false, rivalsFinishing: true, highScores: [],
       standings: [
-        { id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 40, wrecked: false, lap: 3 },
-        { id: 'ai-1', car: 'red' as const, player: false, place: 2, finishTime: null, wrecked: false, lap: 2 },
-        { id: 'ai-2', car: 'yellow' as const, player: false, place: 3, finishTime: null, wrecked: false, lap: 2 },
+        { id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 40, lap: 3 },
+        { id: 'ai-1', car: 'red' as const, player: false, place: 2, finishTime: null, lap: 2 },
+        { id: 'ai-2', car: 'yellow' as const, player: false, place: 3, finishTime: null, lap: 2 },
       ],
     }
     updateRace({ ...race, result })

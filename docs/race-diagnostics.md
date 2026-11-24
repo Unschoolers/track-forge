@@ -19,7 +19,7 @@ By default, time-weighted stats **stop at the player's recorded finish**. Rivals
 
 `track` prints a deterministic geometry/terrain fingerprint, road point count, surface/structure breakdown, terrain cell counts, bounds, checkpoints and scenery count. The fingerprint ignores track names, versions, decoration and terrain cell ordering, so it can check whether a replay and an independently uploaded track use the same *road and terrain*. It does **not** assert identical scenery or checkpoints.
 
-`compare` matches car color **and player/AI role** (not changing grid slot). It warns about different geometry, difficulty, handling, grid, laps, mode and player car. It does not treat a human four-car time as directly equivalent to a seeded AI solo time.
+`stats` and `compare` accept replay format version 1 without modifying the source files. The summary identifies the recorded ruleset and format version, preserving historical Simulation collision incidents. `compare` matches car color **and player/AI role** (not changing grid slot). It warns about different geometry, difficulty, ruleset, grid, laps, mode and player car. It does not treat a human four-car time as directly equivalent to a seeded AI solo time.
 
 ## Simulate a supplied track, with exactly the authored geometry
 
@@ -30,7 +30,7 @@ npm run qa:race -- simulate path/to/trackforge-race-Roundabout-Hard.json
 npm run qa:race -- simulate path/to/Roundabout.trackforge.json --car yellow --seed 4331
 ```
 
-The simulator emits a machine-readable line prefixed `TRACKFORGE_AI_DIAGNOSTIC`. Use this to compare individual AI finish times, recoveries, off-road seconds and failures on identical track/cars/settings. When passed a **race replay**, the command defaults to its player car, difficulty, grid, start and handling; that slot is AI-controlled for this diagnostic. When passed a **track file**, it defaults to four single-car simulations. Override as needed with `--car`, `--mode`, `--seed`, `--laps`, `--start`, `--grid` and `--seconds`. These are deterministic simulations, **not** exact replays of human input or multiplayer network traffic.
+The simulator emits a machine-readable line prefixed `TRACKFORGE_AI_DIAGNOSTIC`. Use this to compare individual AI finish times, recoveries, off-road seconds and failures on identical track/cars/settings. When passed a **race replay**, the command defaults to its player car, difficulty, grid, and start; that slot is AI-controlled for this diagnostic. When passed a **track file**, it defaults to four single-car simulations. Override as needed with `--car`, `--mode`, `--seed`, `--laps`, `--start`, `--grid` and `--seconds`. These are deterministic simulations using the current Arcade engine, **not** exact replays of human input, historical Simulation physics or multiplayer network traffic. A legacy Simulation input produces an explicit ruleset warning.
 
 The start ratio is inferred from the first recorded player road distance
 when a replay does not explicitly save it. If this cannot be recovered, use
@@ -54,4 +54,4 @@ The simulator uses actual exported road controls and terrain cells, but the lane
 4. Tune **driver strategy only**, per car in `src/domain/race/ai/aiCarDrivingProfiles.ts`; never grant AI-only engine, steering friction, or brake power. A fast lap with automatic recovery is a regression.
 5. Run `npm run qa:race:test`, the targeted AI tests, lane QA, typecheck and cross-track regression runs before claiming a gain.
 
-Sources: `qa/race-analysis/{summary.mjs,cli.mjs,simulateTrack.test.ts}`; pure analyzer tests `qa/race-analysis/summary.check.mjs`.
+Sources: `qa/race-analysis/{summary.mjs,cli.mjs}` and `tests/qa/raceAnalysisSimulation.test.ts`; pure analyzer tests `qa/race-analysis/summary.check.mjs`.

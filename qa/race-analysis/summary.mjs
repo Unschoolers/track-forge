@@ -7,6 +7,17 @@ const finite = (n) => typeof n === 'number' && Number.isFinite(n)
 const round = (n) => Math.round(n * 1000) / 1000
 const identity = (v) => (v.player ? 'player' : 'AI') + ':' + v.car
 
+/** Read the original replay contract, including historical Simulation races. */
+export function replayRuleset(exported) {
+  assert(exported?.format === 'trackforge-race-replay', 'expected trackforge-race-replay')
+  assert(exported.formatVersion === 1, 'unsupported race formatVersion (expected 1)')
+  // V1 RaceSetup.handling was optional; its engine default was Arcade.
+  const handling = exported.setup?.handling
+  assert(handling === undefined || handling === 'arcade' || handling === 'simulation',
+    'invalid legacy race handling')
+  return handling ?? 'arcade'
+}
+
 /** Geometry + terrain identity, independent of track name and decoration. */
 export function trackFingerprint(exported) {
   const track = exported?.track
@@ -53,7 +64,7 @@ export function groupHotspots(events, binSize = 50) {
   assert(Number.isInteger(binSize) && binSize > 0, 'hotspotBin must be positive')
   const groups = new Map()
   const interesting = new Set([
-    'curb-hit', 'vehicle-recovered', 'collision', 'barrier-collision', 'surface-changed',
+    'curb-hit', 'vehicle-recovered', 'surface-changed', 'collision', 'barrier-collision',
   ])
   for (const event of events) {
     if (!interesting.has(event.type)) continue
@@ -78,8 +89,7 @@ export function groupHotspots(events, binSize = 50) {
  * Events use exact ticks; telemetry is sampled at the export's frame interval.
  */
 export function summarizeRace(exported, options = {}) {
-  assert(exported?.format === 'trackforge-race-replay', 'expected trackforge-race-replay')
-  assert(exported.formatVersion === 1, 'unsupported race formatVersion')
+  const ruleset = replayRuleset(exported)
   assert(Array.isArray(exported.frames) && exported.frames.length > 0, 'missing frames')
   assert(Array.isArray(exported.events), 'missing events')
   const frames = exported.frames
@@ -165,24 +175,30 @@ export function summarizeRace(exported, options = {}) {
     const event = item.event
     if (!event || typeof event.type !== 'string') continue
     while (frameIndex + 1 < frames.length && frames[frameIndex + 1].t <= item.t) frameIndex++
-    const s = statsById.get(event.vehicleId)
-    if (!s) continue
-    s.events[event.type] = (s.events[event.type] ?? 0) + 1
-    if (event.type === 'vehicle-recovered') {
-      s.recoveries.push({
-        time: round(item.t), reason: event.reason ?? 'unknown',
-        pathIndex: event.pathIndex ?? null,
+    // Historical car-to-car collisions identify two participants, whereas
+    // all other vehicle events carry a single vehicleId.
+    const ids = event.type === 'collision'
+      ? new Set([event.leftId, event.rightId]) : [event.vehicleId]
+    for (const id of ids) {
+      const s = statsById.get(id)
+      if (!s) continue
+      s.events[event.type] = (s.events[event.type] ?? 0) + 1
+      if (event.type === 'vehicle-recovered') {
+        s.recoveries.push({
+          time: round(item.t), reason: event.reason ?? 'unknown',
+          pathIndex: event.pathIndex ?? null,
+        })
+      }
+      if (event.type === 'gate-crossed') s.gates.push({
+        lap: event.lap, gate: event.gate, time: round(event.time ?? item.t),
+      })
+      const sample = frames[frameIndex]?.vehicles?.find((v) => v.id === id)
+      const pathIndex = event.pathIndex ?? sample?.pathIndex
+      if (Number.isInteger(pathIndex)) locations.push({
+        id: s.id, car: s.car, type: event.type,
+        time: round(item.t), pathIndex,
       })
     }
-    if (event.type === 'gate-crossed') s.gates.push({
-      lap: event.lap, gate: event.gate, time: round(event.time ?? item.t),
-    })
-    const sample = frames[frameIndex]?.vehicles?.find((v) => v.id === event.vehicleId)
-    const pathIndex = event.pathIndex ?? sample?.pathIndex
-    if (Number.isInteger(pathIndex)) locations.push({
-      id: s.id, car: s.car, type: event.type,
-      time: round(item.t), pathIndex,
-    })
   }
   const standings = new Map((exported.result?.standings ?? []).map((v) => [v.id, v]))
   const vehicles = [...statsById.values()].map((s) => {
@@ -203,6 +219,7 @@ export function summarizeRace(exported, options = {}) {
     }
   })
   return {
+    formatVersion: exported.formatVersion, ruleset,
     track: summarizeTrack(exported), setup: exported.setup,
     observationEnd: round(end), observationType: options.full ? 'full-recording' : 'player-finish',
     droppedEvents: exported.droppedEvents ?? 0, vehicles,
@@ -214,8 +231,9 @@ export function summarizeRace(exported, options = {}) {
 export function compareRaces(before, after) {
   const a = summarizeRace(before), b = summarizeRace(after)
   const warnings = []
+  if (a.ruleset !== b.ruleset) warnings.push('Different handling rulesets (Arcade vs Simulation)')
   if (a.track.fingerprint !== b.track.fingerprint) warnings.push('Different track geometry/terrain')
-  for (const key of ['difficulty', 'handling', 'laps', 'mode', 'car']) {
+  for (const key of ['difficulty', 'laps', 'mode', 'car']) {
     if (a.setup?.[key] !== b.setup?.[key]) warnings.push('Different ' + key)
   }
   if (JSON.stringify(a.setup?.gridPositions) !== JSON.stringify(b.setup?.gridPositions))
@@ -234,7 +252,7 @@ export function compareRaces(before, after) {
     }]
   })
   return {
-    warnings, first: { track: a.track.name, observed: a.observationEnd },
-    second: { track: b.track.name, observed: b.observationEnd }, comparisons,
+    warnings, first: { track: a.track.name, observed: a.observationEnd, formatVersion: a.formatVersion, ruleset: a.ruleset },
+    second: { track: b.track.name, observed: b.observationEnd, formatVersion: b.formatVersion, ruleset: b.ruleset }, comparisons,
   }
 }

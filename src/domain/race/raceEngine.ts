@@ -1,8 +1,6 @@
 import type { RandomSource } from '@/domain/race/randomSource'
 import { rivalCatchUp } from '@/domain/race/ai/catchUp'
-import { solveCollisionFrame } from '@/domain/race/collisions'
 import { lastRoadRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
-import { hitScenery } from '@/domain/race/sceneryCollisions'
 import { lastSampleBeforeCheckpoint, passedPendingCheckpoint, updateProgress } from '@/domain/race/progress'
 import {
   manualRecoveryTicksRemaining,
@@ -18,7 +16,6 @@ import {
   resetVehicleToTrack,
 } from '@/domain/race/trackContext'
 import { advanceRaceEffects } from '@/domain/race/effects'
-import { solveBridgeBarrierFrame } from '@/domain/race/bridgeBarriers'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
@@ -43,26 +40,14 @@ export type RaceEvent =
     }
   | { readonly type: 'vehicle-landed'; readonly vehicleId: string; readonly strength: number }
   | {
-      readonly type: 'collision'
-      readonly leftId: string
-      readonly rightId: string
-      readonly strength: number
-    }
-  | {
-      readonly type: 'barrier-collision'
-      readonly vehicleId: string
-      readonly strength: number
-    }
-  | {
       readonly type: 'vehicle-finished'
       readonly vehicleId: string
       readonly time: number
     }
-  | { readonly type: 'vehicle-wrecked'; readonly vehicleId: string }
   | {
       readonly type: 'vehicle-recovered'
       readonly vehicleId: string
-      readonly reason: 'off-road' | 'water' | 'wreck' | 'scenery' | 'missed-checkpoint'
+      readonly reason: 'off-road' | 'water' | 'missed-checkpoint'
       /** Position and followed road sample before automatic recovery. */
       readonly x: number
       readonly y: number
@@ -110,7 +95,7 @@ function controlsForVehicle(
 export const stepRace: RaceStep = advanceRace
 
 export function isRivalRacing(vehicle: RaceVehicle): boolean {
-  return !vehicle.player && vehicle.finishedAt === null && !vehicle.wrecked
+  return !vehicle.player && vehicle.finishedAt === null
 }
 
 /** Advance only active rivals after the player has finished. */
@@ -154,7 +139,6 @@ function advanceRace(
   const dt = Math.min(0.05, deltaSeconds)
   const elapsed = state.elapsed + dt
   const events: RaceEvent[] = []
-  const arcade = !('handling' in state) || state.handling !== 'simulation'
   let missedCheckpoint = state.missedCheckpoint
   const held = new Set(state.vehicles.filter(vehicle => manualRecoveryTicksRemaining(vehicle, state.tick) > 0).map(vehicle => vehicle.id))
   const moved = state.vehicles.map((vehicle) => {
@@ -164,26 +148,11 @@ function advanceRace(
     return advanceVehicle(vehicle, state, input, dt, random,
       input ? undefined : rivalCatchUp(state, vehicle))
   })
-  const barrierFrame = arcade
-    ? { vehicles: moved, activeContacts: [], events: [] }
-    : solveBridgeBarrierFrame(
-    state.vehicles,
-    moved,
-    state.path,
-    state.activeContacts,
-  )
-  for (const event of barrierFrame.events) {
-    events.push({
-      type: 'barrier-collision',
-      vehicleId: event.vehicleId,
-      strength: event.strength,
-    })
-  }
-  const progressed = barrierFrame.vehicles.map((vehicle, index) => {
+  const progressed = moved.map((vehicle, index) => {
     if (held.has(vehicle.id)) return state.vehicles[index] ?? vehicle
     const context = raceVehicleContext(state, vehicle)
     const previous = state.vehicles[index]
-    const stuckInput = vehicle.player && elapsed > 1.1 && vehicle.speed < 13 && !vehicle.wrecked
+    const stuckInput = vehicle.player && elapsed > 1.1 && vehicle.speed < 13
       ? (controls && controlsForVehicle(controls, vehicle.id)) ?? playerInput
       : undefined
     const stuckDuration = stuckInput && stuckInput.throttle > 0 && !stuckInput.braking
@@ -293,21 +262,12 @@ function advanceRace(
     }
     return updated
   })
-  const collisionFrame = arcade
-    ? { vehicles: progressed, activeContacts: [], events: [] }
-    : solveCollisionFrame(
-    progressed,
-    state.activeContacts,
-    dt,
-    held,
-  )
-  let vehicles = collisionFrame.vehicles.map((collided, index) => {
+  let vehicles = progressed.map((collided, index) => {
     const prior = state.vehicles[index]
     if (prior && (held.has(prior.id) || (!prior.player && prior.finishedAt !== null))) return prior
     const context = raceVehicleContext(state, collided)
     const vehicle = reconcileSupportAfterCollision(collided, context)
     const usesCheckpoints = vehicle.player && Boolean(state.recoveryCheckpoints?.length)
-    if (vehicle.player && !arcade && !usesCheckpoints && !state.sceneryColliders?.size) return vehicle
     const waterContact = hasVehicleWaterContact({
       grounded: vehicle.grounded,
       terrainMaterial: context.terrainMaterial,
@@ -318,10 +278,7 @@ function advanceRace(
     if (vehicle.player && vehicle.bridgeFallSeconds !== undefined &&
         vehicle.bridgeFallSeconds < BRIDGE_FALL_RESPAWN_SECONDS) return vehicle
     const previous = state.vehicles[index]
-    const sceneryHit = !arcade && vehicle.player && previous && state.sceneryColliders &&
-      !events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id) &&
-      hitScenery(state.sceneryColliders, previous, vehicle)
-    if ((usesCheckpoints && ((waterContact && !vehicle.waterRecoveryProtected) || vehicle.wrecked)) || sceneryHit) {
+    if (usesCheckpoints && waterContact && !vehicle.waterRecoveryProtected) {
       const candidate = previous
         ? restoreFrameProgress({ ...vehicle, pathIndex: previous.pathIndex }, previous)
         : vehicle
@@ -329,14 +286,13 @@ function advanceRace(
       if (reset !== candidate) {
         events.push({
           type: 'vehicle-recovered', vehicleId: vehicle.id,
-          reason: waterContact ? 'water' : vehicle.wrecked ? 'wreck' : 'scenery',
+          reason: 'water',
           x: vehicle.x, y: vehicle.y, pathIndex: vehicle.pathIndex,
         })
         return reset
       }
     }
-    if (vehicle.player && !arcade) return vehicle
-    if (arcade && vehicle.player && vehicle.waterRecoveryProtected) {
+    if (vehicle.player && vehicle.waterRecoveryProtected) {
       return vehicle.grounded && !waterContact
         ? { ...vehicle, waterRecoveryProtected: false }
         : vehicle
@@ -405,9 +361,6 @@ function advanceRace(
       }
     }
   }
-  for (const collision of collisionFrame.events) {
-    events.push({ type: 'collision', ...collision })
-  }
   let player = vehicles.find((vehicle) => vehicle.player)
   const playerContext = player
     ? raceVehicleContext(state, player)
@@ -415,7 +368,7 @@ function advanceRace(
   const playerWaterContact =
     player !== undefined &&
     playerContext !== undefined &&
-    !(arcade && player.waterRecoveryProtected) &&
+    !player.waterRecoveryProtected &&
     (player.bridgeFallSeconds === undefined || player.bridgeFallSeconds >= BRIDGE_FALL_RESPAWN_SECONDS) &&
     hasVehicleWaterContact({
       grounded: player.grounded,
@@ -454,24 +407,18 @@ function advanceRace(
         time: vehicle.finishedAt,
       })
     }
-    if (!previous.wrecked && vehicle.wrecked) {
-      events.push({ type: 'vehicle-wrecked', vehicleId: vehicle.id })
-    }
   }
   player = vehicles.find((vehicle) => vehicle.player)
   const impactShake = Math.min(
     6,
     Math.max(
       0,
-      ...collisionFrame.events.map(({ strength }) => strength / 18),
       (player?.landingIntensity ?? 0) * 4.5,
     ),
   )
   const terminalReason =
     playerWaterContact
       ? 'water'
-      : player?.wrecked === true
-      ? 'wrecked'
       : player?.finishedAt !== null && player?.finishedAt !== undefined
         ? 'finished'
         : null
@@ -486,10 +433,6 @@ function advanceRace(
       tick: state.tick + 1,
       elapsed,
       phase: terminalReason ? 'finished' : 'running',
-      activeContacts: [
-        ...collisionFrame.activeContacts,
-        ...barrierFrame.activeContacts,
-      ],
       cameraHints: player
         ? {
             ...buildRaceCameraHints(
