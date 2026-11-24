@@ -65,6 +65,7 @@ export function lastSampleBeforeCheckpoint(
 export function passedPendingCheckpoint(
   path: RoadPath, vehicle: RaceVehicle, timingGates: readonly number[] = [],
 ): boolean {
+  if (vehicle.finishedAt !== null) return false
   const next = timingGates[vehicle.nextSector - 1] ?? path.points.length - 1
   return vehicle.pathIndex > next + 2
 }
