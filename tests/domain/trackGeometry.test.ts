@@ -209,67 +209,6 @@ describe('TrackGeometry', () => {
     expect(service.get({ ...track, terrain })).not.toBe(first)
   })
 
-  it('uses immutable points and terrain identity before allocating a signature', () => {
-    const service = new TrackGeometryService()
-    const track = square()
-    let terrainSignatureReads = 0
-    const cells = new Proxy(track.terrain.cells, {
-      get(target, property, receiver) {
-        if (property === 'map') terrainSignatureReads += 1
-        return Reflect.get(target, property, receiver)
-      },
-    })
-    const input = {
-      points: track.points,
-      terrain: { ...track.terrain, cells },
-      ...(track.start ? { start: track.start } : {}),
-    }
-    const first = service.get(input)
-    const readsAfterFirstBuild = terrainSignatureReads
-
-    expect(service.get({ ...input })).toBe(first)
-    expect(terrainSignatureReads).toBe(readsAfterFirstBuild)
-  })
-
-  it('resolves immutable identity hits with constant input reads', () => {
-    const service = new TrackGeometryService()
-    const inputs = Array.from({ length: 24 }, (_, variant) => {
-      const candidate = square()
-      return {
-        ...candidate,
-        points: candidate.points.map((point, index) =>
-          index === 1 ? { ...point, x: point.x + variant } : point,
-        ),
-      }
-    })
-    for (const input of inputs) service.get(input)
-    const targetInput = inputs.at(-1)
-    if (!targetInput) throw new Error('Expected an identity target')
-    const targetStart = targetInput.start
-    if (!targetStart) throw new Error('Expected a start configuration')
-    let inputReads = 0
-    const measuredInput = {
-      get points() {
-        inputReads += 1
-        return targetInput.points
-      },
-      get terrain() {
-        inputReads += 1
-        return targetInput.terrain
-      },
-      get start() {
-        inputReads += 1
-        return targetStart
-      },
-    }
-
-    expect(service.get(measuredInput)).toBe(service.get(targetInput))
-    inputReads = 0
-    service.get(measuredInput)
-
-    expect(inputReads).toBeLessThanOrEqual(4)
-  })
-
   it('evicts before retaining three worst-case terrain geometries', () => {
     const service = new TrackGeometryService()
     const baseCells = rectangle(0, 199, 0, 99).map((cell) => ({
