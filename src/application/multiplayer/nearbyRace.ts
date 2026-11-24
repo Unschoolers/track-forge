@@ -63,13 +63,17 @@ type Purpose = 'race' | 'share'
 export const LOBBY_DELIVERY_TIMEOUT_MS = 10_000
 const LOBBY_ACK_TIMEOUT_MS = 30_000
 
+class LobbyDeliveryTimeoutError extends Error {
+  constructor() { super('Lobby delivery timed out.') }
+}
+
 async function withLobbyDeliveryDeadline(operation: Promise<void>): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
       operation,
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error('Lobby delivery timed out.')), LOBBY_DELIVERY_TIMEOUT_MS)
+        timer = setTimeout(() => reject(new LobbyDeliveryTimeoutError()), LOBBY_DELIVERY_TIMEOUT_MS)
       }),
     ])
   } finally {
@@ -391,7 +395,9 @@ export class NearbyRace {
       send: id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'),
       settled: () => { if (this.currentLobby(active, round)) this.startHost() },
       failed: error => {
-        if (this.currentLobby(active, round)) this.fail('Could not update a connected player’s lobby.', 'lobby_roster', error)
+        if (this.currentLobby(active, round)) this.fail(error instanceof LobbyDeliveryTimeoutError
+        ? 'Lobby synchronization timed out. Rejoin the room.'
+        : 'Could not update a connected player’s lobby.', 'lobby_roster', error)
       },
       superseded: () => {
         if (this.currentLobby(active, round)) this.record('lobby_roster_delivery_superseded', { revision })
@@ -988,6 +994,8 @@ export class NearbyRace {
       if (message.type === 'finish' || message.type === 'left') {
         this.error = 'A player did not receive the latest race result.'
         this.changed()
+      } else if (error instanceof LobbyDeliveryTimeoutError) {
+        this.fail('Lobby synchronization timed out. Rejoin the room.', 'lobby_choice', error)
       } else this.fail('A nearby race message could not be sent.')
     })
   }
@@ -1143,6 +1151,7 @@ export class NearbyRace {
 
   private errorKind(error: unknown): string {
     // Arbitrary exception text can contain endpoint IDs, room names or track data.
+    if (error instanceof LobbyDeliveryTimeoutError) return 'lobby_delivery_timeout'
     return error instanceof Error ? 'Error' : 'unknown'
   }
 
