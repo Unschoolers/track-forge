@@ -63,7 +63,8 @@ const trackStore = new BrowserTrackRepository(storage)
 // Retire untouched system copies only. Never erase changed art or track data.
 for (const track of trackStore.list()) {
   if (isUntouchedLegacyStarter(track) &&
-      (track.origin === 'seeded' || track.id === SYSTEM_STARTER_TRACK_ID)) {
+      (track.origin === 'seeded' || track.id === SYSTEM_STARTER_TRACK_ID ||
+       (!track.origin && !track.creator && track.id.startsWith('starter-')))) {
     if (!trackStore.remove(track.id)) console.error('Could not remove the retired starter circuit.')
   }
 }
