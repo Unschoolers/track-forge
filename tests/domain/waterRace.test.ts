@@ -716,7 +716,7 @@ describe('water race contact', () => {
               y: 16,
               z: 0,
               pathIndex: path.points.length - 2,
-              nextSector: 4 as const,
+              nextSector: 1 as const,
               vx: 0,
               vy: 0,
               speed: 0,
