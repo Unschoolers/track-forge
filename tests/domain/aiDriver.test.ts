@@ -79,11 +79,11 @@ describe('rival tendencies', () => {
     expect(createAiDriverState(0).personality).toBeUndefined()
   })
 
-  it('makes three distinct decisions in the same safe passing scene', () => {
+  it('makes three distinct decisions when safely passing a human', () => {
     const [, first, second] = cars()
     if (!first || !second) throw new Error('Missing race fixtures')
     const ego = { ...first, lane: 0, pathIndex: 10, speed: 110, vx: 110 }
-    const traffic = getTrafficState(ego, [{ ...second, lane: 0, pathIndex: 16, speed: 100 }], path.points.length)
+    const traffic = getTrafficState(ego, [{ ...second, player: true, lane: 0, pathIndex: 16, speed: 100 }], path.points.length)
     const decisions = (['cautious', 'steady', 'opportunist'] as const).map((profile) =>
       driveWithTraffic({ ...ego, ai: createAiDriverState(0, profile) }, traffic).ai,
     )
@@ -98,9 +98,9 @@ describe('rival tendencies', () => {
     if (!first || !second || !third) throw new Error('Missing race fixtures')
     const ego = { ...first, lane: 0, pathIndex: 10, speed: 110, vx: 110, ai: createAiDriverState(0, profile) }
     const traffic = getTrafficState(ego, [
-      { ...second, lane: 0, pathIndex: 16, speed: 45 },
-      { ...third, lane: -24, pathIndex: 11, speed: 90 },
-      { ...third, id: 'other', lane: 24, pathIndex: 11, speed: 90 },
+      { ...second, player: true, lane: 0, pathIndex: 16, speed: 45 },
+      { ...third, player: true, lane: -24, pathIndex: 11, speed: 90 },
+      { ...third, player: true, id: 'other', lane: 24, pathIndex: 11, speed: 90 },
     ], path.points.length)
     expect(driveWithTraffic(ego, traffic).ai?.phase).toBe('follow')
   })
@@ -144,7 +144,7 @@ describe('overtaking AI', () => {
       if (!first || !second || !third) throw new Error('Missing race fixtures')
       const ego = onPath(first, path, 30, 0, 120)
       const finisher = { ...onPath(second, path, 33, 0, 0), finishedAt: 0 }
-      const rival = onPath(third, path, 34, 0, 10)
+      const rival = onPath({ ...third, player: true }, path, 34, 0, 10)
       const trafficPath = pathKind === 'road path' ? path : path.points.length
 
       const clear = getTrafficState(ego, [finisher], trafficPath)
@@ -203,11 +203,11 @@ describe('overtaking AI', () => {
     )
   })
 
-  it('brakes when the car ahead overlaps the vehicle clearance corridor', () => {
+  it('brakes when the human ahead overlaps the vehicle clearance corridor', () => {
     const [, first, second] = cars()
     if (!first || !second) throw new Error('Missing race fixtures')
     const ego = onPath(first, path, 30, -8, 120)
-    const rival = onPath(second, path, 33, 8, 10)
+    const rival = onPath({ ...second, player: true }, path, 33, 8, 10)
     const traffic = getTrafficState(ego, [rival], path)
 
     expect(traffic.ahead?.vehicle.id).toBe(rival.id)
@@ -377,14 +377,14 @@ describe('overtaking AI', () => {
   )
 
   it.each([false, true])(
-    'brakes for a closing car across the physical path wrap (reversed: %s)',
+    'brakes for a closing human-driven car across the physical path wrap (reversed: %s)',
     (reversed) => {
       const [, first, second] = cars()
       if (!first || !second) throw new Error('Missing race fixtures')
       const egoIndex = reversed ? 1 : path.points.length - 2
       const rivalIndex = reversed ? path.points.length - 2 : 1
       const ego = onPath(first, path, egoIndex, 0, 120, reversed)
-      const rival = onPath(second, path, rivalIndex, 0, 10, reversed)
+      const rival = onPath({ ...second, player: true }, path, rivalIndex, 0, 10, reversed)
       const traffic = getTrafficState(ego, [rival], path, reversed)
       const stepped = stepAiVehicle(
         ego,
@@ -457,7 +457,7 @@ describe('overtaking AI', () => {
     expect(Number.isFinite(stepped.angle)).toBe(true)
   })
 
-  it('commits to a passing lane and does not oscillate while holding it', () => {
+  it('commits to a lane when passing a human and does not oscillate', () => {
     const [, ego, rival] = cars()
     if (!ego || !rival) throw new Error('Missing race fixtures')
     const moving = {
@@ -470,7 +470,7 @@ describe('overtaking AI', () => {
     }
     const traffic = getTrafficState(
       moving,
-      [{ ...rival, speed: 45, pathIndex: 16, lane: 0 }],
+      [{ ...rival, player: true, speed: 45, pathIndex: 16, lane: 0 }],
       path.points.length,
     )
     const passing = stepAiVehicle(
@@ -484,7 +484,7 @@ describe('overtaking AI', () => {
     const committedLane = passing.ai?.passLane
     const changedTraffic = getTrafficState(
       passing,
-      [{ ...rival, speed: 45, pathIndex: 17, lane: committedLane ?? 0 }],
+      [{ ...rival, player: true, speed: 45, pathIndex: 17, lane: committedLane ?? 0 }],
       path.points.length,
     )
     const held = stepAiVehicle(
@@ -544,25 +544,25 @@ describe('overtaking AI', () => {
     expect(iceOnset).toBeLessThan(streetOnset)
   })
 
-  it('does not cut back while the passed target is still ahead in the base lane', () => {
+  it('does not cut back while the passed human is still ahead in the base lane', () => {
     const [, ego, rival] = cars()
     if (!ego || !rival) throw new Error('Missing race fixtures')
     const passing = { ...ego, lane: 40, pathIndex: 10, ai: {
       ...createAiDriverState(0), phase: 'passing' as const, targetLane: 40,
       passLane: 40, holdRemaining: 0, clearTime: 0.3, passTargetId: rival.id,
     } }
-    const blocker = { ...rival, lane: 0, pathIndex: 16 }
+    const blocker = { ...rival, player: true, lane: 0, pathIndex: 16 }
     const result = driveWithTraffic(passing, getTrafficState(passing, [blocker], path.points.length))
     expect(result.ai?.phase).toBe('passing')
   })
 
-  it.each(['passing', 'rejoin'] as const)('keeps clear of near-edge traffic during %s', (phase) => {
+  it.each(['passing', 'rejoin'] as const)('keeps clear of near-edge human traffic during %s', (phase) => {
     const [, first, second] = cars()
     if (!first || !second) throw new Error('Missing race fixtures')
     const ego = onPath(first, path, 30, 35, 100)
     const passing = { ...ego, ai: { ...createAiDriverState(0), phase, passLane: 35,
       targetLane: phase === 'rejoin' ? 0 : 35, holdRemaining: 0, clearTime: 0.3 } }
-    const rival = onPath(second, path, 31, 17, 100)
+    const rival = onPath({ ...second, player: true }, path, 31, 17, 100)
     const result = stepAiVehicle(passing, path, getTrafficState(passing, [rival], path), 'normal', 0.05)
     expect(result.ai?.phase).toBe('passing')
     expect(result.ai?.targetLane).toBe(35)

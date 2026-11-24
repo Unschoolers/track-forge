@@ -25,7 +25,7 @@ describe('AI race integration', () => {
     expect(new Set(ai.map((vehicle) => vehicle.aiPace)).size).toBe(3)
   })
 
-  it('updates AI lanes and state deterministically in the race engine', () => {
+  it('updates AI lanes deterministically when passing a human in the race engine', () => {
     const race = createRace({
       path,
       playerCar: 'blue',
@@ -54,7 +54,7 @@ describe('AI race integration', () => {
               vx: Math.cos(vehicle.angle) * 100,
               vy: Math.sin(vehicle.angle) * 100,
             }
-          : index === 2
+          : index === 0
             ? {
                 ...vehicle,
                 x: ahead.x,
