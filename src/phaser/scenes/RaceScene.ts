@@ -234,9 +234,10 @@ export class RaceScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.raceCamera.zoom)
       this.cameras.main.setRotation(-this.raceCamera.angle - Math.PI / 2)
     }
+    const cameraRotation = this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0
     this.renderGroundPresentation(
       this.raceSession.snapshot().setup?.lighting === 'night',
-      this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0,
+      cameraRotation,
     )
     this.vehicleGraphics.clear()
     this.shadowGraphics.clear()
@@ -250,7 +251,7 @@ export class RaceScene extends Phaser.Scene {
       const camera = this.cameras.main
       graphics.save()
       graphics.translateCanvas(player.x, player.y)
-      graphics.rotateCanvas(-camera.rotation)
+      graphics.rotateCanvas(-cameraRotation)
       graphics.scaleCanvas(1 / camera.zoom, 1 / camera.zoom)
       graphics.fillStyle(0x101820, 0.9 * restart.alpha)
       graphics.fillRoundedRect(-24, -54, 48, 22, 8)
