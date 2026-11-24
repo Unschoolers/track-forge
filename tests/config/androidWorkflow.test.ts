@@ -13,6 +13,18 @@ describe('Android CI selection', () => {
     expect(requiresNative([])).toBe(true)
   })
 
+  it('does not trigger native compilation for browser-only QA and configuration changes', () => {
+    const webAndQa = ['src/ui/components/raceFlyover.ts', 'tests/ui/raceFlyoverRenderer.test.ts',
+      'qa/browser/race-picker.spec.mjs', 'qa/production/race-start.spec.mjs',
+      'playwright.mobile.config.mjs', 'playwright.production.config.mjs']
+    expect(requiresNative(webAndQa)).toBe(false)
+    for (const path of ['android/app/src/main/AndroidManifest.xml', 'src-tauri/Cargo.toml',
+      'scripts/android-ci-native-required.mjs', 'qa/unknown/build.mjs',
+      'playwright.mobile.config.mjs.backup', '.github/workflows/build.yml', 'package-lock.json']) {
+      expect(requiresNative([...webAndQa, path]), path).toBe(true)
+    }
+  })
+
   it('always runs native on main and manual runs, invalid bases, or failed diffs', () => {
     expect(nativeRequired('push', baseSha)).toBe(true)
     expect(nativeRequired('workflow_dispatch', baseSha)).toBe(true)
