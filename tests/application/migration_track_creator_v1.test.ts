@@ -32,7 +32,11 @@ function setup() {
 describe('one-time track creator release migration', () => {
   it('claims every uncredited player track but preserves fixed system attribution and racing identity', () => {
     const { storage, tracks, preferences, migrate } = setup()
-    const builtIn = createStarterTrack(asTrackId('starter-old-generated-id'), 12)
+    // Old bundled starters predate authored checkpoint serialization.
+    const { recoveryCheckpoints: _markers, autoCheckpoints: _auto, ...builtIn } =
+      createStarterTrack(asTrackId('starter-old-generated-id'), 12)
+    void _markers
+    void _auto
     const userTrack: Track = {
       ...createStarterTrack(asTrackId('custom-rally'), 34),
       name: 'Rally',
