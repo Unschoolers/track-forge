@@ -172,11 +172,11 @@ export function createNearbyRaceModal(
       frame.body.append(element('p', 'modal-subtitle', 'Loading everyone into the race…'))
       break
   }
-  if (phase === 'idle') {
-    const details = element('details')
+  if (phase === 'idle' || phase === 'lobby') {
+    const details = element('details', phase === 'lobby' ? 'nearby-lobby-diagnostics' : undefined)
     details.append(element('summary', 'modal-subtitle', 'Diagnostics'), createDiagnosticsControl(actions.downloadDiagnostics))
     frame.body.append(details)
-  } else if (phase !== 'lobby') frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
+  } else frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
   frame.footer.append(button(phase === 'lobby' ? 'LEAVE ROOM' : 'BACK', 'nearby-back', actions.close, phase === 'lobby' ? 'button button-danger' : 'button'))
   return frame.overlay
 }
