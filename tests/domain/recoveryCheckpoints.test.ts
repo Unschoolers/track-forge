@@ -17,7 +17,7 @@ function running(
 ) {
   const initial = createRace({
     path, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'normal',
-    handling, laps: 1, recoveryCheckpoints: [0.15, 0.4, 0.8], recoveryScenery,
+    handling, laps: 1, recoveryCheckpoints: [0.15, 0.65, 0.8], recoveryScenery,
   })
   const player = requireFixture(initial.vehicles[0])
   return { ...initial, phase: 'running' as const, vehicles: [player] }
