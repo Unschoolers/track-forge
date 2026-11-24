@@ -7,6 +7,8 @@ import { createEditorState } from '@/domain/editor/editorState'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { asTrackId } from '@/domain/model'
 import type { AppSnapshot } from '@/application/appState'
+import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import { createNearbyRaceModal } from '@/ui/modals/nearbyRaceModal'
 import type { RaceResult } from '@/application/race/raceSession'
 
 const track = createStarterTrack(asTrackId('ghost-ui'), 1)
@@ -21,6 +23,43 @@ const state: AppSnapshot = {
   scoresByTrack: {}, notice: null,
 }
 const actions = () => ({ close: vi.fn(), preferences: vi.fn(), lighting: vi.fn(), start: vi.fn(), options: vi.fn() })
+describe('Shared race preparation', () => {
+  it('uses identical preview and car picker structure with distinct mode controls', () => {
+    const preview = () => {
+      const panel = document.createElement('div')
+      panel.className = 'race-flyover-panel'
+      return panel
+    }
+    const solo = createRaceSetupModal(state, actions(), null, preview())
+    const nearby = {
+      snapshot: () => ({
+        phase: 'lobby', purpose: 'race', role: 'host', track: track.name,
+        lobbyTrack: track, lighting: 'day', laps: 2, localCar: 'blue',
+        localReady: false, readyPending: false, unlockPending: false,
+        lobbyPlayers: [{ slot: 0, car: 'blue', name: 'Host', accepted: false, choice: 0 }],
+      }),
+      localSlot: () => 0, selectLobbyCar: vi.fn(), setLobbyReady: vi.fn(),
+    } as unknown as NearbyRace
+    const multi = createNearbyRaceModal(nearby, {
+      close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
+      saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(), downloadDiagnostics: vi.fn(async () => true),
+    }, undefined, preview())
+    for (const modal of [solo, multi]) {
+      expect(modal.classList.contains('race-preparation-modal')).toBe(true)
+      expect(modal.querySelector('.race-preparation-body > .race-flyover-panel')).not.toBeNull()
+      expect(modal.querySelectorAll('.race-preparation-picker .car-choice')).toHaveLength(4)
+      expect(modal.querySelectorAll('.car-stat-meter .car-stat-segment')).toHaveLength(20)
+    }
+    expect(solo.querySelector('.race-preparation-picker')?.outerHTML).toEqual(multi.querySelector('.race-preparation-picker')?.outerHTML)
+    expect(solo.querySelector('[data-action="setup-start"]')).not.toBeNull()
+    expect(solo.querySelector('[data-action="nearby-ready"]')).toBeNull()
+    expect(multi.querySelector('[data-action="nearby-ready"]')).not.toBeNull()
+    expect(multi.querySelector('[data-action="setup-start"]')).toBeNull()
+    expect(multi.querySelector('[data-action="mode-ghost"]')).toBeNull()
+    expect(solo.querySelector('.nearby-lobby-roster')).toBeNull()
+  })
+})
+
 describe('Ghost Race setup', () => {
   it('always shows a disabled Ghost Race button when no replay is available', () => {
     const modal = createRaceSetupModal(state, actions(), null)
