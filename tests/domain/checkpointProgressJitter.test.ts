@@ -13,12 +13,13 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 const race = createRace({
-  path, playerCar: 'blue', difficulty: 'normal', handling: 'arcade', laps: 1,
+  path, recoveryCheckpoints: [0.25], playerCar: 'blue', difficulty: 'normal', handling: 'arcade', laps: 1,
 })
 const player = race.vehicles[0]
 if (!player) throw new Error('Missing player fixture')
 const count = path.points.length
-const gate = ((race.startPathIndex + count / 4) % count + count) % count
+const gate = race.timingGates?.[0]
+if (gate === undefined) throw new Error('Authored checkpoint not resolved')
 const lower = Math.floor(gate)
 const a = path.points[lower]
 const b = path.points[(lower + 1) % count]
