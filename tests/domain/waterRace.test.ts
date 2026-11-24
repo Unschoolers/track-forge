@@ -685,7 +685,7 @@ describe('water race contact', () => {
     ).not.toBe('water')
   })
 
-  it('gives post-collision water priority over a same-frame finish', () => {
+  it('does not award a same-frame finish when water recovery interrupts the crossing', () => {
     const path = buildRoadPath(
       [
         { id: 'start', x: -1, y: 16, surface: 'street' },
@@ -702,6 +702,7 @@ describe('water race contact', () => {
         playerCar: 'blue',
         difficulty: 'normal',
         laps: 1,
+        recoveryCheckpoints: [0.5],
       }),
       phase: 'running' as const,
       countdown: 0,
@@ -712,14 +713,15 @@ describe('water race contact', () => {
         index === 0
           ? {
               ...vehicle,
-              x: -1,
-              y: 16,
+              x: 1,
+              y: 18,
               z: 0,
               pathIndex: path.points.length - 2,
-              nextSector: 4 as const,
+              nextSector: 2 as const,
               vx: 0,
-              vy: 0,
-              speed: 0,
+              vy: -250,
+              speed: 250,
+              angle: -Math.PI / 2,
               grounded: true,
             }
           : index === 1
@@ -737,13 +739,15 @@ describe('water race contact', () => {
       ),
     }
 
-    const result = stepRace(state, noInput, 0.001, random)
+    const result = stepRace(state, noInput, 1 / 60, random)
     const player = result.state.vehicles.find(({ player }) => player)
 
-    expect(result.events).toContainEqual({
-      type: 'race-finished',
+    expect(result.state.phase).toBe('running')
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'vehicle-recovered',
+      vehicleId: 'player',
       reason: 'water',
-    })
+    }))
     expect(
       result.events.some(
         (event) =>

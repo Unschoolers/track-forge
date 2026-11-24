@@ -23,7 +23,7 @@ function validRun(value: unknown): value is GhostRun {
     run.frames.length <= MAX_GHOST_FRAMES &&
     run.frames[0]?.t === 0 && run.frames.at(-1)?.t === run.time &&
     (run.splits === undefined || (Array.isArray(run.splits) && run.splits.length > 0 &&
-      run.splits.length % 4 === 0 && run.splits.every((time, index, splits) =>
+      run.splits.every((time, index, splits) =>
         Number.isFinite(time) && time > 0 && time <= (run.time ?? 0) &&
         (index === 0 || time >= splits[index - 1])))) &&
     run.frames.every((frame, index, frames) =>

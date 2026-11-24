@@ -14,7 +14,7 @@ const track = createStarterTrack(asTrackId('recovery'), 1)
 const path = buildRoadPath(track.points, track.terrain)
 
 function stoppedPlayerRace(stuckDuration = 0) {
-  const race = createRace({
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
     path,
     playerCar: 'blue',
     difficulty: 'normal',
@@ -108,7 +108,7 @@ describe('automatic player recovery', () => {
         ],
         EMPTY_TERRAIN,
       )
-      let race = createRace({
+      let race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
         path: bridgePath,
         playerCar: 'blue',
         difficulty: 'normal',
@@ -171,7 +171,7 @@ const closeArmsPath = buildRoadPath([
 
 describe('fallback recovery on a circuit', () => {
   it.each([false, true])('stays on the previously followed road arm (reversed: %s)', reversed => {
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed,
     })
     const x = reversed ? 600 : 440
@@ -198,7 +198,7 @@ describe('fallback recovery on a circuit', () => {
       { x: -200, y: 16, surface: 'street' },
     ], { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] })
     const wetIndex = requireFixture(nearestPathPoint(wetPath, { x: 16, y: 16 })).index
-    const race = createRace({ path: wetPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: wetPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const player = {
       ...requireFixture(race.vehicles[0]), ...requireFixture(wetPath.points[wetIndex]), pathIndex: wetIndex,
     }
@@ -211,7 +211,7 @@ describe('fallback recovery on a circuit', () => {
   })
 
   it('retains the followed arm when automatically recovering on a displaced tick', () => {
-    const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const index = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
     const player = {
       ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: index, stuckDuration: 0.65,
@@ -225,7 +225,7 @@ describe('fallback recovery on a circuit', () => {
 })
 
 it('still recovers to the original arm after a displaced non-recovery tick', () => {
-  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
   const index = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
   const player = { ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: index }
   const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
@@ -236,7 +236,7 @@ it('still recovers to the original arm after a displaced non-recovery tick', () 
 })
 
 it.each([false, true])('does not recover at an authored checkpoint beyond the pending gate (reversed: %s)', reversed => {
-  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3, reversed })
   const count = closeArmsPath.points.length
   const direction = reversed ? -1 : 1
   const indexAt = (progress: number) => ((race.startPathIndex + direction * progress) % count + count) % count
@@ -249,7 +249,7 @@ it.each([false, true])('does not recover at an authored checkpoint beyond the pe
 })
 
 it('clears the recovery anchor after sustained travel on a newly acquired arm', () => {
-  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
   const origin = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
   const destination = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 100 })).index
   const player = { ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: origin }
@@ -265,7 +265,7 @@ it('clears the recovery anchor after sustained travel on a newly acquired arm', 
 
 
 it('recovers at the last supported road position rather than the latest authored marker', () => {
-  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
   const contact = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
   const player = {
     ...requireFixture(race.vehicles[0]),
@@ -280,7 +280,7 @@ it('recovers at the last supported road position rather than the latest authored
 })
 
 it('never uses road contact across an unpassed timing gate', () => {
-  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
   const count = closeArmsPath.points.length
   const beforeGate = Math.floor(count / 8)
   const beyondGate = Math.floor(count / 2)
@@ -294,7 +294,7 @@ it('never uses road contact across an unpassed timing gate', () => {
 })
 
 it('uses an authored marker only when the most recent road contact is unavailable', () => {
-  const race = createRace({ path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
   const marker = Math.floor(closeArmsPath.points.length / 8)
   const player = {
     ...requireFixture(race.vehicles[0]),

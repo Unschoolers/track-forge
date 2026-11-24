@@ -6,22 +6,16 @@
  * this file. Keep permanent creator ownership and sharing rules elsewhere.
  */
 import type { KeyValueStore, PreferencesStore, TrackStore } from '@/application/ports/storage'
-import { courseIdentity } from '@/application/race/raceRecords'
-import { asTrackId, type Track } from '@/domain/model'
-import { createStarterTrack } from '@/domain/track/starterTrack'
+import { isUntouchedLegacyStarter } from '@/migrations/legacyStarterIdentity'
+import type { Track } from '@/domain/model'
 import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
 
 const MIGRATION_MARKER = 'trackforge-creator-migration-v1'
 
-const originalStarterSignature =
-  courseIdentity(createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0))
-
 function isLegacyBuiltInStarter(track: Track): boolean {
-  // Pre-credit starter tracks had a random "starter-..." ID. Identify only
-  // unchanged originals; customized versions belong to the player.
+  // Pre-credit starters used random IDs. Edited copies are player-owned.
   return !track.origin && !track.creator &&
-    track.id.startsWith('starter-') &&
-    courseIdentity(track) === originalStarterSignature
+    track.id.startsWith('starter-') && isUntouchedLegacyStarter(track)
 }
 
 function isBuiltIn(track: Track): boolean {

@@ -12,9 +12,8 @@ import { handleAndroidBack } from '@/application/androidBackNavigation'
 import { audioVolumes, musicGain, type AudioVolumeSetting } from '@/application/audioVolume'
 import { createApplication } from '@/app/createApplication'
 import { AppController } from '@/application/appController'
-import { asTrackId } from '@/domain/model'
-import { createStarterTrack } from '@/domain/track/starterTrack'
-import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
+import { SYSTEM_STARTER_TRACK_ID } from '@/domain/track/trackCreator'
+import { isUntouchedLegacyStarter } from '@/migrations/legacyStarterIdentity'
 // TEMPORARY one-time release migration: delete this import and startup call together.
 import { migrateTrackCreatorCredits } from '@/migrations/migration_track_creator_v1'
 import { BrowserStorage } from '@/infrastructure/storage/browserStorage'
@@ -61,13 +60,12 @@ appRoot.replaceChildren(gameContainer, uiRoot)
 
 const storage = new BrowserStorage()
 const trackStore = new BrowserTrackRepository(storage)
-if (trackStore.list().length === 0) {
-  if (!trackStore.save({
-    ...createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), Date.now()),
-    creator: TRACK_FORGE_CREATOR,
-    origin: 'seeded',
-  })) {
-    console.error('Could not persist the built-in starter circuit.')
+// Retire untouched system copies only. Never erase changed art or track data.
+for (const track of trackStore.list()) {
+  if (isUntouchedLegacyStarter(track) &&
+      (track.origin === 'seeded' || track.id === SYSTEM_STARTER_TRACK_ID ||
+       (!track.origin && !track.creator && track.id.startsWith('starter-')))) {
+    if (!trackStore.remove(track.id)) console.error('Could not remove the retired starter circuit.')
   }
 }
 

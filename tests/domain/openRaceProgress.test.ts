@@ -4,18 +4,18 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { resetRaceVehicle } from '@/domain/race/raceEngine'
-import { updateOpenRouteProgress } from '@/domain/race/progress'
+import { updateOpenRouteProgress, updateProgress } from '@/domain/race/progress'
 import { rankVehicles } from '@/domain/race/ranking'
 import { requireFixture } from '../fixtures/requireFixture'
 
 const track = createStarterTrack(asTrackId('open-race'), 1)
 const path = buildRoadPath(track.points, track.terrain, undefined, 'point-to-point')
-const race = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 3, startRatio: 0.5, reversed: true, routeKind: 'point-to-point' })
+const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'red', difficulty: 'normal', laps: 3, startRatio: 0.5, reversed: true, routeKind: 'point-to-point' })
 const player = requireFixture(race.vehicles[0])
 const last = path.points.length - 1
 
 function gateLine(gate: 1 | 2 | 3 | 4) {
-  const gatePosition = last * gate / 4
+  const gatePosition = gate === 4 ? last : requireFixture(race.timingGates?.[gate - 1])
   const lower = Math.min(last - 1, Math.floor(gatePosition))
   const a = requireFixture(path.points[lower])
   const b = requireFixture(path.points[lower + 1])
@@ -35,7 +35,7 @@ function cross(vehicle: typeof player, gate: 1 | 2 | 3 | 4, backwards = false) {
   const { before, after } = gateLine(gate)
   const from = backwards ? after : before
   const to = backwards ? before : after
-  return updateOpenRouteProgress({ ...vehicle, ...from }, { ...vehicle, ...to }, path, to.pathIndex, 12, true, true, 42)
+  return updateOpenRouteProgress({ ...vehicle, ...from }, { ...vehicle, ...to }, path, to.pathIndex, 12, true, true, 42, race.timingGates)
 }
 
 describe('point-to-point race', () => {
@@ -70,13 +70,38 @@ it('requires an on-road physical crossing and allows recovery before a missed ga
   // Off-road bypass is a shortcut only when the swept path misses the painted stripe.
   const grassBefore = { ...before, y: before.y + 80 }
   const grassAfter = { ...after, y: after.y + 80 }
-  const bypass = updateOpenRouteProgress(grassBefore, grassAfter, path, after.pathIndex, 1, false, true, 42)
+  const bypass = updateOpenRouteProgress(grassBefore, grassAfter, path, after.pathIndex, 1, false, true, 42, race.timingGates)
   expect(bypass.nextSector).toBe(1)
   expect(bypass.finishedAt).toBeNull()
-  const rejoin = updateOpenRouteProgress(bypass, bypass, path, after.pathIndex, 2, true, true, 42)
+  const rejoin = updateOpenRouteProgress(bypass, bypass, path, after.pathIndex, 2, true, true, 42, race.timingGates)
   expect(rejoin.nextSector).toBe(1)
   const recovered = resetRaceVehicle(rejoin, race)
   expect(recovered.pathIndex).toBeLessThan(last / 4)
-  expect(updateOpenRouteProgress(before, after, path, after.pathIndex, 3, true, true, 42).nextSector).toBe(2)
+  expect(updateOpenRouteProgress(before, after, path, after.pathIndex, 3, true, true, 42, race.timingGates).nextSector).toBe(2)
   expect(cross({ ...player, grounded: false }, 1).nextSector).toBe(2)
+})
+
+it('lets AI finish at the last driveable sample only after its authored gates', () => {
+  const last = path.points.length - 1
+  const gates = race.timingGates ?? []
+  expect(gates.length).toBeGreaterThan(0)
+  const rival = { ...player, player: false, pathIndex: last - 2, nextSector: gates.length + 1 }
+  const finished = updateProgress(rival, last - 2, path.points.length, 12, 1, 0, false, gates, false)
+  expect(finished).toMatchObject({ lap: 1, finishedAt: 12, nextSector: 1 })
+  const offRoad = updateProgress(rival, last - 2, path.points.length, 12, 1, 0, false, gates, false, false)
+  expect(offRoad).toMatchObject({ lap: 0, finishedAt: null, nextSector: gates.length + 1 })
+  expect(updateProgress({ ...rival, nextSector: 1 }, last - 2, path.points.length, 12, 1, 0, false, gates, false))
+    .toMatchObject({ lap: 0, finishedAt: null })
+  expect(updateProgress({ ...rival, pathIndex: last - 5 }, last - 4, path.points.length, 12, 1, 0, false, gates, false))
+    .toMatchObject({ lap: 0, finishedAt: null })
+})
+
+it('consumes adjacent authored checkpoint samples crossed in the same 60 Hz tick', () => {
+  const gates = [5, 6, 7]
+  const rival = { ...player, player: false, nextSector: 1, pathIndex: 4 }
+  const next = updateProgress(rival, 8, path.points.length, 1, 1, 0, false, gates, false)
+  expect(next).toMatchObject({ nextSector: 4, lap: 0, finishedAt: null })
+  // Skipping these would strand the next checkpoint permanently behind AI.
+  expect(updateProgress(rival, 5, path.points.length, 1, 1, 0, false, gates, false))
+    .toMatchObject({ nextSector: 2, lap: 0 })
 })

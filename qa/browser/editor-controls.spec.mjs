@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { EDITOR_FIXTURE_NAME, seedEditorFixture } from './editor-fixture.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 function intersects(a, b) {
@@ -47,12 +48,13 @@ async function assertClearEditorControls(page, tool) {
 }
 
 test('mobile editor controls have vector icons, visible save and no overlapping dock', async ({ page }) => {
+  await seedEditorFixture(page)
   for (const [width, height] of [[320, 568], [390, 720], [844, 390]]) {
     await page.setViewportSize({ width, height })
     await page.goto('/?qa')
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'Edit Starter Circuit', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit ' + EDITOR_FIXTURE_NAME, exact: true }).click()
 
     const editor = page.locator('[data-screen="editor"]')
     await expect(editor).toBeVisible()
@@ -93,7 +95,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
   await page.addInitScript((road) => {
     if (localStorage.getItem('trackforge-library-v2')) return
     localStorage.setItem('trackforge-library-v2', JSON.stringify([{
-      id: 'environment-qa', name: 'Environment QA', version: 8, points: road, trees: [],
+      id: 'environment-qa', name: 'Environment QA', version: 8, points: road, trees: [], recoveryCheckpoints: [0.45],
       terrain: { cellSize: 32, cells: [] }, lighting: 'day', createdAt: 1, updatedAt: 1,
     }]))
     localStorage.setItem('trackforge-library-v1-migrated', '1')

@@ -5,20 +5,20 @@ import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import type { CarId } from '@/domain/model'
 import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
-import { decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
+
+import { createLaneScenarios, decodeTrackInput, prepareLanePath } from '../../qa/lanes/scenarios'
 import { runLaneCheck } from '../../qa/lanes/simulation'
 
-const sweep = process.env.AI_PROFILE_SWEEP === '1' ? it : it.skip
+const sweep = it
 const profiles: Readonly<Record<CarId, CarDrivingProfile>> = CAR_DRIVING_PROFILES
 const [kids] = decodeTrackInput(JSON.parse(readFileSync(
   'tests/fixtures/kidsRoomAi.trackforge.json', 'utf8',
 )) as unknown)
 if (!kids) throw new Error('Missing Kids Room fixture')
 const kidsPath = prepareLanePath(kids)
-const pine = OFFICIAL_CIRCUITS.find(circuit => circuit.track.name === 'Pine Hairpins')
-if (!pine) throw new Error('Missing Pine Hairpins')
-const pinePath = prepareLanePath(pine.track)
+const hairpin = createLaneScenarios().find(({ id }) => id === 'hairpin')
+if (!hairpin) throw new Error('Missing authored hairpin fixture')
+const pinePath = prepareLanePath(hairpin)
 
 type ProfileEdit = { readonly label: string, readonly changes: Partial<CarDrivingProfile> }
 const cases: Readonly<Record<CarId, readonly ProfileEdit[]>> = {
@@ -311,7 +311,7 @@ sweep('measures bounded car-specific Hard controller candidates on Kids Room and
         })
         const kidsVehicle = kidsRun.vehicles[0]
         const pineRun = runLaneCheck({
-          path: pinePath, trackName: pine.track.name, car, seed: 11,
+          path: pinePath, trackName: hairpin.name, car, seed: 11,
           aiProfileOverrides: { [car]: profile },
           difficulty: 'hard', handling: 'arcade', mode: 'solo',
           reversed: false, laps: 1, seconds: 75,

@@ -36,7 +36,7 @@ function raceAtCrossing(lane: number, reversed: boolean) {
   const length = Math.hypot(next.x - point.x, next.y - point.y)
   const tx = (next.x - point.x) / length
   const ty = (next.y - point.y) / length
-  const base = createRace({
+  const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
     path,
     playerCar: 'blue',
     difficulty: 'normal',
@@ -75,7 +75,7 @@ describe('road branch continuity', () => {
     ], EMPTY_TERRAIN)
     const index = hairpin.points.findIndex((point) => point.segment === 0 && point.x > 100)
     const point = requireFixture(hairpin.points[index])
-    const base = createRace({ path: hairpin, playerCar: 'blue', difficulty: 'normal', laps: 3 })
+    const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: hairpin, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     let race = {
       ...base,
       handling: 'arcade' as const,
@@ -100,6 +100,7 @@ describe('road branch continuity', () => {
           points,
           trees: [],
           terrain: EMPTY_TERRAIN,
+          recoveryCheckpoints: [0.5],
           lighting: 'day',
           createdAt: 1,
           updatedAt: 1,
@@ -316,7 +317,7 @@ describe('road branch continuity', () => {
       for (const lane of [-10, 0, 10]) {
         const position = { x: point.x - ty * lane, y: point.y + tx * lane }
         const surface = path.roadSurface.at(index, position)
-        const base = createRace({
+        const base = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
           path,
           playerCar: 'blue',
           difficulty: 'normal',
@@ -429,7 +430,7 @@ describe('road branch continuity', () => {
     )
     const index = bridge.points.findIndex((point) => point.x > 240)
     const point = requireFixture(bridge.points[index])
-    const race = createRace({
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75],
       path: bridge,
       playerCar: 'blue',
       difficulty: 'normal',

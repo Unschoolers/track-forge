@@ -14,7 +14,7 @@ test('Simulation starts stationary and keeps steering, gas and brake independent
     }))
     localStorage.setItem('trackforge-library-v2', JSON.stringify([{
       id: 'simulation-controls', name: 'Simulation test circuit', version: 8,
-      points, trees: [], terrain: { cellSize: 32, cells: [] },
+      points, recoveryCheckpoints: [0.45], trees: [], terrain: { cellSize: 32, cells: [] },
       lighting: 'day', createdAt: 1, updatedAt: 1,
     }]))
     localStorage.setItem('trackforge-library-v1-migrated', '1')

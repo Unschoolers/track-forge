@@ -10,7 +10,7 @@ describe('race record identity', () => {
   it('keeps metadata changes but partitions layout and start changes', () => {
     const original = courseIdentity(track)
     expect(courseIdentity({ ...track, name: 'Renamed', updatedAt: 100, lighting: 'night' })).toBe(original)
-    expect(courseIdentity({ ...track, environmentId: 'cityscape', scenery: [{ kind: 'city-house', x: 30, y: -10 }] })).toBe(original)
+    expect(courseIdentity({ ...track, environmentId: 'cityscape', scenery: [{ kind: 'city-house', x: 30, y: -10 }] })).not.toBe(original)
     expect(courseIdentity({ ...track, points: track.points.map((point, i) => i ? point : { ...point, x: point.x + 1 }) })).not.toBe(original)
     expect(courseIdentity({ ...track, start: { ratio: 0.5, reversed: true } })).not.toBe(original)
   })
@@ -18,7 +18,7 @@ describe('race record identity', () => {
   it('keeps large terrain identities compact and deterministic', () => {
     const cells = Array.from({ length: 20000 }, (_, i) => ({ column: i, row: 0, kind: 'hill' as const }))
     const large = { ...track, terrain: { ...track.terrain, cells } }
-    expect(courseIdentity(large)).toMatch(/^v2:[0-9a-f]{16}$/)
+    expect(courseIdentity(large)).toMatch(/^v3:[0-9a-f]{16}$/)
     expect(courseIdentity({ ...large, terrain: { ...large.terrain, cells: [...cells].reverse() } })).toBe(courseIdentity(large))
     expect(courseIdentity({ ...large, terrain: { ...large.terrain, cells: cells.slice(1) } })).not.toBe(courseIdentity(large))
   })

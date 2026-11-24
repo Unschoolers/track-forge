@@ -7,7 +7,7 @@ export class LapTiming {
   private valid = true
   private lapValid = true
 
-  constructor(private readonly target?: readonly number[]) {}
+  constructor(private readonly target?: readonly number[], private readonly gatesPerLap = target?.length ?? 1) {}
 
   recover(): void {
     this.valid = false
@@ -15,15 +15,15 @@ export class LapTiming {
     this.gap = null
   }
 
-  readonly accepted: { lap: number; gate: 1 | 2 | 3 | 4; time: number }[] = []
+  readonly accepted: { lap: number; gate: number; time: number }[] = []
 
-  accept(lap: number, gate: 1 | 2 | 3 | 4, elapsed: number): void {
+  accept(lap: number, gate: number, elapsed: number): void {
     this.accepted.push({ lap, gate, time: elapsed })
-    const index = lap * 4 + gate - 1
+    const index = lap * this.gatesPerLap + gate - 1
     if (this.valid) this.splits.push(elapsed)
     const reference = this.target?.[index]
     this.gap = this.valid && reference !== undefined ? elapsed - reference : null
-    if (gate === 4) {
+    if (gate === this.gatesPerLap) {
       if (this.lapValid) {
         const duration = elapsed - this.lapStart
         this.bestLap = this.bestLap === null ? duration : Math.min(this.bestLap, duration)
@@ -43,6 +43,6 @@ export class LapTiming {
   }
 
   complete(laps: number): readonly number[] | undefined {
-    return this.valid && this.splits.length === laps * 4 ? this.splits : undefined
+    return this.valid && this.splits.length === laps * this.gatesPerLap ? this.splits : undefined
   }
 }

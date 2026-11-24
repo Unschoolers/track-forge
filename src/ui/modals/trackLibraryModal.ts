@@ -87,10 +87,11 @@ export function createTrackLibraryModal(
     dot.setAttribute('aria-label', `${ENVIRONMENT_NAMES[environment]} environment`)
     creator.append(dot, element('span', 'track-creator-name', track.creator?.name ?? (official ? 'Track Forge' : 'Unknown creator')))
     copy.append(creator)
-    if (race && !validation.ready) {
-      const status = element('span', 'track-card-unavailable', 'Needs editing')
+    if (!validation.ready) {
+      const status = element('span', 'track-card-unavailable',
+        validation.code === 'missing-checkpoints' ? 'INCOMPLETE · Add checkpoints' : validation.message)
       status.id = `track-status-${track.id}`
-      select.setAttribute('aria-describedby', status.id)
+      if (race) select.setAttribute('aria-describedby', status.id)
       copy.append(status)
     } else if (race && official) {
       const medal = timeMedal(track, state.scoresByTrack[track.id] ?? [])

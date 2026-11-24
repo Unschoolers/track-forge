@@ -3,7 +3,7 @@ import type { CarId } from '@/domain/model'
 
 // Indexed by the authored road segment. Offsets are in world units and
 // lookahead extends the normal pursuit target by a number of road samples.
-export const EMILE_COURSE = 'v2:988cf01ca954b488'
+export const EMILE_COURSE = 'v3:b61460bf60d391eb'
 function section(extraSamples: number, laneOffset: number, cornerPace: number): RacingLineSection {
   return { extraSamples, laneOffset, cornerPace }
 }

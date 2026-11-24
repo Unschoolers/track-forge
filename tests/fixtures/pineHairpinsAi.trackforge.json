@@ -1,0 +1,169 @@
+{
+  "id": "official-hairpin",
+  "name": "Pine Hairpins",
+  "version": 8,
+  "points": [
+    {
+      "x": -720,
+      "y": -432,
+      "id": "official-hairpin-0",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 0,
+      "y": -432,
+      "id": "official-hairpin-1",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 576,
+      "y": -432,
+      "id": "official-hairpin-2",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 720,
+      "y": -288,
+      "id": "official-hairpin-3",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 576,
+      "y": -144,
+      "id": "official-hairpin-4",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 0,
+      "y": -144,
+      "id": "official-hairpin-5",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -288,
+      "y": -144,
+      "id": "official-hairpin-6",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -432,
+      "y": 0,
+      "id": "official-hairpin-7",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -288,
+      "y": 144,
+      "id": "official-hairpin-8",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 288,
+      "y": 144,
+      "id": "official-hairpin-9",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 576,
+      "y": 288,
+      "id": "official-hairpin-10",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 576,
+      "y": 576,
+      "id": "official-hairpin-11",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -520,
+      "y": 576,
+      "id": "official-hairpin-12",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -670,
+      "y": 536,
+      "id": "official-hairpin-13",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -720,
+      "y": 376,
+      "id": "official-hairpin-14",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -720,
+      "y": 192,
+      "id": "official-hairpin-15",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -720,
+      "y": -192,
+      "id": "official-hairpin-16",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -720,
+      "y": -432,
+      "id": "official-hairpin-17",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    }
+  ],
+  "trees": [],
+  "terrain": {
+    "cellSize": 32,
+    "cells": []
+  },
+  "recoveryCheckpoints": [
+    0.25,
+    0.5,
+    0.75
+  ],
+  "autoCheckpoints": false,
+  "start": {
+    "ratio": 0,
+    "reversed": false
+  },
+  "lighting": "day",
+  "createdAt": 0,
+  "updatedAt": 0
+}

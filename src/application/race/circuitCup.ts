@@ -3,16 +3,7 @@ import type { RaceStanding } from '@/application/race/raceSession'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { randomGridPositions } from '@/domain/race/startGrid'
 
-export const CUP_CIRCUITS = [
-  'official-meadow',
-  'official-hairpin',
-  'official-frost',
-  'official-bridge',
-].map((id) => {
-  const circuit = OFFICIAL_CIRCUITS.find(({ track }) => track.id === id)
-  if (!circuit) throw new Error(`Missing Arcade Cup circuit: ${id}`)
-  return circuit
-})
+export const CUP_CIRCUITS = [...OFFICIAL_CIRCUITS]
 
 export interface CupDriver { readonly id: string; readonly label: string; readonly points: number }
 export interface CircuitCup {

@@ -10,7 +10,7 @@ const track = createStarterTrack(asTrackId('missed-recovery-plan'), 1)
 const path = buildRoadPath(track.points, track.terrain)
 
 describe('missed checkpoint recovery planning', () => {
-  const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
+  const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
   const player = race.vehicles.find(vehicle => vehicle.player)
   if (!player) throw new Error('Missing race player fixture')
 

@@ -98,7 +98,9 @@ it('replays a seeded four-car race with the same checkpoint recovery and finish 
       ? [{ gate: event.gate, lap: event.lap, time: event.time }]
       : [],
   )
-  expect(playerSplits.map(({ gate }) => gate)).toEqual([1, 2, 3, 4])
+  expect(playerSplits.map(({ gate }) => gate)).toEqual(
+    Array.from({ length: (initial.timingGates?.length ?? 0) + 1 }, (_, index) => index + 1),
+  )
   expect(result.splits).toEqual(playerSplits)
   const ranks = rankVehicles(replay.vehicles, replay.path.points.length, replay.startPathIndex, replay.reversed, replay.routeKind)
   expect(result.standings.map(({ id, finishTime }) => [id, finishTime]))

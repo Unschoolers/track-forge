@@ -40,6 +40,7 @@ function track(points: TrackPoint[]): Track {
     points,
     trees: [],
     terrain: EMPTY_TERRAIN,
+    recoveryCheckpoints: [0.5],
     lighting: 'day',
     createdAt: 100,
     updatedAt: 100,
@@ -56,6 +57,12 @@ const analyzeTrack = (candidate: Track) =>
   analyzeTrackWithGeometry(candidate, geometry.get(candidate))
 
 describe('validateTrack', () => {
+  it('requires an authored checkpoint on an otherwise valid road', () => {
+    expect(validateTrack({ ...track(closedPoints()), recoveryCheckpoints: [] })).toMatchObject({
+      ready: false, code: 'missing-checkpoints',
+    })
+  })
+
   it('rejects tracks with fewer than nine points', () => {
     expect(validateTrack(track(closedPoints(8)))).toMatchObject({
       ready: false,

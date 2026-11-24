@@ -136,6 +136,13 @@ export function createRace(options: CreateRaceOptions): RaceState {
   )
   const resolvedStartIndex = Math.max(0, startPathIndex)
   const recoveryCheckpoints = resolveRecoveryCheckpoints(options.path, options.recoveryCheckpoints)
+  const sampleCount = options.path.points.length
+  const reversed = !open && (options.reversed ?? false)
+  const routeProgress = (index: number): number => open ? index :
+    (((reversed ? resolvedStartIndex - index : index - resolvedStartIndex) % sampleCount) + sampleCount) % sampleCount
+  const timingGates = recoveryCheckpoints
+    .filter(index => index !== resolvedStartIndex && (!open || index > 0))
+    .sort((a, b) => routeProgress(a) - routeProgress(b))
   // Physical scenery never depends on whether a creator added checkpoint markers.
   const sceneryColliders = options.recoveryScenery
     ? buildSceneryColliders(options.recoveryScenery, options.path.terrainSurface) : undefined
@@ -218,6 +225,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
     totalLaps: open ? 1 : Math.max(1, Math.floor(options.laps)),
     startPathIndex: resolvedStartIndex,
     ...(recoveryCheckpoints.length ? { recoveryCheckpoints } : {}),
+    timingGates,
     ...(sceneryColliders?.size ? { sceneryColliders } : {}),
     reversed: open ? false : options.reversed ?? false,
     tick: 0,

@@ -18,7 +18,7 @@ const ready = createStarterTrack(asTrackId('ready'), 1)
 const incomplete = {
   ...createStarterTrack(asTrackId('incomplete'), 2),
   name: 'Sketch',
-  points: createStarterTrack(asTrackId('source'), 2).points.slice(0, 3),
+  recoveryCheckpoints: [],
 }
 const preferences: Preferences = {
   car: 'blue',
@@ -201,7 +201,7 @@ describe('modal application flows', () => {
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
     expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
-    expect(root.textContent).toContain('Needs editing')
+    expect(root.textContent).toContain('INCOMPLETE · Add checkpoints')
     expect(
       root.querySelector<HTMLButtonElement>(
         '[data-action="select-race-incomplete"]',

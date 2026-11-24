@@ -305,15 +305,15 @@ describe('AppController', () => {
   it('shows an official race record on Home without adding the circuit to saved tracks', () => {
     const { controller, raceSession, scoreStore } = setup(undefined, true)
     let scores: ReturnType<ScoreStore['forTrack']> = []
-    vi.mocked(scoreStore.forTrack).mockImplementation((id) => id === 'official-meadow' ? scores : [])
+    vi.mocked(scoreStore.forTrack).mockImplementation((id) => id === 'official-city-sprint' ? scores : [])
     vi.mocked(scoreStore.record).mockImplementation((_id, score) => { scores = [score]; return true })
-    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('official-meadow') })
+    controller.dispatch({ type: 'select-track-for-race', id: asTrackId('official-city-sprint') })
     controller.dispatch({ type: 'start-race' })
     const input = { steering: 0, throttle: 1, braking: false }
     raceSession.advance(3.7, input)
     raceSession.advance(0.02, input)
     controller.dispatch({ type: 'go-home' })
-    expect(controller.snapshot().scoresByTrack['official-meadow']?.[0]?.time).toBe(12.5)
+    expect(controller.snapshot().scoresByTrack['official-city-sprint']?.[0]?.time).toBe(12.5)
     expect(controller.snapshot().tracks.map((track) => track.id)).toEqual(['starter'])
   })
 
@@ -323,7 +323,7 @@ describe('AppController', () => {
     const finish = () => { raceSession.advance(3.7, input); raceSession.advance(0.02, input) }
     controller.dispatch({ type: 'open-cup' })
     controller.dispatch({ type: 'start-cup' })
-    expect(controller.snapshot()).toMatchObject({ mode: 'race', cup: { index: 0 }, currentTrack: { id: 'official-meadow' } })
+    expect(controller.snapshot()).toMatchObject({ mode: 'race', cup: { index: 0 }, currentTrack: { id: 'official-city-sprint' } })
     expect(raceSession.snapshot().setup).toMatchObject({ mode: 'normal', handling: 'arcade', laps: 1 })
     finish()
     const first = controller.snapshot().cup
@@ -332,12 +332,12 @@ describe('AppController', () => {
     expect(controller.snapshot().cup?.rounds).toHaveLength(0)
     finish()
     expect(controller.snapshot().cup?.rounds).toEqual(first?.rounds)
-    for (const id of ['official-hairpin', 'official-frost', 'official-bridge']) {
+    for (const id of ['official-desert-sweep', 'official-toy-box']) {
       controller.dispatch({ type: 'next-cup-race' })
       expect(controller.snapshot().currentTrack?.id).toBe(id)
       finish()
     }
-    expect(controller.snapshot().cup?.rounds).toHaveLength(4)
+    expect(controller.snapshot().cup?.rounds).toHaveLength(3)
     controller.dispatch({ type: 'next-cup-race' })
     expect(controller.snapshot()).toMatchObject({ mode: 'home', currentTrack: { id: 'starter' }, cup: null })
     expect(trackStore.list().map((track) => track.id)).toEqual(['starter'])
@@ -876,14 +876,14 @@ describe('AppController', () => {
 })
 
 describe('scenery persistence', () => {
-  it('saves appearance before switching and preserves race revision until a road edit', () => {
+  it('saves scenery changes as race-affecting edits and preserves road revision increments', () => {
     const original = createStarterTrack(asTrackId('first'), 1)
     const { controller, trackStore } = setup(original)
     const other = createStarterTrack(asTrackId('second'), 2)
     trackStore.tracks.set(other.id, other)
     controller.dispatch({ type: 'editor', command: { type: 'set-environment', environmentId: 'cityscape' } })
     controller.dispatch({ type: 'editor', command: { type: 'add-scenery-prop', prop: { kind: 'city-house', x: 100, y: 100 } } })
-    expect(controller.snapshot().currentTrack?.raceRevision).toBe(original.raceRevision ?? original.updatedAt)
+    expect(controller.snapshot().currentTrack?.raceRevision).toBeGreaterThan(original.raceRevision ?? original.updatedAt)
     controller.dispatch({ type: 'select-track-for-edit', id: other.id })
     controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' })
     expect(trackStore.find(original.id)?.scenery).toEqual([{ kind: 'city-house', x: 100, y: 100 }])

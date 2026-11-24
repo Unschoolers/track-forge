@@ -86,7 +86,8 @@ export class AppController {
       now: this.now,
     })
     const tracks = this.library.list()
-    const currentTrack = tracks[0] ?? null
+    // New installations can race a built-in without persisting a legacy starter.
+    const currentTrack = tracks[0] ?? OFFICIAL_CIRCUITS[0]?.track ?? null
     this.state = {
       mode: 'home',
       raceAgainTrackName: this.resolveLastRace()?.track.name,

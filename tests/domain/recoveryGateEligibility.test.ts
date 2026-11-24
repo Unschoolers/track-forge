@@ -10,7 +10,7 @@ const path = buildRoadPath(track.points, track.terrain)
 
 describe('recovery checkpoint eligibility', () => {
   it.each([false, true])('applies the same timing gate limit to road contacts and markers (reversed: %s)', reversed => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 2, reversed })
     const player = race.vehicles.find(vehicle => vehicle.player)
     if (!player) throw new Error('Expected player vehicle')
     const count = path.points.length
@@ -29,7 +29,7 @@ describe('recovery checkpoint eligibility', () => {
   })
 
   it('rejects malformed and missing road indices instead of attempting unsafe recovery', () => {
-    const race = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
+    const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path, playerCar: 'blue', difficulty: 'normal', laps: 2 })
     const player = race.vehicles.find(vehicle => vehicle.player)
     if (!player) throw new Error('Expected player vehicle')
     const invalid = { ...player, nextSector: 1 as const, lastRoadContactIndex: path.points.length + 1, recoveryCheckpoint: path.points.length + 1 }

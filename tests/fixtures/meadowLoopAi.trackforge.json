@@ -1,0 +1,113 @@
+{
+  "id": "official-meadow",
+  "name": "Meadow Loop",
+  "version": 8,
+  "points": [
+    {
+      "x": -340,
+      "y": -180,
+      "id": "official-meadow-0",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 0,
+      "y": -210,
+      "id": "official-meadow-1",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 340,
+      "y": -180,
+      "id": "official-meadow-2",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 420,
+      "y": -70,
+      "id": "official-meadow-3",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 420,
+      "y": 100,
+      "id": "official-meadow-4",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 310,
+      "y": 200,
+      "id": "official-meadow-5",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": 0,
+      "y": 220,
+      "id": "official-meadow-6",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -310,
+      "y": 200,
+      "id": "official-meadow-7",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -420,
+      "y": 100,
+      "id": "official-meadow-8",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -420,
+      "y": -70,
+      "id": "official-meadow-9",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    },
+    {
+      "x": -340,
+      "y": -180,
+      "id": "official-meadow-10",
+      "surface": "street",
+      "curve": "smooth",
+      "tension": 0.5
+    }
+  ],
+  "trees": [],
+  "terrain": {
+    "cellSize": 32,
+    "cells": []
+  },
+  "recoveryCheckpoints": [
+    0.25,
+    0.5,
+    0.75
+  ],
+  "autoCheckpoints": false,
+  "start": {
+    "ratio": 0,
+    "reversed": false
+  },
+  "lighting": "day",
+  "createdAt": 0,
+  "updatedAt": 0
+}

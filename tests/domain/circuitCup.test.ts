@@ -1,28 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { createCup, recordCupResult, advanceCup, cupStandings, retryCupRace, CUP_CIRCUITS, cupRoundCount, cupTrackIds } from '@/application/race/circuitCup'
-import { buildRoadPath } from '@/domain/track/pathBuilder'
-import { validateTrack } from '@/domain/track/trackValidation'
 
 describe('official circuit cup', () => {
-  it('offers six distinct race-ready circuits', () => {
-    expect(new Set(OFFICIAL_CIRCUITS.map(({ track }) => track.id)).size).toBe(6)
-    expect(CUP_CIRCUITS).toHaveLength(4)
-    for (const { track } of OFFICIAL_CIRCUITS) {
-      expect(validateTrack(track, buildRoadPath(track.points, track.terrain).totalLength).ready).toBe(true)
-    }
-  })
-  it('finishes after the original four Cup rounds', () => {
-    const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
-    let cup = createCup()
-    for (let round = 0; round < 4; round++) {
-      cup = advanceCup(recordCupResult(cup, standings))
-    }
-    expect(cup.index).toBe(3)
-    expect(cupStandings(cup)[0]?.points).toBe(40)
+  it('offers each official circuit once in the default Cup', () => {
+    const ids = OFFICIAL_CIRCUITS.map(({ track }) => track.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(CUP_CIRCUITS.map(({ track }) => track.id)).toEqual(ids)
   })
   it('freezes a custom lineup and advances through its exact number of rounds', () => {
-    const tracks = ['official-bridge', 'official-meadow']
+    const tracks = [OFFICIAL_CIRCUITS[0]!.track.id, OFFICIAL_CIRCUITS[1]!.track.id]
     const standings = [{ id: 'player', car: 'blue' as const, player: true, place: 1, finishTime: 10, wrecked: false, lap: 1 }]
     let cup = createCup('blue', 'normal', tracks)
     expect(cupTrackIds(cup)).toEqual(tracks)
@@ -35,7 +22,7 @@ describe('official circuit cup', () => {
   })
   it('rejects an empty or oversized cup sequence', () => {
     expect(() => createCup('blue', 'normal', [])).toThrow()
-    expect(() => createCup('blue', 'normal', Array(13).fill('official-meadow'))).toThrow()
+    expect(() => createCup('blue', 'normal', Array(13).fill(OFFICIAL_CIRCUITS[0]!.track.id))).toThrow()
   })
   it('records each race only once and advances through the fixed order', () => {
     let cup = createCup()

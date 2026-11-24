@@ -1,12 +1,14 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { seedOwnedTrack, OWNED_TRACK_NAME } from './owned-track.mjs'
 
 async function setupRace(page) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
+  await page.getByRole('button', { name: `Race ${OWNED_TRACK_NAME}`, exact: true }).click()
 }
 
 test('Ghost Race stays visible and greyed out without a matching saved replay', async ({ page }) => {
+  await seedOwnedTrack(page)
   await page.goto('/?qa')
   await enterTrackForge(page)
   await setupRace(page)
@@ -18,6 +20,7 @@ test('Ghost Race stays visible and greyed out without a matching saved replay', 
 })
 
 test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the ghost', async ({ page }) => {
+  await seedOwnedTrack(page)
   await page.goto('/?qa')
   await enterTrackForge(page)
   await page.evaluate(() => {

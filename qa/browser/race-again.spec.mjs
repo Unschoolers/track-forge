@@ -5,7 +5,7 @@ test('Race Again restores the original night race setup after reload', async ({ 
   await page.goto('/?qa')
   await enterTrackForge(page)
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
+  await page.getByRole('button', { name: 'Race City Sprint', exact: true }).click()
   const setup = page.getByRole('dialog', { name: 'Race setup' })
   await setup.locator('[data-car="red"]').click()
   await setup.getByRole('button', { name: 'NIGHT', exact: true }).click()
@@ -16,7 +16,7 @@ test('Race Again restores the original night race setup after reload', async ({ 
   await page.getByRole('button', { name: 'QUIT TO HOME', exact: true }).click()
   await page.reload()
   await enterTrackForge(page)
-  await page.getByRole('button', { name: /RACE AGAIN.*Starter Circuit/i }).click()
+  await page.getByRole('button', { name: /RACE AGAIN.*City Sprint/i }).click()
   await expect.poll(async () =>
     page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup),
   ).toMatchObject({

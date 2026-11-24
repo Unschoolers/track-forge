@@ -91,7 +91,7 @@ describe('AI lane monitor', () => {
 		)
 	})
 
-	it('ignores production recovery events from cars that finished before the step', () => {
+	it('never recovers a car that already finished before the step', () => {
 		const race = fixture()
 		const before = {
 			...race,
@@ -113,7 +113,7 @@ describe('AI lane monitor', () => {
 		)
 		expect(
 			result.events.some((event) => event.type === 'vehicle-recovered'),
-		).toBe(true)
+		).toBe(false)
 		const monitor = new LaneMonitor(before)
 		monitor.observe(before, result, 1 / 60)
 		expect(monitor.issues).toHaveLength(0)

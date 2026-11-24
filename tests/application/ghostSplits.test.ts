@@ -57,7 +57,7 @@ it('records real session gate crossings and compares a subsequent ghost race', (
 })
 
 it('invalidates recovered timing until the next lap and resets cleanly for a restart', () => {
-  const timing = new LapTiming([1, 2, 3, 4, 5, 6, 7, 8])
+  const timing = new LapTiming([1, 2, 3, 4, 5, 6, 7, 8], 4)
   timing.accept(0, 1, 1)
   timing.recover()
   expect(timing.currentLap(2)).toBeNull()
@@ -89,6 +89,10 @@ it('rejects malformed split metadata but accepts legacy pose-only runs', () => {
   const frames = [{ t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
     { t: 4, x: 1, y: 1, angle: 0, z: 0, structureRunId: null }]
   expect(store.record(track, setup, 4, frames, [1, 3, 2, 4])).toBe(false)
-  expect(store.record(track, setup, 4, frames)).toBe(true)
-  expect(store.load(track, setup)?.splits).toBeUndefined()
+  expect(store.record(track, setup, 4, frames, [1, 2, 4])).toBe(true)
+  expect(store.load(track, setup)?.splits).toEqual([1, 2, 4])
+  // A pose-only replay remains supported for a separate race revision.
+  const oldTrack = { ...track, raceRevision: 2 }
+  expect(store.record(oldTrack, setup, 4, frames)).toBe(true)
+  expect(store.load(oldTrack, setup)?.splits).toBeUndefined()
 })

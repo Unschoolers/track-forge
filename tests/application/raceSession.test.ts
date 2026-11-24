@@ -356,7 +356,8 @@ describe('RaceSession', () => {
       ...track,
       routeKind: 'point-to-point' as const,
       points: [0, 600, 1200].map((x) => ({ x, y: 0, surface: 'street' as const })),
-      recoveryCheckpoints: [0.1],
+      // The simulated bypass starts just before the authored gate at x=300.
+      recoveryCheckpoints: [0.25],
     }
     const step: RaceStep = (state, input, dt, random) => {
       if (state.tick !== 0) return stepRace(state, input, dt, random)
@@ -541,6 +542,19 @@ describe('RaceSession', () => {
       const rival = state.vehicles[1]
       if (!point || !player || !rival) throw new Error('Missing race fixtures')
       const atLine = { x: point.x, y: point.y, z: 0, vx: 0, vy: 0, speed: 0 }
+      const beforeFinish = state.path.points[state.path.points.length - 2]
+      if (!beforeFinish) throw new Error('Missing finish approach sample')
+      const dx = point.x - beforeFinish.x
+      const dy = point.y - beforeFinish.y
+      const length = Math.hypot(dx, dy)
+      if (length < 0.001) throw new Error('Degenerate finish line')
+      const heading = { x: dx / length, y: dy / length }
+      // The player must physically cross Finish; teleporting onto its plane
+      // while stationary is not a valid lap with authored checkpoints.
+      const approachingFinish = {
+        ...atLine, x: point.x - heading.x * 2, y: point.y - heading.y * 2,
+        angle: Math.atan2(dy, dx), vx: heading.x * 240, vy: heading.y * 240, speed: 240,
+      }
       const prepared = frames++ === 0
         ? {
             ...state,
@@ -553,7 +567,7 @@ describe('RaceSession', () => {
         : {
             ...state,
             vehicles: [
-              { ...player, ...atLine, pathIndex: state.path.points.length - 2, nextSector: 4 as const },
+              { ...player, ...approachingFinish, pathIndex: state.path.points.length - 2, nextSector: 4 as const },
               rival,
             ],
           }

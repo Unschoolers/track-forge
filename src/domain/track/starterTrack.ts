@@ -32,6 +32,9 @@ export function createStarterTrack(id: TrackId, now: number): Track {
     points,
     trees: STARTER_TREES.map((tree) => ({ ...tree })),
     terrain: EMPTY_TERRAIN,
+    // Explicit markers on this reusable demonstration geometry, never virtual timing quarters.
+    recoveryCheckpoints: [0.25, 0.5, 0.75],
+    autoCheckpoints: true,
     start: { ratio: 0, reversed: false },
     lighting: 'day',
     environmentId: DEFAULT_TRACK_ENVIRONMENT_ID,

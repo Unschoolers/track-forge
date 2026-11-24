@@ -53,7 +53,7 @@ export interface RaceVehicle {
   readonly landingIntensity: number
   readonly contactLoad: number
   readonly structureRunId: string | null
-  readonly nextSector: 1 | 2 | 3 | 4
+  readonly nextSector: number
   readonly lap: number
   readonly recoveryCheckpoint?: number | null
   /** Cumulative race-time penalty, independent of simulation elapsed. */
@@ -89,7 +89,7 @@ export interface RaceCameraHints {
 
 export interface RaceState {
   readonly path: RoadPath
-  readonly missedCheckpoint?: { readonly gate: 1 | 2 | 3 | 4; readonly remainingSeconds: number; readonly position: Vector2 } | undefined
+  readonly missedCheckpoint?: { readonly gate: number; readonly remainingSeconds: number; readonly position: Vector2 } | undefined
   readonly routeKind?: RouteKind
   readonly vehicles: readonly RaceVehicle[]
   /** Per-race, immutable driver overrides for deterministic offline diagnostics. */
@@ -105,6 +105,8 @@ export interface RaceState {
   readonly totalLaps: number
   readonly startPathIndex: number
   readonly recoveryCheckpoints?: readonly number[]
+  /** Author-placed timing checkpoint road samples, in driving order. No implicit quarters. */
+  readonly timingGates?: readonly number[]
   readonly sceneryColliders?: SceneryColliders
   readonly reversed: boolean
   /** Number of running simulation updates completed since this race started. */

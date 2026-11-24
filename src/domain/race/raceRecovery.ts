@@ -22,7 +22,7 @@ export function resetRaceVehicle(
   if (race.routeKind !== 'point-to-point') {
     return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
   }
-  const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector)
+  const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector, race.timingGates)
   const pathIndex = findNearestSafeTrackIndex(race.path, vehicle, false, limit)
   return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex })
 }

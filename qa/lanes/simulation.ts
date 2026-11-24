@@ -11,6 +11,7 @@ import { validNearbyGridPositions } from '@/domain/race/startGrid'
 import { stepRace } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import { authoredCheckpointsForPath } from './scenarios'
 import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import { validatePassingPolicy, type CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import {
@@ -127,6 +128,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	}
 	const created = createRace({
 		path,
+		recoveryCheckpoints: authoredCheckpointsForPath(path),
 		handling: options.handling,
 		playerCar: options.car,
 		difficulty: options.difficulty,

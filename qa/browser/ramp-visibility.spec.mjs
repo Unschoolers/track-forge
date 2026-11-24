@@ -39,7 +39,7 @@ for (const reversed of [false, true]) {
       }))
       localStorage.setItem('trackforge-library-v2', JSON.stringify([{
         id: 'ramp-pixel-regression', name: 'Ramp visibility regression', version: 8,
-        points, trees: [], terrain: { cellSize: 32, cells: [] },
+        points, recoveryCheckpoints: [0.55], trees: [], terrain: { cellSize: 32, cells: [] },
         start: { ratio: reverse ? 2250 / 7000 : 350 / 7000, reversed: reverse },
         lighting: 'day', createdAt: 1, updatedAt: 1,
       }]))

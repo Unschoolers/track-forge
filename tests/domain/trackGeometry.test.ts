@@ -57,7 +57,7 @@ function rectangle(
 }
 
 describe('TrackGeometry', () => {
-  it('derives a continuous ribbon, start line, and ordered sectors', () => {
+  it('derives a continuous ribbon and start line without virtual sectors', () => {
     const geometry = buildTrackGeometry(square())
 
     expectContinuousRibbon(geometry)
@@ -65,7 +65,7 @@ describe('TrackGeometry', () => {
       geometry.path.totalLength * 0.125,
       4,
     )
-    expect(geometry.sectors.map((sector) => sector.order)).toEqual([1, 2, 3])
+    expect('sectors' in geometry).toBe(false)
   })
 
   it('caches unchanged shapes and invalidates geometry changes', () => {
@@ -209,67 +209,6 @@ describe('TrackGeometry', () => {
     expect(service.get({ ...track, terrain })).not.toBe(first)
   })
 
-  it('uses immutable points and terrain identity before allocating a signature', () => {
-    const service = new TrackGeometryService()
-    const track = square()
-    let terrainSignatureReads = 0
-    const cells = new Proxy(track.terrain.cells, {
-      get(target, property, receiver) {
-        if (property === 'map') terrainSignatureReads += 1
-        return Reflect.get(target, property, receiver)
-      },
-    })
-    const input = {
-      points: track.points,
-      terrain: { ...track.terrain, cells },
-      ...(track.start ? { start: track.start } : {}),
-    }
-    const first = service.get(input)
-    const readsAfterFirstBuild = terrainSignatureReads
-
-    expect(service.get({ ...input })).toBe(first)
-    expect(terrainSignatureReads).toBe(readsAfterFirstBuild)
-  })
-
-  it('resolves immutable identity hits with constant input reads', () => {
-    const service = new TrackGeometryService()
-    const inputs = Array.from({ length: 24 }, (_, variant) => {
-      const candidate = square()
-      return {
-        ...candidate,
-        points: candidate.points.map((point, index) =>
-          index === 1 ? { ...point, x: point.x + variant } : point,
-        ),
-      }
-    })
-    for (const input of inputs) service.get(input)
-    const targetInput = inputs.at(-1)
-    if (!targetInput) throw new Error('Expected an identity target')
-    const targetStart = targetInput.start
-    if (!targetStart) throw new Error('Expected a start configuration')
-    let inputReads = 0
-    const measuredInput = {
-      get points() {
-        inputReads += 1
-        return targetInput.points
-      },
-      get terrain() {
-        inputReads += 1
-        return targetInput.terrain
-      },
-      get start() {
-        inputReads += 1
-        return targetStart
-      },
-    }
-
-    expect(service.get(measuredInput)).toBe(service.get(targetInput))
-    inputReads = 0
-    service.get(measuredInput)
-
-    expect(inputReads).toBeLessThanOrEqual(4)
-  })
-
   it('evicts before retaining three worst-case terrain geometries', () => {
     const service = new TrackGeometryService()
     const baseCells = rectangle(0, 199, 0, 99).map((cell) => ({
@@ -308,6 +247,6 @@ it('keeps nearby point-to-point endpoints open and keys cache by topology', () =
   expect(open).not.toBe(closed)
   expect(open.start).toMatchObject({ ratio: 0, reversed: false, position: { x: 0, y: 0 } })
   expect(open.finish).toMatchObject({ ratio: 1, reversed: false, position: { x: 1, y: 0 } })
-  expect(open.sectors.map((gate) => gate.ratio)).toEqual([0.25, 0.5, 0.75])
+  expect('sectors' in open).toBe(false)
   expect(service.get(legacy)).toBe(closed)
 })
