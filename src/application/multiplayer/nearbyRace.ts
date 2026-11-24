@@ -1,4 +1,5 @@
 import { EventBus } from '@/application/eventBus'
+import { NearbyOperationQueue } from './nearbyOperationQueue'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track } from '@/domain/model'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
@@ -95,8 +96,8 @@ export class NearbyRace {
   private lastRaceDiagnostics: Record<string, unknown> | null = null
   private lastFailure: Record<string, unknown> | null = null
   private static readonly TIMELINE_LIMIT = 100
-  private generation = 0
-  private busy: Promise<void> = Promise.resolve()
+  private readonly operations = new NearbyOperationQueue()
+  private get generation(): number { return this.operations.generation }
   private error: string | null = null
   private room: string | null = null
   private hostId: string | null = null
@@ -650,20 +651,28 @@ export class NearbyRace {
     const message = decodeControl(bytes)
     if (!message) return
     if (this.purpose === 'share') {
-      if (fromHost && this.phase === 'waiting' && message.type === 'share-offer') {
-        this.receiver = new TrackReceiver()
-        this.setPhase('preparing')
-        this.armTimeout('The nearby track was not received in time.')
-      } else if (this.role === 'host' && this.phase === 'hosting' && message.type === 'share-ready' &&
-          (guestSlot !== undefined || this.pendingPairs.has(id))) {
-        this.shareReady.add(id)
-        this.sendShareToReadyPeer(id)
-      } else if (guestSlot !== undefined && this.phase === 'hosting' && message.type === 'share-result') {
-        if (message.status === 'saved') this.sharedPeers.add(id)
-        this.changed()
-      }
-      return
+      this.receiveShareControl(id, message, fromHost, guestSlot)
+    } else {
+      this.receiveRaceControl(id, message, fromHost, guestSlot)
     }
+  }
+
+  private receiveShareControl(id: string, message: Control, fromHost: boolean, guestSlot: number | undefined): void {
+    if (fromHost && this.phase === 'waiting' && message.type === 'share-offer') {
+      this.receiver = new TrackReceiver()
+      this.setPhase('preparing')
+      this.armTimeout('The nearby track was not received in time.')
+    } else if (this.role === 'host' && this.phase === 'hosting' && message.type === 'share-ready' &&
+        (guestSlot !== undefined || this.pendingPairs.has(id))) {
+      this.shareReady.add(id)
+      this.sendShareToReadyPeer(id)
+    } else if (guestSlot !== undefined && this.phase === 'hosting' && message.type === 'share-result') {
+      if (message.status === 'saved') this.sharedPeers.add(id)
+      this.changed()
+    }
+  }
+
+  private receiveRaceControl(id: string, message: Control, fromHost: boolean, guestSlot: number | undefined): void {
     const incomingRound = 'round' in message ? message.round ?? 0 : 0
     if (fromHost && message.type === 'prepare' &&
         (this.phase === 'waiting' && incomingRound === this.round ||
@@ -863,32 +872,27 @@ export class NearbyRace {
     this.poseSync.resetCounts()
     this.error = null
     this.setPhase(phase)
-    return ++this.generation
+    return this.operations.invalidate()
   }
 
   private perform(operation: string, action: () => Promise<void | 'skipped' | 'failed'>, active: number, complete?: () => void): void {
-    this.busy = this.busy.then(async () => {
-      if (active !== this.generation) return
+    this.operations.perform(active, action, () => {
       this.record('operation', { operation, result: 'started' })
-      const outcome = await action()
-      if (active === this.generation) {
-        this.record('operation', { operation, result: outcome ?? 'succeeded' })
-        if (!outcome) complete?.()
-      }
-    }).catch((error: unknown) => {
-      if (active === this.generation) {
-        this.record('operation', { operation, result: 'failed', error: this.errorKind(error) })
-        this.fail(error instanceof Error ? error.message : 'Nearby connection failed.', operation, error)
-      }
+    }, (outcome) => {
+      this.record('operation', { operation, result: outcome ?? 'succeeded' })
+      if (!outcome) complete?.()
+    }, (error) => {
+      this.record('operation', { operation, result: 'failed', error: this.errorKind(error) })
+      this.fail(error instanceof Error ? error.message : 'Nearby connection failed.', operation, error)
     })
   }
 
   private queueStop(): void {
-    this.busy = this.busy.then(async () => {
+    this.operations.stop(async () => {
       this.record('operation', { operation: 'stop', result: 'started' })
       await this.transport.stop()
       this.record('operation', { operation: 'stop', result: 'succeeded' })
-    }).catch((error: unknown) => {
+    }, (error) => {
       this.record('operation', { operation: 'stop', result: 'failed', error: this.errorKind(error) })
     })
   }
@@ -903,7 +907,7 @@ export class NearbyRace {
   private reset(error: string | null): void {
     this.lastRaceDiagnostics = this.captureRaceDiagnostics() ?? this.lastRaceDiagnostics
     this.replayTrace.reset()
-    this.generation++
+    this.operations.invalidate()
     this.clearTimeout()
     this.course = null
     this.incomingShare = null
