@@ -16,6 +16,22 @@ function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string
   return racer.name ? `${racer.name}${racer.local ? ' (You)' : ''}` : racer.local ? 'You' : `Player ${racer.slot + 1}`
 }
 
+/** A confirmation is part of the existing Nearby overlay, not a room transition. */
+export function createNearbyLeaveConfirmation(
+  role: ReturnType<NearbyRace['snapshot']>['role'],
+  actions: { stay: () => void; leave: () => void },
+): HTMLElement {
+  const frame = createModalFrame('Leave room?', 'Multiplayer', actions.stay, 'nearby-race-modal')
+  frame.body.append(element('p', 'modal-subtitle', role === 'host'
+    ? 'Leaving will close the room for everyone.'
+    : 'You will disconnect from the room and miss the next race.'))
+  frame.footer.append(
+    button('STAY IN ROOM', 'nearby-stay', actions.stay, 'button button-primary'),
+    button('LEAVE ROOM', 'nearby-confirm-leave', actions.leave, 'button button-danger'),
+  )
+  return frame.overlay
+}
+
 export function createNearbyRaceModal(
   nearby: NearbyRace,
   _car: CarId,
@@ -186,7 +202,7 @@ export function createNearbyRaceModal(
     details.append(element('summary', 'modal-subtitle', 'Diagnostics'), createDiagnosticsControl(actions.downloadDiagnostics))
     frame.body.append(details)
   } else if (phase !== 'lobby') frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
-  frame.footer.append(button(phase === 'lobby' ? 'LEAVE ROOM' : 'BACK', 'nearby-back', actions.close, 'button'))
+  frame.footer.append(button(phase === 'lobby' ? 'LEAVE ROOM' : 'BACK', 'nearby-back', actions.close, phase === 'lobby' ? 'button button-danger' : 'button'))
   return frame.overlay
 }
 
