@@ -208,10 +208,12 @@ export class RaceScene extends Phaser.Scene {
     const frameSeconds = Math.max(0, this.game.loop.rawDelta / 1000)
     this.raceSession.advance(
       frameSeconds,
-      inputForPedals(this.snapshot.paused ? { steering: 0, throttle: 0, braking: false } : this.controls.snapshot(), this.controller.snapshot().preferences.pedalMode),
+      this.snapshot.paused
+        ? { steering: 0, throttle: 0, braking: false }
+        : inputForPedals(this.controls.snapshot(), this.snapshot.preferences.pedalMode),
     )
     benchmark?.endSimulation()
-    // Draw interpolated poses while the simulation, HUD, network and collision
+    // Draw interpolated poses while the simulation, HUD, and network
     // systems continue to use the authoritative 60 Hz state.
     const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
     if (!race) return

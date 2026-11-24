@@ -189,3 +189,22 @@ Note: the current Hard AI baseline produces identical outcomes for seeds
 1 and 4331 on all scenario/vehicle configurations. They still independently
 exercise the test harness; do not claim increased stochastic coverage
 until a Hard policy actually consumes random decisions.
+
+### Red terrain and steering physics validation
+
+A player-facing handling adjustment adds a 40-degree low-speed steering lock to
+Red, Blue and Yellow, blending back to the original steering curve by 35% of
+top speed. Red retains its ice stopping-distance target and gains ice grip and
+grass recovery acceleration without raising its grass speed target. Run the
+existing driving and passing optimization studies after physics changes. Compare
+solo and traffic times and recovery counts, without altering physical parameters
+in policy optimization. The Turn fixture measures actual travel direction on ice.
+
+### Pace regression gates
+
+Gameplay balance tests allow 1% per-run variation relative to the frozen Kids
+Room baseline and 1% tolerance for difficulty ordering on simple official tracks.
+The Émile field-spread guard permits 13.5%, including one percentage point of
+physics-tuning tolerance. Completion, zero-recovery gates and deterministic
+physics remain strict. The optimizer reports actual time differences rather than
+rounding them to these tolerances.

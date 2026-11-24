@@ -85,7 +85,17 @@ describe('vehicle physics', () => {
     )
 
     expect(grass.surface).toBe('grass')
-    expect(yellow.speed).toBeGreaterThan(red.speed * 1.8)
+    expect(yellow.speed).toBeGreaterThan(red.speed)
+    // Red now accelerates out of grass more readily, but Yellow retains its
+    // sustained off-road speed advantage.
+    let redCruise = red
+    let yellowCruise = yellow
+    const accelerate = { steering: 0, throttle: 1, braking: false }
+    for (let tick = 0; tick < 480; tick++) {
+      redCruise = stepVehicle(redCruise, accelerate, grass, 1 / 60)
+      yellowCruise = stepVehicle(yellowCruise, accelerate, grass, 1 / 60)
+    }
+    expect(yellowCruise.speed).toBeGreaterThan(redCruise.speed * 1.8)
 
     const streetBase = { ...vehicle('green'), vx: 80, vy: 60, speed: 100 }
     const street = stepVehicle(

@@ -443,7 +443,7 @@ describe('modal application flows', () => {
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
     expect(root.querySelector('[data-action="options-tab-race"]')).toBeNull()
     expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
-    expect(root.querySelector('[data-action="pedalMode-manual"]')).toBeNull()
+    expect(root.querySelector('[data-action="pedalMode-manual"]')).not.toBeNull()
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
   })
 

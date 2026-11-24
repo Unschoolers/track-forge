@@ -39,7 +39,7 @@ export const CAR_DRIVING_PROFILES = {
     hardEdgeAvoidanceScale: 0.4,
     hardCornerTargetBonus: 0.08,
     normalCornerTargetBonus: 0.006,
-    lowerDifficultyReserveScale: 0.99,
+    lowerDifficultyReserveScale: 0.98,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
