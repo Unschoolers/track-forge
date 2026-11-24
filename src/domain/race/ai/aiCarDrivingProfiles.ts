@@ -75,6 +75,6 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
-    lowerDifficultyReserveScale: 0.95,
+    lowerDifficultyReserveScale: 0.9,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>
