@@ -21,6 +21,8 @@ describe('new official circuits at 60 Hz', () => {
     const finish = result.vehicles[0]?.finishedAt
     expect(result.stoppedReason, track.name).toBe('finished')
     expect(finish, track.name).not.toBeNull()
+    expect(finish!, track.name).toBeGreaterThanOrEqual(20)
+    expect(finish!, track.name).toBeLessThanOrEqual(40)
     expect(result.vehicles[0]?.recoveries, track.name).toBe(0)
   }, 30_000)
 })
