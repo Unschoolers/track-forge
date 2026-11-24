@@ -7,12 +7,10 @@ const finite = (n) => typeof n === 'number' && Number.isFinite(n)
 const round = (n) => Math.round(n * 1000) / 1000
 const identity = (v) => (v.player ? 'player' : 'AI') + ':' + v.car
 
-/** V1 recorded two rulesets; V2 records only the shared Arcade ruleset. */
+/** Read the original replay contract, including historical Simulation races. */
 export function replayRuleset(exported) {
   assert(exported?.format === 'trackforge-race-replay', 'expected trackforge-race-replay')
-  assert(exported.formatVersion === 1 || exported.formatVersion === 2,
-    'unsupported race formatVersion (expected 1 or 2)')
-  if (exported.formatVersion === 2) return 'arcade'
+  assert(exported.formatVersion === 1, 'unsupported race formatVersion (expected 1)')
   // V1 RaceSetup.handling was optional; its engine default was Arcade.
   const handling = exported.setup?.handling
   assert(handling === undefined || handling === 'arcade' || handling === 'simulation',
@@ -233,7 +231,6 @@ export function summarizeRace(exported, options = {}) {
 export function compareRaces(before, after) {
   const a = summarizeRace(before), b = summarizeRace(after)
   const warnings = []
-  if (a.formatVersion !== b.formatVersion) warnings.push('Different replay format versions; gameplay physics may also differ')
   if (a.ruleset !== b.ruleset) warnings.push('Different handling rulesets (Arcade vs Simulation)')
   if (a.track.fingerprint !== b.track.fingerprint) warnings.push('Different track geometry/terrain')
   for (const key of ['difficulty', 'laps', 'mode', 'car']) {
