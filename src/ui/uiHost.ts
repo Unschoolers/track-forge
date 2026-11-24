@@ -1,6 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import type { NearbyConnectionModes } from '@/infrastructure/multiplayer/selectNearbyConnection'
-import { createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
+import { createNearbyLeaveConfirmation, createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
 import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
 import { raceDiagnosticsFilename } from '@/infrastructure/export/raceExportName'
 import { formatRaceTime } from '@/ui/format'
@@ -388,6 +388,10 @@ export class DomUiHost implements UiHost {
       case 'nearby': {
         const nearby = this.runtime.nearby
         if (!nearby) return undefined
+        if (state.overlay.confirmLeave) return createNearbyLeaveConfirmation(nearby.snapshot().role, {
+          stay: close,
+          leave: () => this.controller.dispatch({ type: 'leave-nearby' }),
+        })
         return createNearbyRaceModal(nearby, state.preferences.car, {
           close,
           downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
