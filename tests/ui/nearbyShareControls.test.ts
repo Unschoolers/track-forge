@@ -41,9 +41,10 @@ describe('Nearby sharing and rematch controls', () => {
     expect(actions.leave).toHaveBeenCalledOnce()
   })
 
-  it('shows car specifications and explicit consent in the race lobby', () => {
+  it('shows car specifications, diagnostics and explicit consent in the race lobby', async () => {
     const selectLobbyCar = vi.fn()
     const setLobbyReady = vi.fn()
+    const downloadDiagnostics = vi.fn(async () => true)
     const nearby = {
       snapshot: () => ({ phase: 'lobby', role: 'host', purpose: 'race', track: 'Figure eight', laps: 2,
         localCar: 'red', localReady: false, unlockPending: false, error: null,
@@ -54,8 +55,15 @@ describe('Nearby sharing and rematch controls', () => {
     const modal = createNearbyRaceModal(nearby, {
       close: vi.fn(), chooseTrack: vi.fn(), configureCup: vi.fn(), scan: vi.fn(), scanTracks: vi.fn(),
       saveTrack: vi.fn(), declineTrack: vi.fn(), connectByIp: vi.fn(),
-      downloadDiagnostics: vi.fn(async () => true),
+      downloadDiagnostics,
     })
+    const details = modal.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')
+    expect(details?.open).toBe(false)
+    expect(details?.querySelector('summary')?.textContent).toBe('Diagnostics')
+    details!.open = true
+    details?.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')?.click()
+    expect(downloadDiagnostics).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(details?.textContent).toContain('Diagnostic report saved.'))
     expect(modal.textContent).toContain('1/2 READY')
     expect(modal.querySelector('.car-summary-title')?.textContent).toContain('Red')
     expect(modal.querySelectorAll('.car-stat')).toHaveLength(4)
