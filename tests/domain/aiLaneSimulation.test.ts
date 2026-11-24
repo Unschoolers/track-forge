@@ -76,7 +76,8 @@ describe('AI lane simulations', () => {
 			difficulty: 'normal' as const,
 			reversed: false,
 			seconds: 2,
-			laps: 1,
+			// Three laps keep this monitoring test running for the entire 120 fixed ticks.
+			laps: 3,
 			mode: 'traffic' as const,
 			car: 'blue' as const,
 		}
