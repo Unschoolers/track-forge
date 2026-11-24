@@ -19,14 +19,14 @@ async function launch(page) {
 
 async function enterEditor(page) {
   await page.getByRole('button', { name: 'TRACK EDITOR' }).click()
-  await page.getByRole('button', { name: 'Edit Starter Circuit', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit City Sprint', exact: true }).click()
   await expect(page.locator('[data-screen="editor"]')).toBeVisible()
   await expect.poll(async () => (await telemetry(page)).camera).not.toBeNull()
 }
 
 async function enterRace(page, { fastCountdown = false } = {}) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'Race Starter Circuit', exact: true }).click()
+  await page.getByRole('button', { name: 'Race City Sprint', exact: true }).click()
   await page.getByRole('button', { name: 'START RACE' }).click()
   await expect(page.locator('[data-screen="race"]')).toBeVisible()
   if (fastCountdown) await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
