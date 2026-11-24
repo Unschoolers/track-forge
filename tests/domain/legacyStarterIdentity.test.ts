@@ -22,7 +22,7 @@ describe('retired starter safety', () => {
     const old = original()
     const edits = [
       { ...old, lighting: 'night' as const },
-      { ...old, scenery: [{ kind: 'grass-rock' as const, x: 12, y: 23 }] },
+      { ...old, scenery: [{ kind: 'grass-boulder' as const, x: 12, y: 23 }] },
       { ...old, start: { ratio: 0.2, reversed: false } },
       { ...old, recoveryCheckpoints: [] },
       { ...old, autoCheckpoints: false },
