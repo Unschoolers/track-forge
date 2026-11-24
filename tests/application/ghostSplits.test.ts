@@ -57,7 +57,7 @@ it('records real session gate crossings and compares a subsequent ghost race', (
 })
 
 it('invalidates recovered timing until the next lap and resets cleanly for a restart', () => {
-  const timing = new LapTiming([1, 2, 3, 4, 5, 6, 7, 8])
+  const timing = new LapTiming([1, 2, 3, 4, 5, 6, 7, 8], 4)
   timing.accept(0, 1, 1)
   timing.recover()
   expect(timing.currentLap(2)).toBeNull()
