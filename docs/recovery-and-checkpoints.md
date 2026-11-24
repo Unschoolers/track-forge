@@ -1,21 +1,26 @@
-# Road-contact recovery and checkpoint authoring
+# Authored checkpoints, timing, and recovery
 
-## Contracts
+## Contract
 
-- During normal racing, RECOVER returns the player to the **latest safe, grounded road contact**, not to the last user-placed recovery checkpoint. Water, wreck and scenery recoveries use the same source when available. A **pending missed timing gate** takes priority over this normal rule.
-- The tracked road index is anchored to actual road support. It must not jump to the other arm of an overlapping road or elevated crossing, or advance past a missing timing gate. If the contact is unsafe or invalid, prefer the last valid authored checkpoint as a fallback, then the existing gate-limited fallback; never award a missed sector or lap.
-- **Every missed timing gate (1–4, including Finish)** uses one direction-aware recovery policy. Manual RECOVER, the red RESET NOW button, the grace timer, and automatic stuck/wreck/water/scenery recovery must respawn roughly one road half-width **before the pending stripe**, not at a recent road contact or a manually placed marker past it. If the approach is flooded, search farther backward; if no dry road exists, use the approach with temporary water protection. Keep completed laps and the pending gate unchanged. This applies to normal/reverse circuits, relocated starts, and point-to-point stages.
-- Missed timing gates automatically reset after **2 seconds** (previously 5); RESET NOW still works immediately. Falling from an elevated bridge off its road support triggers the same **2-second auto-respawn fallback** if the car has not rejoined the raised road. Recovery returns to the last safe pre-gate road contact and cannot advance progress; ordinary ramp exits do not trigger the timer. A plunge into water beneath the bridge also waits for the two-second timer; ordinary non-bridge water recovery remains immediate.
-- Each successful player or rival recovery adds **100 ms** to that car's official finish time, cumulative across manual resets, missed gates, water, wrecks and falling. Physics, other drivers, and gate positions do not change. Leaderboards, splits, multiplayer results and ghost replay times use the adjusted timing.
-- The warning's red RESET NOW is usable immediately on mobile touch-down as well as mouse/keyboard clicks; its hit area stays above the race HUD, while hidden/paused/finished states cannot trigger it.
-- Timing gates (including Finish) forgive a near-edge pass by **5 world units** beyond their existing collision width. The car must still cross the gate plane in the correct direction and remain on the local path arm and the correct bridge level; farther off-road bypasses still trigger the missed-gate warning. This applies to circuits (normal/reverse) and point-to-point stages. Author-placed recovery markers retain their narrower collision rule.
-- Author-created recovery checkpoint markers remain visible in the editor and during racing. They do **not** determine the manual respawn location. Checkpoint progress and sector timing remain distinct.
-- New tracks default to automatic checkpoint additions: one per **ten authoring control points** during draw. The marker is placed near the penultimate control point on the compiled safe road, avoiding the open-path endpoint. The ratio is provisional tuning, not a gameplay difficulty setting.
-- Automatic addition **only appends** a new marker at each tenth point; it does not regenerate deleted or manually moved markers. Existing markers retain their approximate world distance as the road extends. Imported/older tracks do not silently gain checkpoints.
-- In the Checkpoint tool, tap road to add, tap marker to remove, or drag marker along safe road to move. A two-finger navigation gesture cancels the whole change; undo/redo captures the gesture. Checkpoints use the existing serialized ratio list, so no track format version bump.
+- **One checkpoint system.** The editor owns checkpoints, serialized as road-distance ratios in `Track.recoveryCheckpoints`. There are no virtual quarter-lap sectors or invisible timing gates. The physical start/finish line remains a separate required gate.
+- During a race, authored checkpoints are resolved to safe road samples, sorted in driving order (including reversed circuits), drawn as visible transverse stripes, and enforced in that same order. Splits include each checkpoint and then Finish, so gates per lap = authored checkpoints + 1.
+- A track with **zero valid authored checkpoints is INCOMPLETE**. It remains available to edit, but cannot be raced in single-player, Cups, or nearby play. Importing or opening an old track never silently creates gates. Once the editor adds a checkpoint, the same track becomes raceable.
+- While drawing a new track with auto-checkpoints enabled, add approximately one checkpoint every ten authored control points. Automatic creation appends only; deleting or manually moving a marker is respected. The creator can add, drag, or delete markers, and undo or cancel the gesture. Existing tracks with no markers stay incomplete.
+- The game ships three simple crossing-free circuits (City Sprint, Desert Sweep, Toy Box Dash) with authored checkpoints and environmental scenery. Target lap time is approximately 30 seconds; the fixed-step QA benchmark is the acceptance test, not unverified gold medal targets.
+- Retire old bundled circuits. On upgrade, only delete an **untouched** old starter: race identity alone is insufficient for deletion because it omits some edits (e.g. scenery). Any saved track that differs in editable content must be preserved.
+- Timing/ghost/score identity is versioned so old quarter-sector results cannot be compared with authored-checkpoint runs.
 
-## Tests and risks
+## Gate crossing and recovery
 
-Cheap domain/component checks cover checkpoint cadence, extension, moving and deleting, gesture undo/cancel, physical recovery on crossing arms, and missing timing gates. Full gates are `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`. Physical Android touch testing remains relevant for screen-space hit targets.
+- Award a checkpoint only when the vehicle crosses its real road stripe forward and within the bounded lateral forgiveness. A nearby-road index jump does **not** award a checkpoint, and overpasses must respect elevation.
+- A valid finish requires all authored checkpoints in sequence. Missing Finish must not add an extra lap.
+- A missed checkpoint starts a two-second warning and reset countdown. Manual RECOVER, RESET NOW, and automatic recovery must return to a safe approach **before that same authored gate**, preserving lap and pending checkpoint. Do not jump to a later track section.
+- Without a pending missed gate, RECOVER prefers the latest safe grounded road contact instead of jumping back to a distant checkpoint. Water and bridge recovery follow the same safe-contact constraints.
+- Each completed recovery adds 100 ms to the car's official time, including results, ghosts, and multiplayer records.
 
-The road-path ratios are proportional to centreline distance while extension rebasing uses authored control-line distance: for strongly curved edits some small visual drift is possible. Keep this behaviour observable and improve it if tuning reveals actual user friction. Rollback is the single feature PR without migration.
+## Validation
+
+- Fast domain/component tests must cover marker order (normal/reversed), crossing/near-edge bypass, missed-gate recovery, finish, checkpoint-free imports, old starter preservation, and save/undo.
+- Verify checkpoint rendering in both editor and race and that the displayed stripe uses the exact physics gate sample. Mobile touch tests remain useful for hit targets.
+- Run the fixed 60 Hz clean-lap benchmark for all three shipped tracks and calibrate actual geometry and medal targets before merging.
+- Required gates: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` plus the repository's AI and mobile workflows. Do not merge with known gate regressions.
