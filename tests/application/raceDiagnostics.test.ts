@@ -30,7 +30,10 @@ describe('all-car race diagnostics', () => {
 
     expect(report.format).toBe('trackforge-race-replay')
     expect(report.track).toEqual(track)
-    expect(report.setup).toEqual(setup)
+    expect(report.formatVersion).toBe(1)
+    expect(report.setup).toEqual({ ...setup, handling: 'arcade' })
+    expect(report.result.playerWrecked).toBe(false)
+    expect(report.frames.flatMap(frame => frame.vehicles).every(vehicle => vehicle.wrecked === false)).toBe(true)
     expect(report.frames).toHaveLength(2)
     expect(report.frames[1]?.vehicles.map(vehicle => vehicle.id)).toEqual(initial.vehicles.map(vehicle => vehicle.id))
     expect(report.frames[1]?.vehicles.find(vehicle => vehicle.player)?.speed).toBe(44)
@@ -39,6 +42,24 @@ describe('all-car race diagnostics', () => {
     expect(report.playerInputSampleTicks).toBe(1)
     expect(report.events[0]?.event.type).toBe('gate-crossed')
     expect(JSON.parse(JSON.stringify(report)).frames).toHaveLength(2)
+  })
+
+  it('preserves the v1 result fields without putting removed rules back into live state', () => {
+    const recording = new RaceDiagnosticsRecording(initial)
+    const standing = { id: 'player', car: setup.car, player: true, place: 1, finishTime: 42, lap: 2 }
+    const category = { course: 'v3:example', laps: 2, mode: 'normal' as const }
+    const score = { time: 42, car: setup.car, difficulty: setup.difficulty, recordedAt: 1, category }
+    const historicalScore = { time: 40, car: setup.car, difficulty: setup.difficulty, recordedAt: 2 }
+    const live = { ...result, standings: [standing], highScores: [score, historicalScore] }
+    const exported = recording.report(track, setup, live)
+    expect(exported.result).toEqual({
+      ...live, playerWrecked: false, standings: [{ ...standing, wrecked: false }],
+      highScores: [{ ...score, category: { ...category, handling: 'arcade' } }, historicalScore],
+    })
+    expect(live).not.toHaveProperty('playerWrecked')
+    expect(standing).not.toHaveProperty('wrecked')
+    expect(category).not.toHaveProperty('handling')
+    expect(setup).not.toHaveProperty('handling')
   })
 
   it('keeps a one-tick brake press and steering changes between 20 Hz pose frames', () => {
