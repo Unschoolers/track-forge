@@ -1,6 +1,6 @@
 {
   "baselineRevision": "a7c9637cf66d2e5e1e0e22a6f48427c73c0edab1",
-  "reason": "Project owner approved Red's measured 1.517 s slowdown in exchange for shared checkpoint validation and removal of track-specific AI tuning. No recovery or finish exemption.",
+  "reason": "Project owner approved Red's measured 1.517 s slowdown in exchange for shared checkpoint validation and removal of track-specific AI tuning. No recovery or finish exemption. Tracked in issue #314.",
   "approvals": [
     {
       "trial": "red|green|rival|driving|none|default|emile|1|hard|traffic",

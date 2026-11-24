@@ -226,3 +226,7 @@ A PR labeled `gameplay-improvement` by a reviewer can pass the fleet benefit gat
 ### Explicit release timing review
 
 The default one-second review threshold remains unchanged. A user-approved timing-only tradeoff may be recorded in `qa/optimization/reviews/pr-NUMBER.json`, bound to the frozen baseline revision, exact trial identity, original finish time and maximum approved slowdown. Only the final matched PR comparison consumes it; candidate search and recovery/finish/error gates do not. The raw timing loss and review are printed and retained in the report. The approval is scoped to that PR and does not carry over to later releases.
+
+### Shared-framework pace baseline (PR #313)
+
+Owner-approved temporary performance debt is tracked in [#314](https://github.com/Unschoolers/track-forge/issues/314). Émile's Blue mirror still beats the ghost but is stamped at the measured 1853 simulation ticks (30.8833 s), rather than the desired 30.633 s. The measured Medium-to-Easy gap is 2.916%, with a temporary 2.91% floor; the 3% target remains documented and the Hard-to-Medium requirement is unchanged. The test logs outstanding target misses; no test is skipped. The matched Red review remains limited to the two approved trials. Restore the original targets through cross-track car tuning. [#315](https://github.com/Unschoolers/track-forge/issues/315) tracks the separate expanded Hairpin recovery/timeout failures, which are not timing exemptions. The required lane and optimization gates remain unchanged; the experimental matrix remains strict.
