@@ -39,6 +39,7 @@ export const CAR_DRIVING_PROFILES = {
     hardEdgeAvoidanceScale: 0.4,
     hardCornerTargetBonus: 0.08,
     normalCornerTargetBonus: 0.006,
+    lowerDifficultyReserveScale: 0.99,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
   // turn-in; it uses the existing stable late-braking logic separately.
@@ -64,6 +65,7 @@ export const CAR_DRIVING_PROFILES = {
     // preserve forward pursuit preview near ordinary road edges without
     // overriding real tire grip, corner/braking safety, or recovery rules.
     hardEdgeAvoidanceScale: 0.25,
+    lowerDifficultyReserveScale: 0.97,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
@@ -73,5 +75,6 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0,
     hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
+    lowerDifficultyReserveScale: 0.95,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>

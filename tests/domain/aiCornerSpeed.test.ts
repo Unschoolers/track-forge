@@ -13,15 +13,22 @@ const path = buildRoadPath([
 ], EMPTY_TERRAIN)
 
 describe('AI approach speed planning', () => {
-  it('uses finer Red pavement brake corrections without limiting full service brakes', () => {
+  it('uses finer surface-specific brake corrections without limiting full service brakes', () => {
     const red = CAR_SPECS.red
     const light = correctionBrakePressure(red, 'street', 0.25)
     expect(light).toBeGreaterThanOrEqual(0.25 / 1.5)
     expect(light).toBeLessThan(0.25)
     expect(correctionBrakePressure(red, 'street', 0)).toBe(0)
     expect(correctionBrakePressure(red, 'street', 1)).toBeCloseTo(1, 12)
+    expect(correctionBrakePressure(red, 'ice', 0.25)).toBeLessThan(light)
+    expect(correctionBrakePressure(red, 'ice', 1)).toBeCloseTo(1, 12)
     for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
       for (const surface of ['street', 'dirt', 'ice', 'grass'] as const) {
+        if (surface === 'ice') {
+          expect(correctionBrakePressure(CAR_SPECS[car], surface, 0.25)).toBeLessThan(0.25)
+          expect(correctionBrakePressure(CAR_SPECS[car], surface, 1)).toBeCloseTo(1, 12)
+          continue
+        }
         if (car === 'red' && surface === 'street') continue
         expect(correctionBrakePressure(CAR_SPECS[car], surface, 0.25)).toBe(0.25)
       }

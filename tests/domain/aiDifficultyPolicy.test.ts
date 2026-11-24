@@ -50,17 +50,15 @@ describe('AI difficulty policy', () => {
     expect(arcadeCornerMargin('normal')).toBeGreaterThan(arcadeCornerMargin('hard'))
   })
 
-  it('derives ordered lower-difficulty Red reserves without affecting other cars', () => {
-    const hard = arcadeCornerMargin('hard', 'red')
-    const normal = arcadeCornerMargin('normal', 'red')
-    const easy = arcadeCornerMargin('easy', 'red')
-    expect(normal).toBeGreaterThan(hard)
-    expect(easy).toBeGreaterThan(normal)
-    expect(normal).toBeLessThan(arcadeCornerMargin('normal'))
-    expect(easy).toBeLessThan(arcadeCornerMargin('easy'))
-    for (const car of ['blue', 'green', 'yellow'] as const) {
-      expect(arcadeCornerMargin('normal', car)).toBe(arcadeCornerMargin('normal'))
-      expect(arcadeCornerMargin('easy', car)).toBe(arcadeCornerMargin('easy'))
+  it('derives ordered lower-difficulty reserves for every chassis', () => {
+    for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
+      const hard = arcadeCornerMargin('hard', car)
+      const normal = arcadeCornerMargin('normal', car)
+      const easy = arcadeCornerMargin('easy', car)
+      expect(normal).toBeGreaterThan(hard)
+      expect(easy).toBeGreaterThan(normal)
+      expect(normal).toBeLessThanOrEqual(arcadeCornerMargin('normal'))
+      expect(easy).toBeLessThanOrEqual(arcadeCornerMargin('easy'))
     }
   })
 

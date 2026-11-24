@@ -203,7 +203,15 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     }
   })
 
-  it('increases Red service-brake force by 50% on pavement only', () => {
+  it('matches the four ice braking distance targets from 170 units/s', () => {
+    const targets = { red: 250, blue: 235, green: 200, yellow: 150 } as const
+    for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
+      const distance = stoppingDistance(car, handling, 'ice')
+      expect(Math.abs(distance - targets[car]), car).toBeLessThan(1)
+    }
+  })
+
+  it('scales Red service brakes on pavement and ice only', () => {
     for (const surface of ['street', 'dirt', 'grass', 'ice'] as const) {
       const spec = surface === 'grass' ? OFFROAD_SURFACE : SURFACE_SPECS[surface]
       const terrain = VEHICLE_TERRAIN_SPECS.red[surface]
@@ -222,7 +230,7 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
         forces.gravityAcceleration * car.grip * initial.surfaceGrip * forces.brakeGripUsage,
       ) * forces.brakingTractionScale * 1.38
       expect((coast.speed - brake.speed) / dt / oldBrakeForce, surface)
-        .toBeCloseTo(surface === 'street' ? 1.5 : 1, 8)
+        .toBeCloseTo(surface === 'street' ? 1.5 : surface === 'ice' ? 1.9877 : 1, 8)
     }
   })
 })
