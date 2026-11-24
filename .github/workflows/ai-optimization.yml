@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'qa/optimization/**'
+      - 'src/domain/race/vehicleDynamics.ts'
+      - 'src/domain/race/vehiclePhysicsConfig.ts'
+      - 'src/domain/race/vehiclePhysics.ts'
       - 'tests/fixtures/desertSandAi.trackforge.json'
       - 'docs/ai-optimization.md'
       - '.github/workflows/ai-optimization.yml'
@@ -40,8 +43,29 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Capture matched pre-change physics baseline
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags origin "$BASE_SHA"
+          if git diff --quiet "$BASE_SHA" HEAD -- src/domain/race/vehicleDynamics.ts src/domain/race/vehiclePhysicsConfig.ts src/domain/race/vehiclePhysics.ts; then
+            exit 0
+          fi
+          baseline="$RUNNER_TEMP/trackforge-physics-baseline"
+          git worktree add --detach "$baseline" "$BASE_SHA"
+          (
+            cd "$baseline"
+            npm ci
+            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/optimization/baseline"
+          )
       - name: Run four-car parallel AI optimization study
         run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization
+      - name: Report matched physics comparison
+        run: |
+          if test -f qa/results/optimization/baseline/summary.json; then
+            node qa/optimization/comparePhysics.mjs qa/results/optimization/baseline/summary.json qa/results/optimization/summary.json
+          fi
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'

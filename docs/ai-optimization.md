@@ -212,3 +212,7 @@ rounding them to these tolerances.
 ## AI speed-planning responsibility
 
 `aiDriver.ts` owns perception, pursuit, passing/mistakes, steering and integration; `aiSpeedPlan.ts` owns longitudinal speed requests (corner target, braking, throttle and catch-up eligibility). Both continue to use the same per-car driving profiles and existing physical tire model. A behavior-preserving extraction must retain deterministic pace, recovery and difficulty outcomes; the optimization lab and lane checker are validation tools, not permission to retune physical handling in a refactoring PR.
+
+### Low-speed steering response experiment
+
+The linear tire response below 26 game units/s is the initial comparison point. A concave response curve (`lowSpeedResponseGain: 1`) retains zero tire force at rest and the unchanged full response at 26 units/s, while preserving the per-car steering rack, grip and brake settings. This is a shared physics experiment, not an AI profile override. Run isolated vehicle dynamics tests and the existing four-car driving/passing studies; compare matched solo and traffic baselines across physics revisions before promoting any change. Do not relax existing recovery, braking, or difficulty gates.

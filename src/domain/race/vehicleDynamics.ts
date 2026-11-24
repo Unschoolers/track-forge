@@ -220,12 +220,16 @@ export function stepVehicleDynamics(
     lateral - rearAxle * yawRate,
     tireSpeed,
   )
-  const tireResponse = clamp(
+  const linearTireResponse = clamp(
     Math.abs(longitudinal) /
       Math.max(0.001, tuning.steering.fullTireResponseSpeed),
     0,
     1,
   )
+  // Preserve zero tire authority at rest and the original full-speed response.
+  // A concave curve gives rolling cars more authority during tight manoeuvres.
+  const tireResponse = linearTireResponse * (1 +
+    clamp(tuning.steering.lowSpeedResponseGain, 0, 1) * (1 - linearTireResponse))
   const frontLateralAcceleration =
     softLimit(
       -frontSlip *
