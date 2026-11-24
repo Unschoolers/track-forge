@@ -23,27 +23,36 @@ export function updateProgress(
   const travel = closed ? (after - before + pathLength) % pathLength : after - before
   if (travel < 0 || travel > pathLength / 2) return { ...vehicle, pathIndex: nextPathIndex }
 
-  const finish = vehicle.nextSector === timingGates.length + 1
-  const required = finish
-    ? closed ? pathLength : pathLength - 1
-    : directed(timingGates[vehicle.nextSector - 1] ?? startPathIndex)
-  const distance = closed
-    ? (required - before + pathLength) % pathLength || (finish ? pathLength : 0)
-    : required - before
-  // AI on a point-to-point course brakes at its final drivable sample.
-  // Its nearest-path index may never reach the terminal endpoint exactly,
-  // even when all authored checkpoints were passed in sequence. Only the
-  // AI index-based progress adapter uses this tolerance; player Finish stays
-  // a strict physical-line crossing in advanceArcadeTimingGate.
+  // A 60 Hz tick can cross several tightly spaced authored gates. Consume
+  // every gate encountered along the same bounded forward road movement,
+  // rather than stranding a rival forever with an unpassed gate behind it.
+  let nextSector = vehicle.nextSector
+  for (; nextSector <= timingGates.length; nextSector++) {
+    const index = timingGates[nextSector - 1]
+    if (index === undefined) break
+    const required = directed(index)
+    const distance = closed
+      ? (required - before + pathLength) % pathLength
+      : required - before
+    if (travel <= 0 || distance < 0 || distance > travel) break
+  }
+
+  const finish = nextSector === timingGates.length + 1
+  const crossedStart = closed && after < before && travel > 0
+  // AI on a point-to-point stage cannot steer beyond its final physical
+  // road sample; it may brake one index short of the terminal endpoint.
+  // This tolerance is exclusively for AI progress (players require the
+  // physical gate plane in advanceArcadeTimingGate).
   const aiAtStageFinish = !closed && finish &&
     before >= pathLength - 3 && after >= pathLength - 2
-  if (!aiAtStageFinish && (distance <= 0 || distance > travel)) return { ...vehicle, pathIndex: nextPathIndex }
-  if (finish) {
+  if (finish && (crossedStart || aiAtStageFinish ||
+      (!closed && before < pathLength - 1 && after >= pathLength - 1))) {
     const lap = vehicle.lap + 1
     return { ...vehicle, pathIndex: nextPathIndex, nextSector: 1, lap,
       finishedAt: lap >= totalLaps ? elapsed : null }
   }
-  return { ...vehicle, pathIndex: nextPathIndex, nextSector: vehicle.nextSector + 1 }
+  return { ...vehicle, pathIndex: nextPathIndex, nextSector }
+
 }
 
 /** Next authored gate index for an open route (finish when all are passed). */
