@@ -145,7 +145,7 @@ describe('reverse races', () => {
   })
   it('faces reverse after automatic player and off-road AI recovery', () => {
     const base = race()
-    const player = { ...requireFixture(base.vehicles[0]), stuckDuration: 0.7 }
+    const player = { ...requireFixture(base.vehicles[0]), stuckDuration: 2 }
     const ai = {
       ...requireFixture(base.vehicles[1]),
       x: requireFixture(base.vehicles[1]).x + 250,

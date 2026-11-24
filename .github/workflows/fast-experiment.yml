@@ -25,7 +25,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Focused vehicle physics and car identity contracts
-        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts --maxWorkers=2
+        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts tests/domain/raceCameraContinuity.test.ts tests/domain/reverseRace.test.ts --maxWorkers=2
       - run: npm run qa:optimize:test
       - name: Recalibrate AI against main with full steering gain
         shell: bash
@@ -39,12 +39,18 @@ jobs:
           # Use the same CLI selection logic; retain the baseline's real engine,
           # profiles, fixtures and simulator. Never copy candidate physics.
           cp qa/optimization/cli.mjs qa/optimization/score.mjs "$baseline/qa/optimization/"
+          cp qa/lanes/emileRecovery.benchmark.ts "$baseline/qa/lanes/"
           (
             cd "$baseline"
             npm ci
+            AI_BENCHMARK=1 npx --no-install vitest run qa/lanes/emileRecovery.benchmark.ts --maxWorkers=2
             GITHUB_SHA="$base_sha" npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay --seeds 1 --workers 2 --trials 1 --baseline-only --no-telemetry --out "$report/before"
           )
+          AI_BENCHMARK=1 npx --no-install vitest run qa/lanes/emileRecovery.benchmark.ts --maxWorkers=2
           npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay --seeds 1 --workers 2 --trials 14 --no-telemetry --reference "$report/before/baseline-results.json" --gameplay-improvement --out "$report/after"
+      - name: Production Émile balance guard
+        if: success()
+        run: npx --no-install vitest run tests/domain/emileHardRace.test.ts --maxWorkers=2
       - name: Publish quick experiment results
         if: always()
         uses: actions/upload-artifact@v7.0.2
