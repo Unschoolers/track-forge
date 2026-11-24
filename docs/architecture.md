@@ -46,7 +46,7 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 
 ## Shared invariants to protect
 
-- **One ruleset:** all races use the same Arcade physics, AI, collisions (none) and recovery. Auto-accelerate and manual pedals are local input preferences, not race categories. Previous race record, ghost and last-race namespaces are retired; track storage is unchanged.
+- **One ruleset:** all races use the same Arcade physics, AI, collisions (none) and recovery. Auto-accelerate and manual pedals are local input preferences, not race categories. Existing Arcade scores, ghost replays and last-race setup migrate to the single-ruleset storage formats; track storage is unchanged. Explicit Simulation records are excluded from the new race categories.
 - **One geometric truth:** road/terrain height, structures, crossings, checkpoint locations and nearest-path context must agree between editor, AI, physics and rendering. Prefer the existing `TrackGeometryService`, `roadSurface` and terrain authorities.
 - **No track-specific gameplay exceptions:** AI, physics, progress and difficulty must derive decisions from shared geometry, road/terrain surfaces, vehicle properties and race settings. Never recognize a particular circuit by name, ID, export hash or hand-authored segment index to apply different steering, speed, grip, checkpoints or racing-line rules. Named tracks are allowed as **test fixtures**, never production behavior switches. If a layout exposes a weakness, fix the generic rule and protect it with seeded regressions.
 - **Determinism:** fixed input/tick/randomness should yield reproducible simulation and comparable AI results. Inject clock and random source at appropriate boundaries.
@@ -60,3 +60,26 @@ src/main.ts (composition root: dependencies, lifecycle, capabilities)
 ## When adding a feature
 
 Identify the **owner of the rule**, the **authoritative data structure**, the **ports**, and the **consumer(s)**. Prefer introducing one clear operation at the right level over adding conditionals to `AppController`, `RaceScene`, and the UI simultaneously. If multiple consumers need the same derived geometry, compute it once at the geometry boundary and reuse it.
+
+## Single-ruleset storage upgrade
+
+- Scores: merge valid Arcade records from `trackforge-highscores-v2` and any
+  not-yet-migrated v1 records into `trackforge-highscores-v3`. Uncategorised
+  historical scores remain visible as legacy only. Deduplicate by category,
+  car, difficulty, time and recording date; retain the normal top-five policy.
+- Ghosts: migrate v1 Arcade keys into the v2 bank by removing only the final
+  ruleset component. Preserve revision, direction, laps, frames, cuts and
+  splits; keep the faster duplicate. Never import Simulation ghosts.
+- Race Again: use the existing v2 setup if present, otherwise migrate the
+  last compatible v1 Arcade setup. Preserve the original track identity.
+- Preferences: read the old committed snapshot, not potentially stale
+  individual mirrors. Previous manual throttle becomes the manual pedal
+  preference; a new explicit pedal selection takes precedence.
+- The score and ghost banks commit their migration state atomically with their
+  contents. Legacy source keys remain untouched for recovery or rollback. If
+  the new write fails, old compatible data stays readable and the migration
+  retries on later access. Do not evict ghosts solely to make migration fit.
+  Once committed, old banks cannot resurrect deleted scores or overwrite newer
+  data. No track, creator or player identity migration is required.
+
+Verification: `npx vitest run tests/infrastructure/singleRulesetMigration.test.ts tests/infrastructure/storage.test.ts tests/infrastructure/scoreRetentionEfficiency.test.ts tests/application/ghostReplay.test.ts tests/application/lastRace.test.ts` followed by the standard CI gates.
