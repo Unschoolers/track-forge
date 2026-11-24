@@ -1,4 +1,15 @@
-import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
+import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining, type RaceState, type RaceVehicle } from '@/domain/race/raceState'
+
+/** Only the local human gets a restart signal. Green fades over 18 running ticks. */
+export function manualRecoverySignal(state: RaceState): { color: number; progress: number; alpha: number } | null {
+  const player = state.vehicles.find(vehicle => vehicle.player)
+  const unlock = player?.manualRecoveryUntilTick
+  if (state.phase !== 'running' || unlock === undefined) return null
+  const remaining = manualRecoveryTicksRemaining(player, state.tick)
+  if (remaining > 0) return { color: 0xfacc15, progress: 1 - remaining / MANUAL_RECOVERY_TICKS, alpha: 1 }
+  const alpha = 1 - (state.tick - unlock) / 18
+  return alpha > 0 ? { color: 0x4ade80, progress: 1, alpha } : null
+}
 
 function blend(from: number, to: number, fraction: number): number {
   return from + (to - from) * fraction

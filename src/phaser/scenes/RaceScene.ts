@@ -1,4 +1,6 @@
 import { inputForHandling } from '@/phaser/input/raceInput'
+import { manualRecoveryTicksRemaining } from '@/domain/race/raceState'
+import { manualRecoverySignal } from '@/application/race/racePresentation'
 import Phaser from 'phaser'
 import type { AppSnapshot } from '@/application/appState'
 import {
@@ -232,15 +234,35 @@ export class RaceScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.raceCamera.zoom)
       this.cameras.main.setRotation(-this.raceCamera.angle - Math.PI / 2)
     }
+    const cameraRotation = this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0
     this.renderGroundPresentation(
       this.raceSession.snapshot().setup?.lighting === 'night',
-      this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0,
+      cameraRotation,
     )
     this.vehicleGraphics.clear()
     this.shadowGraphics.clear()
     this.upperVehicleGraphics.clear()
     this.effectGraphics.clear()
     renderRaceEffects(this.effectGraphics, race.effects)
+    const restart = manualRecoverySignal(race)
+    if (player && restart) {
+      // Counter-rotate and scale to keep the local signal upright and legible.
+      const graphics = this.effectGraphics
+      const camera = this.cameras.main
+      graphics.save()
+      graphics.translateCanvas(player.x, player.y)
+      graphics.rotateCanvas(-cameraRotation)
+      graphics.scaleCanvas(1 / camera.zoom, 1 / camera.zoom)
+      graphics.fillStyle(0x101820, 0.9 * restart.alpha)
+      graphics.fillRoundedRect(-24, -54, 48, 22, 8)
+      graphics.fillStyle(restart.color, restart.alpha)
+      graphics.fillCircle(0, -46, 5)
+      graphics.fillStyle(0xffffff, 0.18 * restart.alpha)
+      graphics.fillRect(-17, -38, 34, 3)
+      graphics.fillStyle(restart.color, restart.alpha)
+      graphics.fillRect(-17, -38, 34 * restart.progress, 3)
+      graphics.restore()
+    }
     const visibleVehicles = race.vehicles.filter(
       (vehicle) => vehicle.player || vehicle.finishedAt === null,
     )
@@ -371,7 +393,8 @@ export class RaceScene extends Phaser.Scene {
     }
     if (event.key.toLowerCase() === 'r' && !event.repeat) {
       const state = this.raceSession.snapshot().state
-      if (state?.phase !== 'running' || state.paused || this.controller.snapshot().paused) return
+      if (state?.phase !== 'running' || state.paused || this.controller.snapshot().paused ||
+          manualRecoveryTicksRemaining(state.vehicles.find(vehicle => vehicle.player), state.tick) > 0) return
       this.controls.reset()
       this.raceSession.resetPlayer()
       return

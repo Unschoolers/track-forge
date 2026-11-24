@@ -5,7 +5,7 @@ import type {
   RaceSessionSnapshot,
 } from '@/application/race/raceSession'
 import type { Unsubscribe } from '@/application/eventBus'
-import { countdownCue } from '@/domain/race/raceState'
+import { countdownCue, manualRecoveryTicksRemaining } from '@/domain/race/raceState'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { bindRacePointer, STEERING_RANGE_PX } from '@/phaser/input/racePointer'
@@ -102,7 +102,8 @@ export function createRaceHud(
   throttle.setAttribute('aria-label', 'Accelerate')
   const recoverPlayer = (): void => {
     const state = raceSession.snapshot().state
-    if (state?.phase !== 'running' || state.paused) return
+    if (state?.phase !== 'running' || state.paused ||
+        manualRecoveryTicksRemaining(state.vehicles.find(vehicle => vehicle.player), state.tick) > 0) return
     controls.reset()
     updateControls()
     raceSession.resetPlayer()
@@ -270,7 +271,8 @@ export function createRaceHud(
     throttle.hidden = handling !== 'simulation'
     pedals.classList.toggle('simulation', handling === 'simulation')
     updateControls()
-    recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused
+    recover.disabled = snapshot.state?.phase !== 'running' || snapshot.state.paused ||
+      manualRecoveryTicksRemaining(snapshot.state.vehicles.find(vehicle => vehicle.player), snapshot.state.tick) > 0
     const telemetry = snapshot.telemetry
     const missed = snapshot.state?.missedCheckpoint
     checkpointWarning.hidden = !missed || phase !== 'running' || paused

@@ -1,6 +1,5 @@
 import type { RaceVehicle } from '@/domain/race/raceState'
 import { captureGhost, MAX_GHOST_FRAMES, type GhostFrame } from './ghostReplay'
-import { penalizedRaceTime } from '@/domain/race/recoveryPenalty'
 
 /** Bounded replay recording, with explicit cuts for Arcade recoveries. */
 export class GhostRecording {
@@ -14,9 +13,9 @@ export class GhostRecording {
 
   recover(before: RaceVehicle, after: RaceVehicle, elapsed: number): void {
     if (!this.arcade) { this.valid = false; return }
-    // Hold the approach pose through the 100 ms official-time penalty; a
-    // recovery remains a hard cut, never an interpolated teleport.
-    const time = penalizedRaceTime(elapsed, after)
+    // Cut at the actual recovery tick; stationary samples during a manual
+    // hold record the real delay without adding synthetic ghost time.
+    const time = elapsed
     const last = this.frames.at(-1)
     if (last?.t === time && last.cut) {
       // Multiple resets within one physics tick share the original approach.
@@ -31,7 +30,7 @@ export class GhostRecording {
 
   sample(player: RaceVehicle, elapsed: number, finished = false): void {
     if (!this.valid) return
-    const time = penalizedRaceTime(elapsed, player)
+    const time = elapsed
     if (player.wrecked && !this.arcade) { this.valid = false; return }
     const last = this.frames.at(-1)
     if (!finished && last && time < last.t + this.interval) return

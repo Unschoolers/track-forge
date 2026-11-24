@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { createRace } from '@/domain/race/raceFactory'
-import { recoverRacePlayer, stepRace } from '@/domain/race/raceEngine'
-import type { RaceState } from '@/domain/race/raceState'
-import { addRecoveryTimePenalty, penalizedRaceTime, RECOVERY_TIME_PENALTY_SECONDS } from '@/domain/race/recoveryPenalty'
+import { recoverRacePlayer, stepRace, stepRaceTick } from '@/domain/race/raceEngine'
+import { recoverRaceVehicle } from '@/domain/race/raceRecovery'
+import { manualRecoverySignal } from '@/application/race/racePresentation'
+import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining, type RaceState } from '@/domain/race/raceState'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { requireFixture } from '../fixtures/requireFixture'
@@ -21,19 +22,53 @@ const start = () => {
   return { ...race, phase: 'running' as const }
 }
 
-describe('recovery penalty and elevated-road auto respawn', () => {
-  it('adds 100 ms to the recovering player only, stacks across manual resets, and resets on a new race', () => {
+describe('manual recovery hold and elevated-road auto respawn', () => {
+  it('ignores repeated requests until release and starts a fresh hold on the next manual recovery', () => {
     const initial = start()
     const once = recoverRacePlayer(initial)
-    const twice = recoverRacePlayer(once)
+    expect(recoverRacePlayer(once)).toBe(once)
+    let released: RaceState = once
+    for (let tick = 0; tick < MANUAL_RECOVERY_TICKS; tick++) {
+      released = stepRace(released, { steering: 0, throttle: 1, braking: false }, 1 / 60, { next: () => 0.5 }).state
+    }
+    const twice = recoverRacePlayer(released)
     expect(once.elapsed).toBe(initial.elapsed)
-    expect(once.vehicles[0]?.recoveryPenaltySeconds).toBeCloseTo(RECOVERY_TIME_PENALTY_SECONDS)
-    expect(twice.vehicles[0]?.recoveryPenaltySeconds).toBeCloseTo(0.2)
-    expect(twice.vehicles[1]?.recoveryPenaltySeconds).toBeUndefined()
-    expect(penalizedRaceTime(10, requireFixture(twice.vehicles[0]))).toBeCloseTo(10.2)
+    expect(once.vehicles[0]?.manualRecoveryUntilTick).toBe(30)
+    expect(twice.vehicles[0]?.manualRecoveryUntilTick).toBe(60)
+    expect(twice.vehicles[1]?.manualRecoveryUntilTick).toBeUndefined()
+    expect(twice.elapsed).toBeCloseTo(0.5, 10)
     const paused = { ...twice, paused: true }
     expect(recoverRacePlayer(paused)).toBe(paused)
-    expect(start().vehicles[0]?.recoveryPenaltySeconds).toBeUndefined()
+    expect(start().vehicles[0]?.manualRecoveryUntilTick).toBeUndefined()
+  })
+
+  it('holds human and AI manual requests for exactly 30 running ticks and shows only the human signal', () => {
+    for (const handling of ['arcade', 'simulation'] as const) {
+      const initial = { ...start(), handling }
+      const player = requireFixture(initial.vehicles[0])
+      const rival = requireFixture(initial.vehicles[1])
+      const input = { steering: 0, throttle: 1, braking: false }
+      const random = { next: () => 0.5 }
+      let race = recoverRaceVehicle(initial, rival.id)
+      expect(manualRecoverySignal(race)).toBeNull()
+      race = recoverRacePlayer(race)
+      const held = race.vehicles.slice(0, 2).map(vehicle => ({ x: vehicle.x, y: vehicle.y, speed: vehicle.speed }))
+      expect(manualRecoverySignal(race)?.color).toBe(0xfacc15)
+      expect(manualRecoverySignal(race)?.progress).toBe(0)
+      const paused = { ...race, paused: true }
+      expect(stepRace(paused, input, 1 / 60, random).state).toBe(paused)
+      for (let tick = 1; tick <= MANUAL_RECOVERY_TICKS; tick++) {
+        race = stepRaceTick(race, { tick, controls: { [player.id]: input, [rival.id]: input } }, random).state
+        expect(race.vehicles.slice(0, 2).map(vehicle => ({ x: vehicle.x, y: vehicle.y, speed: vehicle.speed }))).toEqual(held)
+        expect(race.elapsed).toBeCloseTo(tick / 60, 10)
+        expect(manualRecoveryTicksRemaining(race.vehicles[0], tick)).toBe(MANUAL_RECOVERY_TICKS - tick)
+      }
+      expect(manualRecoverySignal(race)?.color).toBe(0x4ade80)
+      race = stepRaceTick(race, { tick: MANUAL_RECOVERY_TICKS + 1, controls: { [player.id]: input, [rival.id]: input } }, random).state
+      expect(race.vehicles[0]?.speed).toBeGreaterThan(0)
+      expect(race.vehicles[1]?.speed).toBeGreaterThan(0)
+      expect(manualRecoverySignal({ ...race, tick: MANUAL_RECOVERY_TICKS + 18 })).toBeNull()
+    }
   })
 
   it('starts a bridge fall only after losing raised support and cancels after rejoining it', () => {
@@ -77,7 +112,7 @@ describe('recovery penalty and elevated-road auto respawn', () => {
       if (tick.events.some((event) => event.type === 'vehicle-recovered' && event.vehicleId === 'player')) {
         recoveredAt = race.elapsed
         expect(car.bridgeFallSeconds).toBeUndefined()
-        expect(car.recoveryPenaltySeconds).toBeCloseTo(0.1)
+        expect(manualRecoveryTicksRemaining(car, race.tick)).toBe(0)
         expect(car.grounded).toBe(true)
         break
       }
@@ -88,11 +123,4 @@ describe('recovery penalty and elevated-road auto respawn', () => {
     expect((recoveredAt ?? 0) - (startedAt ?? 0)).toBeLessThanOrEqual(BRIDGE_FALL_RESPAWN_SECONDS + 0.05)
   })
 
-  it('penalizes the official time without advancing the simulation clock', () => {
-    const car = requireFixture(start().vehicles[0])
-    const penalized = addRecoveryTimePenalty(addRecoveryTimePenalty(car))
-    expect(penalizedRaceTime(12.5, penalized)).toBeCloseTo(12.7)
-    expect(car.finishedAt).toBeNull()
-    expect(penalized.finishedAt).toBeNull()
-  })
 })

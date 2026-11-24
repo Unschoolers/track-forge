@@ -8,6 +8,7 @@ import type {
 } from '@/application/race/raceSession'
 import { RaceSession } from '@/application/race/raceSession'
 import type { RaceStep } from '@/domain/race/raceEngine'
+import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining } from '@/domain/race/raceState'
 import type { RaceControlsPort } from '@/application/ports/input'
 import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
@@ -200,16 +201,20 @@ function recoverySession() {
 }
 
 describe('race UI flow', () => {
-  it('shows the missed gate countdown and lets the player recover immediately', () => {
+  it('shows the missed gate countdown, recovers, and waits for the manual restart hold', () => {
     const controls = new RaceInputController()
-    const step: RaceStep = (state) => ({
-      state: {
-        ...state,
-        elapsed: 2,
-        missedCheckpoint: { gate: 1, remainingSeconds: 1.8, position: { x: 25, y: 20 } },
-      },
-      events: [],
-    })
+    const step: RaceStep = (state, _input, dt) => {
+      const held = manualRecoveryTicksRemaining(state.vehicles.find(vehicle => vehicle.player), state.tick) > 0
+      return {
+        state: {
+          ...state,
+          tick: state.tick + 1,
+          elapsed: held ? state.elapsed + dt : state.elapsed || 2,
+          missedCheckpoint: held ? undefined : { gate: 1, remainingSeconds: 1.8, position: { x: 25, y: 20 } },
+        },
+        events: [],
+      }
+    }
     const session = new RaceSession({
       scoreStore: { forTrack: () => [], record: () => false, removeTrack: () => false },
       random: { next: () => 0.5 },
@@ -231,8 +236,21 @@ describe('race UI flow', () => {
     expect(resetPlayer).toHaveBeenCalledTimes(1)
     expect(warning.hidden).toBe(true)
     expect(controls.snapshot().steering).toBe(0)
-    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(2.1)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(2)
     expect(session.snapshot().state?.elapsed).toBe(2)
+
+    const recover = requiredElement(root, 'button[data-action="recover"]') as HTMLButtonElement
+    expect(recover.disabled).toBe(true)
+    for (let tick = 0; tick < MANUAL_RECOVERY_TICKS - 1; tick++) {
+      session.advance(1 / 60, controls.snapshot())
+      expect(recover.disabled).toBe(true)
+      expect(warning.hidden).toBe(true)
+    }
+    recover.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(resetPlayer).toHaveBeenCalledTimes(1)
+    session.advance(1 / 60, controls.snapshot())
+    expect(recover.disabled).toBe(false)
+    expect(session.snapshot().telemetry.elapsed).toBeCloseTo(2.5)
 
     // The next miss must also respond directly to a mobile touch down.
     // A synthesized click is not reliable if the player has another finger
@@ -284,7 +302,8 @@ describe('race UI flow', () => {
     const after = session.snapshot()
     expect(after.state?.vehicles[0]?.x).not.toBe(before.state?.vehicles[0]?.x)
     expect(after.state?.vehicles[0]).toMatchObject({ speed: 0, lap: 1, nextSector: 2, damage: 2 })
-    expect(after.telemetry).toMatchObject({ elapsed: 23.1, lap: 1, damage: 2 })
+    expect(after.telemetry).toMatchObject({ elapsed: 23, lap: 1, damage: 2 })
+    expect(recover.disabled).toBe(true)
     expect(controls.snapshot()).toMatchObject({ steering: 0, braking: false })
     expect(pad.getAttribute('aria-valuenow')).toBe('0.00')
     expect(knob.style.transform).toBe('translateX(0px)')

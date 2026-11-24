@@ -335,7 +335,7 @@ describe('RaceSession', () => {
     expect(player?.x).not.toBe(beforePlayer.x)
     expect(player?.y).not.toBe(beforePlayer.y)
     expect(player).toMatchObject({ speed: 0, vx: 0, vy: 0, lap: 1, nextSector: 3, damage: 2 })
-    expect(recovered.telemetry).toMatchObject({ elapsed: 42.1, lap: 1, damage: 2 })
+    expect(recovered.telemetry).toMatchObject({ elapsed: 42, lap: 1, damage: 2 })
     expect(recovered.state?.elapsed).toBe(42)
     expect(recovered.state?.vehicles.filter((vehicle) => !vehicle.player)).toEqual(
       before.state?.vehicles.filter((vehicle) => !vehicle.player),
@@ -386,7 +386,7 @@ describe('RaceSession', () => {
     expect(recovered.state?.missedCheckpoint).toBeUndefined()
     expect(recovered.state?.vehicles[0]?.nextSector).toBe(1)
     expect(recovered.state?.vehicles[0]?.x).toBeLessThan(300)
-    expect(recovered.telemetry.elapsed).toBeCloseTo(elapsed + 0.1)
+    expect(recovered.telemetry.elapsed).toBeCloseTo(elapsed)
     expect(recovered.state?.elapsed).toBeCloseTo(elapsed)
   })
 

@@ -1,5 +1,4 @@
-import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
-import { addRecoveryTimePenalty } from '@/domain/race/recoveryPenalty'
+import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining, type RaceState, type RaceVehicle } from '@/domain/race/raceState'
 import { authoredRecoveryTarget, lastRoadRecoveryTarget, missedGateRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
@@ -28,19 +27,27 @@ export function resetRaceVehicle(
 }
 
 export function recoverRacePlayer(state: RaceState): RaceState {
+  const player = state.vehicles.find((vehicle) => vehicle.player)
+  return player ? recoverRaceVehicle(state, player.id) : state
+}
+
+/** Explicit manual request, for any driver. Automatic resets use resetRaceVehicle. */
+export function recoverRaceVehicle(state: RaceState, vehicleId: string): RaceState {
   if (state.phase !== 'running' || state.paused) return state
-  const index = state.vehicles.findIndex((vehicle) => vehicle.player)
-  const player = state.vehicles[index]
-  if (!player) return state
-  const recovered = resetRaceVehicle(player, state)
-  if (recovered === player) return state
+  const index = state.vehicles.findIndex((vehicle) => vehicle.id === vehicleId)
+  const vehicle = state.vehicles[index]
+  if (!vehicle || vehicle.finishedAt !== null || manualRecoveryTicksRemaining(vehicle, state.tick) > 0) return state
+  const recovered = resetRaceVehicle(vehicle, state)
+  if (recovered === vehicle) return state
   const vehicles = [...state.vehicles]
-  vehicles[index] = addRecoveryTimePenalty(recovered)
+  vehicles[index] = { ...recovered, manualRecoveryUntilTick: state.tick + MANUAL_RECOVERY_TICKS }
   return {
     ...state,
     vehicles,
-    missedCheckpoint: undefined,
-    cameraHints: buildRaceCameraHints(state.path, recovered, state.reversed),
+    ...(vehicle.player ? {
+      missedCheckpoint: undefined,
+      cameraHints: buildRaceCameraHints(state.path, recovered, state.reversed),
+    } : {}),
   }
 }
 
