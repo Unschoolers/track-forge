@@ -15,7 +15,7 @@ export function raceProgress(
     : vehicle.pathIndex - startPathIndex
   let progress = ((offset % length) + length) % length
   // A car on its grid approach is behind the line, not almost one lap ahead.
-  if (vehicle.nextSector === 1 && progress >= length - 12) progress -= length
+  if (vehicle.nextSector === 1 && progress >= length * 0.75) progress -= length
   return vehicle.lap * length + progress
 }
 
