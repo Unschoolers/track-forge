@@ -12,7 +12,7 @@ import { stepVehicle } from '@/domain/race/vehiclePhysics'
 const track = createStarterTrack(asTrackId('physics'), 1)
 const path = buildRoadPath(track.points, track.terrain)
 
-function vehicle(car: 'red' | 'green' | 'yellow' = 'red') {
+function vehicle(car: 'red' | 'blue' | 'green' | 'yellow' = 'red') {
   const value = createRace({
     path,
     playerCar: car,
@@ -209,6 +209,27 @@ describe('vehicle physics', () => {
       car = stepVehicle(car, { steering: 0, throttle: 1, braking: false }, context, dt, 'arcade')
     }
     expect(car.speed).toBeGreaterThan(40)
+  })
+
+  it('keeps Red planted during hard braking on pavement without erasing ice slip', () => {
+    for (const handling of ['arcade', 'simulation'] as const) {
+      const initial = { ...vehicle(), angle: 0, vx: 170, vy: 40,
+        speed: Math.hypot(170, 40), brakePressure: 1 }
+      const context = { ...getVehicleStepContext(path, initial), grade: 0, surface: 'street' as const }
+      const brake = { steering: 0, throttle: 0, braking: true }
+      const street = { ...initial, currentSurface: 'street' as const, surfaceGrip: 1 }
+      const ice = { ...initial, currentSurface: 'ice' as const, surfaceGrip: 0.34 * 0.76 }
+      const iceContext = { ...context, surface: 'ice' as const }
+      let streetResult = stepVehicle(street, brake, context, 1 / 60, handling)
+      let iceResult = stepVehicle(ice, brake, iceContext, 1 / 60, handling)
+      for (let frame = 1; frame < 12; frame++) {
+        streetResult = stepVehicle(streetResult, brake, context, 1 / 60, handling)
+        iceResult = stepVehicle(iceResult, brake, iceContext, 1 / 60, handling)
+      }
+      expect(streetResult.slip).toBeLessThan(10)
+      expect(iceResult.slip).toBeGreaterThan(streetResult.slip)
+      expect(streetResult.speed).toBeLessThan(iceResult.speed)
+    }
   })
 
   it('resets a stuck player to the nearest road heading', () => {
