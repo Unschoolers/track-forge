@@ -37,14 +37,21 @@ function stoppedPlayerRace(stuckDuration = 0) {
 }
 
 describe('automatic player recovery', () => {
-  it('reports a short stuck-player reset so replay recording can reject it', () => {
-    const race = stoppedPlayerRace(0.65)
+  it('reports a two-second stuck-player reset so replay recording can reject it', () => {
+    const race = stoppedPlayerRace(2)
     const result = stepRace(race,
       { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
     expect(result.state.vehicles[0]?.stuckDuration).toBe(0)
     expect(result.events).toContainEqual(expect.objectContaining({
       type: 'vehicle-recovered', vehicleId: race.vehicles[0]?.id,
     }))
+  })
+
+  it('does not recover the player at the previous 0.65-second threshold', () => {
+    const result = stepRace(stoppedPlayerRace(0.65),
+      { steering: 0, throttle: 1, braking: false }, 1 / 60, random)
+    expect(result.events.some(event => event.type === 'vehicle-recovered')).toBe(false)
+    expect(result.state.vehicles[0]?.stuckDuration).toBeGreaterThan(0.65)
   })
 
   it('does not move or recover a stopped player holding the brake', () => {
@@ -159,7 +166,7 @@ describe('fallback recovery on a circuit', () => {
     const race = createRace({ recoveryCheckpoints: [0.25, 0.5, 0.75], path: closeArmsPath, playerCar: 'blue', difficulty: 'normal', laps: 3 })
     const index = requireFixture(nearestPathPoint(closeArmsPath, { x: 440, y: 0 })).index
     const player = {
-      ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: index, stuckDuration: 0.65,
+      ...requireFixture(race.vehicles[0]), x: 440, y: 100, pathIndex: index, stuckDuration: 2,
     }
     const result = stepRace({ ...race, phase: 'running', elapsed: 2, vehicles: [player] },
       { steering: 0, throttle: 1, braking: false }, 1 / 60, random)

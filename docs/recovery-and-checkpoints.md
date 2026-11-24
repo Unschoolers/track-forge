@@ -19,6 +19,12 @@
 - Recovery never adds a separate scoring surcharge; splits, results and ghosts use the actual race clock.
 - Manual recovery holds the recovered vehicle stationary for 30 running ticks (500 ms at 60 Hz). Repeated requests during the hold are ignored. Other drivers and the race clock continue normally. Automatic recovery adds no immobilization. Only the local human receives the yellow progress light, green release light, and restart sound. Missed-checkpoint recovery is automatic even when the player skips its countdown.
 
+## Automatic driving recovery
+
+- A grounded AI has up to two seconds to drive back onto the road using its existing low-speed pursuit controller. A distance exceeding 100 world units from its followed road is an immediate lost-car reset. Natural re-entry clears the timer and does not emit a recovery event. Airborne time does not advance the timer. Keep the original 72-unit finish eligibility boundary and preserve checkpoint progress outside it.
+- A player accelerating below the existing low-speed threshold must accumulate two seconds of stuck time before an automatic reset; braking still prevents or decays that timer.
+- Water contact, bridge-deck loss, manual recovery, and missed-checkpoint rules retain their existing immediate/countdown behavior. Forced resets still emit recovery telemetry. The optimization goal is zero forced resets, not zero excursions onto grass.
+
 ## Validation
 
 - Fast domain/component tests must cover marker order (normal/reversed), crossing/near-edge bypass, missed-gate recovery, finish, checkpoint-free imports, old starter preservation, and save/undo.

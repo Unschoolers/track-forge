@@ -277,7 +277,7 @@ describe('missed timing gate recovery', () => {
       vehicles: [{
         ...car, x: afterGate.x, y: afterGate.y,
         pathIndex: afterGateIndex, lastRoadContactIndex: afterGateIndex,
-        speed: 0, stuckDuration: 0.65, nextSector: 2 as const,
+        speed: 0, stuckDuration: 2, nextSector: 2 as const,
       }],
       missedCheckpoint: { gate: 2 as const, remainingSeconds: 4, position: { x: afterGate.x, y: afterGate.y } },
     }

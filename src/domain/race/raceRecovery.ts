@@ -1,7 +1,7 @@
 import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining, type RaceState, type RaceVehicle } from '@/domain/race/raceState'
 import { authoredRecoveryTarget, lastRoadRecoveryTarget, missedGateRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
-import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack } from '@/domain/race/trackContext'
+import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack, type VehicleStepContext } from '@/domain/race/trackContext'
 
 export function resetRaceVehicle(
   vehicle: RaceVehicle,
@@ -79,3 +79,26 @@ export function restoreFrameProgress(vehicle: RaceVehicle, previous: RaceVehicle
   }
 }
 
+
+/** Gameplay recovery thresholds; independent from checkpoint scoring geometry. */
+export const RECOVERY_TUNING = {
+  aiOffRoadDistance: 100,
+  aiOffRoadGraceSeconds: 2,
+  playerStuckSeconds: 2,
+} as const
+
+export function advanceRivalOffRoadRecovery(
+  vehicle: RaceVehicle,
+  context: Pick<VehicleStepContext, 'onRoad' | 'nearest'>,
+  dt: number,
+): { vehicle: RaceVehicle; expired: boolean } {
+  if (vehicle.player || vehicle.finishedAt !== null) return { vehicle, expired: false }
+  const previous = vehicle.aiOffRoadSeconds ?? 0
+  const seconds = context.onRoad ? 0 : vehicle.grounded ? previous + dt : previous
+  return {
+    vehicle: seconds === previous ? vehicle : { ...vehicle, aiOffRoadSeconds: seconds },
+    expired: vehicle.grounded && !context.onRoad &&
+      (context.nearest.distance > RECOVERY_TUNING.aiOffRoadDistance ||
+        seconds >= RECOVERY_TUNING.aiOffRoadGraceSeconds - 1e-9),
+  }
+}

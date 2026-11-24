@@ -519,6 +519,7 @@ export function resetVehicleToTrack(
     currentSurface: nearest.point.surface,
     onCurb: false,
     stuckDuration: 0,
+    aiOffRoadSeconds: 0,
   }
 }
 

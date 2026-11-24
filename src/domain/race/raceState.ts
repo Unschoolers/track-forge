@@ -63,6 +63,8 @@ export interface RaceVehicle {
   readonly surfaceGrip?: number
   readonly onCurb: boolean
   readonly stuckDuration: number
+  /** Continuous grounded off-road time before an AI needs a forced reset. */
+  readonly aiOffRoadSeconds?: number
   readonly finishedAt: number | null
   /** Arcade fallback: suppress repeat water resets until safe grounded support. */
   readonly waterRecoveryProtected?: boolean

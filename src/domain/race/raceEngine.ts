@@ -18,7 +18,7 @@ import {
 import { advanceRaceEffects } from '@/domain/race/effects'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
-import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress } from '@/domain/race/raceRecovery'
+import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress, RECOVERY_TUNING, advanceRivalOffRoadRecovery } from '@/domain/race/raceRecovery'
 import { advanceArcadeTimingGate, finishGateNumber } from '@/domain/race/arcadeTimingGate'
 import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
@@ -204,10 +204,13 @@ function advanceRace(
         withPath, progressIndex, state.path.points.length, elapsed,
         state.totalLaps, state.startPathIndex, state.reversed,
         state.timingGates ?? [], state.path.closed,
-        // Match the AI's existing off-road reset boundary so a drivable
-        // near-edge path does not permanently strand a mandatory gate.
+        // Preserve the existing finish eligibility boundary independently
+        // of the physical off-road recovery distance.
         context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius + 30,
       )
+    }
+    if (!vehicle.player && previous && context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30) {
+      updated = restoreFrameProgress(updated, previous)
     }
     if (vehicle.player && state.path.closed) {
       updated = { ...updated, pathIndex: context.nearest.index, pathDistance: context.nearest.point.distance,
@@ -223,13 +226,15 @@ function advanceRace(
       updated = { ...updated, recoveryCheckpoint: checkpoint }
     }
     const playerStuck = updated.player && updated.bridgeFallSeconds === undefined &&
-      updated.stuckDuration > 0.65
+      updated.stuckDuration >= RECOVERY_TUNING.playerStuckSeconds - 1e-9
     const bridgeFallExpired = updated.player &&
       (updated.bridgeFallSeconds ?? 0) >= BRIDGE_FALL_RESPAWN_SECONDS
     const rivalBelowDeck = !updated.player && !context.onRoad &&
       context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
+    const offRoadRecovery = advanceRivalOffRoadRecovery(updated, context, dt)
+    updated = offRoadRecovery.vehicle
     const lostRival = !updated.player && updated.finishedAt === null && updated.grounded &&
-      (rivalBelowDeck || context.nearest.distance > ROAD_GEOMETRY.onRoadRadius + 30 ||
+      (rivalBelowDeck || offRoadRecovery.expired ||
         (state.routeKind === 'point-to-point' && passedPendingCheckpoint(state.path, updated, state.timingGates)))
     if (playerStuck || bridgeFallExpired || lostRival) {
       const candidate = previous && (rivalBelowDeck || updated.player || state.routeKind === 'point-to-point')
