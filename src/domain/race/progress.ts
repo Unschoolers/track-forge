@@ -44,7 +44,7 @@ export function updateProgress(
   // This tolerance is exclusively for AI progress (players require the
   // physical gate plane in advanceArcadeTimingGate).
   const aiAtStageFinish = !closed && finish &&
-    before >= pathLength - 3 && after >= pathLength - 2
+    before >= pathLength - 4 && after >= pathLength - 3
   if (finish && (crossedStart || aiAtStageFinish ||
       (!closed && before < pathLength - 1 && after >= pathLength - 1))) {
     const lap = vehicle.lap + 1
