@@ -6,7 +6,7 @@ import { physicsPlayer } from '../support/physicsPlayer'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
-import { VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
+import { steeringLimitAtSpeed, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
 import { decodeTrack } from '@/domain/track/trackCodec'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 
@@ -96,8 +96,14 @@ function stoppingDistance(car: CarId, handling: Handling, surface: Surface = 'st
 /** Identical effective wheel angle: compare handling rather than steering-rack gearing. */
 function cornering(car: CarId, handling: Handling, speed = 135, matchedWheelAngle = true) {
   const road = context('street')
+  const steeringLimit = (spec: CarPhysicsSpec) => steeringLimitAtSpeed(
+    spec.steer * VEHICLE_DYNAMICS_TUNING.steering.maximumAngleScale,
+    speed / spec.max,
+    VEHICLE_DYNAMICS_TUNING.steering.highSpeedReduction,
+    spec.lowSpeedSteerAngle,
+  )
   const steer = matchedWheelAngle
-    ? 0.65 * CAR_SPECS.blue.steer / CAR_SPECS[car].steer
+    ? 0.65 * steeringLimit(CAR_SPECS.blue) / steeringLimit(CAR_SPECS[car])
     : 0.65
   let vehicle = makeVehicle(car, speed)
   let angleSum = 0
