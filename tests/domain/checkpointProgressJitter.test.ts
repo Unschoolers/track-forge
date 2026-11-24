@@ -4,6 +4,7 @@ import { advanceArcadeTimingGate } from '@/domain/race/arcadeTimingGate'
 import { createRace } from '@/domain/race/raceFactory'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { roadGateGeometry } from '@/domain/track/trackGeometry'
 
 const path = buildRoadPath([
   { x: 0, y: 0, surface: 'street' },
@@ -17,21 +18,12 @@ const race = createRace({
 })
 const player = race.vehicles[0]
 if (!player) throw new Error('Missing player fixture')
-const count = path.points.length
 const gate = race.timingGates?.[0]
 if (gate === undefined) throw new Error('Authored checkpoint not resolved')
 const lower = Math.floor(gate)
-const a = path.points[lower]
-const b = path.points[(lower + 1) % count]
-if (!a || !b) throw new Error('Missing checkpoint fixture')
-const dx = b.x - a.x
-const dy = b.y - a.y
-const length = Math.hypot(dx, dy)
-if (length <= 0) throw new Error('Degenerate checkpoint fixture')
-const tx = dx / length
-const ty = dy / length
-const gx = a.x + dx * (gate - lower)
-const gy = a.y + dy * (gate - lower)
+const geometry = roadGateGeometry(path, gate)
+if (!geometry) throw new Error('Missing checkpoint geometry')
+const { center: { x: gx, y: gy }, tangent: { x: tx, y: ty } } = geometry
 const at = (along: number, lateral = 0) => ({
   x: gx + tx * along - ty * lateral,
   y: gy + ty * along + tx * lateral,

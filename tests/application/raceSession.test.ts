@@ -7,6 +7,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { stepRace, type RaceStep } from '@/domain/race/raceEngine'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import type { RaceState } from '@/domain/race/raceState'
+import { roadGateGeometry } from '@/domain/track/trackGeometry'
 
 const track = createStarterTrack(asTrackId('session-track'), 1)
 const setup = {
@@ -19,15 +20,11 @@ const noInput = { steering: 0, throttle: 1, braking: false }
 // Physical approach on the same outgoing tangent used by the finish gate.
 function finishApproach(state: RaceState) {
   const index = state.startPathIndex
-  const line = state.path.points[index]
-  const after = state.path.points[(index + 1) % state.path.points.length]
-  if (!line || !after) throw new Error('Missing finish geometry')
-  const dx = after.x - line.x
-  const dy = after.y - line.y
-  const length = Math.hypot(dx, dy)
-  if (length < 0.001) throw new Error('Degenerate finish geometry')
-  const tx = dx / length * (state.reversed ? -1 : 1)
-  const ty = dy / length * (state.reversed ? -1 : 1)
+  const gate = roadGateGeometry(state.path, index)
+  if (!gate) throw new Error('Missing finish geometry')
+  const { center: line, tangent } = gate
+  const tx = tangent.x * (state.reversed ? -1 : 1)
+  const ty = tangent.y * (state.reversed ? -1 : 1)
   return {
     x: line.x - tx * 2, y: line.y - ty * 2,
     z: state.path.roadSurface.at(index, line).height,

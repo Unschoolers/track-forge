@@ -5,6 +5,8 @@ import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
+import { roadGateGeometry } from '@/domain/track/trackGeometry'
+import { createLaneScenarios, prepareLanePath } from '../../qa/lanes/scenarios'
 
 const motion = vi.hoisted(() => new Map<string, { x: number; y: number }>())
 vi.mock('@/domain/race/vehiclePhysics', async (importOriginal) => {
@@ -18,14 +20,26 @@ const input = { throttle: 0, steering: 0, braking: false }
 const random = { next: () => 0.5 }
 
 describe('shared checkpoint authority', () => {
+  it('does not miss the finish while following the road into a sharp start corner', () => {
+    const fixture = createLaneScenarios().find(track => track.id === 'hairpin')
+    if (!fixture) throw new Error('Missing hairpin fixture')
+    const road = prepareLanePath(fixture)
+    const race = createRace({ path: road, playerCar: 'blue', difficulty: 'normal', laps: 1, recoveryCheckpoints: [0.25, 0.5, 0.75] })
+    const car = race.vehicles[0]!
+    // Actual lane-check failure, seven to twelve samples before Start.
+    const before = { ...car, player: false, x: -290.30348985865214, y: -119.33487130584501, pathIndex: 444, nextSector: 4 }
+    const after = { ...before, x: -289.07875102012434, y: -121.47788609288719 }
+    const result = advanceArcadeTimingGate(race, before, after, 15.516666666667017, true, () => true)
+    expect(result.vehicle.finishedAt).toBeNull()
+    expect(result.missedCheckpoint).toBeUndefined()
+  })
+
   it.each([false, true])('uses identical swept crossing and missed-gate rules for every car (reversed=%s)', reversed => {
     const race = createRace({ path, playerCar: 'yellow', difficulty: 'hard', laps: 2, reversed, recoveryCheckpoints: [0.125, 0.5, 0.875] })
     const gate = race.timingGates![0]!
-    const a = path.points[gate]!
-    const b = path.points[(gate + 1) % path.points.length]!
-    const length = Math.hypot(b.x - a.x, b.y - a.y)
-    const tx = (b.x - a.x) / length * (reversed ? -1 : 1)
-    const ty = (b.y - a.y) / length * (reversed ? -1 : 1)
+    const { center: a, tangent } = roadGateGeometry(path, gate)!
+    const tx = tangent.x * (reversed ? -1 : 1)
+    const ty = tangent.y * (reversed ? -1 : 1)
     const at = (along: number, offset: number) => ({ x: a.x + tx * along - ty * offset, y: a.y + ty * along + tx * offset })
     const radius = ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace
     for (const car of race.vehicles) {

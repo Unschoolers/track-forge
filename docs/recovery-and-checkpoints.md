@@ -31,3 +31,5 @@
 - Verify checkpoint rendering in both editor and race and that the displayed stripe uses the exact physics gate sample. Mobile touch tests remain useful for hit targets.
 - Run the fixed 60 Hz clean-lap benchmark for all three shipped tracks and calibrate actual geometry and medal targets before merging.
 - Required gates: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` plus the repository's AI and mobile workflows. Do not merge with known gate regressions.
+
+Gate geometry uses the same centered tangent as the road ribbon, for both painted stripes and physical validation. Crossing the infinite extension of a stripe while still on its approach road is not evidence of a missed checkpoint; only an off-road bypass or confirmed forward route progress can trigger the countdown.

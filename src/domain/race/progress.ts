@@ -1,6 +1,7 @@
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import { roadGateGeometry } from '@/domain/track/trackGeometry'
 
 /** Indexed progress for rivals: all gates are authored and ordered by race direction. */
 export function updateProgress(
@@ -138,18 +139,12 @@ export function roadGateCrossingFraction(
     return path.closed ? Math.min(distance, count - distance) : distance
   }
   if (sampleDistance(previous.pathIndex) > 12 || sampleDistance(vehicle.pathIndex) > 12) return undefined
-  const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(gatePosition))
-  const a = path.points[lower]
-  const b = path.points[(lower + 1) % count]
-  if (!a || !b) return undefined
-  const fraction = gatePosition - lower
-  const gx = a.x + (b.x - a.x) * fraction
-  const gy = a.y + (b.y - a.y) * fraction
-  const length = Math.hypot(b.x - a.x, b.y - a.y)
-  if (length < 0.001) return undefined
+  const geometry = roadGateGeometry(path, gatePosition)
+  if (!geometry) return undefined
+  const { lower, center: { x: gx, y: gy }, tangent } = geometry
   const direction = reversed ? -1 : 1
-  const tx = direction * (b.x - a.x) / length
-  const ty = direction * (b.y - a.y) / length
+  const tx = direction * tangent.x
+  const ty = direction * tangent.y
   const before = (previous.x - gx) * tx + (previous.y - gy) * ty
   const after = (vehicle.x - gx) * tx + (vehicle.y - gy) * ty
   if (before >= 0 || after < 0 || after <= before) return undefined

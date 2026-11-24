@@ -4,7 +4,7 @@ import { roadColorsForEnvironment } from '@/presentation/environments/roadMateri
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
-import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { roadGateGeometry, type TrackGeometry } from '@/domain/track/trackGeometry'
 import {
   boundsVisible,
   renderRaceRoadRibbon,
@@ -41,15 +41,12 @@ export function renderRecoveryCheckpoints(
   checkpoints: readonly number[],
   editorZoom?: number,
 ): void {
-  const count = path.points.length
   for (const index of checkpoints) {
-    const point = path.points[index]
-    const after = path.points[path.closed ? (index + 1) % count : index + 1]
-    if (!point || !after) continue
-    const length = Math.hypot(after.x - point.x, after.y - point.y)
-    if (length < 0.001) continue
-    const x = -(after.y - point.y) / length * ROAD_GEOMETRY.checkpointHalfWidth
-    const y = (after.x - point.x) / length * ROAD_GEOMETRY.checkpointHalfWidth
+    const gate = roadGateGeometry(path, index)
+    if (!gate) continue
+    const { center: point, tangent } = gate
+    const x = -tangent.y * ROAD_GEOMETRY.checkpointHalfWidth
+    const y = tangent.x * ROAD_GEOMETRY.checkpointHalfWidth
     // Author-owned checkpoints use a bright transverse stripe with visible endpoints.
     // No implicit race gates are painted anywhere.
     graphics.lineStyle(editorZoom ? 6 / editorZoom : 8, 0x66d9ff, 1)
