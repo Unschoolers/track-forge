@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { decodeTrack } from '@/domain/track/trackCodec'
 import { isUntouchedLegacyStarter } from '@/migrations/legacyStarterIdentity'
 
 function original() {
@@ -8,7 +9,9 @@ function original() {
     createStarterTrack(asTrackId('starter-original'), 0)
   void _markers
   void _auto
-  return track
+  const decoded = decodeTrack(track, 0)
+  if (!decoded) throw new Error('Invalid normalized legacy test fixture')
+  return decoded
 }
 
 describe('retired starter safety', () => {
