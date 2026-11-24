@@ -32,10 +32,10 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 8,
     hardSteerGain: 2.22,
     hardCornerReserve: 0,
-    hardLookAheadSamples: 12,
+    hardLookAheadSamples: 10,
     hardApexCutScale: 1,
     hardEdgeAvoidanceScale: 0.4,
-    hardCornerTargetBonus: 0.08,
+    hardCornerTargetBonus: 0.12,
     normalCornerTargetBonus: 0.006,
   },
   // Red's low-grip, high-speed chassis needs a settled, slower-changing
