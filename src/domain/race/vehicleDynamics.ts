@@ -1,5 +1,6 @@
 import type { Vector2 } from '@/domain/model'
 import {
+  LOW_SPEED_BRAKE_CORNER,
   VEHICLE_DYNAMICS_TUNING,
   steeringLimitAtSpeed,
   type VehicleDynamicsTuning,
@@ -28,6 +29,7 @@ export interface VehicleDynamicsParameters {
   readonly cornerStiffness: number
   readonly brakeForce: number
   readonly brakingTractionScale?: number
+  readonly lowSpeedBrakeCornerReserve?: number
   /** Chassis-specific lateral stability, supplied with surface traction blending. */
   readonly lateralStability?: number
   readonly recovery: number
@@ -191,10 +193,19 @@ export function stepVehicleDynamics(
     0,
     tuning.forces.maximumBrakeUsage,
   )
+  const cornerReserve = clamp(parameters.lowSpeedBrakeCornerReserve ?? 0, 0, 1) *
+    Math.abs(steeringInput) * clamp(
+      (LOW_SPEED_BRAKE_CORNER.fadeOutSpeed - Math.abs(longitudinal)) /
+        (LOW_SPEED_BRAKE_CORNER.fadeOutSpeed - LOW_SPEED_BRAKE_CORNER.fullReserveSpeed),
+      0, 1,
+    )
+  // Arcade reserve restores lateral authority at crawl speed without changing
+  // longitudinal service brakes or high-speed cornering.
+  const cornerBrakeUsage = brakeUsage * (1 - cornerReserve)
   const lateralBudget = Math.sqrt(
     Math.max(
       tuning.forces.minimumLateralBudget,
-      1 - brakeUsage * brakeUsage,
+      1 - cornerBrakeUsage * cornerBrakeUsage,
     ),
   )
   const frontCapacity =

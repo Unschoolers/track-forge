@@ -225,6 +225,27 @@ describe('Car handling personalities', () => {
     }
   })
 
+  it('lets Red change its path while crawling under full braking on ice', () => {
+    const road = context('ice')
+    for (const speed of [10, 20]) {
+      for (const steering of [-1, 1]) {
+        const initial = {
+          ...makeVehicle('red', speed, 0, 'ice'),
+          brakePressure: 1,
+          surfaceGrip: SURFACE_SPECS.ice.grip * VEHICLE_TERRAIN_SPECS.red.ice.grip,
+        }
+        const result = travel(initial, { steering, throttle: 0, braking: true }, 'ice', 30)
+        const dx = result.x - initial.x
+        const dy = result.y - initial.y
+        const forward = dx * road.tangent.x + dy * road.tangent.y
+        const sideways = dx * road.normal.x + dy * road.normal.y
+        // Measure the actual trajectory, not body rotation or wheel angle.
+        expect(Math.atan2(sideways, forward) * steering).toBeGreaterThan(0.3)
+        expect(result.speed).toBeLessThan(2)
+      }
+    }
+  })
+
   it('matches the four ice braking distance targets from 170 units/s', () => {
     const targets = { red: 250, blue: 235, green: 200, yellow: 150 } as const
     for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
