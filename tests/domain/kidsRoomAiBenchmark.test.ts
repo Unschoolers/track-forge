@@ -67,7 +67,9 @@ describe('Kids Room deterministic all-car three-difficulty AI pace benchmark', (
     expect(Object.keys(matrix)).toHaveLength(4)
 
     // Guard every car and difficulty against a hidden regression. Normal and
-    // Easy must remain unchanged when calibrating the Hard-specific profiles.
+    // Easy remain unchanged for untouched chassis. Red's pavement brake
+    // upgrade intentionally affects all difficulties: require no slower pace
+    // than the frozen baseline and keep the same zero-recovery gate.
     const baseline = JSON.parse(readFileSync(
       'qa/benchmarks/kidsRoomAiBaseline.json', 'utf8',
     )) as { matrix: Record<CarId, Record<DifficultyId, { times: number[] }>> }
@@ -81,10 +83,10 @@ describe('Kids Room deterministic all-car three-difficulty AI pace benchmark', (
         for (const [index, time] of (run?.times ?? []).entries()) {
           const old = original?.[index]
           if (old === undefined || time === null) continue
-          if (difficulty !== 'hard') {
+          if (difficulty !== 'hard' && car !== 'red') {
             expect(Math.abs(time - old), `${car} ${difficulty} seed ${seeds[index]}`).toBeLessThan(0.05)
           } else {
-            expect(time, `${car} Hard seed ${seeds[index]} (before ${old.toFixed(3)} s)`)
+            expect(time, `${car} ${difficulty} seed ${seeds[index]} (before ${old.toFixed(3)} s)`)
               .toBeLessThanOrEqual(old + 0.05)
           }
         }
