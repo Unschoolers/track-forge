@@ -296,9 +296,23 @@ describe('DomUiHost', () => {
       expect(preview?.dataset.car).toBe('red')
       expect(preview?.dataset.lighting).toBe('night')
       expect(preview?.getAttribute('aria-label')).toContain(proposed.name)
+      lobby.lobbyPlayers[0]!.accepted = true
+      update(overlay)
+      expect(root.querySelector('.race-flyover')).toBe(preview)
+      expect(root.querySelector('.nearby-lobby-count')?.textContent).toBe('1/2 READY')
+      lobby.localReady = true
+      lobby.readyPending = true
+      update(overlay)
+      expect(root.querySelector('.race-flyover')).toBe(preview)
       lobby.localCar = 'blue'
       update(overlay)
+      expect(root.querySelector('.race-flyover')).not.toBe(preview)
       expect(root.querySelector<HTMLCanvasElement>('.race-flyover')?.dataset.car).toBe('blue')
+      const bluePreview = root.querySelector('.race-flyover')
+      lobby.lighting = 'day'
+      update(overlay)
+      expect(root.querySelector('.race-flyover')).not.toBe(bluePreview)
+      expect(root.querySelector<HTMLCanvasElement>('.race-flyover')?.dataset.lighting).toBe('day')
       update(snapshot('home'))
       expect(root.querySelector('.race-flyover')).toBeNull()
     } finally { host.destroy() }
