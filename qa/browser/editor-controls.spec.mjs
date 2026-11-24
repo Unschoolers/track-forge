@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { EDITOR_FIXTURE_NAME, seedEditorFixture } from './editor-fixture.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 function intersects(a, b) {
@@ -47,12 +48,13 @@ async function assertClearEditorControls(page, tool) {
 }
 
 test('mobile editor controls have vector icons, visible save and no overlapping dock', async ({ page }) => {
+  await seedEditorFixture(page)
   for (const [width, height] of [[320, 568], [390, 720], [844, 390]]) {
     await page.setViewportSize({ width, height })
     await page.goto('/?qa')
     await enterTrackForge(page)
     await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
-    await page.getByRole('button', { name: 'Edit City Sprint', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit ' + EDITOR_FIXTURE_NAME, exact: true }).click()
 
     const editor = page.locator('[data-screen="editor"]')
     await expect(editor).toBeVisible()
