@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       native: ${{ steps.changes.outputs.native }}
+      release: ${{ steps.changes.outputs.release }}
       web_artifact_id: ${{ steps.web-artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -31,8 +32,14 @@ jobs:
         id: changes
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/android-ci-native-required.mjs >> "$GITHUB_OUTPUT"
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # Multi-commit main pushes can exceed the shallow checkout. Retrieve
+          # the exact previous revision before deciding whether to publish.
+          if [[ "$EVENT_NAME" == push && "$BASE_SHA" =~ ^[a-f0-9]{40}$ ]] && ! git cat-file -e "$BASE_SHA^{commit}"; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          fi
+          node scripts/android-ci-native-required.mjs >> "$GITHUB_OUTPUT"
       - run: npm ci
       - name: Set web build release identity
         id: version
@@ -190,8 +197,8 @@ jobs:
           if-no-files-found: error
 
   sign-and-release:
-    needs: [android, verify, windows, ai-matrix]
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [web-build, android, verify, windows, ai-matrix]
+    if: github.ref == 'refs/heads/main' && needs.web-build.outputs.release == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: android-signing
     runs-on: ubuntu-latest
     permissions:
