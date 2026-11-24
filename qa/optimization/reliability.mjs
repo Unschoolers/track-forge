@@ -70,6 +70,17 @@ function candidateEdits(car, current) {
   // Target the observed wide entry/exit and Normal reverse traffic failures.
   // These are driver-policy controls, not track or checkpoint exceptions.
   const targeted = car === 'yellow' ? [
+    // The remaining misses occur at high speed on wide exits. Test coupled
+    // pace/preview/edge corrections rather than another single-axis sweep.
+    ...[0.25, 0.35, 0.45].flatMap(hardCornerTargetBonus =>
+      [8, 10, 14].flatMap(hardLookAheadSamples =>
+        [0.4, 0.8].map(hardEdgeAvoidanceScale => ({
+          hardCornerTargetBonus, hardLookAheadSamples, hardEdgeAvoidanceScale,
+        })))),
+    ...[0.9, 0.95, 1].flatMap(technicalCornerPursuitScale =>
+      [2.7, 3.2, 3.5].map(hardSteerGain => ({
+        technicalCornerPursuitScale, hardSteerGain, hardReaction: 8,
+      }))),
     ...[0, 0.25, 0.5, 0.75].map(hardApexCutScale => ({ hardApexCutScale })),
     ...[0.05, 0.1, 0.15, 0.2].map(hardHairpinReserve => ({ hardHairpinReserve })),
     ...[0.2, 0.3, 0.4].flatMap(hardCornerTargetBonus => [
@@ -117,7 +128,8 @@ try {
     // Resume the last measured, cross-track-safe lab result, but revalidate
     // against the original checked-in profiles on this exact revision.
     const seed = {
-      yellow: { technicalCornerPaceScale: 0.95 },
+      yellow: { technicalCornerPaceScale: 0.95, hardHairpinReserve: 0.05 },
+      green: { lowerDifficultyReserveScale: 1.2 },
       red: { technicalCornerPursuitScale: 0.85 },
       blue: { hardCornerTargetBonus: 0.12 },
     }
