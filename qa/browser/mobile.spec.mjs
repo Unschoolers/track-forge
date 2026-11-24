@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { EDITOR_FIXTURE_NAME, seedEditorFixture } from './editor-fixture.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
 async function telemetry(page) {
@@ -11,6 +12,7 @@ async function telemetry(page) {
 }
 
 async function launch(page) {
+  await seedEditorFixture(page)
   await page.goto('/?qa')
   await enterTrackForge(page)
   await expect(page.locator('[data-screen="home"]')).toBeVisible()
@@ -19,14 +21,14 @@ async function launch(page) {
 
 async function enterEditor(page) {
   await page.getByRole('button', { name: 'TRACK EDITOR' }).click()
-  await page.getByRole('button', { name: 'Edit City Sprint', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit ' + EDITOR_FIXTURE_NAME, exact: true }).click()
   await expect(page.locator('[data-screen="editor"]')).toBeVisible()
   await expect.poll(async () => (await telemetry(page)).camera).not.toBeNull()
 }
 
 async function enterRace(page, { fastCountdown = false } = {}) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
-  await page.getByRole('button', { name: 'Race City Sprint', exact: true }).click()
+  await page.getByRole('button', { name: 'Race ' + EDITOR_FIXTURE_NAME, exact: true }).click()
   await page.getByRole('button', { name: 'START RACE' }).click()
   await expect(page.locator('[data-screen="race"]')).toBeVisible()
   if (fastCountdown) await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
