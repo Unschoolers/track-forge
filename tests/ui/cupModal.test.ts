@@ -33,11 +33,11 @@ describe('Cup menu', () => {
       close: vi.fn(), addTrack: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
       start: vi.fn(), resume: vi.fn(), hostNearby: vi.fn(),
     }
-    const overlay = createCupModal(state(['official-bridge', 'official-meadow']), actions)
-    const bridge = OFFICIAL_CIRCUITS.find(({ track }) => track.id === 'official-bridge')
-    const meadow = OFFICIAL_CIRCUITS.find(({ track }) => track.id === 'official-meadow')
+    const overlay = createCupModal(state([OFFICIAL_CIRCUITS[0]!.track.id, OFFICIAL_CIRCUITS[1]!.track.id]), actions)
+    const first = OFFICIAL_CIRCUITS[0]
+    const second = OFFICIAL_CIRCUITS[1]
     expect([...overlay.querySelectorAll('.cup-track-name')].map(node => node.textContent))
-      .toEqual([`1. ${bridge?.track.name}`, `2. ${meadow?.track.name}`])
+      .toEqual([`1. ${first?.track.name}`, `2. ${second?.track.name}`])
     overlay.querySelector<HTMLButtonElement>('[data-action="cup-down-0"]')?.click()
     expect(actions.moveTrack).toHaveBeenCalledExactlyOnceWith(0, 1)
     overlay.querySelector<HTMLButtonElement>('[data-action="cup-remove-1"]')?.click()
