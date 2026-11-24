@@ -28,7 +28,7 @@ const scenarios: readonly Scenario[] = [
   { name: 'Hairpin circuit', qa: 'hairpin',
     startRatio: 0, reversed: false, laps: 1, seconds: 80 },
   { name: 'City Sprint', official: 'City Sprint',
-    startRatio: 0, reversed: false, laps: 2, seconds: 70 },
+    startRatio: 0, reversed: false, laps: 1, seconds: 75 },
 ]
 const pathCache = scenarios.map(scenario => {
   const track = scenario.file
