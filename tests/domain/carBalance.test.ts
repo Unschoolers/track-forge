@@ -79,12 +79,26 @@ describe('Red grass handling', () => {
     }
   })
 
-  it('changes only Red grass modifiers, preserving street speed and rival specialties', () => {
+  it('lets Red accelerate away from a grass mistake without raising its grass speed target', () => {
+    const base = createRace({ path, playerCar: 'red', difficulty: 'normal', laps: 1 }).vehicles[0]
+    if (!base) throw new Error('Missing player')
+    let vehicle: RaceVehicle = {
+      ...base, angle: 0, vx: 0, vy: 0, speed: 0, currentSurface: 'grass',
+    }
+    for (let frame = 0; frame < 480; frame++) {
+      vehicle = stepVehicle(vehicle, { steering: 0, throttle: 1, braking: false },
+        grass, 1 / 60)
+      if (frame === 59) expect(vehicle.speed).toBeGreaterThan(45)
+      expect(vehicle.speed).toBeLessThan(100)
+    }
+  })
+
+  it('keeps the grass speed penalty and rival specialties while improving Red recovery', () => {
     const grassPenalty = VEHICLE_TERRAIN_PHYSICS_SPECS.red.grass
     expect(grassPenalty.max).toBeCloseTo(0.51)
-    expect(grassPenalty.accel).toBeCloseTo(0.4)
+    expect(grassPenalty.accel).toBeCloseTo(0.7)
     expect(grassPenalty.grip).toBeCloseTo(0.57)
-    expect(grassPenalty.drag).toBeCloseTo(2.35)
+    expect(grassPenalty.drag).toBeCloseTo(1.6)
     expect(VEHICLE_TERRAIN_PHYSICS_SPECS.red.street)
       .toEqual(VEHICLE_TERRAIN_PHYSICS_SPECS.blue.street)
     expect(VEHICLE_TERRAIN_PHYSICS_SPECS.yellow.grass.max)
