@@ -28,6 +28,8 @@ export interface CarDrivingProfile {
   /** Curvature-weighted pace and pursuit reserves across all difficulties. */
   readonly technicalCornerPaceScale?: number
   readonly technicalCornerPursuitScale?: number
+  /** Local curvature at which the technical-corner reserve starts fading in. */
+  readonly technicalCornerActivation?: number
 }
 
 export const CAR_DRIVING_PROFILES = {

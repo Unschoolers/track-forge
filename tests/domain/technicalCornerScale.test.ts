@@ -13,5 +13,8 @@ describe('chassis technical corner reserves', () => {
     expect(technicalCornerScale(1, 0.7)).toBeCloseTo(0.7)
     expect(technicalCornerScale(1, 0)).toBe(0.5)
     expect(technicalCornerScale(1, 2)).toBe(1)
+    expect(technicalCornerScale(0.35, 0.7, 0.4)).toBe(1)
+    expect(technicalCornerScale(0.525, 0.7, 0.4)).toBeCloseTo(0.85)
+    expect(technicalCornerScale(0.7, 0.7, 0.4)).toBeCloseTo(0.7)
   })
 })

@@ -144,7 +144,7 @@ export function planAiSpeed({
   }
   // Apply the chassis reserve after all pace bonuses, so the Hard bonus
   // cannot undo the earlier technical-corner margin. Straights are unchanged.
-  curveSpeed *= technicalCornerScale(Math.max(bend, corner.bend), hardProfile.technicalCornerPaceScale)
+  curveSpeed *= technicalCornerScale(Math.max(bend, corner.bend), hardProfile.technicalCornerPaceScale, hardProfile.technicalCornerActivation)
   // Braking during turn-in consumes the same tire-force budget that rotates
   // the chassis. Finish the heavy braking on approach, then release it
   // progressively through a stable pavement apex. Emergency/traffic braking
