@@ -2,6 +2,7 @@ import { EventBus } from '@/application/eventBus'
 import { NearbyOperationQueue } from './nearbyOperationQueue'
 import { NearbyTrackShare } from './nearbyTrackShare'
 import { NearbyLobby } from './nearbyLobby'
+import { NearbyRosterDelivery } from './nearbyRosterDelivery'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track } from '@/domain/model'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
@@ -106,6 +107,7 @@ export class NearbyRace {
   private readonly pendingPairs = new Set<string>()
   private readonly guests = new Map<string, number>()
   private readonly lobby = new NearbyLobby()
+  private readonly rosterDelivery = new NearbyRosterDelivery()
   private readonly armed = new Map<string, number>()
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
@@ -324,6 +326,7 @@ export class NearbyRace {
     const course = this.course
     const active = this.generation
     this.lobby.reset()
+    this.rosterDelivery.reset()
     this.setPhase('lobby')
     this.armTimeout('A player did not load the track in time.')
     void this.prepareGuests(course, active, first).catch((error: unknown) => {
@@ -359,15 +362,19 @@ export class NearbyRace {
   private publishLobby(): void {
     const active = this.generation
     const round = this.round
-    const revision = this.lobby.beginRoster()
+    const revision = this.lobby.nextRevision()
     const bytes = encodeControl({ type: 'lobby', round, revision, players: this.lobbyPlayers() })
-    const ids = [...this.lobby.peerIds()].filter(id => this.guests.has(id))
-    void Promise.all(ids.map(id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'))).then(() => {
-      if (!this.currentLobby(active, round)) return
-      this.lobby.finishRoster(revision)
-      this.startHost()
-    }).catch((error: unknown) => {
-      if (this.currentLobby(active, round)) this.fail('Could not update a connected player’s lobby.', 'lobby_roster', error)
+    const ids = this.lobby.peerIds().filter(id => this.guests.has(id))
+    this.rosterDelivery.publish(ids, {
+      revision,
+      send: id => this.deliverLobbyPeer(id, bytes, active, round, 'roster'),
+      settled: () => { if (this.currentLobby(active, round)) this.startHost() },
+      failed: error => {
+        if (this.currentLobby(active, round)) this.fail('Could not update a connected player’s lobby.', 'lobby_roster', error)
+      },
+      superseded: () => {
+        if (this.currentLobby(active, round)) this.record('lobby_roster_delivery_superseded', { revision })
+      },
     })
     this.changed()
   }
@@ -386,6 +393,7 @@ export class NearbyRace {
     this.replayTrace.reset()
     this.networkTelemetry = new NearbyNetworkTelemetry()
     this.lobby.reset()
+    this.rosterDelivery.reset()
     this.armed.clear()
     this.racers.clear()
     this.lineup = null
@@ -809,7 +817,7 @@ export class NearbyRace {
   }
 
   private startHost(): void {
-    if (!this.course || this.phase !== 'lobby' || !this.lobby.canStage(this.guests)) return
+    if (!this.course || this.phase !== 'lobby' || this.rosterDelivery.pending || !this.lobby.canStage(this.guests)) return
     const cars: (CarId | null)[] = Array(MAX_PLAYERS).fill(null)
     const identities: (PlayerIdentity | null)[] = Array(MAX_PLAYERS).fill(null)
     const names: (string | null)[] = Array(MAX_PLAYERS).fill(null)
@@ -909,6 +917,7 @@ export class NearbyRace {
       if (this.phase === 'preparing' || this.phase === 'staging') { this.fail('A player left while the race was loading.'); return }
       if (this.phase === 'lobby') {
         this.lobby.removePeer(id)
+        this.rosterDelivery.removePeer(id)
         if (!this.guests.size) { this.fail('All other players left the room.'); return }
         if (this.lobby.peerCount === this.guests.size) this.clearTimeout()
         this.publishLobby()
@@ -1021,6 +1030,7 @@ export class NearbyRace {
     this.pendingPairs.clear()
     this.guests.clear()
     this.lobby.reset()
+    this.rosterDelivery.reset()
     this.armed.clear()
     this.localSceneReady = false
     this.lineup = null
