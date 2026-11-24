@@ -57,7 +57,7 @@ function rectangle(
 }
 
 describe('TrackGeometry', () => {
-  it('derives a continuous ribbon, start line, and ordered sectors', () => {
+  it('derives a continuous ribbon and start line without virtual sectors', () => {
     const geometry = buildTrackGeometry(square())
 
     expectContinuousRibbon(geometry)
@@ -65,7 +65,7 @@ describe('TrackGeometry', () => {
       geometry.path.totalLength * 0.125,
       4,
     )
-    expect(geometry.sectors.map((sector) => sector.order)).toEqual([1, 2, 3])
+    expect('sectors' in geometry).toBe(false)
   })
 
   it('caches unchanged shapes and invalidates geometry changes', () => {
@@ -308,6 +308,6 @@ it('keeps nearby point-to-point endpoints open and keys cache by topology', () =
   expect(open).not.toBe(closed)
   expect(open.start).toMatchObject({ ratio: 0, reversed: false, position: { x: 0, y: 0 } })
   expect(open.finish).toMatchObject({ ratio: 1, reversed: false, position: { x: 1, y: 0 } })
-  expect(open.sectors.map((gate) => gate.ratio)).toEqual([0.25, 0.5, 0.75])
+  expect('sectors' in open).toBe(false)
   expect(service.get(legacy)).toBe(closed)
 })
