@@ -203,7 +203,15 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     }
   })
 
-  it('increases Red service-brake force by 50% on pavement only', () => {
+  it('cuts Red ice stopping distance approximately in half from 170 units/s', () => {
+    // Frozen stopping distance measured with the original ice brake force.
+    const original = 469.00875375646046
+    const distance = stoppingDistance('red', handling, 'ice')
+    expect(distance / original).toBeGreaterThan(0.48)
+    expect(distance / original).toBeLessThan(0.52)
+  })
+
+  it('scales Red service brakes on pavement and ice only', () => {
     for (const surface of ['street', 'dirt', 'grass', 'ice'] as const) {
       const spec = surface === 'grass' ? OFFROAD_SURFACE : SURFACE_SPECS[surface]
       const terrain = VEHICLE_TERRAIN_SPECS.red[surface]
@@ -222,7 +230,7 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
         forces.gravityAcceleration * car.grip * initial.surfaceGrip * forces.brakeGripUsage,
       ) * forces.brakingTractionScale * 1.38
       expect((coast.speed - brake.speed) / dt / oldBrakeForce, surface)
-        .toBeCloseTo(surface === 'street' ? 1.5 : 1, 8)
+        .toBeCloseTo(surface === 'street' ? 1.5 : surface === 'ice' ? 2.12 : 1, 8)
     }
   })
 })
