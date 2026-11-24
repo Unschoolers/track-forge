@@ -64,6 +64,8 @@ const SNAPSHOT_KEYS = [
   STORAGE_KEYS.soundEffectsVolume, STORAGE_KEYS.haptics, STORAGE_KEYS.dynamicZoom,
 ] as const
 
+const LEGACY_HANDLING_KEY = 'trackforge-handling-mode'
+
 function snapshotValues(raw: string | null): Record<string, string> | null {
   if (!raw || raw.length > 128_000) return null
   try {
@@ -73,10 +75,17 @@ function snapshotValues(raw: string | null): Record<string, string> | null {
     const values = envelope.values
     if (envelope.version !== 1 || !values || typeof values !== 'object' || Array.isArray(values)) return null
     const record = values as Record<string, unknown>
-    if (Object.keys(record).length !== SNAPSHOT_KEYS.length ||
-      !SNAPSHOT_KEYS.every(key => Object.hasOwn(record, key) &&
+    const legacy = !Object.hasOwn(record, STORAGE_KEYS.pedalMode) &&
+      Object.hasOwn(record, LEGACY_HANDLING_KEY)
+    const keys = legacy ? SNAPSHOT_KEYS.map(key =>
+      key === STORAGE_KEYS.pedalMode ? LEGACY_HANDLING_KEY : key) : SNAPSHOT_KEYS
+    if (Object.keys(record).length !== keys.length ||
+      !keys.every(key => Object.hasOwn(record, key) &&
         typeof record[key] === 'string' && (record[key] as string).length <= 4096)) return null
-    return record as Record<string, string>
+    const valid = record as Record<string, string>
+    if (!legacy) return valid
+    // The old atomic snapshot remains authoritative even if its mirrors failed.
+    return { ...valid, [STORAGE_KEYS.pedalMode]: valid[LEGACY_HANDLING_KEY] === 'simulation' ? 'manual' : 'auto' }
   } catch {
     // A corrupt snapshot is not authoritative: older installations remain readable.
     return null
@@ -97,7 +106,8 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       ? committed[key] ?? null : this.storage.get(key)
     const car = read(STORAGE_KEYS.car)
     const difficulty = read(STORAGE_KEYS.difficulty)
-    const pedalMode = read(STORAGE_KEYS.pedalMode)
+    const pedalMode = read(STORAGE_KEYS.pedalMode) ??
+      (read(LEGACY_HANDLING_KEY) === 'simulation' ? 'manual' : 'auto')
     const raceLaps = read(STORAGE_KEYS.raceLaps)
     const raceMode = read(STORAGE_KEYS.raceMode)
     const storedIdentity = read(STORAGE_KEYS.playerIdentity)
