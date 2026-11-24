@@ -203,12 +203,12 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     }
   })
 
-  it('cuts Red ice stopping distance approximately in half from 170 units/s', () => {
-    // Frozen stopping distance measured with the original ice brake force.
-    const original = 469.00875375646046
-    const distance = stoppingDistance('red', handling, 'ice')
-    expect(distance / original).toBeGreaterThan(0.48)
-    expect(distance / original).toBeLessThan(0.52)
+  it('matches the four ice braking distance targets from 170 units/s', () => {
+    const targets = { red: 250, blue: 235, green: 200, yellow: 150 } as const
+    for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
+      const distance = stoppingDistance(car, handling, 'ice')
+      expect(Math.abs(distance - targets[car]), car).toBeLessThan(1)
+    }
   })
 
   it('scales Red service brakes on pavement and ice only', () => {
@@ -230,7 +230,7 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
         forces.gravityAcceleration * car.grip * initial.surfaceGrip * forces.brakeGripUsage,
       ) * forces.brakingTractionScale * 1.38
       expect((coast.speed - brake.speed) / dt / oldBrakeForce, surface)
-        .toBeCloseTo(surface === 'street' ? 1.5 : surface === 'ice' ? 2.12 : 1, 8)
+        .toBeCloseTo(surface === 'street' ? 1.5 : surface === 'ice' ? 1.9877 : 1, 8)
     }
   })
 })
