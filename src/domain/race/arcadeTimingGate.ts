@@ -35,7 +35,11 @@ function passedCircuitGateByProgress(
   const tolerance = Math.min(2, window / 2)
   if (finish) return before > count - window && after > tolerance && after < window
   const required = directedProgress(gateIndex, count, startIndex, reversed)
-  return before <= required + tolerance && after > required + tolerance && after < count - tolerance
+  // A missed stripe can remain behind the car for several frames after a
+  // nearest-road index reacquires the correct arm. Do not require crossing
+  // this index during the same tick; the physical beyond-plane check below
+  // still rejects off-route jumps and a start-grid approach.
+  return after > required + tolerance && after < count - Math.max(window, Math.floor(count / 8))
 }
 
 function clearlyBeyondGate(
@@ -87,7 +91,7 @@ export function advanceArcadeTimingGate(
   const passedGate = path.closed
     ? previous.recoveryAnchorIndex === undefined && vehicle.recoveryAnchorIndex === undefined &&
       passedCircuitGateByProgress(count, startPathIndex, reversed, position, finish, previous.pathIndex, vehicle.pathIndex)
-    : finish ? passedStageFinish(path, vehicle) : previous.pathIndex <= position + 2 && vehicle.pathIndex > position + 2
+    : finish ? passedStageFinish(path, vehicle) : vehicle.pathIndex > position + 2
   const confirmedBypass = passedGate && (!path.closed && finish ||
     clearlyBeyondGate(path, position, vehicle, reversed))
   if (!crossedLine && !confirmedBypass) return { vehicle, missedCheckpoint }
