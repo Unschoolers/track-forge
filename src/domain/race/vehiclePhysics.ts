@@ -11,6 +11,7 @@ import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
   ARCADE_BRAKE_TIMING,
+  type CarPhysicsSpec,
   brakingTractionForSurface,
   VEHICLE_DYNAMICS_TUNING,
 } from '@/domain/race/vehiclePhysicsConfig'
@@ -64,7 +65,7 @@ export function stepVehicle(
     : clamp(input.brakePressure ?? Number(input.braking), 0, 1)
   const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
   const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
-  const car = CAR_SPECS[vehicle.car]
+  const car: CarPhysicsSpec = CAR_SPECS[vehicle.car]
   const surface = getSurfaceSpec(context.surface)
   const terrain = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
   const damageRatio = vehicle.player
@@ -135,6 +136,7 @@ export function stepVehicle(
         condition.accel,
       maxSteerAngle:
         car.steer * tuning.steering.maximumAngleScale,
+      ...(car.lowSpeedSteerAngle === undefined ? {} : { lowSpeedSteerAngle: car.lowSpeedSteerAngle }),
       grip:
         car.grip *
         surfaceGrip *

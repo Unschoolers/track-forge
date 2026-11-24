@@ -79,7 +79,10 @@ export interface VehicleDynamicsTuning {
 export interface CarPhysicsSpec {
   readonly max: number
   readonly accel: number
+  /** Original steering rack scale, retained for high-speed authority and AI planning. */
   readonly steer: number
+  /** Optional low-speed steering limit, in radians. */
+  readonly lowSpeedSteerAngle?: number
   readonly grip: number
   readonly brake: number
   readonly steerLoss: number
@@ -182,11 +185,26 @@ export const VEHICLE_DYNAMICS_TUNING = {
 
 export const ARCADE_BRAKE_TIMING = { pressSeconds: 0.15, releaseSeconds: 0.1 } as const
 
+const LOW_SPEED_STEERING_ANGLE = 40 * Math.PI / 180
+
+/** Blend low-speed lock into the unchanged original high-speed limit. */
+export function steeringLimitAtSpeed(
+  baseAngle: number,
+  speedRatio: number,
+  highSpeedReduction: number,
+  lowSpeedAngle = baseAngle,
+): number {
+  const ratio = Math.max(0, Math.min(1, speedRatio))
+  const reduction = Math.max(0, Math.min(1, highSpeedReduction))
+  return baseAngle * (1 - ratio * reduction) + (lowSpeedAngle - baseAngle) * (1 - ratio)
+}
+
 export const CAR_PHYSICS_SPECS = {
   blue: {
     max: 306,
     accel: 222,
     steer: 2.72,
+    lowSpeedSteerAngle: LOW_SPEED_STEERING_ANGLE,
     grip: 1,
     brake: 1,
     steerLoss: 0.057,
@@ -207,6 +225,7 @@ export const CAR_PHYSICS_SPECS = {
     max: 337,
     accel: 230,
     steer: 2.28,
+    lowSpeedSteerAngle: LOW_SPEED_STEERING_ANGLE,
     grip: 0.79,
     brake: 0.83,
     steerLoss: 0.118,
@@ -220,7 +239,8 @@ export const CAR_PHYSICS_SPECS = {
     // Race-grade service brakes without granting Red more cornering grip.
     brakingTractionScale: 1.38,
     pavementBrakeMultiplier: 1.5,
-    iceBrakeMultiplier: 1.9877,
+    // Preserve the 250-unit ice stopping target with the improved ice grip.
+    iceBrakeMultiplier: 1.5268,
     lateralStability: 0.9,
     recovery: 1.25,
   },
@@ -247,6 +267,7 @@ export const CAR_PHYSICS_SPECS = {
     max: 286,
     accel: 202,
     steer: 2.46,
+    lowSpeedSteerAngle: LOW_SPEED_STEERING_ANGLE,
     grip: 1.24,
     brake: 1.2,
     steerLoss: 0.061,
@@ -296,9 +317,9 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
   red: {
     street: DEFAULT_TERRAIN,
     dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.75, drag: 1.55 },
-    ice: { max: 0.95, accel: 0.84, grip: 0.76, brake: 0.78, drag: 1.2 },
-    // The pavement specialist pays extra for grass shortcuts; street is unchanged.
-    grass: { max: 0.51, accel: 0.40, grip: 0.57, brake: 0.72, drag: 2.35 },
+    ice: { max: 0.95, accel: 0.84, grip: 1, brake: 0.78, drag: 1.2 },
+    // Keep the low grass speed target but let Red recover from a mistake sooner.
+    grass: { max: 0.51, accel: 0.7, grip: 0.57, brake: 0.72, drag: 1.6 },
   },
   green: {
     street: DEFAULT_TERRAIN,

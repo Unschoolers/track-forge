@@ -1,6 +1,7 @@
 import type { Vector2 } from '@/domain/model'
 import {
   VEHICLE_DYNAMICS_TUNING,
+  steeringLimitAtSpeed,
   type VehicleDynamicsTuning,
 } from '@/domain/race/vehiclePhysicsConfig'
 
@@ -36,6 +37,7 @@ export interface VehicleDynamicsParameters {
   readonly safetySpeed?: number
   readonly engineAcceleration: number
   readonly maxSteerAngle: number
+  readonly lowSpeedSteerAngle?: number
   readonly grip: number
   readonly brakeGrip: number
   readonly rollingResistance: number
@@ -200,12 +202,12 @@ export function stepVehicleDynamics(
   const rearCapacity =
     lateralGripAcceleration * rearLoad * lateralBudget
 
-  const speedSteeringScale =
-    1 -
-    clamp(speedRatio, 0, 1) *
-      clamp(tuning.steering.highSpeedReduction, 0, 1)
-  const steerAngle =
-    steeringInput * parameters.maxSteerAngle * speedSteeringScale
+  const steerAngle = steeringInput * steeringLimitAtSpeed(
+    parameters.maxSteerAngle,
+    speedRatio,
+    tuning.steering.highSpeedReduction,
+    parameters.lowSpeedSteerAngle,
+  )
   const frontAxle = parameters.wheelbase * (1 - parameters.frontWeightBias)
   const rearAxle = parameters.wheelbase * parameters.frontWeightBias
   const tireSpeed = Math.max(
