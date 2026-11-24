@@ -205,8 +205,20 @@ export function safeEntrySpeedAhead(
     let distance = direction * (point.distance - at.distance)
     if (path.closed && distance < 0) distance += path.totalLength
     distance = Math.max(0, distance)
+    // Peak pavement service-brake force is not a cornering capability.
+    // Red needs time to release the brake and rotate before a tight apex.
+    // Keep its proven approach budget through technical bends/transitions;
+    // exploit the added straight-line braking capacity on gentle paved sweeps.
+    const chassis = CAR_SPECS[carId]
+    const serviceTraction = brakingTractionForSurface(chassis, point.surface)
+    const extraBrakeAllowance = serviceTraction > chassis.brakingTractionScale
+      ? (1 - clamp((bend - 0.045) / 0.10, 0, 1)) *
+        sweepingPavementAllowance(path, nearestIndex, reversed)
+      : 0
+    const plannedBrakeTraction = chassis.brakingTractionScale +
+      (serviceTraction - chassis.brakingTractionScale) * extraBrakeAllowance
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
-      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * brakingTractionForSurface(CAR_SPECS[carId], point.surface)
+      VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * plannedBrakeTraction
     const agileGripBonus = useChassisYawSafety
       ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
         clamp((grip - 0.75) / 0.2, 0, 1)
