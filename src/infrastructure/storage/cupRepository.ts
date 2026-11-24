@@ -1,8 +1,22 @@
 import type { CupStore, KeyValueStore } from '@/application/ports/storage'
-import { cupRoundCount, DEFAULT_CUP_TRACK_IDS, validCupLineup, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
+import { cupRoundCount, cupTrackIds, DEFAULT_CUP_TRACK_IDS, validCupLineup, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 import { isCarId, isDifficultyId } from '@/domain/model'
 
 const KEY = 'trackforge-cup-v1'
+const RETIRED_OFFICIAL_TRACKS = new Set([
+  'official-meadow', 'official-hairpin', 'official-frost',
+  'official-bridge', 'official-quarry', 'official-switchback',
+])
+function includesRetired(ids: readonly string[]): boolean {
+  return ids.some(id => RETIRED_OFFICIAL_TRACKS.has(id))
+}
+function migratedLineup(value: unknown): readonly string[] {
+  if (!validCupLineup(value)) return [...DEFAULT_CUP_TRACK_IDS]
+  const retained = value.filter(id => !RETIRED_OFFICIAL_TRACKS.has(id))
+  return value.length > 0 && retained.length === 0
+    ? [...DEFAULT_CUP_TRACK_IDS]
+    : retained
+}
 function validCup(value: unknown): value is CircuitCup {
   if (!value || typeof value !== 'object') return false
   const cup = value as CircuitCup
@@ -23,12 +37,19 @@ export class BrowserCupRepository implements CupStore {
   load(): CupProgress {
     try {
       const data = JSON.parse(this.storage.get(KEY) ?? 'null')
-      if (data?.version !== 1) return { checkpoint: null, bestPlacement: null, lineup: [...DEFAULT_CUP_TRACK_IDS] }
+      if (data?.version !== 1 && data?.version !== 2) {
+        return { checkpoint: null, bestPlacement: null, lineup: [...DEFAULT_CUP_TRACK_IDS] }
+      }
       const bestPlacement = Number.isInteger(data.bestPlacement) &&
         data.bestPlacement >= 1 && data.bestPlacement <= 4 ? data.bestPlacement : null
-      return { checkpoint: validCup(data.checkpoint) ? data.checkpoint : null, bestPlacement,
-        lineup: validCupLineup(data.lineup) ? [...data.lineup] : [...DEFAULT_CUP_TRACK_IDS] }
+      const checkpoint = validCup(data.checkpoint) ? data.checkpoint : null
+      // Version 1 implicitly referred to the retired four-track Cup.
+      // Explicitly authored, non-retired user lineups are still resumable.
+      const safeCheckpoint = checkpoint &&
+        (data.version === 2 || checkpoint.trackIds !== undefined) &&
+        !includesRetired(cupTrackIds(checkpoint)) ? checkpoint : null
+      return { checkpoint: safeCheckpoint, bestPlacement, lineup: migratedLineup(data.lineup) }
     } catch { return { checkpoint: null, bestPlacement: null, lineup: [...DEFAULT_CUP_TRACK_IDS] } }
   }
-  save(progress: CupProgress): boolean { return this.storage.set(KEY, JSON.stringify({ version: 1, ...progress })) }
+  save(progress: CupProgress): boolean { return this.storage.set(KEY, JSON.stringify({ version: 2, ...progress })) }
 }
