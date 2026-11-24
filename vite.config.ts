@@ -9,7 +9,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: process.env.AI_BENCHMARK === '1'
+      ? ['qa/lanes/*.benchmark.ts']
+      : ['tests/**/*.test.ts'],
   },
   build: {
     target: 'es2023',
