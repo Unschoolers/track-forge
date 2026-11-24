@@ -7,12 +7,13 @@ import {
   getVehicleStepContext,
   resetVehicleToTrack,
 } from '@/domain/race/trackContext'
+import type { RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
 
 const track = createStarterTrack(asTrackId('physics'), 1)
 const path = buildRoadPath(track.points, track.terrain)
 
-function vehicle(car: 'red' | 'green' | 'yellow' = 'red') {
+function vehicle(car: 'red' | 'blue' | 'green' | 'yellow' = 'red') {
   const value = createRace({
     path,
     playerCar: car,
@@ -149,16 +150,26 @@ describe('vehicle physics', () => {
     expect(curb).toBe(true)
   })
 
-  it('offers an arcade handling profile without replacing simulation physics', () => {
-    const fixture = vehicle()
-    const initial = { ...fixture, vx: Math.cos(fixture.angle) * 130, vy: Math.sin(fixture.angle) * 130, speed: 130 }
-    const context = getVehicleStepContext(path, initial)
-    const input = { steering: 0.85, throttle: 1, braking: false }
-    const simulation = stepVehicle(initial, input, context, 1 / 60, 'simulation')
-    const arcade = stepVehicle(initial, input, context, 1 / 60, 'arcade')
-    expect(arcade).not.toEqual(simulation)
-    expect(Number.isFinite(arcade.angle)).toBe(true)
-    expect(arcade.speed).toBeGreaterThan(0)
+  it('uses identical Arcade vehicle physics across race styles, drivers and surfaces', () => {
+    for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
+      for (const surface of ['street', 'dirt', 'ice', 'grass'] as const) {
+        for (const player of [true, false]) {
+          const initial = { ...vehicle(car), player, angle: 0, vx: 130, vy: 20, speed: Math.hypot(130, 20) }
+          const context = { ...getVehicleStepContext(path, initial), surface, grade: 0, onRoad: surface !== 'grass' }
+          let arcade: RaceVehicle = initial
+          let simulation: RaceVehicle = initial
+          let implicit: RaceVehicle = initial
+          for (let frame = 0; frame < 60; frame++) {
+            const input = { steering: frame < 30 ? 0.85 : -0.45, throttle: 1, braking: frame < 20 }
+            arcade = stepVehicle(arcade, input, context, 1 / 60, 'arcade')
+            simulation = stepVehicle(simulation, input, context, 1 / 60, 'simulation')
+            implicit = stepVehicle(implicit, input, context, 1 / 60)
+            expect(simulation).toEqual(arcade)
+            expect(implicit).toEqual(arcade)
+          }
+        }
+      }
+    }
   })
 
   it('lets an AI trail-brake proportionally while human brakes remain unchanged', () => {
