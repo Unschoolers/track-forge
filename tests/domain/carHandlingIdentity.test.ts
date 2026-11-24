@@ -203,6 +203,26 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     }
   })
 
+  it('lets Red change its actual travel direction on ice even while braking', () => {
+    const road = context('ice')
+    const terrain = VEHICLE_TERRAIN_SPECS.red.ice
+    for (const steering of [-1, 1]) {
+      const initial = {
+        ...makeVehicle('red', 110, 0, 'ice'),
+        surfaceGrip: SURFACE_SPECS.ice.grip * terrain.grip,
+      }
+      for (const braking of [false, true]) {
+        const result = travel(initial, { steering, throttle: 0, braking }, 'ice', handling, 60)
+        const forward = result.vx * road.tangent.x + result.vy * road.tangent.y
+        const sideways = result.vx * road.normal.x + result.vy * road.normal.y
+        const travelAngle = Math.atan2(sideways, forward) * steering
+        // Measure velocity direction, not just body rotation during a slide.
+        expect(travelAngle, `steering=${steering}, braking=${braking}`)
+          .toBeGreaterThan(braking ? 0.35 : 0.55)
+      }
+    }
+  })
+
   it('matches the four ice braking distance targets from 170 units/s', () => {
     const targets = { red: 250, blue: 235, green: 200, yellow: 150 } as const
     for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
@@ -230,7 +250,7 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
         forces.gravityAcceleration * car.grip * initial.surfaceGrip * forces.brakeGripUsage,
       ) * forces.brakingTractionScale * 1.38
       expect((coast.speed - brake.speed) / dt / oldBrakeForce, surface)
-        .toBeCloseTo(surface === 'street' ? 1.5 : surface === 'ice' ? 1.9877 : 1, 8)
+        .toBeCloseTo(surface === 'street' ? 1.5 : surface === 'ice' ? 1.5268 : 1, 8)
     }
   })
 })
