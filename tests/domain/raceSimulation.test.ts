@@ -22,6 +22,7 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 
 const track = createStarterTrack(asTrackId('starter'), 1)
 const path = buildRoadPath(track.points, track.terrain)
+const authoredGates = resolveRecoveryCheckpoints(path, track.recoveryCheckpoints)
 
 describe('race simulation', () => {
   it('creates a deterministic four-car starting grid', () => {
@@ -118,7 +119,7 @@ describe('race simulation', () => {
       lap: 0,
       nextSector: 4 as const,
     }
-    const finished = updateProgress(nearEnd, 2, path.points.length, 12.5, 1)
+    const finished = updateProgress(nearEnd, 2, path.points.length, 12.5, 1, 0, false, authoredGates)
 
     expect(finished).toMatchObject({ lap: 1, finishedAt: 12.5 })
   })
@@ -141,6 +142,9 @@ describe('race simulation', () => {
         path.points.length,
         4,
         3,
+        0,
+        false,
+        authoredGates,
       ),
     ).toMatchObject({ lap: 1, finishedAt: null })
   })
@@ -160,11 +164,14 @@ describe('race simulation', () => {
       path.points.length,
       5,
       1,
+      0,
+      false,
+      authoredGates,
     )
 
     expect(shortcut).toMatchObject({
       lap: 0,
-      nextSector: 1,
+      nextSector: 2,
       finishedAt: null,
     })
   })
