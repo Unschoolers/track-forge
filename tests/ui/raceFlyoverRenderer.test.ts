@@ -7,6 +7,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { createRaceFlyoverRenderer } from '@/ui/components/raceFlyoverRenderer'
+import { createRaceFlyover } from '@/ui/components/raceFlyover'
 import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 
 function canvas() {
@@ -34,6 +35,45 @@ describe('race flyover renderer', () => {
   })
 
   afterEach(() => vi.restoreAllMocks())
+
+  it('advances the preview at twice wall-clock speed and freezes when paused', () => {
+    let scheduled: FrameRequestCallback | undefined
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      scheduled = callback
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => { scheduled = undefined })
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    const track = createStarterTrack(asTrackId('playback'), 1)
+    const geometry = new TrackGeometryService().get(track)
+    const playback = { elapsedSeconds: 0, playing: true }
+    const view = createRaceFlyover(track, geometry, 'blue', 'day', true, playback)
+    try {
+      const preview = view.element.querySelector('canvas')!
+      Object.defineProperties(preview, {
+        clientWidth: { value: 320 }, clientHeight: { value: 150 },
+      })
+      document.body.append(view.element)
+      const frame = (at: number) => {
+        const callback = scheduled
+        if (!callback) throw new Error('Expected an animation frame')
+        scheduled = undefined
+        callback(at)
+      }
+      frame(0)
+      frame(50)
+      expect(playback.elapsedSeconds).toBeCloseTo(0.1)
+      frame(100)
+      expect(playback.elapsedSeconds).toBeCloseTo(0.2)
+      view.element.querySelector('button')!.click()
+      frame(150)
+      expect(playback.elapsedSeconds).toBeCloseTo(0.2)
+      expect(scheduled).toBeUndefined()
+    } finally {
+      view.destroy()
+      view.element.remove()
+    }
+  })
 
   it.each([
     ['day', '#2d7344'],
