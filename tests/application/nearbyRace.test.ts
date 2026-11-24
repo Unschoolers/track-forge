@@ -69,12 +69,12 @@ describe('Nearby Arcade', () => {
 
       if (kind === 'roster') {
         await vi.advanceTimersByTimeAsync(LOBBY_DELIVERY_TIMEOUT_MS + 500)
-        expect(host.snapshot()).toMatchObject({ phase: 'idle', error: 'Could not update a connected player’s lobby.' })
-        expect((await host.diagnostics()).lastFailure).toMatchObject({ source: 'lobby_roster' })
+        expect(host.snapshot()).toMatchObject({ phase: 'idle', error: 'Lobby synchronization timed out. Rejoin the room.' })
+        expect((await host.diagnostics()).lastFailure).toMatchObject({ source: 'lobby_roster', error: 'lobby_delivery_timeout' })
       } else {
         await vi.advanceTimersByTimeAsync(kind === 'choice' ? LOBBY_DELIVERY_TIMEOUT_MS : 30_000)
         expect(guest.snapshot().phase).toBe('idle')
-        expect(guest.snapshot().error).toContain(kind === 'choice' ? 'message could not be sent' : 'did not confirm')
+        expect(guest.snapshot().error).toContain(kind === 'choice' ? 'synchronization timed out' : 'did not confirm')
       }
       expect(started).not.toHaveBeenCalled()
     } finally {
