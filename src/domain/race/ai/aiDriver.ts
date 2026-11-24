@@ -375,6 +375,8 @@ export function stepAiVehicle(
     ? clamp((curveOverspeed - curveBrakeThreshold + 4) / 18, 0.22, 1)
     : 0
   // Ease off on approach so the tires can turn without repeated hard braking.
+  const plannedBrakePressure = vehicle.racingLine ? cornerBrakePressure
+    : correctionBrakePressure(car, context.surface, cornerBrakePressure)
   const throttleWindow = fastCorners ? 5 : arcadePavement
     ? HARD_PAVEMENT_THROTTLE_WINDOW * basePace + RACING_PAVEMENT_THROTTLE_WINDOW * racingPace
     : CORNER_THROTTLE_WINDOW
@@ -424,7 +426,7 @@ export function stepAiVehicle(
           vehicle.speed > 90),
       brakePressure: emergency || (recovering &&
         context.nearest.distance > 72 && vehicle.speed > 90)
-        ? 1 : correctionBrakePressure(car, context.surface, cornerBrakePressure),
+        ? 1 : plannedBrakePressure,
     },
     context,
     deltaSeconds,
