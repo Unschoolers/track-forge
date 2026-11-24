@@ -91,6 +91,8 @@ export interface CarPhysicsSpec {
   readonly brakeForce: number
   /** Additional braking traction relative to other cars. */
   readonly brakingTractionScale: number
+  /** Extra lateral authority during braking on high-grip surfaces. */
+  readonly brakingStabilityBoost?: number
   /** Planted lateral behavior per chassis; road grip blends it out on loose surfaces. */
   readonly lateralStability: number
   readonly recovery: number
@@ -234,9 +236,10 @@ export const CAR_PHYSICS_SPECS = {
     cornerStiffness: 7.4,
     brakeForce: 112_000,
     // Race-grade service brakes without granting Red more cornering grip.
-    brakingTractionScale: 1.38,
+    brakingTractionScale: 1.62,
+    brakingStabilityBoost: 0.45,
     lateralStability: 0.9,
-    recovery: 1.25,
+    recovery: 1.44,
   },
   green: {
     max: 294,
