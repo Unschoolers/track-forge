@@ -93,3 +93,13 @@ it('lets AI finish at the last driveable sample only after its authored gates', 
   expect(updateProgress({ ...rival, pathIndex: last - 5 }, last - 4, path.points.length, 12, 1, 0, false, gates, false))
     .toMatchObject({ lap: 0, finishedAt: null })
 })
+
+it('consumes adjacent authored checkpoint samples crossed in the same 60 Hz tick', () => {
+  const gates = [5, 6, 7]
+  const rival = { ...player, player: false, nextSector: 1, pathIndex: 4 }
+  const next = updateProgress(rival, 8, path.points.length, 1, 1, 0, false, gates, false)
+  expect(next).toMatchObject({ nextSector: 4, lap: 0, finishedAt: null })
+  // Skipping these would strand the next checkpoint permanently behind AI.
+  expect(updateProgress(rival, 5, path.points.length, 1, 1, 0, false, gates, false))
+    .toMatchObject({ nextSector: 2, lap: 0 })
+})
