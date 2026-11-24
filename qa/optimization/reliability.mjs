@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { SimulationPool } from './pool.mjs'
 import { STUDY_SCENARIOS } from './scenarios.mjs'
 import { DEFAULT_CARS, generateCandidates } from './candidates.mjs'
@@ -6,11 +6,14 @@ import { metrics, noNewDebt, crossTrackRegressions, compareReliability, compareR
 
 const output = 'qa/results/reliability'
 const verifyOnly = process.argv.includes('--verify-only')
+const repairPromoted = process.argv.includes('--repair-promoted')
 const hairpins = [false, true].map(reverse => ({
   id: reverse ? 'hairpin-matrix-reverse' : 'hairpin-matrix-forward',
   laneScenarioId: 'hairpin', reverse, startRatio: 0, laps: 1, seconds: 60,
 }))
-const scenarios = [...hairpins, ...STUDY_SCENARIOS]
+const bridges = [false, true].map(reverse => ({ id: reverse ? 'bridge-guard-reverse' : 'bridge-guard-forward',
+  laneScenarioId: 'bridge', reverse, startRatio: 0, laps: 1, seconds: 60 }))
+const scenarios = [...hairpins, ...STUDY_SCENARIOS, ...bridges]
 const pool = new SimulationPool({ workers: 2, scenarios, physicsRevision: process.env.GITHUB_SHA ?? 'local' })
 const matrix = hairpins.flatMap(s => ['easy', 'normal', 'hard'].flatMap(difficulty =>
   DEFAULT_CARS.flatMap(car => ['solo', 'traffic'].map(mode => ({
@@ -36,6 +39,15 @@ const proposals = [
     { technicalCornerActivation, technicalCornerPaceScale: 0.9, technicalCornerPursuitScale: 0.8 },
   ]),
 ]
+const lowerValidation = [
+  ...['easy', 'normal'].flatMap(difficulty => [1, 4331].flatMap(seed => DEFAULT_CARS.map(car => ({
+    car, scenarioId: 'kids-room', difficulty, mode: 'solo', seed, policyKind: 'driving',
+  })))),
+  ...bridges.flatMap(s => ['solo', 'traffic'].map(mode => ({
+    car: 'blue', scenarioId: s.id, difficulty: 'normal', mode, seed: 1, policyKind: 'driving',
+  }))),
+]
+const kidsReference = JSON.parse(await readFile('qa/benchmarks/kidsRoomAiBaseline.json', 'utf8'))
 const cache = new Map()
 function profileKey(profiles) {
   return JSON.stringify(Object.entries(profiles).filter(([, values]) => Object.keys(values).length)
@@ -112,11 +124,130 @@ function candidateEdits(car, current) {
   return [...unique.values()]
 }
 
+// Exact frozen Kids Room timing contract plus matched lower-difficulty and bridge checks.
+function lowerRegressions(before, after) {
+  const issues = crossTrackRegressions(before, after)
+  for (const record of after) {
+    for (const row of record.rows) {
+      if (row.scenario_id !== 'kids-room' || row.mode !== 'solo') continue
+      const seedIndex = kidsReference.seeds.indexOf(row.seed)
+      const old = kidsReference.matrix[row.car_type]?.[row.difficulty]?.times[seedIndex]
+      if (old === undefined || row.finished_seconds === null || row.recoveries !== 0 || row.finished_seconds > old * 1.01) {
+        issues.push({ car: row.car_type, difficulty: row.difficulty, seed: row.seed, before: old,
+          after: row.finished_seconds, reasons: ['frozen Kids Room timing/recovery gate'] })
+      }
+    }
+  }
+  return issues
+}
+
+async function repairCandidate(baseline, crossBaseline) {
+  const profiles = {
+    blue: { hardCornerTargetBonus: 0.12 },
+    red: { technicalCornerPursuitByDifficulty: { hard: 0.85 } },
+    green: {},
+    yellow: { hardHairpinReserve: 0.05, hardLookAheadSamples: 8,
+      hardEdgeAvoidanceScale: 0.4, hardCornerTargetBonus: 0.45,
+      technicalCornerPaceByDifficulty: { hard: 0.95 } },
+  }
+  const history = []
+  const guardsBefore = await simulate(lowerValidation, {}, 'lower-baseline')
+  const hardIndices = matrix.map((task, i) => task.difficulty === 'hard' ? i : -1).filter(i => i >= 0)
+  const hard = await simulate(hardIndices.map(i => matrix[i]), profiles, 'hard-candidate')
+  const cross = await simulate(validation, profiles, 'hard-cross')
+  const hardRegressions = crossTrackRegressions(crossBaseline, cross)
+  const hardMetrics = metrics(hard)
+  console.log('RELIABILITY_HARD_REPAIR ' + JSON.stringify({ profiles, metrics: hardMetrics, regressions: hardRegressions }))
+  if (!noNewDebt(hardIndices.map(i => baseline[i]), hard) ||
+      hardMetrics.dnf || hardMetrics.recoveries || hardMetrics.errors || hardRegressions.length) {
+    return { profiles, history, combined: await simulate(matrix, profiles, 'hard-rejected'),
+      regressions: [...hardRegressions, { reasons: ['Hard candidate did not reproduce prior validation'] }],
+      crossTrackTrials: cross.length }
+  }
+  for (const difficulty of ['easy', 'normal']) {
+    const indices = matrix.map((task, i) => task.difficulty === difficulty ? i : -1).filter(i => i >= 0)
+    const cases = indices.map(i => matrix[i])
+    const frozen = indices.map(i => baseline[i])
+    const guardIndices = lowerValidation.map((task, i) => task.difficulty === difficulty ? i : -1).filter(i => i >= 0)
+    const guardCases = guardIndices.map(i => lowerValidation[i])
+    const frozenGuards = guardIndices.map(i => guardsBefore[i])
+    let current = await simulate(cases, profiles, 'lower-start')
+    const guards = await simulate(guardCases, profiles, 'lower-start-guards')
+    if (!noNewDebt(frozen, current) || lowerRegressions(frozenGuards, guards).length) {
+      return { profiles, history, combined: await simulate(matrix, profiles, 'lower-start-rejected'),
+        regressions: [{ reasons: ['neutral lower-difficulty seed regressed'] }], crossTrackTrials: cross.length }
+    }
+    for (let round = 1; round <= 2 && metrics(current).recoveries > 0; round++) {
+      let changed = false
+      for (const car of ['green', 'yellow', 'red', 'blue']) {
+        const affectedIndices = affected(current, car)
+        const old = affectedIndices.map(i => current[i])
+        const original = affectedIndices.map(i => frozen[i])
+        const oldMetrics = metrics(old)
+        if (oldMetrics.recoveries === 0 && oldMetrics.dnf === 0) continue
+        const guardAffected = affected(guards, car)
+        const guardTasks = guardAffected.map(i => guardCases[i])
+        const guardOriginal = guardAffected.map(i => frozenGuards[i])
+        const base = profiles[car]
+        const proposals = [
+          ...[0.99, 0.97, 0.95, 0.92, 0.9, 0.85, 0.8, 0.7].map(pace => ({ pace, pursuit: 1 })),
+          ...[0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7].map(pursuit => ({ pace: 1, pursuit })),
+          ...[0.97, 0.95, 0.9].flatMap(pace => [0.95, 0.85, 0.75].map(pursuit => ({ pace, pursuit }))),
+        ]
+        let best = { profile: base, records: old, score: oldMetrics }
+        for (const { pace, pursuit } of proposals) {
+          const profile = { ...base,
+            technicalCornerPaceByDifficulty: { ...base.technicalCornerPaceByDifficulty, [difficulty]: pace },
+            technicalCornerPursuitByDifficulty: { ...base.technicalCornerPursuitByDifficulty, [difficulty]: pursuit },
+          }
+          const candidate = { ...profiles, [car]: profile }
+          const records = await simulate(affectedIndices.map(i => cases[i]), candidate, 'repair-' + difficulty + '-' + car)
+          const score = metrics(records)
+          if (!noNewDebt(original, records) || !noNewDebt(old, records) ||
+              compareReliability(score, oldMetrics) >= 0 || compareReliability(score, best.score) > 0) continue
+          const after = await simulate(guardTasks, candidate, 'repair-guard-' + difficulty + '-' + car)
+          const regressions = lowerRegressions(guardOriginal, after)
+          history.push({ difficulty, car, profile, score, regressions })
+          if (!regressions.length && (compareReliability(score, best.score) < 0 ||
+              (compareReliability(score, best.score) === 0 && score.seconds < best.score.seconds))) {
+            best = { profile, records, score }
+          }
+        }
+        if (best.profile !== base) {
+          profiles[car] = best.profile
+          current = replaceRecords(current, affectedIndices, best.records)
+          changed = true
+          console.log('RELIABILITY_LOWER_REPAIR ' + JSON.stringify({ difficulty, round, car, profile: best.profile, metrics: metrics(current) }))
+        }
+      }
+      if (!changed) break
+    }
+  }
+  const combined = await simulate(matrix, profiles, 'repair-combined')
+  const finalCross = await simulate(validation, profiles, 'repair-cross')
+  const finalGuards = await simulate(lowerValidation, profiles, 'repair-lower')
+  return { profiles, history, combined,
+    regressions: [...crossTrackRegressions(crossBaseline, finalCross), ...lowerRegressions(guardsBefore, finalGuards)],
+    crossTrackTrials: finalCross.length + finalGuards.length }
+}
+
 try {
   await pool.start()
   const baseline = await simulate(matrix, {}, 'baseline')
   const baselineMetrics = metrics(baseline)
   console.log('RELIABILITY_BASELINE ' + JSON.stringify({ metrics: baselineMetrics, failures: findings(matrix, baseline) }))
+  if (repairPromoted) {
+    const crossBaseline = await simulate(validation, {}, 'cross-track-baseline')
+    const result = await repairCandidate(baseline, crossBaseline)
+    const final = metrics(result.combined)
+    const accepted = noNewDebt(baseline, result.combined) && final.errors === 0 && final.dnf === 0 && final.recoveries === 0 && result.regressions.length === 0
+    const report = { accepted, repairPromoted, profiles: result.profiles, baseline: baselineMetrics, combined: final,
+      failures: findings(matrix, result.combined), regressions: result.regressions, history: result.history, crossTrackTrials: result.crossTrackTrials }
+    await mkdir(output, { recursive: true })
+    await writeFile(output + '/report.json', JSON.stringify(report, null, 2) + '\n')
+    console.log('RELIABILITY_RESULT ' + JSON.stringify({ ...report, history: undefined, candidateCount: result.history.length }))
+    if (!accepted) process.exitCode = 1
+  } else {
   const profiles = {}
   const history = []
   let current = baseline
@@ -210,6 +341,7 @@ try {
   await writeFile(output + '/report.json', JSON.stringify(report, null, 2) + '\n')
   console.log('RELIABILITY_RESULT ' + JSON.stringify({ ...report, history: undefined, candidateCount: history.length }))
   if (!accepted) process.exitCode = 1
+  }
 } finally {
   await pool.close()
 }

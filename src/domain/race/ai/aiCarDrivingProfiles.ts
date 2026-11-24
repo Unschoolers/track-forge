@@ -1,4 +1,4 @@
-import type { CarId } from '@/domain/model'
+import type { CarId, DifficultyId } from '@/domain/model'
 
 /**
  * Car-specific Arcade AI *driving decisions*, not car physics.
@@ -28,6 +28,9 @@ export interface CarDrivingProfile {
   /** Curvature-weighted pace and pursuit reserves across all difficulties. */
   readonly technicalCornerPaceScale?: number
   readonly technicalCornerPursuitScale?: number
+  /** Optional difficulty-specific overrides; unspecified levels retain the shared scale. */
+  readonly technicalCornerPaceByDifficulty?: Readonly<Partial<Record<DifficultyId, number>>>
+  readonly technicalCornerPursuitByDifficulty?: Readonly<Partial<Record<DifficultyId, number>>>
   /** Local curvature at which the technical-corner reserve starts fading in. */
   readonly technicalCornerActivation?: number
 }
@@ -42,7 +45,7 @@ export const CAR_DRIVING_PROFILES = {
     hardLookAheadSamples: 10,
     hardApexCutScale: 1,
     hardEdgeAvoidanceScale: 0.4,
-    hardCornerTargetBonus: 0.12,
+    hardCornerTargetBonus: 0.08,
     normalCornerTargetBonus: 0.006,
     lowerDifficultyReserveScale: 0.98,
   },
@@ -54,7 +57,6 @@ export const CAR_DRIVING_PROFILES = {
     hardCornerReserve: 0.01,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
-    technicalCornerPursuitScale: 0.85,
     // The revised brake controller already reserves more corner-entry time.
     // Scale the additional Easy/Normal reserve so it does not double-count it.
     lowerDifficultyReserveScale: 0.45,
@@ -71,7 +73,7 @@ export const CAR_DRIVING_PROFILES = {
     // preserve forward pursuit preview near ordinary road edges without
     // overriding real tire grip, corner/braking safety, or recovery rules.
     hardEdgeAvoidanceScale: 0.25,
-    lowerDifficultyReserveScale: 1.2,
+    lowerDifficultyReserveScale: 0.97,
   },
   // Yellow's heavier yaw and strong loose-surface grip favor the stable
   // controller; its terrain advantages remain exclusively in physics.
@@ -79,11 +81,8 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 12,
     hardSteerGain: 3,
     hardCornerReserve: 0,
-    hardLookAheadSamples: 8,
+    hardLookAheadSamples: 12,
     hardCornerTargetBonus: 0.45,
-    technicalCornerPaceScale: 0.95,
-    hardHairpinReserve: 0.05,
-    hardEdgeAvoidanceScale: 0.4,
     lowerDifficultyReserveScale: 0.9,
   },
 } as const satisfies Record<CarId, CarDrivingProfile>

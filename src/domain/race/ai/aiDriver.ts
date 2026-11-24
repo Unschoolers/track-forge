@@ -173,7 +173,7 @@ export function stepAiVehicle(
   const pursuitSamples = Math.max(1, Math.round(
     (lookAheadSamples + extraSamples) *
       (1 - 0.5 * edgeRisk * (difficulty === 'hard' ? hardProfile.hardEdgeAvoidanceScale ?? 1 : 1)) *
-      corner.pursuitScale * technicalCornerScale(corner.bend, hardProfile.technicalCornerPursuitScale, hardProfile.technicalCornerActivation),
+      corner.pursuitScale * technicalCornerScale(corner.bend, hardProfile.technicalCornerPursuitByDifficulty?.[difficulty] ?? hardProfile.technicalCornerPursuitScale, hardProfile.technicalCornerActivation),
   ))
   const rawTargetIndex = context.nearest.index + (reversed ? -pursuitSamples : pursuitSamples)
   const targetIndex = path.closed
