@@ -4,7 +4,6 @@ import { createRaceFlyoverRenderer } from '@/ui/components/raceFlyoverRenderer'
 import { button, element } from '@/ui/dom'
 
 const FRAME_INTERVAL_MS = 32
-const PLAYBACK_SPEED = 2
 
 export interface RaceFlyoverPlayback {
   elapsedSeconds: number
@@ -57,7 +56,7 @@ export function createRaceFlyover(
       if (canvas.width !== pixelWidth) canvas.width = pixelWidth
       if (canvas.height !== pixelHeight) canvas.height = pixelHeight
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-      if (playing) playback.elapsedSeconds += Math.min(dt, 100) * PLAYBACK_SPEED / 1000
+      if (playing) playback.elapsedSeconds += Math.min(dt, 100) / 1000
       paint(context, width, height, playback.elapsedSeconds)
       lastFrame = now
     }
