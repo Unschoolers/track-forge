@@ -217,6 +217,30 @@ describe('modal application flows', () => {
     })
   })
 
+  it('offers EDIT in the race picker even for an incomplete personal track', () => {
+    const { root, port } = setup(state({ type: 'track-library', purpose: 'race' }))
+    const edit = root.querySelector<HTMLButtonElement>('[data-action="edit-incomplete"]')
+    const racing = root.querySelector<HTMLButtonElement>('[data-action="select-race-incomplete"]')
+    expect(racing?.disabled).toBe(true)
+    expect(edit?.getAttribute('aria-label')).toBe('Edit Sketch')
+    const overflow = edit?.closest<HTMLDetailsElement>('details.track-card-overflow')
+    if (!overflow) throw new Error('Missing incomplete track actions menu')
+    overflow.open = true
+    edit?.click()
+    expect(overflow.open).toBe(false)
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: incomplete.id })
+    expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'select-track-for-race', id: incomplete.id })
+  })
+
+  it('offers RACE TRACK in the editor menu without starting racing directly', () => {
+    const { root, port } = setup({ ...state({ type: 'editor-menu' }), mode: 'editor' })
+    const button = root.querySelector<HTMLButtonElement>('[data-action="menu-race"]')
+    expect(button?.textContent).toBe('RACE TRACK')
+    button?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'race-current-track' })
+    expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'start-race' })
+  })
+
   it('makes edit the main card action with a separate favorite star and overflow management', () => {
     const { root, port } = setup(state({ type: 'track-library', purpose: 'edit' }))
     const card = root.querySelector('.track-card')
