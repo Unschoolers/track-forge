@@ -19,6 +19,7 @@ export function solveCollisionFrame(
   vehicles: readonly RaceVehicle[],
   previousContacts: readonly string[],
   deltaSeconds: number,
+  held: ReadonlySet<string> = new Set(),
 ): CollisionFrame {
   const previous = new Set(previousContacts)
   const current = new Set<string>()
@@ -31,7 +32,7 @@ export function solveCollisionFrame(
     for (let rightIndex = leftIndex + 1; rightIndex < next.length; rightIndex += 1) {
       const left = next[leftIndex]
       const right = next[rightIndex]
-      if (!left || !right || (!left.player && !right.player)) continue
+      if (!left || !right || held.has(left.id) || held.has(right.id) || (!left.player && !right.player)) continue
       // The player can finish during this frame, before collision resolution.
       // Preserve that final-frame behavior while removing completed opponents.
       if (
