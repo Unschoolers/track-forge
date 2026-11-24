@@ -208,3 +208,7 @@ The Émile field-spread guard permits 13.5%, including one percentage point of
 physics-tuning tolerance. Completion, zero-recovery gates and deterministic
 physics remain strict. The optimizer reports actual time differences rather than
 rounding them to these tolerances.
+
+## AI speed-planning responsibility
+
+`aiDriver.ts` owns perception, pursuit, passing/mistakes, steering and integration; `aiSpeedPlan.ts` owns longitudinal speed requests (corner target, braking, throttle and catch-up eligibility). Both continue to use the same per-car driving profiles and existing physical tire model. A behavior-preserving extraction must retain deterministic pace, recovery and difficulty outcomes; the optimization lab and lane checker are validation tools, not permission to retune physical handling in a refactoring PR.
