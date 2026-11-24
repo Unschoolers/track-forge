@@ -90,11 +90,11 @@ describe('Nearby sharing and rematch controls', () => {
       downloadDiagnostics: vi.fn(async () => true),
     })
     expect(modal.classList.contains('nearby-lobby-modal')).toBe(true)
-    expect(modal.querySelector('.nearby-lobby-course')?.textContent).toContain('2 laps · Night race')
+    expect(modal.querySelector('.race-preparation-meta')?.textContent).toContain('2 laps · Night race')
     expect(modal.querySelectorAll('.nearby-lobby-player')).toHaveLength(8)
     expect(modal.querySelector('.nearby-lobby-player.player')?.getAttribute('data-status')).toBe(state.status)
     expect(modal.querySelector('[data-slot="7"]')?.getAttribute('data-status')).toBe('loading')
-    expect(modal.querySelectorAll('.nearby-lobby-picker .car-choice:disabled')).toHaveLength(4)
+    expect(modal.querySelectorAll('.race-preparation-picker .car-choice:disabled')).toHaveLength(4)
     expect(modal.querySelector('.nearby-lobby-feedback')?.getAttribute('data-ready')).toBe(String(state.status === 'ready'))
     const ready = modal.querySelector<HTMLButtonElement>('[data-action="nearby-ready"]')
     expect(ready?.textContent).toBe(state.label)
