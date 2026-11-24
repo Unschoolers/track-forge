@@ -1,8 +1,16 @@
 import { asTrackId, type Track } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { decodeTrack } from '@/domain/track/trackCodec'
 import { SYSTEM_STARTER_TRACK_ID } from '@/domain/track/trackCreator'
 
-const legacy = createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0)
+const { recoveryCheckpoints: _markers, autoCheckpoints: _auto, ...original } =
+  createStarterTrack(asTrackId(SYSTEM_STARTER_TRACK_ID), 0)
+void _markers
+void _auto
+// Compare canonical repository data; decoded legacy points may carry explicit
+// default curve/structure fields absent from the original generator.
+const legacy = decodeTrack(original, 0)
+if (!legacy) throw new Error('Invalid built-in legacy track fixture')
 
 /**
  * An old bundled starter is removable only when all user-editable content
