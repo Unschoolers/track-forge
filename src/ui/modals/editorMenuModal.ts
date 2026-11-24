@@ -9,6 +9,7 @@ export function createEditorMenuModal(environmentId: TrackEnvironmentId, routeKi
   readonly close: () => void
   readonly export: () => void
   readonly save: () => void
+  readonly race: () => void
   readonly saveAs: () => void
   readonly rename: () => void
   readonly choose: () => void
@@ -50,6 +51,7 @@ export function createEditorMenuModal(environmentId: TrackEnvironmentId, routeKi
       actions.save,
       'button button-primary',
     ),
+    button('RACE TRACK', 'menu-race', actions.race, 'button'),
     button('SAVE AS NEW TRACK', 'menu-save-as', actions.saveAs, 'button'),
     button('EXPORT TRACK', 'menu-export', actions.export, 'button'),
     button('RENAME TRACK', 'menu-rename', actions.rename, 'button'),
