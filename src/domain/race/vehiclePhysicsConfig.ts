@@ -79,7 +79,10 @@ export interface VehicleDynamicsTuning {
 export interface CarPhysicsSpec {
   readonly max: number
   readonly accel: number
+  /** Original steering rack scale, retained for high-speed authority and AI planning. */
   readonly steer: number
+  /** Optional low-speed steering limit, in radians. */
+  readonly lowSpeedSteerAngle?: number
   readonly grip: number
   readonly brake: number
   readonly steerLoss: number
@@ -182,11 +185,26 @@ export const VEHICLE_DYNAMICS_TUNING = {
 
 export const ARCADE_BRAKE_TIMING = { pressSeconds: 0.15, releaseSeconds: 0.1 } as const
 
+const LOW_SPEED_STEERING_ANGLE = 40 * Math.PI / 180
+
+/** Blend low-speed lock into the unchanged original high-speed limit. */
+export function steeringLimitAtSpeed(
+  baseAngle: number,
+  speedRatio: number,
+  highSpeedReduction: number,
+  lowSpeedAngle = baseAngle,
+): number {
+  const ratio = Math.max(0, Math.min(1, speedRatio))
+  const reduction = Math.max(0, Math.min(1, highSpeedReduction))
+  return baseAngle * (1 - ratio * reduction) + (lowSpeedAngle - baseAngle) * (1 - ratio)
+}
+
 export const CAR_PHYSICS_SPECS = {
   blue: {
     max: 306,
     accel: 222,
     steer: 2.72,
+    lowSpeedSteerAngle: LOW_SPEED_STEERING_ANGLE,
     grip: 1,
     brake: 1,
     steerLoss: 0.057,
@@ -206,7 +224,8 @@ export const CAR_PHYSICS_SPECS = {
     // High-speed pavement specialist: visibly quicker than Blue on a straight.
     max: 337,
     accel: 230,
-    steer: 2.6,
+    steer: 2.28,
+    lowSpeedSteerAngle: LOW_SPEED_STEERING_ANGLE,
     grip: 0.79,
     brake: 0.83,
     steerLoss: 0.118,
@@ -248,6 +267,7 @@ export const CAR_PHYSICS_SPECS = {
     max: 286,
     accel: 202,
     steer: 2.46,
+    lowSpeedSteerAngle: LOW_SPEED_STEERING_ANGLE,
     grip: 1.24,
     brake: 1.2,
     steerLoss: 0.061,
