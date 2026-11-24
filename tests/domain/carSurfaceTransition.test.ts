@@ -28,6 +28,7 @@ const midpoint = {
 const scenario = {
   ...original,
   routeKind: 'point-to-point' as const,
+  recoveryCheckpoints: [0.25, 0.5, 0.75],
   points: [first, midpoint, last],
 }
 const path = buildRoadPath(scenario.points, scenario.terrain, Infinity, scenario.routeKind)
