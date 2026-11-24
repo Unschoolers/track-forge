@@ -2,6 +2,12 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 
+/** Fade a chassis-specific reserve in only where the local road actually bends. */
+export function technicalCornerScale(bend: number, scale = 1, activation = 0.1): number {
+  const onset = clamp(activation, 0.1, 1.2)
+  return 1 - (1 - clamp(scale, 0.5, 1)) * clamp((bend - onset) / 0.25, 0, 1)
+}
+
 export type CornerPhase = 'approach' | 'turn' | 'exit' | 'straight'
 
 export interface CornerTactics {

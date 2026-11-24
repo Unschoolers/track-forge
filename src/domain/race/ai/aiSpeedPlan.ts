@@ -8,7 +8,7 @@ import { turnAmountAt, type VehicleStepContext } from '@/domain/race/trackContex
 import type { SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { correctionBrakePressure, safeEntrySpeedAhead } from '@/domain/race/ai/cornerSpeed'
 import { arcadeCornerMargin } from '@/domain/race/ai/difficultyPolicy'
-import type { CornerTactics } from '@/domain/race/ai/cornerTactics'
+import { technicalCornerScale, type CornerTactics } from '@/domain/race/ai/cornerTactics'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -142,6 +142,9 @@ export function planAiSpeed({
       (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))
     curveSpeed *= 1 + (hardProfile.hardCornerTargetBonus ?? 0) * controlled
   }
+  // Apply the chassis reserve after all pace bonuses, so the Hard bonus
+  // cannot undo the earlier technical-corner margin. Straights are unchanged.
+  curveSpeed *= technicalCornerScale(Math.max(bend, corner.bend), hardProfile.technicalCornerPaceByDifficulty?.[difficulty] ?? hardProfile.technicalCornerPaceScale, hardProfile.technicalCornerActivation)
   // Braking during turn-in consumes the same tire-force budget that rotates
   // the chassis. Finish the heavy braking on approach, then release it
   // progressively through a stable pavement apex. Emergency/traffic braking

@@ -20,7 +20,7 @@ const server = await createServer({
 try {
   // Vite SSR respects the project's TypeScript path aliases. The game engine
   // runs unchanged inside the worker; no separate approximate physics model.
-  const { decodeTrackInput, prepareLanePath } =
+  const { createLaneScenarios, decodeTrackInput, prepareLanePath } =
     await server.ssrLoadModule('/qa/lanes/scenarios.ts')
   const { runLaneCheck } =
     await server.ssrLoadModule('/qa/lanes/simulation.ts')
@@ -34,7 +34,9 @@ try {
   const tracks = new Map()
   for (const scenario of workerData.scenarios) {
     let track
-    if (scenario.file) {
+    if (scenario.laneScenarioId) {
+      track = createLaneScenarios().find(x => x.id === scenario.laneScenarioId)
+    } else if (scenario.file) {
       const decoded = decodeTrackInput(JSON.parse(
         readFileSync(resolve(root, scenario.file), 'utf8'),
       ))

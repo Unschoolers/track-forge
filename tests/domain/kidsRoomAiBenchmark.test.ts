@@ -1,3 +1,4 @@
+import { MIN_ADJACENT_DIFFICULTY_GAP } from '../fixtures/aiDifficultyBalance'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CAR_IDS, type CarId, type DifficultyId } from '@/domain/model'
@@ -86,10 +87,17 @@ describe('Kids Room deterministic all-car three-difficulty AI pace benchmark', (
         }
       }
       for (const [index, seed] of seeds.entries()) {
-        expect(matrix[car]?.hard?.times[index] ?? Infinity, `${car} hard seed ${seed}`)
-          .toBeLessThan(matrix[car]?.normal?.times[index] ?? Infinity)
-        expect(matrix[car]?.normal?.times[index] ?? Infinity, `${car} normal seed ${seed}`)
-          .toBeLessThan(matrix[car]?.easy?.times[index] ?? Infinity)
+        const hard = matrix[car]?.hard?.times[index]
+        const normal = matrix[car]?.normal?.times[index]
+        const easy = matrix[car]?.easy?.times[index]
+        if (hard == null || normal == null || easy == null ||
+            ![hard, normal, easy].every(Number.isFinite)) {
+          throw new Error(`${car} seed ${seed}: all three difficulties must finish`)
+        }
+        expect(normal, `${car} normal vs hard seed ${seed}`)
+          .toBeGreaterThanOrEqual(hard * (1 + MIN_ADJACENT_DIFFICULTY_GAP))
+        expect(easy, `${car} easy vs normal seed ${seed}`)
+          .toBeGreaterThanOrEqual(normal * (1 + MIN_ADJACENT_DIFFICULTY_GAP))
       }
     }
   }, 120_000)
