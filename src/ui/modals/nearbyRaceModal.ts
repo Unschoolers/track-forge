@@ -4,33 +4,47 @@ import { MAX_PLAYERS } from '@/application/multiplayer/controlProtocol'
 import type { RaceResult } from '@/application/race/raceSession'
 import { createFinishCelebration, medalForFinish } from '@/ui/components/finishMedal'
 import { CAR_SPECS } from '@/domain/config'
-import type { CarId } from '@/domain/model'
-import { createCarPicker } from '@/ui/components/carPicker'
+import { populateNearbyLobby } from '@/ui/components/nearbyLobbyPanel'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime, ordinalSuffix } from '@/ui/format'
 import { createModalFrame } from './modalFrame'
-import { DEFAULT_PLAYER_IDENTITY, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
-import { createTopperMarker, createTopperSelector } from '@/ui/components/playerTopperPicker'
+import { createTopperMarker } from '@/ui/components/playerTopperPicker'
 
 function nearbyRacerLabel(racer: { readonly slot: number; readonly name?: string | undefined; readonly local: boolean }): string {
   return racer.name ? `${racer.name}${racer.local ? ' (You)' : ''}` : racer.local ? 'You' : `Player ${racer.slot + 1}`
 }
 
+/** A confirmation is part of the existing Nearby overlay, not a room transition. */
+export function createNearbyLeaveConfirmation(
+  role: ReturnType<NearbyRace['snapshot']>['role'],
+  actions: { stay: () => void; leave: () => void },
+): HTMLElement {
+  const frame = createModalFrame('Leave room?', 'Multiplayer', actions.stay, 'nearby-race-modal')
+  frame.body.append(element('p', 'modal-subtitle', role === 'host'
+    ? 'Leaving will close the room for everyone.'
+    : 'You will disconnect from the room and miss the next race.'))
+  frame.footer.append(
+    button('STAY IN ROOM', 'nearby-stay', actions.stay, 'button button-primary'),
+    button('LEAVE ROOM', 'nearby-confirm-leave', actions.leave, 'button button-danger'),
+  )
+  return frame.overlay
+}
+
 export function createNearbyRaceModal(
   nearby: NearbyRace,
-  car: CarId,
   actions: { close: () => void; chooseTrack: () => void; configureCup: () => void; scan: () => void; scanTracks: () => void;
     saveTrack: () => void; declineTrack: () => void; connectByIp: (ip: string) => void;
-    selectCar: (car: CarId) => void; downloadDiagnostics: () => Promise<boolean>;
+    downloadDiagnostics: () => Promise<boolean>;
   },
-  identity: PlayerIdentity = DEFAULT_PLAYER_IDENTITY,
   connections?: NearbyConnectionModes,
+  preview?: HTMLElement,
 ): HTMLElement {
-  const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = nearby.snapshot()
-  const cup = nearby.snapshot().cup
-  const frame = createModalFrame(cup ? 'Nearby Cup' : 'Nearby Race',
-    room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
-    actions.close, 'nearby-race-modal')
+  const snapshot = nearby.snapshot()
+  const { phase, purpose, room, track, lighting, incomingTrack, sharedCount, shareStatus, players, canStart, rooms, error } = snapshot
+  const cup = snapshot.cup
+  const frame = createModalFrame(phase === 'lobby' ? 'Race Lobby' : cup ? 'Nearby Cup' : 'Nearby Race',
+    phase === 'lobby' ? [track ?? 'Next race', room].filter(Boolean).join(' · ') : room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
+    actions.close, phase === 'lobby' ? 'nearby-race-modal nearby-lobby-modal race-preparation-modal' : 'nearby-race-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
     const message = element('p', 'modal-subtitle', error)
@@ -65,9 +79,6 @@ export function createNearbyRaceModal(
         frame.body.append(section)
       }
       frame.body.append(
-        createCarPicker(car, actions.selectCar),
-        createTopperSelector(identity, false),
-        element('p', 'modal-subtitle', 'Change your topper in Options → Profile.'),
         button('CHOOSE TRACK TO HOST', 'nearby-choose-track', actions.chooseTrack, 'button button-primary'),
         button('HOST CUP', 'nearby-host-cup', actions.configureCup, 'button'),
         button('FIND A RACE', 'nearby-scan', actions.scan, 'button'),
@@ -101,7 +112,7 @@ export function createNearbyRaceModal(
         }
         lightingSection.append(choices)
         frame.body.append(lightingSection)
-        const start = button('START RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
+        const start = button('PREPARE RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
         start.disabled = !canStart
         if (!canStart) frame.body.append(element('p', 'modal-subtitle',
           players > 1 ? 'Connecting players…' : 'Waiting for at least one nearby player to join.'))
@@ -142,6 +153,9 @@ export function createNearbyRaceModal(
           : 'Waiting for the track…'
         : 'Waiting for the host to start the race.'))
       break
+    case 'lobby':
+      populateNearbyLobby(frame, nearby, snapshot, preview)
+      break
     case 'preparing':
       frame.body.append(element('p', 'modal-subtitle', purpose === 'share' ? 'Receiving and checking the track…' : 'Sharing the track with all players…'))
       break
@@ -158,8 +172,12 @@ export function createNearbyRaceModal(
       frame.body.append(element('p', 'modal-subtitle', 'Loading everyone into the race…'))
       break
   }
-  frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
-  frame.footer.append(button('BACK', 'nearby-back', actions.close, 'button'))
+  if (phase === 'idle' || phase === 'lobby') {
+    const details = element('details', phase === 'lobby' ? 'nearby-lobby-diagnostics' : undefined)
+    details.append(element('summary', 'modal-subtitle', 'Diagnostics'), createDiagnosticsControl(actions.downloadDiagnostics))
+    frame.body.append(details)
+  } else frame.body.append(createDiagnosticsControl(actions.downloadDiagnostics))
+  frame.footer.append(button(phase === 'lobby' ? 'LEAVE ROOM' : 'BACK', 'nearby-back', actions.close, phase === 'lobby' ? 'button button-danger' : 'button'))
   return frame.overlay
 }
 

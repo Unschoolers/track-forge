@@ -1,88 +1,329 @@
 // @vitest-environment node
 import { assert, describe, expect, it, vi } from 'vitest'
-import { NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import { LOBBY_DELIVERY_TIMEOUT_MS, NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import { decodePoseBatch, Packet, POSE_BYTES } from '@/application/multiplayer/raceWire'
 import { decodeControl, encodeControl } from '@/application/multiplayer/controlProtocol'
 import { RaceSession } from '@/application/race/raceSession'
 import { createRace } from '@/domain/race/raceFactory'
 import { gridPositionsForPlayer } from '@/domain/race/startGrid'
 import { nearbyCar as makeCar, nearbyPath as path, nearbyTrack as track } from '../fixtures/nearbyRace'
+import { NearbyNetwork } from '../fixtures/nearbyNetwork'
 
-class NearbyNetwork {
-  readonly packets: { from: string; to: string[]; bytes: Uint8Array }[] = []
-  private readonly rooms = new Map<string, string>()
-  private readonly listeners = new Map<string, (event: NearbyEvent) => void>()
-  private readonly pairs = new Map<string, Set<string>>()
-  private readonly connections = new Map<string, Set<string>>()
-
-  constructor(private readonly rewritePacket?: (sender: string, recipient: string, bytes: Uint8Array) => Uint8Array) {}
-
-  endpoint(id: string): NearbyTransport {
-    return {
-      subscribe: (listener) => {
-        this.listeners.set(id, listener)
-        return () => this.listeners.delete(id)
-      },
-      host: async (name) => { this.rooms.set(id, name) },
-      scan: async () => {
-        for (const [host, name] of this.rooms) this.emit(id, { type: 'found', id: host, name })
-      },
-      connect: async (host) => {
-        const pairing = this.key(id, host)
-        this.pairs.set(pairing, new Set())
-        this.emit(id, { type: 'pairing', id: host })
-        this.emit(host, { type: 'pairing', id })
-      },
-      respond: async (remote, yes) => {
-        const key = this.key(id, remote)
-        const pair = this.pairs.get(key)
-        if (!pair) throw new Error('Unknown pairing')
-        if (!yes) {
-          this.pairs.delete(key)
-          this.emit(remote, { type: 'error', id, message: 'Pairing declined' })
-          return
-        }
-        pair.add(id)
-        if (pair.size !== 2) return
-        this.pairs.delete(key)
-        this.connect(id, remote)
-        this.connect(remote, id)
-        this.emit(id, { type: 'connected', id: remote })
-        this.emit(remote, { type: 'connected', id })
-      },
-      lock: async () => { this.rooms.delete(id) },
-      send: async (ids, bytes) => {
-        this.packets.push({ from: id, to: [...ids], bytes })
-        for (const remote of ids) {
-          if (!this.connections.get(id)?.has(remote)) throw new Error('Unknown connection')
-          const delivered = this.rewritePacket?.(id, remote, bytes) ?? bytes
-          this.emit(remote, { type: 'packet', id, bytes: new Uint8Array(delivered) })
-        }
-      },
-      stop: async () => {
-        this.rooms.delete(id)
-        for (const remote of this.connections.get(id) ?? []) {
-          this.connections.get(remote)?.delete(id)
-          this.emit(remote, { type: 'disconnected', id })
-        }
-        this.connections.delete(id)
-      },
-    }
-  }
-
-  private connect(id: string, remote: string): void {
-    const connections = this.connections.get(id) ?? new Set()
-    connections.add(remote)
-    this.connections.set(id, connections)
-  }
-
-  private key(left: string, right: string) { return [left, right].sort().join('|') }
-  private emit(id: string, event: NearbyEvent): void {
-    queueMicrotask(() => this.listeners.get(id)?.(event))
-  }
+async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): Promise<void> {
+  host.start()
+  await vi.waitFor(() => {
+    expect(host.snapshot().phase).toBe('lobby')
+    for (const guest of guests) expect(guest.snapshot().phase).toBe('lobby')
+  }, { interval: 5 })
+  for (const guest of guests) guest.setLobbyReady(true)
+  host.setLobbyReady(true)
 }
 
 describe('Nearby Arcade', () => {
+  it.each(['roster', 'choice', 'acknowledgement'] as const)('bounds a stalled %s without imposing a deadline on human choice', async kind => {
+    let stall = false
+    let blocked = false
+    let release: (() => void) | undefined
+    const delayed = new Promise<void>(resolve => { release = resolve })
+    const network = new NearbyNetwork((sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      // Simulate a native send reporting success but never delivering the latest consent.
+      return stall && kind === 'acknowledgement' && sender === 'guest' && recipient === 'host' &&
+        message?.type === 'ready' && message.accepted ? new Uint8Array([255]) : bytes
+    }, async (sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (!stall) return
+      if ((kind === 'roster' && sender === 'host' && recipient === 'guest' &&
+          message?.type === 'lobby' && message.players.every(player => player.accepted)) ||
+          (kind === 'choice' && sender === 'guest' && recipient === 'host' &&
+          message?.type === 'ready' && message.accepted)) {
+        blocked = true
+        await delayed
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const started = vi.fn()
+    host.onStart(started)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(host.snapshot().phase).toBe('lobby')
+      expect(guest.snapshot().phase).toBe('lobby')
+
+      stall = true
+      guest.setLobbyReady(true)
+      if (kind === 'roster') host.setLobbyReady(true)
+      await vi.advanceTimersByTimeAsync(0)
+      if (kind !== 'acknowledgement') expect(blocked).toBe(true)
+      expect(started).not.toHaveBeenCalled()
+
+      if (kind === 'roster') {
+        await vi.advanceTimersByTimeAsync(LOBBY_DELIVERY_TIMEOUT_MS + 500)
+        expect(host.snapshot()).toMatchObject({ phase: 'idle', error: 'Lobby synchronization timed out. Rejoin the room.' })
+        expect((await host.diagnostics()).lastFailure).toMatchObject({ source: 'lobby_roster', error: 'lobby_delivery_timeout' })
+      } else {
+        await vi.advanceTimersByTimeAsync(kind === 'choice' ? LOBBY_DELIVERY_TIMEOUT_MS : 30_000)
+        expect(guest.snapshot().phase).toBe('idle')
+        expect(guest.snapshot().error).toContain(kind === 'choice' ? 'synchronization timed out' : 'did not confirm')
+      }
+      expect(started).not.toHaveBeenCalled()
+    } finally {
+      host.destroy()
+      guest.destroy()
+      release?.()
+      vi.useRealTimers()
+    }
+  })
+
+  it('waits for final roster delivery before staging and reconciles a departing ready player', async () => {
+    let depart: (() => void) | undefined
+    let failed = false
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (sender === 'host' && recipient === 'leaver' && message?.type === 'lobby' &&
+          message.players.length === 3 && message.players.every(player => player.accepted) && !failed) {
+        failed = true
+        setTimeout(() => depart?.(), 30)
+        throw new Error('Final roster recipient disconnected')
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const leaver = new NearbyRace(network.endpoint('leaver'), () => true)
+    depart = () => leaver.close()
+    const started = vi.fn()
+    host.onStart(started)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const device of [guest, leaver]) {
+        device.scan('red')
+        await vi.waitFor(() => expect(device.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        device.connect('host')
+        await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
+      }
+      await vi.waitFor(() => expect(host.snapshot().players).toBe(3), { interval: 5 })
+      await readyEveryone(host, [guest, leaver])
+      await vi.waitFor(() => expect(failed).toBe(true), { interval: 5 })
+      expect(started).not.toHaveBeenCalled()
+      await vi.waitFor(() => {
+        expect(host.snapshot().phase).toBe('staging')
+        expect(guest.snapshot().phase).toBe('staging')
+      }, { interval: 5 })
+      expect(host.standings()).toHaveLength(2)
+      expect(started).toHaveBeenCalledOnce()
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+    } finally {
+      host.destroy()
+      guest.destroy()
+      leaver.destroy()
+    }
+  })
+
+  it.each(['superseded', 'current'] as const)('handles a late %s readiness delivery failure', async kind => {
+    let rejectChoice: (reason: Error) => void = () => { throw new Error('Choice not sent') }
+    const delayed = new Promise<void>((_resolve, reject) => { rejectChoice = reject })
+    let pending = false
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (sender === 'guest' && recipient === 'host' && message?.type === 'ready' && message.choice === 1) {
+        pending = true
+        await delayed
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      guest.selectLobbyCar('yellow')
+      await vi.waitFor(() => expect(pending).toBe(true), { interval: 5 })
+      if (kind === 'superseded') {
+        guest.selectLobbyCar('green')
+        await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers.find(player => player.slot === 1)?.car).toBe('green'), { interval: 5 })
+      }
+      rejectChoice(new Error('Delayed native failure'))
+      if (kind === 'current') {
+        await vi.waitFor(() => expect(guest.snapshot().phase).toBe('idle'), { interval: 5 })
+        expect(guest.snapshot().error).toContain('message could not be sent')
+      } else {
+        await vi.waitFor(async () => {
+          const report = await guest.diagnostics()
+          expect(report.timeline).toEqual(expect.arrayContaining([expect.objectContaining({ event: 'lobby_choice_delivery_obsolete' })]))
+        }, { interval: 5 })
+        expect(guest.snapshot()).toMatchObject({ phase: 'lobby', localCar: 'green', error: null })
+        guest.setLobbyReady(true)
+        host.setLobbyReady(true)
+        await vi.waitFor(() => expect(guest.snapshot().phase).toBe('staging'), { interval: 5 })
+      }
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
+  it.each(['roster', 'track'] as const)('keeps remaining players when a %s send fails before the disconnect event', async kind => {
+    let depart: (() => void) | undefined
+    let triggered = false
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      const target = kind === 'track' ? bytes[0] === Packet.Track : decodeControl(bytes)?.type === 'lobby'
+      if (sender === 'host' && recipient === 'leaver' && target && !triggered) {
+        triggered = true
+        // Native rejects the pending send before delivering onDisconnected.
+        setTimeout(() => depart?.(), 15)
+        throw new Error('Peer disconnected during delivery')
+      }
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const leaver = new NearbyRace(network.endpoint('leaver'), () => true)
+    depart = () => leaver.close()
+    const started = vi.fn()
+    host.onStart(started)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      for (const device of [guest, leaver]) {
+        device.scan('red')
+        await vi.waitFor(() => expect(device.snapshot().rooms).toHaveLength(1), { interval: 5 })
+        device.connect('host')
+        await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
+      }
+      await vi.waitFor(() => expect(host.snapshot().players).toBe(3), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => {
+        expect(triggered).toBe(true)
+        expect(host.snapshot().players).toBe(2)
+        expect(guest.snapshot().lobbyPlayers).toHaveLength(2)
+      }, { interval: 5 })
+      expect(host.snapshot().error).toBeNull()
+      host.setLobbyReady(true)
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(started).toHaveBeenCalledOnce(), { interval: 5 })
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      expect(host.standings()).toHaveLength(2)
+    } finally {
+      host.destroy()
+      guest.destroy()
+      leaver.destroy()
+    }
+  })
+
+  it('reports a genuine reliable delivery error when the peer remains connected', async () => {
+    const network = new NearbyNetwork(undefined, async (sender, recipient, bytes) => {
+      if (sender === 'host' && recipient === 'guest' && bytes[0] === Packet.Track) throw new Error('Track delivery failed')
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('idle'), { interval: 5, timeout: 2000 })
+      expect(host.snapshot().error).toContain('Track delivery failed')
+      expect((await host.diagnostics()).lastFailure).toMatchObject({ source: 'prepare' })
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
+  it('requires consent every round, permits car changes and rejects stale readiness', async () => {
+    const network = new NearbyNetwork()
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const hostStarts: NearbyStart[] = []
+    const guestStarts: NearbyStart[] = []
+    host.onStart(start => hostStarts.push(start))
+    guest.onStart(start => guestStarts.push(start))
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      host.selectLobbyCar('green')
+      guest.selectLobbyCar('yellow')
+      guest.setLobbyReady(true)
+      expect(guest.snapshot().readyPending).toBe(true)
+      await vi.waitFor(() => {
+        expect(host.snapshot().lobbyPlayers.find(p => p.slot === 1)?.accepted).toBe(true)
+        expect(guest.snapshot().readyPending).toBe(false)
+      }, { interval: 5 })
+      guest.selectLobbyCar('red')
+      expect(guest.snapshot().localCar).toBe('yellow')
+      expect(hostStarts).toHaveLength(0)
+      guest.setLobbyReady(false)
+      await vi.waitFor(() => expect(guest.snapshot().unlockPending).toBe(false), { interval: 5 })
+      guest.selectLobbyCar('blue')
+      host.setLobbyReady(true)
+      host.selectLobbyCar('red')
+      expect(host.snapshot()).toMatchObject({ localCar: 'green', localReady: true, readyPending: false })
+      host.setLobbyReady(false)
+      host.selectLobbyCar('red')
+      expect(host.snapshot()).toMatchObject({ localCar: 'red', localReady: false })
+      host.selectLobbyCar('green')
+      host.setLobbyReady(true)
+      expect(hostStarts).toHaveLength(0)
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
+      expect(hostStarts[0]?.car).toBe('green')
+      expect(guestStarts[0]?.car).toBe('blue')
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('racing'), { interval: 5 })
+      host.finish(40)
+      guest.finish(39)
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      expect(host.snapshot()).toMatchObject({ localCar: 'green', localReady: false })
+      expect(guest.snapshot()).toMatchObject({ localCar: 'blue', localReady: false })
+      const oldConsent = network.packets.find(p => {
+        const control = decodeControl(p.bytes)
+        return p.from === 'guest' && control?.type === 'ready' && control.accepted
+      })
+      assert(oldConsent)
+      await network.endpoint('guest').send(['host'], oldConsent.bytes)
+      host.setLobbyReady(true)
+      expect(hostStarts).toHaveLength(1)
+      guest.selectLobbyCar('red')
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(guestStarts).toHaveLength(2), { interval: 5 })
+      expect(guestStarts[1]?.car).toBe('red')
+    } finally {
+      host.destroy()
+      guest.destroy()
+    }
+  })
+
   it('lets the host override lighting for a Cup session without changing saved tracks', async () => {
     const network = new NearbyNetwork()
     const host = new NearbyRace(network.endpoint('host'), () => true)
@@ -106,7 +347,7 @@ describe('Nearby Arcade', () => {
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
       expect(guest.setLighting('day')).toBe(false)
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(hostStarts).toHaveLength(1), { interval: 5 })
       expect(hostStarts[0]?.lighting).toBe('night')
       expect(guestStarts[0]?.lighting).toBe('night')
@@ -116,7 +357,7 @@ describe('Nearby Arcade', () => {
       host.finish(40)
       guest.finish(38)
       await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(guestStarts).toHaveLength(2), { interval: 5 })
       expect(hostStarts[1]?.lighting).toBe('night')
       expect(guestStarts[1]?.lighting).toBe('night')
@@ -151,7 +392,7 @@ describe('Nearby Arcade', () => {
         }, { interval: 5 })
       }
       expect(host.snapshot().players).toBe(8)
-      host.start()
+      await readyEveryone(host, devices.slice(1))
       await vi.waitFor(() => expect(starts.size).toBe(8), { interval: 5 })
       expect([...starts.values()].map(start => start.gridSlot).sort((a,b)=>a-b))
         .toEqual([0,1,2,3,4,5,6,7])
@@ -229,7 +470,7 @@ describe('Nearby Arcade', () => {
         expect(guest.snapshot()).not.toHaveProperty('pairing')
       }
 
-      host.start()
+      await readyEveryone(host, devices.slice(1))
       await vi.waitFor(() => expect(starts.size).toBe(4), { interval: 5 })
       for (const { name, device, car } of setups) {
         const start = starts.get(name)
@@ -428,7 +669,7 @@ describe('Nearby Arcade', () => {
         device.connect('host')
         await vi.waitFor(() => expect(device.snapshot().phase).toBe('waiting'), { interval: 5 })
       }
-      host.start()
+      await readyEveryone(host, participants.slice(1).map(({ device }) => device))
       await vi.waitFor(() => expect(starts.size).toBe(count), { interval: 5 })
       expect([...starts.values()].map(({ gridSlot }) => gridSlot).sort()).toEqual(
         Array.from({ length: count }, (_, index) => index),
@@ -581,7 +822,7 @@ describe('Nearby track sharing and rematches', () => {
       await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
       expect(guest.snapshot().cup).toMatchObject({ index: 0, total: 2 })
       host.sceneReady()
@@ -594,12 +835,22 @@ describe('Nearby track sharing and rematches', () => {
       expect(guest.cupStandings()).toEqual(host.cupStandings())
       expect(host.selectNextTrack(nextTrack)).toBe(false) // Host cannot override the Cup schedule.
       host.start()
+      await vi.waitFor(() => expect(guest.snapshot().lobbyPlayers).toHaveLength(2), { interval: 5 })
+      expect(host.snapshot()).toMatchObject({ localCar: 'blue', localReady: false })
+      expect(guest.snapshot()).toMatchObject({ localCar: 'red', localReady: false })
+      host.selectLobbyCar('yellow')
+      guest.selectLobbyCar('green')
+      host.setLobbyReady(true)
+      expect(hostStarts).toHaveLength(1)
+      guest.setLobbyReady(true)
       await vi.waitFor(() => {
         expect(hostStarts).toHaveLength(2)
         expect(guestStarts).toHaveLength(2)
       }, { interval: 5 })
       expect(hostStarts[1]?.track.name).toBe('Final track')
       expect(guestStarts[1]?.track.name).toBe('Final track')
+      expect(hostStarts[1]?.car).toBe('yellow')
+      expect(guestStarts[1]?.car).toBe('green')
       expect(guest.snapshot().cup).toMatchObject({ index: 1, total: 2 })
       host.sceneReady()
       guest.sceneReady()
@@ -634,7 +885,7 @@ describe('Nearby track sharing and rematches', () => {
       await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(guestStarts).toHaveLength(1), { interval: 5 })
       host.sceneReady()
       guest.sceneReady()
@@ -647,7 +898,7 @@ describe('Nearby track sharing and rematches', () => {
       const nextTrack = { ...track, name: 'Changed circuit', raceRevision: track.updatedAt + 1 }
       expect(host.selectNextTrack(nextTrack)).toBe(true)
       expect(host.snapshot().track).toBe('Changed circuit')
-      host.start()
+      await readyEveryone(host, [guest])
       await vi.waitFor(() => {
         expect(hostStarts).toHaveLength(2)
         expect(guestStarts).toHaveLength(2)

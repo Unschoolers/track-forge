@@ -40,6 +40,7 @@ function carSilhouette(car: CarId): SVGSVGElement {
 export function createCarPicker(
   selected: CarId,
   select: (car: CarId) => void,
+  options: { disabled?: boolean } = {},
 ): HTMLElement {
   const section = element('section', 'setup-section')
   section.append(element('h3', 'setup-label', 'CHOOSE YOUR CAR'))
@@ -52,6 +53,7 @@ export function createCarPicker(
       () => select(car),
       `car-choice${car === selected ? ' active' : ''}`,
     )
+    choice.disabled = options.disabled ?? false
     choice.prepend(carSilhouette(car))
     choice.dataset.car = car
     choice.style.setProperty('--car-color', spec.color)
@@ -68,6 +70,7 @@ export function createCarPicker(
     element('p', 'modal-subtitle', spec.description),
   )
   const stats = element('div', 'car-stats')
+  stats.style.setProperty('--car-stat-color', spec.color)
   for (const [label, value] of [
     ['SPEED', spec.uiSpeed],
     ['GRIP', spec.uiGrip],
@@ -79,6 +82,12 @@ export function createCarPicker(
       element('strong', undefined, `${value}/5`),
       element('span', 'label', label),
     )
+    const meter = element('span', 'car-stat-meter')
+    meter.setAttribute('aria-hidden', 'true')
+    for (let index = 0; index < 5; index++) {
+      meter.append(element('span', 'car-stat-segment' + (index < value ? ' filled' : '')))
+    }
+    stat.append(meter)
     stats.append(stat)
   }
   summary.append(stats)

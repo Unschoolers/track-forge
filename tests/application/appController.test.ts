@@ -17,7 +17,8 @@ import { RaceSession, type RaceSessionPort } from '@/application/race/raceSessio
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
-import { NearbyRace, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import { NearbyRace, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
+import { NearbyNetwork } from '../fixtures/nearbyNetwork'
 
 class TrackMemory implements TrackStore {
   readonly tracks = new Map<TrackId, Track>()
@@ -38,7 +39,7 @@ const preferences: Preferences = {
   dynamicZoomEnabled: true,
 }
 
-function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false, cupStore?: CupStore, nearby?: NearbyRace) {
+function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = false, cupStore?: CupStore, nearby?: NearbyRace, monotonicNow?: () => number) {
   const trackStore = new TrackMemory()
   trackStore.tracks.set(track.id, track)
   const preferencesStore: PreferencesStore = {
@@ -62,6 +63,8 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
     destroy: vi.fn(),
   }
   const session = realRace ? new RaceSession({
+    ...(nearby ? { nearby } : {}),
+    ...(monotonicNow ? { monotonicNow } : {}),
     scoreStore,
     random: { next: () => 0.5 },
     feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() },
@@ -91,6 +94,73 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('moves both clients from race results to a fresh lobby and synchronized retry', async () => {
+    const network = new NearbyNetwork()
+    let clock = 100
+    const now = () => clock
+    const track = createStarterTrack(asTrackId('starter'), 1)
+    const host = new NearbyRace(network.endpoint('host'), () => true, now)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true, now)
+    const h = setup(track, true, undefined, host, now)
+    const g = setup(track, true, undefined, guest, now)
+    const input = { steering: 0, throttle: 1, braking: false }
+    try {
+      h.controller.dispatch({ type: 'open-nearby' })
+      g.controller.dispatch({ type: 'open-nearby' })
+      host.host({ track, car: 'blue', laps: 1, lighting: 'day' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('lobby'), { interval: 5 })
+      host.setLobbyReady(true)
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => {
+        expect(h.controller.snapshot().overlay.type).toBe('none')
+        expect(g.controller.snapshot().overlay.type).toBe('none')
+        expect(host.snapshot().phase).toBe('staging')
+        expect(guest.snapshot().phase).toBe('staging')
+      }, { interval: 5 })
+      h.controller.dispatch({ type: 'nearby-scene-ready' })
+      g.controller.dispatch({ type: 'nearby-scene-ready' })
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+      clock += 5000
+      for (const device of [h, g]) {
+        device.raceSession.advance(0.05, input)
+        device.raceSession.advance(0.05, input)
+        expect(device.controller.snapshot().overlay.type).toBe('results')
+      }
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+      h.controller.dispatch({ type: 'nearby-race-again' })
+      await vi.waitFor(() => {
+        expect(h.controller.snapshot().overlay.type).toBe('nearby')
+        expect(g.controller.snapshot().overlay.type).toBe('nearby')
+        expect(guest.snapshot().phase).toBe('lobby')
+      }, { interval: 5 })
+      host.selectLobbyCar('yellow')
+      guest.selectLobbyCar('green')
+      host.setLobbyReady(true)
+      expect(h.controller.snapshot().overlay.type).toBe('nearby')
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => {
+        expect(h.controller.snapshot().overlay.type).toBe('none')
+        expect(g.controller.snapshot().overlay.type).toBe('none')
+        expect(h.raceSession.snapshot().setup?.car).toBe('yellow')
+        expect(g.raceSession.snapshot().setup?.car).toBe('green')
+      }, { interval: 5 })
+      expect(h.raceSession.snapshot().result).toBeNull()
+      expect(g.raceSession.snapshot().result).toBeNull()
+      h.controller.dispatch({ type: 'nearby-scene-ready' })
+      g.controller.dispatch({ type: 'nearby-scene-ready' })
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+    } finally {
+      h.controller.destroy()
+      g.controller.destroy()
+    }
+  })
+
   it('does not apply unsaved preferences to UI state when durable storage rejects the commit', () => {
     const { controller, preferencesStore } = setup()
     vi.mocked(preferencesStore.save).mockReturnValueOnce(false)
@@ -148,6 +218,57 @@ describe('AppController', () => {
       nearby.start()
       controller.dispatch({ type: 'start-race' })
       expect(raceSession.start).not.toHaveBeenCalled()
+    } finally {
+      controller.destroy()
+    }
+  })
+
+  it.each(['home', 'rematch'] as const)('requires explicit confirmation to leave a %s lobby', (entry) => {
+    const transport: NearbyTransport = {
+      subscribe: () => () => undefined, host: async () => undefined,
+      scan: async () => undefined, connect: async () => undefined,
+      respond: async () => undefined, lock: async () => undefined,
+      send: async () => undefined, stop: async () => undefined,
+    }
+    const nearby = new NearbyRace(transport, () => true)
+    const track = createStarterTrack(asTrackId('starter'), 1)
+    let start: ((race: NearbyStart) => void) | undefined
+    vi.spyOn(nearby, 'onStart').mockImplementation(listener => {
+      start = listener
+      return () => undefined
+    })
+    const original = nearby.snapshot()
+    vi.spyOn(nearby, 'snapshot').mockReturnValue({
+      ...original, phase: 'lobby', purpose: 'race', role: 'host',
+      localCar: 'green', localReady: true,
+    })
+    const close = vi.spyOn(nearby, 'close')
+    const { controller, raceSession } = setup(track, false, undefined, nearby)
+    try {
+      controller.dispatch({ type: 'open-nearby' })
+      if (entry === 'rematch') {
+        if (!start) throw new Error('Missing start subscription')
+        start({ track, car: 'green', laps: 2, lighting: 'day', gridSlot: 0 })
+        expect(controller.snapshot().mode).toBe('race')
+        controller.dispatch({ type: 'open-nearby' })
+      }
+
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay).toEqual({ type: 'nearby', confirmLeave: true })
+      expect(close).not.toHaveBeenCalled()
+      expect(raceSession.stop).not.toHaveBeenCalled()
+
+      // Back / Escape in the confirmation means Stay, not Leave.
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay).toEqual({ type: 'nearby' })
+      expect(close).not.toHaveBeenCalled()
+      expect(nearby.snapshot()).toMatchObject({ localCar: 'green', localReady: true })
+
+      controller.dispatch({ type: 'close-overlay' })
+      controller.dispatch({ type: 'leave-nearby' })
+      expect(controller.snapshot()).toMatchObject({ mode: 'home', overlay: { type: 'none' } })
+      expect(close).toHaveBeenCalledOnce()
+      if (entry === 'rematch') expect(raceSession.stop).toHaveBeenCalledOnce()
     } finally {
       controller.destroy()
     }
