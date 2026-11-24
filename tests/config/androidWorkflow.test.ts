@@ -51,6 +51,13 @@ describe('Main release eligibility', () => {
     expect(requiresRelease(testPaths)).toBe(false)
   })
 
+  it('verifies CI changes without publishing a new game version', () => {
+    expect(buildPolicy('push', baseSha, diffOf([...testPaths, '.github/workflows/build.yml',
+      'scripts/android-ci-native-required.mjs'])))
+      .toEqual({ native: true, release: false })
+    expect(requiresRelease(['.github/workflows/build.yml', 'scripts/android-ci-native-required.mjs'])).toBe(false)
+  })
+
   it('runs native tests without publishing when only native tests change', () => {
     expect(buildPolicy('push', baseSha, diffOf(['android/app/src/test/a.java', 'src-tauri/tests/a.rs'])))
       .toEqual({ native: true, release: false })
