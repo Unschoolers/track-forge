@@ -3,7 +3,7 @@ import { normalizeRouteKind } from '@/domain/model'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import type { PlayerIdentity } from './playerIdentity'
 import type { NearbyLobby } from './nearbyLobby'
-import type { PoseRacer } from './nearbyPoseSync'
+import type { NearbyPoseSync, PoseRacer } from './nearbyPoseSync'
 import type { NearbyProgressSync } from './nearbyProgressSync'
 import { NearbyNetworkTelemetry } from './nearbyNetworkTelemetry'
 import { NearbyReplayTrace, type NearbyTraceRival } from './nearbyReplayTrace'
@@ -30,7 +30,7 @@ interface DiagnosticContext {
 }
 
 interface DiagnosticCounters {
-  readonly poseCounts: unknown
+  readonly poseCounts: NearbyPoseSync['counts']
   readonly progressSendFailures: number
   readonly targetPoseHz: number
 }
@@ -194,5 +194,4 @@ export class NearbyRaceDiagnostics {
       }),
     }
   }
-
 }
