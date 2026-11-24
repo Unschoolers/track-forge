@@ -33,3 +33,5 @@
 - Required gates: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` plus the repository's AI and mobile workflows. Do not merge with known gate regressions.
 
 Gate geometry uses the same centered tangent as the road ribbon, for both painted stripes and physical validation. Crossing the infinite extension of a stripe while still on its approach road is not evidence of a missed checkpoint; only an off-road bypass or confirmed forward route progress can trigger the countdown.
+
+At a sharp bend, the gate span follows the connected local road-support cross-section, not a fixed straight-road half-width. Only contiguous samples in the gate's route window may extend that span; disconnected road arms cannot extend it. The same 10-unit grace is applied to the resulting timing span. Painted stripes use the same cross-section at their visible width.

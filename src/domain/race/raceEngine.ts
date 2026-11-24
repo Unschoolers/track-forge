@@ -182,8 +182,10 @@ function advanceRace(
     const recoveryReacquiredIndex = travelledOnNewArm ? undefined :
       vehicle.recoveryReacquiredIndex ?? (unrelatedArm ? context.nearest.index : undefined)
     const usesCheckpoints = prepared.player && Boolean(state.recoveryCheckpoints?.length)
-    const onRoadBefore = previous && usesCheckpoints
-      ? raceVehicleContext(state, previous).onRoad : false
+    // All drivers must supply real previous support, even when recovery
+    // markers are only recorded for the local player.
+    let previousOnRoad: boolean | undefined
+    const wasOnRoad = () => previousOnRoad ??= previous ? raceVehicleContext(state, previous).onRoad : false
     const withPath = previous
       ? trackBridgeFall(
           previous,
@@ -194,7 +196,7 @@ function advanceRace(
     let updated: RaceVehicle = { ...withPath, pathIndex: progressIndex }
     if (previous) {
       const progress = advanceArcadeTimingGate(
-        state, previous, updated, elapsed, context.onRoad, () => onRoadBefore,
+        state, previous, updated, elapsed, context.onRoad, wasOnRoad,
       )
       updated = progress.vehicle
       if (vehicle.player) missedCheckpoint = progress.missedCheckpoint
@@ -211,7 +213,7 @@ function advanceRace(
       updated = { ...updated, lastRoadContactIndex: context.nearest.index }
     }
     if (usesCheckpoints && previous) {
-      const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, onRoadBefore && context.onRoad)
+      const checkpoint = reachedRecoveryCheckpoint(state, previous, updated, wasOnRoad() && context.onRoad)
       updated = { ...updated, recoveryCheckpoint: checkpoint }
     }
     const playerStuck = updated.player && updated.bridgeFallSeconds === undefined &&

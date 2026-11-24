@@ -86,7 +86,7 @@ export function advanceArcadeTimingGate(
   while (gate <= finishGateNumber(race)) {
     const finish = gate === finishGateNumber(race)
     const position = pendingTimingGateIndex(race, gate)
-    const crossing = roadGateCrossingFraction(path, previous, vehicle, position, radius, reversed)
+    const crossing = roadGateCrossingFraction(path, previous, vehicle, position, radius, reversed, ROAD_GEOMETRY.onRoadRadius)
     if (crossing === undefined || crossing <= lastCrossing) break
     lastCrossing = crossing
     pending = undefined

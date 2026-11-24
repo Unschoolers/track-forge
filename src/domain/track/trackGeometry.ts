@@ -70,6 +70,44 @@ export function roadGateGeometry(path: RoadPath, position: number) {
   return { lower, center: { x: a.x + dx * fraction, y: a.y + dy * fraction }, tangent }
 }
 
+/**
+ * The cross-section of the contiguous local road at the gate. In a sharp
+ * corner the inner verge is farther along the stripe than the nominal road
+ * radius. Intersect the same sampled road-support discs used by physics with
+ * the gate plane, stopping at the first gap in either route direction.
+ * Nearby but disconnected road arms cannot enlarge the gate.
+ */
+export function roadGateSpan(path: RoadPath, position: number, radius: number): { min: number; max: number } {
+  const geometry = roadGateGeometry(path, position)
+  let min = -radius
+  let max = radius
+  if (!geometry || !Number.isFinite(radius) || radius <= 0) return { min, max }
+  const { center, tangent } = geometry
+  const count = path.points.length
+  const lower = Math.floor(position)
+  for (const direction of [-1, 1]) {
+    const start = direction < 0 ? lower : Math.ceil(position)
+    for (let step = 0; step <= Math.min(12, count - 1); step++) {
+      const raw = start + direction * step
+      if (!path.closed && (raw < 0 || raw >= count)) break
+      const sample = path.points[((raw % count) + count) % count]
+      if (!sample) break
+      const dx = sample.x - center.x
+      const dy = sample.y - center.y
+      const along = dx * tangent.x + dy * tangent.y
+      if (Math.abs(along) > radius) break
+      const across = -dx * tangent.y + dy * tangent.x
+      const half = Math.sqrt(Math.max(0, radius * radius - along * along))
+      const left = across - half
+      const right = across + half
+      if (left > max || right < min) break
+      min = Math.min(min, left)
+      max = Math.max(max, right)
+    }
+  }
+  return { min, max }
+}
+
 function offset(point: Vector2, normal: Vector2, amount: number): Vector2 {
   return {
     x: point.x + normal.x * amount,

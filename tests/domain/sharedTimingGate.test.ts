@@ -5,7 +5,7 @@ import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
-import { roadGateGeometry } from '@/domain/track/trackGeometry'
+import { roadGateGeometry, roadGateSpan } from '@/domain/track/trackGeometry'
 import { createLaneScenarios, prepareLanePath } from '../../qa/lanes/scenarios'
 
 const motion = vi.hoisted(() => new Map<string, { x: number; y: number }>())
@@ -32,6 +32,26 @@ describe('shared checkpoint authority', () => {
     const result = advanceArcadeTimingGate(race, before, after, 15.516666666667017, true, () => true)
     expect(result.vehicle.finishedAt).toBeNull()
     expect(result.missedCheckpoint).toBeUndefined()
+  })
+
+  it.each([false, true])('accepts the contiguous inner verge at the curved finish (reversed=%s)', reversed => {
+    const fixture = createLaneScenarios().find(track => track.id === 'hairpin')
+    if (!fixture) throw new Error('Missing hairpin fixture')
+    const road = prepareLanePath(fixture)
+    const race = createRace({ path: road, playerCar: 'green', difficulty: 'normal', laps: 1, reversed, recoveryCheckpoints: [0.25, 0.5, 0.75] })
+    const car = race.vehicles[0]!
+    const span = roadGateSpan(road, 0, ROAD_GEOMETRY.onRoadRadius)
+    expect(span.max).toBeGreaterThan(ROAD_GEOMETRY.onRoadRadius)
+    const frames = reversed
+      ? [{ x: -275.7530557507991, y: -126.74597995916382, pathIndex: 4 }, { x: -277.1709238643195, y: -125.0302176685622, pathIndex: 3 }]
+      : [{ x: -278.75285549920636, y: -128.19263200717364, pathIndex: 445 }, { x: -276.9226688519395, y: -129.86613431269626, pathIndex: 445 }]
+    for (const player of [false, true]) {
+      const before = { ...car, player, ...frames[0]!, nextSector: 4 }
+      const after = { ...before, ...frames[1]! }
+      const result = advanceArcadeTimingGate(race, before, after, 18, !reversed, () => !reversed)
+      expect(result.vehicle.finishedAt).toBe(18)
+      expect(result.missedCheckpoint).toBeUndefined()
+    }
   })
 
   it.each([false, true])('uses identical swept crossing and missed-gate rules for every car (reversed=%s)', reversed => {

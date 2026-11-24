@@ -1,7 +1,7 @@
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
-import { roadGateGeometry } from '@/domain/track/trackGeometry'
+import { roadGateGeometry, roadGateSpan } from '@/domain/track/trackGeometry'
 
 /** Indexed progress for rivals: all gates are authored and ordered by race direction. */
 export function updateProgress(
@@ -106,7 +106,7 @@ export function updateOpenRouteProgress(
   const finish = gate === timingGates.length + 1
   const position = timingGates[gate - 1] ?? last
   const radius = timingGateCrossingRadius(roadRadius, onRoadBefore && onRoadAfter)
-  if (!crossesRoadGate(path, previous, result, position, radius)) return result
+  if (roadGateCrossingFraction(path, previous, result, position, radius, false, roadRadius) === undefined) return result
   return finish
     ? { ...result, lap: previous.lap + 1, nextSector: 1, finishedAt: elapsed }
     : { ...result, nextSector: gate + 1 }
@@ -132,6 +132,7 @@ export function roadGateCrossingFraction(
   gatePosition: number,
   roadRadius: number,
   reversed = false,
+  roadEnvelopeRadius?: number,
 ): number | undefined {
   const count = path.points.length
   const sampleDistance = (index: number): number => {
@@ -151,7 +152,16 @@ export function roadGateCrossingFraction(
   const t = -before / (after - before)
   const x = previous.x + (vehicle.x - previous.x) * t - gx
   const y = previous.y + (vehicle.y - previous.y) * t - gy
-  if (Math.abs(-x * ty + y * tx) > roadRadius) return undefined
+  // The signed lateral coordinate is in authored (not travel) direction.
+  // The ordinary stripe is the fast path; only an edge crossing needs the
+  // actual contiguous local road span. Recovery-marker geometry stays strict.
+  const lateral = (-x * ty + y * tx) * direction
+  if (Math.abs(lateral) > roadRadius) {
+    if (roadEnvelopeRadius === undefined) return undefined
+    const span = roadGateSpan(path, gatePosition, roadEnvelopeRadius)
+    const grace = Math.max(0, roadRadius - roadEnvelopeRadius)
+    if (lateral < span.min - grace || lateral > span.max + grace) return undefined
+  }
 
   // Checkpoint ribbons can lie on a bridge. A car crossing beneath that
   // ribbon must not get credit merely because its 2D projection overlaps it.
