@@ -6,7 +6,7 @@ import { SimulationPool } from './pool.mjs'
 import { generateCandidates, DEFAULT_CARS } from './candidates.mjs'
 import { generatePassingCandidates } from './passingCandidates.mjs'
 import { STUDY_SCENARIOS, selectScenarios } from './scenarios.mjs'
-import { trialKey, assessCandidate, evaluatePair, compareScores, PHYSICS_ACCEPTANCE } from './score.mjs'
+import { trialKey, assessCandidate, evaluatePair, compareScores, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
 import { jsonLines } from './records.mjs'
 
 function options(args) {
@@ -23,6 +23,7 @@ function options(args) {
   const scenarioIds = take('scenarios', STUDY_SCENARIOS.map(x => x.id).join(',')).split(',')
   const baselineOnly = args.includes('--baseline-only')
   const reference = take('reference', null)
+  const gameplayImprovement = args.includes('--gameplay-improvement')
   if (args.includes('--help')) return { help: true }
   if (cars.some(car => !DEFAULT_CARS.includes(car)) || new Set(cars).size !== cars.length || !cars.length)
     throw new Error('Invalid --cars: expected unique red,green,blue,yellow')
@@ -36,7 +37,8 @@ function options(args) {
     throw new Error('--seeds requires nonnegative integers')
   if (reference && (baselineOnly || focus !== 'driving'))
     throw new Error('--reference is for driving recalibration only')
-  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference,
+  if (gameplayImprovement && !reference) throw new Error('--gameplay-improvement requires a matched reference')
+  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement,
     sampleTelemetry: !args.includes('--no-telemetry') }
 }
 
@@ -44,7 +46,7 @@ const args = options(process.argv.slice(2))
 if (args.help) {
   console.log('Usage: npm run qa:optimize -- [--focus driving|passing] [--cars red,green,blue,yellow]' +
     ' [--workers 2] [--trials 14] [--seeds 1,4331]' +
-    ' [--scenarios pine-hairpins,desert-reverse] [--baseline-only] [--reference baseline-results.json]' +
+    ' [--scenarios pine-hairpins,desert-reverse] [--baseline-only] [--reference baseline-results.json] [--gameplay-improvement]' +
     ' [--out qa/results/optimization] [--no-telemetry]')
 } else {
   const scenarios = selectScenarios(args.scenarioIds)
@@ -127,7 +129,7 @@ if (args.help) {
         return [get(baseId, task), get(candidate.id, task)]
       })
       return { ...candidate, score: assessCandidate(pairs, {
-        minGain: 0.003, maxSlowdown: 0.025,
+        requireBenefit: !reference,
       }) }
     })
     const shortlisted = args.cars.flatMap(car =>
@@ -169,7 +171,7 @@ if (args.help) {
         return [reference ? referenceFor(task) : get(`base-${candidate.car}`, task), get(candidate.id, task)]
       })
       return { ...candidate, score: assessCandidate(pairs, {
-        ...(reference ? PHYSICS_ACCEPTANCE : { minGain: 0.005, maxSlowdown: 0.01 }),
+        ...(reference ? PHYSICS_ACCEPTANCE : {}),
       }) }
     })
     const winners = validation.filter(row => row.score.eligible)
@@ -185,10 +187,11 @@ if (args.help) {
     const combinedComparisons = combinedTasks.map(task => evaluatePair(referenceFor(task), get(task.candidateId, task), {
       ...PHYSICS_ACCEPTANCE,
     }))
+    const combinedAcceptance = reference ? assessFleet(combinedComparisons, { gameplayImprovement: args.gameplayImprovement }) : null
     if (reference) console.log('AI_RECALIBRATION_RESULT ' + JSON.stringify({
       perCarWinners: perCarWinners.map(row => ({ car: row.car, changes: row.changes, gainPercent: 100 * row.score.improvement, recoveriesReduced: row.score.recoveriesReduced })),
       combinedFailures: combinedComparisons.filter(row => !row.eligible),
-      combinedComparisons: combinedComparisons.length,
+      combinedComparisons: combinedComparisons.length, acceptance: combinedAcceptance,
     }))
     const reports = screening.map(x => ({
       id: x.id, car: x.car, changes: x.changes,
@@ -221,7 +224,7 @@ if (args.help) {
       physicsRevision, focus: args.focus, cars: args.cars, seeds: args.seeds,
       workers: args.workers, trialsPerCar: args.baselineOnly ? 0 : args.trials,
       scenarios, baselineMatrix: matrix, candidates: reports,
-      ...(reference ? { recalibration: { combinedChanges, combinedComparisons } } : {}),
+      ...(reference ? { recalibration: { combinedChanges, combinedComparisons, acceptance: combinedAcceptance } } : {}),
       recommendation: best ? {
         car: best.car, changes: best.changes, candidateId: best.id,
         matchedGainPercent: Number((best.score.improvement * 100).toFixed(3)),
@@ -254,7 +257,7 @@ if (args.help) {
       writeFile(resolve(args.out, 'telemetry.jsonl'),
         jsonLines(records.flatMap(item => item.result.samples))),
     ])
-    if (reference && combinedComparisons.some(row => !row.eligible)) process.exitCode = 1
+    if (reference && !combinedAcceptance.eligible) process.exitCode = 1
     console.log('AI_OPTIMIZER_RESULT ' + JSON.stringify({
       recommendation: result.recommendation &&
         { car: result.recommendation.car, changes: result.recommendation.changes,

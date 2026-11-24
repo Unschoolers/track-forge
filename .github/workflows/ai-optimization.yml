@@ -63,9 +63,13 @@ jobs:
       - name: Run four-car parallel AI optimization study
         run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization
       - name: Report matched physics comparison
+        env:
+          GAMEPLAY_IMPROVEMENT: ${{ contains(github.event.pull_request.labels.*.name, 'gameplay-improvement') }}
         run: |
           if test -f qa/results/optimization/baseline/summary.json; then
-            node qa/optimization/comparePhysics.mjs qa/results/optimization/baseline/summary.json qa/results/optimization/summary.json
+            flags=()
+            if [[ "$GAMEPLAY_IMPROVEMENT" == true ]]; then flags+=(--gameplay-improvement); fi
+            node qa/optimization/comparePhysics.mjs qa/results/optimization/baseline/summary.json qa/results/optimization/summary.json "${flags[@]}"
           fi
       - uses: actions/setup-python@v6
         with:

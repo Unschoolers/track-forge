@@ -1,10 +1,13 @@
 /** Recovery non-regression is a hard gate; timing is secondary. */
 export const PHYSICS_ACCEPTANCE = Object.freeze({
-  maxSlowdown: 0.02, minGain: null, allowPhysicsRevisionChange: true,
+  maxSlowdownSeconds: 1, requireBenefit: false, allowPhysicsRevisionChange: true,
 })
 
+const NEUTRAL_SECONDS = 0.1
+const EPSILON = 1e-9
+
 export function compareScores(a, b) {
-  return b.recoveriesReduced - a.recoveriesReduced || b.improvement - a.improvement
+  return b.recoveriesReduced - a.recoveriesReduced || b.meanGainSeconds - a.meanGainSeconds
 }
 export function trialKey(task) {
   return [task.car, task.playerCar ?? task.car, task.focusRole ?? 'player',
@@ -16,7 +19,7 @@ function driver(record) {
   return record.rows.find(row => row.vehicle_id === (record.focusVehicleId ?? record.driverVehicleId))
 }
 
-export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01, allowPhysicsRevisionChange = false, requireZeroRecoveries = false } = {}) {
+export function evaluatePair(baseline, candidate, { maxSlowdownSeconds = 1, allowPhysicsRevisionChange = false, requireZeroRecoveries = false } = {}) {
   const old = driver(baseline)
   const current = driver(candidate)
   if (!old || !current || old.car_type !== current.car_type)
@@ -79,12 +82,13 @@ export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01, allowPhy
   }
   const improvement = old.finished_seconds === null || current.finished_seconds === null
     ? null : (old.finished_seconds - current.finished_seconds) / old.finished_seconds
-  const allowedSlowdown = recoveriesReduced > 0 ? Math.max(maxSlowdown, 0.02) : maxSlowdown
-  if (improvement !== null && improvement < -allowedSlowdown)
-    reasons.push(`slower by ${(-100 * improvement).toFixed(2)}%`)
+  const gainSeconds = improvement === null ? null : old.finished_seconds - current.finished_seconds
+  const requiresReview = gainSeconds !== null && gainSeconds < -maxSlowdownSeconds - EPSILON
+  const hardFailure = reasons.length > 0
+  if (requiresReview) reasons.push(`slower by ${(-gainSeconds).toFixed(3)}s; manual review required`)
   return {
-    eligible: reasons.length === 0, reasons,
-    improvement, recoveriesReduced, before: old.finished_seconds, after: current.finished_seconds,
+    eligible: !hardFailure && !requiresReview, hardFailure, requiresReview, reasons,
+    improvement, gainSeconds, recoveriesReduced, before: old.finished_seconds, after: current.finished_seconds,
     scenarioId: current.scenario_id, mode: current.mode, seed: current.seed,
     playerCar: current.driver_car, focusRole: current.focus_role,
     car: current.car_type,
@@ -93,15 +97,33 @@ export function evaluatePair(baseline, candidate, { maxSlowdown = 0.01, allowPhy
   }
 }
 
-export function assessCandidate(pairs, { minGain = 0.005, maxSlowdown = 0.01, allowPhysicsRevisionChange = false, requireZeroRecoveries = false } = {}) {
-  if (!pairs.length) throw new Error('No comparison trials')
-  const scored = pairs.map(([before, after]) => evaluatePair(before, after, { maxSlowdown, allowPhysicsRevisionChange, requireZeroRecoveries }))
-  const failures = scored.filter(row => !row.eligible)
-  const improvement = scored.reduce((sum, x) => sum + (x.improvement ?? 0), 0) / scored.length
-  const recoveriesReduced = scored.reduce((sum, row) => sum + row.recoveriesReduced, 0)
-  if (minGain !== null && recoveriesReduced <= 0 && improvement < minGain) failures.push({
-    reasons: [`average improvement ${(100 * improvement).toFixed(2)}% below ${(100 * minGain).toFixed(2)}%`],
+/** Give each car equal weight, regardless of its number of matched trials. */
+export function assessFleet(comparisons, { gameplayImprovement = false, requireBenefit = true } = {}) {
+  if (!comparisons.length) throw new Error('No comparison trials')
+  const cars = [...new Set(comparisons.map(row => row.car))].map(car => {
+    const rows = comparisons.filter(row => row.car === car)
+    const valid = rows.filter(row => row.gainSeconds !== null)
+    const meanGainSeconds = valid.length ? valid.reduce((sum, row) => sum + row.gainSeconds, 0) / valid.length : 0
+    return { car, meanGainSeconds, trials: rows.length,
+      recoveriesBefore: rows.reduce((sum, row) => sum + row.recoveriesBefore, 0),
+      recoveriesAfter: rows.reduce((sum, row) => sum + row.recoveriesAfter, 0) }
   })
-  return { eligible: failures.length === 0, improvement, recoveriesReduced, comparisons: scored,
-    rejectedReasons: failures.flatMap(x => x.reasons) }
+  const meanGainSeconds = cars.reduce((sum, row) => sum + row.meanGainSeconds, 0) / cars.length
+  const recoveriesReduced = comparisons.reduce((sum, row) => sum + row.recoveriesReduced, 0)
+  const hardFailure = comparisons.some(row => row.hardFailure)
+  const requiresReview = comparisons.some(row => row.requiresReview)
+  const hasBenefit = recoveriesReduced > 0 || meanGainSeconds > NEUTRAL_SECONDS + EPSILON || gameplayImprovement
+  const decision = hardFailure ? 'reject' : requiresReview ? 'manual-review'
+    : !requireBenefit || hasBenefit ? 'accept' : 'no-benefit'
+  return { eligible: decision === 'accept', decision, cars, meanGainSeconds, recoveriesReduced, gameplayImprovement, hasBenefit }
+}
+
+export function assessCandidate(pairs, options = {}) {
+  if (!pairs.length) throw new Error('No comparison trials')
+  const comparisons = pairs.map(([before, after]) => evaluatePair(before, after, options))
+  const fleet = assessFleet(comparisons, options)
+  const improvement = comparisons.reduce((sum, x) => sum + (x.improvement ?? 0), 0) / comparisons.length
+  return { ...fleet, improvement, comparisons,
+    rejectedReasons: [...comparisons.flatMap(x => x.reasons),
+      ...(fleet.decision === 'no-benefit' ? ['no meaningful pace, recovery or gameplay improvement'] : [])] }
 }

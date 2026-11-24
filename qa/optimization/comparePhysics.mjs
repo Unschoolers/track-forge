@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { evaluatePair, trialKey, PHYSICS_ACCEPTANCE } from './score.mjs'
+import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
 
-const [beforePath, afterPath] = process.argv.slice(2)
+const [beforePath, afterPath, ...flags] = process.argv.slice(2)
+if (flags.some(flag => flag !== '--gameplay-improvement')) throw new Error('Unknown physics comparison option')
 if (!beforePath || !afterPath) throw new Error('Usage: comparePhysics.mjs BEFORE AFTER')
 const before = JSON.parse(readFileSync(beforePath, 'utf8'))
 const after = JSON.parse(readFileSync(afterPath, 'utf8'))
@@ -23,8 +24,9 @@ const comparisons = records(afterPath).map(({ task, result }) => {
 if (seen.size !== baseline.size || baseline.size !== original.length || baseline.size === 0)
   throw new Error('Physics comparison matrix is incomplete')
 const regressions = comparisons.filter(row => row.regression)
+const acceptance = assessFleet(comparisons, { gameplayImprovement: flags.includes('--gameplay-improvement') })
 const summary = { beforeRevision: before.physicsRevision, afterRevision: after.physicsRevision,
-  policy: PHYSICS_ACCEPTANCE, comparisons, regressions }
+  policy: PHYSICS_ACCEPTANCE, acceptance, comparisons, regressions }
 writeFileSync(join(dirname(afterPath), 'physics-comparison.json'), JSON.stringify(summary, null, 2))
 for (const car of [...new Set(comparisons.map(row => row.car))]) {
   const rows = comparisons.filter(row => row.car === car)
@@ -35,7 +37,8 @@ for (const car of [...new Set(comparisons.map(row => row.car))]) {
     recoveriesAfter: rows.reduce((sum, row) => sum + row.recoveriesAfter, 0),
     regressions: rows.filter(row => row.regression).length }))
 }
-if (regressions.length) {
+console.log('FLEET_ACCEPTANCE ' + JSON.stringify(acceptance))
+if (!acceptance.eligible) {
   console.error(JSON.stringify(regressions))
   process.exitCode = 1
 }

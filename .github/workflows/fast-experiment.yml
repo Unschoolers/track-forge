@@ -44,7 +44,7 @@ jobs:
             npm ci
             GITHUB_SHA="$base_sha" npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay --seeds 1 --workers 2 --trials 1 --baseline-only --no-telemetry --out "$report/before"
           )
-          npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay --seeds 1 --workers 2 --trials 14 --no-telemetry --reference "$report/before/baseline-results.json" --out "$report/after"
+          npm run qa:optimize -- --scenarios pine-hairpins,meadow-loop,desert-reverse,kids-room,figure-eight-replay --seeds 1 --workers 2 --trials 14 --no-telemetry --reference "$report/before/baseline-results.json" --gameplay-improvement --out "$report/after"
       - name: Publish quick experiment results
         if: always()
         uses: actions/upload-artifact@v7.0.2

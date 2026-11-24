@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateCandidates } from './candidates.mjs'
-import { assessCandidate, evaluatePair, trialKey, compareScores, PHYSICS_ACCEPTANCE } from './score.mjs'
+import { assessCandidate, evaluatePair, trialKey, compareScores, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
 
 test('candidate enumeration stays bounded and deterministic', () => {
   const base = { hardCornerTargetBonus: 0.04, hardSteerGain: 2.22,
@@ -30,7 +30,7 @@ test('pair comparisons reject recovery, roster, and incomparable metadata', () =
   assert.throws(() => evaluatePair(wrap(35), wrap(33, { physics_revision: 'other', track_fingerprint: 'wrong' }), { allowPhysicsRevisionChange: true }), /mismatch/)
   assert.equal(evaluatePair(wrap(35), wrap(33, { recoveries: 1 }), { requireZeroRecoveries: false }).eligible, false)
   assert.equal(assessCandidate([[wrap(35), wrap(33)]]).eligible, true)
-  assert.equal(assessCandidate([[wrap(35), wrap(34.9)]], { minGain: 0.01 }).eligible, false)
+  assert.equal(assessCandidate([[wrap(35), wrap(34.9)]]).eligible, false)
   assert.equal(trialKey({ car: 'blue', scenarioId: 'desert', seed: 1,
     difficulty: 'hard', mode: 'solo' }), 'blue|blue|player|driving|none|default|desert|1|hard|solo')
 })
@@ -98,7 +98,12 @@ test('recovery-first acceptance preserves debt visibility and rejects new errors
   assert.equal(tolerated.eligible, true)
   assert.equal(tolerated.recoveriesAfter, 2)
   assert.equal(evaluatePair(before, run(39, 3, 'new'), PHYSICS_ACCEPTANCE).eligible, false)
-  assert.equal(evaluatePair(before, run(40.9, 2, 'new'), PHYSICS_ACCEPTANCE).eligible, false)
+  assert.equal(evaluatePair(before, run(40.9, 2, 'new'), PHYSICS_ACCEPTANCE).eligible, true)
+  assert.equal(evaluatePair(before, run(41, 2, 'new'), PHYSICS_ACCEPTANCE).eligible, true)
+  const largeLoss = evaluatePair(before, run(41.01, 2, 'new'), PHYSICS_ACCEPTANCE)
+  assert.equal(largeLoss.eligible, false)
+  assert.equal(largeLoss.requiresReview, true)
+  assert.equal(largeLoss.hardFailure, false)
   assert.equal(evaluatePair(before, run(39, 2, 'new', [{ code: 'invalid-state', severity: 'error', vehicle_id: 'v0' }]), PHYSICS_ACCEPTANCE).eligible, false)
   const safer = assessCandidate([[before, run(40.6, 1)]])
   const faster = assessCandidate([[before, run(39, 2)]])
@@ -110,4 +115,22 @@ test('recovery-first acceptance preserves debt visibility and rejects new errors
   const oldTraffic = { ...before, rows: [...before.rows, opponent] }
   const newTraffic = { ...run(39, 0, 'new'), rows: [...run(39, 0, 'new').rows, { ...opponent, recoveries: 1 }] }
   assert.equal(evaluatePair(oldTraffic, newTraffic, PHYSICS_ACCEPTANCE).eligible, false)
+})
+
+test('fleet acceptance rewards the net result, not a perfect time on every car', () => {
+  const make = (car, gainSeconds, recoveriesReduced = 0, hardFailure = false, requiresReview = false) => ({
+    car, gainSeconds, recoveriesReduced, hardFailure, requiresReview,
+    recoveriesBefore: 2, recoveriesAfter: 2 - recoveriesReduced,
+  })
+  const fleet = [make('red', 1.2), make('green', 0.8), make('blue', 0.6), make('yellow', -0.7)]
+  assert.equal(assessFleet(fleet).decision, 'accept')
+  assert.ok(Math.abs(assessFleet(fleet).meanGainSeconds - 0.475) < 1e-9)
+  // A car with extra simulations cannot dominate the fleet average.
+  assert.equal(assessFleet([...fleet, ...Array(10).fill(fleet[3])]).meanGainSeconds.toFixed(3), '0.475')
+  assert.equal(assessFleet([make('red', -0.8, 1)]).decision, 'accept')
+  assert.equal(assessFleet([make('red', -0.8)]).decision, 'no-benefit')
+  assert.equal(assessFleet([make('red', -0.8)], { gameplayImprovement: true }).decision, 'accept')
+  assert.equal(assessFleet([make('red', 0.05)]).decision, 'no-benefit')
+  assert.equal(assessFleet([...fleet, make('yellow', -1.1, 0, false, true)], { gameplayImprovement: true }).decision, 'manual-review')
+  assert.equal(assessFleet([...fleet, make('yellow', 2, -1, true)], { gameplayImprovement: true }).decision, 'reject')
 })
