@@ -162,7 +162,7 @@ export function safeEntrySpeedAhead(
   carId: CarId = 'blue',
   useSharpBendSafety = false,
   fastCorners = false,
-  useChassisYawSafety = true,
+  useAutomaticCornerPlanning = true,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -181,7 +181,7 @@ export function safeEntrySpeedAhead(
   // can rotate through an apex more quickly, but only when the CURRENT
   // surface has enough real tire grip to support it. This deliberately gives
   // no bonus on ice and does not change car physics or surface speed limits.
-  const turningPace = useChassisYawSafety ? clamp(steeringResponse, 0.84, 1) : 1
+  const turningPace = useAutomaticCornerPlanning ? clamp(steeringResponse, 0.84, 1) : 1
   let allowed = straightSpeed
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
     const raw = nearestIndex + direction * step
@@ -226,11 +226,13 @@ export function safeEntrySpeedAhead(
       ? (1 - clamp((bend - 0.045) / 0.10, 0, 1)) *
         sweepingPavementAllowance(path, nearestIndex, reversed)
       : 0
-    const plannedBrakeTraction = chassis.brakingTractionScale +
-      (serviceTraction - chassis.brakingTractionScale) * extraBrakeAllowance
+    // Authored racing lines already own their approach and brake timing.
+    const plannedBrakeTraction = useAutomaticCornerPlanning
+      ? chassis.brakingTractionScale + (serviceTraction - chassis.brakingTractionScale) * extraBrakeAllowance
+      : serviceTraction
     const brakeDeceleration = Math.min(95 * car.brake * surface.brake * terrain.brake, grip * BRAKE_TRACTION) *
       VEHICLE_DYNAMICS_TUNING.forces.brakingTractionScale * plannedBrakeTraction
-    const agileGripBonus = useChassisYawSafety
+    const agileGripBonus = useAutomaticCornerPlanning
       ? Math.min(0.12, Math.max(0, steeringResponse - 1) * 0.3) *
         clamp((grip - 0.75) / 0.2, 0, 1)
       : 0
