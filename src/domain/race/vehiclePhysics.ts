@@ -11,7 +11,6 @@ import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
   ARCADE_BRAKE_TIMING,
-  ARCADE_DYNAMICS_TUNING,
   VEHICLE_DYNAMICS_TUNING,
 } from '@/domain/race/vehiclePhysicsConfig'
 
@@ -32,7 +31,8 @@ export function stepVehicle(
   input: DriverInput,
   context: VehicleStepContext,
   deltaSeconds: number,
-  handling: 'arcade' | 'simulation' = 'simulation',
+  // Legacy handling argument describes race rules, not vehicle physics.
+  _handling: 'arcade' | 'simulation' = 'arcade',
   speedLimit = Number.POSITIVE_INFINITY,
   speedAssist?: SpeedAssist,
 ): RaceVehicle {
@@ -51,8 +51,8 @@ export function stepVehicle(
     0,
     VEHICLE_DYNAMICS_TUNING.integration.maximumDeltaSeconds,
   )
-  const arcadePlayer = handling === 'arcade' && vehicle.player
-  const driverPressure = arcadePlayer
+  const humanDriver = vehicle.player
+  const driverPressure = humanDriver
     ? clamp(
         (vehicle.brakePressure ?? 0) + (input.braking
           ? dt / ARCADE_BRAKE_TIMING.pressSeconds
@@ -60,8 +60,7 @@ export function stepVehicle(
         0,
         1,
       )
-    : vehicle.player ? Number(input.braking)
-      : clamp(input.brakePressure ?? Number(input.braking), 0, 1)
+    : clamp(input.brakePressure ?? Number(input.braking), 0, 1)
   const aiSpeedBrake = !vehicle.player && vehicle.speed > speedLimit
   const brakePressure = Math.max(driverPressure, Number(aiSpeedBrake))
   const car = CAR_SPECS[vehicle.car]
@@ -91,9 +90,7 @@ export function stepVehicle(
     : stockMaxSpeed
   const maxSpeed = Math.min(physicsSpeedLimit, engineSpeed)
   const braking = input.braking || aiSpeedBrake
-  const tuning = handling === 'arcade'
-    ? ARCADE_DYNAMICS_TUNING
-    : VEHICLE_DYNAMICS_TUNING
+  const tuning = VEHICLE_DYNAMICS_TUNING
   const targetGrip = surface.grip * terrain.grip
   const previousGrip = vehicle.speed === 0
     ? targetGrip
@@ -172,7 +169,7 @@ export function stepVehicle(
     speed: dynamics.speed,
     slip: Math.abs(dynamics.lateralSpeed),
     braking: braking || brakePressure > 0,
-    ...(arcadePlayer ? { brakePressure: driverPressure } : {}),
+    ...(humanDriver ? { brakePressure: driverPressure } : {}),
     currentSurface: context.surface,
     surfaceGrip,
     onCurb: context.onCurb,
