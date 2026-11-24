@@ -91,6 +91,8 @@ export interface CarPhysicsSpec {
   readonly brakeForce: number
   /** Additional braking traction relative to other cars. */
   readonly brakingTractionScale: number
+  /** Additional longitudinal brake force on paved roads only. */
+  readonly pavementBrakeMultiplier?: number
   /** Planted lateral behavior per chassis; road grip blends it out on loose surfaces. */
   readonly lateralStability: number
   readonly recovery: number
@@ -235,6 +237,7 @@ export const CAR_PHYSICS_SPECS = {
     brakeForce: 112_000,
     // Race-grade service brakes without granting Red more cornering grip.
     brakingTractionScale: 1.38,
+    pavementBrakeMultiplier: 1.5,
     lateralStability: 0.9,
     recovery: 1.25,
   },
@@ -275,6 +278,11 @@ export const CAR_PHYSICS_SPECS = {
     recovery: 1.65,
   },
 } as const satisfies Record<CarId, CarPhysicsSpec>
+
+/** Shared traction scale for actual braking and AI stopping-distance prediction. */
+export function brakingTractionForSurface(car: CarPhysicsSpec, surface: SurfaceId | 'grass'): number {
+  return car.brakingTractionScale * (surface === 'street' ? (car.pavementBrakeMultiplier ?? 1) : 1)
+}
 
 export const SURFACE_PHYSICS_SPECS = {
   street: { max: 1, accel: 1, grip: 1, brake: 1 },

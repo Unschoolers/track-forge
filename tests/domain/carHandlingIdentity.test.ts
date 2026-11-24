@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CAR_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
+import { CAR_SPECS, OFFROAD_SURFACE, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId } from '@/domain/model'
 import { physicsPlayer } from '../support/physicsPlayer'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
 import { stepVehicle } from '@/domain/race/vehiclePhysics'
+import { VEHICLE_DYNAMICS_TUNING } from '@/domain/race/vehiclePhysicsConfig'
 import { decodeTrack } from '@/domain/track/trackCodec'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 
@@ -23,7 +24,7 @@ type Handling = 'simulation' | 'arcade'
 type Surface = 'street' | 'ice' | 'dirt' | 'grass'
 
 function context(surface: Surface): VehicleStepContext {
-  const index = path.points.findIndex(point => point.surface === surface)
+  const index = path.points.findIndex(point => point.surface === (surface === 'grass' ? 'street' : surface))
   const point = path.points[index]
   if (!point) throw new Error(`Turn test has no ${surface} section`)
   const ahead = path.points[index + 1] ?? path.points[index - 1]
@@ -135,10 +136,10 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     expect(green).toBeLessThan(blue * 0.94)
   })
 
-  it('gives Red race-car brakes on pavement without overtaking Yellow\'s 5/5 brakes', () => {
+  it('gives Red the strongest pavement brakes while Yellow stays the all-terrain braking specialist', () => {
     const red = stoppingDistance('red', handling)
     expect(red).toBeLessThan(stoppingDistance('blue', handling) * 0.97)
-    expect(red).toBeGreaterThan(stoppingDistance('yellow', handling) * 1.05)
+    expect(red).toBeLessThan(stoppingDistance('yellow', handling) * 0.85)
   })
 
   it('makes Yellow feel more planted than balanced Blue in the same paved corner', () => {
@@ -192,9 +193,36 @@ describe.each(['simulation', 'arcade'] as const)('%s car handling personalities'
     }
   })
 
-  it('preserves Yellow\'s braking advantage through dirt too', () => {
-    expect(stoppingDistance('yellow', handling, 'dirt')).toBeLessThan(
-      stoppingDistance('blue', handling, 'dirt') * 0.9,
-    )
+  it('gives Yellow the shortest stopping distance on dirt and grass', () => {
+    for (const surface of ['dirt', 'grass'] as const) {
+      const yellow = stoppingDistance('yellow', handling, surface)
+      for (const rival of ['blue', 'green', 'red'] as const) {
+        expect(yellow, `${surface}/${rival}`).toBeLessThan(stoppingDistance(rival, handling, surface))
+      }
+      expect(yellow).toBeLessThan(stoppingDistance('blue', handling, surface) * 0.9)
+    }
+  })
+
+  it('increases Red service-brake force by 50% on pavement only', () => {
+    for (const surface of ['street', 'dirt', 'grass', 'ice'] as const) {
+      const spec = surface === 'grass' ? OFFROAD_SURFACE : SURFACE_SPECS[surface]
+      const terrain = VEHICLE_TERRAIN_SPECS.red[surface]
+      const initial = { ...makeVehicle('red', 170, 0, surface),
+        brakePressure: 1, surfaceGrip: spec.grip * terrain.grip }
+      const road = context(surface)
+      const coast = stepVehicle({ ...initial, brakePressure: 0 },
+        { steering: 0, throttle: 0, braking: false }, road, dt, handling)
+      const brake = stepVehicle(initial,
+        { steering: 0, throttle: 0, braking: true }, road, dt, handling)
+      const car = CAR_SPECS.red
+      const forces = VEHICLE_DYNAMICS_TUNING.forces
+      // Freeze the pre-upgrade service-brake scale, not the new multiplier.
+      const oldBrakeForce = Math.min(
+        car.brakeForce / car.mass * car.brake * spec.brake * terrain.brake,
+        forces.gravityAcceleration * car.grip * initial.surfaceGrip * forces.brakeGripUsage,
+      ) * forces.brakingTractionScale * 1.38
+      expect((coast.speed - brake.speed) / dt / oldBrakeForce, surface)
+        .toBeCloseTo(surface === 'street' ? 1.5 : 1, 8)
+    }
   })
 })

@@ -11,6 +11,7 @@ import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
 import {
   ARCADE_BRAKE_TIMING,
+  brakingTractionForSurface,
   ARCADE_DYNAMICS_TUNING,
   VEHICLE_DYNAMICS_TUNING,
 } from '@/domain/race/vehiclePhysicsConfig'
@@ -123,7 +124,7 @@ export function stepVehicle(
       frontWeightBias: car.frontWeightBias,
       cornerStiffness: car.cornerStiffness,
       brakeForce: car.brakeForce,
-      brakingTractionScale: car.brakingTractionScale,
+      brakingTractionScale: brakingTractionForSurface(car, context.surface),
       recovery: car.recovery,
       // Strong stability is a dry-road trait, not an ice/gravel cheat.
       lateralStability: 1 + (car.lateralStability - 1) *
