@@ -2,7 +2,7 @@ import type { LightingMode } from '@/domain/model'
 import { CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
 import type { GhostAvailability } from '@/application/race/ghostReplay'
 import type { AppSnapshot } from '@/application/appState'
-import { createCarPicker } from '@/ui/components/carPicker'
+import { populateRacePreparation } from '@/ui/components/racePreparationLayout'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 import { formatRaceTime } from '@/ui/format'
@@ -31,9 +31,8 @@ export function createRaceSetupModal(
     'Race setup',
     state.currentTrack?.name ?? 'Selected track',
     actions.close,
-    'race-setup-modal',
+    'race-setup-modal race-preparation-modal',
   )
-  if (flyover) frame.body.append(flyover)
   const lighting = state.raceLighting ?? state.currentTrack?.lighting ?? 'day'
   const lightingSection = element('section', 'setup-section')
   lightingSection.append(element('h3', 'setup-label', 'LIGHTING'))
@@ -44,12 +43,6 @@ export function createRaceSetupModal(
     lightingRow.append(choice)
   }
   lightingSection.append(lightingRow)
-  frame.body.append(lightingSection)
-  frame.body.append(
-    createCarPicker(state.preferences.car, (car) =>
-      actions.preferences({ ...state.preferences, car }),
-    ),
-  )
   const mode = element('section', 'setup-section')
   mode.append(element('h3', 'setup-label', 'RACE MODE'))
   const modeRow = element('div', 'choice-row race-mode-row')
@@ -73,10 +66,15 @@ export function createRaceSetupModal(
       : 'Finish a race on this layout to save a ghost.')
   description.id = 'ghost-availability'
   mode.append(modeRow, description)
-  frame.body.append(mode)
   const laps = state.preferences.raceLaps ?? 2
   const lightLabel = lighting === 'night' ? 'Night' : 'Day'
-  frame.body.append(element('p', 'modal-subtitle', `${DIFFICULTY_SPECS[state.preferences.difficulty].name} · ${openRoute ? 'Single run' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`} · ${lightLabel}`))
+  populateRacePreparation(frame.body, {
+    car: state.preferences.car,
+    selectCar: car => actions.preferences({ ...state.preferences, car }),
+    preview: flyover,
+    metadata: `${DIFFICULTY_SPECS[state.preferences.difficulty].name} · ${openRoute ? 'Single run' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`} · ${lightLabel}`,
+    sections: [lightingSection, mode],
+  })
   frame.footer.append(
     button('BACK', 'setup-back', actions.close, 'button'),
     button('OPTIONS', 'setup-options', actions.options, 'button'),
