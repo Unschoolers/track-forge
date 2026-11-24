@@ -79,7 +79,7 @@ describe('Nearby sharing and rematch controls', () => {
         localCar: 'red', ...state,
         lobbyPlayers: Array.from({ length: 8 }, (_, slot) => ({
           slot, car: slot === 7 ? null : slot === localSlot ? 'red' : 'green',
-          name: 'Racer ' + slot, accepted: slot !== 7 && (slot !== localSlot || state.status === 'ready'), choice: 1,
+          name: 'Racer ' + slot, accepted: slot !== 7, choice: 1,
         })),
       }),
       localSlot: () => localSlot, selectLobbyCar, setLobbyReady,
@@ -93,6 +93,8 @@ describe('Nearby sharing and rematch controls', () => {
     expect(modal.querySelector('.race-preparation-meta')?.textContent).toContain('2 laps · Night race')
     expect(modal.querySelectorAll('.nearby-lobby-player')).toHaveLength(8)
     expect(modal.querySelector('.nearby-lobby-player.player')?.getAttribute('data-status')).toBe(state.status)
+    expect(modal.querySelector('.nearby-lobby-count')?.textContent).toBe(state.status === 'ready' ? '7/8 READY' : '6/8 READY')
+    expect(modal.querySelector('.nearby-lobby-count')?.getAttribute('data-pending')).toBe(String(state.readyPending || state.unlockPending))
     expect(modal.querySelector('[data-slot="7"]')?.getAttribute('data-status')).toBe('loading')
     expect(modal.querySelectorAll('.race-preparation-picker .car-choice:disabled')).toHaveLength(4)
     expect(modal.querySelector('.nearby-lobby-feedback')?.getAttribute('data-ready')).toBe(String(state.status === 'ready'))
