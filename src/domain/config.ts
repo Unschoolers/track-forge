@@ -164,10 +164,10 @@ export const CAR_SPECS = {
     name: 'Red',
     role: 'Pavement specialist',
     description:
-      'Fastest on clean street with race-grade brakes, but demanding in fast corners and poor off-road.',
+      'Fastest on clean street with the strongest pavement brakes, but demanding in fast corners and poor off-road.',
     uiSpeed: 5,
     uiGrip: 2,
-    uiBrake: 4,
+    uiBrake: 5,
     uiOffroad: 1,
   },
   green: {
