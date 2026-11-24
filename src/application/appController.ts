@@ -39,7 +39,7 @@ import type {
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { EditorSession } from '@/application/editor/editorSession'
-import { requiresEditorExitConfirmation } from '@/application/editor/editorExitPolicy'
+import { EditorExitFlow } from '@/application/editor/editorExitFlow'
 import { reduceEditorUi } from '@/application/editor/editorUiReducer'
 import { isSeededTrack, normalizeDisplayName } from '@/domain/track/trackCreator'
 
@@ -65,7 +65,7 @@ export class AppController {
   private readonly cupFlow: CupFlow
   private pendingCreatorId: string | undefined
   private readonly editorSession: EditorSession
-  private pendingEditorExit: AppCommand | null = null
+  private readonly editorExitFlow: EditorExitFlow
   private beforeNearbyTrack: Track | null | undefined
   private readonly unsubscribeNearby: (() => void) | undefined
   private readonly unsubscribeNearbyStart: (() => void) | undefined
@@ -131,6 +131,17 @@ export class AppController {
       nearby: dependencies.nearby,
       raceSession: dependencies.raceSession,
       geometry: dependencies.geometry,
+    })
+    this.editorExitFlow = new EditorExitFlow({
+      snapshot: () => this.state,
+      update: (state) => this.update(state),
+      dispatch: (command) => this.dispatch(command),
+      editorSession: this.editorSession,
+      library: this.library,
+      trackStore: dependencies.trackStore,
+      librarySnapshot: () => this.librarySnapshot(),
+      creator: () => this.creator(),
+      applyTrackMutation: (result) => this.applyTrackMutation(result, true),
     })
     dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
     dependencies.nearby?.setDisplayName(this.state.preferences.displayName)
@@ -205,11 +216,7 @@ export class AppController {
   }
 
   dispatch(command: AppCommand): void {
-    if (this.shouldConfirmEditorExit(command)) {
-      this.pendingEditorExit = command
-      this.update({ ...this.state, overlay: { type: 'editor-exit' }, notice: null })
-      return
-    }
+    if (this.editorExitFlow.intercept(command)) return
     switch (command.type) {
       case 'go-home':
         this.update({
@@ -449,10 +456,10 @@ export class AppController {
         this.saveCurrentTrack()
         break
       case 'save-as-track':
-        this.saveAsTrack(command.name)
+        this.editorExitFlow.saveAs(command.name)
         break
       case 'resolve-editor-exit':
-        this.resolveEditorExit(command.choice)
+        this.editorExitFlow.resolve(command.choice)
         break
       case 'set-editor-scenery':
       case 'set-editor-tool':
@@ -803,7 +810,7 @@ export class AppController {
   private closeOverlay(): void {
     const overlay = this.state.overlay
     if (overlay.type === 'editor-exit') {
-      this.resolveEditorExit('cancel')
+      this.editorExitFlow.resolve('cancel')
       return
     }
     if (overlay.type === 'cup-final' || overlay.type === 'results') {
@@ -906,7 +913,7 @@ export class AppController {
     this.dependencies.nearby?.setDisplayName(name)
     const tracks = this.library.list()
     const storedTrack = tracks.find((track) => track.id === this.state.currentTrack?.id)
-    const currentTrack = storedTrack && this.state.currentTrack && this.state.mode === 'editor' && this.hasUnsavedEditorChanges()
+    const currentTrack = storedTrack && this.state.currentTrack && this.state.mode === 'editor' && this.editorExitFlow.isDirty()
       ? { ...this.state.currentTrack, ...(storedTrack.creator ? { creator: storedTrack.creator } : {}) }
       : storedTrack ?? this.state.currentTrack
     this.update({
@@ -940,75 +947,6 @@ export class AppController {
       ...(saved ? { ...this.librarySnapshot(), overlay: { type: 'none' } as const } : {}),
       notice: saved ? 'Track saved.' : 'Save unavailable.',
     })
-  }
-
-  private hasUnsavedEditorChanges(): boolean {
-    const track = this.state.currentTrack
-    return !!track && this.editorSession.isDirty(track, this.dependencies.trackStore.find(track.id))
-  }
-
-  private shouldConfirmEditorExit(command: AppCommand): boolean {
-    return this.state.mode === 'editor' &&
-      requiresEditorExitConfirmation(command) &&
-      // Compare potentially large drafts only when an exit is requested.
-      this.hasUnsavedEditorChanges()
-  }
-
-  private resolveEditorExit(choice: 'save' | 'save-as' | 'discard' | 'cancel'): void {
-    if (this.state.overlay.type !== 'editor-exit') return
-    if (choice === 'cancel') {
-      this.pendingEditorExit = null
-      this.update({ ...this.state, overlay: { type: 'none' }, notice: null })
-      return
-    }
-    if (choice === 'save-as') {
-      this.update({
-        ...this.state,
-        overlay: { type: 'track-name', purpose: 'save-as', returnTo: { type: 'editor-exit' } },
-        notice: null,
-      })
-      return
-    }
-    if (choice === 'save') {
-      if (!this.editorSession.save(this.state.currentTrack)) {
-        this.update({ ...this.state, notice: 'Save unavailable.' })
-        return
-      }
-      this.update({ ...this.state, ...this.librarySnapshot(), overlay: { type: 'none' }, notice: null })
-    } else {
-      const trackId = this.state.currentTrack?.id
-      const saved = trackId ? this.library.select(trackId) : undefined
-      // Discard is an explicit choice to abandon the draft. Even if its saved
-      // baseline was deleted, allow navigation rather than trapping the user.
-      this.editorSession.discardPendingSave()
-      this.update({
-        ...this.state,
-        ...this.librarySnapshot(),
-        currentTrack: saved ?? null,
-        editor: saved
-          ? createEditorState(saved.points, saved.trees, saved.start, saved.terrain, saved)
-          : createEditorState([], []),
-        overlay: { type: 'none' },
-        notice: null,
-      })
-    }
-    const destination = this.pendingEditorExit
-    this.pendingEditorExit = null
-    if (destination) this.dispatch(destination)
-  }
-
-  private saveAsTrack(name: string): void {
-    if (this.state.mode !== 'editor' || this.state.overlay.type !== 'track-name' ||
-        this.state.overlay.purpose !== 'save-as' || !this.state.currentTrack) return
-    const result = this.library.saveAs(this.state.currentTrack, name, this.creator())
-    if (!result.ok) {
-      this.update({ ...this.state, notice: result.message })
-      return
-    }
-    this.applyTrackMutation(result, true)
-    const destination = this.pendingEditorExit
-    this.pendingEditorExit = null
-    if (destination) this.dispatch(destination)
   }
 
   private scoresForTracks(
