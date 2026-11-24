@@ -7,8 +7,9 @@ export function resetRaceVehicle(
   vehicle: RaceVehicle,
   race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
 ): RaceVehicle {
+  const pending = vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint
+  if (pending) return resetMissedCheckpoint(vehicle, { ...race, missedCheckpoint: pending })
   if (vehicle.player) {
-    if (race.missedCheckpoint) return resetMissedCheckpoint(vehicle, race)
     const pathIndex = lastRoadRecoveryTarget(race, vehicle) ??
       authoredRecoveryTarget(race, vehicle) ?? safeFallbackRecoveryTarget(race, vehicle)
     if (pathIndex === undefined) return vehicle
@@ -18,6 +19,11 @@ export function resetRaceVehicle(
     }, race.path, { pathIndex, reversed: race.reversed })
   }
   if (race.routeKind !== 'point-to-point') {
+    if (race.timingGates?.length) {
+      const pathIndex = safeFallbackRecoveryTarget(race, vehicle)
+      if (pathIndex !== undefined) return resetVehicleToTrack(vehicle, race.path, { pathIndex, reversed: race.reversed })
+      return resetMissedCheckpoint(vehicle, { ...race, missedCheckpoint: undefined })
+    }
     return resetVehicleToTrack(vehicle, race.path, { reversed: race.reversed })
   }
   const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector, race.timingGates)
@@ -56,7 +62,7 @@ export function resetMissedCheckpoint(
   vehicle: RaceVehicle,
   race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
 ): RaceVehicle {
-  const target = missedGateRecoveryTarget(race, race.missedCheckpoint?.gate ?? vehicle.nextSector)
+  const target = missedGateRecoveryTarget(race, (vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint ?? race.missedCheckpoint)?.gate ?? vehicle.nextSector)
   if (!target) return vehicle
   return resetVehicleToTrack(
     {

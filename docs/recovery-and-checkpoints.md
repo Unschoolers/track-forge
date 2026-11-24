@@ -12,16 +12,16 @@
 
 ## Gate crossing and recovery
 
-- Award a checkpoint only when the vehicle crosses its real road stripe forward and within the bounded lateral forgiveness. A nearby-road index jump does **not** award a checkpoint, and overpasses must respect elevation.
+- Humans and AI use the same swept checkpoint validator, including the finish. Award a checkpoint only when the vehicle crosses its real road stripe forward, on the correct road arm and elevation, within the physics road radius plus 10 world units of forgiveness. Endpoint on-road classification does not change the crossing tolerance. A nearby-road index jump does **not** award a checkpoint, and overpasses must respect elevation.
 - A valid finish requires all authored checkpoints in sequence. Missing Finish must not add an extra lap.
-- A missed checkpoint starts a two-second warning and reset countdown. Manual RECOVER, RESET NOW, and automatic recovery must return to a safe approach **before that same authored gate**, preserving lap and pending checkpoint. Do not jump to a later track section.
+- A missed checkpoint starts a separate two-second countdown for each car (a warning is shown only for the local player). Manual RECOVER, RESET NOW, and automatic recovery must return to a safe approach **before that same authored gate**, preserving lap and pending checkpoint. Do not jump to a later track section.
 - Without a pending missed gate, RECOVER prefers the latest safe grounded road contact instead of jumping back to a distant checkpoint. Water and bridge recovery follow the same safe-contact constraints.
 - Recovery never adds a separate scoring surcharge; splits, results and ghosts use the actual race clock.
 - Manual recovery holds the recovered vehicle stationary for 30 running ticks (500 ms at 60 Hz). Repeated requests during the hold are ignored. Other drivers and the race clock continue normally. Automatic recovery adds no immobilization. Only the local human receives the yellow progress light, green release light, and restart sound. Missed-checkpoint recovery is automatic even when the player skips its countdown.
 
 ## Automatic driving recovery
 
-- A grounded AI has up to two seconds to drive back onto the road using its existing low-speed pursuit controller. A distance exceeding 100 world units from its followed road is an immediate lost-car reset. Natural re-entry clears the timer and does not emit a recovery event. Airborne time does not advance the timer. Keep the original 72-unit finish eligibility boundary and preserve checkpoint progress outside it.
+- A grounded AI has up to two seconds to drive back onto the road using its existing low-speed pursuit controller. A distance exceeding 100 world units from its followed road is an immediate lost-car reset. Natural re-entry clears the timer and does not emit a recovery event. Airborne time does not advance the timer. Gate eligibility is independent of the 100-unit recovery limit: all cars must physically cross each gate in order. A forced reset never grants a checkpoint.
 - A player accelerating below the existing low-speed threshold must accumulate two seconds of stuck time before an automatic reset; braking still prevents or decays that timer.
 - Water contact, bridge-deck loss, manual recovery, and missed-checkpoint rules retain their existing immediate/countdown behavior. Forced resets still emit recovery telemetry. The optimization goal is zero forced resets, not zero excursions onto grass.
 

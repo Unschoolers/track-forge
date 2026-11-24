@@ -25,7 +25,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Focused vehicle physics and car identity contracts
-        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts tests/domain/raceCameraContinuity.test.ts tests/domain/reverseRace.test.ts tests/domain/aiDifficultyPolicy.test.ts tests/domain/aiCompactRivalClearance.test.ts --maxWorkers=2
+        run: npx --no-install vitest run tests/domain/vehicleDynamics.test.ts tests/domain/vehiclePhysics.test.ts tests/domain/vehiclePhysicsConfig.test.ts tests/domain/carHandlingIdentity.test.ts tests/domain/carSpeedIdentity.test.ts tests/domain/aiRecoveryEvents.test.ts tests/domain/raceRecovery.test.ts tests/domain/missedCheckpointRecovery.test.ts tests/domain/missedFinishRecoveryRegression.test.ts tests/domain/waterRace.test.ts tests/domain/raceCameraContinuity.test.ts tests/domain/reverseRace.test.ts tests/domain/aiDifficultyPolicy.test.ts tests/domain/aiCompactRivalClearance.test.ts tests/domain/checkpointProgressJitter.test.ts tests/domain/diagonalGates.test.ts tests/domain/openRaceGateIntegration.test.ts tests/domain/sharedTimingGate.test.ts --maxWorkers=2
       - run: npm run qa:optimize:test
       - name: Recalibrate AI against main with full steering gain
         shell: bash

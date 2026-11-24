@@ -80,11 +80,9 @@ export function passedPendingCheckpoint(
 /** Slightly forgive near-edge timing passes, not distant off-road shortcuts.
  * Author-placed recovery markers continue to use their own strict geometry.
  */
-export function timingGateCrossingRadius(roadRadius: number, bothOnRoad: boolean): number {
-  const base = bothOnRoad
-    ? roadRadius
-    : Math.min(roadRadius, ROAD_GEOMETRY.checkpointHalfWidth)
-  return base + ROAD_GEOMETRY.checkpointGrace
+export function timingGateCrossingRadius(roadRadius: number, _bothOnRoad: boolean): number {
+  // Endpoint contact classification must not change a swept crossing's width.
+  return roadRadius + ROAD_GEOMETRY.checkpointGrace
 }
 
 /** Accept an open-route gate only when the driven segment crosses its road line. */
@@ -122,39 +120,53 @@ export function crossesRoadGate(
   roadRadius: number,
   reversed = false,
 ): boolean {
+  return roadGateCrossingFraction(path, previous, vehicle, gatePosition, roadRadius, reversed) !== undefined
+}
+
+/** Swept crossing time within this physics step; undefined for an invalid crossing. */
+export function roadGateCrossingFraction(
+  path: RoadPath,
+  previous: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'z'>>,
+  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'pathIndex'> & Partial<Pick<RaceVehicle, 'z'>>,
+  gatePosition: number,
+  roadRadius: number,
+  reversed = false,
+): number | undefined {
   const count = path.points.length
   const sampleDistance = (index: number): number => {
     const distance = Math.abs(index - gatePosition)
     return path.closed ? Math.min(distance, count - distance) : distance
   }
-  if (sampleDistance(previous.pathIndex) > 12 || sampleDistance(vehicle.pathIndex) > 12) return false
+  if (sampleDistance(previous.pathIndex) > 12 || sampleDistance(vehicle.pathIndex) > 12) return undefined
   const lower = Math.min(path.closed ? count - 1 : count - 2, Math.floor(gatePosition))
   const a = path.points[lower]
   const b = path.points[(lower + 1) % count]
-  if (!a || !b) return false
+  if (!a || !b) return undefined
   const fraction = gatePosition - lower
   const gx = a.x + (b.x - a.x) * fraction
   const gy = a.y + (b.y - a.y) * fraction
   const length = Math.hypot(b.x - a.x, b.y - a.y)
-  if (length < 0.001) return false
+  if (length < 0.001) return undefined
   const direction = reversed ? -1 : 1
   const tx = direction * (b.x - a.x) / length
   const ty = direction * (b.y - a.y) / length
   const before = (previous.x - gx) * tx + (previous.y - gy) * ty
   const after = (vehicle.x - gx) * tx + (vehicle.y - gy) * ty
-  if (before >= 0 || after < 0 || after <= before) return false
+  if (before >= 0 || after < 0 || after <= before) return undefined
   const t = -before / (after - before)
   const x = previous.x + (vehicle.x - previous.x) * t - gx
   const y = previous.y + (vehicle.y - previous.y) * t - gy
-  if (Math.abs(-x * ty + y * tx) > roadRadius) return false
+  if (Math.abs(-x * ty + y * tx) > roadRadius) return undefined
 
   // Checkpoint ribbons can lie on a bridge. A car crossing beneath that
   // ribbon must not get credit merely because its 2D projection overlaps it.
   const road = path.roadSurface.at(lower, { x: gx, y: gy })
-  const chassisHeight = Math.max(previous.z ?? Number.NaN, vehicle.z ?? Number.NaN)
+  const previousHeight = previous.z ?? Number.NaN
+  const currentHeight = vehicle.z ?? Number.NaN
+  const chassisHeight = previousHeight + (currentHeight - previousHeight) * t
   const halfLevel = WORLD_ELEVATION.levelHeight / 2
   if (Number.isFinite(chassisHeight) &&
       road.structureHeight > halfLevel &&
-      road.height - chassisHeight > halfLevel) return false
-  return true
+      road.height - chassisHeight > halfLevel) return undefined
+  return t
 }

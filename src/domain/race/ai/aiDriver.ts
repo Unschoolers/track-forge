@@ -212,8 +212,17 @@ export function stepAiVehicle(
   // This controls an intended racing line, never the actual friction,
   // road support or checkpoint collision geometry.
   const cutScale = difficulty === 'hard' ? hardProfile.hardApexCutScale ?? 1 : 1
-  const targetX = target.x + context.normal.x * pursuitLane + cut.x * cutScale
-  const targetY = target.y + context.normal.y * pursuitLane + cut.y * cutScale
+  const terminalApproach = !path.closed && rawTargetIndex >= path.points.length - 1
+  const terminalBefore = terminalApproach ? path.points[path.points.length - 2] : undefined
+  const terminalLength = terminalBefore ? Math.hypot(target.x - terminalBefore.x, target.y - terminalBefore.y) : 0
+  // Aim beyond the physical finish plane, rather than braking/turning at its last sample.
+  const extension = terminalLength > 0 ? ROAD_GEOMETRY.onRoadRadius : 0
+  const targetX = terminalBefore && terminalLength > 0
+    ? target.x + (target.x - terminalBefore.x) / terminalLength * extension
+    : target.x + context.normal.x * pursuitLane + cut.x * cutScale
+  const targetY = terminalBefore && terminalLength > 0
+    ? target.y + (target.y - terminalBefore.y) / terminalLength * extension
+    : target.y + context.normal.y * pursuitLane + cut.y * cutScale
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +

@@ -19,6 +19,12 @@ export function countdownCue(seconds: number): CountdownCue {
   return seconds > Number.EPSILON ? 1 : 'go'
 }
 
+export interface MissedTimingGate {
+  readonly gate: number
+  readonly remainingSeconds: number
+  readonly position: Vector2
+}
+
 export interface RaceVehicle {
   readonly id: string
   readonly car: CarId
@@ -51,6 +57,8 @@ export interface RaceVehicle {
   readonly landingIntensity: number
   readonly contactLoad: number
   readonly structureRunId: string | null
+  /** Rival-only countdown; the local player's HUD state is on RaceState. */
+  readonly missedCheckpoint?: MissedTimingGate | undefined
   readonly nextSector: number
   readonly lap: number
   readonly recoveryCheckpoint?: number | null
@@ -91,7 +99,7 @@ export interface RaceCameraHints {
 
 export interface RaceState {
   readonly path: RoadPath
-  readonly missedCheckpoint?: { readonly gate: number; readonly remainingSeconds: number; readonly position: Vector2 } | undefined
+  readonly missedCheckpoint?: MissedTimingGate | undefined
   readonly routeKind?: RouteKind
   readonly vehicles: readonly RaceVehicle[]
   /** Per-race, immutable driver overrides for deterministic offline diagnostics. */

@@ -520,6 +520,7 @@ export function resetVehicleToTrack(
     onCurb: false,
     stuckDuration: 0,
     aiOffRoadSeconds: 0,
+    missedCheckpoint: undefined,
   }
 }
 

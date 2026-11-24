@@ -62,11 +62,11 @@ describe('arcade checkpoint authority with route-index jitter', () => {
       return advanceArcadeTimingGate(race, before, after, 3, false, () => false)
     }
 
-    const forgiven = attempt(ROAD_GEOMETRY.checkpointHalfWidth + 3)
+    const forgiven = attempt(ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace - 1)
     expect(forgiven.vehicle.nextSector).toBe(2)
     expect(forgiven.missedCheckpoint).toBeUndefined()
 
-    const bypass = attempt(ROAD_GEOMETRY.checkpointHalfWidth + ROAD_GEOMETRY.checkpointGrace + 4)
+    const bypass = attempt(ROAD_GEOMETRY.onRoadRadius + ROAD_GEOMETRY.checkpointGrace + 4)
     expect(bypass.vehicle.nextSector).toBe(1)
     expect(bypass.missedCheckpoint?.gate).toBe(1)
   })

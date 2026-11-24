@@ -11,6 +11,8 @@ on:
       - 'src/domain/race/vehiclePhysics.ts'
       - 'src/domain/race/raceRecovery.ts'
       - 'src/domain/race/raceEngine.ts'
+      - 'src/domain/race/arcadeTimingGate.ts'
+      - 'src/domain/race/progress.ts'
       - 'tests/fixtures/desertSandAi.trackforge.json'
       - 'docs/ai-optimization.md'
       - '.github/workflows/ai-optimization.yml'
@@ -53,7 +55,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --no-tags origin "$BASE_SHA"
-          if git diff --quiet "$BASE_SHA" HEAD -- src/domain/race/vehicleDynamics.ts src/domain/race/vehiclePhysicsConfig.ts src/domain/race/vehiclePhysics.ts src/domain/race/raceRecovery.ts src/domain/race/raceEngine.ts src/domain/race/ai src/domain/race/raceFactory.ts; then
+          if git diff --quiet "$BASE_SHA" HEAD -- src/domain/race/vehicleDynamics.ts src/domain/race/vehiclePhysicsConfig.ts src/domain/race/vehiclePhysics.ts src/domain/race/raceRecovery.ts src/domain/race/raceEngine.ts src/domain/race/ai src/domain/race/raceFactory.ts src/domain/race/arcadeTimingGate.ts src/domain/race/progress.ts; then
             exit 0
           fi
           baseline="$RUNNER_TEMP/trackforge-physics-baseline"
