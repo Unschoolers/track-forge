@@ -105,11 +105,5 @@ it('replays a seeded four-car race with the same checkpoint recovery and finish 
   const ranks = rankVehicles(replay.vehicles, replay.path.points.length, replay.startPathIndex, replay.reversed, replay.routeKind)
   expect(result.standings.map(({ id, finishTime }) => [id, finishTime]))
     .toEqual(ranks.map(({ id, finishedAt }) => [id, finishedAt]))
-  console.log('REPLAY_DIAGNOSTICS', JSON.stringify({
-    elapsed: replay.elapsed, tick: replay.tick,
-    racers: ranks.map(v => ({ id: v.id, lap: v.lap, nextSector: v.nextSector,
-      pathIndex: v.pathIndex, speed: v.speed, finishedAt: v.finishedAt, wrecked: v.wrecked })),
-    playerSplits,
-  }))
   expect(ranks.filter((vehicle) => vehicle.finishedAt !== null)).toHaveLength(4)
 })
