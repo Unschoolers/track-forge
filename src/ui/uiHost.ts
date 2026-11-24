@@ -360,7 +360,15 @@ export class DomUiHost implements UiHost {
     const libraryScroll = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
       ? this.root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop
       : undefined
+    // Keep the local player's scroll and diagnostic export across roster updates.
+    const previousLobby = lobbyTrack && this.previousOverlayType === 'nearby'
+      ? this.root.querySelector<HTMLElement>('.nearby-lobby-modal') : null
+    const lobbyScroll = previousLobby?.querySelector<HTMLElement>('.modal-body')?.scrollTop
+    const diagnostics = previousLobby?.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')
     const overlay = this.renderOverlay(state)
+    if (diagnostics && overlay?.classList.contains('nearby-lobby-modal')) {
+      overlay.querySelector('.nearby-lobby-diagnostics')?.replaceWith(diagnostics)
+    }
     this.flyover.end()
     const nodes: Node[] = [screen]
     if (overlay) nodes.push(overlay)
@@ -368,9 +376,10 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
-    if (libraryScroll !== undefined) {
+    const scroll = libraryScroll ?? lobbyScroll
+    if (scroll !== undefined) {
       const body = overlay?.querySelector<HTMLElement>('.modal-body')
-      if (body) body.scrollTop = libraryScroll
+      if (body) body.scrollTop = scroll
     }
     this.dialogs.afterRender(this.root, state.overlay, () =>
       this.controller.dispatch({ type: 'close-overlay' }),
