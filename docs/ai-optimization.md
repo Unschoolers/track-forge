@@ -230,3 +230,55 @@ The default one-second review threshold remains unchanged. A user-approved timin
 ### Shared-framework pace baseline (PR #313)
 
 Owner-approved temporary performance debt is tracked in [#314](https://github.com/Unschoolers/track-forge/issues/314). Émile's Blue mirror still beats the ghost but is stamped at the measured 1853 simulation ticks (30.8833 s), rather than the desired 30.633 s. The measured Medium-to-Easy gap is 2.916%, with a temporary 2.91% floor; the 3% target remains documented and the Hard-to-Medium requirement is unchanged. The test logs outstanding target misses; no test is skipped. The matched Red review remains limited to the two approved trials. Restore the original targets through cross-track car tuning. [#315](https://github.com/Unschoolers/track-forge/issues/315) tracks the separate expanded Hairpin recovery/timeout failures, which are not timing exemptions. The required lane and optimization gates remain unchanged; the experimental matrix remains strict.
+
+## Four-car balance study
+
+```sh
+npm run qa:optimize -- --focus balance
+npm run qa:optimize -- --focus balance --tune --trials 14
+npm run qa:optimize -- --focus balance --tune --holdout-track /path/to/circuit.trackforge.json
+```
+
+The six flat scenarios combine two compact layouts with street, dirt and ice.
+Each car runs two laps solo on Hard. The report includes all six car pairings,
+raw finish times, recoveries, timeouts and fingerprints. A pair's overall
+percentage is the geometric mean of its time ratios, with equal weight per
+scenario. A positive Red-versus-Green percentage means Red took more time.
+The two default seeds produced identical baseline outcomes in this study.
+
+Results go to `qa/results/balance/` by default. Archive each revision in a
+different `--out` directory. `summary.json` includes the inputs and timings.
+`baseline-results.json` is compatible with the existing matched comparison:
+
+```sh
+node qa/optimization/comparePhysics.mjs /path/to/before/summary.json /path/to/after/summary.json
+```
+
+The optional tuner evaluates equal candidate counts on the six synthetic
+scenarios and checks frozen profiles both individually and together on held-out
+circuits. Repeat `--holdout-track` to use explicit exports in place of the
+bundled holdouts. The lane runner requires valid closed circuits. A failed
+validation exits nonzero and keeps the report and diagnostic records. Player
+probes exercise production acceleration, braking, and steering at common
+inputs on flat surfaces. They characterize handling separately from AI pace.
+
+The initial baseline completed all 48 runs. Red took 32.45% longer than Green
+across the six scenarios, and Green took 2.12% less time than Yellow.
+Red and Blue recorded 10 and 15 recoveries respectively across the two ice
+scenarios per seed. Red still had the fastest player-input run on asphalt
+after eight seconds of full throttle. These measurements establish the
+starting point for balance decisions. No numeric acceptance thresholds have
+been set for the balance study.
+
+### Car balance adjustments
+
+Red gains up to 18% additional asphalt grip as speed increases from 170 to
+210 units/s for both player and AI handling. Red and Blue's Hard AI profiles
+use more cautious ice apex targets and improved pavement driving decisions.
+Red uses a dirt corner allowance. Red's Normal profile has a small corner
+allowance to preserve difficulty separation after the physics change.
+
+With the latest settings the six-course Hard solo benchmark completes all
+48 runs. Fast asphalt finishes Red 28.45 s, Blue 28.93 s, Green 28.95 s,
+Yellow 30.85 s. Red remains 26.60% slower than Green overall on the six
+equally weighted scenarios. The two tested seeds yield identical outcomes.

@@ -1,6 +1,6 @@
 import { CAR_SPECS, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 import type { CarId, SurfaceId } from '@/domain/model'
-import { brakingTractionForSurface, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec } from '@/domain/race/vehiclePhysicsConfig'
+import { brakingTractionForSurface, VEHICLE_DYNAMICS_TUNING, type CarPhysicsSpec, type TerrainPhysicsModifier } from '@/domain/race/vehiclePhysicsConfig'
 import { clamp } from '@/domain/geometry/math'
 import { turnAmountAt } from '@/domain/race/trackContext'
 import type { RoadPath } from '@/domain/track/pathBuilder'
@@ -163,6 +163,7 @@ export function safeEntrySpeedAhead(
   useSharpBendSafety = false,
   fastCorners = false,
   useAutomaticCornerPlanning = true,
+  iceApexPaceScale = 1,
 ): number {
   const count = path.points.length
   if (!count || path.totalLength <= 0) return 225
@@ -182,6 +183,7 @@ export function safeEntrySpeedAhead(
   // surface has enough real tire grip to support it. This deliberately gives
   // no bonus on ice and does not change car physics or surface speed limits.
   const turningPace = useAutomaticCornerPlanning ? clamp(steeringResponse, 0.84, 1) : 1
+  const iceApexReserve = 1 - clamp(iceApexPaceScale, 0, 1)
   let allowed = straightSpeed
   for (const step of [...BRAKE_LOOKAHEAD, ...LOW_GRIP_BRAKE_LOOKAHEAD]) {
     const raw = nearestIndex + direction * step
@@ -191,9 +193,9 @@ export function safeEntrySpeedAhead(
     if (!point) continue
     const bend = Math.abs(turnAmountAt(path, index, 6))
     const surface = SURFACE_SPECS[point.surface]
-    const terrain = VEHICLE_TERRAIN_SPECS[carId][point.surface]
+    const terrain: TerrainPhysicsModifier = VEHICLE_TERRAIN_SPECS[carId][point.surface]
     if (step > 100 && surface.grip * terrain.grip >= 0.82) continue
-    const grip = car.grip * surface.grip * terrain.grip
+    const grip = car.grip * surface.grip * terrain.grip * (terrain.highSpeedGrip ?? 1)
     const surfaceMax = straightSpeed * surface.max * terrain.max
     // Allow the chassis more time to rotate through tight bends, especially
     // when traffic places it away from the center of the racing line.
@@ -237,7 +239,9 @@ export function safeEntrySpeedAhead(
         clamp((grip - 0.75) / 0.2, 0, 1)
       : 0
     const corneringPace = 1 - (1 - turningPace - agileGripBonus) * clamp(bend / 0.1, 0, 1)
-    const entrySpeed = Math.sqrt((apexSpeed * corneringPace) ** 2 + 2 * brakeDeceleration * distance)
+    const icePace = useAutomaticCornerPlanning && point.surface === 'ice' && bend >= 0.001
+      ? 1 - iceApexReserve * clamp(bend / 0.12, 0, 1) : 1
+    const entrySpeed = Math.sqrt((apexSpeed * corneringPace * icePace) ** 2 + 2 * brakeDeceleration * distance)
     allowed = Math.min(allowed, entrySpeed)
   }
   return allowed

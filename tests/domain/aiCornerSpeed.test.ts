@@ -157,6 +157,16 @@ describe('AI approach speed planning', () => {
     expect(iceSpeed).toBeGreaterThan(70)
   })
 
+  it('reserves ice apex speed only for automatic corner planning', () => {
+    const approach = path.points.findIndex(point => point.distance > 355)
+    const ice = { ...path, points: path.points.map(point => ({ ...point, surface: 'ice' as const })) }
+    const plan = (road: typeof path, automatic: boolean, scale: number) =>
+      safeEntrySpeedAhead(road, approach, false, 0.74, CAR_SPECS.red, 1, 'red', true, false, automatic, scale)
+    expect(plan(ice, true, 0.72)).toBeLessThan(plan(ice, true, 1))
+    expect(plan(path, true, 0.72)).toBe(plan(path, true, 1))
+    expect(plan(ice, false, 0.72)).toBe(plan(ice, false, 1))
+  })
+
   it('uses physical travel direction and wraps a closed lap in reverse', () => {
     const nearStart = path.points.findIndex((point) => point.distance > 20)
     const nearEnd = path.points.findIndex((point) => point.distance > path.totalLength - 30)

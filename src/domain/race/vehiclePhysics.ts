@@ -76,7 +76,8 @@ export function stepVehicle(
   const maxSpeed = Math.min(physicsSpeedLimit, engineSpeed)
   const braking = input.braking || aiSpeedBrake
   const tuning = VEHICLE_DYNAMICS_TUNING
-  const targetGrip = surface.grip * terrain.grip
+  const extraGrip = 1 + ((terrain.highSpeedGrip ?? 1) - 1) * clamp((vehicle.speed - 170) / 40, 0, 1)
+  const targetGrip = surface.grip * terrain.grip * extraGrip
   const previousGrip = vehicle.speed === 0
     ? targetGrip
     : vehicle.surfaceGrip ??

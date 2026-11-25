@@ -173,7 +173,6 @@ describe('Car handling personalities', () => {
   it('keeps Red weaker than Blue on dirt without the old excessive braking penalty', () => {
     // Dirt grip remains Red's weakness, while its brakes have a usable range.
     expect(VEHICLE_TERRAIN_SPECS.red.dirt.grip).toBeLessThan(VEHICLE_TERRAIN_SPECS.blue.dirt.grip)
-    expect(VEHICLE_TERRAIN_SPECS.red.street).toEqual(VEHICLE_TERRAIN_SPECS.blue.street)
     const red = stoppingDistance('red', 'dirt')
     const blue = stoppingDistance('blue', 'dirt')
     const green = stoppingDistance('green', 'dirt')
@@ -282,6 +281,21 @@ describe('Car handling personalities', () => {
     for (const car of ['red', 'blue', 'green', 'yellow'] as const) {
       const distance = stoppingDistance(car, 'ice')
       expect(Math.abs(distance - targets[car]), car).toBeLessThan(1)
+    }
+  })
+
+  it('ramps Red street grip at high speed without changing other surfaces or cars', () => {
+    for (const [car, surface, speed, expected] of [
+      ['red', 'street', 170, 1], ['red', 'street', 190, 1.09],
+      ['red', 'street', 210, 1.18], ['red', 'street', 230, 1.18],
+      ['blue', 'street', 210, 1], ['red', 'ice', 210, SURFACE_SPECS.ice.grip],
+    ] as const) {
+      let vehicle = makeVehicle(car, speed, 0, surface)
+      const road = context(surface)
+      for (let frame = 0; frame < 90; frame += 1) {
+        vehicle = stepVehicle({ ...vehicle, speed }, { steering: 0, throttle: 0, braking: false }, road, dt)
+      }
+      expect(vehicle.surfaceGrip, `${car}/${surface}/${speed}`).toBeCloseTo(expected, 5)
     }
   })
 

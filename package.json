@@ -21,7 +21,7 @@
     "qa:race": "node qa/race-analysis/cli.mjs",
     "qa:race:test": "node --test qa/race-analysis/summary.check.mjs",
     "qa:optimize": "node qa/optimization/cli.mjs",
-    "qa:optimize:test": "node --test qa/optimization/*.test.mjs",
+    "qa:optimize:test": "node --test qa/optimization/*.test.mjs qa/optimization/balance/*.test.mjs",
     "test:fast": "vitest run --exclude tests/domain/aiFourCarHardImprovements.test.ts",
     "test:ai:matrix": "vitest run tests/domain/aiFourCarHardImprovements.test.ts --maxWorkers=1",
     "qa:ai:benchmark": "AI_BENCHMARK=1 vitest run qa/lanes/aiFourCarHardImprovements.benchmark.ts --maxWorkers=1",

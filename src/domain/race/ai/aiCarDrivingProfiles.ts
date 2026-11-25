@@ -21,6 +21,10 @@ export interface CarDrivingProfile {
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
   readonly hardCornerTargetBonus?: number
+  readonly hardDirtCornerTargetBonus?: number
+  readonly hardStreetCornerTargetBonus?: number
+  readonly hardStreetSweepCornerTargetBonus?: number
+  readonly hardIceApexPaceScale?: number
   /** Small Normal-only planned corner-speed allowance for this chassis. */
   readonly normalCornerTargetBonus?: number
   /** Scale the shared difficulty reserve for this chassis. */
@@ -36,16 +40,17 @@ export interface CarDrivingProfile {
 }
 
 export const CAR_DRIVING_PROFILES = {
-  // Blue's stronger steering is a mixed-track regression: the fast Kids Room
-  // line loses more time in Pine Hairpins. Tune its preview before turn-in.
+  // Pair stronger steering with less pursuit shortening near the road edge.
   blue: {
     hardReaction: 8,
-    hardSteerGain: 2.22,
+    hardSteerGain: 2.4,
     hardCornerReserve: 0,
+    hardIceApexPaceScale: 0.72,
     hardLookAheadSamples: 10,
     hardApexCutScale: 1,
-    hardEdgeAvoidanceScale: 0.4,
+    hardEdgeAvoidanceScale: 0.3,
     hardCornerTargetBonus: 0.12,
+    hardStreetSweepCornerTargetBonus: 0.6,
     normalCornerTargetBonus: 0.006,
     lowerDifficultyReserveScale: 0.98,
   },
@@ -55,8 +60,12 @@ export const CAR_DRIVING_PROFILES = {
     hardReaction: 12,
     hardSteerGain: 2.22,
     hardCornerReserve: 0.01,
+    hardIceApexPaceScale: 0.86,
     hardLookAheadSamples: 10,
     hardCornerTargetBonus: 0.06,
+    hardDirtCornerTargetBonus: 0.27,
+    hardStreetCornerTargetBonus: 0.19,
+    normalCornerTargetBonus: 0.02,
     technicalCornerPursuitByDifficulty: { hard: 0.85 },
     // The revised brake controller already reserves more corner-entry time.
     // Scale the additional Easy/Normal reserve so it does not double-count it.

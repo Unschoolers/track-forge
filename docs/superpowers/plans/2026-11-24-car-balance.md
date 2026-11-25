@@ -1,0 +1,7 @@
+# Car balance implementation plan
+
+1. Add a balance study to the offline AI optimization tool. Compare all four current Hard AI drivers on two compact, flat circuits, each compiled with street, dirt and ice. Run two-lap solo races with the existing 60 Hz worker. Persist the six car pairings, raw outcomes, fingerprints, revisions, and measured wall time. Count the two default seeds as deterministic repeats when outcomes match. Verify that every configured trial is accounted for.
+2. Use the existing candidate generator and acceptance scoring to try an equal number of candidates per car. Choose one global profile on the synthetic matrix and evaluate the frozen choices on real circuits. Keep results for synthetic pace and held-out reliability visible. Use controlled production player inputs to measure acceleration, braking and turning on the three surfaces.
+3. Review measured gaps with the owner and agree acceptable limits. Evaluate one related physics change at a time against the frozen baseline and repeat the real-track trials. Preserve existing physics, difficulty and recovery gates. Add a balance regression threshold only after agreeing the limits.
+
+Track geometry, reporting, tuning and player probes can proceed in parallel on separate files. Integrate via the existing worker and CLI. Verify focused contracts, run the production baseline and the optional tuning study, and run the repository checks.

@@ -19,7 +19,8 @@ function options(args) {
   const focus = take('focus', 'driving')
   const trials = Number(take('trials', 14))
   const seeds = take('seeds', '1,4331').split(',').map(Number)
-  const out = resolve(take('out', 'qa/results/optimization'))
+  const out = resolve(take('out', focus === 'balance' ? 'qa/results/balance' : 'qa/results/optimization'))
+  const tune = args.includes('--tune')
   const scenarioIds = take('scenarios', STUDY_SCENARIOS.map(x => x.id).join(',')).split(',')
   const baselineOnly = args.includes('--baseline-only')
   const reference = take('reference', null)
@@ -27,27 +28,39 @@ function options(args) {
   if (args.includes('--help')) return { help: true }
   if (cars.some(car => !DEFAULT_CARS.includes(car)) || new Set(cars).size !== cars.length || !cars.length)
     throw new Error('Invalid --cars: expected unique red,green,blue,yellow')
-  if (!['driving', 'passing'].includes(focus))
-    throw new Error('--focus must be driving or passing')
+  if (!['driving', 'passing', 'balance'].includes(focus))
+    throw new Error('--focus must be driving, passing or balance')
   if (!Number.isInteger(workers) || workers < 1 || workers > 8)
     throw new Error('--workers must be 1..8')
   if (!Number.isInteger(trials) || trials < 1 || trials > 100)
     throw new Error('--trials must be 1..100 per car')
-  if (!seeds.length || seeds.some(x => !Number.isInteger(x) || x < 0 || x > 0xffffffff))
+  if (!seeds.length || new Set(seeds).size !== seeds.length ||
+      seeds.some(x => !Number.isInteger(x) || x < 0 || x > 0xffffffff))
     throw new Error('--seeds requires nonnegative integers')
   if (reference && (baselineOnly || focus !== 'driving'))
     throw new Error('--reference is for driving recalibration only')
   if (gameplayImprovement && !reference) throw new Error('--gameplay-improvement requires a matched reference')
-  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement,
+  const holdoutFiles = args.flatMap((arg, i) => arg === '--holdout-track' ? [args[i + 1]] : [])
+  if (holdoutFiles.some(file => !file || file.startsWith('--')) || new Set(holdoutFiles).size !== holdoutFiles.length)
+    throw new Error('--holdout-track requires distinct track JSON paths')
+  if ((tune && focus !== 'balance') || (holdoutFiles.length && !tune))
+    throw new Error('--tune and --holdout-track are for balance tuning only')
+  if (focus === 'balance' && (args.includes('--cars') || args.includes('--scenarios') || (tune && baselineOnly)))
+    throw new Error('Balance uses all four cars and the fixed six benchmark scenarios')
+  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement, tune, holdoutFiles,
     sampleTelemetry: !args.includes('--no-telemetry') }
 }
 
 const args = options(process.argv.slice(2))
 if (args.help) {
-  console.log('Usage: npm run qa:optimize -- [--focus driving|passing] [--cars red,green,blue,yellow]' +
+  console.log('Usage: npm run qa:optimize -- [--focus driving|passing|balance] [--cars red,green,blue,yellow]' +
     ' [--workers 2] [--trials 14] [--seeds 1,4331]' +
     ' [--scenarios pine-hairpins,desert-reverse] [--baseline-only] [--reference baseline-results.json] [--gameplay-improvement]' +
     ' [--out qa/results/optimization] [--no-telemetry]')
+  console.log('Balance: npm run qa:optimize -- --focus balance [--tune [--trials 14] [--holdout-track file.json]] [--out qa/results/balance]')
+} else if (args.focus === 'balance') {
+  const { runBalance } = await import('./balance/runner.mjs')
+  await runBalance(args)
 } else {
   const scenarios = selectScenarios(args.scenarioIds)
   const calibration = scenarios.filter(x => x.group === 'calibration')
