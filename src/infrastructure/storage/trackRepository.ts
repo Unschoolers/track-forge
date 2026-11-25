@@ -33,6 +33,8 @@ function parse(value: string | null): unknown {
 
 export class BrowserTrackRepository implements TrackStore {
   private readonly dependencies: RepositoryDependencies
+  private cachedRawLibrary: string | null | undefined
+  private cachedLibrary: readonly Track[] = []
 
   constructor(
     private readonly storage: KeyValueStore,
@@ -42,11 +44,21 @@ export class BrowserTrackRepository implements TrackStore {
   }
 
   list(): readonly Track[] {
-    const current = this.decodeLibrary(
-      parse(this.storage.get(STORAGE_KEYS.tracks)),
-    )
-    if (this.storage.get(STORAGE_KEYS.trackMigration) === '1') {
-      return current
+    const rawLibrary = this.storage.get(STORAGE_KEYS.tracks)
+    const migrationComplete =
+      this.storage.get(STORAGE_KEYS.trackMigration) === '1'
+    if (
+      migrationComplete &&
+      this.cachedRawLibrary !== undefined &&
+      rawLibrary === this.cachedRawLibrary
+    ) {
+      return this.readCachedLibrary()
+    }
+
+    const current = this.decodeLibrary(parse(rawLibrary))
+    if (migrationComplete) {
+      this.cacheLibrary(rawLibrary, current)
+      return this.copyTracks(current)
     }
 
     const legacy = this.decodeLibrary(
@@ -54,14 +66,14 @@ export class BrowserTrackRepository implements TrackStore {
     )
     if (current.length > 0 || legacy.length > 0) {
       const merged = this.mergeLibraries(legacy, current)
-      if (
-        this.storage.set(STORAGE_KEYS.tracks, JSON.stringify(merged))
-      ) {
+      const serialized = JSON.stringify(merged)
+      if (this.storage.set(STORAGE_KEYS.tracks, serialized)) {
         this.storage.set(STORAGE_KEYS.trackMigration, '1')
+        this.cacheLibrary(serialized, merged)
       }
-      return merged
+      return this.copyTracks(merged)
     }
-    return this.recoverLegacy()
+    return this.copyTracks(this.recoverLegacy())
   }
 
   find(id: TrackId): Track | undefined {
@@ -75,7 +87,10 @@ export class BrowserTrackRepository implements TrackStore {
     const index = tracks.findIndex((item) => item.id === normalized.id)
     if (index >= 0) tracks[index] = normalized
     else tracks.push(normalized)
-    return this.storage.set(STORAGE_KEYS.tracks, JSON.stringify(tracks))
+    const serialized = JSON.stringify(tracks)
+    if (!this.storage.set(STORAGE_KEYS.tracks, serialized)) return false
+    this.cacheLibrary(serialized, tracks)
+    return true
   }
 
   saveMany(updated: readonly Track[]): boolean {
@@ -86,14 +101,19 @@ export class BrowserTrackRepository implements TrackStore {
     for (const track of decoded) {
       if (track) tracks.set(track.id, track)
     }
-    return this.storage.set(STORAGE_KEYS.tracks, JSON.stringify([...tracks.values()]))
+    const savedTracks = [...tracks.values()]
+    const serialized = JSON.stringify(savedTracks)
+    if (!this.storage.set(STORAGE_KEYS.tracks, serialized)) return false
+    this.cacheLibrary(serialized, savedTracks)
+    return true
   }
 
   remove(id: TrackId): boolean {
-    return this.storage.set(
-      STORAGE_KEYS.tracks,
-      JSON.stringify(this.list().filter((track) => track.id !== id)),
-    )
+    const tracks = this.list().filter((track) => track.id !== id)
+    const serialized = JSON.stringify(tracks)
+    if (!this.storage.set(STORAGE_KEYS.tracks, serialized)) return false
+    this.cacheLibrary(serialized, tracks)
+    return true
   }
 
   private decodeLibrary(value: unknown): readonly Track[] {
@@ -102,6 +122,35 @@ export class BrowserTrackRepository implements TrackStore {
     return value
       .map((track) => decodeTrack(track, now))
       .filter((track) => track !== undefined)
+  }
+
+  private cacheLibrary(rawLibrary: string | null, tracks: readonly Track[]): void {
+    this.cachedRawLibrary = rawLibrary
+    this.cachedLibrary = tracks
+  }
+
+  private readCachedLibrary(): readonly Track[] {
+    return this.copyTracks(this.cachedLibrary)
+  }
+
+  private copyTracks(tracks: readonly Track[]): readonly Track[] {
+    return tracks.map((track) => ({
+      ...track,
+      ...(track.creator ? { creator: { ...track.creator } } : {}),
+      points: track.points.map((point) => ({ ...point })),
+      trees: track.trees.map((tree) => ({ ...tree })),
+      terrain: {
+        ...track.terrain,
+        cells: track.terrain.cells.map((cell) => ({ ...cell })),
+      },
+      ...(track.start ? { start: { ...track.start } } : {}),
+      ...(track.recoveryCheckpoints
+        ? { recoveryCheckpoints: [...track.recoveryCheckpoints] }
+        : {}),
+      ...(track.scenery
+        ? { scenery: track.scenery.map((prop) => ({ ...prop })) }
+        : {}),
+    }))
   }
 
   private mergeLibraries(
@@ -136,12 +185,14 @@ export class BrowserTrackRepository implements TrackStore {
         now,
       )
       if (track) {
-        if (!this.storage.set(STORAGE_KEYS.tracks, JSON.stringify([track]))) {
+        const serialized = JSON.stringify([track])
+        if (!this.storage.set(STORAGE_KEYS.tracks, serialized)) {
           // The legacy autosave remains intact. Do not advertise an ephemeral
           // recovered track as saved when storage has denied the write.
           return []
         }
         this.storage.set(STORAGE_KEYS.trackMigration, '1')
+        this.cacheLibrary(serialized, [track])
         return [track]
       }
     }
