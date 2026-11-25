@@ -128,7 +128,7 @@ export function stepVehicle(
   const assistSeconds = !canDrift || input.braking || !turning ? 0
     : tapReleased ? driftTuning.assistSeconds
     : previousTap?.direction === steeringDirection
-      ? Math.max(0, previousTap.assistSeconds - dt) : 0
+      ? Math.max(0, previousTap.assistSeconds - dt - 1e-9) : 0
   const assisting = assistSeconds > 0
   const tuning = VEHICLE_DYNAMICS_TUNING
   const extraGrip = 1 + ((terrain.highSpeedGrip ?? 1) - 1) * clamp((vehicle.speed - 170) / 40, 0, 1)
