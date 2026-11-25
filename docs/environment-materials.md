@@ -139,3 +139,18 @@ have faint iridescent fringes and overlap world-tile boundaries consistently;
 the existing water clip keeps them off land. No new physical surfaces,
 hazards, serialized data or GPU layers are introduced. Authored city props
 are unchanged. Kids' Room remains the next separate art pass.
+
+
+### Kids' Room visual identity
+
+The fourth environment uses the generated Cozy Carpet World concept.
+A seam-blended six-cell 144×96 WebP atlas supplies carpet pile, navy
+woven road, textured dirt, shiny ice, berry juice (recolored from the
+painted water swatch), and red plaid comforter fabric. The generated pile
+is colorized once to preserve the existing royal-blue carpet identity.
+Hills use the comforter material for both sides and top, with the existing
+terrain gradient supplying fabric-fold shading. Juice uses a tinted carpet
+stain rather than sand, narrow translucent liquid shelves and a glossy
+contact edge. The vector overview palette is updated to the same identity.
+No terrain or collision rules change, and authored toys remain intact.
+All four current environments now use the same bitmap material interface.

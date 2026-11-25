@@ -13,6 +13,9 @@ export interface BitmapTerrainPalette {
   readonly slopeLightStrength: number
   readonly plateauGlaze: string
   readonly waterDetail?: 'oil-slicks'
+  /** Width multipliers, in (0, 1]; smaller spills need narrower rims. */
+  readonly bankScale?: number
+  readonly shallowScale?: number
 }
 
 type LightingProfiles = Readonly<Record<'day' | 'night', BitmapTerrainPalette>>
@@ -68,5 +71,25 @@ export const CITY_TERRAIN_ART = {
     slopeShadowStrength: 0.085, slopeLightStrength: 0.055,
     plateauGlaze: 'rgba(112,137,145,0.12)',
     waterDetail: 'oil-slicks',
+  },
+} as const satisfies LightingProfiles
+
+
+export const KIDS_ROOM_TERRAIN_ART = {
+  day: {
+    outerBank: '#524173', wetBank: '#873d62', deepGlaze: 'rgba(103,22,66,0.36)',
+    shallow: ['#c96987', '#df889e', '#efb1bd'], contact: '#ffdfdb',
+    slopeShadow: '67,25,48', slopeLight: '255,232,210',
+    slopeShadowStrength: 0.115, slopeLightStrength: 0.075,
+    plateauGlaze: 'rgba(135,49,62,0.12)',
+    bankScale: 0.55, shallowScale: 0.42,
+  },
+  night: {
+    outerBank: '#332847', wetBank: '#563047', deepGlaze: 'rgba(44,12,40,0.42)',
+    shallow: ['#8a456f', '#ae6a8e', '#d090a5'], contact: '#eac1c8',
+    slopeShadow: '24,14,35', slopeLight: '184,156,176',
+    slopeShadowStrength: 0.10, slopeLightStrength: 0.055,
+    plateauGlaze: 'rgba(77,37,68,0.12)',
+    bankScale: 0.55, shallowScale: 0.42,
   },
 } as const satisfies LightingProfiles

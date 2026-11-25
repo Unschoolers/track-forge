@@ -209,9 +209,11 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
  * All patterns are world anchored across tile boundaries. */
 export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile): void {
   const palette = art.terrainPalette
-  bankStroke(context, items, WATER_BANK_RADIUS * 2, palette.outerBank, 0.6)
-  bankStroke(context, items, 20, repeatPattern(context, art.sand), 1)
-  bankStroke(context, items, 9, palette.wetBank, 0.95)
+  const bankScale = palette.bankScale ?? 1
+  const shallowScale = palette.shallowScale ?? 1
+  bankStroke(context, items, WATER_BANK_RADIUS * 2 * bankScale, palette.outerBank, 0.6)
+  bankStroke(context, items, 20 * bankScale, repeatPattern(context, art.sand), 1)
+  bankStroke(context, items, 9 * bankScale, palette.wetBank, 0.95)
 
   context.save()
   context.beginPath()
@@ -226,10 +228,10 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   // fillRect covers the current tile in world coordinates via its clip.
   context.fillStyle = palette.deepGlaze
   context.fill()
-  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2, palette.shallow[0], 0.28)
-  bankStroke(context, items, 42, palette.shallow[1], 0.35)
-  bankStroke(context, items, 22, palette.shallow[2], 0.47)
-  bankStroke(context, items, 4, palette.contact, 0.72)
+  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2 * shallowScale, palette.shallow[0], 0.28)
+  bankStroke(context, items, 42 * shallowScale, palette.shallow[1], 0.35)
+  bankStroke(context, items, 22 * shallowScale, palette.shallow[2], 0.47)
+  bankStroke(context, items, 4 * shallowScale, palette.contact, 0.72)
   if (palette.waterDetail === 'oil-slicks' && tile) paintHarborOilSlicks(context, tile)
   context.restore()
 
