@@ -8,6 +8,7 @@ import { createArtCanvas, getEnvironmentBitmapArt, type EnvironmentBitmapArt } f
 import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
+import { roadTextureRepeat } from './roadTextureVariants'
 import { elevationLevelForHeight, elevationMaterialForLevel, groupElevationFaces } from './elevationMaterials'
 
 export const BITMAP_TILE_LIMIT = 48
@@ -84,7 +85,7 @@ class CachedBitmapTiles<T> implements BitmapTiles {
 
 /** Tile x is across the road; tile y follows the local tangent. Longitudinal
  * phase depends on canonical path distance, not a world chunk or camera. */
-export function roadBitmapTransform(quad: RoadRibbonQuad, repeat: number, size: number): DOMMatrix2DInit | undefined {
+export function roadBitmapTransform(quad: RoadRibbonQuad, repeat: number, size: number, variants = 1): DOMMatrix2DInit | undefined {
   const dx = quad.to.x - quad.from.x
   const dy = quad.to.y - quad.from.y
   const length = Math.hypot(dx, dy)
@@ -92,7 +93,8 @@ export function roadBitmapTransform(quad: RoadRibbonQuad, repeat: number, size: 
   const tx = dx / length, ty = dy / length
   const nx = -ty, ny = tx
   const width = ROAD_GEOMETRY.surfaceWidth
-  const phase = ((quad.from.distance % repeat) + repeat) % repeat
+  const stripLength = repeat * variants
+  const phase = ((quad.from.distance % stripLength) + stripLength) % stripLength
   return {
     a: nx * width / size, b: ny * width / size,
     c: tx * repeat / size, d: ty * repeat / size,
@@ -111,7 +113,7 @@ function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTi
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
   const index = indexBitmapItems(quads, quad => quad.road)
   const length = geometry.path.totalLength
-  const repeat = geometry.path.closed && length > 0 ? length / Math.max(1, Math.round(length / 96)) : 96
+  const repeat = roadTextureRepeat(length, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, items) => {
     const patterns: Record<SurfaceId, CanvasPattern> = {
       street: repeatPattern(context, art.road.street),
@@ -119,7 +121,8 @@ function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTi
       ice: repeatPattern(context, art.road.ice),
     }
     for (const quad of items) {
-      const transform = roadBitmapTransform(quad, repeat, art.road[quad.surface].width)
+      const source = art.road[quad.surface]
+      const transform = roadBitmapTransform(quad, repeat, source.width, source.height / source.width)
       if (!transform) continue
       const pattern = patterns[quad.surface]
       pattern.setTransform(transform)
