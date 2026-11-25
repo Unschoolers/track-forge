@@ -9,7 +9,6 @@ import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } fr
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
 import { roadTextureRepeat } from './roadTextureVariants'
-import { paintToyRoadBricks, toyBrickSpacing, toyRoadBricks } from './toyRoadBricks'
 import { buildBridgePresentation, type BridgePrimitive } from '@/phaser/rendering/bridgeRenderer'
 import type { TrackShadowMode } from '@/phaser/rendering/lighting'
 import { bridgePaintCommands, paintBridgeCanvas } from './bridgeMaterials'
@@ -140,16 +139,11 @@ function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentB
   }
 }
 
-function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean): BitmapTiles {
+function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
-  const toyRoad = environment === 'kids-room'
-  const index = indexBitmapItems(quads, quad => toyRoad ? quad.edge : quad.road, toyRoad ? 3 : 0)
+  const index = indexBitmapItems(quads, quad => quad.road)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
-  const spacing = toyBrickSpacing(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, items) => {
-    // All shoulders precede all road surfaces: crossings keep the same
-    // paint order as the canonical vector ribbon.
-    if (toyRoad) paintToyRoadBricks(context, items.flatMap(quad => toyRoadBricks(quad, spacing, night)), night)
     const paint = roadPatternPainter(context, art, repeat)
     for (const quad of items) paint(quad)
   })
@@ -382,7 +376,7 @@ export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean
   if (!art) return undefined
   const bridge = buildBridgePresentation(geometry, shadowMode)
   return {
-    road: roadTiles(geometry, art, environment, night),
+    road: roadTiles(geometry, art),
     terrain: terrainTiles(geometry, art),
     bridgeApproach: bridgeTiles(bridge, geometry, art, environment, night, true),
     bridgeDeck: bridgeTiles(bridge, geometry, art, environment, night, false),

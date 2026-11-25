@@ -17,12 +17,9 @@ source canvases do use more decoded memory; actual device validation
 is necessary. The physical surfaces, steering, AI, authored tracks
 and terrain swatches are unchanged.
 
-Kids' Room road shoulders use independent, distance-anchored red,
-yellow and blue plastic brick fragments and small embossed studs on
-the actual ribbon edge. The bitmap painter caches them together with
-the road, so editor, race and flyover share the appearance without a
-new GPU layer. Ordinary apex curbs keep their shape and contrasting
-colors, now red/yellow for the toy environment. At extreme zoom the
-existing inexpensive vector fallback remains; bridge decks use their
-existing themed rails rather than the shoulder studs. Visual quality
-and frame pacing on physical Android remain release checks.
+Kids' Room uses ordinary road shoulders. Only existing apex curb segments
+receive red/yellow molded plastic bricks with embossed studs. The shared
+Phaser curb renderer preserves the original turn detection and footprint
+in editor and race. No continuous brick border, changes to road material,
+or extra bitmap cache layers. Bridge rails remain separate.
+Physical Android visual validation remains necessary.
