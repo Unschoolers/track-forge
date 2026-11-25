@@ -77,7 +77,7 @@ export function planAiSpeed({
   const cornerTarget = safeEntrySpeedAhead(
     path, context.nearest.index, reversed, tuning.cornerSafety,
     car, tuning.pace * vehicle.aiPace, vehicle.car, true, fastCorners,
-    true,
+    true, difficulty === 'hard' ? hardProfile.hardIceApexPaceScale : undefined,
   ) * cornerPace
   let curveSpeed = cornerTarget
   // A tight pavement hairpin may need more entry caution than an ordinary
@@ -140,7 +140,11 @@ export function planAiSpeed({
   if (difficulty === 'hard' && context.onRoad) {
     const controlled = (1 - edgeRisk) *
       (1 - clamp((Math.abs(slipAngle) - 0.045) / 0.11, 0, 1))
-    curveSpeed *= 1 + (hardProfile.hardCornerTargetBonus ?? 0) * controlled
+    const surfaceBonus = context.surface === 'dirt' ? hardProfile.hardDirtCornerTargetBonus
+      : context.surface === 'street' ? hardProfile.hardStreetCornerTargetBonus : undefined
+    const bonus = surfaceBonus ?? hardProfile.hardCornerTargetBonus ?? 0
+    const sweepBonus = (hardProfile.hardStreetSweepCornerTargetBonus ?? bonus) - bonus
+    curveSpeed *= 1 + (bonus + sweepBonus * sweep * clamp((vehicle.speed - 210) / 50, 0, 1)) * controlled
   }
   // Apply the chassis reserve after all pace bonuses, so the Hard bonus
   // cannot undo the earlier technical-corner margin. Straights are unchanged.

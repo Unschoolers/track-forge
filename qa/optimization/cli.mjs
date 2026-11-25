@@ -8,7 +8,6 @@ import { generatePassingCandidates } from './passingCandidates.mjs'
 import { STUDY_SCENARIOS, selectScenarios } from './scenarios.mjs'
 import { trialKey, assessCandidate, evaluatePair, compareScores, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
 import { jsonLines } from './records.mjs'
-import { runBalance } from './balance/runner.mjs'
 
 function options(args) {
   const take = (key, fallback) => {
@@ -60,6 +59,7 @@ if (args.help) {
     ' [--out qa/results/optimization] [--no-telemetry]')
   console.log('Balance: npm run qa:optimize -- --focus balance [--tune [--trials 14] [--holdout-track file.json]] [--out qa/results/balance]')
 } else if (args.focus === 'balance') {
+  const { runBalance } = await import('./balance/runner.mjs')
   await runBalance(args)
 } else {
   const scenarios = selectScenarios(args.scenarioIds)

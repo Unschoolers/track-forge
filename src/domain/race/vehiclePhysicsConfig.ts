@@ -110,6 +110,8 @@ export interface SurfacePhysicsSpec {
 
 export interface TerrainPhysicsModifier extends SurfacePhysicsSpec {
   readonly drag: number
+  /** Extra grip at high speed, applied progressively from 170 to 210 units/s. */
+  readonly highSpeedGrip?: number
   /** Arcade lateral reserve during very slow braking turns. */
   readonly lowSpeedBrakeCornerReserve?: number
 }
@@ -357,7 +359,7 @@ export const VEHICLE_TERRAIN_PHYSICS_SPECS = {
     grass: DEFAULT_TERRAIN,
   },
   red: {
-    street: DEFAULT_TERRAIN,
+    street: { ...DEFAULT_TERRAIN, highSpeedGrip: 1.18 },
     dirt: { max: 0.78, accel: 0.68, grip: 0.78, brake: 0.75, drag: 1.55 },
     ice: { max: 0.95, accel: 0.84, grip: 1, brake: 0.78, drag: 1.2, lowSpeedBrakeCornerReserve: 0.1 },
     // Keep the low grass speed target but let Red recover from a mistake sooner.

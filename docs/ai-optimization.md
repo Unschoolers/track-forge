@@ -269,3 +269,16 @@ scenarios per seed. Red still had the fastest player-input run on asphalt
 after eight seconds of full throttle. These measurements establish the
 starting point for balance decisions. No numeric acceptance thresholds have
 been set for the balance study.
+
+### Car balance adjustments
+
+Red gains up to 18% additional asphalt grip as speed increases from 170 to
+210 units/s for both player and AI handling. Red and Blue's Hard AI profiles
+use more cautious ice apex targets and improved pavement driving decisions.
+Red uses a dirt corner allowance. Red's Normal profile has a small corner
+allowance to preserve difficulty separation after the physics change.
+
+With the latest settings the six-course Hard solo benchmark completes all
+48 runs. Fast asphalt finishes Red 28.45 s, Blue 28.93 s, Green 28.95 s,
+Yellow 30.85 s. Red remains 26.60% slower than Green overall on the six
+equally weighted scenarios. The two tested seeds yield identical outcomes.

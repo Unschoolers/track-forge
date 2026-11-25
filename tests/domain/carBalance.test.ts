@@ -99,8 +99,6 @@ describe('Red grass handling', () => {
     expect(grassPenalty.accel).toBeCloseTo(0.7)
     expect(grassPenalty.grip).toBeCloseTo(0.57)
     expect(grassPenalty.drag).toBeCloseTo(1.6)
-    expect(VEHICLE_TERRAIN_PHYSICS_SPECS.red.street)
-      .toEqual(VEHICLE_TERRAIN_PHYSICS_SPECS.blue.street)
     expect(VEHICLE_TERRAIN_PHYSICS_SPECS.yellow.grass.max)
       .toBeGreaterThan(VEHICLE_TERRAIN_PHYSICS_SPECS.green.grass.max)
   })
