@@ -7,6 +7,7 @@ import { buildRoadRibbonQuads, type RoadRibbonQuad } from './roadRibbonQuads'
 import { createArtCanvas, getEnvironmentBitmapArt, type EnvironmentBitmapArt } from './meadowBitmapArt'
 import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
+import { paintHarborOilSlicks } from './harborOilSlicks'
 
 export const BITMAP_TILE_LIMIT = 48
 const TILE = GROUND_TILE_SIZE
@@ -48,7 +49,7 @@ class CachedBitmapTiles<T> implements BitmapTiles {
   private readonly cache = new Map<string, HTMLCanvasElement>()
 
   constructor(private readonly index: ReadonlyMap<string, readonly T[]>,
-    private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[]) => void) {}
+    private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[], tile: GroundTile) => void) {}
 
   visible(view: GroundViewport, bounds = groundViewportBounds(view)): readonly GroundTile[] {
     // Preserve the inexpensive vector overview at extreme zooms. Texture
@@ -70,7 +71,7 @@ class CachedBitmapTiles<T> implements BitmapTiles {
     if (!items) throw new Error('No Meadow bitmap geometry for tile')
     const { canvas, context } = createArtCanvas(TILE)
     context.translate(-tile.x * TILE, -tile.y * TILE)
-    this.paint(context, items)
+    this.paint(context, items, tile)
     this.cache.set(key, canvas)
     if (this.cache.size > BITMAP_TILE_LIMIT) {
       const oldest = this.cache.keys().next().value
@@ -206,7 +207,7 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
 /** Painter order: sand outside, deep water, translucent shallow shelves
  * clipped to water, narrow contact foam, then the textured mountain faces.
  * All patterns are world anchored across tile boundaries. */
-export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt): void {
+export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile): void {
   const palette = art.terrainPalette
   bankStroke(context, items, WATER_BANK_RADIUS * 2, palette.outerBank, 0.6)
   bankStroke(context, items, 20, repeatPattern(context, art.sand), 1)
@@ -229,6 +230,7 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   bankStroke(context, items, 42, palette.shallow[1], 0.35)
   bankStroke(context, items, 22, palette.shallow[2], 0.47)
   bankStroke(context, items, 4, palette.contact, 0.72)
+  if (palette.waterDetail === 'oil-slicks' && tile) paintHarborOilSlicks(context, tile)
   context.restore()
 
   // Batch slope facets by the existing nine directional shades. Adjacent
@@ -259,7 +261,7 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
 }
 
 function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
-  return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items) => paintTerrainBitmap(context, items, art))
+  return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items, tile) => paintTerrainBitmap(context, items, art, tile))
 }
 
 export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): { road: BitmapTiles; terrain: BitmapTiles } | undefined {

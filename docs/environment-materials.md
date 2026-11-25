@@ -124,3 +124,18 @@ deep blue core, luminous oasis shallows and warm sand banks. Road paint
 remains geometry-driven. Existing authored cactus and rock props are
 unchanged. Cityscape and Kids' Room retain their current art until their
 own passes; this PR changes no terrain mechanics or track formats.
+
+
+### Cityscape visual identity
+
+Cityscape uses its own generated 144×96 WebP atlas: cobblestones,
+weathered asphalt with fine branching cracks, dusty construction dirt,
+ice, harbor water and mossy quay masonry. The cracks are baked inside the
+road swatch, away from its edges, so they add age without changing grip or
+interfering with procedural lane paint. Elevated terrain looks like raised
+stone plazas rather than natural hills. Harbor banks use masonry, with
+muted blue-green depth bands. Deterministic translucent black oil slicks
+have faint iridescent fringes and overlap world-tile boundaries consistently;
+the existing water clip keeps them off land. No new physical surfaces,
+hazards, serialized data or GPU layers are introduced. Authored city props
+are unchanged. Kids' Room remains the next separate art pass.

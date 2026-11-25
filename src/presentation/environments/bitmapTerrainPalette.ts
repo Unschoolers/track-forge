@@ -12,6 +12,7 @@ export interface BitmapTerrainPalette {
   readonly slopeShadowStrength: number
   readonly slopeLightStrength: number
   readonly plateauGlaze: string
+  readonly waterDetail?: 'oil-slicks'
 }
 
 type LightingProfiles = Readonly<Record<'day' | 'night', BitmapTerrainPalette>>
@@ -47,5 +48,25 @@ export const DESERT_TERRAIN_ART = {
     slopeShadow: '24,21,32', slopeLight: '172,155,134',
     slopeShadowStrength: 0.08, slopeLightStrength: 0.055,
     plateauGlaze: 'rgba(144,125,103,0.15)',
+  },
+} as const satisfies LightingProfiles
+
+
+export const CITY_TERRAIN_ART = {
+  day: {
+    outerBank: '#737c77', wetBank: '#999d94', deepGlaze: 'rgba(9,32,48,0.42)',
+    shallow: ['#377786', '#518b93', '#82a5a0'], contact: '#c4d1cc',
+    slopeShadow: '27,36,42', slopeLight: '224,220,196',
+    slopeShadowStrength: 0.10, slopeLightStrength: 0.06,
+    plateauGlaze: 'rgba(203,205,192,0.12)',
+    waterDetail: 'oil-slicks',
+  },
+  night: {
+    outerBank: '#39454b', wetBank: '#55676b', deepGlaze: 'rgba(3,15,30,0.48)',
+    shallow: ['#255363', '#376977', '#527d85'], contact: '#96afb0',
+    slopeShadow: '9,16,27', slopeLight: '156,180,185',
+    slopeShadowStrength: 0.085, slopeLightStrength: 0.055,
+    plateauGlaze: 'rgba(112,137,145,0.12)',
+    waterDetail: 'oil-slicks',
   },
 } as const satisfies LightingProfiles
