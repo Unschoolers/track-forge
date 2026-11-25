@@ -456,6 +456,9 @@ export class WebAudioAdapter implements FeedbackPort {
       )
     } else if (event.type === 'curb') {
       this.sink.play(120, 0.025, 0.015, 'square')
+    } else if (event.type === 'boost-ignition') {
+      this.sink.play(180, 0.09, 0.055, 'sawtooth')
+      this.sink.play(420, 0.13, 0.045, 'triangle', 0.035)
     }
   }
 

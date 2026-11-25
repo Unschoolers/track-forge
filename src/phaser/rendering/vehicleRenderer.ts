@@ -188,6 +188,51 @@ export function renderVehicles(
   }
 }
 
+/** Draw a compact pair of exhaust flames in the same pose transform as the car. */
+export function renderBoostFlames(
+  graphics: Phaser.GameObjects.Graphics,
+  vehicle: RaceVehicle,
+  color: number,
+  pulse = 0,
+  clearance = 0,
+): void {
+  if (!vehicle.player || vehicle.driftBoost?.phase !== 'active') return
+  const compression = Math.max(0, vehicle.suspensionCompression)
+  const liftHeight = vehicle.grounded ? 0 : Math.max(0, clearance)
+  const pitch = vehicle.grounded ? -vehicle.landingIntensity :
+    Math.max(-1, Math.min(1, vehicle.verticalVelocity / 35))
+  const lift = Math.min(0.11, liftHeight * 0.012)
+  const pulseScale = 0.9 + Math.min(1, Math.max(0, pulse)) * 0.18
+  graphics.save()
+  graphics.translateCanvas(vehicle.x, vehicle.y)
+  graphics.rotateCanvas(vehicle.angle)
+  graphics.scaleCanvas(
+    (1 + lift - 0.12 * Math.abs(pitch)) * VEHICLE_VISUAL_SCALE,
+    (1 + lift + 0.1 * Math.max(vehicle.landingIntensity * 0.55, compression)) * VEHICLE_VISUAL_SCALE,
+  )
+  // Artwork owns each car's exhaust locations via its rear lamp anchors.
+  // Local +X is the nose; each flame remains bounded to 9 local units.
+  for (const exhaust of getVehicleGeometry(vehicle.car).taillights) {
+    const x = exhaust.x - 1
+    const y = exhaust.y
+    graphics.fillStyle(color, 0.9)
+    graphics.beginPath()
+    graphics.moveTo(x, y - 2.2)
+    graphics.lineTo(x - 8 * pulseScale, y)
+    graphics.lineTo(x, y + 2.2)
+    graphics.closePath()
+    graphics.fillPath()
+    graphics.fillStyle(0xffe9a0, 0.92)
+    graphics.beginPath()
+    graphics.moveTo(x, y - 1)
+    graphics.lineTo(x - 4.2 * pulseScale, y)
+    graphics.lineTo(x, y + 1)
+    graphics.closePath()
+    graphics.fillPath()
+  }
+  graphics.restore()
+}
+
 /** Transparent reference lap. A ghost never enters physics or collisions. */
 export function renderGhostVehicle(
   graphics: Phaser.GameObjects.Graphics,

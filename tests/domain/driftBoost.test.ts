@@ -163,6 +163,9 @@ describe('drift boost domain', () => {
 		expect(updatedPlayer?.driftBoost?.phase).toBe('active')
 		expect(updatedPlayer?.driftBoost?.charge).toBe(0)
 		expect(updatedPlayer?.speed).toBeGreaterThan(initialSpeed * 1.8)
+		expect(activated.events.filter(event => event.type === 'boost-activated')).toEqual([
+			{ type: 'boost-activated', vehicleId: player.id },
+		])
 	})
 
 	it('cancels active propulsion and preserves charge through manual recovery', () => {

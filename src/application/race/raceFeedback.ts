@@ -52,6 +52,9 @@ export function routeRaceFeedback(
       })
     }
     for (const event of events) {
+      if (event.type === 'boost-activated' && event.vehicleId === player?.id) {
+        feedback.handle({ type: 'boost-ignition' })
+      }
       if (event.type === 'curb-hit' && event.vehicleId === 'player') {
         feedback.handle({
           type: 'curb',

@@ -20,6 +20,30 @@ describe('feedback adapters', () => {
     expect(sink.play).toHaveBeenCalledTimes(2)
   })
 
+  it('plays a short boost ignition cue only when audio is enabled', () => {
+    const sink: ToneSink = {
+      unlock: vi.fn(), play: vi.fn(), playLanding: vi.fn(), setEngine: vi.fn(), setSurface: vi.fn(),
+      setSlip: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn(),
+    }
+    const audio = new WebAudioAdapter(() => sink, true)
+    audio.unlock()
+    audio.handle({ type: 'boost-ignition' })
+    expect(sink.play).toHaveBeenCalledTimes(2)
+    audio.setEnabled(false)
+    audio.handle({ type: 'boost-ignition' })
+    expect(sink.play).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses one brief ignition vibration only when haptics are enabled', () => {
+    const vibrate = vi.fn(() => true)
+    const haptics = new HapticsAdapter(vibrate, true)
+    haptics.handle({ type: 'boost-ignition' })
+    expect(vibrate).toHaveBeenCalledWith([18])
+    haptics.setEnabled(false)
+    haptics.handle({ type: 'boost-ignition' })
+    expect(vibrate).toHaveBeenCalledOnce()
+  })
+
   it('stays locked until a gesture then maps continuous and one-shot audio', () => {
     const sink: ToneSink = {
       unlock: vi.fn(),
