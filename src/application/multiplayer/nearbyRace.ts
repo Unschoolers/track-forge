@@ -513,6 +513,11 @@ export class NearbyRace {
 
   pendingSharedTrack(): Track | null { return this.share.incoming }
 
+  /** A local storage rejection is retryable and must not tear down the room. */
+  recordShareSaveFailure(reason: string): void {
+    if (this.phase === 'share-review') this.diagnostic.failure('save_shared_track', reason)
+  }
+
   respondToShare(saved: boolean): void {
     if (this.purpose !== 'share' || this.phase !== 'share-review' ||
         !this.share.incoming || !this.hostId) return

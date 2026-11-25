@@ -21,7 +21,7 @@ import { BrowserPreferencesRepository } from '@/infrastructure/storage/preferenc
 import { BrowserLastRaceRepository } from '@/infrastructure/storage/lastRaceRepository'
 import { BrowserScoreRepository } from '@/infrastructure/storage/scoreRepository'
 import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository'
-import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
+import { IndexedDbTrackRepository } from '@/infrastructure/storage/indexedDbTrackRepository'
 import { PhaserSceneHost } from '@/phaser/sceneHost'
 import { DomUiHost } from '@/ui/uiHost'
 import { RaceFrameDiagnostics } from '@/infrastructure/qa/raceFrameDiagnostics'
@@ -61,13 +61,13 @@ uiRoot.id = 'ui-root'
 appRoot.replaceChildren(gameContainer, uiRoot)
 
 const storage = new BrowserStorage()
-const trackStore = new BrowserTrackRepository(storage)
+const trackStore = await IndexedDbTrackRepository.open()
 // Retire untouched system copies only. Never erase changed art or track data.
 for (const track of trackStore.list()) {
   if (isUntouchedLegacyStarter(track) &&
       (track.origin === 'seeded' || track.id === SYSTEM_STARTER_TRACK_ID ||
        (!track.origin && !track.creator && track.id.startsWith('starter-')))) {
-    if (!trackStore.remove(track.id)) console.error('Could not remove the retired starter circuit.')
+    if (!await trackStore.remove(track.id)) console.error('Could not remove the retired starter circuit.')
   }
 }
 
@@ -79,7 +79,7 @@ const nearby = nearbyTransport && new NearbyRace(nearbyTransport,
   (track) => validateTrack(track, geometry.get(track).path.totalLength).ready)
 const initialPreferences = new BrowserPreferencesRepository(storage)
 // TEMPORARY one-time migration: safe to remove with its isolated module.
-if (!migrateTrackCreatorCredits(storage, trackStore, initialPreferences).ok) {
+if (!(await migrateTrackCreatorCredits(storage, trackStore, initialPreferences)).ok) {
   console.error('Track creator migration could not be persisted. It will be retried on the next launch.')
 }
 const toneSink = new BrowserToneSink()

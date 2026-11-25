@@ -4,6 +4,7 @@ import { DEFAULT_CUP_TRACK_IDS, createCup, recordCupResult, advanceCup, CUP_CIRC
 import { describe, expect, it, vi } from 'vitest'
 import type {
   CupStore,
+  Persistence,
   Preferences,
   PreferencesStore,
   ScoreStore,
@@ -22,7 +23,7 @@ import { NearbyNetwork } from '../fixtures/nearbyNetwork'
 
 class TrackMemory implements TrackStore {
   readonly tracks = new Map<TrackId, Track>()
-  save = vi.fn((track: Track) => {
+  save = vi.fn((track: Track): Persistence<boolean> => {
     this.tracks.set(track.id, track)
     return true
   })
@@ -94,6 +95,50 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('acknowledges Nearby sharing only after persistence commits and retains failed transfers for retry', async () => {
+    const network = new NearbyNetwork()
+    const source = { ...createStarterTrack(asTrackId('shared'), 1), name: 'Large circuit' }
+    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true)
+    const { controller, trackStore } = setup(undefined, false, undefined, guest)
+    try {
+      controller.dispatch({ type: 'open-nearby' })
+      host.hostShare(source)
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'))
+      guest.scan('red', 'share')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1))
+      guest.connect('host')
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('share-review'))
+      let finish: (saved: boolean) => void = () => { throw new Error('Save was not started') }
+      trackStore.save.mockImplementationOnce(() => new Promise<boolean>(resolve => { finish = resolve }))
+      controller.dispatch({ type: 'save-nearby-track' })
+      controller.dispatch({ type: 'save-nearby-track' })
+      expect(trackStore.save).toHaveBeenCalledTimes(1)
+      expect(host.snapshot().sharedCount).toBe(0)
+      expect(guest.pendingSharedTrack()).not.toBeNull()
+      finish(false)
+      await vi.waitFor(() => expect(controller.snapshot().notice).toContain('could not be saved'))
+      expect((await guest.diagnostics()).lastFailure).toMatchObject({ source: 'save_shared_track' })
+      expect(guest.snapshot().phase).toBe('share-review')
+      expect(host.snapshot().sharedCount).toBe(0)
+      trackStore.save.mockImplementationOnce(track => new Promise<boolean>(resolve => {
+        finish = saved => {
+          if (saved) trackStore.tracks.set(track.id, track)
+          resolve(saved)
+        }
+      }))
+      controller.dispatch({ type: 'save-nearby-track' })
+      expect(host.snapshot().sharedCount).toBe(0)
+      expect(trackStore.find(asTrackId('created'))).toBeUndefined()
+      finish(true)
+      await vi.waitFor(() => expect(host.snapshot().sharedCount).toBe(1))
+      expect(trackStore.find(asTrackId('created'))?.name).toBe(source.name)
+    } finally {
+      controller.destroy()
+      host.destroy()
+    }
+  })
+
   it('moves both clients from race results to a fresh lobby and synchronized retry', async () => {
     const network = new NearbyNetwork()
     let clock = 100

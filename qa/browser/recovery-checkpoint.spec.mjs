@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 
 test('places a checkpoint while arcade ignores physical scenery collisions', async ({ page }) => {
@@ -32,9 +33,8 @@ test('places a checkpoint while arcade ignores physical scenery collisions', asy
     page.evaluate(() => window.__trackForgeQa.snapshot().editor.recoveryCheckpoints.length),
   ).toBe(1)
   await page.getByRole('button', { name: 'Save track', exact: true }).click()
-  const marks = () => page.evaluate(trackId =>
-    JSON.parse(localStorage.getItem('trackforge-library-v2'))
-      .find(track => track.id === trackId)?.recoveryCheckpoints, id)
+  const marks = async () => (await readSavedTracks(page))
+    .find(track => track.id === id)?.recoveryCheckpoints
   await expect.poll(marks).toHaveLength(1)
   const [checkpoint] = await marks()
   expect(checkpoint).toBeGreaterThan(0.3)

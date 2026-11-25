@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 import { seedOwnedTrack, OWNED_TRACK_NAME } from './owned-track.mjs'
 
@@ -23,8 +24,8 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await seedOwnedTrack(page)
   await page.goto('/?qa')
   await enterTrackForge(page)
-  await page.evaluate(() => {
-    const track = JSON.parse(localStorage.getItem('trackforge-library-v2'))[0]
+  const savedTrack = (await readSavedTracks(page))[0]
+  await page.evaluate(track => {
     const key = [track.id, track.updatedAt, track.start?.ratio ?? 0,
       track.start?.reversed ? 'reverse' : 'forward', 'blue', 2].join('|')
     const point = track.points[0]
@@ -34,7 +35,7 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
         angle: 0, z: 0, structureRunId: null })),
     } }))
     localStorage.setItem('trackforge-audio-enabled', '0')
-  })
+  }, savedTrack)
   await page.reload()
   await enterTrackForge(page)
   await setupRace(page)

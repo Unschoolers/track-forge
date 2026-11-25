@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
@@ -312,7 +313,7 @@ test('Papou-sized terrain and road remain visible at fit and after zooming out',
     await expect.poll(() => readCamera(page)).not.toBeNull()
     const camera = await readCamera(page)
     expect(camera.zoom).toBeLessThan(0.16)
-    const savedTrack = await page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0])
+    const savedTrack = (await readSavedTracks(page)).find(track => track.id === 'large-stress')
     const outline = await readRoadOutline(page, savedTrack)
     const canvasBounds = await canvas.boundingBox()
     const xs = outline.map(point => point.x)

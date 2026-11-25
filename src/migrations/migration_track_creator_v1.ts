@@ -5,7 +5,7 @@
  * and its focused regression test. The marker is intentionally private to
  * this file. Keep permanent creator ownership and sharing rules elsewhere.
  */
-import type { KeyValueStore, PreferencesStore, TrackStore } from '@/application/ports/storage'
+import { mapPersistence, type Persistence, type KeyValueStore, type PreferencesStore, type TrackStore } from '@/application/ports/storage'
 import { isUntouchedLegacyStarter } from '@/migrations/legacyStarterIdentity'
 import type { Track } from '@/domain/model'
 import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
@@ -35,7 +35,7 @@ export function migrateTrackCreatorCredits(
   tracks: TrackStore,
   preferences: PreferencesStore,
   createId: () => string = () => crypto.randomUUID(),
-): { readonly ok: boolean; readonly changed: number } {
+): Persistence<{ readonly ok: boolean; readonly changed: number }> {
   if (storage.get(MIGRATION_MARKER) === '1') return { ok: true, changed: 0 }
 
   const profile = preferences.load()
@@ -62,9 +62,10 @@ export function migrateTrackCreatorCredits(
   }
 
   // One library write; never mark completed if persistence fails.
-  if (updated.length && (!tracks.saveMany || !tracks.saveMany(updated))) {
-    return { ok: false, changed: 0 }
-  }
-  if (!storage.set(MIGRATION_MARKER, '1')) return { ok: false, changed: updated.length }
-  return { ok: true, changed: updated.length }
+  const saved = updated.length ? tracks.saveMany?.(updated) ?? false : true
+  return mapPersistence(saved, ok => {
+    if (!ok) return { ok: false, changed: 0 }
+    if (!storage.set(MIGRATION_MARKER, '1')) return { ok: false, changed: updated.length }
+    return { ok: true, changed: updated.length }
+  })
 }

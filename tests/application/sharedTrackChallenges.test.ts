@@ -106,7 +106,7 @@ describe('shareable track challenges', () => {
       { x: 40_000, y: 0, surface: 'street' },
     ] })).ok).toBe(true)
   })
-  it('imports copies rather than replacing the existing circuit or scores', () => {
+  it('imports copies rather than replacing the existing circuit or scores', async () => {
     const tracks: Track[] = [track]
     let next = 0
     const library = new TrackLibraryService({
@@ -123,8 +123,8 @@ describe('shareable track challenges', () => {
     const appearance = { environmentId: 'cityscape' as const, scenery: [{ kind: 'city-house' as const, x: 12, y: -4 }, { kind: 'desert-cactus' as const, x: 9, y: 3 }] }
     const source = parseTrackImport(serializeTrack({ ...track, ...appearance }).content)
     if (!source.ok) throw new Error(source.message)
-    const first = library.importShared(source.track)
-    const second = library.importShared(source.track)
+    const first = await library.importShared(source.track)
+    const second = await library.importShared(source.track)
     expect(first.ok).toBe(true)
     expect(second.ok).toBe(true)
     if (!first.ok || !second.ok) return
@@ -159,13 +159,13 @@ it('round-trips all scenery and rejects oversized shared scenery', () => {
   expect(parseTrackImport(JSON.stringify(invalid)).ok).toBe(false)
 })
 
-it('keeps the effective ghost revision through a rename', () => {
+it('keeps the effective ghost revision through a rename', async () => {
   const library = new TrackLibraryService({
     trackStore: { list: () => [track], find: () => track, save: () => true, remove: () => true },
     scoreStore: { forTrack: () => [], record: () => true, removeTrack: () => true },
     createId: () => asTrackId('new'), now: () => 99,
   })
-  const result = library.rename(track.id, 'A new name')
+  const result = await library.rename(track.id, 'A new name')
   expect(result.ok).toBe(true)
   if (result.ok) expect(result.track).toMatchObject({ updatedAt: 99, raceRevision: track.updatedAt })
 })

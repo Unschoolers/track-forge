@@ -1,4 +1,4 @@
-import type { TrackStore } from '@/application/ports/storage'
+import type { Persistence, TrackStore } from '@/application/ports/storage'
 import { applyEditorCommand, type EditorCommand, type EditorState } from '@/domain/editor/editorState'
 import { type Track, type TrackId } from '@/domain/model'
 import { decodeTrack } from '@/domain/track/trackCodec'
@@ -71,7 +71,7 @@ export class EditorSession {
   }
 
   /** Only deliberate Save/Save As actions write an editor draft. */
-  save(track: Track | null): boolean {
+  save(track: Track | null): Persistence<boolean> {
     return !!track && this.trackStore.save(track)
   }
 

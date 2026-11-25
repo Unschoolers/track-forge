@@ -1,6 +1,8 @@
-import type {
-  ScoreStore,
-  TrackStore,
+import {
+  mapPersistence,
+  type Persistence,
+  type ScoreStore,
+  type TrackStore,
 } from '@/application/ports/storage'
 import {
   normalizeTrackName,
@@ -36,7 +38,7 @@ export class TrackLibraryService {
     return this.dependencies.trackStore.find(id)
   }
 
-  create(value: string, creator?: TrackCreator): TrackMutationResult {
+  create(value: string, creator?: TrackCreator): Persistence<TrackMutationResult> {
     const validated = this.validateName(value)
     if (!validated.ok) return validated
     const now = this.dependencies.now()
@@ -57,12 +59,10 @@ export class TrackLibraryService {
       createdAt: now,
       updatedAt: now,
     }
-    return this.dependencies.trackStore.save(track)
-      ? { ok: true, track }
-      : { ok: false, message: 'Track could not be saved.' }
+    return this.persist(track, 'Track could not be saved.')
   }
 
-  importShared(source: Track): TrackMutationResult {
+  importShared(source: Track): Persistence<TrackMutationResult> {
     // A shared track is always a copy. Never overwrite the sender's or
     // receiver's existing circuit, scores or best-time ghosts.
     const now = this.dependencies.now()
@@ -74,13 +74,11 @@ export class TrackLibraryService {
       ...source, id: this.dependencies.createId(), name, origin: 'imported',
       createdAt: now, updatedAt: now, raceRevision: now,
     }
-    return this.dependencies.trackStore.save(track)
-      ? { ok: true, track }
-      : { ok: false, message: 'Shared track could not be saved.' }
+    return this.persist(track, 'Shared track could not be saved.')
   }
 
   /** Save a draft as a new track without changing its original or its records. */
-  saveAs(source: Track, value: string, creator?: TrackCreator): TrackMutationResult {
+  saveAs(source: Track, value: string, creator?: TrackCreator): Persistence<TrackMutationResult> {
     const validated = this.validateName(value)
     if (!validated.ok) return validated
     const now = this.dependencies.now()
@@ -94,29 +92,27 @@ export class TrackLibraryService {
       updatedAt: now,
       raceRevision: now,
     }
-    return this.dependencies.trackStore.save(copy)
-      ? { ok: true, track: copy }
-      : { ok: false, message: 'Track copy could not be saved.' }
+    return this.persist(copy, 'Track copy could not be saved.')
   }
 
   /** Update only tracks with this installation's stable creator ID. */
-  recredit(creator: TrackCreator): { readonly ok: boolean; readonly count: number } {
+  recredit(creator: TrackCreator): Persistence<{ readonly ok: boolean; readonly count: number }> {
     const updated = this.dependencies.trackStore.list()
       .filter((track) => !isSeededTrack(track) && track.creator?.id === creator.id)
       .filter((track) => track.creator?.name !== creator.name || !track.creator)
       .map((track) => ({ ...track, creator }))
     if (updated.length === 0) return { ok: true, count: 0 }
-    if (this.dependencies.trackStore.saveMany) {
-      return { ok: this.dependencies.trackStore.saveMany(updated), count: updated.length }
+    const store = this.dependencies.trackStore
+    let saved: Persistence<boolean> = true
+    if (store.saveMany) saved = store.saveMany(updated)
+    else for (const track of updated) {
+      saved = mapPersistence(saved, ok => ok ? store.save(track) : false)
     }
-    for (const track of updated) {
-      if (!this.dependencies.trackStore.save(track)) return { ok: false, count: 0 }
-    }
-    return { ok: true, count: updated.length }
+    return mapPersistence(saved, ok => ({ ok, count: ok ? updated.length : 0 }))
   }
 
   /** Fork built-in geometry to a new personal, shareable track before editing. */
-  forkSeededForEdit(source: Track, creator?: TrackCreator): TrackMutationResult {
+  forkSeededForEdit(source: Track, creator?: TrackCreator): Persistence<TrackMutationResult> {
     if (!isSeededTrack(source)) return { ok: false, message: 'Not a built-in track.' }
     const now = this.dependencies.now()
     const name = allocateUniqueTrackName(
@@ -136,9 +132,7 @@ export class TrackLibraryService {
       updatedAt: now,
       raceRevision: now,
     }
-    return this.dependencies.trackStore.save(copy)
-      ? { ok: true, track: copy }
-      : { ok: false, message: 'Could not copy the built-in track.' }
+    return this.persist(copy, 'Could not copy the built-in track.')
   }
 
   /** Validate a rename without persisting an editor draft. */
@@ -149,7 +143,7 @@ export class TrackLibraryService {
       : validated
   }
 
-  rename(id: TrackId, value: string): TrackMutationResult {
+  rename(id: TrackId, value: string): Persistence<TrackMutationResult> {
     const existing = this.dependencies.trackStore.find(id)
     if (!existing) {
       return { ok: false, message: 'Track unavailable.' }
@@ -165,15 +159,19 @@ export class TrackLibraryService {
       raceRevision: existing.raceRevision ?? existing.updatedAt,
       updatedAt: this.dependencies.now(),
     }
-    return this.dependencies.trackStore.save(track)
-      ? { ok: true, track }
-      : { ok: false, message: 'Track could not be saved.' }
+    return this.persist(track, 'Track could not be saved.')
   }
 
-  delete(id: TrackId): boolean {
-    if (!this.dependencies.trackStore.remove(id)) return false
-    this.dependencies.scoreStore.removeTrack(id)
-    return true
+  delete(id: TrackId): Persistence<boolean> {
+    return mapPersistence(this.dependencies.trackStore.remove(id), ok => {
+      if (ok) this.dependencies.scoreStore.removeTrack(id)
+      return ok
+    })
+  }
+
+  private persist(track: Track, message: string): Persistence<TrackMutationResult> {
+    return mapPersistence<boolean, TrackMutationResult>(this.dependencies.trackStore.save(track), ok =>
+      ok ? { ok: true, track } : { ok: false, message })
   }
 
   private validateName(

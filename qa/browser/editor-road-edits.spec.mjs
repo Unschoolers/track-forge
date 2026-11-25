@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
@@ -42,10 +43,10 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
       work.builds++
       return cache.apply(this, args)
     }
-    const setItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function (key, value) {
-      if (this === localStorage && key === 'trackforge-library-v2') work.writes++
-      return setItem.call(this, key, value)
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args) {
+      if (this.name === 'tracks' && this.transaction.db.name === 'trackforge-track-library') work.writes++
+      return put.apply(this, args)
     }
   })
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
@@ -53,7 +54,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   const work = () => page.evaluate(() => window.roadEditWork)
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
   const draft = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor.controlPoints)
-  const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('trackforge-library-v2'))[0].points)
+  const saved = async () => (await readSavedTracks(page)).find(track => track.id === 'road-edit-stress').points
   const initiallySaved = await saved()
   await expect.poll(async () => (await work()).redraws).toBeGreaterThan(0)
   const expectEditWork = async (before) => {
@@ -111,8 +112,10 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     await expectEditWork(before)
     // No storage writes should occur for a gesture or its Undo.
     expect(await saved()).toEqual(initiallySaved)
+    const beforeSave = await work()
     await page.getByRole('button', { name: 'Save track', exact: true }).click()
-    expect(await saved()).toEqual(await draft())
+    await expect.poll(async () => (await work()).writes - beforeSave.writes).toBe(1)
+    await expect.poll(saved).toEqual(await draft())
   } finally {
     await pointer.detach()
   }

@@ -194,7 +194,16 @@ export class DomUiHost implements UiHost {
 
   private async downloadNearbyDiagnostics(nearby: NearbyRace): Promise<boolean> {
     const capturedAt = new Date().toISOString()
-    const report = { capturedAt, ...await nearby.diagnostics() }
+    let storage: Record<string, unknown>
+    try {
+      const estimate = await navigator.storage?.estimate?.()
+      storage = estimate ? { status: 'available', usageBytes: estimate.usage ?? null, quotaBytes: estimate.quota ?? null }
+        : { status: 'unavailable' }
+    } catch (error) {
+      console.error('Could not estimate browser storage.', error)
+      storage = { status: 'failed' }
+    }
+    const report = { capturedAt, ...await nearby.diagnostics(), storage }
     const timestamp = capturedAt.replace(/[:.]/g, '-')
     return saveJsonFile({ filename: `trackforge-nearby-${timestamp}.json`, content: JSON.stringify(report, null, 2) })
   }

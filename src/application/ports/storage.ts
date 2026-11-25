@@ -15,13 +15,22 @@ export interface KeyValueStore {
   remove(key: string): boolean
 }
 
+/** Legacy and in-memory writes are synchronous; IndexedDB writes wait for commit. */
+export type Persistence<T> = T | Promise<T>
+
+export function mapPersistence<T, U>(value: Persistence<T>, next: (result: T) => Persistence<U>): Persistence<U> {
+  return value instanceof Promise ? value.then(next) : next(value)
+}
+
 export interface TrackStore {
   list(): readonly Track[]
   find(id: TrackId): Track | undefined
-  save(track: Track): boolean
+  save(track: Track): Persistence<boolean>
   /** Optional optimized atomic batch for attribution changes. */
-  saveMany?(tracks: readonly Track[]): boolean
-  remove(id: TrackId): boolean
+  saveMany?(tracks: readonly Track[]): Persistence<boolean>
+  remove(id: TrackId): Persistence<boolean>
+  /** Bounded, non-sensitive error code for the most recent write. */
+  failureReason?(): string | null
 }
 
 export interface ScoreCategory {
