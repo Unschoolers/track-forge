@@ -2,7 +2,7 @@ import type { AppCommand, AppSnapshot } from '@/application/appState'
 import type { EditorSession } from '@/application/editor/editorSession'
 import { requiresEditorExitConfirmation } from '@/application/editor/editorExitPolicy'
 import type { TrackLibraryService, TrackMutationResult } from '@/application/library/trackLibraryService'
-import type { TrackStore } from '@/application/ports/storage'
+import type { Persistence, TrackStore } from '@/application/ports/storage'
 import { createEditorState } from '@/domain/editor/editorState'
 
 interface EditorExitDependencies {
@@ -15,6 +15,7 @@ interface EditorExitDependencies {
   readonly librarySnapshot: () => Pick<AppSnapshot, 'tracks' | 'scoresByTrack'>
   readonly creator: () => { readonly id: string; readonly name: string } | undefined
   readonly applyTrackMutation: (result: TrackMutationResult) => void
+  readonly persist: <T>(result: Persistence<T>, complete: (result: T) => void) => void
 }
 
 /** Owns pending editor navigation and the save/discard/cancel transaction. */
@@ -62,11 +63,15 @@ export class EditorExitFlow {
       return
     }
     if (choice === 'save') {
-      if (!this.dependencies.editorSession.save(this.state.currentTrack)) {
-        this.update({ ...this.state, notice: 'Save unavailable.' })
-        return
-      }
-      this.update({ ...this.state, ...this.dependencies.librarySnapshot(), overlay: { type: 'none' }, notice: null })
+      this.dependencies.persist(this.dependencies.editorSession.save(this.state.currentTrack), saved => {
+        if (!saved) {
+          this.update({ ...this.state, notice: 'Save unavailable.' })
+          return
+        }
+        this.update({ ...this.state, ...this.dependencies.librarySnapshot(), overlay: { type: 'none' }, notice: null })
+        this.finish()
+      })
+      return
     } else {
       const trackId = this.state.currentTrack?.id
       const saved = trackId ? this.dependencies.library.select(trackId) : undefined
@@ -84,6 +89,10 @@ export class EditorExitFlow {
         notice: null,
       })
     }
+    this.finish()
+  }
+
+  private finish(): void {
     const destination = this.pendingEditorExit
     this.pendingEditorExit = null
     if (destination) this.dependencies.dispatch(destination)
@@ -92,14 +101,13 @@ export class EditorExitFlow {
   saveAs(name: string): void {
     if (this.state.mode !== 'editor' || this.state.overlay.type !== 'track-name' ||
         this.state.overlay.purpose !== 'save-as' || !this.state.currentTrack) return
-    const result = this.dependencies.library.saveAs(this.state.currentTrack, name, this.dependencies.creator())
-    if (!result.ok) {
-      this.update({ ...this.state, notice: result.message })
-      return
-    }
-    this.dependencies.applyTrackMutation(result)
-    const destination = this.pendingEditorExit
-    this.pendingEditorExit = null
-    if (destination) this.dependencies.dispatch(destination)
+    this.dependencies.persist(this.dependencies.library.saveAs(this.state.currentTrack, name, this.dependencies.creator()), result => {
+      if (!result.ok) {
+        this.update({ ...this.state, notice: result.message })
+        return
+      }
+      this.dependencies.applyTrackMutation(result)
+      this.finish()
+    })
   }
 }

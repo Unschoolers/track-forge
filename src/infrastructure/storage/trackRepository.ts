@@ -76,6 +76,16 @@ export class BrowserTrackRepository implements TrackStore {
     return this.copyTracks(this.recoverLegacy())
   }
 
+  /** Read the same legacy sources without performing any quota-limited writes. */
+  readForMigration(): readonly Track[] {
+    const current = this.decodeLibrary(parse(this.storage.get(STORAGE_KEYS.tracks)))
+    if (this.storage.get(STORAGE_KEYS.trackMigration) === '1') return current
+    const legacy = this.decodeLibrary(parse(this.storage.get(STORAGE_KEYS.legacyTracks)))
+    if (current.length || legacy.length) return this.mergeLibraries(legacy, current)
+    const recovered = this.readLegacyAutosave()
+    return recovered ? [recovered] : []
+  }
+
   find(id: TrackId): Track | undefined {
     return this.list().find((track) => track.id === id)
   }
@@ -170,6 +180,16 @@ export class BrowserTrackRepository implements TrackStore {
   }
 
   private recoverLegacy(): readonly Track[] {
+    const track = this.readLegacyAutosave()
+    if (!track) return []
+    const serialized = JSON.stringify([track])
+    if (!this.storage.set(STORAGE_KEYS.tracks, serialized)) return []
+    this.storage.set(STORAGE_KEYS.trackMigration, '1')
+    this.cacheLibrary(serialized, [track])
+    return [track]
+  }
+
+  private readLegacyAutosave(): Track | undefined {
     for (const key of STORAGE_KEYS.legacyAutosaves) {
       const raw = object(parse(this.storage.get(key)))
       if (!raw || !Array.isArray(raw.points)) continue
@@ -184,18 +204,8 @@ export class BrowserTrackRepository implements TrackStore {
         },
         now,
       )
-      if (track) {
-        const serialized = JSON.stringify([track])
-        if (!this.storage.set(STORAGE_KEYS.tracks, serialized)) {
-          // The legacy autosave remains intact. Do not advertise an ephemeral
-          // recovered track as saved when storage has denied the write.
-          return []
-        }
-        this.storage.set(STORAGE_KEYS.trackMigration, '1')
-        this.cacheLibrary(serialized, [track])
-        return [track]
-      }
+      if (track) return track
     }
-    return []
+    return undefined
   }
 }

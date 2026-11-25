@@ -100,3 +100,7 @@ Component tests: eight-slot wire encoding and rejection, eight unique starting p
 ## Host-selected Day/Night lighting
 
 After selecting a normal race track or a Nearby Cup, the host can choose **DAY** or **NIGHT** from the hosting lobby. All connected players receive the chosen lighting in the existing reliable race preparation message. The chosen override applies to subsequent Cup tracks and new race track selections in the same room; it does not edit the saved track. When no choice is made, each track uses its stored lighting. Track sharing has no lighting selector. The selection remains host-authoritative to avoid players racing in inconsistent visibility conditions.
+
+### Durable local saves
+
+Incoming track copies are acknowledged only after the IndexedDB transaction commits. On failure, the share remains available for retry and the diagnostic report records `save_shared_track` with the bounded storage error code. See [Track library storage](track-library-storage.md).

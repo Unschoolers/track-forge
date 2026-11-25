@@ -9,6 +9,7 @@ import type {
   CupStore,
   LastRace,
   LastRaceStore,
+  Persistence,
   Preferences,
   PreferencesStore,
   ScoreEntry,
@@ -64,6 +65,8 @@ export class AppController {
   private state: AppSnapshot
   private readonly cupFlow: CupFlow
   private pendingCreatorId: string | undefined
+  private persistencePending = false
+  private destroyed = false
   private readonly editorSession: EditorSession
   private readonly editorExitFlow: EditorExitFlow
   private beforeNearbyTrack: Track | null | undefined
@@ -142,6 +145,7 @@ export class AppController {
       librarySnapshot: () => this.librarySnapshot(),
       creator: () => this.creator(),
       applyTrackMutation: (result) => this.applyTrackMutation(result, true),
+      persist: (result, complete) => this.completePersistence(result, complete),
     })
     dependencies.nearby?.setIdentity(this.state.preferences.playerIdentity)
     dependencies.nearby?.setDisplayName(this.state.preferences.displayName)
@@ -228,6 +232,8 @@ export class AppController {
   }
 
   dispatch(command: AppCommand): void {
+    // Do not allow another edit, navigation or share response to race a commit.
+    if (this.persistencePending || this.destroyed) return
     if (this.editorExitFlow.intercept(command)) return
     switch (command.type) {
       case 'go-home':
@@ -250,9 +256,7 @@ export class AppController {
         break
       case 'open-editor':
         if (this.state.currentTrack && isSeededTrack(this.state.currentTrack)) {
-          const copy = this.library.forkSeededForEdit(this.state.currentTrack, this.creator())
-          if (!copy.ok) { this.update({ ...this.state, notice: copy.message }); break }
-          this.applyTrackMutation(copy, true)
+          this.completePersistence(this.library.forkSeededForEdit(this.state.currentTrack, this.creator()), copy => this.applyTrackMutation(copy, true))
           break
         }
         this.update({ ...this.state, cup: null, mode: 'editor', paused: false, overlay: { type: 'none' }, notice: null })
@@ -326,13 +330,16 @@ export class AppController {
         const nearby = this.dependencies.nearby
         const track = nearby?.pendingSharedTrack()
         if (!track) break
-        const saved = this.library.importShared(track)
-        if (!saved.ok) {
-          this.update({ ...this.state, notice: saved.message })
-          break
-        }
-        nearby?.respondToShare(true)
-        this.update({ ...this.state, ...this.librarySnapshot(), notice: `Saved "${saved.track.name}" to your library.` })
+        this.completePersistence(this.library.importShared(track), saved => {
+          const currentShare = nearby?.pendingSharedTrack() === track
+          if (!saved.ok) {
+            if (currentShare) nearby?.recordShareSaveFailure(this.dependencies.trackStore.failureReason?.() ?? 'storage_rejected')
+            this.update({ ...this.state, notice: saved.message })
+            return
+          }
+          if (currentShare) nearby?.respondToShare(true)
+          this.update({ ...this.state, ...this.librarySnapshot(), notice: `Saved "${saved.track.name}" to your library.` })
+        })
         break
       }
       case 'decline-nearby-track':
@@ -491,27 +498,29 @@ export class AppController {
         })
         break
       case 'create-track':
-        this.applyTrackMutation(this.library.create(command.name, this.creator()), true)
+        this.completePersistence(this.library.create(command.name, this.creator()), result => this.applyTrackMutation(result, true))
         break
       case 'rename-track':
         if (this.state.currentTrack) {
-          const result = this.state.mode === 'editor'
+          const mutation = this.state.mode === 'editor'
             ? this.library.renameDraft(this.state.currentTrack, command.name)
             : this.library.rename(this.state.currentTrack.id, command.name)
-          if (!result.ok) {
-            this.update({ ...this.state, notice: result.message })
-          } else {
-            const track = this.state.mode === 'editor'
-              ? { ...result.track, updatedAt: this.now() }
-              : result.track
-            this.update({
-              ...this.state,
-              currentTrack: track,
-              tracks: this.library.list().map((item) => item.id === track.id ? track : item),
-              overlay: { type: 'none' },
-              notice: null,
-            })
-          }
+          this.completePersistence(mutation, result => {
+            if (!result.ok) {
+              this.update({ ...this.state, notice: result.message })
+            } else {
+              const track = this.state.mode === 'editor'
+                ? { ...result.track, updatedAt: this.now() }
+                : result.track
+              this.update({
+                ...this.state,
+                currentTrack: track,
+                tracks: this.library.list().map((item) => item.id === track.id ? track : item),
+                overlay: { type: 'none' },
+                notice: null,
+              })
+            }
+          })
         }
         break
       case 'toggle-track-favorite': {
@@ -563,6 +572,7 @@ export class AppController {
   }
 
   destroy(): void {
+    this.destroyed = true
     this.editorSession.discardPendingSave()
     this.events.clear()
     this.unsubscribeRace?.()
@@ -655,7 +665,7 @@ export class AppController {
     const source = this.library.select(id)
     if (!source) return
     if (isSeededTrack(source)) {
-      this.applyTrackMutation(this.library.forkSeededForEdit(source, this.creator()), true)
+      this.completePersistence(this.library.forkSeededForEdit(source, this.creator()), result => this.applyTrackMutation(result, true))
       return
     }
     const track = source
@@ -786,39 +796,41 @@ export class AppController {
       this.update({ ...this.state, notice: parsed.message })
       return
     }
-    this.applyTrackMutation(this.library.importShared(parsed.track), true)
+    this.completePersistence(this.library.importShared(parsed.track), result => this.applyTrackMutation(result, true))
   }
 
   private deleteTrack(id: TrackId): void {
     const deletingCurrent = this.state.currentTrack?.id === id
-    if (!this.library.delete(id)) {
-      this.update({ ...this.state, notice: 'Track could not be deleted.' })
-      return
-    }
-    if (this.state.currentTrack?.id === id) {
-      this.editorSession.discardPendingSave()
-    }
-    const tracks = this.library.list()
-    const currentTrack =
-      this.state.currentTrack?.id === id
-        ? (tracks[0] ?? null)
-        : this.state.currentTrack
-    this.update({
-      ...this.state,
-      tracks,
-      scoresByTrack: this.scoresForTracks(tracks),
-      currentTrack,
-      editor:
+    this.completePersistence(this.library.delete(id), deleted => {
+      if (!deleted) {
+        this.update({ ...this.state, notice: 'Track could not be deleted.' })
+        return
+      }
+      if (this.state.currentTrack?.id === id) {
+        this.editorSession.discardPendingSave()
+      }
+      const tracks = this.library.list()
+      const currentTrack =
         this.state.currentTrack?.id === id
-          ? createEditorState(
-              currentTrack?.points ?? [],
-              currentTrack?.trees ?? [],
-              currentTrack?.start,
-              currentTrack?.terrain,
-              currentTrack ?? {},
-            )
-          : this.state.editor,
-      notice: deletingCurrent ? null : this.state.notice,
+          ? (tracks[0] ?? null)
+          : this.state.currentTrack
+      this.update({
+        ...this.state,
+        tracks,
+        scoresByTrack: this.scoresForTracks(tracks),
+        currentTrack,
+        editor:
+          this.state.currentTrack?.id === id
+            ? createEditorState(
+                currentTrack?.points ?? [],
+                currentTrack?.trees ?? [],
+                currentTrack?.start,
+                currentTrack?.terrain,
+                currentTrack ?? {},
+              )
+            : this.state.editor,
+        notice: deletingCurrent ? null : this.state.notice,
+      })
     })
   }
 
@@ -931,29 +943,30 @@ export class AppController {
     const id = this.state.preferences.creatorId ?? this.pendingCreatorId ??
       (this.dependencies.createCreatorId ?? (() => crypto.randomUUID()))()
     this.pendingCreatorId = id
-    const result = this.library.recredit({ id, name })
-    if (!result.ok) {
-      this.update({ ...this.state, notice: 'Could not update track credits. Try again.' })
-      return
-    }
-    const preferences = { ...this.state.preferences, displayName: name, creatorId: id }
-    if (!this.dependencies.preferencesStore.save(preferences)) {
-      this.update({ ...this.state, notice: 'Could not save your player name. Try again.' })
-      return
-    }
-    this.dependencies.nearby?.setDisplayName(name)
-    const tracks = this.library.list()
-    const storedTrack = tracks.find((track) => track.id === this.state.currentTrack?.id)
-    const currentTrack = storedTrack && this.state.currentTrack && this.state.mode === 'editor' && this.editorExitFlow.isDirty()
-      ? { ...this.state.currentTrack, ...(storedTrack.creator ? { creator: storedTrack.creator } : {}) }
-      : storedTrack ?? this.state.currentTrack
-    this.update({
-      ...this.state,
-      preferences,
-      tracks,
-      currentTrack,
-      overlay: this.state.overlay.type === 'player-name' ? { type: 'none' } : this.state.overlay,
-      notice: result.count > 0 ? `Player name saved · ${result.count} track credit${result.count === 1 ? '' : 's'} updated.` : 'Player name saved.',
+    this.completePersistence(this.library.recredit({ id, name }), result => {
+      if (!result.ok) {
+        this.update({ ...this.state, notice: 'Could not update track credits. Try again.' })
+        return
+      }
+      const preferences = { ...this.state.preferences, displayName: name, creatorId: id }
+      if (!this.dependencies.preferencesStore.save(preferences)) {
+        this.update({ ...this.state, notice: 'Could not save your player name. Try again.' })
+        return
+      }
+      this.dependencies.nearby?.setDisplayName(name)
+      const tracks = this.library.list()
+      const storedTrack = tracks.find((track) => track.id === this.state.currentTrack?.id)
+      const currentTrack = storedTrack && this.state.currentTrack && this.state.mode === 'editor' && this.editorExitFlow.isDirty()
+        ? { ...this.state.currentTrack, ...(storedTrack.creator ? { creator: storedTrack.creator } : {}) }
+        : storedTrack ?? this.state.currentTrack
+      this.update({
+        ...this.state,
+        preferences,
+        tracks,
+        currentTrack,
+        overlay: this.state.overlay.type === 'player-name' ? { type: 'none' } : this.state.overlay,
+        notice: result.count > 0 ? `Player name saved · ${result.count} track credit${result.count === 1 ? '' : 's'} updated.` : 'Player name saved.',
+      })
     })
   }
 
@@ -972,11 +985,29 @@ export class AppController {
   private saveCurrentTrack(): void {
     const track = this.state.currentTrack
     if (!track) return
-    const saved = this.editorSession.save(track)
-    this.update({
-      ...this.state,
-      ...(saved ? { ...this.librarySnapshot(), overlay: { type: 'none' } as const } : {}),
-      notice: saved ? 'Track saved.' : 'Save unavailable.',
+    this.completePersistence(this.editorSession.save(track), saved => {
+      this.update({
+        ...this.state,
+        ...(saved ? { ...this.librarySnapshot(), overlay: { type: 'none' } as const } : {}),
+        notice: saved ? 'Track saved.' : 'Save unavailable.',
+      })
+    })
+  }
+
+  private completePersistence<T>(result: Persistence<T>, complete: (value: T) => void): void {
+    if (!(result instanceof Promise)) {
+      complete(result)
+      return
+    }
+    this.persistencePending = true
+    this.update({ ...this.state, notice: 'Saving track library…' })
+    void result.then(value => {
+      this.persistencePending = false
+      if (!this.destroyed) complete(value)
+    }, (error: unknown) => {
+      this.persistencePending = false
+      console.error('Track library transaction failed unexpectedly.', error)
+      if (!this.destroyed) this.update({ ...this.state, notice: 'Track library operation failed. Try again.' })
     })
   }
 

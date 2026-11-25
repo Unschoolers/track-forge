@@ -100,7 +100,7 @@ describe('TrackLibraryService', () => {
     expect(trackStore.find(second.id)).toBeUndefined()
     expect(scoreStore.removeTrack).toHaveBeenCalledWith(second.id)
   })
-  it('attributes old local tracks, but preserves imported credits across renames and share copies', () => {
+  it('attributes old local tracks, but preserves imported credits across renames and share copies', async () => {
     const legacy = createStarterTrack(asTrackId('legacy-local'), 42)
     const imported = { ...createStarterTrack(asTrackId('imported'), 30), origin: 'imported' as const }
     const other = {
@@ -120,7 +120,7 @@ describe('TrackLibraryService', () => {
     expect(service.recredit({ ...creator, name: 'New Name' })).toEqual({ ok: true, count: 1 })
     expect(trackStore.find(legacy.id)?.creator?.name).toBe('New Name')
     expect(service.recredit({ ...creator, name: 'New Name' })).toEqual({ ok: true, count: 0 })
-    const shared = service.importShared(other)
+    const shared = await service.importShared(other)
     expect(shared.ok).toBe(true)
     if (shared.ok) {
       expect(shared.track.creator).toEqual(other.creator)
@@ -128,10 +128,10 @@ describe('TrackLibraryService', () => {
     }
   })
 
-  it('credits new tracks immediately when a profile exists', () => {
+  it('credits new tracks immediately when a profile exists', async () => {
     const { service } = setup()
     const creator = { id: 'local-user-123', name: 'Julien QC' }
-    const result = service.create('Morning Rally', creator)
+    const result = await service.create('Morning Rally', creator)
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.track.creator).toEqual(creator)
   })
