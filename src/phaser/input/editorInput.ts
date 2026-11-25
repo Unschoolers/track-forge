@@ -33,12 +33,12 @@ import {
 } from '@/domain/track/pathBuilder'
 import { isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import {
+  EMPTY_TERRAIN,
   planTerrainCellsInBrush,
-  planTerrainPaint,
   terrainCellKey,
   type TerrainCellCoordinate,
 } from '@/domain/terrain/terrainField'
-import type { TerrainMap } from '@/domain/model'
+import type { TerrainCell, TerrainMap } from '@/domain/model'
 import {
   TERRAIN_CAPACITY_REJECTION,
   TERRAIN_COORDINATE_BOUNDS_REJECTION,
@@ -50,6 +50,46 @@ import {
 export type { EditorTool } from '@/domain/editor/editorGeometry'
 
 const SELECTION_DRAG_SCREEN_PIXELS = 8
+
+function terrainWithStroke(
+  base: TerrainMap,
+  changedCells: readonly TerrainCellCoordinate[],
+  kind: TerrainBrushKind,
+): TerrainMap {
+  if (changedCells.length === 0) return base
+  const changed = changedCells
+  const cells: TerrainCell[] = []
+  let baseIndex = 0
+  let changedIndex = 0
+  while (baseIndex < base.cells.length || changedIndex < changed.length) {
+    const original = base.cells[baseIndex]
+    const replacement = changed[changedIndex]
+    if (!replacement) {
+      if (original) cells.push(original)
+      baseIndex += 1
+      continue
+    }
+    if (!original) {
+      if (kind !== 'ground') cells.push({ ...replacement, kind })
+      changedIndex += 1
+      continue
+    }
+    const order =
+      original.row - replacement.row || original.column - replacement.column
+    if (order < 0) {
+      cells.push(original)
+      baseIndex += 1
+    } else if (order > 0) {
+      if (kind !== 'ground') cells.push({ ...replacement, kind })
+      changedIndex += 1
+    } else {
+      if (kind !== 'ground') cells.push({ ...replacement, kind })
+      baseIndex += 1
+      changedIndex += 1
+    }
+  }
+  return cells.length === 0 ? EMPTY_TERRAIN : { cellSize: base.cellSize, cells }
+}
 
 export interface EditorCamera {
   x: number
@@ -481,19 +521,10 @@ export class EditorInputController {
         (left, right) =>
           left.row - right.row || left.column - right.column,
       )
-      const plan = planTerrainPaint(stroke.baseTerrain, cells, stroke.kind)
-      if (!plan.ok) {
-        this.rejectTerrainStroke(
-          plan.reason === 'coordinate-bounds'
-            ? TERRAIN_COORDINATE_BOUNDS_REJECTION
-            : TERRAIN_CAPACITY_REJECTION,
-        )
-        return null
-      }
       stroke.materialized = {
         revision: preview.revision,
-        cells: plan.changedCells,
-        terrain: plan.terrain,
+        cells,
+        terrain: terrainWithStroke(stroke.baseTerrain, cells, stroke.kind),
       }
     }
     return {

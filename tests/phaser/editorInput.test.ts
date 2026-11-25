@@ -4,7 +4,10 @@ import {
   type EditorCamera,
 } from '@/phaser/input/editorInput'
 import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
-import type { TerrainCellCoordinate } from '@/domain/terrain/terrainField'
+import {
+  planTerrainPaint,
+  type TerrainCellCoordinate,
+} from '@/domain/terrain/terrainField'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
@@ -674,7 +677,7 @@ describe('EditorInputController', () => {
     expect(editor.history).toEqual([])
   })
 
-  it('defers full candidate materialization until preview is consumed', () => {
+  it('materializes terrain previews with an ordered merge instead of rebuilding a key map', () => {
     const terrain = normalizeTerrain({
       cells: Array.from({ length: 100 }, (_, index) => ({
         column: index % 10,
@@ -701,8 +704,54 @@ describe('EditorInputController', () => {
     input.pointerMove({ id: 1, x: 48, y: 16 })
 
     expect(iteration).not.toHaveBeenCalled()
-    input.terrainPreview()
-    expect(iteration).toHaveBeenCalledTimes(1)
+    expect(input.terrainPreview()?.terrain.cells).toHaveLength(106)
+    expect(iteration).not.toHaveBeenCalled()
+  })
+
+  it('matches terrain paint plans for no-op, erase, and kind-change previews', () => {
+    const hillCells = Array.from({ length: 9 }, (_, index) => ({
+      column: (index % 3) - 1,
+      row: Math.floor(index / 3) - 1,
+      kind: 'hill' as const,
+    }))
+    const cases = [
+      { terrain: normalizeTerrain({ cells: hillCells }), kind: 'hill' as const },
+      { terrain: normalizeTerrain({ cells: hillCells }), kind: 'ground' as const },
+      {
+        terrain: normalizeTerrain({
+          cells: hillCells.map((cell, index) =>
+            index === 4 ? { ...cell, kind: 'water' as const } : cell,
+          ),
+        }),
+        kind: 'water' as const,
+      },
+    ]
+
+    for (const { terrain, kind } of cases) {
+      let editor = createEditorState([], [], undefined, terrain)
+      const input = new EditorInputController({
+        camera: { x: 0, y: 0, zoom: 1 },
+        tool: () => 'terrain',
+        surface: () => 'street',
+        terrainBrush: () => ({ kind, radius: 48 }),
+        editor: () => editor,
+        dispatch: (command) => {
+          editor = reduceEditor(editor, command)
+        },
+      })
+      input.pointerDown({ id: 1, x: 16, y: 16 })
+      const preview = input.terrainPreview()
+      if (!preview) throw new Error('Expected terrain preview')
+      const plan = planTerrainPaint(terrain, preview.cells, kind)
+
+      expect(plan.ok).toBe(true)
+      if (!plan.ok) continue
+      expect(preview.cells).toEqual(plan.changedCells)
+      expect(preview.terrain).toEqual(plan.terrain)
+      if (kind === 'hill' && preview.cells.length === 0) {
+        expect(preview.terrain).toBe(terrain)
+      }
+    }
   })
 
   it('rejects an over-capacity stroke with feedback and no partial history', () => {
