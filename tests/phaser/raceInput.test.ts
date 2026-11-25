@@ -134,4 +134,28 @@ describe('RaceInputController', () => {
     input.endPointer(4)
     expect(input.snapshot().steering).toBe(0)
   })
+
+  it('queues one deliberate boost edge until the simulation consumes it', () => {
+    const input = new RaceInputController()
+    input.beginBoost(10)
+    input.beginBoost(10)
+    expect(input.snapshot()).toEqual({ steering: 0, throttle: 0, braking: false })
+    expect(input.consumeBoostRequest()).toBe(true)
+    expect(input.consumeBoostRequest()).toBe(false)
+    input.endPointer(10)
+    input.beginBoost(11)
+    expect(input.consumeBoostRequest()).toBe(true)
+  })
+
+  it('treats Shift as a one-shot boost press and clears pending presses on reset', () => {
+    const input = new RaceInputController()
+    input.setKeyboard('Shift', true)
+    input.setKeyboard('Shift', true)
+    expect(input.consumeBoostRequest()).toBe(true)
+    expect(input.consumeBoostRequest()).toBe(false)
+    input.setKeyboard('Shift', false)
+    input.setKeyboard('Shift', true)
+    input.reset()
+    expect(input.consumeBoostRequest()).toBe(false)
+  })
 })

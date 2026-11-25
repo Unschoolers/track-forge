@@ -40,6 +40,9 @@ export interface VehicleDynamicsParameters {
   readonly maxSpeed: number
   /** Separate numerical limit before the integration headroom is applied. */
   readonly safetySpeed?: number
+  /** Absolute longitudinal cap, overriding normal integration headroom when set. */
+  readonly absoluteSpeedLimit?: number
+  readonly accelerationMultiplier?: number
   readonly engineAcceleration: number
   readonly maxSteerAngle: number
   readonly lowSpeedSteerAngle?: number
@@ -129,6 +132,7 @@ export function stepVehicleDynamics(
   // heavier car carries more inertia instead of receiving free acceleration.
   const driveAcceleration =
     parameters.engineAcceleration *
+    Math.max(0, finiteOr(parameters.accelerationMultiplier ?? 1, 1)) *
     (tuning.forces.referenceMass / Math.max(1, parameters.mass)) *
     throttle *
     contactLoad *
@@ -297,8 +301,9 @@ export function stepVehicleDynamics(
   if (nextLongitudinal < 0) nextLongitudinal = 0
   nextLongitudinal = Math.min(
     nextLongitudinal,
-    Math.max(1, parameters.safetySpeed ?? maxSpeed) *
-      Math.max(1, tuning.integration.maximumSpeedFactor),
+    Math.max(1, parameters.absoluteSpeedLimit ??
+      Math.max(1, parameters.safetySpeed ?? maxSpeed) *
+        Math.max(1, tuning.integration.maximumSpeedFactor)),
   )
 
   // Below tire-operating speed, settle residual motion without affecting

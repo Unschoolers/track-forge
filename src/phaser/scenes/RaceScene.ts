@@ -81,6 +81,7 @@ export class RaceScene extends Phaser.Scene {
   private snapshot: AppSnapshot | undefined
   private raceCamera: RaceCameraState | undefined
   private pointerBinding: RacePointerBinding | undefined
+  private boostRequestPending = false
 
   constructor(
     private readonly controller: SceneControllerPort,
@@ -206,12 +207,34 @@ export class RaceScene extends Phaser.Scene {
     // Use one real display-frame delta for physics accumulation and camera
     // following. Phaser's smoothed scene delta can diverge at high refresh.
     const frameSeconds = Math.max(0, this.game.loop.rawDelta / 1000)
+    const sessionBeforeAdvance = this.raceSession.snapshot()
+    const boostPractice = sessionBeforeAdvance.setup?.mode === 'boost-practice'
+    const boostInputOpen = boostPractice && !this.snapshot.paused &&
+      !sessionBeforeAdvance.state?.paused && sessionBeforeAdvance.state?.phase === 'running'
+    if (!boostInputOpen) {
+      this.boostRequestPending = false
+      this.controls.consumeBoostRequest()
+    } else if (this.controls.consumeBoostRequest()) {
+      this.boostRequestPending = true
+    }
+    const input = this.snapshot.paused
+      ? { steering: 0, throttle: 0, braking: false }
+      : inputForPedals(this.controls.snapshot(), this.snapshot.preferences.pedalMode)
     this.raceSession.advance(
       frameSeconds,
-      this.snapshot.paused
-        ? { steering: 0, throttle: 0, braking: false }
-        : inputForPedals(this.controls.snapshot(), this.snapshot.preferences.pedalMode),
+      boostInputOpen
+        ? { ...input, boostRequested: this.boostRequestPending }
+        : input,
     )
+    const sessionAfterAdvance = this.raceSession.snapshot()
+    if (
+      this.boostRequestPending &&
+      sessionAfterAdvance.state &&
+      sessionBeforeAdvance.state &&
+      sessionAfterAdvance.state.tick > sessionBeforeAdvance.state.tick
+    ) {
+      this.boostRequestPending = false
+    }
     benchmark?.endSimulation()
     // Draw interpolated poses while the simulation, HUD, and network
     // systems continue to use the authoritative 60 Hz state.
@@ -398,6 +421,7 @@ export class RaceScene extends Phaser.Scene {
       if (state?.phase !== 'running' || state.paused || this.controller.snapshot().paused ||
           manualRecoveryTicksRemaining(state.vehicles.find(vehicle => vehicle.player), state.tick) > 0) return
       this.controls.reset()
+      this.boostRequestPending = false
       this.raceSession.resetPlayer()
       return
     }
@@ -408,13 +432,17 @@ export class RaceScene extends Phaser.Scene {
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.controls.setKeyboard(event.key, false)
   }
-  private readonly onBlur = (): void => this.controls.reset()
+  private readonly onBlur = (): void => {
+    this.controls.reset()
+    this.boostRequestPending = false
+  }
   private readonly onVisibility = (): void => {
     if (document.hidden) this.onBlur()
   }
 
   private dispose(): void {
     this.controls.reset()
+    this.boostRequestPending = false
     this.pointerBinding?.destroy()
     this.pointerBinding = undefined
     window.removeEventListener('keydown', this.onKeyDown)

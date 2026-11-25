@@ -196,7 +196,7 @@ export class AppController {
         }
         return
       }
-      if (snapshot.result.mode === 'nearby') {
+      if (snapshot.result.mode === 'nearby' || snapshot.result.mode === 'boost-practice') {
         this.update({ ...this.state, paused: true, newTimeMedal: null, overlay: { type: 'results' } })
         return
       }

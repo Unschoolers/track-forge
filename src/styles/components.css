@@ -60,6 +60,13 @@
 .steer-button.pressed { background: var(--color-accent); color: white; }
 .steering-thumb { position: absolute; top: 50%; left: 50%; width: 3.2rem; height: 3.2rem; translate: -50% -50%; border-radius: 50%; background: var(--color-text); box-shadow: 0 .3rem 1rem #0008; }
 .brake-button, .throttle-button { width: var(--fitted-pedal-size, var(--pedal-size)); height: var(--fitted-pedal-size, var(--pedal-size)); border-radius: 50%; background: #39242a; color: #ff9aac; touch-action: none; transition: background-color 120ms ease, color 120ms ease, scale 120ms ease; }
+.boost-button { width: calc(var(--fitted-pedal-size, var(--pedal-size)) * .72); min-height: 44px; border-radius: 999px; border-color: #ffd45c99; background: #4a3c18; color: #ffe391; font-size: .75rem; touch-action: none; }
+.boost-button:disabled { opacity: .55; }
+.race-boost-meter { position: relative; display: flex; align-items: center; width: var(--fitted-pedal-size, var(--pedal-size)); height: 1.05rem; overflow: hidden; border: 1px solid #ffd45c99; border-radius: 999px; background: #17191c; }
+.race-boost-fill { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg, #e29634, #ffe477); }
+.race-boost-status { position: relative; z-index: 1; width: 100%; color: white; font-size: .56rem; font-weight: 900; line-height: 1; text-align: center; text-shadow: 0 1px 2px #000; }
+.race-boost-meter[data-phase='ready'] { box-shadow: 0 0 .55rem #ffe47788; }
+.race-boost-meter[data-phase='active'] { border-color: #fff; box-shadow: 0 0 .8rem #ff9d38; }
 .throttle-button { background: #173d31; color: #a0f1c2; }
 .throttle-button[hidden] { display: none; }
 .throttle-button.pressed { scale: .94; background: #238954; color: white; }

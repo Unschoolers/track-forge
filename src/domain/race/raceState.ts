@@ -10,6 +10,7 @@ import type { AiDriverState } from '@/domain/race/ai/aiState'
 import type { CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import type { CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import type { RaceEffectsState } from '@/domain/race/effects'
+import type { DriftBoostRules, DriftBoostSnapshot } from '@/domain/race/driftBoost'
 
 export type CountdownCue = 3 | 2 | 1 | 'go'
 
@@ -26,6 +27,7 @@ export interface MissedTimingGate {
 }
 
 export interface RaceVehicle {
+  readonly driftBoost?: DriftBoostSnapshot
   readonly id: string
   readonly car: CarId
   readonly player: boolean
@@ -98,6 +100,8 @@ export interface RaceCameraHints {
 }
 
 export interface RaceState {
+  /** Frozen opt-in boost rule for this race; missing means boost is off. */
+  readonly driftBoostRules?: DriftBoostRules
   readonly path: RoadPath
   readonly missedCheckpoint?: MissedTimingGate | undefined
   readonly routeKind?: RouteKind
@@ -131,6 +135,8 @@ export type RacePhase = 'countdown' | 'running' | 'finished'
 export type RaceOutcome = 'finished' | 'water'
 
 export interface DriverInput {
+  /** One-tick activation edge; ignored when this race has no enabled boost rule. */
+  readonly boostRequested?: boolean
   readonly steering: number
   readonly throttle: number
   readonly braking: boolean

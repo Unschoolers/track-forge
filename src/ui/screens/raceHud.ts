@@ -91,6 +91,22 @@ export function createRaceHud(
   steering.append(steeringThumb)
   const brake = button('BRAKE', 'brake', () => undefined, 'brake-button')
   brake.setAttribute('aria-label', 'Brake')
+  const boostControl = element('div', 'race-boost-control')
+  boostControl.dataset.raceBoost = ''
+  const boostMeter = element('div', 'race-boost-meter')
+  boostMeter.setAttribute('role', 'meter')
+  boostMeter.setAttribute('aria-label', 'Drift boost charge')
+  boostMeter.setAttribute('aria-valuemin', '0')
+  boostMeter.setAttribute('aria-valuemax', '100')
+  boostMeter.setAttribute('aria-valuenow', '0')
+  boostMeter.dataset.phase = 'charging'
+  const boostFill = element('i', 'race-boost-fill')
+  const boostStatus = element('span', 'race-boost-status', 'DRIFT BOOST')
+  boostMeter.append(boostFill, boostStatus)
+  const boost = button('BOOST', 'boost', () => undefined, 'boost-button')
+  boost.setAttribute('aria-label', 'Activate drift boost')
+  boost.title = 'Activate drift boost (Shift)'
+  boostControl.append(boostMeter, boost)
   const throttle = button('GAS', 'throttle', () => undefined, 'throttle-button')
   throttle.setAttribute('aria-label', 'Accelerate')
   const recoverPlayer = (): void => {
@@ -125,7 +141,7 @@ export function createRaceHud(
   })
   checkpointWarning.append(checkpointMessage, checkpointTimer, resetNow)
   const pedals = element('div', 'race-pedals')
-  pedals.append(recover, brake, throttle)
+  pedals.append(recover, boostControl, brake, throttle)
   const steeringHint = element('div', 'touch-steer-hint', '↔ DRAG TO STEER')
   steeringHint.setAttribute('aria-hidden', 'true')
   steeringGroup.append(steering, steeringHint, steeringButtons)
@@ -149,6 +165,7 @@ export function createRaceHud(
   const rightBinding = bindRacePointer(right, 'right', controls, updateControls)
   const brakeBinding = bindRacePointer(brake, 'brake', controls, updateControls)
   const throttleBinding = bindRacePointer(throttle, 'throttle', controls, updateControls)
+  const boostBinding = bindRacePointer(boost, 'boost', controls, updateControls)
   const bindPedalKeyboard = (target: HTMLButtonElement, pedal: 'brake' | 'throttle'): (() => void) => {
     const keyChange = (event: KeyboardEvent, pressed: boolean): void => {
       if (event.key !== ' ' && event.key !== 'Enter') return
@@ -202,6 +219,28 @@ export function createRaceHud(
   const unbindRightKeyboard = bindSteeringKeyboard(right, 1)
   const unbindBrakeKeyboard = bindPedalKeyboard(brake, 'brake')
   const unbindThrottleKeyboard = bindPedalKeyboard(throttle, 'throttle')
+  const bindBoostKeyboard = (target: HTMLButtonElement): (() => void) => {
+    const change = (event: KeyboardEvent, pressed: boolean): void => {
+      if (event.key !== ' ' && event.key !== 'Enter') return
+      event.preventDefault()
+      if (pressed) event.stopPropagation()
+      if (pressed && (target.disabled || event.repeat)) return
+      controls.setBoostKeyboard(event.key, pressed)
+      updateControls()
+    }
+    const down = (event: KeyboardEvent): void => change(event, true)
+    const up = (event: KeyboardEvent): void => change(event, false)
+    const blur = (): void => {
+      controls.setBoostKeyboard(' ', false)
+      controls.setBoostKeyboard('Enter', false)
+      updateControls()
+    }
+    target.addEventListener('keydown', down)
+    target.addEventListener('keyup', up)
+    target.addEventListener('blur', blur)
+    return () => { blur(); target.removeEventListener('keydown', down); target.removeEventListener('keyup', up); target.removeEventListener('blur', blur) }
+  }
+  const unbindBoostKeyboard = bindBoostKeyboard(boost)
   const onBlur = (): void => {
     controls.reset()
     updateControls()
@@ -256,6 +295,8 @@ export function createRaceHud(
     right.disabled = paused || phase === 'finished'
     throttle.disabled = paused || phase === 'finished'
     brake.disabled = paused || phase === 'finished'
+    const boostPractice = String(snapshot.setup?.mode) === 'boost-practice'
+    boostControl.hidden = !boostPractice
     throttle.hidden = state.preferences.pedalMode !== 'manual'
     pedals.classList.toggle('manual', state.preferences.pedalMode === 'manual')
     updateControls()
@@ -279,6 +320,17 @@ export function createRaceHud(
       if (checkpointAnnouncement.textContent) checkpointAnnouncement.textContent = ''
     }
     const player = snapshot.state?.vehicles.find((car) => car.player)
+    const boostSnapshot = (player as { readonly driftBoost?: { readonly charge: number; readonly phase: string } } | undefined)?.driftBoost
+    const boostCharge = Math.max(0, Math.min(1, boostSnapshot?.charge ?? 0))
+    boost.disabled = !boostPractice || paused || phase !== 'running' || boostSnapshot?.phase !== 'ready'
+    boostMeter.setAttribute('aria-valuenow', String(Math.round(boostCharge * 100)))
+    boostMeter.setAttribute('aria-valuetext', boostSnapshot?.phase === 'ready'
+      ? 'Ready' : `${Math.round(boostCharge * 100)} percent charged`)
+    boostMeter.dataset.phase = boostSnapshot?.phase ?? 'charging'
+    boostFill.style.transform = `scaleX(${boostCharge})`
+    boostStatus.textContent = boostSnapshot?.phase === 'active' ? 'BOOST ACTIVE' :
+      boostSnapshot?.phase === 'ready' ? 'BOOST READY' :
+        boostSnapshot?.phase === 'returning' ? 'RETURNING' : `CHARGING ${Math.round(boostCharge * 100)}%`
     const cue = driftCue(player, telemetry.phase, snapshot.state?.paused ?? false)
     slide.textContent = cue ?? ''
     slide.classList.toggle('visible', cue !== null)
@@ -374,10 +426,12 @@ export function createRaceHud(
       rightBinding.destroy()
       brakeBinding.destroy()
       throttleBinding.destroy()
+      boostBinding.destroy()
       unbindLeftKeyboard()
       unbindRightKeyboard()
       unbindBrakeKeyboard()
       unbindThrottleKeyboard()
+      unbindBoostKeyboard()
       window.removeEventListener('blur', onBlur)
       document.removeEventListener('visibilitychange', onVisibility)
       controls.reset()

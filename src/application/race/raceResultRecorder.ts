@@ -33,6 +33,17 @@ export function createRaceResult({ track, setup, state, terminalReason, scoreSto
         newRecord: false, standings: [], highScores: [],
       }
     }
+    if (setup.mode === 'boost-practice') {
+      const playerTime = outcome === 'finished' ? player.finishedAt : null
+      return {
+        mode: 'boost-practice', outcome, routeKind: normalizeRouteKind(track.routeKind),
+        splits: [...splits], finishGate: (state.timingGates?.length ?? 0) + 1,
+        trackId: track.id, trackName: track.name, playerPlace: 1, playerTime,
+        newRecord: false,
+        standings: [toRaceStanding(player, 0)],
+        highScores: [],
+      }
+    }
     const category = raceCategory(track, setup)
     const comparable = (score: ScoreEntry) => sameCategory(score, category, setup)
     // Local/legacy stores can contain long histories. Never spread all

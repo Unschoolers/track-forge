@@ -168,6 +168,7 @@ describe('ramp vehicle rendering', () => {
 				snapshot: {},
 				controller: { snapshot: () => ({ preferences: { lighting: 'day' } }) },
 				controls: {
+					consumeBoostRequest: () => false,
 					snapshot: () => ({ steering: 0, throttle: 1, braking: false }),
 				},
 				vehicleGraphics: lower,
@@ -239,7 +240,7 @@ describe('ramp vehicle rendering', () => {
       renderGroundPresentation() {},
       snapshot: {},
       controller: { snapshot: () => ({ preferences: { lighting: 'day' } }) },
-      controls: { snapshot: () => ({ steering: 0, throttle: 1, braking: false }) },
+      controls: { consumeBoostRequest: () => false, snapshot: () => ({ steering: 0, throttle: 1, braking: false }) },
       vehicleGraphics: lower,
       upperVehicleGraphics: upper,
       shadowGraphics: new Graphics(),
@@ -289,6 +290,7 @@ describe('ramp vehicle rendering', () => {
 			snapshot: {},
 			controller: { snapshot: () => ({ preferences: { lighting: 'day' } }) },
 			controls: {
+				consumeBoostRequest: () => false,
 				snapshot: () => ({ steering: 0, throttle: 1, braking: false }),
 			},
 			vehicleGraphics: lower,

@@ -64,7 +64,7 @@ export interface Preferences {
   readonly steeringSensitivity?: SteeringSensitivity
   readonly pedalMode?: PedalMode
   readonly raceLaps?: 1 | 2 | 3
-  readonly raceMode?: 'normal' | 'ghost' | 'time-trial'
+  readonly raceMode?: 'normal' | 'ghost' | 'time-trial' | 'boost-practice'
   readonly playerIdentity?: PlayerIdentity
   readonly displayName?: string
   readonly creatorId?: string

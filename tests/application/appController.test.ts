@@ -383,6 +383,37 @@ describe('AppController', () => {
     expect(session.snapshot().result?.playerTime).toBe(12.5)
   })
 
+  it('does not refresh score history or award medals after Boost Practice', () => {
+    const track = createStarterTrack(asTrackId('practice-unranked'), 1)
+    const trackStore = new TrackMemory()
+    trackStore.tracks.set(track.id, track)
+    const forTrack = vi.fn(() => [] as ReturnType<ScoreStore['forTrack']>)
+    const record = vi.fn(() => true)
+    const scoreStore: ScoreStore = { forTrack, record, removeTrack: vi.fn(() => true) }
+    const session = new RaceSession({
+      scoreStore, random: { next: () => 0.5 },
+      feedback: { unlock: vi.fn(), setEnabled: vi.fn(), handle: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn() },
+      step: (state) => ({
+        state: { ...state, phase: 'finished', vehicles: state.vehicles.map(vehicle => vehicle.player ? { ...vehicle, finishedAt: 12.5 } : vehicle) },
+        events: [{ type: 'race-finished', reason: 'finished' }],
+      }),
+    })
+    const controller = new AppController({
+      trackStore, scoreStore,
+      lastRaceStore: { load: () => null, save: () => true },
+      preferencesStore: { load: () => ({ ...preferences, raceMode: 'boost-practice' }), save: () => true },
+      raceSession: session, geometry: new TrackGeometryService(),
+    })
+    forTrack.mockClear()
+    controller.dispatch({ type: 'start-race' })
+    session.advance(3.7, { steering: 0, throttle: 1, braking: false })
+    session.advance(0.02, { steering: 0, throttle: 1, braking: false })
+    expect(controller.snapshot().overlay.type).toBe('results')
+    expect(controller.snapshot().newTimeMedal).toBeNull()
+    expect(forTrack).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
+  })
+
   it('rechecks a remembered track when Race Again is tapped', () => {
     const track = createStarterTrack(asTrackId('remembered'), 1)
     const trackStore = new TrackMemory()
