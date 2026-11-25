@@ -40,6 +40,7 @@ import {
   renderLampPosts,
 } from '@/phaser/rendering/lampPostRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH, type MeadowBitmapRenderer } from '@/phaser/rendering/meadowBitmapRenderer'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
@@ -80,6 +81,8 @@ export class EditorScene extends Phaser.Scene {
   private terrainGraphics?: Phaser.GameObjects.Graphics
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private trackGraphics?: Phaser.GameObjects.Graphics
+  private roadMarkingGraphics?: Phaser.GameObjects.Graphics
+  private meadowBitmapRenderer: MeadowBitmapRenderer | undefined
   private structureUnderlayGraphics?: Phaser.GameObjects.Graphics
   private structureDeckGraphics?: Phaser.GameObjects.Graphics
   private structureWallGraphics?: Phaser.GameObjects.Graphics
@@ -102,6 +105,8 @@ export class EditorScene extends Phaser.Scene {
   private renderedTerrainDetail: TerrainPresentationDetail | undefined
   private terrainRaster: EditorWorldRaster | undefined
   private roadRaster: EditorWorldRaster | undefined
+  private bitmapRoadRaster: EditorWorldRaster | undefined
+  private bitmapMarkingRaster: EditorWorldRaster | undefined
   private rasterizeWorld = false
   private unsubscribe: Unsubscribe | undefined
 
@@ -127,6 +132,7 @@ export class EditorScene extends Phaser.Scene {
     this.trackGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.road)
+    this.roadMarkingGraphics = this.add.graphics().setDepth(ROAD_MARKINGS_DEPTH)
     this.structureUnderlayGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.structureUnderlay)
@@ -146,10 +152,13 @@ export class EditorScene extends Phaser.Scene {
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.editorOverlay)
     this.terrainRaster = new EditorWorldRaster(this, [this.terrainGraphics], WORLD_RENDER_DEPTH.terrain)
-    this.roadRaster = new EditorWorldRaster(this, [
-      this.trackGraphics, this.structureUnderlayGraphics, this.structureDeckGraphics,
-      this.structureWallGraphics, this.lampGraphics,
-    ], WORLD_RENDER_DEPTH.road)
+    const decorations = [this.roadMarkingGraphics, this.structureUnderlayGraphics,
+      this.structureDeckGraphics, this.structureWallGraphics, this.lampGraphics]
+    this.roadRaster = new EditorWorldRaster(this, [this.trackGraphics, ...decorations], WORLD_RENDER_DEPTH.road)
+    // Meadow bitmap sprites sit between the road base and markings. Separate
+    // captures preserve painter order even on very large editor tracks.
+    this.bitmapRoadRaster = new EditorWorldRaster(this, [this.trackGraphics], WORLD_RENDER_DEPTH.road)
+    this.bitmapMarkingRaster = new EditorWorldRaster(this, decorations, ROAD_MARKINGS_DEPTH)
     this.currentSnapshot = this.controller.snapshot()
     this.editorInput = new EditorInputController({
       camera: this.editorCamera,
@@ -237,7 +246,19 @@ export class EditorScene extends Phaser.Scene {
     this.renderPendingGeometry()
     const { width, height } = this.viewport()
     this.terrainRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
-    this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
+    if (this.meadowBitmapRenderer) {
+      this.roadRaster?.render(this.editorCamera, width, height, false)
+      this.bitmapRoadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
+      this.bitmapMarkingRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
+      this.meadowBitmapRenderer.render({
+        centerX: this.editorCamera.x, centerY: this.editorCamera.y,
+        width, height, zoom: this.editorCamera.zoom, rotation: 0,
+      })
+    } else {
+      this.bitmapRoadRaster?.render(this.editorCamera, width, height, false)
+      this.bitmapMarkingRaster?.render(this.editorCamera, width, height, false)
+      this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
+    }
     this.renderGroundPresentation()
     this.renderSceneryPresentation()
     if (!this.previewRenderPending) return
@@ -383,6 +404,7 @@ export class EditorScene extends Phaser.Scene {
       !this.terrainGraphics ||
       !this.sceneryGraphics ||
       !this.trackGraphics ||
+      !this.roadMarkingGraphics ||
       !this.structureUnderlayGraphics ||
       !this.structureDeckGraphics ||
       !this.structureWallGraphics ||
@@ -396,6 +418,11 @@ export class EditorScene extends Phaser.Scene {
     this.rasterizeWorld = (geometry.path.terrainSurface.authoredCellCount ?? 0) >= 1_600 ||
       geometry.path.points.length >= 2_200
     this.trackGraphics.clear()
+    this.roadMarkingGraphics.clear()
+    this.meadowBitmapRenderer?.destroy()
+    // The inexpensive vector geometry remains visible during a live gesture;
+    // bake the new bitmap window only when the geometry is committed.
+    this.meadowBitmapRenderer = snapshot.editor.gestureStart ? undefined : createMeadowBitmapRenderer(this, geometry, night, snapshot.editor.environmentId)
     this.structureUnderlayGraphics.clear()
     this.structureDeckGraphics.clear()
     this.structureWallGraphics.clear()
@@ -406,8 +433,9 @@ export class EditorScene extends Phaser.Scene {
       geometry,
       night,
       snapshot.editor.environmentId,
+      this.roadMarkingGraphics,
     )
-    renderTrackStartGridPreview(this.trackGraphics, geometry)
+    renderTrackStartGridPreview(this.roadMarkingGraphics, geometry)
     renderBridgeUnderlay(
       this.structureUnderlayGraphics,
       geometry,
@@ -432,6 +460,8 @@ export class EditorScene extends Phaser.Scene {
       night,
     )
     this.roadRaster?.invalidate()
+    this.bitmapRoadRaster?.invalidate()
+    this.bitmapMarkingRaster?.invalidate()
   }
 
   private refreshTreePreview(previous: ReturnType<EditorInputController['sceneryPreview']>): void {
@@ -461,7 +491,7 @@ export class EditorScene extends Phaser.Scene {
     if (!renderTreesLayer || !this.sceneryGraphics) return
     this.sceneryGraphics.clear()
     const trees = preview?.type === 'tree' ? snapshot.editor.trees.map((tree, index) => index === preview.index ? preview.position : tree) : snapshot.editor.trees
-    renderTrees(this.sceneryGraphics, trees, snapshot.currentTrack?.lighting === 'night', this.trackGeometry().path.terrainSurface)
+    renderTrees(this.sceneryGraphics, trees, snapshot.currentTrack?.lighting === 'night', this.trackGeometry().path.terrainSurface, snapshot.editor.environmentId)
   }
 
   private terrainDetail(geometry: TrackGeometry): TerrainPresentationDetail {
@@ -691,6 +721,8 @@ export class EditorScene extends Phaser.Scene {
   private readonly invalidateRasters = (): void => {
     this.terrainRaster?.invalidate()
     this.roadRaster?.invalidate()
+    this.bitmapRoadRaster?.invalidate()
+    this.bitmapMarkingRaster?.invalidate()
   }
 
   private dispose(): void {
@@ -714,6 +746,10 @@ export class EditorScene extends Phaser.Scene {
     this.renderedTerrainDetail = undefined
     this.terrainRaster = undefined
     this.roadRaster = undefined
+    this.bitmapRoadRaster = undefined
+    this.bitmapMarkingRaster = undefined
+    this.meadowBitmapRenderer?.destroy()
+    this.meadowBitmapRenderer = undefined
     this.rasterizeWorld = false
   }
 }

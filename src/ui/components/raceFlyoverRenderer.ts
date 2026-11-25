@@ -1,6 +1,9 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
+import { shorelineBands } from '@/presentation/environments/shorelineMaterials'
+import { createMeadowBitmapLayers, drawBitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -46,6 +49,8 @@ export function createRaceFlyoverRenderer(
   const night = lighting === 'night'
   const environmentId = normalizeTrackEnvironmentId(track.environmentId)
   const palette = getTrackEnvironment(environmentId)[lighting]
+  const bitmap = createMeadowBitmapLayers(geometry, night, environmentId)
+  const bitmapArt = environmentId === 'grass' ? getMeadowBitmapArt(night) : undefined
   const props = track.scenery ?? []
   let sceneryWindow = ''
   let scenery = buildSceneryPresentation(environmentId, [], lighting, { left: 0, top: 0, right: 0, bottom: 0 })
@@ -59,14 +64,26 @@ export function createRaceFlyoverRenderer(
   if (path.closed && points.length > 1) {
     const a = points[points.length - 1]
     const b = points[0]
-    if (a && b) sections.push({ a, b })
+    if (a && b) sections.push({ a, b: { ...b, distance: path.totalLength } })
   }
   // Flyover frames must only paint. Prepare distance-anchored details once
   // rather than allocating strokes for every visible section on every frame.
   const materialSections = sections.map((section) => ({
     ...section,
-    strokes: environmentRoadStrokes(environmentId, section.a.surface, section.a, section.b, night),
+    strokes: environmentRoadStrokes(environmentId, section.a.surface, section.a, section.b, night, path.closed ? path.totalLength : undefined),
   }))
+  // Cache actual water contour bounds once. No new geometry is compiled per frame.
+  const waterRings = palette.shorelineBands ? path.terrainSurface.contours
+    .filter(contour => contour.kind === 'water' && contour.points.length >= 3)
+    .map(({ points }) => {
+      let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
+      for (const point of points) {
+        left = Math.min(left, point.x); right = Math.max(right, point.x)
+        top = Math.min(top, point.y); bottom = Math.max(bottom, point.y)
+      }
+      return { points, left, right, top, bottom }
+    }) : []
+  const bankBands = shorelineBands(palette, night)
   const treeStride = Math.max(1, Math.ceil(track.trees.length / 350))
   const trees = track.trees.filter((_, index) => index % treeStride === 0)
 
@@ -172,7 +189,7 @@ export function createRaceFlyoverRenderer(
     // Map the viewport center back to world space because the car sits below it.
     const offsetX = (width / 2 - focusX) / scale
     const offsetY = (height / 2 - focusY) / scale
-    drawGroundTexture(ctx, {
+    const worldView: GroundViewport = {
       centerX: player.x + Math.cos(rotation) * offsetX + Math.sin(rotation) * offsetY,
       centerY: player.y - Math.sin(rotation) * offsetX + Math.cos(rotation) * offsetY,
       width,
@@ -180,12 +197,13 @@ export function createRaceFlyoverRenderer(
       zoom: scale,
       rotation,
       minimumZoom: baseScale * (1 - 0.035),
-    }, night, environmentId)
+    }
+    drawGroundTexture(ctx, worldView, night, environmentId)
 
     const cellSize = track.terrain.cellSize
     for (let i = 0; i < runs.length; i += terrainStride) {
       const run = runs[i]
-      if (!run) continue
+      if (!run || (palette.shorelineBands && run.kind === 'water')) continue
       const x = run.column * cellSize
       const y = run.row * cellSize
       const runWidth = run.count * cellSize
@@ -199,6 +217,31 @@ export function createRaceFlyoverRenderer(
         ctx.fillRect(x, y, runWidth, Math.max(2, cellSize * .12))
       }
     }
+    if (waterRings.length) {
+      // Use complete rings and even-odd fill to preserve land islands inside
+      // water. Paint only rings intersecting the overscanned preview window.
+      ctx.beginPath()
+      for (const ring of waterRings) {
+        if (ring.left > player.x + radius || ring.right < player.x - radius ||
+          ring.top > player.y + radius || ring.bottom < player.y - radius) continue
+        for (const [index, point] of ring.points.entries()) {
+          if (index === 0) ctx.moveTo(point.x, point.y)
+          else ctx.lineTo(point.x, point.y)
+        }
+        ctx.closePath()
+      }
+      ctx.fillStyle = night ? '#183f52' : '#287c9c'
+      ctx.fill('evenodd')
+      ctx.lineJoin = 'round'
+      for (const band of bankBands) {
+        ctx.lineWidth = band.width
+        ctx.strokeStyle = `#${band.color.toString(16).padStart(6, '0')}`
+        ctx.globalAlpha = band.alpha
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+    }
+    if (bitmap) drawBitmapTiles(ctx, bitmap.shoreline, worldView)
     const left = Math.floor((player.x - radius) / GROUND_TILE_SIZE)
     const right = Math.ceil((player.x + radius) / GROUND_TILE_SIZE)
     const top = Math.floor((player.y - radius) / GROUND_TILE_SIZE)
@@ -231,6 +274,10 @@ export function createRaceFlyoverRenderer(
       if (!visible(tree.x, tree.y)) continue
       ctx.fillStyle = night ? 'rgba(0, 0, 0, .26)' : 'rgba(21, 54, 31, .24)'
       ctx.beginPath(); ctx.ellipse(tree.x + 12, tree.y + 12, 23, 13, 0, 0, Math.PI * 2); ctx.fill()
+      if (bitmapArt) {
+        ctx.drawImage(bitmapArt.tree, tree.x - 17, tree.y - 17, 34, 34)
+        continue
+      }
       ctx.fillStyle = night ? '#1b4738' : '#2c6b3c'
       ctx.beginPath(); ctx.arc(tree.x, tree.y, 18, 0, Math.PI * 2); ctx.fill()
       ctx.fillStyle = night ? '#275642' : '#478c4c'
@@ -256,9 +303,10 @@ export function createRaceFlyoverRenderer(
         ctx.stroke()
       }
     }
+    if (bitmap) drawBitmapTiles(ctx, bitmap.road, worldView)
     // The flyover and Phaser road use identical distance-anchored material
     // strokes, so textures never switch character between preview and race.
-    if (materialSections.length > 0) {
+    if (materialSections.length > 0 && (!bitmap || bitmap.road.visible(worldView).length === 0)) {
       for (const section of materialSections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
         for (const stroke of section.strokes) {

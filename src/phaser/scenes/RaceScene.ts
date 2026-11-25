@@ -162,6 +162,7 @@ export class RaceScene extends Phaser.Scene {
       track.trees,
       this.raceSession.snapshot().setup?.lighting === 'night',
       geometry.path.terrainSurface,
+      normalizeTrackEnvironmentId(track.environmentId),
     )
     this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
     renderTrackGeometryStructureUnderlay(

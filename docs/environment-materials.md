@@ -36,3 +36,54 @@ Automated: `tests/phaser/environmentMaterials.test.ts`, `tests/phaser/raceRoadRi
 Manual/device review: race, editor, and flyover for all three environments by day and night, both zoomed in and out, and representative large tracks. Check especially tiled-ground seams, corners/intersections, overpasses, road-surface readability, screen contrast, night light visibility and Android frame pacing. A green browser CI run alone does not certify physical Android GPU frame time.
 
 Rollback: revert the presentation changes. Serialized tracks and physics need no conversion.
+
+## Meadow visual proof of concept (2026-11-24)
+
+The first three presentation phases are deliberately independent of the domain:
+
+1. **Repeatable materials**: the existing baked grass canvas tile and bounded
+   cache remain the base. Meadow's road material is a 192-unit procedural
+   vector tile (eight 24-unit cells), mapped into along/across-road space.
+   Closed circuits fit an integral number of repeats; lane markings and
+   curbs remain separate. No new GPU texture or rasterization per frame.
+2. **Organic groundcover**: automatically compose low vegetation, wildflower
+   clusters, moss and exposed soil from deterministic padded-tile art.
+   Decorative patches are not obstacles, road surfaces or save-file entries.
+   Solid trees and manually placed props retain their current authoring and
+   physics. This avoids visually misleading newly generated collision hazards.
+3. **Water transitions**: four nested sand/damp-bank/contact-highlight bands
+   share the actual water contours. The flyover uses the same contour rings
+   and even-odd water fill, including islands. Bounds include the wider bank.
+   The centerline still marks the physical water boundary.
+
+### Generated bitmap integration
+
+The Meadow art now uses two locally bundled WebP atlases derived from the
+generated concept artwork: a 192×192 atlas of four 96×96 materials and a
+128×128 atlas of four 64×64 alpha sprites (mud, flowers, low shrub cluster,
+overhead pine). These are intentionally small first-pass mobile assets, not
+the final 512px production master. The source swatches were cropped without
+lane paint, periodically blended at opposing edges, and compressed. Mud and
+flowers have feathered alpha; shrubs and tree use the overhead sprite art.
+Boot decodes both atlases before scene creation. A load or dimension error
+reaches the existing retry screen instead of silently disabling the art.
+
+The base texture repeats with identical phase across ground tiles, with
+seeded transparent patch placements. Authored trees retain their existing
+footprints and shadows. Road material sprites use canonical ribbon quads
+and local along/across-road repeating patterns; markings remain on a
+separate layer. Sand and foam bitmap bands are tinted from the dirt and ice
+swatches and clipped to the existing water boundary stroke. Editor, race
+and flyover use the same bitmap tile painter. Each bitmap layer has a
+48-tile canvas cache and no more than 48 live GPU tiles, explicitly removed
+when no longer visible or when scenes close. Extreme zoom/over-budget
+views and live editor drawing gestures keep the established vector material
+fallback. Large editor tracks retain raster caching with separate base and
+decoration captures to preserve depth order.
+
+Meadow is the reference environment; the other three supported themes
+preserve their existing materials. A separate Beach environment is not
+introduced. Individual scenery props beyond the authored pine remain vector.
+Visual approval at driving zoom, day and night, and physical Android frame
+pacing remain release verification requirements. Rollback is a
+presentation-only revert; no serialized track changes.

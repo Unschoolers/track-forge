@@ -1,6 +1,7 @@
 import type { Vector2 } from '@/domain/model'
 import type { TerrainPrimitive } from '@/phaser/rendering/terrainMesh'
 import type { WorldBounds } from '@/presentation/environments/groundTexture'
+import { MAX_SHORELINE_HALF_WIDTH } from '@/presentation/environments/shorelineMaterials'
 
 export interface RaceTerrainChunk {
 	readonly primitive: TerrainPrimitive
@@ -27,13 +28,14 @@ export function chunkRaceTerrain(
 			right = Math.max(right, p.x)
 			bottom = Math.max(bottom, p.y)
 		}
+		const padding = primitive.kind === 'shoreline' ? MAX_SHORELINE_HALF_WIDTH + 2 : 4
 		result.push({
 			primitive,
 			bounds: {
-				left: left - 4,
-				top: top - 4,
-				right: right + 4,
-				bottom: bottom + 4,
+				left: left - padding,
+				top: top - padding,
+				right: right + padding,
+				bottom: bottom + padding,
 			},
 		})
 	}

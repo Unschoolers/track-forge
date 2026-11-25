@@ -6,6 +6,8 @@ import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { RoadRibbonSample } from '@/domain/track/trackGeometry'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { buildRoadRibbonQuads, type RoadRibbonQuad } from '@/presentation/environments/roadRibbonQuads'
+export { buildRoadRibbonQuads, type RoadRibbonQuad } from '@/presentation/environments/roadRibbonQuads'
 import {
   groundViewportBounds,
   type GroundViewport,
@@ -18,42 +20,8 @@ const MAX_RIBBON_CHUNKS = 64
 
 export type UpdateRoadRibbonVisibility = (view: GroundViewport, paddedViewport?: WorldBounds) => void
 
-export interface RoadRibbonQuad {
-  readonly surface: SurfaceId
-  readonly from: RoadRibbonSample['center']
-  readonly to: RoadRibbonSample['center']
-  readonly edge: readonly [Vector2, Vector2, Vector2, Vector2]
-  readonly road: readonly [Vector2, Vector2, Vector2, Vector2]
-}
-
 function hex(value: string): number {
   return Number.parseInt(value.slice(1), 16)
-}
-
-export function buildRoadRibbonQuads(
-  path: RoadPath,
-  ribbon: readonly RoadRibbonSample[],
-): readonly RoadRibbonQuad[] {
-  const count = path.closed ? ribbon.length : ribbon.length - 1
-  const quads: RoadRibbonQuad[] = []
-  for (let index = 0; index < count; index += 1) {
-    const current = ribbon[index]
-    const next = ribbon[(index + 1) % ribbon.length]
-    if (!current || !next) continue
-    quads.push({
-      surface: current.surface,
-      from: current.center,
-      to: next.center,
-      edge: [
-        current.edgeLeft,
-        next.edgeLeft,
-        next.edgeRight,
-        current.edgeRight,
-      ],
-      road: [current.left, next.left, next.right, current.right],
-    })
-  }
-  return quads
 }
 
 /**
@@ -75,10 +43,11 @@ function renderRoadRibbonPass(
   pass: 'edge' | 'road' | 'detail',
   night: boolean,
   environmentId: TrackEnvironmentId = 'grass',
+  loopLength?: number,
 ): void {
   if (pass === 'detail') {
     for (const quad of quads) {
-      for (const stroke of environmentRoadStrokes(environmentId, quad.surface, quad.from, quad.to, night)) {
+      for (const stroke of environmentRoadStrokes(environmentId, quad.surface, quad.from, quad.to, night, loopLength)) {
         graphics.lineStyle(stroke.width, stroke.color, stroke.alpha)
         graphics.lineBetween(stroke.start.x, stroke.start.y, stroke.end.x, stroke.end.y)
       }
@@ -108,7 +77,7 @@ export function renderRoadRibbon(
   const quads = buildRoadRibbonQuads(path, ribbon)
   renderRoadRibbonPass(graphics, quads, 'edge', night, environmentId)
   renderRoadRibbonPass(graphics, quads, 'road', night, environmentId)
-  renderRoadRibbonPass(graphics, quads, 'detail', night, environmentId)
+  renderRoadRibbonPass(graphics, quads, 'detail', night, environmentId, path.closed ? path.totalLength : undefined)
 }
 
 export function validBounds({ left, top, right, bottom }: WorldBounds): boolean {
@@ -172,7 +141,7 @@ export function renderRaceRoadRibbon(
   // Separate static detail objects share the same bounded visibility window.
   const materials = chunks.map(({ batch }) => {
     const detail = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
-    renderRoadRibbonPass(detail, batch, 'detail', night, environmentId)
+    renderRoadRibbonPass(detail, batch, 'detail', night, environmentId, path.closed ? path.totalLength : undefined)
     return detail
   })
 

@@ -35,6 +35,8 @@ const showRetry = () => {
 // The startup art stays available even if the game bundle cannot load.
 const timeout = window.setTimeout(showRetry, 30_000)
 try {
+  const { loadMeadowBitmapArt } = await import('./presentation/environments/meadowBitmapArt')
+  await loadMeadowBitmapArt()
   const game = await import('./main')
   await game.gameReady
   enterGame = game.enterGame

@@ -1,6 +1,8 @@
 import { art, ellipse, polygon } from './artPrimitives'
 import { GROUND_TILE_SIZE, createGroundTileRandom } from '@/presentation/environments/groundTexture'
 import type { EnvironmentPalette } from '@/presentation/environments/types'
+import { meadowGroundPatches } from './meadowGroundPatches'
+import { MEADOW_SHORELINE } from './shorelineMaterials'
 
 export const GRASS_ENVIRONMENT = {
   day: {
@@ -11,6 +13,7 @@ export const GRASS_ENVIRONMENT = {
     hillPlateau: 0x4c9d63,
     flyoverHill: '#80a66a',
     shorelineLand: 0x83a764,
+    shorelineBands: MEADOW_SHORELINE.day,
   },
   night: {
     editorGround: '#0e2b1d',
@@ -20,6 +23,7 @@ export const GRASS_ENVIRONMENT = {
     hillPlateau: 0x235433,
     flyoverHill: '#34533f',
     shorelineLand: 0x59715f,
+    shorelineBands: MEADOW_SHORELINE.night,
   },
 } satisfies Record<'day' | 'night', EnvironmentPalette>
 
@@ -95,6 +99,7 @@ export function getGrassTexture(variant: number, night: boolean): readonly Grass
       alpha: night ? 0.06 : 0.055,
     })
   }
+  marks.push(...meadowGroundPatches(variant, night))
   for (let i = 0; i < 430; i++) {
     marks.push({
       x: random() * GROUND_TILE_SIZE,

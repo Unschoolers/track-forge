@@ -7,6 +7,7 @@ export interface EnvironmentPalette {
   readonly hillPlateau: number
   readonly flyoverHill: string
   readonly shorelineLand: number
+  readonly shorelineBands?: readonly import('./shorelineMaterials').ShorelineBand[]
   /** Optional themed water/juice colors, separate from water physics. */
   readonly waterFill?: number
   readonly waterRipple?: number
