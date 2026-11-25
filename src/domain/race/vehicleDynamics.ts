@@ -36,6 +36,8 @@ export interface VehicleDynamicsParameters {
   /** Chassis-specific lateral stability, supplied with surface traction blending. */
   readonly lateralStability?: number
   readonly recovery: number
+  /** Temporary arcade handbrake assist; omitted for ordinary driving. */
+  readonly driftAssist?: { readonly rearGripScale: number; readonly yawRate: number }
   /** Speed target for drive and drag, which can change at terrain boundaries. */
   readonly maxSpeed: number
   /** Separate numerical limit before the integration headroom is applied. */
@@ -218,7 +220,8 @@ export function stepVehicleDynamics(
   const frontCapacity =
     lateralGripAcceleration * frontLoad * lateralBudget
   const rearCapacity =
-    lateralGripAcceleration * rearLoad * lateralBudget
+    lateralGripAcceleration * rearLoad * lateralBudget *
+    clamp(parameters.driftAssist?.rearGripScale ?? 1, 0, 1)
 
   const steerAngle = steeringInput * steeringLimitAtSpeed(
     parameters.maxSteerAngle,
@@ -287,8 +290,15 @@ export function stepVehicleDynamics(
     tireYawAcceleration - yawRate * recoveryDamping
 
   const maximumYawRate = Math.max(0, tuning.integration.maximumYawRate)
+  const naturalYawRate = yawRate + yawAcceleration * dt
+  const assistYaw = parameters.driftAssist?.yawRate ?? 0
+  // Ease toward a bounded yaw target; never snap the heading or inject velocity.
+  const assistedYawRate = assistYaw !== 0 &&
+    naturalYawRate * Math.sign(assistYaw) < Math.abs(assistYaw)
+    ? naturalYawRate + (assistYaw - naturalYawRate) * Math.min(1, dt * 18)
+    : naturalYawRate
   const nextYawRate = clamp(
-    yawRate + yawAcceleration * dt,
+    assistedYawRate,
     -maximumYawRate,
     maximumYawRate,
   )

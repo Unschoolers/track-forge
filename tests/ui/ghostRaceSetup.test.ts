@@ -70,6 +70,7 @@ describe('Ghost Race setup', () => {
     expect(callbacks.preferences).toHaveBeenCalledWith({ ...state.preferences, raceMode: 'boost-practice' })
     const selected = createRaceSetupModal({ ...state, preferences: { ...state.preferences, raceMode: 'boost-practice' } }, callbacks, null)
     expect(selected.textContent).toContain('unranked Arcade run')
+    expect(selected.textContent).toContain('Tap and release BRAKE while turning at speed')
     expect(selected
       .querySelector('[data-action="setup-start"]')?.textContent).toBe('START BOOST PRACTICE')
     const open = createRaceSetupModal({ ...state, currentTrack: { ...track, routeKind: 'point-to-point' } }, callbacks, null)
