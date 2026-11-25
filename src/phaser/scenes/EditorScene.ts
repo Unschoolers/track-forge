@@ -366,7 +366,6 @@ export class EditorScene extends Phaser.Scene {
       (gestureContextChanged && treePreviewRenderRequired(previousPreview, this.editorInput?.sceneryPreview() ?? null))) {
       this.renderSceneryPresentation(true)
     }
-    if (previousRenderState && previousRenderState.environmentId !== renderState.environmentId && !this.worldRenderPending) this.renderTerrainPresentation(this.trackGeometry())
     if (cameraChanged && !changes.world) this.refreshTerrainForCamera()
   }
 
@@ -422,7 +421,7 @@ export class EditorScene extends Phaser.Scene {
     this.meadowBitmapRenderer?.destroy()
     // The inexpensive vector geometry remains visible during a live gesture;
     // bake the new bitmap window only when the geometry is committed.
-    this.meadowBitmapRenderer = snapshot.editor.gestureStart ? undefined : createMeadowBitmapRenderer(this, geometry, night, snapshot.editor.environmentId)
+    this.meadowBitmapRenderer = snapshot.editor.gestureStart ? undefined : createMeadowBitmapRenderer(this, geometry, night, snapshot.editor.environmentId, 'local-ground')
     this.structureUnderlayGraphics.clear()
     this.structureDeckGraphics.clear()
     this.structureWallGraphics.clear()
@@ -441,18 +440,22 @@ export class EditorScene extends Phaser.Scene {
       geometry,
       night,
       'local-ground',
+      snapshot.editor.environmentId,
     )
     renderBridgeDeck(
       this.structureDeckGraphics,
       geometry,
       night,
       'local-ground',
+      this.structureUnderlayGraphics,
+      snapshot.editor.environmentId,
     )
     renderBridgeSideWalls(
       this.structureWallGraphics,
       geometry,
       night,
       'local-ground',
+      snapshot.editor.environmentId,
     )
     renderLampPosts(
       this.lampGraphics,

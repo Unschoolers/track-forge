@@ -71,6 +71,7 @@ export function editorSnapshotRenderChanges(
   return {
     world:
       geometryChanged ||
+      previous.environmentId !== current.environmentId ||
       previous.night !== current.night,
     appearance: previous.environmentId !== current.environmentId || previous.scenery !== current.scenery || previous.trees !== current.trees || previous.night !== current.night || (previous.tool !== current.tool && (previous.tool === 'tree' || current.tool === 'tree')),
     grid:

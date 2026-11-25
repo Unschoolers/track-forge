@@ -179,6 +179,27 @@ commands, terrain storage, surface meshes and physics for additional
 levels is deliberately out of scope. No new height is authorable or
 persisted by this change.
 
+### Organic ground variation across environments
+
+The other three bitmap environments now use the Meadow layering principle:
+a seamless base texture with broad, feathered, irregular tonal patches
+and small themed surface details. Desert has sand nap, gravel and dry
+grass; Cityscape has worn pavement, hairline cracks and moss; Kids' Room
+has carpet nap, faint stains and lint. Six bounded patches per tile are
+seeded by the existing tile variant. Day/night share the exact same
+placement geometry with different colors. The edge of every tile retains
+the original base bitmap phase to avoid visible seams. Meadow's existing
+generated patch art is unchanged.
+
+The shared ground bitmap painter bakes the overlays into the existing
+eight cached tile variants per environment and lighting, not a new layer
+or live scenery. Editor, race and flyover share this painter. No extra GPU
+textures beyond the existing tile budget, collision objects, physics
+changes or save data. The underlying swatches are reused; the procedural
+color overlays provide broad variation without new asset downloads.
+Physical-device art and frame-pacing review remains required.
+
+
 ### Road texture variation
 
 All four environments bake three longitudinal variants from each of their
@@ -216,3 +237,32 @@ art is retained for pre-boot/component-test presentation. The scenery
 picker continues using its existing labels/icons. No new prop types or
 serialized fields are introduced. Actual in-game art review and Android
 frame pacing remain validation requirements.
+
+
+### Themed bridge materials
+
+All four environments share the canonical bridge geometry and its
+existing terrain/local-ground shadow modes. Meadow has timber rails and
+mossy stone supports, Desert has warm sandstone parapets, Cityscape has
+steel rails and concrete supports, and Kids' Room has colorful toy-block
+rails and supports. Thin distance-anchored deck seams and railing hardware
+add character without modifying the selected street/dirt/ice surface.
+Day/night palettes affect only presentation.
+
+The elevated deck now uses the very same generated road texture strip,
+variation count, world width and canonical path-distance phase as the
+ordinary road. A sparse bitmap overlay paints the road surface, seams,
+lane markings and rails. Two optional bounded tile caches separate shallow
+ramp approaches (below ground vehicles) from the higher deck (above them).
+Each reuses the existing 48-tile limit; tracks without bridges allocate
+neither. The original vector artwork remains as a themed fallback when
+zoomed out or during editing. Rails are included in the bitmap overlay
+to preserve their appearance even when the editor combines vector
+decorations into its static raster. The race keeps its existing wall
+and upper-car depth ordering. The flyover uses the same geometry and
+material commands and overlays. Its existing simplified all-cars-on-top
+preview behavior is unchanged. Environment switches invalidate editor
+world artwork, but not the underlying geometry contract.
+
+No bridge heights, grip, clearance, collision, recovery, track formats or
+authored points are modified. Visual/device verification remains required.

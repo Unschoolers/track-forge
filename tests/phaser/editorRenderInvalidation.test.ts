@@ -87,10 +87,10 @@ describe('editor render invalidation', () => {
     })
   })
 
-  it('refreshes appearance without rebuilding geometry when scenery or theme changes', () => {
+  it('refreshes scenery alone but redraws road and bridge artwork on theme changes', () => {
     const previous = state()
     expect(editorSnapshotRenderChanges(previous, { ...previous, scenery: [] }, false)).toMatchObject({ world: false, appearance: true })
-    expect(editorSnapshotRenderChanges(previous, { ...previous, environmentId: 'desert' }, false)).toMatchObject({ world: false, appearance: true })
+    expect(editorSnapshotRenderChanges(previous, { ...previous, environmentId: 'desert' }, false)).toMatchObject({ world: true, appearance: true })
   })
 
   it('redraws trees only for tree, terrain, lighting, or tree-preview changes', () => {

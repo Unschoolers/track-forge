@@ -1,12 +1,14 @@
 import type Phaser from 'phaser'
 import {
   ROAD_GEOMETRY,
-  SURFACE_SPECS,
   WORLD_ELEVATION,
 } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import type { RoadRibbonQuad } from '@/presentation/environments/roadRibbonQuads'
+import { bridgePaintCommands, type BridgePaintCommand } from '@/presentation/environments/bridgeMaterials'
 import type { RoadSurfaceSample } from '@/domain/track/roadSurface'
 import {
   projectSunShadowOntoLocalGround,
@@ -36,12 +38,14 @@ export interface BridgePolygonPrimitive extends BridgePrimitiveBase {
   readonly polygon: readonly [Vector2, Vector2, Vector2, Vector2]
   readonly deckHeights: readonly [number, number]
   readonly terrainHeights: readonly [number, number]
+  readonly roadQuad?: RoadRibbonQuad
 }
 
 export interface BridgeLinePrimitive extends BridgePrimitiveBase {
   readonly kind: BridgeLineKind
   readonly start: Vector2
   readonly end: Vector2
+  readonly distanceSpan?: readonly [number, number]
 }
 
 export type BridgePrimitive =
@@ -349,10 +353,17 @@ export function* prepareBridgePresentation(
       ],
     }
     if (shadowMode === 'terrain' && !rampApproach) indexBridgeDeck(deckCells, deck)
+    const currentDistance = current.center.distance
+    const nextDistance = next.center.distance >= currentDistance ? next.center.distance : path.totalLength
     decks.push(
       deck,
       {
         kind: 'surface',
+        roadQuad: {
+          surface: current.surface, from: current.center,
+          to: nextDistance === next.center.distance ? next.center : { ...next.center, distance: nextDistance },
+          edge: deck.polygon, road: [current.left, next.left, next.right, current.right],
+        },
         rampApproach,
         ...elevationBase(
           current.surface,
@@ -399,6 +410,7 @@ export function* prepareBridgePresentation(
           ),
           start: current.left,
           end: next.left,
+          distanceSpan: [currentDistance, nextDistance],
         },
         {
           kind: 'wall',
@@ -410,14 +422,10 @@ export function* prepareBridgePresentation(
           ),
           start: current.right,
           end: next.right,
+          distanceSpan: [currentDistance, nextDistance],
         },
       )
     }
-    const currentDistance = current.center.distance
-    const nextDistance =
-      next.center.distance >= currentDistance
-        ? next.center.distance
-        : path.totalLength
     if (
       currentHeight >= WORLD_ELEVATION.levelHeight * 0.99 &&
       nextHeight >= WORLD_ELEVATION.levelHeight * 0.99 &&
@@ -461,38 +469,23 @@ export function* prepareBridgePresentation(
   return presentation
 }
 
-function hex(value: string): number {
-  return Number.parseInt(value.slice(1), 16)
-}
-
-function fill(
-  graphics: Phaser.GameObjects.Graphics,
-  polygon: readonly [Vector2, Vector2, Vector2, Vector2],
-  color: number,
-  alpha = 1,
-): void {
-  graphics.fillStyle(color, alpha)
-  graphics.beginPath()
-  graphics.moveTo(polygon[0].x, polygon[0].y)
-  for (const point of polygon.slice(1)) graphics.lineTo(point.x, point.y)
-  graphics.closePath()
-  graphics.fillPath()
-}
-
-function stroke(
-  graphics: Phaser.GameObjects.Graphics,
-  primitive: BridgeLinePrimitive,
-  width: number,
-  color: number,
-  alpha = 1,
-): void {
-  graphics.lineStyle(width, color, alpha)
-  graphics.lineBetween(
-    primitive.start.x,
-    primitive.start.y,
-    primitive.end.x,
-    primitive.end.y,
-  )
+function paint(graphics: Phaser.GameObjects.Graphics, commands: readonly BridgePaintCommand[]): void {
+  for (const command of commands) {
+    if (command.kind === 'fill') {
+      graphics.fillStyle(command.color, command.alpha)
+      const [a, b, c, d] = command.polygon
+      graphics.beginPath()
+      graphics.moveTo(a.x, a.y)
+      graphics.lineTo(b.x, b.y)
+      graphics.lineTo(c.x, c.y)
+      graphics.lineTo(d.x, d.y)
+      graphics.closePath()
+      graphics.fillPath()
+    } else {
+      graphics.lineStyle(command.width, command.color, command.alpha)
+      graphics.lineBetween(command.start.x, command.start.y, command.end.x, command.end.y)
+    }
+  }
 }
 
 export function renderBridgeUnderlay(
@@ -500,14 +493,11 @@ export function renderBridgeUnderlay(
   geometry: TrackGeometry,
   night = false,
   shadowMode: TrackShadowMode = 'terrain',
+  environment: TrackEnvironmentId = 'grass',
 ): void {
   for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
-    if (primitive.kind === 'shadow-soft' && !night) {
-      fill(graphics, primitive.polygon, 0x050807, 0.15)
-    } else if (primitive.kind === 'shadow-core' && !night) {
-      fill(graphics, primitive.polygon, 0x050807, 0.29)
-    } else if (primitive.kind === 'pillar') {
-      stroke(graphics, primitive, 11, 0x1c2422, 0.9)
+    if (primitive.kind === 'shadow-soft' || primitive.kind === 'shadow-core' || primitive.kind === 'pillar') {
+      paint(graphics, bridgePaintCommands(primitive, environment, night))
     }
   }
 }
@@ -518,38 +508,13 @@ export function renderBridgeDeck(
   night: boolean,
   shadowMode: TrackShadowMode = 'terrain',
   rampApproachGraphics = deckGraphics,
+  environment: TrackEnvironmentId = 'grass',
 ): void {
+  const loopLength = geometry.path.closed ? geometry.path.totalLength : undefined
   for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
+    if (primitive.kind !== 'edge' && primitive.kind !== 'surface' && primitive.kind !== 'side-face' && primitive.kind !== 'marking') continue
     const graphics = primitive.rampApproach ? rampApproachGraphics : deckGraphics
-    const spec = SURFACE_SPECS[primitive.surface]
-    if (primitive.kind === 'edge') {
-      fill(
-        graphics,
-        primitive.polygon,
-        hex(night ? spec.nightEdge : spec.edge),
-      )
-    } else if (primitive.kind === 'surface') {
-      fill(
-        graphics,
-        primitive.polygon,
-        hex(night ? spec.nightRoad : spec.road),
-      )
-    } else if (primitive.kind === 'side-face') {
-      fill(
-        graphics,
-        primitive.polygon,
-        night ? 0x12191d : 0x343d42,
-        night ? 0.92 : 0.78,
-      )
-    } else if (primitive.kind === 'marking') {
-      stroke(
-        graphics,
-        primitive,
-        primitive.surface === 'street' ? 2.4 : 1.7,
-        hex(night ? spec.nightStripe : spec.stripe),
-        0.8,
-      )
-    }
+    paint(graphics, bridgePaintCommands(primitive, environment, night, false, loopLength))
   }
 }
 
@@ -558,10 +523,9 @@ export function renderBridgeSideWalls(
   geometry: TrackGeometry,
   night: boolean,
   shadowMode: TrackShadowMode = 'terrain',
+  environment: TrackEnvironmentId = 'grass',
 ): void {
   for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
-    if (primitive.kind !== 'wall') continue
-    stroke(graphics, primitive, 7, night ? 0x8f9aa4 : 0xd8dde1)
-    stroke(graphics, primitive, 2, night ? 0x303941 : 0x59636d)
+    if (primitive.kind === 'wall') paint(graphics, bridgePaintCommands(primitive, environment, night))
   }
 }
