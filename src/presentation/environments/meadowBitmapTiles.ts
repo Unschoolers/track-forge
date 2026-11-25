@@ -8,6 +8,7 @@ import { createArtCanvas, getEnvironmentBitmapArt, type EnvironmentBitmapArt } f
 import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
+import { elevationLevelForHeight, elevationMaterialForLevel, groupElevationFaces } from './elevationMaterials'
 
 export const BITMAP_TILE_LIMIT = 48
 const TILE = GROUND_TILE_SIZE
@@ -137,10 +138,14 @@ type BankSegment = { readonly start: Vector2; readonly end: Vector2 }
 export const WATER_BANK_RADIUS = 13
 export const WATER_SHALLOW_RADIUS = 32
 
+type ElevationFace =
+  | { readonly kind: 'plateau'; readonly triangle: TerrainTriangle; readonly level: number }
+  | { readonly kind: 'slope'; readonly triangle: TerrainTriangle; readonly shade: number; readonly level: number }
+
 type TerrainBitmapItem =
   | { readonly kind: 'bank'; readonly segment: BankSegment }
-  | { readonly kind: 'water' | 'plateau'; readonly triangle: TerrainTriangle }
-  | { readonly kind: 'slope'; readonly triangle: TerrainTriangle; readonly shade: number }
+  | { readonly kind: 'water'; readonly triangle: TerrainTriangle }
+  | ElevationFace
 
 /** Subdivide long compacted contour edges before spatial indexing. The
  * exact original boundary is preserved, including the shores of islands. */
@@ -173,9 +178,11 @@ function terrainBitmapIndex(geometry: TrackGeometry): Map<string, TerrainBitmapI
   // Full-detail plateau triangles are small and bounded, unlike overview runs.
   for (const primitive of buildTerrainPresentation(surface, 'full')) {
     if (primitive.kind === 'hill-slope') {
-      for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet })
+      const level = elevationLevelForHeight(primitive.height)
+      for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet, level })
     } else if (primitive.kind === 'hill-plateau') {
-      for (const triangle of primitive.triangles) items.push({ kind: 'plateau', triangle })
+      const level = elevationLevelForHeight(primitive.height)
+      for (const triangle of primitive.triangles) items.push({ kind: 'plateau', triangle, level })
     }
   }
   return indexBitmapItems(items, item => item.kind === 'bank'
@@ -235,31 +242,37 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   if (palette.waterDetail === 'oil-slicks' && tile) paintHarborOilSlicks(context, tile)
   context.restore()
 
-  // Batch slope facets by the existing nine directional shades. Adjacent
-  // triangles are drawn as a single path to avoid visible triangle seams.
-  const slope = repeatPattern(context, art.slope)
-  for (let bucket = 0; bucket < 9; bucket++) {
-    context.beginPath()
-    for (const item of items) {
-      if (item.kind === 'slope' && Math.max(0, Math.min(8, Math.round((item.shade + 1) * 4))) === bucket) {
-        appendTriangle(context, item.triangle)
+  // Each actual elevation gets its own material and directional shading.
+  // Paint low to high, with the plateau over the slope of the same level.
+  // Group only the faces in this bounded tile, not the whole terrain.
+  const faces = items.filter((item): item is ElevationFace => item.kind === 'slope' || item.kind === 'plateau')
+  for (const [level, levelFaces] of groupElevationFaces(faces)) {
+    const material = elevationMaterialForLevel(art.elevationMaterials, level)
+    const shading = material.shading
+    const slope = repeatPattern(context, material.slope)
+    for (let bucket = 0; bucket < 9; bucket++) {
+      context.beginPath()
+      for (const item of levelFaces) {
+        if (item.kind === 'slope' && Math.max(0, Math.min(8, Math.round((item.shade + 1) * 4))) === bucket) {
+          appendTriangle(context, item.triangle)
+        }
       }
+      context.fillStyle = slope
+      context.fill()
+      context.fillStyle = bucket < 4
+        ? `rgba(${shading.slopeShadow},${(4 - bucket) * shading.slopeShadowStrength})`
+        : `rgba(${shading.slopeLight},${(bucket - 4) * shading.slopeLightStrength})`
+      context.fill()
     }
-    context.fillStyle = slope
+    context.beginPath()
+    for (const item of levelFaces) {
+      if (item.kind === 'plateau') appendTriangle(context, item.triangle)
+    }
+    context.fillStyle = repeatPattern(context, material.plateau)
     context.fill()
-    context.fillStyle = bucket < 4
-      ? `rgba(${palette.slopeShadow},${(4 - bucket) * palette.slopeShadowStrength})`
-      : `rgba(${palette.slopeLight},${(bucket - 4) * palette.slopeLightStrength})`
+    context.fillStyle = shading.plateauGlaze
     context.fill()
   }
-  context.beginPath()
-  for (const item of items) {
-    if (item.kind === 'plateau') appendTriangle(context, item.triangle)
-  }
-  context.fillStyle = repeatPattern(context, art.plateau)
-  context.fill()
-  context.fillStyle = palette.plateauGlaze
-  context.fill()
 }
 
 function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
