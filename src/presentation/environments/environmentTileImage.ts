@@ -2,6 +2,7 @@ import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { GROUND_TILE_SIZE, GROUND_TILE_VARIANTS } from './groundTexture'
 import { GRASS_TILE_PADDING, getGrassTileImage } from './grassTileImage'
 import { getTrackEnvironment } from './index'
+import { getEnvironmentBitmapArt, paintBitmapGround } from './meadowBitmapArt'
 
 export const GROUND_TILE_PADDING = GRASS_TILE_PADDING
 const images = new Map<string, HTMLCanvasElement>()
@@ -9,7 +10,8 @@ const images = new Map<string, HTMLCanvasElement>()
 export function getEnvironmentTileImage(environmentId: TrackEnvironmentId, variant: number, night: boolean): HTMLCanvasElement {
   const boundedVariant = ((Math.trunc(variant) % GROUND_TILE_VARIANTS) + GROUND_TILE_VARIANTS) % GROUND_TILE_VARIANTS || 0
   if (environmentId === 'grass') return getGrassTileImage(boundedVariant, night)
-  const key = `${environmentId}:${boundedVariant}:${night}`
+  const bitmap = getEnvironmentBitmapArt(environmentId, night)
+  const key = `${environmentId}:${boundedVariant}:${night}:${bitmap ? 'bitmap' : 'vector'}`
   const cached = images.get(key)
   if (cached) return cached
   const canvas = document.createElement('canvas')
@@ -17,6 +19,11 @@ export function getEnvironmentTileImage(environmentId: TrackEnvironmentId, varia
   canvas.height = canvas.width
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D is unavailable for ground tile rendering')
+  if (bitmap) {
+    paintBitmapGround(context, bitmap, boundedVariant, GROUND_TILE_PADDING)
+    images.set(key, canvas)
+    return canvas
+  }
   for (const shape of getTrackEnvironment(environmentId).groundArt(boundedVariant, night)) {
     context.fillStyle = `#${shape.color.toString(16).padStart(6, '0')}`
     context.globalAlpha = shape.alpha ?? 1

@@ -108,3 +108,19 @@ The existing vector overview and live-edit fallback remain available.
 The other environments keep their current palette and textures until
 they receive their own art passes. Day/night, in-game art approval and
 physical Android frame pacing require verification.
+
+
+### Desert visual identity
+
+Desert is the second bitmap environment. The existing renderer consumes a
+shared material contract and a data-driven terrain tint profile, rather than
+assuming all slopes are mossy rock or all banks are green. A six-cell
+144×96 WebP atlas (48px cells) is cropped from the generated Desert Canyon
+concept sheet, seam-blended and locally bundled: stony sand, unmarked
+asphalt, compacted dirt, ice, turquoise oasis water and softened dune sand.
+The same dune swatch covers slope and plateau; warm directional shading
+creates relief without introducing a rock cliff. Day/night water has a
+deep blue core, luminous oasis shallows and warm sand banks. Road paint
+remains geometry-driven. Existing authored cactus and rock props are
+unchanged. Cityscape and Kids' Room retain their current art until their
+own passes; this PR changes no terrain mechanics or track formats.

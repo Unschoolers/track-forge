@@ -1,5 +1,5 @@
 import { getGrassTexture } from '@/presentation/environments/grass'
-import { getMeadowBitmapArt, paintMeadowGround } from './meadowBitmapArt'
+import { getMeadowBitmapArt, paintBitmapGround } from './meadowBitmapArt'
 import { GROUND_TILE_SIZE } from '@/presentation/environments/groundTexture'
 
 /** Room for patches whose centers lie near a tile edge. */
@@ -18,7 +18,7 @@ export function getGrassTileImage(variant: number, night: boolean): HTMLCanvasEl
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D is unavailable for grass tile rendering')
   if (art) {
-    paintMeadowGround(context, art, variant, GRASS_TILE_PADDING)
+    paintBitmapGround(context, art, variant, GRASS_TILE_PADDING)
     images.set(key, canvas)
     return canvas
   }
