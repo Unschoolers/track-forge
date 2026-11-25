@@ -22,6 +22,18 @@ import {
 // An exponential response reaches about 95% of the new grip in 0.15 s.
 const SURFACE_GRIP_TIME_CONSTANT = 0.05
 
+/** Initial arcade practice tuning; ordinary race handling stays unchanged. */
+export const BRAKE_TAP_DRIFT_TUNING = {
+  maximumTapSeconds: 0.22,
+  minimumForwardSpeed: 110,
+  minimumSteering: 0.35,
+  assistSeconds: 0.8,
+  rearGripScale: 0.2,
+  lateralStabilityScale: 0.03,
+  yawRate: 2.1,
+  targetSlipRadians: 25 * Math.PI / 180,
+} as const
+
 export interface SpeedAssist {
   readonly multiplier: number
   readonly ceiling: number
@@ -94,6 +106,30 @@ export function stepVehicle(
     }
   }
   const braking = input.braking || aiSpeedBrake
+  const driftTuning = BRAKE_TAP_DRIFT_TUNING
+  const headingX = Math.cos(vehicle.angle)
+  const headingY = Math.sin(vehicle.angle)
+  const forward = vehicle.vx * headingX + vehicle.vy * headingY
+  const sideways = -vehicle.vx * headingY + vehicle.vy * headingX
+  const slip = Math.atan2(sideways, forward)
+  const canDrift = humanDriver && !!boost && !boost.active &&
+    boost.speedCeilingMultiplier === 1 && !boost.activated &&
+    vehicle.grounded && context.onRoad && context.surface !== 'grass' &&
+    forward >= driftTuning.minimumForwardSpeed
+  const previousTap = vehicle.driftTap
+  const steeringDirection = Math.sign(input.steering)
+  const turning = Math.abs(input.steering) >= driftTuning.minimumSteering
+  const heldSeconds = canDrift && input.braking
+    ? Math.min(driftTuning.maximumTapSeconds + 1, (previousTap?.heldSeconds ?? 0) + dt)
+    : 0
+  const tapReleased = canDrift && !input.braking && turning &&
+    (previousTap?.heldSeconds ?? 0) > 0 &&
+    (previousTap?.heldSeconds ?? 0) <= driftTuning.maximumTapSeconds + 1e-9
+  const assistSeconds = !canDrift || input.braking || !turning ? 0
+    : tapReleased ? driftTuning.assistSeconds
+    : previousTap?.direction === steeringDirection
+      ? Math.max(0, previousTap.assistSeconds - dt) : 0
+  const assisting = assistSeconds > 0
   const tuning = VEHICLE_DYNAMICS_TUNING
   const extraGrip = 1 + ((terrain.highSpeedGrip ?? 1) - 1) * clamp((vehicle.speed - 170) / 40, 0, 1)
   const targetGrip = surface.grip * terrain.grip * extraGrip
@@ -132,8 +168,17 @@ export function stepVehicle(
       }),
       recovery: car.recovery,
       // Strong stability is a dry-road trait, not an ice/gravel cheat.
-      lateralStability: 1 + (car.lateralStability - 1) *
-        Math.min(1, surfaceGrip * surfaceGrip),
+      lateralStability: (1 + (car.lateralStability - 1) *
+        Math.min(1, surfaceGrip * surfaceGrip)) *
+        (assisting ? driftTuning.lateralStabilityScale : 1),
+      ...(assisting ? {
+        driftAssist: {
+          rearGripScale: driftTuning.rearGripScale,
+          // Stop adding yaw once the actual velocity/heading slip reaches the target.
+          yawRate: -slip * steeringDirection < driftTuning.targetSlipRadians
+            ? steeringDirection * driftTuning.yawRate : 0,
+        },
+      } : {}),
       maxSpeed,
       ...(boost ? { absoluteSpeedLimit: maxSpeed } : {}),
       ...(boost?.active ? { accelerationMultiplier: boost.rules.accelerationMultiplier } : {}),
@@ -180,6 +225,9 @@ export function stepVehicle(
     slip: Math.abs(dynamics.lateralSpeed),
     braking: braking || brakePressure > 0,
     ...(humanDriver ? { brakePressure: driverPressure } : {}),
+    ...(boost && humanDriver ? {
+      driftTap: { heldSeconds, assistSeconds, direction: assisting ? steeringDirection : 0 },
+    } : vehicle.driftTap ? { driftTap: undefined } : {}),
     currentSurface: context.surface,
     surfaceGrip,
     onCurb: context.onCurb,
