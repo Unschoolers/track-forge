@@ -9,11 +9,13 @@ import patchesUrl from '@/assets/environments/meadow/patches.webp?url&no-inline'
 import terrainUrl from '@/assets/environments/meadow/terrain.webp?url&no-inline'
 import { createGroundTileRandom, GROUND_TILE_SIZE } from './groundTexture'
 import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS } from './roadTextureVariants'
+import { paintOrganicGround, type OrganicGroundTheme } from './organicGroundDetails'
 import { createElevationMaterials, elevationMaterialForLevel, type ElevationMaterials } from './elevationMaterials'
 
 export interface EnvironmentBitmapArt {
   readonly road: Readonly<Record<SurfaceId, HTMLCanvasElement>>
   readonly patches: readonly HTMLCanvasElement[]
+  readonly organicGround?: { readonly theme: OrganicGroundTheme; readonly night: boolean }
   readonly sand: HTMLCanvasElement
   readonly water: HTMLCanvasElement
   readonly elevationMaterials: ElevationMaterials<HTMLCanvasElement>
@@ -136,6 +138,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         water: cell(1, 1),
         sand: tint(dune, night ? 'rgba(125,103,82,0.25)' : 'rgba(250,221,161,0.30)'),
         patches: [],
+        organicGround: { theme: 'desert', night },
         terrainPalette: DESERT_TERRAIN_ART[night ? 'night' : 'day'],
       }
     }
@@ -152,6 +155,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         water: cell(1, 1),
         sand: tint(quay, night ? 'rgba(87,104,109,0.24)' : 'rgba(185,190,180,0.20)'),
         patches: [],
+        organicGround: { theme: 'cityscape', night },
         terrainPalette: CITY_TERRAIN_ART[night ? 'night' : 'day'],
       }
     }
@@ -178,6 +182,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         water: cell(1, 1),
         sand: tint(ground, night ? 'rgba(44,17,46,0.58)' : 'rgba(90,25,65,0.52)'),
         patches: [],
+        organicGround: { theme: 'kids-room', night },
         terrainPalette: KIDS_ROOM_TERRAIN_ART[night ? 'night' : 'day'],
       }
     }
@@ -201,8 +206,8 @@ export function getEnvironmentBitmapArt(environment: TrackEnvironmentId, night: 
   return undefined
 }
 
-/** Same repeat phase in every world tile; variation lives in the transparent
- * patch placements. Art stays inside the central tile, leaving its old padding
+/** Same base repeat phase in every world tile; variation lives in the
+ * transparent bitmap and procedural patch placements. Art stays inside the central tile, leaving its old padding
  * transparent so adjacent world tiles cannot cover one another. */
 export function paintBitmapGround(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, variant: number, padding: number): void {
   const ground = elevationMaterialForLevel(art.elevationMaterials, 0).plateau
@@ -211,6 +216,9 @@ export function paintBitmapGround(context: CanvasRenderingContext2D, art: Enviro
     for (let x = 0; x < 2; x++) {
       context.drawImage(ground, padding + x * repeat, padding + y * repeat, repeat, repeat)
     }
+  }
+  if (art.organicGround) {
+    paintOrganicGround(context, art.organicGround.theme, variant, art.organicGround.night, padding)
   }
   const random = createGroundTileRandom(variant, 0x5c3a)
   for (const patch of art.patches) {
