@@ -38,7 +38,6 @@ export type RaceEvent =
       readonly vehicleId: string
       readonly speed: number
     }
-  | { readonly type: 'boost-activated'; readonly vehicleId: string }
   | { readonly type: 'vehicle-landed'; readonly vehicleId: string; readonly strength: number }
   | {
       readonly type: 'vehicle-finished'
@@ -250,9 +249,6 @@ function advanceRace(
         })
         updated = reset
       }
-    }
-    if (previous?.driftBoost?.phase !== 'active' && updated.driftBoost?.phase === 'active') {
-      events.push({ type: 'boost-activated', vehicleId: updated.id })
     }
     if (previous && previous.currentSurface !== updated.currentSurface) {
       events.push({

@@ -10,6 +10,7 @@ export function routeRaceFeedback(
   events: ReturnType<RaceStep>['events'],
   input: DriverInput,
   peakLanding: number,
+  boostIgnited = false,
 ): void {
     const player = state.vehicles.find((vehicle) => vehicle.player)
     if (player) {
@@ -51,10 +52,8 @@ export function routeRaceFeedback(
         speedRatio: rival ? Math.min(1, rival.vehicle.speed / CAR_SPECS[rival.vehicle.car].max) : 0,
       })
     }
+    if (boostIgnited) feedback.handle({ type: 'boost-ignition' })
     for (const event of events) {
-      if (event.type === 'boost-activated' && event.vehicleId === player?.id) {
-        feedback.handle({ type: 'boost-ignition' })
-      }
       if (event.type === 'curb-hit' && event.vehicleId === 'player') {
         feedback.handle({
           type: 'curb',

@@ -390,6 +390,7 @@ export class RaceSession implements RaceSessionPort {
     let stepped = false
     let peakShake = 0
     let peakLanding = 0
+    let boostIgnited = false
     while (state.phase === 'running' && this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       const before = state.vehicles.find((vehicle) => vehicle.player)
       const tickInput = stepped ? { ...input, boostRequested: false } : input
@@ -399,9 +400,12 @@ export class RaceSession implements RaceSessionPort {
         event.type === 'vehicle-recovered' ? [event.vehicleId] : [],
       ))
       state = next.state
+      const player = state.vehicles.find((vehicle) => vehicle.player)
+      if (before?.driftBoost?.phase !== 'active' && player?.driftBoost?.phase === 'active') {
+        boostIgnited = true
+      }
       peakShake = Math.max(peakShake, state.cameraHints.shake)
       events.push(...next.events)
-      const player = state.vehicles.find((vehicle) => vehicle.player)
       if (player?.manualRecoveryUntilTick === state.tick && state.phase === 'running') {
         this.dependencies.feedback.handle({ type: 'countdown', cue: 'go' })
       }
@@ -450,7 +454,7 @@ export class RaceSession implements RaceSessionPort {
       if (player && result && !this.current.result) nearby.captureFinalFrame(player, resultState)
       if (result && !this.current.result) nearby.finish(result.playerTime)
     }
-    if (stepped) routeRaceFeedback(this.dependencies.feedback, resultState, events, input, peakLanding)
+    if (stepped) routeRaceFeedback(this.dependencies.feedback, resultState, events, input, peakLanding, boostIgnited)
     if (result && !this.current.result) {
       if (result.outcome === 'finished' && resultState.vehicles.some(isRivalRacing)) {
         this.rivalFinishRemaining = RIVAL_FINISH_SECONDS
