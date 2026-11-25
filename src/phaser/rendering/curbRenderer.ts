@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import type { TrackStart, Vector2 } from '@/domain/model'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { roadGateGeometry, roadGateSpan } from '@/domain/track/trackGeometry'
 import { samplePathBehindStart } from '@/domain/race/raceFactory'
 
@@ -120,16 +121,21 @@ export function renderCurbs(
   graphics: Phaser.GameObjects.Graphics,
   path: RoadPath,
   night: boolean,
+  environment: TrackEnvironmentId = 'grass',
 ): void {
-  renderCurbSegments(graphics, buildCurbSegments(path), night)
+  renderCurbSegments(graphics, buildCurbSegments(path), night, environment)
 }
 
 export function renderCurbSegments(
   graphics: Phaser.GameObjects.Graphics,
   curbs: readonly CurbSegment[],
   night: boolean,
+  environment: TrackEnvironmentId = 'grass',
 ): void {
-  const palette = night ? CURB_COLORS.night : CURB_COLORS.day
+  // Keep apex cues and geometry; use matching toy-plastic colors.
+  const palette = environment === 'kids-room'
+    ? (night ? { red: 0x9e4248, white: 0xb18b40 } : { red: 0xe84a43, white: 0xf5bf35 })
+    : (night ? CURB_COLORS.night : CURB_COLORS.day)
   for (const curb of curbs) {
     graphics.lineStyle(curb.width, palette[curb.color], 1)
     graphics.beginPath()

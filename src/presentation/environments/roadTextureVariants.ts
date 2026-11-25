@@ -1,6 +1,14 @@
 /** Three deterministic, smoothly joined variations of a seamless road swatch.
  * Keep the longitudinal grain direction: mirror/offset, never rotate by 90°. */
 export const ROAD_TEXTURE_VARIANTS = 3
+export const ROAD_TEXTURE_SIZE = 256
+export const ROAD_TEXTURE_SURFACES = ['street', 'dirt', 'ice'] as const
+
+export function validateRoadAtlasDimensions(width: number, height: number): void {
+  if (width !== ROAD_TEXTURE_SIZE * ROAD_TEXTURE_SURFACES.length || height !== ROAD_TEXTURE_SIZE) {
+    throw new Error('Unexpected road artwork atlas dimensions')
+  }
+}
 
 export function buildRoadTextureStrip(source: Uint8ClampedArray, size: number): Uint8ClampedArray {
   if (!Number.isInteger(size) || size < 8 || source.length !== size * size * 4) {
@@ -38,7 +46,7 @@ export function buildRoadTextureStrip(source: Uint8ClampedArray, size: number): 
         for (let c = 0; c < 4; c++) {
           const value = sample(variant, x, y, c)
           strip[((variant * size + y) * size + x) * 4 + c] =
-            value * (1 - mix) + sample(neighbor, x, y, c) * mix
+            mix === 0 ? value : value * (1 - mix) + sample(neighbor, x, y, c) * mix
         }
       }
     }
