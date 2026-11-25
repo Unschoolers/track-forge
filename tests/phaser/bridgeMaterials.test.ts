@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
-import { buildBridgePresentation, type BridgePolygonPrimitive } from '@/phaser/rendering/bridgeRenderer'
+import { bridgeRenderPasses, buildBridgePresentation, chunkBridgePrimitives, type BridgePolygonPrimitive } from '@/phaser/rendering/bridgeRenderer'
 import { BRIDGE_THEMES, bridgeJointFractions, bridgePaintCommands } from '@/presentation/environments/bridgeMaterials'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import { buildRoadRibbonQuads } from '@/presentation/environments/roadRibbonQuads'
@@ -21,6 +21,38 @@ const geometry = buildTrackGeometry({
 })
 
 describe('environment bridge artwork', () => {
+  it('chunks bridge primitives in painter order with bounds covering every item', () => {
+    const primitives = buildBridgePresentation(geometry)
+    const batches = chunkBridgePrimitives(primitives, 7)
+    expect(batches.flatMap(batch => batch.items)).toEqual(primitives)
+    for (const batch of batches) {
+      for (const primitive of batch.items) {
+        const points = 'polygon' in primitive ? primitive.polygon : [primitive.start, primitive.end]
+        for (const point of points) {
+          expect(point.x).toBeGreaterThanOrEqual(batch.bounds.left)
+          expect(point.x).toBeLessThanOrEqual(batch.bounds.right)
+          expect(point.y).toBeGreaterThanOrEqual(batch.bounds.top)
+          expect(point.y).toBeLessThanOrEqual(batch.bounds.bottom)
+        }
+      }
+    }
+  })
+
+  it('assigns each primitive once and keeps underlay before ramp and deck passes', () => {
+    const primitives = buildBridgePresentation(geometry)
+    const passes = bridgeRenderPasses(primitives)
+    const rendered = [...passes.underlay, ...passes.rampApproach, ...passes.deck, ...passes.walls]
+    expect(new Set(rendered).size).toBe(primitives.length)
+    for (const pass of [passes.underlay, passes.rampApproach, passes.deck, passes.walls]) {
+      expect(pass.map(item => primitives.indexOf(item))).toEqual(pass.map(item => primitives.indexOf(item)).sort((a, b) => a - b))
+    }
+    expect(passes.underlay.every(item => item.kind === 'shadow-soft' || item.kind === 'shadow-core' || item.kind === 'pillar')).toBe(true)
+    expect(passes.rampApproach.length).toBeGreaterThan(0)
+    expect(passes.rampApproach.every(item => item.rampApproach === true)).toBe(true)
+    expect(passes.deck.every(item => item.kind !== 'wall' && item.kind !== 'pillar' && item.kind !== 'shadow-soft' && item.kind !== 'shadow-core' && !item.rampApproach)).toBe(true)
+    expect(passes.walls.every(item => item.kind === 'wall')).toBe(true)
+  })
+
   it('uses exact canonical road quads and texture phases for elevated surfaces', () => {
     const road = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
     const surfaces = buildBridgePresentation(geometry).filter(

@@ -9,7 +9,6 @@ import {
 } from '@/phaser/rendering/nightRenderer'
 import {
   renderRaceTrackGeometryBase,
-  renderTrackGeometryStructureUnderlay,
   renderRecoveryCheckpoints,
 } from '@/phaser/rendering/trackRenderer'
 import {
@@ -46,9 +45,13 @@ import { groundViewportBounds, type WorldBounds } from '@/presentation/environme
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import {
+  buildBridgePresentation,
+  bridgeRenderPasses,
+  chunkBridgePrimitives,
   getBridgeDeckOcclusion,
   renderBridgeDeck,
   renderBridgeSideWalls,
+  renderBridgeUnderlay,
   type BridgeDeckOcclusion,
 } from '@/phaser/rendering/bridgeRenderer'
 import type { UpdateRoadRibbonVisibility } from '@/phaser/rendering/roadRibbonRenderer'
@@ -75,6 +78,7 @@ export class RaceScene extends Phaser.Scene {
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  private bridgeGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
@@ -119,21 +123,12 @@ export class RaceScene extends Phaser.Scene {
     this.sceneryGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.scenery)
-    const structureUnderlayGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.structureUnderlay)
     this.shadowGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.vehicleShadow)
     this.vehicleGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.lowerVehicle)
-    const bridgeGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.structureDeck)
-    const wallGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.structureWall)
     this.upperVehicleGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.upperVehicle)
@@ -163,14 +158,25 @@ export class RaceScene extends Phaser.Scene {
       normalizeTrackEnvironmentId(track.environmentId),
     )
     this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
-    renderTrackGeometryStructureUnderlay(
-      structureUnderlayGraphics,
-      geometry,
-      this.raceSession.snapshot().setup?.lighting === 'night',
-      normalizeTrackEnvironmentId(track.environmentId),
-    )
-    renderBridgeDeck(bridgeGraphics, geometry, night, 'terrain', structureUnderlayGraphics, normalizeTrackEnvironmentId(track.environmentId))
-    renderBridgeSideWalls(wallGraphics, geometry, night, 'terrain', normalizeTrackEnvironmentId(track.environmentId))
+    const bridgePresentation = buildBridgePresentation(geometry)
+    const bridgeEnvironment = normalizeTrackEnvironmentId(track.environmentId)
+    const bridgeNight = this.raceSession.snapshot().setup?.lighting === 'night'
+    const drawBridgeBatches = (items: typeof bridgePresentation, depth: number, draw: (graphics: Phaser.GameObjects.Graphics, items: typeof bridgePresentation) => void) => {
+      for (const batch of chunkBridgePrimitives(items)) {
+        const graphics = this.add.graphics().setDepth(depth)
+        draw(graphics, batch.items)
+        this.bridgeGraphics.push({ graphics, bounds: batch.bounds })
+      }
+    }
+    const bridgePasses = bridgeRenderPasses(bridgePresentation)
+    drawBridgeBatches(bridgePasses.underlay, WORLD_RENDER_DEPTH.structureUnderlay, (graphics, items) =>
+      renderBridgeUnderlay(graphics, geometry, bridgeNight, 'terrain', bridgeEnvironment, items))
+    drawBridgeBatches(bridgePasses.rampApproach, WORLD_RENDER_DEPTH.structureUnderlay, (graphics, items) =>
+      renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
+    drawBridgeBatches(bridgePasses.deck, WORLD_RENDER_DEPTH.structureDeck, (graphics, items) =>
+      renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
+    drawBridgeBatches(bridgePasses.walls, WORLD_RENDER_DEPTH.structureWall, (graphics, items) =>
+      renderBridgeSideWalls(graphics, geometry, night, 'terrain', bridgeEnvironment, items))
     this.lamps = buildLampPosts(geometry)
     for (const batch of chunkSpatialItems(this.lamps, lamp => [lamp.position, lamp.shadowEnd], 64, 8)) {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
@@ -408,6 +414,10 @@ export class RaceScene extends Phaser.Scene {
         const visible = terrainChunkVisible(bounds, nextStaticWindow)
         if (graphics.visible !== visible) graphics.setVisible(visible)
       }
+      for (const { graphics, bounds } of this.bridgeGraphics) {
+        const visible = terrainChunkVisible(bounds, nextStaticWindow)
+        if (graphics.visible !== visible) graphics.setVisible(visible)
+      }
     }
     // Road markings and ribbons are static. Rechecking all their bounds every
     // animation frame is wasted CPU: a padded visibility window keeps incoming
@@ -470,6 +480,7 @@ export class RaceScene extends Phaser.Scene {
     this.roadVisibilityBounds = undefined
     this.staticGraphicsVisibilityBounds = undefined
     this.lampGraphics = []
+    this.bridgeGraphics = []
     this.groundRenderer = undefined
     this.environmentSceneryRenderer?.destroy()
     this.environmentSceneryRenderer = undefined
