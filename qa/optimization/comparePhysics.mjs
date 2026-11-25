@@ -1,11 +1,15 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview } from './score.mjs'
+import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview,
+  hasIdenticalSimulationOutput } from './score.mjs'
 
 const [beforePath, afterPath, ...flags] = process.argv.slice(2)
 const reviewIndex = flags.indexOf('--timing-review')
 const timingReview = reviewIndex < 0 ? null : JSON.parse(readFileSync(flags.splice(reviewIndex, 2)[1], 'utf8'))
-if (flags.some(flag => flag !== '--gameplay-improvement')) throw new Error('Unknown physics comparison option')
+if (flags.some(flag => !['--gameplay-improvement', '--behavior-preserving'].includes(flag)))
+  throw new Error('Unknown physics comparison option')
+if (flags.includes('--gameplay-improvement') && flags.includes('--behavior-preserving'))
+  throw new Error('Gameplay-improvement and behavior-preserving classifications conflict')
 if (!beforePath || !afterPath) throw new Error('Usage: comparePhysics.mjs BEFORE AFTER')
 const before = JSON.parse(readFileSync(beforePath, 'utf8'))
 const after = JSON.parse(readFileSync(afterPath, 'utf8'))
@@ -15,18 +19,24 @@ const records = path => JSON.parse(readFileSync(join(dirname(path), 'baseline-re
 const original = records(beforePath)
 const baseline = new Map(original.map(item => [trialKey(item.task), item.result]))
 const seen = new Set()
+const behaviorPreserving = flags.includes('--behavior-preserving')
 const comparisons = records(afterPath).map(({ task, result }) => {
   const id = trialKey(task)
   const old = baseline.get(id)
   if (!old || seen.has(id)) throw new Error('Unmatched or duplicate trial: ' + id)
   seen.add(id)
+  if (behaviorPreserving && !hasIdenticalSimulationOutput(old, result))
+    throw new Error(`Behavior-preserving comparison changed simulation output: ${id}`)
   const pair = applyTimingReview(evaluatePair(old, result, PHYSICS_ACCEPTANCE), task, timingReview, before.physicsRevision)
   return { ...pair, regression: !pair.eligible }
 })
 if (seen.size !== baseline.size || baseline.size !== original.length || baseline.size === 0)
   throw new Error('Physics comparison matrix is incomplete')
 const regressions = comparisons.filter(row => row.regression)
-const acceptance = assessFleet(comparisons, { gameplayImprovement: flags.includes('--gameplay-improvement') })
+const acceptance = assessFleet(comparisons, {
+  gameplayImprovement: flags.includes('--gameplay-improvement'),
+  requireBenefit: !behaviorPreserving,
+})
 const summary = { beforeRevision: before.physicsRevision, afterRevision: after.physicsRevision,
   policy: PHYSICS_ACCEPTANCE, acceptance, comparisons, regressions,
   timingReviews: comparisons.filter(row => row.timingReview) }

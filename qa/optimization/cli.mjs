@@ -23,6 +23,7 @@ function options(args) {
   const tune = args.includes('--tune')
   const scenarioIds = take('scenarios', STUDY_SCENARIOS.map(x => x.id).join(',')).split(',')
   const baselineOnly = args.includes('--baseline-only')
+  const behaviorPreserving = args.includes('--behavior-preserving')
   const reference = take('reference', null)
   const gameplayImprovement = args.includes('--gameplay-improvement')
   if (args.includes('--help')) return { help: true }
@@ -47,7 +48,9 @@ function options(args) {
     throw new Error('--tune and --holdout-track are for balance tuning only')
   if (focus === 'balance' && (args.includes('--cars') || args.includes('--scenarios') || (tune && baselineOnly)))
     throw new Error('Balance uses all four cars and the fixed six benchmark scenarios')
-  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement, tune, holdoutFiles,
+  if (behaviorPreserving && (reference || focus !== 'driving'))
+    throw new Error('--behavior-preserving is for driving comparisons without recalibration')
+  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement, behaviorPreserving, tune, holdoutFiles,
     sampleTelemetry: !args.includes('--no-telemetry') }
 }
 
@@ -55,7 +58,7 @@ const args = options(process.argv.slice(2))
 if (args.help) {
   console.log('Usage: npm run qa:optimize -- [--focus driving|passing|balance] [--cars red,green,blue,yellow]' +
     ' [--workers 2] [--trials 14] [--seeds 1,4331]' +
-    ' [--scenarios pine-hairpins,desert-reverse] [--baseline-only] [--reference baseline-results.json] [--gameplay-improvement]' +
+    ' [--scenarios pine-hairpins,desert-reverse] [--baseline-only] [--reference baseline-results.json] [--gameplay-improvement] [--behavior-preserving]' +
     ' [--out qa/results/optimization] [--no-telemetry]')
   console.log('Balance: npm run qa:optimize -- --focus balance [--tune [--trials 14] [--holdout-track file.json]] [--out qa/results/balance]')
 } else if (args.focus === 'balance') {
@@ -108,6 +111,7 @@ if (args.help) {
       car, playerCar, focusRole, scenarioId: scenario.id, seed, mode, difficulty: 'hard',
       policyKind: args.focus, ...(opponentCar ? { opponentCar } : {}),
       ...(opponentSpeedLimit !== undefined ? { duelOpponentSpeedLimit: opponentSpeedLimit } : {}),
+      ...(args.behaviorPreserving && candidate.id === `base-${car}` ? { telemetry: true } : {}),
       candidateId: candidate.id, changes: candidate.changes,
     }
   }
@@ -260,7 +264,8 @@ if (args.help) {
       }
     }
     await mkdir(args.out, { recursive: true })
-    await writeFile(resolve(args.out, 'baseline-results.json'), JSON.stringify(records.filter(({ task }) => task.candidateId === `base-${task.car}`).map(({ task, result }) => ({ task, result: { ...result, samples: [] } }))))
+    await writeFile(resolve(args.out, 'baseline-results.json'), JSON.stringify(records.filter(({ task }) => task.candidateId === `base-${task.car}`).map(({ task, result }) => ({ task,
+      result: { ...result, samples: args.behaviorPreserving ? result.samples : [] } }))))
     await Promise.all([
       writeFile(resolve(args.out, 'summary.json'), JSON.stringify(result, null, 2) + '\n'),
       writeFile(resolve(args.out, 'runs.jsonl'),
