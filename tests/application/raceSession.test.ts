@@ -90,6 +90,75 @@ describe('RaceSession', () => {
     expect(ghostStore.record).not.toHaveBeenCalled()
   })
 
+  it('routes boost ignition once when activation and return happen within a multi-tick frame', () => {
+    const feedback = createFeedback()
+    const observedRequests: boolean[] = []
+    const step: RaceStep = (state, input, deltaSeconds) => {
+      observedRequests.push(input.boostRequested ?? false)
+      const phase = state.tick === 0 ? 'active' as const : 'returning' as const
+      return {
+        state: {
+          ...state,
+          tick: state.tick + 1,
+          elapsed: state.elapsed + deltaSeconds,
+          vehicles: state.vehicles.map((vehicle) => vehicle.player
+            ? { ...vehicle, driftBoost: { phase, charge: 0, remainingTicks: phase === 'active' ? 60 : 24 } }
+            : vehicle),
+        },
+        events: [],
+      }
+    }
+    const session = new RaceSession({
+      scoreStore: createScoreStore().store,
+      random: { next: () => 0.5 },
+      feedback,
+      step,
+    })
+    session.start(track, { ...setup, mode: 'boost-practice' })
+
+    // This frame consumes the 3.7 second countdown and advances multiple 60 Hz ticks.
+    session.advance(4.4, { ...noInput, boostRequested: true })
+
+    const ignitionEvents = vi.mocked(feedback.handle).mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === 'boost-ignition')
+    expect(session.snapshot().state?.tick).toBeGreaterThan(1)
+    expect(ignitionEvents).toEqual([{ type: 'boost-ignition' }])
+    expect(session.snapshot().state?.vehicles.find((vehicle) => vehicle.player)?.driftBoost?.phase).toBe('returning')
+    expect(observedRequests[0]).toBe(true)
+    expect(observedRequests.slice(1).every((requested) => !requested)).toBe(true)
+  })
+
+  it('does not cue when recovery cancels a boost before it becomes active', () => {
+    const feedback = createFeedback()
+    const step: RaceStep = (state, _input, deltaSeconds) => ({
+      state: {
+        ...state,
+        tick: state.tick + 1,
+        elapsed: state.elapsed + deltaSeconds,
+        vehicles: state.vehicles.map((vehicle) => vehicle.player
+          ? { ...vehicle, driftBoost: { phase: 'returning', charge: 0.4, remainingTicks: 24 } }
+          : vehicle),
+      },
+      events: state.tick === 0
+        ? [{ type: 'vehicle-recovered', vehicleId: 'player', reason: 'off-road', x: 0, y: 0, pathIndex: 0 }]
+        : [],
+    })
+    const session = new RaceSession({
+      scoreStore: createScoreStore().store,
+      random: { next: () => 0.5 },
+      feedback,
+      step,
+    })
+    session.start(track, { ...setup, mode: 'boost-practice' })
+    session.advance(4.4, noInput)
+
+    const ignitionEvents = vi.mocked(feedback.handle).mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === 'boost-ignition')
+    expect(ignitionEvents).toEqual([])
+  })
+
   it('gives each rematch a fresh run identity without changing it during Nearby staging', () => {
     const { store } = createScoreStore()
     const session = new RaceSession({

@@ -12,6 +12,7 @@ export const FEEDBACK_EVENT_TYPES = [
   'rival',
   'position-change',
   'finish',
+  'boost-ignition',
 ] as const
 
 export type FeedbackEvent =
@@ -33,6 +34,7 @@ export type FeedbackEvent =
   | { readonly type: 'landing'; readonly strength: number }
   | { readonly type: 'rival'; readonly proximity: number; readonly pan: number; readonly speedRatio: number }
   | { readonly type: 'curb'; readonly speed: number }
+  | { readonly type: 'boost-ignition' }
   | { readonly type: 'position-change'; readonly direction: 'gain' | 'loss'; readonly place: number }
   | {
       readonly type: 'finish'

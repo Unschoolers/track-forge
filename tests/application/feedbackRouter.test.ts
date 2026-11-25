@@ -40,6 +40,25 @@ describe('FeedbackRouter', () => {
     expect(haptics.silenceContinuous).toHaveBeenCalledOnce()
   })
 
+  it('keeps ignition sound and haptics independently controlled by preferences', () => {
+    const audio = port()
+    const haptics = port()
+    const router = new FeedbackRouter({ audio, haptics })
+    router.setChannels({ audio: true, haptics: false })
+    router.handle({ type: 'boost-ignition' })
+    expect(audio.handle).toHaveBeenCalledWith({ type: 'boost-ignition' })
+    expect(audio.setEnabled).toHaveBeenCalledWith(true)
+    expect(haptics.setEnabled).toHaveBeenCalledWith(false)
+
+    router.setChannels({ audio: false, haptics: true })
+    router.handle({ type: 'boost-ignition' })
+    expect(audio.handle).toHaveBeenCalledTimes(2)
+    expect(haptics.handle).toHaveBeenCalledTimes(2)
+    expect(audio.setEnabled).toHaveBeenLastCalledWith(false)
+    expect(haptics.setEnabled).toHaveBeenLastCalledWith(true)
+    router.destroy()
+  })
+
   it('rate-limits curb and tire-slip streams without dropping engine updates', () => {
     const audio = port()
     const haptics = port()

@@ -7,10 +7,12 @@ import { buildBridgePresentation, getBridgeDeckOcclusion, renderBridgeDeck, type
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { createRace } from '@/domain/race/raceFactory'
 import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
+import type { RaceState } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
 import { isVehicleAboveStructures, renderVehicles } from '@/phaser/rendering/vehicleRenderer'
 import { VEHICLE_VISUAL_SCALE, vehiclePaintColor } from '@/presentation/vehicleArtwork'
+import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 
 vi.mock('phaser', () => ({ default: { Scene: class {} } }))
 
@@ -37,6 +39,7 @@ const track: Track = {
 const BODY_PAINT_COLORS = new Set(CAR_IDS.map(car => vehiclePaintColor(car, 'body')))
 
 class Graphics {
+	readonly fillColors: number[] = []
 	readonly bodies: { x: number; y: number }[] = []
 	readonly scales: { x: number; y: number }[] = []
 	readonly shadows: { x: number; y: number }[] = []
@@ -46,6 +49,7 @@ class Graphics {
 	strokes = 0
 	clear() {
 		this.bodies.length = 0
+		this.fillColors.length = 0
 		this.scales.length = 0
 		this.shadows.length = 0
 		this.outlines.length = 0
@@ -62,6 +66,7 @@ class Graphics {
 		this.scales.push({ x, y })
 	}
 	fillStyle(color: number) {
+		this.fillColors.push(color)
 		if (BODY_PAINT_COLORS.has(color)) this.bodies.push({ ...this.position })
 	}
 	beginPath() {}
@@ -256,6 +261,69 @@ describe('ramp vehicle rendering', () => {
       { x: point.x + 3, y: point.y },
       { x: point.x, y: point.y },
     ])
+  })
+
+  it('wires active flames to the selected topper color on the player vehicle layer', () => {
+    const path = buildRoadPath(track.points, track.terrain)
+    const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
+    const ground = requireFixture(path.points[0])
+    const deckIndex = path.points.findIndex((point, index) =>
+      path.roadSurface.at(index, point).structureHeight > 23,
+    )
+    const deck = requireFixture(path.points[deckIndex])
+    const deckSupport = path.roadSurface.at(deckIndex, deck)
+    const activePlayer = {
+      ...requireFixture(base.vehicles.find(({ player }) => player)),
+      driftBoost: { charge: 0, phase: 'active' as const, remainingTicks: 30 },
+    }
+    let current: RaceState = {
+      ...base,
+      phase: 'running' as const,
+      vehicles: base.vehicles.map((vehicle) => vehicle.player
+        ? { ...activePlayer, x: ground.x, y: ground.y, z: 0, pathIndex: 0, grounded: true, structureRunId: null }
+        : vehicle),
+    }
+    const lower = new Graphics()
+    const upper = new Graphics()
+    const scene = {
+      renderGroundPresentation() {},
+      snapshot: {},
+      controller: { snapshot: () => ({ paused: false, currentTrack: track, preferences: {
+        lighting: 'day', pedalMode: 'auto', playerIdentity: { icon: 'star', color: 'violet' },
+      } }) },
+      controls: { consumeBoostRequest: () => false, snapshot: () => ({ steering: 0, throttle: 1, braking: false }) },
+      vehicleGraphics: lower,
+      upperVehicleGraphics: upper,
+      shadowGraphics: new Graphics(),
+      effectGraphics: new Graphics(),
+      game: { loop: { rawDelta: 16 } },
+      raceSession: { advance() {}, snapshot: () => ({ state: current, setup: { mode: 'boost-practice', lighting: 'day' } }) },
+    }
+    const draw = () => RaceScene.prototype.update.call(scene as never, 48, 16)
+
+    draw()
+    expect(lower.fillColors.filter((color) => color === TOPPER_COLORS.violet)).toHaveLength(3)
+    expect(upper.fillColors).not.toContain(TOPPER_COLORS.violet)
+
+    current = {
+      ...current,
+      vehicles: current.vehicles.map((vehicle) => vehicle.player
+        ? { ...vehicle, x: deck.x, y: deck.y, z: deckSupport.height, pathIndex: deckIndex,
+          structureRunId: deckSupport.structureRunId }
+        : vehicle),
+    }
+    draw()
+    expect(lower.fillColors).not.toContain(TOPPER_COLORS.violet)
+    expect(upper.fillColors.filter((color) => color === TOPPER_COLORS.violet)).toHaveLength(3)
+
+    current = {
+      ...current,
+      vehicles: current.vehicles.map((vehicle) => vehicle.player
+        ? { ...vehicle, driftBoost: { charge: 0, phase: 'returning' as const, remainingTicks: 30 } }
+        : vehicle),
+    }
+    draw()
+    expect(upper.fillColors.filter((color) => color === TOPPER_COLORS.violet)).toHaveLength(1)
   })
 
 	it('draws only a player outline above a deck that covers a lower car', () => {

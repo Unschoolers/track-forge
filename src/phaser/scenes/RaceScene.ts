@@ -17,6 +17,7 @@ import {
   renderGhostVehicle,
   renderNearbyVehicle,
   renderPlayerTopper,
+  renderBoostFlames,
   renderCoveredPlayerOutline,
   isVehicleAboveStructures,
   transformVehicleLights,
@@ -44,6 +45,7 @@ import { chunkRaceTerrain, chunkSpatialItems, terrainChunkVisible, terrainVisibi
 import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 import {
   buildBridgePresentation,
   bridgeRenderPasses,
@@ -323,6 +325,19 @@ export class RaceScene extends Phaser.Scene {
     const forPaint = (raised: boolean) => visibleVehicles
       .filter(({ id }) => upperVehicles.has(id) === raised)
       .sort((a, b) => Number(a.player) - Number(b.player))
+    if (boostPractice && player) {
+      const graphics = upperVehicles.has(player.id) ? this.upperVehicleGraphics : this.vehicleGraphics
+      const supportHeight = race.path.roadSurface.at(player.pathIndex, player).height
+      if (graphics) {
+        renderBoostFlames(
+          graphics,
+          player,
+          TOPPER_COLORS[this.snapshot.preferences.playerIdentity?.color ?? 'cyan'],
+          (_time % 240) / 240,
+          Math.max(0, player.z - supportHeight),
+        )
+      }
+    }
     renderVehicles(this.vehicleGraphics, forPaint(false), race.path)
     renderVehicles(this.upperVehicleGraphics, forPaint(true), race.path)
     if (player && race.missedCheckpoint && race.phase === 'running' && !race.paused) {
