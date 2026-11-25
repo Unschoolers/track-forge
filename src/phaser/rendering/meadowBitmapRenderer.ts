@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { BITMAP_TILE_LIMIT, createMeadowBitmapLayers, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
-import { GROUND_TILE_SIZE, type GroundTile, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
+import { GROUND_TILE_SIZE, groundViewportBounds, type GroundTile, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { WORLD_RENDER_DEPTH } from './renderLayers'
 import type { TrackShadowMode } from './lighting'
 
@@ -15,6 +15,10 @@ const PREFETCH_GUTTER_TILES = 1
 // texture budget remains shared with visible tiles, so large zoomed-out
 // views naturally disable prefetch rather than increasing memory use.
 const MAX_PREFETCH_TILES_PER_LAYER = 8
+const MAX_UNUSED_TILES_PER_LAYER = 8
+const FRAME_RESERVE_MS = 3
+const MAX_FRAME_INTERVAL_MS = 1000 / 60
+const HEADING_BUCKETS = 24
 let nextRenderer = 0
 
 interface CachedImage {
@@ -23,8 +27,15 @@ interface CachedImage {
   lastUsed: number
 }
 
-interface UploadRequest {
-  readonly owner: BitmapTileRenderer
+interface BitmapTileUploadOwner {
+  wants(key: string): boolean
+  prepare(tile: GroundTile): HTMLCanvasElement
+  upload(tile: GroundTile, key: string, canvas: HTMLCanvasElement): void
+  retireUnused?(): boolean
+}
+
+export interface UploadRequest {
+  readonly owner: BitmapTileUploadOwner
   readonly tile: GroundTile
   readonly key: string
   readonly priority: number
@@ -35,16 +46,25 @@ interface UploadRequest {
 }
 
 /** One bounded texture upload per display frame, shared across the bitmap layers. */
-class BitmapTileUploadScheduler {
+export class BitmapTileUploadScheduler {
   private readonly requests = new Map<string, UploadRequest>()
+  private readonly retirement = new Set<BitmapTileUploadOwner>()
+  private prepared: { request: UploadRequest; canvas: HTMLCanvasElement } | undefined
+  private frameStart: number | undefined
   private destroyed = false
 
-  constructor(private readonly scene: Phaser.Scene) {
+  constructor(private readonly scene: Phaser.Scene, private readonly now = () => performance.now()) {
+    scene.game.events.on('prestep', this.beginFrame)
     scene.game.events.on('postrender', this.processOne)
   }
 
-  replace(owner: BitmapTileRenderer, requests: readonly UploadRequest[]): void {
+  private readonly beginFrame = (): void => {
+    this.frameStart = this.now()
+  }
+
+  replace(owner: BitmapTileUploadOwner, requests: readonly UploadRequest[]): void {
     if (this.destroyed) return
+    if (owner.retireUnused) this.retirement.add(owner)
     for (const [id, request] of this.requests) {
       if (request.owner === owner) this.requests.delete(id)
     }
@@ -53,7 +73,9 @@ class BitmapTileUploadScheduler {
     }
   }
 
-  cancel(owner: BitmapTileRenderer): void {
+  cancel(owner: BitmapTileUploadOwner): void {
+    this.retirement.delete(owner)
+    if (this.prepared?.request.owner === owner) this.prepared = undefined
     for (const [id, request] of this.requests) {
       if (request.owner === owner) this.requests.delete(id)
     }
@@ -63,26 +85,76 @@ class BitmapTileUploadScheduler {
     if (this.destroyed) return
     this.destroyed = true
     this.requests.clear()
+    this.retirement.clear()
+    this.prepared = undefined
+    this.scene.game.events.off('prestep', this.beginFrame)
     this.scene.game.events.off('postrender', this.processOne)
   }
 
-  private readonly processOne = (): void => {
+  /** Startup-only: complete current-window textures before the first scene frame.
+   * Never drain speculative requests on the synchronous startup path. */
+  warmVisible(): void {
     if (this.destroyed) return
-    let bestId: string | undefined
+    for (let next = this.bestRequest(); next?.priority === 0; next = this.bestRequest()) {
+      const canvas = this.takePrepared(next) ?? next.owner.prepare(next.tile)
+      this.requests.delete(this.requestId(next))
+      next.owner.upload(next.tile, next.key, canvas)
+    }
+  }
+
+  private requestId(request: UploadRequest): string {
+    return `${request.ownerOrder}:${request.key}`
+  }
+
+  private bestRequest(): UploadRequest | undefined {
     let best: UploadRequest | undefined
     for (const [id, request] of this.requests) {
       if (!request.owner.wants(request.key)) {
         this.requests.delete(id)
         continue
       }
-      if (!best || compareRequests(request, best) < 0) {
-        best = request
-        bestId = id
-      }
+      if (!best || compareRequests(request, best) < 0) best = request
     }
-    if (!best || bestId === undefined) return
-    this.requests.delete(bestId)
-    best.owner.upload(best.tile, best.key)
+    return best
+  }
+
+  private takePrepared(request: UploadRequest): HTMLCanvasElement | undefined {
+    if (this.prepared?.request.owner !== request.owner || this.prepared.request.key !== request.key) return undefined
+    const { canvas } = this.prepared
+    this.prepared = undefined
+    return canvas
+  }
+
+  private readonly processOne = (): void => {
+    if (this.destroyed || this.frameStart === undefined) return
+    const start = this.frameStart
+    this.frameStart = undefined
+    const interval = this.scene.game.loop.rawDelta
+    const budget = Math.min(MAX_FRAME_INTERVAL_MS, interval > 0 ? interval : MAX_FRAME_INTERVAL_MS) - FRAME_RESERVE_MS
+    if (this.now() - start >= budget) return
+    const best = this.bestRequest()
+    if (!best) {
+      this.prepared = undefined
+      // Deleting GPU resources can also stall. Retire at most one stale tile
+      // per spare frame rather than destroying a batch during a camera update.
+      for (const owner of this.retirement) {
+        if (owner.retireUnused?.()) return
+        this.retirement.delete(owner)
+      }
+      return
+    }
+    // Finish prepared visible work even if distance priorities moved slightly.
+    // A new visible request may displace speculative prepared work.
+    const pending = this.prepared
+    const live = pending && this.requests.get(this.requestId(pending.request))
+    const next = live && live.owner.wants(live.key) && live.priority <= best.priority ? live : best
+    const canvas = this.takePrepared(next)
+    if (canvas) {
+      this.requests.delete(this.requestId(next))
+      next.owner.upload(next.tile, next.key, canvas)
+    } else {
+      this.prepared = { request: next, canvas: next.owner.prepare(next.tile) }
+    }
   }
 }
 
@@ -137,11 +209,12 @@ export function selectAheadTiles(
 }
 
 /** Only current and nearby prefetched tiles own GPU textures; no full-track atlas is allocated. */
-class BitmapTileRenderer {
+export class BitmapTileRenderer {
   readonly order = ++nextRenderer
   private readonly images = new Map<string, CachedImage>()
   private readonly current = new Set<string>()
   private readonly wanted = new Set<string>()
+  private selectionSignature = ''
   private currentSignature = ''
   private wantedSignature = ''
   private clock = 0
@@ -157,8 +230,18 @@ class BitmapTileRenderer {
 
   render(view: GroundViewport, bounds?: WorldBounds): void {
     if (this.destroyed) return
-    const currentTiles = this.tiles.visible(view, bounds)
-    const prefetchTiles = bounds ? this.tiles.visible(view, expanded(bounds)) : currentTiles
+    const window = bounds ?? groundViewportBounds(view)
+    const grid = [window.left, window.top, window.right, window.bottom]
+      .map(edge => Math.floor(edge / GROUND_TILE_SIZE)).join(':')
+    // Tile membership depends on grid bounds and the bitmap zoom cutoff.
+    // Directional priorities only need refreshing at meaningful camera changes.
+    const heading = bounds ? Math.round(view.rotation * HEADING_BUCKETS / (2 * Math.PI)) : 0
+    const center = bounds ? `${Math.floor(view.centerX / (GROUND_TILE_SIZE / 2))}:${Math.floor(view.centerY / (GROUND_TILE_SIZE / 2))}` : ''
+    const selection = `${grid}:${Math.min(view.zoom, view.minimumZoom ?? view.zoom) < 0.18}:${heading}:${center}`
+    if (selection === this.selectionSignature) return
+    this.selectionSignature = selection
+    const currentTiles = this.tiles.visible(view, window)
+    const prefetchTiles = bounds ? this.tiles.visible(view, expanded(window)) : currentTiles
     const currentSignature = currentTiles.map(tileKey).join('|')
     const maxPrefetch = Math.max(0, Math.min(
       MAX_PREFETCH_TILES_PER_LAYER,
@@ -214,12 +297,16 @@ class BitmapTileRenderer {
     return !this.destroyed && this.wanted.has(key) && !this.images.has(key)
   }
 
-  upload(tile: GroundTile, key: string): void {
+  prepare(tile: GroundTile): HTMLCanvasElement {
+    return this.tiles.image(tile)
+  }
+
+  upload(tile: GroundTile, key: string, canvas: HTMLCanvasElement): void {
     if (!this.wants(key)) return
     this.ensureCapacity()
     if (this.images.size >= BITMAP_TILE_LIMIT) return
     const texture = `meadow-layer-${this.order}:${key}`
-    const registered = this.scene.textures.addCanvas(texture, this.tiles.image(tile))
+    const registered = this.scene.textures.addCanvas(texture, canvas)
     if (!registered) throw new Error('Could not register Meadow bitmap tile')
     try {
       const image = this.scene.add.image(tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, texture)
@@ -237,43 +324,43 @@ class BitmapTileRenderer {
     this.scheduler.cancel(this)
     this.current.clear()
     this.wanted.clear()
+    this.selectionSignature = ''
     this.currentSignature = ''
     this.wantedSignature = ''
     for (const item of this.images.values()) this.remove(item)
     this.images.clear()
   }
 
+  retireUnused(): boolean {
+    let unused = 0
+    for (const key of this.images.keys()) if (!this.wanted.has(key)) unused++
+    return unused > MAX_UNUSED_TILES_PER_LAYER && this.evictOldest(key => !this.wanted.has(key))
+  }
+
   private ensureCapacity(): void {
-    while (this.images.size >= BITMAP_TILE_LIMIT) {
-      let oldestKey: string | undefined
-      let oldestUsed = Infinity
-      for (const [key, item] of this.images) {
-        // Keep current tiles resident, but let urgent visible requests evict
-        // prefetched entries even when the cache is otherwise protected.
-        if (this.current.has(key)) continue
-        const lastUsed = item.lastUsed
-        if (lastUsed < oldestUsed) {
-          oldestUsed = lastUsed
-          oldestKey = key
-        }
-      }
-      if (oldestKey === undefined) {
-        // A current miss cannot be blocked by prefetched cache entries. The
-        // current set itself is bounded to BITMAP_TILE_LIMIT.
-        for (const [key, item] of this.images) {
-          const lastUsed = item.lastUsed
-          if (lastUsed < oldestUsed) {
-            oldestUsed = lastUsed
-            oldestKey = key
-          }
-        }
-      }
-      if (oldestKey === undefined) return
-      const item = this.images.get(oldestKey)
-      if (!item) return
-      this.remove(item)
-      this.images.delete(oldestKey)
+    if (this.images.size < BITMAP_TILE_LIMIT) return
+    // Evict stale tiles before any requested tile. Current tiles are never
+    // sacrificed for speculation.
+    if (!this.evictOldest(key => !this.wanted.has(key))) {
+      this.evictOldest(key => !this.current.has(key))
     }
+  }
+
+  private evictOldest(eligible: (key: string) => boolean): boolean {
+    let oldestKey: string | undefined
+    let oldestUsed = Infinity
+    for (const [key, item] of this.images) {
+      if (eligible(key) && item.lastUsed < oldestUsed) {
+        oldestKey = key
+        oldestUsed = item.lastUsed
+      }
+    }
+    if (oldestKey === undefined) return false
+    const item = this.images.get(oldestKey)
+    if (!item) return false
+    this.remove(item)
+    this.images.delete(oldestKey)
+    return true
   }
 
   private touch(key: string, item: CachedImage): void {
@@ -289,6 +376,7 @@ class BitmapTileRenderer {
 
 export interface MeadowBitmapRenderer {
   render(view: GroundViewport, bounds?: WorldBounds): void
+  warmVisible(): void
   destroy(): void
 }
 
@@ -315,6 +403,7 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackG
     render(view, bounds) {
       for (const renderer of renderers) renderer.render(view, bounds)
     },
+    warmVisible: () => scheduler.warmVisible(),
     destroy,
   }
 }

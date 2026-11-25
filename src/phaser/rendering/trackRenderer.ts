@@ -14,7 +14,7 @@ import {
 import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import type { Vector2 } from '@/domain/model'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
-import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH } from '@/phaser/rendering/meadowBitmapRenderer'
+import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH, type MeadowBitmapRenderer } from '@/phaser/rendering/meadowBitmapRenderer'
 import {
   buildCurbSegments,
   renderCurbSegments,
@@ -112,14 +112,17 @@ export function renderTrackGeometryBase(
   renderTrackGeometryMarkings(markings, geometry, night, environmentId)
 }
 
+export type RaceTrackVisibility = UpdateRoadRibbonVisibility & { readonly bitmap?: MeadowBitmapRenderer }
+
 export function renderRaceTrackGeometryBase(
   scene: Phaser.Scene,
   geometry: TrackGeometry,
   night: boolean,
   environmentId: TrackEnvironmentId = 'grass',
-): UpdateRoadRibbonVisibility | undefined {
+): RaceTrackVisibility | undefined {
   const bitmap = createMeadowBitmapRenderer(scene, geometry, night, environmentId)
-  if (bitmap) scene.events.once('shutdown', () => bitmap.destroy())
+  const withBitmap = (update: UpdateRoadRibbonVisibility): RaceTrackVisibility =>
+    bitmap ? Object.assign(update, { bitmap }) : update
   const markingsDepth = bitmap ? ROAD_MARKINGS_DEPTH : WORLD_RENDER_DEPTH.road
   const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night, environmentId)
   if (!updateVisibility) {
@@ -130,7 +133,7 @@ export function renderRaceTrackGeometryBase(
       return undefined
     }
     renderTrackGeometryMarkings(scene.add.graphics().setDepth(markingsDepth), geometry, night, environmentId)
-    return (view, paddedViewport) => bitmap.render(view, paddedViewport)
+    return withBitmap((view, paddedViewport) => bitmap.render(view, paddedViewport))
   }
 
   // Keep the original paint order (all curbs, then stripes, then markers),
@@ -180,7 +183,7 @@ export function renderRaceTrackGeometryBase(
   }
   const graphics = scene.add.graphics().setDepth(markingsDepth)
   renderTrackMarkers(graphics, geometry, night)
-  return (view, paddedViewport) => {
+  return withBitmap((view, paddedViewport) => {
     updateVisibility(view, paddedViewport)
     bitmap?.render(view, paddedViewport)
     const viewport = paddedViewport ?? groundViewportBounds(view)
@@ -188,7 +191,7 @@ export function renderRaceTrackGeometryBase(
       const visible = boundsVisible(bounds, viewport)
       if (graphics.visible !== visible) graphics.setVisible(visible)
     }
-  }
+  })
 }
 
 export function renderTrackGeometryStructureUnderlay(
