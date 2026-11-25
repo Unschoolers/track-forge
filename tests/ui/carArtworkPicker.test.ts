@@ -13,7 +13,7 @@ describe('car picker artwork', () => {
     for (const id of CAR_IDS) {
       const choice = picker.querySelector<HTMLButtonElement>(`[data-car="${id}"]`)
       expect(choice?.getAttribute('aria-pressed')).toBe(String(id === 'yellow'))
-      const image = choice?.querySelector('img.car-silhouette')
+      const image = choice?.querySelector<HTMLImageElement>('img.car-silhouette')
       expect(image?.getAttribute('src')).toBe(vehicleBitmapUrl(id))
       expect(image?.alt).toBe('')
       urls.add(vehicleBitmapUrl(id))

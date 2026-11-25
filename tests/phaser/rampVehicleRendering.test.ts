@@ -153,6 +153,16 @@ describe('ramp vehicle rendering', () => {
     expect(graphics.scales).toEqual([
       { x: VEHICLE_VISUAL_SCALE, y: VEHICLE_VISUAL_SCALE },
     ])
+
+    // The production bitmap path must use the same position/scale and avoid
+    // redrawing the vector body when the sprite successfully paints.
+    graphics.clear()
+    const draw = vi.fn(() => true)
+    renderVehicles(graphics as never, [{ ...car, braking: false }], path, { draw })
+    expect(draw).toHaveBeenCalledWith(car.car, car.x, car.y, car.angle,
+      VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE, undefined)
+    expect(graphics.bodies).toEqual([])
+
   })
 
 	it.each([false, true])(
