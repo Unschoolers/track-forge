@@ -458,6 +458,8 @@ export class RaceScene extends Phaser.Scene {
     this.lightVisibilityBounds = undefined
     this.roadVisibilityBounds = undefined
     this.groundRenderer = undefined
+    this.environmentSceneryRenderer?.destroy()
+    this.environmentSceneryRenderer = undefined
     this.updateRoadRibbonVisibility = undefined
     this.raceCamera = undefined
     this.isCoveredByBridgeDeck = undefined

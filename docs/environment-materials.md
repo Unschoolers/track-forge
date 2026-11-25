@@ -193,6 +193,31 @@ and the 48-tile cache budget stay unchanged. These are derived variants,
 not new independent paintings; visual approval at driving zoom remains
 required.
 
+### Generated scenery sprites
+
+A single locally bundled 256×320 alpha WebP atlas (27,990 bytes) contains
+19 independently generated props in 64px cells, with one unused cell.
+The original high-resolution AI art is cropped to each silhouette, scaled
+proportionally, centered with transparent padding, and compressed for
+mobile use. Every existing scenery kind has an explicit atlas index:
+four Meadow props, four Desert props, four Cityscape props, six Kids'
+Room toys and the shared tree. Boot validates the atlas dimensions and
+decodes day/night cells once. A load error reaches the existing startup
+retry screen rather than silently hiding artwork.
+
+Editor, race and flyover share the same visible-scenery render plan.
+Existing placement radius, stable identifiers, day/night contact shadows,
+selection/drag/undo semantics and terrain physics are preserved. The
+shared tree retains the existing canopy size and terrain-projected shadow.
+Phaser registers a bounded texture per kind and lighting and reuses live
+visible sprite objects; departing props and scene shutdown release
+objects. Canvas flyover draws the same cells with the same size. Vector
+art is retained for pre-boot/component-test presentation. The scenery
+picker continues using its existing labels/icons. No new prop types or
+serialized fields are introduced. Actual in-game art review and Android
+frame pacing remain validation requirements.
+
+
 ### Organic ground variation across environments
 
 The other three bitmap environments now use the Meadow layering principle:
