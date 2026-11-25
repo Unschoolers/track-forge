@@ -69,3 +69,23 @@ test('offers a retry when the game bundle fails to load', async ({ page }) => {
   await page.getByRole('button', { name: /^try again$/i }).tap()
   await expect(startButton(page)).toBeVisible()
 })
+
+test('reports an artwork failure while the game bundle is still loading', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  let releaseBundle
+  const heldBundle = new Promise(resolve => { releaseBundle = resolve })
+  await page.route(gameBundle, async route => {
+    await heldBundle
+    await route.continue()
+  })
+  await page.route(/\/assets\/scenery-[^/]+\.webp$/, route => route.abort())
+  try {
+    await page.goto('/', { waitUntil: 'commit' })
+    await expect(page.getByRole('button', { name: /^try again$/i })).toBeVisible()
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)))
+    await expect.poll(() => errors).toEqual([])
+  } finally {
+    releaseBundle()
+  }
+})
