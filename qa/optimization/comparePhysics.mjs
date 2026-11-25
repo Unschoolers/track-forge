@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview,
-  hasIdenticalSimulationOutput } from './score.mjs'
+  hasIdenticalRecordedOutput } from './score.mjs'
 
 const [beforePath, afterPath, ...flags] = process.argv.slice(2)
 const reviewIndex = flags.indexOf('--timing-review')
@@ -25,8 +25,8 @@ const comparisons = records(afterPath).map(({ task, result }) => {
   const old = baseline.get(id)
   if (!old || seen.has(id)) throw new Error('Unmatched or duplicate trial: ' + id)
   seen.add(id)
-  if (behaviorPreserving && !hasIdenticalSimulationOutput(old, result))
-    throw new Error(`Behavior-preserving comparison changed simulation output: ${id}`)
+  if (behaviorPreserving && !hasIdenticalRecordedOutput(old, result))
+    throw new Error(`Behavior-preserving comparison changed recorded output: ${id}`)
   const pair = applyTimingReview(evaluatePair(old, result, PHYSICS_ACCEPTANCE), task, timingReview, before.physicsRevision)
   return { ...pair, regression: !pair.eligible }
 })

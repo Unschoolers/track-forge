@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateCandidates } from './candidates.mjs'
-import { assessCandidate, evaluatePair, trialKey, compareScores, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview, hasIdenticalSimulationOutput } from './score.mjs'
+import { assessCandidate, evaluatePair, trialKey, compareScores, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview, hasIdenticalRecordedOutput } from './score.mjs'
 
 test('candidate enumeration stays bounded and deterministic', () => {
   const base = { hardCornerTargetBonus: 0.04, hardSteerGain: 2.22,
@@ -13,7 +13,7 @@ test('candidate enumeration stays bounded and deterministic', () => {
   assert.throws(() => generateCandidates('blue', base, 0))
   assert.throws(() => generateCandidates('unknown', base, 4))
 })
-test('behavior-preserving comparisons require identical outputs except build revision', () => {
+test('behavior-preserving comparisons require identical recorded outputs except build metadata', () => {
   const before = { rows: [{ vehicle_id: 'v0', car_type: 'blue', finished_seconds: 35,
     recoveries: 0, offroad_seconds: 0, max_lane_error: 0, laps_completed: 1,
     passing_seconds: 0, pass_attempts: 0, physics_revision: 'base' }],
@@ -24,20 +24,20 @@ test('behavior-preserving comparisons require identical outputs except build rev
   const after = { ...before,
     rows: [{ ...before.rows[0], physics_revision: 'head' }],
     samples: [{ ...before.samples[0] }] }
-  assert.equal(hasIdenticalSimulationOutput(before, after), true)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after, elapsedMs: 4 }), true)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after, secondsSimulated: 34.9 }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after,
+  assert.equal(hasIdenticalRecordedOutput(before, after), true)
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after, elapsedMs: 4 }), true)
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after, secondsSimulated: 34.9 }), false)
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after,
     rows: [{ ...after.rows[0], offroad_seconds: 0.1 }] }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after,
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after,
     events: [{ code: 'recovery', severity: 'error' }] }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after, rows: [] }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after,
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after, rows: [] }), false)
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after,
     rows: [{ vehicle_id: 'v0', finished_seconds: 35 }] }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after, samples: [] }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after,
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after, samples: [] }), false)
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after,
     samples: [{ ...after.samples[0], speed: 1 }] }), false)
-  assert.equal(hasIdenticalSimulationOutput(before, { ...after, samples: undefined }), false)
+  assert.equal(hasIdenticalRecordedOutput(before, { ...after, samples: undefined }), false)
 })
 test('pair comparisons reject recovery, roster, and incomparable metadata', () => {
   const row = {

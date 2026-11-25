@@ -17,10 +17,11 @@ export function trialKey(task) {
 }
 
 /**
- * A behavior-preserving change must produce identical simulation outputs.
- * The physics revision is expected to differ between the compared builds.
+ * A behavior-preserving change must match all recorded run metrics, events,
+ * and sampled telemetry. Samples include path/section/lane/speed/state, not x/y.
+ * Build revision and runner wall time may differ between compared builds.
  */
-export function hasIdenticalSimulationOutput(before, after) {
+export function hasIdenticalRecordedOutput(before, after) {
   const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
   const validSample = sample => isObject(sample) &&
     typeof sample.vehicle_id === 'string' && typeof sample.car_type === 'string' &&
@@ -43,7 +44,7 @@ export function hasIdenticalSimulationOutput(before, after) {
     Array.isArray(record.events) && record.events.every(isObject) &&
     Array.isArray(record.samples) && record.samples.length > 0 && record.samples.every(validSample)
   if (!valid(before) || !valid(after)) return false
-  // Build revision and runner wall time do not describe simulation behavior.
+  // Build revision and runner wall time are not recorded simulation output.
   const comparable = record => ({
     focusVehicleId: record.focusVehicleId,
     driverVehicleId: record.driverVehicleId,

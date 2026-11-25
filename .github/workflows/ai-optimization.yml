@@ -2,7 +2,7 @@ name: AI optimization lab
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - 'qa/optimization/**'
       - 'src/domain/race/ai/**'
