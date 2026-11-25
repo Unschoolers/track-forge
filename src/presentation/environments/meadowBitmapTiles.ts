@@ -9,6 +9,9 @@ import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } fr
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
 import { roadTextureRepeat } from './roadTextureVariants'
+import { buildBridgePresentation, type BridgePrimitive } from '@/phaser/rendering/bridgeRenderer'
+import type { TrackShadowMode } from '@/phaser/rendering/lighting'
+import { bridgePaintCommands, paintBridgeCanvas } from './bridgeMaterials'
 import { elevationLevelForHeight, elevationMaterialForLevel, groupElevationFaces } from './elevationMaterials'
 
 export const BITMAP_TILE_LIMIT = 48
@@ -109,30 +112,62 @@ function repeatPattern(context: CanvasRenderingContext2D, source: HTMLCanvasElem
   return pattern
 }
 
+/** Ordinary and elevated roads deliberately use the identical bitmap
+ * swatches, width, variation count and canonical longitudinal phase. */
+function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, repeat: number): (quad: RoadRibbonQuad) => void {
+  const patterns: Record<SurfaceId, CanvasPattern> = {
+    street: repeatPattern(context, art.road.street),
+    dirt: repeatPattern(context, art.road.dirt),
+    ice: repeatPattern(context, art.road.ice),
+  }
+  return quad => {
+    const source = art.road[quad.surface]
+    const transform = roadBitmapTransform(quad, repeat, source.width, source.height / source.width)
+    if (!transform) return
+    const pattern = patterns[quad.surface]
+    pattern.setTransform(transform)
+    context.fillStyle = pattern
+    const [a, b, c, d] = quad.road
+    context.beginPath()
+    context.moveTo(a.x, a.y); context.lineTo(b.x, b.y)
+    context.lineTo(c.x, c.y); context.lineTo(d.x, d.y)
+    context.closePath()
+    context.fill()
+  }
+}
+
 function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
   const index = indexBitmapItems(quads, quad => quad.road)
-  const length = geometry.path.totalLength
-  const repeat = roadTextureRepeat(length, geometry.path.closed)
+  const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, items) => {
-    const patterns: Record<SurfaceId, CanvasPattern> = {
-      street: repeatPattern(context, art.road.street),
-      dirt: repeatPattern(context, art.road.dirt),
-      ice: repeatPattern(context, art.road.ice),
-    }
-    for (const quad of items) {
-      const source = art.road[quad.surface]
-      const transform = roadBitmapTransform(quad, repeat, source.width, source.height / source.width)
-      if (!transform) continue
-      const pattern = patterns[quad.surface]
-      pattern.setTransform(transform)
-      context.fillStyle = pattern
-      const [a, b, c, d] = quad.road
-      context.beginPath()
-      context.moveTo(a.x, a.y); context.lineTo(b.x, b.y)
-      context.lineTo(c.x, c.y); context.lineTo(d.x, d.y)
-      context.closePath()
-      context.fill()
+    const paint = roadPatternPainter(context, art, repeat)
+    for (const quad of items) paint(quad)
+  })
+}
+
+/** Only the deck surface, markings and rails need a bitmap overlay.
+ * Keep approach tiles below ground-level cars; deck tiles above them.
+ * The original opaque vector deck is retained at all zoom levels. */
+export function bridgeBitmapPrimitives(primitives: readonly BridgePrimitive[], approach: boolean): readonly BridgePrimitive[] {
+  return primitives.filter(p => Boolean(p.rampApproach) === approach &&
+    (p.kind === 'surface' || p.kind === 'marking' || p.kind === 'wall'))
+}
+
+function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean): BitmapTiles | undefined {
+  const items = bridgeBitmapPrimitives(primitives, approach)
+  if (items.length === 0) return undefined
+  const index = indexBitmapItems(items, p => 'polygon' in p ? p.polygon : [p.start, p.end], 5)
+  const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
+  return new CachedBitmapTiles(index, (context, visible) => {
+    const paintRoad = roadPatternPainter(context, art, repeat)
+    // Preserve canonical surface, marking and wall painter order per tile.
+    for (const p of visible) {
+      if (p.kind === 'surface') {
+        if (!p.roadQuad) throw new Error('Bridge surface is missing its road texture quad')
+        paintRoad(p.roadQuad)
+      }
+      paintBridgeCanvas(context, bridgePaintCommands(p, environment, night, true))
     }
   })
 }
@@ -282,9 +317,23 @@ function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): Bitma
   return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items, tile) => paintTerrainBitmap(context, items, art, tile))
 }
 
-export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): { road: BitmapTiles; terrain: BitmapTiles } | undefined {
+export interface EnvironmentBitmapLayers {
+  readonly road: BitmapTiles
+  readonly terrain: BitmapTiles
+  readonly bridgeApproach: BitmapTiles | undefined
+  readonly bridgeDeck: BitmapTiles | undefined
+}
+
+export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain'): EnvironmentBitmapLayers | undefined {
   const art = getEnvironmentBitmapArt(environment, night)
-  return art ? { road: roadTiles(geometry, art), terrain: terrainTiles(geometry, art) } : undefined
+  if (!art) return undefined
+  const bridge = buildBridgePresentation(geometry, shadowMode)
+  return {
+    road: roadTiles(geometry, art),
+    terrain: terrainTiles(geometry, art),
+    bridgeApproach: bridgeTiles(bridge, geometry, art, environment, night, true),
+    bridgeDeck: bridgeTiles(bridge, geometry, art, environment, night, false),
+  }
 }
 
 export function drawBitmapTiles(context: CanvasRenderingContext2D, tiles: BitmapTiles, view: GroundViewport): void {

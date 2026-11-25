@@ -81,12 +81,12 @@ export function renderTrackGeometry(
   environmentId: TrackEnvironmentId = 'grass',
 ): void {
   renderTrackGeometryBase(graphics, geometry, night, environmentId)
-  renderTrackGeometryStructureUnderlay(graphics, geometry, night)
+  renderTrackGeometryStructureUnderlay(graphics, geometry, night, environmentId)
   if (showGridPreview) {
     renderTrackStartGridPreview(graphics, geometry)
   }
-  renderBridgeDeck(graphics, geometry, night)
-  renderBridgeSideWalls(graphics, geometry, night)
+  renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, environmentId)
+  renderBridgeSideWalls(graphics, geometry, night, 'terrain', environmentId)
   renderLampPosts(graphics, buildLampPosts(geometry), night)
 }
 
@@ -195,8 +195,9 @@ export function renderTrackGeometryStructureUnderlay(
   graphics: Phaser.GameObjects.Graphics,
   geometry: TrackGeometry,
   night: boolean,
+  environmentId: TrackEnvironmentId = 'grass',
 ): void {
-  renderBridgeUnderlay(graphics, geometry, night)
+  renderBridgeUnderlay(graphics, geometry, night, 'terrain', environmentId)
 }
 
 function renderTrackGeometryMarkings(

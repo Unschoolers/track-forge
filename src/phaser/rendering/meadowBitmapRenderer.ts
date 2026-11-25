@@ -4,9 +4,12 @@ import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { GROUND_TILE_SIZE, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { createMeadowBitmapLayers, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
 import { WORLD_RENDER_DEPTH } from './renderLayers'
+import type { TrackShadowMode } from './lighting'
 
 export const ROAD_BITMAP_DEPTH = WORLD_RENDER_DEPTH.road + 0.2
 export const ROAD_MARKINGS_DEPTH = WORLD_RENDER_DEPTH.road + 0.4
+export const BRIDGE_APPROACH_BITMAP_DEPTH = WORLD_RENDER_DEPTH.structureUnderlay + 0.2
+export const BRIDGE_DECK_BITMAP_DEPTH = WORLD_RENDER_DEPTH.structureDeck + 0.2
 let nextRenderer = 0
 
 /** Only currently visible bitmap tiles own GPU textures. Reused world-tile
@@ -64,13 +67,18 @@ export interface MeadowBitmapRenderer {
   destroy(): void
 }
 
-export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): MeadowBitmapRenderer | undefined {
-  const layers = createMeadowBitmapLayers(geometry, night, environment)
+export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain'): MeadowBitmapRenderer | undefined {
+  const layers = createMeadowBitmapLayers(geometry, night, environment, shadowMode)
   if (!layers) return undefined
   const road = new BitmapTileRenderer(scene, layers.road, ROAD_BITMAP_DEPTH)
   const terrain = new BitmapTileRenderer(scene, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2)
+  const approach = layers.bridgeApproach ? new BitmapTileRenderer(scene, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH) : undefined
+  const deck = layers.bridgeDeck ? new BitmapTileRenderer(scene, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH) : undefined
   return {
-    render(view, bounds) { road.render(view, bounds); terrain.render(view, bounds) },
-    destroy() { road.destroy(); terrain.destroy() },
+    render(view, bounds) {
+      road.render(view, bounds); terrain.render(view, bounds)
+      approach?.render(view, bounds); deck?.render(view, bounds)
+    },
+    destroy() { road.destroy(); terrain.destroy(); approach?.destroy(); deck?.destroy() },
   }
 }

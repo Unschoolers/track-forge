@@ -216,3 +216,32 @@ art is retained for pre-boot/component-test presentation. The scenery
 picker continues using its existing labels/icons. No new prop types or
 serialized fields are introduced. Actual in-game art review and Android
 frame pacing remain validation requirements.
+
+
+### Themed bridge materials
+
+All four environments share the canonical bridge geometry and its
+existing terrain/local-ground shadow modes. Meadow has timber rails and
+mossy stone supports, Desert has warm sandstone parapets, Cityscape has
+steel rails and concrete supports, and Kids' Room has colorful toy-block
+rails and supports. Thin distance-anchored deck seams and railing hardware
+add character without modifying the selected street/dirt/ice surface.
+Day/night palettes affect only presentation.
+
+The elevated deck now uses the very same generated road texture strip,
+variation count, world width and canonical path-distance phase as the
+ordinary road. A sparse bitmap overlay paints the road surface, seams,
+lane markings and rails. Two optional bounded tile caches separate shallow
+ramp approaches (below ground vehicles) from the higher deck (above them).
+Each reuses the existing 48-tile limit; tracks without bridges allocate
+neither. The original vector artwork remains as a themed fallback when
+zoomed out or during editing. Rails are included in the bitmap overlay
+to preserve their appearance even when the editor combines vector
+decorations into its static raster. The race keeps its existing wall
+and upper-car depth ordering. The flyover uses the same geometry and
+material commands and overlays. Its existing simplified all-cars-on-top
+preview behavior is unchanged. Environment switches invalidate editor
+world artwork, but not the underlying geometry contract.
+
+No bridge heights, grip, clearance, collision, recovery, track formats or
+authored points are modified. Visual/device verification remains required.
