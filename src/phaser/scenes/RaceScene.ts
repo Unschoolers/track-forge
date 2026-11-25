@@ -24,6 +24,7 @@ import {
   transformVehicleLights,
 } from '@/phaser/rendering/vehicleRenderer'
 import type { SceneControllerPort } from '@/phaser/scenes/EditorScene'
+import type { RaceFrameDiagnostics } from '@/infrastructure/qa/raceFrameDiagnostics'
 import type { RacePerformance } from '@/infrastructure/qa/racePerformance'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
@@ -96,6 +97,7 @@ export class RaceScene extends Phaser.Scene {
     private readonly controls: RaceControlsPort,
     private readonly geometry: TrackGeometryService,
     private readonly racePerformance?: RacePerformance,
+    private readonly frameDiagnostics?: RaceFrameDiagnostics,
   ) {
     super({ key: 'RaceScene' })
   }
@@ -221,8 +223,11 @@ export class RaceScene extends Phaser.Scene {
       !this.snapshot
     ) return
     const benchmark = this.racePerformance?.beginUpdate()
+    const runId = this.raceSession.snapshot().runId
+    if (runId !== undefined) this.frameDiagnostics?.beginUpdate(runId)
     this.snapshot = this.controller.snapshot()
     benchmark?.beginSimulation()
+    this.frameDiagnostics?.beginSimulation()
     // Use one real display-frame delta for physics accumulation and camera
     // following. Phaser's smoothed scene delta can diverge at high refresh.
     const frameSeconds = Math.max(0, this.game.loop.rawDelta / 1000)
@@ -255,6 +260,7 @@ export class RaceScene extends Phaser.Scene {
       this.boostRequestPending = false
     }
     benchmark?.endSimulation()
+    this.frameDiagnostics?.endSimulation()
     // Draw interpolated poses while the simulation, HUD, and network
     // systems continue to use the authoritative 60 Hz state.
     const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
@@ -398,6 +404,7 @@ export class RaceScene extends Phaser.Scene {
       renderNightLights(this.nightLightGraphics, lights, [])
     }
     benchmark?.endUpdate()
+    this.frameDiagnostics?.endUpdate()
   }
 
   private renderGroundPresentation(night: boolean, rotation = 0): void {

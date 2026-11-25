@@ -6,6 +6,14 @@ After a **single-player** race, hold the results status (e.g. **BEST GHOST SAVED
 
 The file is saved through the existing web/Android JSON export adapter as `trackforge-race-<track>-<timestamp>.json`. It includes the exact authored track and the current race setup, all vehicles and AI data, gameplay events and standings/splits. Unlike the best ghost, **this is the latest race** and remains available even when the race did not beat the record. Restart/leave invalidates it. Nearby multiplayer uses its separate diagnostics exporter.
 
+The export also contains `performance.timings.frames`, sampled once per rendered
+race frame. Each row contains the simulation tick, frame interval, race update,
+simulation and CPU render submission times in milliseconds. Recording pauses
+while the race is paused, and is capped at 36,000 samples; `droppedFrames`
+reports any additional frames. The export also includes the browser user agent, pixel ratio and viewport size. GPU completion and garbage collection are not
+measured directly. A long frame interval with short measured CPU durations
+therefore needs further profiling before attributing its cause.
+
 ## Contract
 
 - `format: "trackforge-race-replay"`, `formatVersion: 1` distinguish it from importable track JSON. It must **not** be accepted as a track by `trackCodec`.
