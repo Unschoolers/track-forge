@@ -4,7 +4,7 @@ import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { GROUND_TILE_SIZE, groundViewportBounds, visibleGroundTiles, type GroundTile, type GroundViewport, type WorldBounds } from './groundTexture'
 import { buildRoadRibbonQuads, type RoadRibbonQuad } from './roadRibbonQuads'
-import { createArtCanvas, getMeadowBitmapArt, type MeadowBitmapArt } from './meadowBitmapArt'
+import { createArtCanvas, getEnvironmentBitmapArt, type EnvironmentBitmapArt } from './meadowBitmapArt'
 import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 
@@ -105,7 +105,7 @@ function repeatPattern(context: CanvasRenderingContext2D, source: HTMLCanvasElem
   return pattern
 }
 
-function roadTiles(geometry: TrackGeometry, art: MeadowBitmapArt): BitmapTiles {
+function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
   const index = indexBitmapItems(quads, quad => quad.road)
   const length = geometry.path.totalLength
@@ -206,11 +206,11 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
 /** Painter order: sand outside, deep water, translucent shallow shelves
  * clipped to water, narrow contact foam, then the textured mountain faces.
  * All patterns are world anchored across tile boundaries. */
-export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: MeadowBitmapArt): void {
-  const night = art.night
-  bankStroke(context, items, WATER_BANK_RADIUS * 2, night ? '#586045' : '#9a9860', 0.6)
+export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt): void {
+  const palette = art.terrainPalette
+  bankStroke(context, items, WATER_BANK_RADIUS * 2, palette.outerBank, 0.6)
   bankStroke(context, items, 20, repeatPattern(context, art.sand), 1)
-  bankStroke(context, items, 9, night ? '#676954' : '#c7b47f', 0.95)
+  bankStroke(context, items, 9, palette.wetBank, 0.95)
 
   context.save()
   context.beginPath()
@@ -223,17 +223,17 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   // Transparent navy glaze deepens the center without hiding the painted
   // caustics. The two inner bands gradually restore the shallows.
   // fillRect covers the current tile in world coordinates via its clip.
-  context.fillStyle = night ? 'rgba(5,20,38,0.72)' : 'rgba(4,46,76,0.66)'
+  context.fillStyle = palette.deepGlaze
   context.fill()
-  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2, night ? '#286371' : '#35a7b0', 0.28)
-  bankStroke(context, items, 42, night ? '#398184' : '#66c9bb', 0.35)
-  bankStroke(context, items, 22, night ? '#69988d' : '#9bd9b9', 0.47)
-  bankStroke(context, items, 4, night ? '#b2d1c8' : '#e6f5d8', 0.72)
+  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2, palette.shallow[0], 0.28)
+  bankStroke(context, items, 42, palette.shallow[1], 0.35)
+  bankStroke(context, items, 22, palette.shallow[2], 0.47)
+  bankStroke(context, items, 4, palette.contact, 0.72)
   context.restore()
 
   // Batch slope facets by the existing nine directional shades. Adjacent
   // triangles are drawn as a single path to avoid visible triangle seams.
-  const rock = repeatPattern(context, art.rock)
+  const slope = repeatPattern(context, art.slope)
   for (let bucket = 0; bucket < 9; bucket++) {
     context.beginPath()
     for (const item of items) {
@@ -241,29 +241,29 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
         appendTriangle(context, item.triangle)
       }
     }
-    context.fillStyle = rock
+    context.fillStyle = slope
     context.fill()
     context.fillStyle = bucket < 4
-      ? `rgba(10,26,20,${(4 - bucket) * 0.095})`
-      : `rgba(246,224,173,${(bucket - 4) * 0.065})`
+      ? `rgba(${palette.slopeShadow},${(4 - bucket) * palette.slopeShadowStrength})`
+      : `rgba(${palette.slopeLight},${(bucket - 4) * palette.slopeLightStrength})`
     context.fill()
   }
   context.beginPath()
   for (const item of items) {
     if (item.kind === 'plateau') appendTriangle(context, item.triangle)
   }
-  context.fillStyle = repeatPattern(context, art.ground)
+  context.fillStyle = repeatPattern(context, art.plateau)
   context.fill()
-  context.fillStyle = night ? 'rgba(51,88,65,0.16)' : 'rgba(165,194,115,0.17)'
+  context.fillStyle = palette.plateauGlaze
   context.fill()
 }
 
-function terrainTiles(geometry: TrackGeometry, art: MeadowBitmapArt): BitmapTiles {
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
   return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items) => paintTerrainBitmap(context, items, art))
 }
 
 export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): { road: BitmapTiles; terrain: BitmapTiles } | undefined {
-  const art = environment === 'grass' ? getMeadowBitmapArt(night) : undefined
+  const art = getEnvironmentBitmapArt(environment, night)
   return art ? { road: roadTiles(geometry, art), terrain: terrainTiles(geometry, art) } : undefined
 }
 
