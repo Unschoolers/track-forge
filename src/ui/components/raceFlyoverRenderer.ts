@@ -1,6 +1,7 @@
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
+import { shorelineBands } from '@/presentation/environments/shorelineMaterials'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -59,14 +60,26 @@ export function createRaceFlyoverRenderer(
   if (path.closed && points.length > 1) {
     const a = points[points.length - 1]
     const b = points[0]
-    if (a && b) sections.push({ a, b })
+    if (a && b) sections.push({ a, b: { ...b, distance: path.totalLength } })
   }
   // Flyover frames must only paint. Prepare distance-anchored details once
   // rather than allocating strokes for every visible section on every frame.
   const materialSections = sections.map((section) => ({
     ...section,
-    strokes: environmentRoadStrokes(environmentId, section.a.surface, section.a, section.b, night),
+    strokes: environmentRoadStrokes(environmentId, section.a.surface, section.a, section.b, night, path.closed ? path.totalLength : undefined),
   }))
+  // Cache actual water contour bounds once. No new geometry is compiled per frame.
+  const waterRings = palette.shorelineBands ? path.terrainSurface.contours
+    .filter(contour => contour.kind === 'water' && contour.points.length >= 3)
+    .map(({ points }) => {
+      let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
+      for (const point of points) {
+        left = Math.min(left, point.x); right = Math.max(right, point.x)
+        top = Math.min(top, point.y); bottom = Math.max(bottom, point.y)
+      }
+      return { points, left, right, top, bottom }
+    }) : []
+  const bankBands = shorelineBands(palette, night)
   const treeStride = Math.max(1, Math.ceil(track.trees.length / 350))
   const trees = track.trees.filter((_, index) => index % treeStride === 0)
 
@@ -185,7 +198,7 @@ export function createRaceFlyoverRenderer(
     const cellSize = track.terrain.cellSize
     for (let i = 0; i < runs.length; i += terrainStride) {
       const run = runs[i]
-      if (!run) continue
+      if (!run || (palette.shorelineBands && run.kind === 'water')) continue
       const x = run.column * cellSize
       const y = run.row * cellSize
       const runWidth = run.count * cellSize
@@ -198,6 +211,30 @@ export function createRaceFlyoverRenderer(
           : night ? 'rgba(181, 204, 155, .10)' : 'rgba(226, 239, 186, .18)'
         ctx.fillRect(x, y, runWidth, Math.max(2, cellSize * .12))
       }
+    }
+    if (waterRings.length) {
+      // Use complete rings and even-odd fill to preserve land islands inside
+      // water. Paint only rings intersecting the overscanned preview window.
+      ctx.beginPath()
+      for (const ring of waterRings) {
+        if (ring.left > player.x + radius || ring.right < player.x - radius ||
+          ring.top > player.y + radius || ring.bottom < player.y - radius) continue
+        for (const [index, point] of ring.points.entries()) {
+          if (index === 0) ctx.moveTo(point.x, point.y)
+          else ctx.lineTo(point.x, point.y)
+        }
+        ctx.closePath()
+      }
+      ctx.fillStyle = night ? '#183f52' : '#287c9c'
+      ctx.fill('evenodd')
+      ctx.lineJoin = 'round'
+      for (const band of bankBands) {
+        ctx.lineWidth = band.width
+        ctx.strokeStyle = `#${band.color.toString(16).padStart(6, '0')}`
+        ctx.globalAlpha = band.alpha
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
     }
     const left = Math.floor((player.x - radius) / GROUND_TILE_SIZE)
     const right = Math.ceil((player.x + radius) / GROUND_TILE_SIZE)

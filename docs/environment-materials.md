@@ -36,3 +36,29 @@ Automated: `tests/phaser/environmentMaterials.test.ts`, `tests/phaser/raceRoadRi
 Manual/device review: race, editor, and flyover for all three environments by day and night, both zoomed in and out, and representative large tracks. Check especially tiled-ground seams, corners/intersections, overpasses, road-surface readability, screen contrast, night light visibility and Android frame pacing. A green browser CI run alone does not certify physical Android GPU frame time.
 
 Rollback: revert the presentation changes. Serialized tracks and physics need no conversion.
+
+## Meadow visual proof of concept (2026-11-24)
+
+The first three presentation phases are deliberately independent of the domain:
+
+1. **Repeatable materials**: the existing baked grass canvas tile and bounded
+   cache remain the base. Meadow's road material is a 192-unit procedural
+   vector tile (eight 24-unit cells), mapped into along/across-road space.
+   Closed circuits fit an integral number of repeats; lane markings and
+   curbs remain separate. No new GPU texture or rasterization per frame.
+2. **Organic groundcover**: automatically compose low vegetation, wildflower
+   clusters, moss and exposed soil from deterministic padded-tile art.
+   Decorative patches are not obstacles, road surfaces or save-file entries.
+   Solid trees and manually placed props retain their current authoring and
+   physics. This avoids visually misleading newly generated collision hazards.
+3. **Water transitions**: four nested sand/damp-bank/contact-highlight bands
+   share the actual water contours. The flyover uses the same contour rings
+   and even-odd water fill, including islands. Bounds include the wider bank.
+   The centerline still marks the physical water boundary.
+
+The current implementation is procedural vector art, not the generated concept
+sheet or an imported bitmap atlas. Meadow is the reference environment; the
+other three supported themes preserve their existing materials. A separate
+Beach environment is not introduced. Visual approval at driving zoom, day
+and night, and Android frame pacing remain release verification requirements.
+Rollback is a presentation-only revert; no serialized track changes.

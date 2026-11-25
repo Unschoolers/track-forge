@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
+import { MEADOW_SHORELINE } from '@/presentation/environments/shorelineMaterials'
 
 describe('Grass environment presentation', () => {
   it('preserves the day and night terrain palettes', () => {
@@ -13,6 +14,7 @@ describe('Grass environment presentation', () => {
       hillPlateau: 0x4c9d63,
       flyoverHill: '#80a66a',
       shorelineLand: 0x83a764,
+      shorelineBands: MEADOW_SHORELINE.day,
     })
     expect(GRASS_ENVIRONMENT.night).toEqual({
       editorGround: '#0e2b1d',
@@ -22,6 +24,7 @@ describe('Grass environment presentation', () => {
       hillPlateau: 0x235433,
       flyoverHill: '#34533f',
       shorelineLand: 0x59715f,
+      shorelineBands: MEADOW_SHORELINE.night,
     })
   })
 })

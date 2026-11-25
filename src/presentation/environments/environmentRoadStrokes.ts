@@ -3,6 +3,8 @@ import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { kidsRoomRoadStrokes, type RoadMaterialStroke } from './kidsRoomRoadStrokes'
 
+import { meadowRoadTileStrokes } from './meadowRoadTile'
+
 type RoadPoint = Pick<RoadPathPoint, 'x' | 'y' | 'distance'>
 
 /**
@@ -16,8 +18,10 @@ export function environmentRoadStrokes(
   from: RoadPoint,
   to: RoadPoint,
   night: boolean,
+  loopLength?: number,
 ): readonly RoadMaterialStroke[] {
   if (environment === 'kids-room') return kidsRoomRoadStrokes(surface, from, to, night)
+  if (environment === 'grass') return meadowRoadTileStrokes(surface, from, to, night, loopLength)
   const dx = to.x - from.x
   const dy = to.y - from.y
   const length = Math.hypot(dx, dy)
@@ -54,22 +58,6 @@ export function environmentRoadStrokes(
     const y = from.y + dy * t
     const jitter = ((Math.imul(mark + 19, 2654435761) >>> 8) % 27) - 13
     switch (environment) {
-      case 'grass':
-        if (surface === 'street') {
-          // Fine stone aggregate and occasional worn asphalt repairs.
-          draw(x, y, -7, jitter, 9, jitter + 3, night ? 0x89949d : 0x8e9894, 0.34, 1.5)
-          draw(x, y, -3, jitter - 10, 4, jitter - 13, night ? 0x151c23 : 0x252c31, 0.35, 1.3)
-          if (mark % 5 === 0) draw(x, y, 0, -30, 0, 30, 0x151b1e, night ? 0.32 : 0.28, 1.8)
-        } else if (surface === 'dirt') {
-          // Twin shallow wheel ruts and broken pebbly edges.
-          draw(x, y, -14, -17, 15, -17, night ? 0x312c26 : 0x573f2c, 0.44, 2.3)
-          draw(x, y, -14, 17, 15, 17, night ? 0x312c26 : 0x573f2c, 0.44, 2.3)
-          draw(x, y, -4, jitter, 1, jitter - 3, night ? 0xb4a083 : 0xd9b98b, 0.52, 2)
-        } else {
-          draw(x, y, -14, jitter, 15, jitter + 2, night ? 0x9ed9ec : 0xe8faff, 0.7, 1.8)
-          draw(x, y, -5, -21, 7, -17, night ? 0x70a7bb : 0xffffff, 0.38, 1.5)
-        }
-        break
       case 'desert':
         if (surface === 'street') {
           // Pale dust trapped at the shoulder, fine heat-weathered cracks.

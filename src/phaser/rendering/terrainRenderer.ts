@@ -1,6 +1,7 @@
 import type Phaser from 'phaser'
 import { GRASS_ENVIRONMENT } from '@/presentation/environments/grass'
 import type { EnvironmentPalette } from '@/presentation/environments/types'
+import { shorelineBands } from '@/presentation/environments/shorelineMaterials'
 import { WORLD_ELEVATION } from '@/domain/config'
 import type { Vector2 } from '@/domain/model'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
@@ -92,10 +93,10 @@ export function renderTerrainPrimitives(
         }
         break
       case 'shoreline':
-        graphics.lineStyle(3.5, palette.shorelineLand, 0.9)
-        for (const ring of primitive.rings) strokeRing(graphics, ring)
-        graphics.lineStyle(1.2, palette.waterShoreline ?? (night ? 0x7eb4c1 : 0xc1edf2), 0.75)
-        for (const ring of primitive.rings) strokeRing(graphics, ring)
+        for (const band of shorelineBands(palette, night)) {
+          graphics.lineStyle(band.width, band.color, band.alpha)
+          for (const ring of primitive.rings) strokeRing(graphics, ring)
+        }
         break
       case 'hill-shadow':
         graphics.fillStyle(0x08120d, night ? 0.16 : 0.24)
