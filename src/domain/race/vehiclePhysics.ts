@@ -107,24 +107,31 @@ export function stepVehicle(
   }
   const braking = input.braking || aiSpeedBrake
   const driftTuning = BRAKE_TAP_DRIFT_TUNING
-  const headingX = Math.cos(vehicle.angle)
-  const headingY = Math.sin(vehicle.angle)
+  const driftAvailable = humanDriver && !!boost && !boost.active &&
+    boost.speedCeilingMultiplier === 1 && !boost.activated &&
+    vehicle.grounded && context.onRoad && context.surface !== 'grass'
+  const headingX = driftAvailable ? Math.cos(vehicle.angle) : 0
+  const headingY = driftAvailable ? Math.sin(vehicle.angle) : 0
   const forward = vehicle.vx * headingX + vehicle.vy * headingY
   const sideways = -vehicle.vx * headingY + vehicle.vy * headingX
-  const slip = Math.atan2(sideways, forward)
-  const canDrift = humanDriver && !!boost && !boost.active &&
-    boost.speedCeilingMultiplier === 1 && !boost.activated &&
-    vehicle.grounded && context.onRoad && context.surface !== 'grass' &&
-    forward >= driftTuning.minimumForwardSpeed
+  const slip = driftAvailable ? Math.atan2(sideways, forward) : 0
+  const canDrift = driftAvailable && forward >= driftTuning.minimumForwardSpeed
   const previousTap = vehicle.driftTap
   const steeringDirection = Math.sign(input.steering)
   const turning = Math.abs(input.steering) >= driftTuning.minimumSteering
-  const heldSeconds = canDrift && input.braking
-    ? Math.min(driftTuning.maximumTapSeconds + 1, (previousTap?.heldSeconds ?? 0) + dt)
+  // An invalid press stays invalid until release; never re-arm midway through
+  // a held brake when the driver starts turning or returns to the road.
+  const previousHeld = previousTap?.heldSeconds ?? 0
+  const validPress = canDrift && turning &&
+    (previousHeld === 0 || previousTap?.direction === steeringDirection)
+  const heldSeconds = input.braking
+    ? validPress
+      ? Math.min(driftTuning.maximumTapSeconds + 1, previousHeld + dt)
+      : driftTuning.maximumTapSeconds + 1
     : 0
   const tapReleased = canDrift && !input.braking && turning &&
-    (previousTap?.heldSeconds ?? 0) > 0 &&
-    (previousTap?.heldSeconds ?? 0) <= driftTuning.maximumTapSeconds + 1e-9
+    previousTap?.direction === steeringDirection &&
+    previousHeld > 0 && previousHeld <= driftTuning.maximumTapSeconds + 1e-9
   const assistSeconds = !canDrift || input.braking || !turning ? 0
     : tapReleased ? driftTuning.assistSeconds
     : previousTap?.direction === steeringDirection
@@ -226,7 +233,7 @@ export function stepVehicle(
     braking: braking || brakePressure > 0,
     ...(humanDriver ? { brakePressure: driverPressure } : {}),
     ...(boost && humanDriver ? {
-      driftTap: { heldSeconds, assistSeconds, direction: assisting ? steeringDirection : 0 },
+      driftTap: { heldSeconds, assistSeconds, direction: assisting || (input.braking && validPress) ? steeringDirection : 0 },
     } : vehicle.driftTap ? { driftTap: undefined } : {}),
     currentSurface: context.surface,
     surfaceGrip,

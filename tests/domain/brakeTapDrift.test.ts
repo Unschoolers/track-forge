@@ -72,6 +72,18 @@ describe('arcade brake-tap drift initiation', () => {
     expect(ordinary.driftTap).toBeUndefined()
   })
 
+  it('requires a valid turn throughout the tap and a fresh press after cancellation', () => {
+    const { vehicle, step } = fixture()
+    const straight = step(vehicle, drive(0, true))
+    const turning = step(straight, drive(1, true))
+    const released = step(turning, drive(1))
+    expect(released.driftTap?.assistSeconds).toBe(0)
+    const reversed = step(step(vehicle, drive(1, true)), drive(-1))
+    expect(reversed.driftTap?.assistSeconds).toBe(0)
+    const fresh = step(step(released, drive(1, true)), drive(1))
+    expect(fresh.driftTap?.assistSeconds).toBeGreaterThan(0)
+  })
+
   it('ends assistance on countersteering, neutral steering or a new brake press', () => {
     const { vehicle, step } = fixture()
     const active = step(step(vehicle, drive(1, true)), drive(1))

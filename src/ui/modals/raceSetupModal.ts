@@ -63,16 +63,12 @@ export function createRaceSetupModal(
     choice.setAttribute('aria-describedby', 'ghost-availability')
     modeRow.append(choice)
   }
-  const description = element('p', 'modal-subtitle', ghostAvailable
-    ? raceMode === 'boost-practice'
-      ? 'Solo, unranked Arcade. Tap BRAKE while turning at speed to drift and charge boost.'
-      : `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; ${openRoute ? 'Race AI' : 'Normal Race'} has AI opponents.`
-    : ghost.kind === 'different-setup'
-      ? raceMode === 'boost-practice'
-        ? 'Solo, unranked Arcade. Tap BRAKE while turning at speed to drift and charge boost.'
-        : `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${openRoute ? 'single run' : `${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'}`}.`
-      : raceMode === 'boost-practice'
-        ? 'Solo, unranked Arcade. Tap BRAKE while turning at speed to drift and charge boost.'
+  const description = element('p', 'modal-subtitle', raceMode === 'boost-practice'
+    ? 'Solo, unranked Arcade run. Tap and release BRAKE while turning at speed to drift and charge boost.'
+    : ghostAvailable
+      ? `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; ${openRoute ? 'Race AI' : 'Normal Race'} has AI opponents.`
+      : ghost.kind === 'different-setup'
+        ? `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${openRoute ? 'single run' : `${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'}`}.`
         : 'Finish a race on this layout to save a ghost.')
   description.id = 'ghost-availability'
   mode.append(modeRow, description)
