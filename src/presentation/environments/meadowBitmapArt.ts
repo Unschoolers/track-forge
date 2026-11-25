@@ -7,6 +7,10 @@ import desertUrl from '@/assets/environments/desert/materials.webp?url&no-inline
 import materialsUrl from '@/assets/environments/meadow/materials.webp?url&no-inline'
 import patchesUrl from '@/assets/environments/meadow/patches.webp?url&no-inline'
 import terrainUrl from '@/assets/environments/meadow/terrain.webp?url&no-inline'
+import meadowGroundUrl from '@/assets/environments/meadow/ground.webp?url&no-inline'
+import desertGroundUrl from '@/assets/environments/desert/ground.webp?url&no-inline'
+import cityGroundUrl from '@/assets/environments/cityscape/ground.webp?url&no-inline'
+import kidsGroundUrl from '@/assets/environments/kids-room/ground.webp?url&no-inline'
 import { createGroundTileRandom, GROUND_TILE_SIZE } from './groundTexture'
 import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS } from './roadTextureVariants'
 import { paintOrganicGround, type OrganicGroundTheme } from './organicGroundDetails'
@@ -90,7 +94,16 @@ function roadStrips(road: EnvironmentBitmapArt['road']): EnvironmentBitmapArt['r
 /** Decode the bundled, generated WebP atlases before creating any scenes.
  * No remote requests, per-frame image decoding or silent asset-load failures. */
 export function loadEnvironmentBitmapArt(): Promise<void> {
-  loading ??= Promise.all([loadImage(materialsUrl), loadImage(patchesUrl), loadImage(terrainUrl), loadImage(desertUrl), loadImage(cityUrl), loadImage(kidsUrl)]).then(([materials, patches, terrain, desert, city, kids]) => {
+  loading ??= Promise.all([
+    loadImage(materialsUrl), loadImage(patchesUrl), loadImage(terrainUrl),
+    loadImage(desertUrl), loadImage(cityUrl), loadImage(kidsUrl),
+    loadImage(meadowGroundUrl), loadImage(desertGroundUrl), loadImage(cityGroundUrl), loadImage(kidsGroundUrl),
+  ]).then(([materials, patches, terrain, desert, city, kids, meadowGround, desertGround, cityGround, kidsGround]) => {
+    for (const [name, image] of [['Meadow', meadowGround], ['Desert', desertGround], ['Cityscape', cityGround], ['Kids’ Room', kidsGround]] as const) {
+      if (image.naturalWidth !== GROUND_TILE_SIZE || image.naturalHeight !== GROUND_TILE_SIZE) {
+        throw new Error(`Unexpected ${name} ground artwork dimensions`)
+      }
+    }
     if (materials.naturalWidth !== 192 || materials.naturalHeight !== 192 ||
       patches.naturalWidth !== 128 || patches.naturalHeight !== 128 ||
       terrain.naturalWidth !== 128 || terrain.naturalHeight !== 64) {
@@ -106,7 +119,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
       throw new Error('Unexpected Kids’ Room artwork atlas dimensions')
     }
     const build = (night: boolean): MeadowBitmapArt => {
-      const ground = extract(materials, 96, 0, 0, night)
+      const ground = extract(meadowGround, GROUND_TILE_SIZE, 0, 0, night)
       const road = {
         street: extract(materials, 96, 1, 0, night),
         dirt: extract(materials, 96, 0, 1, night),
@@ -130,7 +143,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
       const cell = (x: number, y: number) => extract(desert, 48, x, y, night)
       const dune = cell(2, 1)
       return {
-        elevationMaterials: createElevationMaterials(cell(0, 0), {
+        elevationMaterials: createElevationMaterials(extract(desertGround, GROUND_TILE_SIZE, 0, 0, night), {
           plateau: dune, slope: dune,
           shading: DESERT_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
@@ -144,7 +157,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     }
     const buildCity = (night: boolean): EnvironmentBitmapArt => {
       const cell = (x: number, y: number) => extract(city, 48, x, y, night)
-      const cobble = cell(0, 0)
+      const cobble = extract(cityGround, GROUND_TILE_SIZE, 0, 0, night)
       const quay = cell(2, 1)
       return {
         elevationMaterials: createElevationMaterials(cobble, {
@@ -161,17 +174,8 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     }
     const buildKids = (night: boolean): EnvironmentBitmapArt => {
       const cell = (x: number, y: number) => extract(kids, 48, x, y, night)
-      // Preserve the established royal-blue carpet identity. Colorize the
-      // generated high-pile texture once, retaining its light/dark weave.
-      const pile = cell(0, 0)
-      const { canvas: ground, context } = createArtCanvas(pile.width)
-      context.drawImage(pile, 0, 0)
-      context.globalCompositeOperation = 'color'
-      context.fillStyle = night ? '#122858' : '#2651b1'
-      context.fillRect(0, 0, pile.width, pile.height)
-      context.globalCompositeOperation = 'source-atop'
-      context.fillStyle = night ? 'rgba(18,40,88,0.40)' : 'rgba(38,81,177,0.35)'
-      context.fillRect(0, 0, pile.width, pile.height)
+      // The new source is already royal blue; preserve its original fiber detail.
+      const ground = extract(kidsGround, GROUND_TILE_SIZE, 0, 0, night)
       const quilt = cell(2, 1)
       return {
         elevationMaterials: createElevationMaterials(ground, {
@@ -207,16 +211,13 @@ export function getEnvironmentBitmapArt(environment: TrackEnvironmentId, night: 
 }
 
 /** Same base repeat phase in every world tile; variation lives in the
- * transparent bitmap and procedural patch placements. Art stays inside the central tile, leaving its old padding
+ * transparent bitmap and procedural patch placements. Art stays inside the
+ * central tile, leaving its old padding
  * transparent so adjacent world tiles cannot cover one another. */
 export function paintBitmapGround(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, variant: number, padding: number): void {
   const ground = elevationMaterialForLevel(art.elevationMaterials, 0).plateau
-  const repeat = GROUND_TILE_SIZE / 2
-  for (let y = 0; y < 2; y++) {
-    for (let x = 0; x < 2; x++) {
-      context.drawImage(ground, padding + x * repeat, padding + y * repeat, repeat, repeat)
-    }
-  }
+  // The generated swatch covers the full tile at one texel per world unit.
+  context.drawImage(ground, padding, padding, GROUND_TILE_SIZE, GROUND_TILE_SIZE)
   if (art.organicGround) {
     paintOrganicGround(context, art.organicGround.theme, variant, art.organicGround.night, padding)
   }
