@@ -81,10 +81,21 @@ export function bridgePaintCommands(
   }
   if ('polygon' in primitive) {
     const fill = (color: number, alpha = 1) => commands.push({ kind: 'fill', polygon: primitive.polygon, color, alpha })
+    const [faceA, faceB, faceC, faceD] = primitive.polygon
+    const faceBand = (start: number, end: number, color: number, alpha: number) => {
+      commands.push({ kind: 'fill', polygon: [lerp(faceA, faceD, start), lerp(faceB, faceC, start), lerp(faceB, faceC, end), lerp(faceA, faceD, end)], color, alpha })
+    }
     switch (primitive.kind) {
       case 'shadow-soft': if (!night) fill(0x050807, 0.15); break
       case 'shadow-core': if (!night) fill(0x050807, 0.29); break
-      case 'side-face': fill(palette.face, night ? 0.92 : 0.78); break
+      case 'side-face':
+        fill(palette.face, night ? 0.94 : 0.90)
+        // Light catches the deck lip; the lower fascia falls into shadow.
+        faceBand(0, 0.13, palette.highlight, night ? 0.28 : 0.50)
+        faceBand(0.13, 0.25, palette.edge, 0.36)
+        faceBand(0.64, 1, palette.seam, night ? 0.40 : 0.28)
+        faceBand(0.90, 1, palette.seam, 0.38)
+        break
       case 'edge': fill(palette.edge); break
       case 'surface': {
         const quad = primitive.roadQuad
@@ -98,6 +109,15 @@ export function bridgePaintCommands(
         }
         if (!quad) break
         const [a, b, c, d] = quad.road
+        // Contact shadow under both rails gives the road a recessed deck.
+        // Stay within the surface so the underlying texture remains visible.
+        if (!primitive.rampApproach) {
+          for (const t of [0.055, 0.945]) {
+            const start = lerp(a, d, t), end = lerp(b, c, t)
+            line(start, end, 3.5, palette.seam, 0.26)
+            line(start, end, 1.2, palette.seam, 0.22)
+          }
+        }
         // Thin expansion joints / material seams across the road, inset from
         // the existing guardrails. Do not add a new physical road surface.
         for (const t of bridgeJointFractions(quad.from.distance, quad.to.distance, theme.jointSpacing)) {
@@ -119,7 +139,8 @@ export function bridgePaintCommands(
         break
       case 'wall': {
         line(start, end, theme.railWidth, palette.rail)
-        line(start, end, 1.7, palette.highlight)
+        line(start, end, Math.max(1, theme.railWidth - 2), palette.seam, 0.26)
+        line(start, end, 1.7, palette.highlight, 0.85)
         const span = primitive.distanceSpan
         const length = Math.hypot(end.x - start.x, end.y - start.y)
         if (!span || length < 0.001) break

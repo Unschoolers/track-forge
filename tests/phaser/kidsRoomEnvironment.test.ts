@@ -66,13 +66,13 @@ describe("Kids' Room environment", () => {
     }
   })
 
-  it('renders a recognizable royal-blue carpet and contrasting comforter folds in both lighting modes', () => {
+  it('renders a recognizable royal-blue carpet and contrasting foam mats in both lighting modes', () => {
     const day = getTrackEnvironment('kids-room').day
     const night = getTrackEnvironment('kids-room').night
     expect(day.raceGround).toBe('#2651b1')
     expect(day.editorGround).toBe(day.flyoverGround)
     expect(night.raceGround).toBe('#122858')
-    expect(day.hillPlateau).toBe(0xb66b72)
+    expect(day.hillPlateau).toBe(0xdd579b)
     const fibers = getTrackEnvironment('kids-room').groundArt(2, false)
     expect(fibers.length).toBeGreaterThan(1000)
     expect(fibers).toEqual(getTrackEnvironment('kids-room').groundArt(2, false))
@@ -121,7 +121,7 @@ describe("Kids' Room environment", () => {
     }
   })
 
-  it('renders juice and carpet hills through the shared terrain primitives', () => {
+  it('renders toy-pool water and foam hills through the shared terrain primitives', () => {
     const palette = getTrackEnvironment('kids-room').day
     const fills: number[] = []
     const strokes: number[] = []
@@ -140,7 +140,7 @@ describe("Kids' Room environment", () => {
     expect(fills).toContain(palette.hillPlateau)
     expect(strokes).toContain(palette.waterRipple)
     expect(strokes).toContain(palette.waterShoreline)
-    expect(palette.flyoverWater).toBe('#b14e68')
+    expect(palette.flyoverWater).toBe('#168bc4')
     expect(getTrackEnvironment('kids-room').night.waterFill).not.toBe(palette.waterFill)
   })
 })

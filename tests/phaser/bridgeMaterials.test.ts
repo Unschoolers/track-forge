@@ -82,3 +82,27 @@ describe('environment bridge artwork', () => {
     expect(bridgeJointFractions(100, 100, 96)).toEqual([])
   })
 })
+
+describe('bridge material relief', () => {
+  it('adds only bounded, translucent fascia bevels within the canonical side face', () => {
+    const face = buildBridgePresentation(geometry).find(p => p.kind === 'side-face')
+    if (!face || !('polygon' in face)) throw new Error('Expected side face')
+    const commands = bridgePaintCommands(face, 'cityscape', false)
+    expect(commands[0]).toMatchObject({ kind: 'fill', polygon: face.polygon })
+    expect(commands).toHaveLength(5)
+    const [a, b, c, d] = face.polygon
+    const along = (p: { x: number; y: number }, from: { x: number; y: number }, to: { x: number; y: number }) => {
+      const dx = to.x - from.x, dy = to.y - from.y
+      const len = dx * dx + dy * dy
+      return len > 0 ? ((p.x - from.x) * dx + (p.y - from.y) * dy) / len : 0
+    }
+    for (const command of commands.slice(1)) {
+      if (command.kind !== 'fill') throw new Error('Expected fascia band')
+      expect(command.alpha).toBeLessThan(1)
+      for (const [point, from, to] of [[command.polygon[0], a, d], [command.polygon[1], b, c], [command.polygon[2], b, c], [command.polygon[3], a, d]] as const) {
+        expect(along(point, from, to)).toBeGreaterThanOrEqual(-1e-8)
+        expect(along(point, from, to)).toBeLessThanOrEqual(1 + 1e-8)
+      }
+    }
+  })
+})

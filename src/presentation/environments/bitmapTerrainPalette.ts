@@ -90,8 +90,8 @@ export const CITY_TERRAIN_ART = {
 
 export const KIDS_ROOM_TERRAIN_ART = {
   day: {
-    outerBank: '#524173', wetBank: '#873d62', deepGlaze: 'rgba(103,22,66,0.36)',
-    shallow: ['#c96987', '#df889e', '#efb1bd'], contact: '#ffdfdb',
+    outerBank: '#355d99', wetBank: '#397da9', deepGlaze: 'rgba(7,54,105,0.24)',
+    shallow: ['#2e9dc8', '#63cbe9', '#a6e5fa'], contact: '#d6f6ff',
     raised: {
       slopeShadow: '67,25,48', slopeLight: '255,232,210',
       slopeShadowStrength: 0.115, slopeLightStrength: 0.075,
@@ -100,8 +100,8 @@ export const KIDS_ROOM_TERRAIN_ART = {
     bankScale: 0.55, shallowScale: 0.42,
   },
   night: {
-    outerBank: '#332847', wetBank: '#563047', deepGlaze: 'rgba(44,12,40,0.42)',
-    shallow: ['#8a456f', '#ae6a8e', '#d090a5'], contact: '#eac1c8',
+    outerBank: '#203750', wetBank: '#2b597d', deepGlaze: 'rgba(5,22,52,0.32)',
+    shallow: ['#28658d', '#4789af', '#82bdd6'], contact: '#b8ddea',
     raised: {
       slopeShadow: '24,14,35', slopeLight: '184,156,176',
       slopeShadowStrength: 0.10, slopeLightStrength: 0.055,

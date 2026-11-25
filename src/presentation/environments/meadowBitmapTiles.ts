@@ -115,6 +115,14 @@ function repeatPattern(context: CanvasRenderingContext2D, source: HTMLCanvasElem
 
 /** Ordinary and elevated roads deliberately use the identical bitmap
  * swatches, width, variation count and canonical longitudinal phase. */
+function fillRoadPolygon(context: CanvasRenderingContext2D, [a, b, c, d]: RoadRibbonQuad['road']): void {
+  context.beginPath()
+  context.moveTo(a.x, a.y); context.lineTo(b.x, b.y)
+  context.lineTo(c.x, c.y); context.lineTo(d.x, d.y)
+  context.closePath()
+  context.fill()
+}
+
 function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, repeat: number): (quad: RoadRibbonQuad) => void {
   const patterns: Record<SurfaceId, CanvasPattern> = {
     street: repeatPattern(context, art.road.street),
@@ -128,12 +136,7 @@ function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentB
     const pattern = patterns[quad.surface]
     pattern.setTransform(transform)
     context.fillStyle = pattern
-    const [a, b, c, d] = quad.road
-    context.beginPath()
-    context.moveTo(a.x, a.y); context.lineTo(b.x, b.y)
-    context.lineTo(c.x, c.y); context.lineTo(d.x, d.y)
-    context.closePath()
-    context.fill()
+    fillRoadPolygon(context, quad.road)
   }
 }
 
@@ -163,15 +166,35 @@ export function bridgeBitmapPrimitives(primitives: readonly BridgePrimitive[], a
 function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean): BitmapTiles | undefined {
   const items = bridgeBitmapPrimitives(primitives, approach)
   if (items.length === 0) return undefined
-  const index = indexBitmapItems(items, p => 'polygon' in p ? p.polygon : [p.start, p.end], 5)
+  const index = indexBitmapItems(items, p => p.kind === 'surface' && p.roadQuad ? p.roadQuad.edge : 'polygon' in p ? p.polygon : [p.start, p.end], 5)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, visible) => {
     const paintRoad = roadPatternPainter(context, art, repeat)
+    const source = art.bridge
+    const structure = source ? repeatPattern(context, source) : undefined
     // Preserve canonical surface, marking and wall painter order per tile.
     for (const p of visible) {
       if (p.kind === 'surface') {
         if (!p.roadQuad) throw new Error('Bridge surface is missing its road texture quad')
-        paintRoad(p.roadQuad)
+        const quad = p.roadQuad
+        const transform = source && structure ? roadBitmapTransform(quad, repeat, source.width) : undefined
+        if (structure && transform) {
+          // Material is visible on the structural shoulders; the road covers
+          // the center in the next pass. Keep the exact authored footprint.
+          structure.setTransform(transform)
+          context.fillStyle = structure
+          fillRoadPolygon(context, quad.edge)
+        }
+        paintRoad(quad)
+        if (structure && transform && quad.surface === 'street' && !p.rampApproach) {
+          // A light material overlay only on standard elevated decks; mud
+          // and ice remain unambiguously the authored driving surface.
+          context.save()
+          context.globalAlpha = 0.28
+          context.fillStyle = structure
+          fillRoadPolygon(context, quad.road)
+          context.restore()
+        }
       }
       paintBridgeCanvas(context, bridgePaintCommands(p, environment, night, true))
     }
@@ -188,6 +211,7 @@ type ElevationFace =
 
 type TerrainBitmapItem =
   | { readonly kind: 'bank'; readonly segment: BankSegment }
+  | { readonly kind: 'hill-bank'; readonly segment: BankSegment }
   | { readonly kind: 'water'; readonly triangle: TerrainTriangle }
   | ElevationFace
 
@@ -206,11 +230,11 @@ function terrainBitmapIndex(geometry: TrackGeometry): Map<string, TerrainBitmapI
   const surface = geometry.path.terrainSurface
   const items: TerrainBitmapItem[] = []
   for (const contour of surface.contours) {
-    if (contour.kind !== 'water' || contour.points.length < 3) continue
+    if ((contour.kind !== 'water' && contour.kind !== 'hill') || contour.points.length < 3) continue
     for (let i = 0; i < contour.points.length; i++) {
       const a = contour.points[i], b = contour.points[(i + 1) % contour.points.length]
       if (!a || !b) continue
-      for (const segment of splitBankSegment(a, b)) items.push({ kind: 'bank', segment })
+      for (const segment of splitBankSegment(a, b)) items.push({ kind: contour.kind === 'water' ? 'bank' : 'hill-bank', segment })
     }
   }
   // Tiling the water components avoids indexing a huge triangulated interior
@@ -229,7 +253,7 @@ function terrainBitmapIndex(geometry: TrackGeometry): Map<string, TerrainBitmapI
       for (const triangle of primitive.triangles) items.push({ kind: 'plateau', triangle, level })
     }
   }
-  return indexBitmapItems(items, item => item.kind === 'bank'
+  return indexBitmapItems(items, item => 'segment' in item
     ? [item.segment.start, item.segment.end] : item.triangle, WATER_SHALLOW_RADIUS + 2)
 }
 
@@ -240,10 +264,10 @@ function appendTriangle(context: CanvasRenderingContext2D, [a, b, c]: TerrainTri
   context.closePath()
 }
 
-function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], width: number, style: string | CanvasPattern, alpha: number): void {
+function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], width: number, style: string | CanvasPattern, alpha: number, kind: 'bank' | 'hill-bank' = 'bank'): void {
   context.beginPath()
   for (const item of items) {
-    if (item.kind !== 'bank') continue
+    if (item.kind !== kind) continue
     context.moveTo(item.segment.start.x, item.segment.start.y)
     context.lineTo(item.segment.end.x, item.segment.end.y)
   }
@@ -262,9 +286,13 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   const palette = art.terrainPalette
   const bankScale = palette.bankScale ?? 1
   const shallowScale = palette.shallowScale ?? 1
-  bankStroke(context, items, WATER_BANK_RADIUS * 2 * bankScale, palette.outerBank, 0.6)
-  bankStroke(context, items, 20 * bankScale, repeatPattern(context, art.sand), 1)
-  bankStroke(context, items, 9 * bankScale, palette.wetBank, 0.95)
+  // Overlapping low-opacity rounded bands disguise hard grid steps without
+  // altering the authored shoreline or extending the opaque water mask.
+  bankStroke(context, items, WATER_BANK_RADIUS * 2 * bankScale, palette.outerBank, 0.16)
+  bankStroke(context, items, 23 * bankScale, palette.outerBank, 0.27)
+  bankStroke(context, items, 18 * bankScale, repeatPattern(context, art.sand), 0.65)
+  bankStroke(context, items, 13 * bankScale, repeatPattern(context, art.sand), 0.78)
+  bankStroke(context, items, 8 * bankScale, palette.wetBank, 0.62)
 
   context.save()
   context.beginPath()
@@ -279,10 +307,13 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   // fillRect covers the current tile in world coordinates via its clip.
   context.fillStyle = palette.deepGlaze
   context.fill()
-  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2 * shallowScale, palette.shallow[0], 0.28)
-  bankStroke(context, items, 42 * shallowScale, palette.shallow[1], 0.35)
-  bankStroke(context, items, 22 * shallowScale, palette.shallow[2], 0.47)
-  bankStroke(context, items, 4 * shallowScale, palette.contact, 0.72)
+  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2 * shallowScale, palette.shallow[0], 0.10)
+  bankStroke(context, items, 54 * shallowScale, palette.shallow[0], 0.14)
+  bankStroke(context, items, 44 * shallowScale, palette.shallow[1], 0.16)
+  bankStroke(context, items, 33 * shallowScale, palette.shallow[1], 0.16)
+  bankStroke(context, items, 23 * shallowScale, palette.shallow[2], 0.18)
+  bankStroke(context, items, 12 * shallowScale, palette.shallow[2], 0.20)
+  bankStroke(context, items, 3 * shallowScale, palette.contact, 0.55)
   if (palette.waterDetail === 'oil-slicks' && tile) paintHarborOilSlicks(context, tile)
   context.restore()
 
@@ -290,6 +321,11 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   // Paint low to high, with the plateau over the slope of the same level.
   // Group only the faces in this bounded tile, not the whole terrain.
   const faces = items.filter((item): item is ElevationFace => item.kind === 'slope' || item.kind === 'plateau')
+  // Soft contact shadow hugs the existing hill contour. The opaque hill
+  // material still covers only the exact canonical mesh triangles.
+  bankStroke(context, items, 12, '#15202a', 0.055, 'hill-bank')
+  bankStroke(context, items, 8, '#15202a', 0.075, 'hill-bank')
+  bankStroke(context, items, 4, '#15202a', 0.11, 'hill-bank')
   for (const [level, levelFaces] of groupElevationFaces(faces)) {
     const material = elevationMaterialForLevel(art.elevationMaterials, level)
     const shading = material.shading
@@ -316,6 +352,17 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
     context.fill()
     context.fillStyle = shading.plateauGlaze
     context.fill()
+
+    // Shade only the inside of the real elevated footprint, with no added
+    // solid geometry. Rounded strokes soften the stepped visual transitions.
+    context.save()
+    context.beginPath()
+    for (const face of levelFaces) appendTriangle(context, face.triangle)
+    context.clip()
+    bankStroke(context, items, 18, `rgb(${shading.slopeShadow})`, 0.07, 'hill-bank')
+    bankStroke(context, items, 12, `rgb(${shading.slopeShadow})`, 0.10, 'hill-bank')
+    bankStroke(context, items, 6, `rgb(${shading.slopeShadow})`, 0.15, 'hill-bank')
+    context.restore()
   }
 }
 

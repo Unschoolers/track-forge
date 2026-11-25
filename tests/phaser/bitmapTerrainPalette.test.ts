@@ -16,7 +16,7 @@ describe('bitmap terrain profiles', () => {
     }
   })
 
-  it('uses narrow, non-sandy juice rims in both Kids’ Room lighting modes', () => {
+  it('uses narrow, non-sandy toy-pool rims in both Kids’ Room lighting modes', () => {
     for (const lighting of ['day', 'night'] as const) {
       const profile = KIDS_ROOM_TERRAIN_ART[lighting]
       expect(profile.bankScale).toBeGreaterThan(0)
