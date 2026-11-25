@@ -70,6 +70,7 @@ export class RaceScene extends Phaser.Scene {
   private terrainVisibilityBounds: WorldBounds | undefined
   private lightVisibilityBounds: WorldBounds | undefined
   private roadVisibilityBounds: WorldBounds | undefined
+  private treeVisibilityBounds: WorldBounds | undefined
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
@@ -156,6 +157,7 @@ export class RaceScene extends Phaser.Scene {
       this.raceSession.snapshot().setup?.lighting === 'night',
       geometry.path.terrainSurface,
       normalizeTrackEnvironmentId(track.environmentId),
+      this.treeVisibilityBounds,
     )
     this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
     const bridgePresentation = buildBridgePresentation(geometry)
@@ -419,6 +421,20 @@ export class RaceScene extends Phaser.Scene {
         if (graphics.visible !== visible) graphics.setVisible(visible)
       }
     }
+    const nextTreeWindow = terrainVisibilityWindow(viewport, this.treeVisibilityBounds)
+    if (nextTreeWindow) {
+      this.treeVisibilityBounds = nextTreeWindow
+      if (this.sceneryGraphics && track) {
+        renderTrees(
+          this.sceneryGraphics,
+          track.trees,
+          night,
+          this.geometry.get(track).path.terrainSurface,
+          environmentId,
+          nextTreeWindow,
+        )
+      }
+    }
     // Road markings and ribbons are static. Rechecking all their bounds every
     // animation frame is wasted CPU: a padded visibility window keeps incoming
     // road geometry visible until the camera moves beyond its coverage.
@@ -476,6 +492,7 @@ export class RaceScene extends Phaser.Scene {
     this.lamps = []
     this.terrainChunks = []
     this.terrainVisibilityBounds = undefined
+    this.treeVisibilityBounds = undefined
     this.lightVisibilityBounds = undefined
     this.roadVisibilityBounds = undefined
     this.staticGraphicsVisibilityBounds = undefined

@@ -10,7 +10,13 @@ vi.mock('phaser', () => ({
   },
 }))
 vi.mock('@/phaser/rendering/bridgeRenderer', () => ({
-  getBridgeDeckOcclusion: () => () => false, renderBridgeDeck: vi.fn(), renderBridgeSideWalls: vi.fn(),
+  buildBridgePresentation: () => [],
+  bridgeRenderPasses: () => ({ underlay: [], rampApproach: [], deck: [], walls: [] }),
+  chunkBridgePrimitives: () => [],
+  getBridgeDeckOcclusion: () => () => false,
+  renderBridgeDeck: vi.fn(),
+  renderBridgeSideWalls: vi.fn(),
+  renderBridgeUnderlay: vi.fn(),
 }))
 vi.mock('@/phaser/rendering/nightRenderer', () => ({ renderNightLights: vi.fn(), renderNightShade: vi.fn() }))
 vi.mock('@/phaser/rendering/trackRenderer', () => ({
@@ -21,6 +27,7 @@ vi.mock('@/phaser/rendering/lampPostRenderer', () => ({ buildLampPosts: () => []
 vi.mock('@/phaser/rendering/treeRenderer', () => ({ renderTrees: vi.fn() }))
 vi.mock('@/phaser/rendering/terrainRenderer', () => ({ buildTerrainPresentation: vi.fn(() => []), renderTerrainPrimitives: vi.fn() }))
 vi.mock('@/phaser/rendering/environmentRenderer', () => ({ GroundTextureRenderer: class { render() {} } }))
+vi.mock('@/phaser/rendering/sceneryRenderer', () => ({ SceneryRenderer: class { render() {} destroy() {} } }))
 
 import { RaceInputController } from '@/phaser/input/raceInput'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
@@ -47,18 +54,27 @@ function createScene(controls: RaceInputController, session: Pick<RaceSessionPor
   const controller = { snapshot: () => ({ currentTrack: { trees: [] }, preferences: { lighting: 'day', steeringSensitivity } }), dispatch: vi.fn() }
   const geometry = { get: () => ({ path: { terrainSurface: {} } }) }
   const graphics = { setDepth() { return this }, setBlendMode() { return this } }
+  const camera = {
+    width: 320,
+    height: 180,
+    scrollX: 0,
+    scrollY: 0,
+    zoom: 1,
+    rotation: 0,
+    setBackgroundColor: vi.fn(),
+  }
   let shutdown: (() => void) | undefined
   const scene = new RaceScene(controller as never, session as never, controls, geometry as never)
   Object.assign(scene, {
     game: { canvas },
     add: { graphics: () => graphics },
-    cameras: { main: { setBackgroundColor: vi.fn() } },
+    cameras: { main: camera },
     events: { once: (_event: string, callback: () => void, context: unknown) => { shutdown = callback.bind(context) } },
     input: { on: vi.fn(), off: vi.fn() },
     scale: { width: 2000 },
   })
   scene.create()
-  return { canvas, shutdown: () => shutdown?.() }
+  return { canvas, camera, scene, shutdown: () => shutdown?.() }
 }
 
 function recoverySession() {
@@ -84,6 +100,22 @@ function recoverySession() {
 }
 
 describe('race canvas steering', () => {
+  it('resets tree culling bounds before a restarted race creates a fresh window', () => {
+    const controls = new RaceInputController()
+    const { session } = recoverySession()
+    const { scene, camera, shutdown } = createScene(controls, session)
+    const state = scene as unknown as { treeVisibilityBounds?: { left: number } }
+    const initialLeft = state.treeVisibilityBounds?.left
+    expect(initialLeft).toBeTypeOf('number')
+
+    shutdown()
+    expect(state.treeVisibilityBounds).toBeUndefined()
+
+    camera.scrollX = 1_000
+    scene.create()
+    expect(state.treeVisibilityBounds?.left).toBeGreaterThan(initialLeft ?? Infinity)
+  })
+
   it.each(['canvas', 'pad'] as const)('backs off immediately after overtravel on the %s while braking', (surface) => {
     const controls = new RaceInputController()
     const { session } = recoverySession()

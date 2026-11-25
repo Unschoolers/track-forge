@@ -22,6 +22,13 @@ export interface TreePrimitive {
   readonly baseHeight: number
 }
 
+export interface TreeViewBounds {
+  readonly left: number
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+}
+
 const TREE_CANOPY_HEIGHT = 6
 
 const TREE_COLORS = {
@@ -40,11 +47,14 @@ const TREE_COLORS = {
 /**
  * Builds renderer-neutral scenery primitives. Keeping this pure lets editor
  * and race scenes share the exact same tree shape, lighting, and scale.
+ * Bounds are optional because callers with moving cameras must refresh the
+ * presentation when the viewport moves; omitting them always renders safely.
  */
 export function buildTreePresentation(
   trees: readonly Tree[],
   night: boolean,
   terrainSurface?: TerrainSurface,
+  viewBounds?: TreeViewBounds,
 ): readonly TreePrimitive[] {
   const colors = night ? TREE_COLORS.night : TREE_COLORS.day
   const shadows: TreePrimitive[] = []
@@ -60,6 +70,23 @@ export function buildTreePresentation(
           terrainSurface,
         ).point
       : projectSunShadow(tree, TREE_CANOPY_HEIGHT)
+    // Bitmap canopies are rendered at 34px (radius 17); use that larger
+    // extent here so culling never clips their visible edge.
+    const canopyVisible = !viewBounds || intersectsEllipse(
+      tree.x,
+      tree.y,
+      17,
+      17,
+      viewBounds,
+    )
+    const shadowVisible = !viewBounds || intersectsEllipse(
+      shadow.x,
+      shadow.y,
+      14,
+      7,
+      viewBounds,
+    )
+    if (!canopyVisible && !shadowVisible) continue
     shadows.push({
       layer: 'shadow',
       x: shadow.x,
@@ -95,6 +122,17 @@ export function buildTreePresentation(
   return [...shadows, ...canopies, ...highlights]
 }
 
+function intersectsEllipse(
+  x: number,
+  y: number,
+  radiusX: number,
+  radiusY: number,
+  bounds: TreeViewBounds,
+): boolean {
+  return x + radiusX >= bounds.left && x - radiusX <= bounds.right &&
+    y + radiusY >= bounds.top && y - radiusY <= bounds.bottom
+}
+
 const treeSprites = new WeakMap<Phaser.GameObjects.Graphics, Phaser.GameObjects.Image[]>()
 
 export function renderTrees(
@@ -103,7 +141,9 @@ export function renderTrees(
   night: boolean,
   terrainSurface?: TerrainSurface,
   environment: TrackEnvironmentId = 'grass',
+  viewBounds?: TreeViewBounds,
 ): void {
+  graphics.clear()
   const generated = getSceneryBitmap('tree', night)
   const bitmap = generated ?? (environment === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined)
   const sprites = treeSprites.get(graphics) ?? []
@@ -114,6 +154,7 @@ export function renderTrees(
       trees,
       night,
       terrainSurface,
+      viewBounds,
     )
   ) {
     if (bitmap && primitive.layer !== 'shadow') {
