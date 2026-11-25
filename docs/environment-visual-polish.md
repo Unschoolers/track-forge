@@ -11,12 +11,13 @@ not a claim that each original crop had 256 native pixels.
 
 The shared loader validates dimensions and decodes day/night canvases
 once. Generated artwork replaces the earlier procedural water and
-gradient/particle ground overlays. Existing base ground and road artwork
-remain untouched. Meadow retains its existing three smaller decorative
+gradient/particle ground overlays. Existing base ground artwork remains untouched except for Kids’ Room,
+which uses the latest supplied unprinted carpet swatch. Road artwork remains untouched. Meadow retains its existing three smaller decorative
 patches plus a new generated patch; Desert and City Port place six
-instances of their themed transparent patch. Kids’ Room places two smaller
-woven star motifs to avoid clutter. All use stable scale, rotation and
-placement and matching day/night geometry. No new collision objects.
+instances of their themed transparent patch. Kids’ Room has no automatic
+star placement; the transparent star cell is retained for a future texture
+brush. No editor tool or serialized decoration changes in this PR.
+Natural patch placement remains stable across lighting. No new collision objects.
 
 Graded shoreline bands and contact shadows soften the visible terrain
 edges. The opaque water and hill footprints remain aligned with canonical
@@ -43,8 +44,9 @@ with blue toy-pool water and colorful interlocking foam-mat material.
 The final cleaner Kids’ Room sheet has no floating toys in the water;
 its woven yellow star is extracted with transparent alpha and the wooden
 bridge cell excludes the surrounding background. Bitmap and vector
-fallback palettes follow that art direction; the original royal-blue
-carpet, road materials, LEGO-style shoulders and authored toys stay intact.
+fallback palettes follow that art direction; the latest unprinted blue carpet replaces the earlier shag swatch, while
+road materials, LEGO-style shoulders and authored toys stay intact. The
+new 256px carpet is cropped from the clean source sheet and edge-blended.
 Crops avoid large baked objects where practical; the artwork is decorative,
 not collision geometry. The source composition of cliffs and puzzle mats is
 not reconstructed as new terrain geometry in this pass.

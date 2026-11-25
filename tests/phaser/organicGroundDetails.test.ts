@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { GROUND_TILE_SIZE, GROUND_TILE_VARIANTS } from '@/presentation/environments/groundTexture'
 import { groundDetailPatches, paintOrganicGround, type OrganicGroundTheme } from '@/presentation/environments/organicGroundDetails'
 
-const themes = ['desert', 'cityscape', 'kids-room'] as const satisfies readonly OrganicGroundTheme[]
+const themes = ['desert', 'cityscape'] as const satisfies readonly OrganicGroundTheme[]
 
 describe('organic bitmap ground detail', () => {
   it.each(themes)('bakes stable, distinct, bounded compositions for all eight %s variants', theme => {
@@ -11,10 +11,9 @@ describe('organic bitmap ground detail', () => {
     for (let variant = 0; variant < GROUND_TILE_VARIANTS; variant++) {
       const patches = groundDetailPatches(theme, variant)
       expect(patches).toEqual(plans[variant])
-      expect(patches).toHaveLength(theme === 'kids-room' ? 2 : 6)
+      expect(patches).toHaveLength(6)
       for (const patch of patches) {
         expect(patch.radius).toBeGreaterThanOrEqual(24)
-        if (theme === 'kids-room') expect(patch.radius).toBeLessThanOrEqual(40)
         expect(patch.x - patch.radius).toBeGreaterThanOrEqual(3 - 1e-9)
         expect(patch.y - patch.radius).toBeGreaterThanOrEqual(3 - 1e-9)
         expect(patch.x + patch.radius).toBeLessThanOrEqual(GROUND_TILE_SIZE - 3 + 1e-9)
@@ -40,6 +39,17 @@ describe('organic bitmap ground detail', () => {
   })
 
   it('varies placement by environment while sharing day and night geometry', () => {
-    expect(new Set(themes.map(theme => JSON.stringify(groundDetailPatches(theme, 0)))).size).toBe(3)
+    expect(new Set(themes.map(theme => JSON.stringify(groundDetailPatches(theme, 0)))).size).toBe(themes.length)
+  })
+
+  it('reserves Kids’ Room stars for a future brush without painting them automatically', () => {
+    const context = { save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(), drawImage: vi.fn() }
+    const image = { width: 256, height: 256 } as HTMLCanvasElement
+    for (let variant = 0; variant < GROUND_TILE_VARIANTS; variant++) {
+      expect(groundDetailPatches('kids-room', variant)).toEqual([])
+      paintOrganicGround(context as unknown as CanvasRenderingContext2D, 'kids-room', variant, image, 64)
+    }
+    expect(context.drawImage).not.toHaveBeenCalled()
+    expect(context.save).not.toHaveBeenCalled()
   })
 })
