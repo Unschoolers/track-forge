@@ -182,3 +182,30 @@ the initial camera area is fully textured before the countdown starts, nor
 does it establish a performance improvement. Verify startup readiness, camera
 movement and equivalent before/after captures on the target device before
 making either claim.
+
+### Startup readiness and frame-budgeted bitmap streaming
+
+The race scene prepares the initial player camera's padded bitmap window
+synchronously during scene creation, before its first rendered countdown frame.
+Only current-window tiles are warmed; forward prefetch remains deferred. This
+can increase Start-to-countdown latency on a cold track, so measure that metric
+alongside driving frame intervals. The vector overview remains the intentional
+fallback when a window exceeds the texture cap. No simulation clock or nearby
+countdown protocol is changed.
+
+During driving, canvas painting and GPU registration run on separate display
+frames. The scheduler checks elapsed CPU frame time at post-render against
+the observed frame interval (capped at the 60 Hz interval) with 3 ms reserved.
+This is an admission budget, not a hard deadline: individual canvas painting
+and GPU registration cannot be preempted, and a persistently overloaded device
+may defer work until a frame has room. Current-window work outranks prefetch.
+The original 48 GPU texture cap remains strict. Spare frames retire at most
+one unused tile at a time until eight unused tiles per layer remain; CPU
+canvas caches remain bounded separately. Static road culling
+is unchanged while bitmap selection refreshes on quantized heading and tile
+window changes. The editor skips tile enumeration when its grid is unchanged.
+
+Compare the same Papou track, lighting, car and device for 30–60 seconds of
+active driving, cold and warm, including turns. Record p95/p99 frame intervals,
+spikes over 33/50 ms, startup latency and Android memory pressure. The component
+tests establish scheduling behavior, not a measured device improvement.

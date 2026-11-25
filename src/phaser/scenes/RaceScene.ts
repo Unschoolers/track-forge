@@ -11,6 +11,7 @@ import {
 import {
   renderRaceTrackGeometryBase,
   renderRecoveryCheckpoints,
+  type RaceTrackVisibility,
 } from '@/phaser/rendering/trackRenderer'
 import {
   renderVehicleShadows,
@@ -58,7 +59,6 @@ import {
   renderBridgeUnderlay,
   type BridgeDeckOcclusion,
 } from '@/phaser/rendering/bridgeRenderer'
-import type { UpdateRoadRibbonVisibility } from '@/phaser/rendering/roadRibbonRenderer'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
@@ -73,7 +73,7 @@ export class RaceScene extends Phaser.Scene {
   private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
   private terrainVisibilityBounds: WorldBounds | undefined
   private roadVisibilityBounds: WorldBounds | undefined
-  private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
+  private updateRoadRibbonVisibility: RaceTrackVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
   private vehicleGraphics?: Phaser.GameObjects.Graphics
   private upperVehicleGraphics?: Phaser.GameObjects.Graphics
@@ -166,6 +166,20 @@ export class RaceScene extends Phaser.Scene {
       normalizeTrackEnvironmentId(track.environmentId),
     )
     this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
+    const bitmap = this.updateRoadRibbonVisibility?.bitmap
+    if (bitmap && this.raceCamera) {
+      const camera = this.cameras.main
+      const view = {
+        centerX: this.raceCamera.x, centerY: this.raceCamera.y,
+        width: camera.width, height: camera.height,
+        zoom: this.snapshot.preferences.dynamicZoomEnabled ? this.raceCamera.zoom : RACE_CAMERA_TUNING.fixedZoom,
+        rotation: -this.raceCamera.angle - Math.PI / 2,
+        minimumZoom: RACE_CAMERA_TUNING.minimumZoom,
+      }
+      const bounds = terrainVisibilityWindow(groundViewportBounds(view))
+      bitmap.render(view, bounds ?? undefined)
+      bitmap.warmVisible()
+    }
     const bridgePresentation = buildBridgePresentation(geometry)
     const bridgeEnvironment = normalizeTrackEnvironmentId(track.environmentId)
     const bridgeNight = this.raceSession.snapshot().setup?.lighting === 'night'
@@ -455,6 +469,9 @@ export class RaceScene extends Phaser.Scene {
       if (nextRoadWindow) {
         this.roadVisibilityBounds = nextRoadWindow
         this.updateRoadRibbonVisibility(view, nextRoadWindow)
+      } else {
+        // Prefetch heading changes independently of static geometry culling.
+        this.updateRoadRibbonVisibility.bitmap?.render(view, this.roadVisibilityBounds)
       }
     }
     this.environmentSceneryRenderer?.render(view, environmentId, track.scenery ?? EMPTY_SCENERY, night)
