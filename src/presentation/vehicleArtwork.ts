@@ -1,5 +1,6 @@
 import { CAR_SPECS } from '@/domain/config'
 import type { CarId, Vector2 } from '@/domain/model'
+import { getVehicleBitmap, vehicleBitmapBounds } from './vehicleBitmapArt'
 
 /** Purely cosmetic size shared by real races and the setup flyover. */
 export const VEHICLE_VISUAL_SCALE = 0.88
@@ -230,6 +231,20 @@ export function drawVehicleArtworkOnCanvas(
   braking = false,
 ): void {
   const art = getVehicleArtwork(car)
+  const bitmap = getVehicleBitmap(car)
+  if (bitmap) {
+    const bounds = vehicleBitmapBounds(car)
+    ctx.drawImage(bitmap, bounds.x, bounds.y, bounds.width, bounds.height)
+    if (braking) {
+      for (const lamp of art.taillights) {
+        ctx.beginPath()
+        ctx.arc(lamp.x, lamp.y, 2.1, 0, Math.PI * 2)
+        ctx.fillStyle = '#ff3038'
+        ctx.fill()
+      }
+    }
+    return
+  }
   for (const layer of art.layers) {
     const color = vehiclePaintColor(car, layer.tone).toString(16).padStart(6, '0')
     ctx.beginPath()
