@@ -14,6 +14,7 @@ import {
 import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import type { Vector2 } from '@/domain/model'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH } from '@/phaser/rendering/meadowBitmapRenderer'
 import {
   buildCurbSegments,
   renderCurbSegments,
@@ -105,9 +106,10 @@ export function renderTrackGeometryBase(
   geometry: TrackGeometry,
   night: boolean,
   environmentId: TrackEnvironmentId = 'grass',
+  markings: Phaser.GameObjects.Graphics = graphics,
 ): void {
   renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
-  renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
+  renderTrackGeometryMarkings(markings, geometry, night, environmentId)
 }
 
 export function renderRaceTrackGeometryBase(
@@ -116,12 +118,19 @@ export function renderRaceTrackGeometryBase(
   night: boolean,
   environmentId: TrackEnvironmentId = 'grass',
 ): UpdateRoadRibbonVisibility | undefined {
+  const bitmap = createMeadowBitmapRenderer(scene, geometry, night, environmentId)
+  if (bitmap) scene.events.once('shutdown', () => bitmap.destroy())
+  const markingsDepth = bitmap ? ROAD_MARKINGS_DEPTH : WORLD_RENDER_DEPTH.road
   const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night, environmentId)
   if (!updateVisibility) {
     const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
     renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
-    renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
-    return undefined
+    if (!bitmap) {
+      renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
+      return undefined
+    }
+    renderTrackGeometryMarkings(scene.add.graphics().setDepth(markingsDepth), geometry, night, environmentId)
+    return (view, paddedViewport) => bitmap.render(view, paddedViewport)
   }
 
   // Keep the original paint order (all curbs, then stripes, then markers),
@@ -132,7 +141,7 @@ export function renderRaceTrackGeometryBase(
     endpoints: (item: T) => readonly [Vector2, Vector2],
     paint: (graphics: Phaser.GameObjects.Graphics) => void,
   ) => {
-    const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
+    const graphics = scene.add.graphics().setDepth(markingsDepth)
     paint(graphics)
     let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity
     for (const item of items) {
@@ -169,10 +178,11 @@ export function renderRaceTrackGeometryBase(
       for (const { previous, current } of batch) renderStripe(graphics, previous, current, night, environmentId)
     })
   }
-  const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
+  const graphics = scene.add.graphics().setDepth(markingsDepth)
   renderTrackMarkers(graphics, geometry, night)
   return (view, paddedViewport) => {
     updateVisibility(view, paddedViewport)
+    bitmap?.render(view, paddedViewport)
     const viewport = paddedViewport ?? groundViewportBounds(view)
     for (const { graphics, bounds } of batches) {
       const visible = boundsVisible(bounds, viewport)

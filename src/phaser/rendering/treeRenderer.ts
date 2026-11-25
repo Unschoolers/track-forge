@@ -1,5 +1,7 @@
 import type Phaser from 'phaser'
 import type { Tree } from '@/domain/model'
+import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import {
   projectSunShadow,
@@ -92,12 +94,19 @@ export function buildTreePresentation(
   return [...shadows, ...canopies, ...highlights]
 }
 
+const treeSprites = new WeakMap<Phaser.GameObjects.Graphics, Phaser.GameObjects.Image[]>()
+
 export function renderTrees(
   graphics: Phaser.GameObjects.Graphics,
   trees: readonly Tree[],
   night: boolean,
   terrainSurface?: TerrainSurface,
+  environment: TrackEnvironmentId = 'grass',
 ): void {
+  const art = environment === 'grass' ? getMeadowBitmapArt(night) : undefined
+  const sprites = treeSprites.get(graphics) ?? []
+  for (const sprite of sprites) sprite.setVisible(false)
+  let shown = 0
   for (
     const primitive of buildTreePresentation(
       trees,
@@ -105,6 +114,24 @@ export function renderTrees(
       terrainSurface,
     )
   ) {
+    if (art && primitive.layer !== 'shadow') {
+      if (primitive.layer === 'highlight') continue
+      const texture = `trackforge-meadow-tree-${night ? 'night' : 'day'}`
+      const scene = graphics.scene
+      if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, art.tree)) {
+        throw new Error('Could not register Meadow tree artwork')
+      }
+      let sprite = sprites[shown]
+      if (!sprite) {
+        sprite = scene.add.image(primitive.x, primitive.y, texture).setDepth(graphics.depth + 0.01)
+        sprites.push(sprite)
+        treeSprites.set(graphics, sprites)
+      }
+      sprite.setTexture(texture).setPosition(primitive.x, primitive.y)
+        .setDisplaySize(34, 34).setVisible(true)
+      shown++
+      continue
+    }
     graphics.fillStyle(primitive.color, primitive.alpha)
     graphics.fillEllipse(
       primitive.x,
@@ -113,4 +140,6 @@ export function renderTrees(
       primitive.radiusY * 2,
     )
   }
+  // Keep only currently authored trees; no growing sprite pool after deletes.
+  for (const sprite of sprites.splice(shown)) sprite.destroy()
 }

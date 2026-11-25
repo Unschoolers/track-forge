@@ -2,6 +2,8 @@ import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
 import { shorelineBands } from '@/presentation/environments/shorelineMaterials'
+import { createMeadowBitmapLayers, drawBitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -47,6 +49,8 @@ export function createRaceFlyoverRenderer(
   const night = lighting === 'night'
   const environmentId = normalizeTrackEnvironmentId(track.environmentId)
   const palette = getTrackEnvironment(environmentId)[lighting]
+  const bitmap = createMeadowBitmapLayers(geometry, night, environmentId)
+  const bitmapArt = environmentId === 'grass' ? getMeadowBitmapArt(night) : undefined
   const props = track.scenery ?? []
   let sceneryWindow = ''
   let scenery = buildSceneryPresentation(environmentId, [], lighting, { left: 0, top: 0, right: 0, bottom: 0 })
@@ -185,7 +189,7 @@ export function createRaceFlyoverRenderer(
     // Map the viewport center back to world space because the car sits below it.
     const offsetX = (width / 2 - focusX) / scale
     const offsetY = (height / 2 - focusY) / scale
-    drawGroundTexture(ctx, {
+    const worldView: GroundViewport = {
       centerX: player.x + Math.cos(rotation) * offsetX + Math.sin(rotation) * offsetY,
       centerY: player.y - Math.sin(rotation) * offsetX + Math.cos(rotation) * offsetY,
       width,
@@ -193,7 +197,8 @@ export function createRaceFlyoverRenderer(
       zoom: scale,
       rotation,
       minimumZoom: baseScale * (1 - 0.035),
-    }, night, environmentId)
+    }
+    drawGroundTexture(ctx, worldView, night, environmentId)
 
     const cellSize = track.terrain.cellSize
     for (let i = 0; i < runs.length; i += terrainStride) {
@@ -236,6 +241,7 @@ export function createRaceFlyoverRenderer(
       }
       ctx.globalAlpha = 1
     }
+    if (bitmap) drawBitmapTiles(ctx, bitmap.shoreline, worldView)
     const left = Math.floor((player.x - radius) / GROUND_TILE_SIZE)
     const right = Math.ceil((player.x + radius) / GROUND_TILE_SIZE)
     const top = Math.floor((player.y - radius) / GROUND_TILE_SIZE)
@@ -268,6 +274,10 @@ export function createRaceFlyoverRenderer(
       if (!visible(tree.x, tree.y)) continue
       ctx.fillStyle = night ? 'rgba(0, 0, 0, .26)' : 'rgba(21, 54, 31, .24)'
       ctx.beginPath(); ctx.ellipse(tree.x + 12, tree.y + 12, 23, 13, 0, 0, Math.PI * 2); ctx.fill()
+      if (bitmapArt) {
+        ctx.drawImage(bitmapArt.tree, tree.x - 17, tree.y - 17, 34, 34)
+        continue
+      }
       ctx.fillStyle = night ? '#1b4738' : '#2c6b3c'
       ctx.beginPath(); ctx.arc(tree.x, tree.y, 18, 0, Math.PI * 2); ctx.fill()
       ctx.fillStyle = night ? '#275642' : '#478c4c'
@@ -293,9 +303,10 @@ export function createRaceFlyoverRenderer(
         ctx.stroke()
       }
     }
+    if (bitmap) drawBitmapTiles(ctx, bitmap.road, worldView)
     // The flyover and Phaser road use identical distance-anchored material
     // strokes, so textures never switch character between preview and race.
-    if (materialSections.length > 0) {
+    if (materialSections.length > 0 && (!bitmap || bitmap.road.visible(worldView).length === 0)) {
       for (const section of materialSections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
         for (const stroke of section.strokes) {
