@@ -2,6 +2,7 @@ import type Phaser from 'phaser'
 import type { Tree } from '@/domain/model'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
+import { getSceneryBitmap } from '@/presentation/environments/sceneryBitmapArt'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import {
   projectSunShadow,
@@ -103,7 +104,8 @@ export function renderTrees(
   terrainSurface?: TerrainSurface,
   environment: TrackEnvironmentId = 'grass',
 ): void {
-  const art = environment === 'grass' ? getMeadowBitmapArt(night) : undefined
+  const generated = getSceneryBitmap('tree', night)
+  const bitmap = generated ?? (environment === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined)
   const sprites = treeSprites.get(graphics) ?? []
   for (const sprite of sprites) sprite.setVisible(false)
   let shown = 0
@@ -114,12 +116,12 @@ export function renderTrees(
       terrainSurface,
     )
   ) {
-    if (art && primitive.layer !== 'shadow') {
+    if (bitmap && primitive.layer !== 'shadow') {
       if (primitive.layer === 'highlight') continue
-      const texture = `trackforge-meadow-tree-${night ? 'night' : 'day'}`
+      const texture = `trackforge-${generated ? 'scenery' : 'meadow'}-tree-${night ? 'night' : 'day'}`
       const scene = graphics.scene
-      if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, art.tree)) {
-        throw new Error('Could not register Meadow tree artwork')
+      if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, bitmap)) {
+        throw new Error('Could not register tree artwork')
       }
       let sprite = sprites[shown]
       if (!sprite) {
