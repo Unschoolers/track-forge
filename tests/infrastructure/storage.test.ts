@@ -185,6 +185,36 @@ describe('BrowserTrackRepository', () => {
     expect(repository.find(track.id)?.name).toBe('Starter Circuit')
   })
 
+  it('reuses decoded library data until storage changes across tabs', () => {
+    const storage = new MemoryStore()
+    const track = createStarterTrack(asTrackId('cached'), 10)
+    storage.values.set('trackforge-library-v2', JSON.stringify([track]))
+    storage.values.set('trackforge-library-v1-migrated', '1')
+    const repository = new BrowserTrackRepository(storage)
+
+    const firstRead = repository.list()
+    const secondRead = repository.list()
+    expect(secondRead).not.toBe(firstRead)
+    const exposedTrack = firstRead[0]
+    const exposedPoint = exposedTrack?.points[0]
+    if (exposedTrack && exposedPoint) {
+      Object.assign(exposedTrack, { name: 'Mutated outside repository' })
+      Object.assign(exposedPoint, { x: -1000 })
+    }
+    const stored = repository.find(track.id)
+    expect(stored?.name).toBe(track.name)
+    expect(stored?.points[0]?.x).toBe(track.points[0]?.x)
+
+    const externalTrack = createStarterTrack(asTrackId('other-tab'), 20)
+    storage.values.set(
+      'trackforge-library-v2',
+      JSON.stringify([track, externalTrack]),
+    )
+    const updatedRead = repository.list()
+    expect(updatedRead).not.toBe(secondRead)
+    expect(updatedRead.map(({ id }) => id)).toEqual(['cached', 'other-tab'])
+  })
+
   it('recovers a legacy autosave once when the v2 library is empty', () => {
     const storage = new MemoryStore()
     storage.values.set(
