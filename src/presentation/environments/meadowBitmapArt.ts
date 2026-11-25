@@ -11,8 +11,12 @@ import meadowGroundUrl from '@/assets/environments/meadow/ground.webp?url&no-inl
 import desertGroundUrl from '@/assets/environments/desert/ground.webp?url&no-inline'
 import cityGroundUrl from '@/assets/environments/cityscape/ground.webp?url&no-inline'
 import kidsGroundUrl from '@/assets/environments/kids-room/ground.webp?url&no-inline'
+import meadowRoadUrl from '@/assets/environments/meadow/roads.webp?url&no-inline'
+import desertRoadUrl from '@/assets/environments/desert/roads.webp?url&no-inline'
+import cityRoadUrl from '@/assets/environments/cityscape/roads.webp?url&no-inline'
+import kidsRoadUrl from '@/assets/environments/kids-room/roads.webp?url&no-inline'
 import { createGroundTileRandom, GROUND_TILE_SIZE } from './groundTexture'
-import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS } from './roadTextureVariants'
+import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS, ROAD_TEXTURE_SIZE, ROAD_TEXTURE_SURFACES, validateRoadAtlasDimensions } from './roadTextureVariants'
 import { paintOrganicGround, type OrganicGroundTheme } from './organicGroundDetails'
 import { createElevationMaterials, elevationMaterialForLevel, type ElevationMaterials } from './elevationMaterials'
 
@@ -87,8 +91,14 @@ function roadStrip(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas
 }
 
-function roadStrips(road: EnvironmentBitmapArt['road']): EnvironmentBitmapArt['road'] {
-  return { street: roadStrip(road.street), dirt: roadStrip(road.dirt), ice: roadStrip(road.ice) }
+function roadAtlas(image: HTMLImageElement): Readonly<Record<'day' | 'night', EnvironmentBitmapArt['road']>> {
+  validateRoadAtlasDimensions(image.naturalWidth, image.naturalHeight)
+  const cell = (surface: SurfaceId) => roadStrip(extract(image, ROAD_TEXTURE_SIZE, ROAD_TEXTURE_SURFACES.indexOf(surface), 0, false))
+  const day = { street: cell('street'), dirt: cell('dirt'), ice: cell('ice') }
+  // Bake the costly three-variant strip only once per surface. Night
+  // lighting is a single color pass over the same finished strip.
+  const shade = (surface: SurfaceId) => tint(day[surface], 'rgba(8, 24, 39, 0.54)')
+  return { day, night: { street: shade('street'), dirt: shade('dirt'), ice: shade('ice') } }
 }
 
 /** Decode the bundled, generated WebP atlases before creating any scenes.
@@ -98,7 +108,9 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     loadImage(materialsUrl), loadImage(patchesUrl), loadImage(terrainUrl),
     loadImage(desertUrl), loadImage(cityUrl), loadImage(kidsUrl),
     loadImage(meadowGroundUrl), loadImage(desertGroundUrl), loadImage(cityGroundUrl), loadImage(kidsGroundUrl),
-  ]).then(([materials, patches, terrain, desert, city, kids, meadowGround, desertGround, cityGround, kidsGround]) => {
+    loadImage(meadowRoadUrl), loadImage(desertRoadUrl), loadImage(cityRoadUrl), loadImage(kidsRoadUrl),
+  ]).then(([materials, patches, terrain, desert, city, kids, meadowGround, desertGround, cityGround, kidsGround,
+    meadowRoad, desertRoad, cityRoad, kidsRoad]) => {
     for (const [name, image] of [['Meadow', meadowGround], ['Desert', desertGround], ['Cityscape', cityGround], ['Kids’ Room', kidsGround]] as const) {
       if (image.naturalWidth !== GROUND_TILE_SIZE || image.naturalHeight !== GROUND_TILE_SIZE) {
         throw new Error(`Unexpected ${name} ground artwork dimensions`)
@@ -118,15 +130,14 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     if (kids.naturalWidth !== 144 || kids.naturalHeight !== 96) {
       throw new Error('Unexpected Kids’ Room artwork atlas dimensions')
     }
+    const meadowRoads = roadAtlas(meadowRoad)
+    const desertRoads = roadAtlas(desertRoad)
+    const cityRoads = roadAtlas(cityRoad)
+    const kidsRoads = roadAtlas(kidsRoad)
     const build = (night: boolean): MeadowBitmapArt => {
       const ground = extract(meadowGround, GROUND_TILE_SIZE, 0, 0, night)
-      const road = {
-        street: extract(materials, 96, 1, 0, night),
-        dirt: extract(materials, 96, 0, 1, night),
-        ice: extract(materials, 96, 1, 1, night),
-      }
       return {
-        road: roadStrips(road),
+        road: meadowRoads[night ? 'night' : 'day'],
         elevationMaterials: createElevationMaterials(ground, {
           plateau: ground,
           slope: extract(terrain, 64, 1, 0, night),
@@ -136,7 +147,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         water: extract(terrain, 64, 0, 0, night),
         patches: [extract(patches, 64, 0, 0, night), extract(patches, 64, 1, 0, night), extract(patches, 64, 0, 1, night)],
         tree: extract(patches, 64, 1, 1, night),
-        sand: tint(road.dirt, night ? 'rgba(107, 108, 79, 0.45)' : 'rgba(222, 198, 143, 0.48)'),
+        sand: tint(extract(materials, 96, 0, 1, night), night ? 'rgba(107, 108, 79, 0.45)' : 'rgba(222, 198, 143, 0.48)'),
       }
     }
     const buildDesert = (night: boolean): EnvironmentBitmapArt => {
@@ -147,7 +158,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
           plateau: dune, slope: dune,
           shading: DESERT_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
-        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
+        road: desertRoads[night ? 'night' : 'day'],
         water: cell(1, 1),
         sand: tint(dune, night ? 'rgba(125,103,82,0.25)' : 'rgba(250,221,161,0.30)'),
         patches: [],
@@ -164,7 +175,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
           plateau: cobble, slope: quay,
           shading: CITY_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
-        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
+        road: cityRoads[night ? 'night' : 'day'],
         water: cell(1, 1),
         sand: tint(quay, night ? 'rgba(87,104,109,0.24)' : 'rgba(185,190,180,0.20)'),
         patches: [],
@@ -182,7 +193,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
           plateau: quilt, slope: quilt,
           shading: KIDS_ROOM_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
-        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
+        road: kidsRoads[night ? 'night' : 'day'],
         water: cell(1, 1),
         sand: tint(ground, night ? 'rgba(44,17,46,0.58)' : 'rgba(90,25,65,0.52)'),
         patches: [],
