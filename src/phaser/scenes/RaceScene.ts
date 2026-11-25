@@ -5,6 +5,7 @@ import Phaser from 'phaser'
 import type { AppSnapshot } from '@/application/appState'
 import {
   NightBeamRenderer,
+  createNightLampGraphics,
   renderNightLights,
 } from '@/phaser/rendering/nightRenderer'
 import {
@@ -37,7 +38,6 @@ import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import {
   buildLampPosts,
   renderLampPosts,
-  type LampPost,
 } from '@/phaser/rendering/lampPostRenderer'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { buildTerrainPresentation, renderTerrainPrimitives } from '@/phaser/rendering/terrainRenderer'
@@ -71,7 +71,6 @@ export class RaceScene extends Phaser.Scene {
   private environmentSceneryRenderer: SceneryRenderer | undefined
   private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
   private terrainVisibilityBounds: WorldBounds | undefined
-  private lightVisibilityBounds: WorldBounds | undefined
   private roadVisibilityBounds: WorldBounds | undefined
   private updateRoadRibbonVisibility: UpdateRoadRibbonVisibility | undefined
   private shadowGraphics?: Phaser.GameObjects.Graphics
@@ -86,7 +85,6 @@ export class RaceScene extends Phaser.Scene {
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
-  private lamps: readonly LampPost[] = []
   private snapshot: AppSnapshot | undefined
   private raceCamera: RaceCameraState | undefined
   private pointerBinding: RacePointerBinding | undefined
@@ -185,11 +183,14 @@ export class RaceScene extends Phaser.Scene {
       renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
     drawBridgeBatches(bridgePasses.walls, WORLD_RENDER_DEPTH.structureWall, (graphics, items) =>
       renderBridgeSideWalls(graphics, geometry, night, 'terrain', bridgeEnvironment, items))
-    this.lamps = buildLampPosts(geometry)
-    for (const batch of chunkSpatialItems(this.lamps, lamp => [lamp.position, lamp.shadowEnd], 64, 8)) {
+    const lamps = buildLampPosts(geometry)
+    for (const batch of chunkSpatialItems(lamps, lamp => [lamp.position, lamp.shadowEnd], 64, 8)) {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
       renderLampPosts(graphics, batch.items, night)
       this.lampGraphics.push({ graphics, bounds: batch.bounds })
+    }
+    if (night) {
+      this.lampGraphics.push(...createNightLampGraphics(this, lamps, Phaser.BlendModes.ADD))
     }
     const checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
     renderRecoveryCheckpoints(checkpointGraphics, geometry.path, this.raceSession.snapshot().state?.recoveryCheckpoints ?? [])
@@ -393,12 +394,8 @@ export class RaceScene extends Phaser.Scene {
         transformVehicleLights(vehicle.car, vehicle, vehicle.braking),
       )
       this.nightBeamRenderer?.render(lights)
-      renderNightLights(
-        this.nightLightGraphics,
-        lights,
-        this.lamps,
-        this.lightVisibilityBounds,
-      )
+      // Streetlamp halos are static and already present in the culled batches.
+      renderNightLights(this.nightLightGraphics, lights, [])
     }
     benchmark?.endUpdate()
   }
@@ -419,7 +416,6 @@ export class RaceScene extends Phaser.Scene {
     const environmentId = normalizeTrackEnvironmentId(track.environmentId)
     this.groundRenderer?.render(view, night, environmentId)
     const viewport = groundViewportBounds(view)
-    this.lightVisibilityBounds = viewport
     // Chunk visibility only needs updating when the viewport exits a padded
     // coverage window; all geometry entering the camera is already visible.
     if (this.terrainChunks.length) {
@@ -501,10 +497,8 @@ export class RaceScene extends Phaser.Scene {
     this.upperShadowGraphics = undefined
     this.nightBeamRenderer?.destroy()
     this.nightBeamRenderer = undefined
-    this.lamps = []
     this.terrainChunks = []
     this.terrainVisibilityBounds = undefined
-    this.lightVisibilityBounds = undefined
     this.roadVisibilityBounds = undefined
     this.staticGraphicsVisibilityBounds = undefined
     this.lampGraphics = []
