@@ -11,9 +11,10 @@ describe('organic bitmap ground detail', () => {
     for (let variant = 0; variant < GROUND_TILE_VARIANTS; variant++) {
       const patches = groundDetailPatches(theme, variant)
       expect(patches).toEqual(plans[variant])
-      expect(patches).toHaveLength(6)
+      expect(patches).toHaveLength(theme === 'kids-room' ? 2 : 6)
       for (const patch of patches) {
         expect(patch.radius).toBeGreaterThanOrEqual(24)
+        if (theme === 'kids-room') expect(patch.radius).toBeLessThanOrEqual(40)
         expect(patch.x - patch.radius).toBeGreaterThanOrEqual(3 - 1e-9)
         expect(patch.y - patch.radius).toBeGreaterThanOrEqual(3 - 1e-9)
         expect(patch.x + patch.radius).toBeLessThanOrEqual(GROUND_TILE_SIZE - 3 + 1e-9)

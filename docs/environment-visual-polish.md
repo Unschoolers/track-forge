@@ -5,7 +5,7 @@ The four locally bundled 512 × 512 alpha WebP atlases each contain four
 and bridge structure. Source is the four separate user-supplied 1536 × 1536 environment sheets,
 cropped to usable material regions, resized to the target resolution and
 edge-blended offline for the opaque swatches. The ground patches have
-irregular feathered alpha masks. All four files total 231,594 bytes.
+irregular feathered alpha masks. All four files total 269,002 bytes.
 Some source crops are smaller than 256 px; the final cells are 256 px,
 not a claim that each original crop had 256 native pixels.
 
@@ -13,9 +13,10 @@ The shared loader validates dimensions and decodes day/night canvases
 once. Generated artwork replaces the earlier procedural water and
 gradient/particle ground overlays. Existing base ground and road artwork
 remain untouched. Meadow retains its existing three smaller decorative
-patches plus a new generated patch; the other environments place six
-instances of their themed transparent patch, with stable scale, rotation
-and placement and matching day/night geometry. No new collision objects.
+patches plus a new generated patch; Desert and City Port place six
+instances of their themed transparent patch. Kids’ Room places two smaller
+woven star motifs to avoid clutter. All use stable scale, rotation and
+placement and matching day/night geometry. No new collision objects.
 
 Graded shoreline bands and contact shadows soften the visible terrain
 edges. The opaque water and hill footprints remain aligned with canonical
@@ -38,7 +39,10 @@ AI, save data, terrain height or hazard footprint changes. Rollback is
 presentation-only.
 
 The supplied Kids’ Room reference replaces berry-colored liquid and quilt
-with blue toy-pool water and pink foam-mat material. Bitmap and vector
+with blue toy-pool water and colorful interlocking foam-mat material.
+The final cleaner Kids’ Room sheet has no floating toys in the water;
+its woven yellow star is extracted with transparent alpha and the wooden
+bridge cell excludes the surrounding background. Bitmap and vector
 fallback palettes follow that art direction; the original royal-blue
 carpet, road materials, LEGO-style shoulders and authored toys stay intact.
 Crops avoid large baked objects where practical; the artwork is decorative,

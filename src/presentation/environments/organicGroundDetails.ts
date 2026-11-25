@@ -17,11 +17,16 @@ interface GroundDetailPatch {
  * within the central tile to avoid drawing over a neighboring tile. */
 export function groundDetailPatches(theme: OrganicGroundTheme, variant: number): readonly GroundDetailPatch[] {
   const random = createGroundTileRandom(variant, salts[theme])
-  return Array.from({ length: 6 }, (_, index) => {
-    const radius = index < 3 ? 48 + random() * 19 : 24 + random() * 17
+  // Carpet stars are recognizable motifs, unlike diffuse natural patches.
+  // Keep them sparse and smaller so the blue carpet remains the dominant material.
+  const carpet = theme === 'kids-room'
+  return Array.from({ length: carpet ? 2 : 6 }, (_, index) => {
+    const radius = carpet ? 24 + random() * 16 : index < 3 ? 48 + random() * 19 : 24 + random() * 17
     const margin = radius + 3
     const column = index % 3
-    const anchorX = index < 3 ? (column + 0.5) * GROUND_TILE_SIZE / 3 : random() * GROUND_TILE_SIZE
+    const anchorX = carpet
+      ? (index + 0.5) * GROUND_TILE_SIZE / 2
+      : index < 3 ? (column + 0.5) * GROUND_TILE_SIZE / 3 : random() * GROUND_TILE_SIZE
     const x = Math.max(margin, Math.min(GROUND_TILE_SIZE - margin, anchorX + (random() - 0.5) * 45))
     const y = margin + random() * (GROUND_TILE_SIZE - margin * 2)
     return { x, y, radius, angle: random() * Math.PI * 2 }
