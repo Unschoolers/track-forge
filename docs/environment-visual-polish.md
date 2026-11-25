@@ -1,11 +1,11 @@
 # Visual polish: generated environment materials
 
 The four locally bundled 512 × 512 alpha WebP atlases each contain four
-256 × 256 cells: water/juice, elevated material, transparent ground patch
-and bridge structure. Source is the generated environment concept artwork,
+256 × 256 cells: water, elevated material, transparent ground patch
+and bridge structure. Source is the four separate user-supplied 1536 × 1536 environment sheets,
 cropped to usable material regions, resized to the target resolution and
 edge-blended offline for the opaque swatches. The ground patches have
-irregular feathered alpha masks. All four files total 343,718 bytes.
+irregular feathered alpha masks. All four files total 231,594 bytes.
 Some source crops are smaller than 256 px; the final cells are 256 px,
 not a claim that each original crop had 256 native pixels.
 
@@ -23,8 +23,8 @@ physics geometry; the authored staircase contours can still be visible.
 Island holes and harbor oil slicks remain. True geometric rounding is
 outside this pass.
 
-Bridge materials use the canonical road quad: textured wood, sandstone,
-steel or toy plastic shoulders, with a subtle material glaze on standard
+Bridge materials use the canonical road quad: textured timber (Meadow and Desert),
+steel (City Port), or toy timber (Kids’ Room) shoulders, with a subtle material glaze on standard
 elevated decks only. Mud and ice retain their original road material.
 Existing fascia relief, rail highlights, markings, ramps, shadows and
 occlusion remain. The shared bitmap tiles render in editor, race and
@@ -36,3 +36,11 @@ require measurement. Tests cover atlas dimensions, deterministic patch
 placement, actual bitmap draws and bounded fascia bands. No physics,
 AI, save data, terrain height or hazard footprint changes. Rollback is
 presentation-only.
+
+The supplied Kids’ Room reference replaces berry-colored liquid and quilt
+with blue toy-pool water and pink foam-mat material. Bitmap and vector
+fallback palettes follow that art direction; the original royal-blue
+carpet, road materials, LEGO-style shoulders and authored toys stay intact.
+Crops avoid large baked objects where practical; the artwork is decorative,
+not collision geometry. The source composition of cliffs and puzzle mats is
+not reconstructed as new terrain geometry in this pass.

@@ -200,7 +200,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         road: kidsRoads[night ? 'night' : 'day'],
         water: detail.water,
         bridge: detail.bridge,
-        sand: tint(ground, night ? 'rgba(44,17,46,0.58)' : 'rgba(90,25,65,0.52)'),
+        sand: tint(ground, night ? 'rgba(15,37,71,0.52)' : 'rgba(26,77,139,0.40)'),
         patches: [],
         organicGround: { theme: 'kids-room', patch: detail.patch },
         terrainPalette: KIDS_ROOM_TERRAIN_ART[night ? 'night' : 'day'],
