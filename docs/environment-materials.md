@@ -192,3 +192,23 @@ and race. Existing lane paint, curbs, terrain textures, physical surfaces
 and the 48-tile cache budget stay unchanged. These are derived variants,
 not new independent paintings; visual approval at driving zoom remains
 required.
+
+### Organic ground variation across environments
+
+The other three bitmap environments now use the Meadow layering principle:
+a seamless base texture with broad, feathered, irregular tonal patches
+and small themed surface details. Desert has sand nap, gravel and dry
+grass; Cityscape has worn pavement, hairline cracks and moss; Kids' Room
+has carpet nap, faint stains and lint. Six bounded patches per tile are
+seeded by the existing tile variant. Day/night share the exact same
+placement geometry with different colors. The edge of every tile retains
+the original base bitmap phase to avoid visible seams. Meadow's existing
+generated patch art is unchanged.
+
+The shared ground bitmap painter bakes the overlays into the existing
+eight cached tile variants per environment and lighting, not a new layer
+or live scenery. Editor, race and flyover share this painter. No extra GPU
+textures beyond the existing tile budget, collision objects, physics
+changes or save data. The underlying swatches are reused; the procedural
+color overlays provide broad variation without new asset downloads.
+Physical-device art and frame-pacing review remains required.
