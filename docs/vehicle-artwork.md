@@ -3,27 +3,32 @@
 The four vehicles are the same gameplay cars. This is strictly a visual redesign:
 no physics, collision bounds, car ratings, AI, replay format or multiplayer
 protocol changes. The shared race and flyover artwork renders at 88% of its
-authored size; lighting anchors, day shadows, toppers, ghosts and deck outlines
-follow that scale, with no changes to camera zoom or collision envelopes.
-Blue, red and green have clean body silhouettes without exposed tires; only
-the yellow pickup exposes its tires.
+authored size. Existing light, shadow, topper and ghost geometry is retained.
 
-- `src/presentation/vehicleArtwork.ts` owns the four silhouette and paint-layer
-  definitions, palettes and fixture locations. Blue is a low sports coupe, red
-  a broad-shouldered muscle car, green a rally hatch, yellow an open-bed pickup.
-- `src/phaser/rendering/vehicleRenderer.ts` paints those layers in the race,
-  with existing landing, bridge, ghost, topper, shadow and light behavior.
-- `src/ui/components/raceFlyoverRenderer.ts` paints the **same layers** through
-  Canvas 2D in the race-setup flyover. The car picker uses the same polygons
-  and colors through tiny inline SVGs. No separately redrawn preview art.
-- Artwork data is built once at module initialization, not allocated per frame.
-  New details should remain readable at small mobile zoom levels and bounded
-  inside the existing visual envelope. Fixtures follow the forward (+X) nose.
+- `src/assets/vehicles/` contains four individually generated, transparent,
+  cropped WebP images (768 px wide, approximately 255 KiB combined). The blue
+  coupe has silver shoulder swooshes rather than the red muscle car's center
+  stripes. The rally hatch and open-bed pickup have distinct silhouettes.
+- `src/presentation/vehicleBitmapArt.ts` owns the asset URLs, dimensions and
+  local bounds; +X faces forward. The original body lengths are preserved,
+  with heights derived from each image's aspect ratio. Startup validates and
+  decodes all four assets once; failed loading is surfaced by the existing
+  retry screen.
+- `src/phaser/rendering/vehicleSpriteRenderer.ts` registers four shared GPU
+  textures and reuses a scene-owned image pool. Bodies keep the same landing
+  scale and bridge classification, with player-last ordering, shadows below
+  and brake lights/topper/boost effects above. Scene teardown destroys images,
+  not the reusable textures.
+- The setup flyover and car picker use the same bitmap URLs and proportions.
+  `vehicleArtwork.ts` retains the existing visual geometry for fixtures,
+  covered-player outlines, translucent replay ghosts and pre-boot component
+  tests. No generated textures or per-car canvas allocation in the render loop.
 
 ## Check and rollback
 
 Compare all four cars in the picker, day/night flyover, day/night race, nearby
-race and elevated bridge segments. The truck bed and red/blue/green silhouettes
-should remain distinct without color alone. Run focused component tests and
-`npm run verify`; check mobile performance for drawing overhead. Roll back
-this single visual PR if frame pacing or visibility regresses; no migration.
+race and elevated bridge segments. Run focused component tests and
+`npm run verify`; check physical Android frame pacing and lamp alignment.
+The new images have natural proportions; Blue is slightly wider than the old
+vector shape without affecting collision. Roll back this visual PR if pacing
+or visibility regresses; no migration.

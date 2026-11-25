@@ -1,40 +1,16 @@
 import { CAR_IDS, type CarId } from '@/domain/model'
 import { CAR_SPECS } from '@/domain/config'
-import { getVehicleArtwork, vehiclePaintColor } from '@/presentation/vehicleArtwork'
+import { vehicleBitmapUrl } from '@/presentation/vehicleBitmapArt'
 import { button, element } from '@/ui/dom'
 
-const SVG_NS = 'http://www.w3.org/2000/svg'
-
-function carSilhouette(car: CarId): SVGSVGElement {
-  const art = getVehicleArtwork(car)
-  const svg = document.createElementNS(SVG_NS, 'svg')
-  svg.setAttribute('viewBox', '-29 -16 60 32')
-  svg.setAttribute('aria-hidden', 'true')
-  svg.classList.add('car-silhouette')
-  for (const layer of art.layers) {
-    const polygon = document.createElementNS(SVG_NS, 'polygon')
-    polygon.setAttribute('points', layer.points.map(({ x, y }) => `${x},${y}`).join(' '))
-    polygon.setAttribute('fill', `#${vehiclePaintColor(car, layer.tone).toString(16).padStart(6, '0')}`)
-    if (layer.outline) {
-      polygon.setAttribute('stroke', '#101923')
-      polygon.setAttribute('stroke-width', '1.4')
-    }
-    svg.append(polygon)
-  }
-  for (const [color, lamps, radius] of [
-    ['#eaf7ff', art.headlights, 1.7],
-    ['#5b1620', art.taillights, 1.5],
-  ] as const) {
-    for (const lamp of lamps) {
-      const light = document.createElementNS(SVG_NS, 'circle')
-      light.setAttribute('cx', String(lamp.x))
-      light.setAttribute('cy', String(lamp.y))
-      light.setAttribute('r', String(radius))
-      light.setAttribute('fill', color)
-      svg.append(light)
-    }
-  }
-  return svg
+function carSilhouette(car: CarId): HTMLImageElement {
+  const image = document.createElement('img')
+  image.src = vehicleBitmapUrl(car)
+  image.alt = ''
+  image.setAttribute('aria-hidden', 'true')
+  image.classList.add('car-silhouette')
+  image.draggable = false
+  return image
 }
 
 export function createCarPicker(

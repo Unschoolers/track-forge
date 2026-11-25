@@ -3,28 +3,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CAR_IDS } from '@/domain/model'
 import { createCarPicker } from '@/ui/components/carPicker'
-import { getVehicleArtwork, vehiclePaintColor } from '@/presentation/vehicleArtwork'
+import { vehicleBitmapUrl } from '@/presentation/vehicleBitmapArt'
 
 describe('car picker artwork', () => {
-  it('shows the same authored polygons as the race and flyover for all four choices', () => {
+  it('shows the shared generated bitmap for each car while retaining selection and accessible labels', () => {
     const onSelect = vi.fn()
     const picker = createCarPicker('yellow', onSelect)
+    const urls = new Set<string>()
     for (const id of CAR_IDS) {
       const choice = picker.querySelector<HTMLButtonElement>(`[data-car="${id}"]`)
       expect(choice?.getAttribute('aria-pressed')).toBe(String(id === 'yellow'))
-      const art = getVehicleArtwork(id)
-      const shapes = choice?.querySelectorAll('svg polygon')
-      expect(shapes).toHaveLength(art.layers.length)
-      for (const [index, layer] of art.layers.entries()) {
-        const shape = shapes?.item(index)
-        expect(shape?.getAttribute('points'))
-          .toBe(layer.points.map(({ x, y }) => `${x},${y}`).join(' '))
-        expect(shape?.getAttribute('fill'))
-          .toBe(`#${vehiclePaintColor(id, layer.tone).toString(16).padStart(6, '0')}`)
-      }
-      expect(choice?.querySelectorAll('svg circle')).toHaveLength(4)
+      const image = choice?.querySelector<HTMLImageElement>('img.car-silhouette')
+      expect(image?.getAttribute('src')).toBe(vehicleBitmapUrl(id))
+      expect(image?.alt).toBe('')
+      urls.add(vehicleBitmapUrl(id))
       expect(choice?.textContent).toContain(id.toUpperCase())
     }
+    expect(urls.size).toBe(4)
     picker.querySelector<HTMLButtonElement>('[data-car="green"]')?.click()
     expect(onSelect).toHaveBeenCalledWith('green')
   })

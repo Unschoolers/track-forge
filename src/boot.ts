@@ -35,12 +35,13 @@ const showRetry = () => {
 // The startup art stays available even if the game bundle cannot load.
 const timeout = window.setTimeout(showRetry, 30_000)
 try {
-  const [{ loadEnvironmentBitmapArt }, { loadSceneryBitmapArt }] = await Promise.all([
+  const [{ loadEnvironmentBitmapArt }, { loadSceneryBitmapArt }, { loadVehicleBitmapArt }] = await Promise.all([
     import('./presentation/environments/meadowBitmapArt'),
     import('./presentation/environments/sceneryBitmapArt'),
+    import('./presentation/vehicleBitmapArt'),
   ])
   const { finishStartupArtwork } = await import('./startupArtworkGate')
-  const artworkReady = Promise.all([loadEnvironmentBitmapArt(), loadSceneryBitmapArt()])
+  const artworkReady = Promise.all([loadEnvironmentBitmapArt(), loadSceneryBitmapArt(), loadVehicleBitmapArt()])
   void artworkReady.then(
     () => finishStartupArtwork({ ok: true }),
     error => finishStartupArtwork({ ok: false, error }),

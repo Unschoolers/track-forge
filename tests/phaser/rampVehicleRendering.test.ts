@@ -39,6 +39,7 @@ const track: Track = {
 const BODY_PAINT_COLORS = new Set(CAR_IDS.map(car => vehiclePaintColor(car, 'body')))
 
 class Graphics {
+	readonly depth = 5
 	readonly fillColors: number[] = []
 	readonly bodies: { x: number; y: number }[] = []
 	readonly scales: { x: number; y: number }[] = []
@@ -153,6 +154,16 @@ describe('ramp vehicle rendering', () => {
     expect(graphics.scales).toEqual([
       { x: VEHICLE_VISUAL_SCALE, y: VEHICLE_VISUAL_SCALE },
     ])
+
+    // The production bitmap path must use the same position/scale and avoid
+    // redrawing the vector body when the sprite successfully paints.
+    graphics.clear()
+    const draw = vi.fn(() => true)
+    renderVehicles(graphics as never, [{ ...car, braking: false }], path, { draw })
+    expect(draw).toHaveBeenCalledWith(car.car, car.x, car.y, car.angle,
+      VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE, graphics.depth)
+    expect(graphics.bodies).toEqual([])
+
   })
 
 	it.each([false, true])(

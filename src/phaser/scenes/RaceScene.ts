@@ -45,6 +45,7 @@ import { chunkRaceTerrain, chunkSpatialItems, terrainChunkVisible, terrainVisibi
 import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { VehicleSpriteRenderer } from '@/phaser/rendering/vehicleSpriteRenderer'
 import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 import {
   buildBridgePresentation,
@@ -76,6 +77,8 @@ export class RaceScene extends Phaser.Scene {
   private shadowGraphics?: Phaser.GameObjects.Graphics
   private vehicleGraphics?: Phaser.GameObjects.Graphics
   private upperVehicleGraphics?: Phaser.GameObjects.Graphics
+  private upperShadowGraphics: Phaser.GameObjects.Graphics | undefined
+  private vehicleSprites: VehicleSpriteRenderer | undefined
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
@@ -133,6 +136,8 @@ export class RaceScene extends Phaser.Scene {
     this.upperVehicleGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.upperVehicle)
+    this.upperShadowGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.upperVehicle - 0.2)
+    this.vehicleSprites = new VehicleSpriteRenderer(this)
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
@@ -280,6 +285,8 @@ export class RaceScene extends Phaser.Scene {
     this.vehicleGraphics.clear()
     this.shadowGraphics.clear()
     this.upperVehicleGraphics.clear()
+    this.upperShadowGraphics?.clear()
+    this.vehicleSprites?.beginFrame()
     this.effectGraphics.clear()
     renderRaceEffects(this.effectGraphics, race.effects)
     const restart = manualRecoverySignal(race)
@@ -306,7 +313,7 @@ export class RaceScene extends Phaser.Scene {
     )
     renderVehicleShadows(
       this.shadowGraphics,
-      this.upperVehicleGraphics,
+      this.upperShadowGraphics ?? this.upperVehicleGraphics,
       visibleVehicles,
       race.path,
       this.raceSession.snapshot().setup?.lighting === 'night',
@@ -337,8 +344,8 @@ export class RaceScene extends Phaser.Scene {
         )
       }
     }
-    renderVehicles(this.vehicleGraphics, forPaint(false), race.path)
-    renderVehicles(this.upperVehicleGraphics, forPaint(true), race.path)
+    renderVehicles(this.vehicleGraphics, forPaint(false), race.path, this.vehicleSprites)
+    renderVehicles(this.upperVehicleGraphics, forPaint(true), race.path, this.vehicleSprites)
     if (player && race.missedCheckpoint && race.phase === 'running' && !race.paused) {
       const target = race.missedCheckpoint.position
       const angle = Math.atan2(target.y - player.y, target.x - player.x)
@@ -373,8 +380,10 @@ export class RaceScene extends Phaser.Scene {
     for (const rival of this.raceSession.nearbyGhosts?.() ?? []) {
       const raised = rival.structureRunId !== null ||
         rival.z - race.path.terrainSurface.heightAt(rival) > 10
-      renderNearbyVehicle(raised ? this.upperVehicleGraphics : this.vehicleGraphics, rival)
+      renderNearbyVehicle(raised ? this.upperVehicleGraphics : this.vehicleGraphics, rival, this.vehicleSprites,
+        raised ? this.upperShadowGraphics : this.shadowGraphics)
     }
+    this.vehicleSprites?.endFrame()
     if (player && !upperVehicles.has(player.id) && this.isCoveredByBridgeDeck?.(player)) {
       renderCoveredPlayerOutline(this.upperVehicleGraphics, player)
     }
@@ -487,6 +496,9 @@ export class RaceScene extends Phaser.Scene {
     window.removeEventListener('keyup', this.onKeyUp)
     window.removeEventListener('blur', this.onBlur)
     document.removeEventListener('visibilitychange', this.onVisibility)
+    this.vehicleSprites?.destroy()
+    this.vehicleSprites = undefined
+    this.upperShadowGraphics = undefined
     this.nightBeamRenderer?.destroy()
     this.nightBeamRenderer = undefined
     this.lamps = []

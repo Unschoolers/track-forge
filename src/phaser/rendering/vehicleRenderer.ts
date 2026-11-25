@@ -10,6 +10,8 @@ import type { GhostPose } from '@/application/race/ghostReplay'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { getVehicleArtwork, vehiclePaintColor, VEHICLE_VISUAL_SCALE, type VehicleArtwork } from '@/presentation/vehicleArtwork'
 
+import type { VehicleBodyPainter } from './vehicleSpriteRenderer'
+
 export type VehicleGeometry = VehicleArtwork
 
 export interface VehicleLightTransform {
@@ -165,6 +167,7 @@ export function renderVehicles(
   graphics: Phaser.GameObjects.Graphics,
   vehicles: readonly RaceVehicle[],
   path: RoadPath,
+  painter?: VehicleBodyPainter,
 ): void {
   for (const vehicle of vehicles) {
     const compression = Math.max(0, vehicle.suspensionCompression)
@@ -176,14 +179,19 @@ export function renderVehicles(
     // the raised axle. A falling car visibly noses down before touchdown.
     const pitch = vehicle.grounded ? -impact : Math.max(-1, Math.min(1, vehicle.verticalVelocity / 35))
     const lift = Math.min(0.11, clearance * 0.012)
+    const scaleX = (1 + lift - 0.12 * Math.abs(pitch)) * VEHICLE_VISUAL_SCALE
+    const scaleY = (1 + lift + 0.1 * Math.max(impact * 0.55, compression)) * VEHICLE_VISUAL_SCALE
+    const painted = painter?.draw(vehicle.car, vehicle.x, vehicle.y, vehicle.angle, scaleX, scaleY, graphics.depth)
+    if (painted && !vehicle.braking) continue
     graphics.save()
     graphics.translateCanvas(vehicle.x, vehicle.y)
     graphics.rotateCanvas(vehicle.angle)
-    graphics.scaleCanvas(
-      (1 + lift - 0.12 * Math.abs(pitch)) * VEHICLE_VISUAL_SCALE,
-      (1 + lift + 0.1 * Math.max(impact * 0.55, compression)) * VEHICLE_VISUAL_SCALE,
-    )
-    drawVehicleBody(graphics, vehicle.car, vehicle.braking, 1)
+    graphics.scaleCanvas(scaleX, scaleY)
+    if (!painted) drawVehicleBody(graphics, vehicle.car, vehicle.braking, 1)
+    else {
+      graphics.fillStyle(0xff3038, 1)
+      for (const lamp of getVehicleGeometry(vehicle.car).taillights) graphics.fillCircle(lamp.x, lamp.y, 2.1)
+    }
     graphics.restore()
   }
 }
@@ -254,14 +262,23 @@ export function renderGhostVehicle(
 export function renderNearbyVehicle(
   graphics: Phaser.GameObjects.Graphics,
   pose: GhostPose,
+  painter?: VehicleBodyPainter,
+  shadows?: Phaser.GameObjects.Graphics,
 ): void {
+  const painted = painter?.draw(pose.car, pose.x, pose.y, pose.angle, VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE, graphics.depth)
+  const shadow = painted && shadows ? shadows : graphics
+  shadow.save()
+  shadow.translateCanvas(pose.x, pose.y)
+  shadow.rotateCanvas(pose.angle)
+  shadow.scaleCanvas(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
+  shadow.fillStyle(0x050b11, 0.2)
+  shadow.fillEllipse(2, 3, 34, 17)
+  shadow.restore()
   graphics.save()
   graphics.translateCanvas(pose.x, pose.y)
   graphics.rotateCanvas(pose.angle)
   graphics.scaleCanvas(VEHICLE_VISUAL_SCALE, VEHICLE_VISUAL_SCALE)
-  graphics.fillStyle(0x050b11, 0.2)
-  graphics.fillEllipse(2, 3, 34, 17)
-  drawVehicleBody(graphics, pose.car, false)
+  if (!painted) drawVehicleBody(graphics, pose.car, false)
   drawTopper(graphics, pose.identity ?? DEFAULT_PLAYER_IDENTITY)
   graphics.restore()
 }
