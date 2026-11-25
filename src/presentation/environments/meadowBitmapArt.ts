@@ -8,6 +8,7 @@ import materialsUrl from '@/assets/environments/meadow/materials.webp?url&no-inl
 import patchesUrl from '@/assets/environments/meadow/patches.webp?url&no-inline'
 import terrainUrl from '@/assets/environments/meadow/terrain.webp?url&no-inline'
 import { createGroundTileRandom, GROUND_TILE_SIZE } from './groundTexture'
+import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS } from './roadTextureVariants'
 import { createElevationMaterials, elevationMaterialForLevel, type ElevationMaterials } from './elevationMaterials'
 
 export interface EnvironmentBitmapArt {
@@ -67,6 +68,23 @@ function tint(source: HTMLCanvasElement, color: string): HTMLCanvasElement {
   return canvas
 }
 
+/** Bake once at boot; the world-tile cache and GPU layer count stay unchanged. */
+function roadStrip(source: HTMLCanvasElement): HTMLCanvasElement {
+  const sourceContext = source.getContext('2d')
+  if (!sourceContext) throw new Error('Canvas 2D is unavailable for road artwork')
+  const size = source.width
+  const { canvas, context } = createArtCanvas(size, size * ROAD_TEXTURE_VARIANTS)
+  const pixels = sourceContext.getImageData(0, 0, size, size)
+  const strip = context.createImageData(canvas.width, canvas.height)
+  strip.data.set(buildRoadTextureStrip(pixels.data, size))
+  context.putImageData(strip, 0, 0)
+  return canvas
+}
+
+function roadStrips(road: EnvironmentBitmapArt['road']): EnvironmentBitmapArt['road'] {
+  return { street: roadStrip(road.street), dirt: roadStrip(road.dirt), ice: roadStrip(road.ice) }
+}
+
 /** Decode the bundled, generated WebP atlases before creating any scenes.
  * No remote requests, per-frame image decoding or silent asset-load failures. */
 export function loadEnvironmentBitmapArt(): Promise<void> {
@@ -93,7 +111,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         ice: extract(materials, 96, 1, 1, night),
       }
       return {
-        road,
+        road: roadStrips(road),
         elevationMaterials: createElevationMaterials(ground, {
           plateau: ground,
           slope: extract(terrain, 64, 1, 0, night),
@@ -114,7 +132,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
           plateau: dune, slope: dune,
           shading: DESERT_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
-        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
         water: cell(1, 1),
         sand: tint(dune, night ? 'rgba(125,103,82,0.25)' : 'rgba(250,221,161,0.30)'),
         patches: [],
@@ -130,7 +148,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
           plateau: cobble, slope: quay,
           shading: CITY_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
-        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
         water: cell(1, 1),
         sand: tint(quay, night ? 'rgba(87,104,109,0.24)' : 'rgba(185,190,180,0.20)'),
         patches: [],
@@ -156,7 +174,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
           plateau: quilt, slope: quilt,
           shading: KIDS_ROOM_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
-        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
         water: cell(1, 1),
         sand: tint(ground, night ? 'rgba(44,17,46,0.58)' : 'rgba(90,25,65,0.52)'),
         patches: [],

@@ -179,6 +179,19 @@ commands, terrain storage, surface meshes and physics for additional
 levels is deliberately out of scope. No new height is authorable or
 persisted by this change.
 
+### Road texture variation
+
+All four environments bake three longitudinal variants from each of their
+street, dirt and ice swatches at boot. Mirroring, periodic offsets and a
+quieter blended variant preserve material direction and palette while
+breaking the prominent repeating features. Smooth joins also blend the
+last variant into the first. A full strip repeats roughly every 288 world
+units rather than 96; closed circuits fit an integral number of strips.
+The canonical path distance anchors the same pattern in editor, flyover
+and race. Existing lane paint, curbs, terrain textures, physical surfaces
+and the 48-tile cache budget stay unchanged. These are derived variants,
+not new independent paintings; visual approval at driving zoom remains
+required.
 
 ### Generated scenery sprites
 
