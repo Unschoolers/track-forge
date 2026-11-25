@@ -68,9 +68,9 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackG
   const layers = createMeadowBitmapLayers(geometry, night, environment)
   if (!layers) return undefined
   const road = new BitmapTileRenderer(scene, layers.road, ROAD_BITMAP_DEPTH)
-  const shore = new BitmapTileRenderer(scene, layers.shoreline, WORLD_RENDER_DEPTH.terrain + 0.2)
+  const terrain = new BitmapTileRenderer(scene, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2)
   return {
-    render(view, bounds) { road.render(view, bounds); shore.render(view, bounds) },
-    destroy() { road.destroy(); shore.destroy() },
+    render(view, bounds) { road.render(view, bounds); terrain.render(view, bounds) },
+    destroy() { road.destroy(); terrain.destroy() },
   }
 }

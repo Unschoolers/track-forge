@@ -241,7 +241,7 @@ export function createRaceFlyoverRenderer(
       }
       ctx.globalAlpha = 1
     }
-    if (bitmap) drawBitmapTiles(ctx, bitmap.shoreline, worldView)
+    if (bitmap) drawBitmapTiles(ctx, bitmap.terrain, worldView)
     const left = Math.floor((player.x - radius) / GROUND_TILE_SIZE)
     const right = Math.ceil((player.x + radius) / GROUND_TILE_SIZE)
     const top = Math.floor((player.y - radius) / GROUND_TILE_SIZE)
