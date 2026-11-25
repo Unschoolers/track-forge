@@ -59,6 +59,36 @@ function driver(record) {
   return record.rows.find(row => row.vehicle_id === (record.focusVehicleId ?? record.driverVehicleId))
 }
 
+export function validatePhysicsRecord(record, label = 'physics') {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  if (!object(record) || !Array.isArray(record.rows) || record.rows.length === 0 ||
+      !Array.isArray(record.events) || !Number.isFinite(record.secondsSimulated) ||
+      typeof record.driverVehicleId !== 'string' ||
+      typeof (record.focusVehicleId ?? record.driverVehicleId) !== 'string')
+    throw new Error(`Incomplete ${label} physics result`)
+  const ids = new Set()
+  for (const row of record.rows) {
+    if (!object(row) || typeof row.vehicle_id !== 'string' || !row.vehicle_id ||
+        typeof row.car_type !== 'string' || !row.car_type || ids.has(row.vehicle_id) ||
+        !(row.finished_seconds === null || Number.isFinite(row.finished_seconds)) ||
+        !Number.isInteger(row.recoveries) || row.recoveries < 0 ||
+        !Number.isFinite(row.offroad_seconds) || row.offroad_seconds < 0 ||
+        !Number.isFinite(row.max_lane_error) || row.max_lane_error < 0 ||
+        !Number.isInteger(row.laps_completed) || row.laps_completed < 0 ||
+        !Number.isFinite(row.passing_seconds) || row.passing_seconds < 0 ||
+        !Number.isInteger(row.pass_attempts) || row.pass_attempts < 0)
+      throw new Error(`Invalid or duplicate ${label} physics row`)
+    ids.add(row.vehicle_id)
+  }
+  if (!ids.has(record.driverVehicleId) || !ids.has(record.focusVehicleId ?? record.driverVehicleId))
+    throw new Error(`Missing ${label} driver or focus row`)
+  for (const event of record.events) {
+    if (!object(event) || typeof event.code !== 'string' || typeof event.severity !== 'string' ||
+        typeof event.vehicle_id !== 'string')
+      throw new Error(`Invalid ${label} simulation event`)
+  }
+}
+
 export function evaluatePair(baseline, candidate, { maxSlowdownSeconds = 1, allowPhysicsRevisionChange = false, requireZeroRecoveries = false } = {}) {
   const old = driver(baseline)
   const current = driver(candidate)
@@ -85,6 +115,8 @@ export function evaluatePair(baseline, candidate, { maxSlowdownSeconds = 1, allo
     reasons.push('candidate did not finish')
   if (requireZeroRecoveries && current.recoveries > 0)
     reasons.push(`driver recovered ${current.recoveries} times`)
+  if (current.recoveries > old.recoveries)
+    reasons.push(`driver recovery count increased from ${old.recoveries} to ${current.recoveries}`)
   // Recovery events are still errors in raw telemetry. The matched count gate
   // permits existing debt only, never a new recovery or unrelated engine error.
   const recoveryEvents = record => {
