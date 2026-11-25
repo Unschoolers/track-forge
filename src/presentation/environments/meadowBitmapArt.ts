@@ -1,6 +1,7 @@
 import type { SurfaceId } from '@/domain/model'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { DESERT_TERRAIN_ART, MEADOW_TERRAIN_ART, type BitmapTerrainPalette } from './bitmapTerrainPalette'
+import { CITY_TERRAIN_ART, DESERT_TERRAIN_ART, MEADOW_TERRAIN_ART, type BitmapTerrainPalette } from './bitmapTerrainPalette'
+import cityUrl from '@/assets/environments/cityscape/materials.webp?url&no-inline'
 import desertUrl from '@/assets/environments/desert/materials.webp?url&no-inline'
 import materialsUrl from '@/assets/environments/meadow/materials.webp?url&no-inline'
 import patchesUrl from '@/assets/environments/meadow/patches.webp?url&no-inline'
@@ -24,13 +25,14 @@ export interface MeadowBitmapArt extends EnvironmentBitmapArt {
 
 let artwork: Readonly<Record<'day' | 'night', MeadowBitmapArt>> | undefined
 let desertArtwork: Readonly<Record<'day' | 'night', EnvironmentBitmapArt>> | undefined
+let cityArtwork: Readonly<Record<'day' | 'night', EnvironmentBitmapArt>> | undefined
 let loading: Promise<void> | undefined
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
     image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error(`Could not load Meadow artwork: ${url}`))
+    image.onerror = () => reject(new Error(`Could not load environment artwork: ${url}`))
     image.src = url
   })
 }
@@ -67,7 +69,7 @@ function tint(source: HTMLCanvasElement, color: string): HTMLCanvasElement {
 /** Decode the bundled, generated WebP atlases before creating any scenes.
  * No remote requests, per-frame image decoding or silent asset-load failures. */
 export function loadEnvironmentBitmapArt(): Promise<void> {
-  loading ??= Promise.all([loadImage(materialsUrl), loadImage(patchesUrl), loadImage(terrainUrl), loadImage(desertUrl)]).then(([materials, patches, terrain, desert]) => {
+  loading ??= Promise.all([loadImage(materialsUrl), loadImage(patchesUrl), loadImage(terrainUrl), loadImage(desertUrl), loadImage(cityUrl)]).then(([materials, patches, terrain, desert, city]) => {
     if (materials.naturalWidth !== 192 || materials.naturalHeight !== 192 ||
       patches.naturalWidth !== 128 || patches.naturalHeight !== 128 ||
       terrain.naturalWidth !== 128 || terrain.naturalHeight !== 64) {
@@ -75,6 +77,9 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     }
     if (desert.naturalWidth !== 144 || desert.naturalHeight !== 96) {
       throw new Error('Unexpected Desert artwork atlas dimensions')
+    }
+    if (city.naturalWidth !== 144 || city.naturalHeight !== 96) {
+      throw new Error('Unexpected Cityscape artwork atlas dimensions')
     }
     const build = (night: boolean): MeadowBitmapArt => {
       const ground = extract(materials, 96, 0, 0, night)
@@ -108,6 +113,22 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         terrainPalette: DESERT_TERRAIN_ART[night ? 'night' : 'day'],
       }
     }
+    const buildCity = (night: boolean): EnvironmentBitmapArt => {
+      const cell = (x: number, y: number) => extract(city, 48, x, y, night)
+      const cobble = cell(0, 0)
+      const quay = cell(2, 1)
+      return {
+        ground: cobble,
+        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        water: cell(1, 1),
+        slope: quay,
+        plateau: cobble,
+        sand: tint(quay, night ? 'rgba(87,104,109,0.24)' : 'rgba(185,190,180,0.20)'),
+        patches: [],
+        terrainPalette: CITY_TERRAIN_ART[night ? 'night' : 'day'],
+      }
+    }
+    cityArtwork = { day: buildCity(false), night: buildCity(true) }
     artwork = { day: build(false), night: build(true) }
     desertArtwork = { day: buildDesert(false), night: buildDesert(true) }
   })
@@ -121,6 +142,7 @@ export function getMeadowBitmapArt(night: boolean): MeadowBitmapArt | undefined 
 export function getEnvironmentBitmapArt(environment: TrackEnvironmentId, night: boolean): EnvironmentBitmapArt | undefined {
   if (environment === 'grass') return getMeadowBitmapArt(night)
   if (environment === 'desert') return desertArtwork?.[night ? 'night' : 'day']
+  if (environment === 'cityscape') return cityArtwork?.[night ? 'night' : 'day']
   return undefined
 }
 
