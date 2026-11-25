@@ -169,9 +169,10 @@ export class RaceScene extends Phaser.Scene {
       structureUnderlayGraphics,
       geometry,
       this.raceSession.snapshot().setup?.lighting === 'night',
+      normalizeTrackEnvironmentId(track.environmentId),
     )
-    renderBridgeDeck(bridgeGraphics, geometry, night, 'terrain', structureUnderlayGraphics)
-    renderBridgeSideWalls(wallGraphics, geometry, night)
+    renderBridgeDeck(bridgeGraphics, geometry, night, 'terrain', structureUnderlayGraphics, normalizeTrackEnvironmentId(track.environmentId))
+    renderBridgeSideWalls(wallGraphics, geometry, night, 'terrain', normalizeTrackEnvironmentId(track.environmentId))
     this.lamps = buildLampPosts(geometry)
     renderLampPosts(
       this.lampGraphics,

@@ -3,6 +3,8 @@ import { roadColorsForEnvironment } from '@/presentation/environments/roadMateri
 import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
 import { shorelineBands } from '@/presentation/environments/shorelineMaterials'
 import { createMeadowBitmapLayers, drawBitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { buildBridgePresentation } from '@/phaser/rendering/bridgeRenderer'
+import { bridgePaintCommands, paintBridgeCanvas } from '@/presentation/environments/bridgeMaterials'
 import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
@@ -50,6 +52,10 @@ export function createRaceFlyoverRenderer(
   const environmentId = normalizeTrackEnvironmentId(track.environmentId)
   const palette = getTrackEnvironment(environmentId)[lighting]
   const bitmap = createMeadowBitmapLayers(geometry, night, environmentId)
+  const bridge = buildBridgePresentation(geometry).map(primitive => ({
+    points: 'polygon' in primitive ? primitive.polygon : [primitive.start, primitive.end],
+    commands: bridgePaintCommands(primitive, environmentId, night, false, path.closed ? path.totalLength : undefined),
+  }))
   const bitmapArt = environmentId === 'grass' ? getMeadowBitmapArt(night) : undefined
   const props = track.scenery ?? []
   let sceneryWindow = ''
@@ -285,21 +291,13 @@ export function createRaceFlyoverRenderer(
     }
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    // Elevated runs cast a narrow shadow and receive a brighter deck edge.
-    for (const section of sections) {
-      if (section.a.structure !== 'overpass' || (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y))) continue
-      ctx.beginPath(); ctx.moveTo(section.a.x + 9, section.a.y + 12); ctx.lineTo(section.b.x + 9, section.b.y + 12)
-      ctx.lineWidth = ROAD_GEOMETRY.edgeWidth + 14
-      ctx.strokeStyle = 'rgba(0, 0, 0, .3)'
-      ctx.stroke()
-    }
     for (const edge of [true, false]) {
       for (const section of sections) {
         if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
         const spec = roadColorsForEnvironment(section.a.surface, environmentId)
         ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y)
         ctx.lineWidth = edge ? ROAD_GEOMETRY.edgeWidth : ROAD_GEOMETRY.surfaceWidth
-        ctx.strokeStyle = edge && section.a.structure === 'overpass' ? (night ? '#aab4b2' : '#f3e9d3') : edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
+        ctx.strokeStyle = edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
         ctx.stroke()
       }
     }
@@ -332,6 +330,13 @@ export function createRaceFlyoverRenderer(
       ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y); ctx.stroke()
     }
     ctx.setLineDash([])
+    // Match the canonical bridge geometry and themed material painter, not an
+    // approximate centerline shadow. Tiles replace only deck surface pixels.
+    for (const item of bridge) {
+      if (item.points.some(p => visible(p.x, p.y))) paintBridgeCanvas(ctx, item.commands)
+    }
+    if (bitmap?.bridgeApproach) drawBitmapTiles(ctx, bitmap.bridgeApproach, worldView)
+    if (bitmap?.bridgeDeck) drawBitmapTiles(ctx, bitmap.bridgeDeck, worldView)
     if (night && path.totalLength > 0) {
       for (const lamp of lamps) {
         if (!visible(lamp.x, lamp.y)) continue
