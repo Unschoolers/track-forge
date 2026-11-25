@@ -5,6 +5,8 @@ import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { GROUND_TILE_SIZE, groundViewportBounds, visibleGroundTiles, type GroundTile, type GroundViewport, type WorldBounds } from './groundTexture'
 import { buildRoadRibbonQuads, type RoadRibbonQuad } from './roadRibbonQuads'
 import { createArtCanvas, getMeadowBitmapArt, type MeadowBitmapArt } from './meadowBitmapArt'
+import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
+import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 
 export const BITMAP_TILE_LIMIT = 48
 const TILE = GROUND_TILE_SIZE
@@ -130,40 +132,139 @@ function roadTiles(geometry: TrackGeometry, art: MeadowBitmapArt): BitmapTiles {
   })
 }
 
-interface BankSegment { readonly start: Vector2; readonly end: Vector2 }
+type BankSegment = { readonly start: Vector2; readonly end: Vector2 }
+export const WATER_BANK_RADIUS = 13
+export const WATER_SHALLOW_RADIUS = 32
 
-function shorelineTiles(geometry: TrackGeometry, art: MeadowBitmapArt): BitmapTiles {
-  const segments: BankSegment[] = []
-  for (const contour of geometry.path.terrainSurface.contours) {
+type TerrainBitmapItem =
+  | { readonly kind: 'bank'; readonly segment: BankSegment }
+  | { readonly kind: 'water' | 'plateau'; readonly triangle: TerrainTriangle }
+  | { readonly kind: 'slope'; readonly triangle: TerrainTriangle; readonly shade: number }
+
+/** Subdivide long compacted contour edges before spatial indexing. The
+ * exact original boundary is preserved, including the shores of islands. */
+export function splitBankSegment(start: Vector2, end: Vector2): readonly BankSegment[] {
+  const count = Math.max(1, Math.ceil(Math.hypot(end.x - start.x, end.y - start.y) / TILE))
+  const at = (t: number): Vector2 => ({
+    x: start.x + (end.x - start.x) * t,
+    y: start.y + (end.y - start.y) * t,
+  })
+  return Array.from({ length: count }, (_, i) => ({ start: at(i / count), end: at((i + 1) / count) }))
+}
+
+function terrainBitmapIndex(geometry: TrackGeometry): Map<string, TerrainBitmapItem[]> {
+  const surface = geometry.path.terrainSurface
+  const items: TerrainBitmapItem[] = []
+  for (const contour of surface.contours) {
     if (contour.kind !== 'water' || contour.points.length < 3) continue
     for (let i = 0; i < contour.points.length; i++) {
       const a = contour.points[i], b = contour.points[(i + 1) % contour.points.length]
       if (!a || !b) continue
-      const count = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / TILE))
-      const at = (t: number): Vector2 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
-      for (let j = 0; j < count; j++) segments.push({ start: at(j / count), end: at((j + 1) / count) })
+      for (const segment of splitBankSegment(a, b)) items.push({ kind: 'bank', segment })
     }
   }
-  return new CachedBitmapTiles(indexBitmapItems(segments, segment => [segment.start, segment.end], 9), (context, items) => {
-    context.lineCap = 'round'
-    for (const [source, width, alpha] of [[art.sand, 10, 0.72], [art.foam, 2.4, 0.85]] as const) {
-      context.strokeStyle = repeatPattern(context, source)
-      context.lineWidth = width
-      context.globalAlpha = alpha
-      context.beginPath()
-      for (const segment of items) {
-        context.moveTo(segment.start.x, segment.start.y)
-        context.lineTo(segment.end.x, segment.end.y)
-      }
-      context.stroke()
+  // Tiling the water components avoids indexing a huge triangulated interior
+  // as one primitive. Component holes remain empty, including land islands.
+  for (const component of buildTerrainComponents(surface.contours, 'water')) {
+    for (const triangle of tileTerrainComponent(component, TILE)) items.push({ kind: 'water', triangle })
+  }
+  // Reuse the canonical full-detail facets and their directional lighting.
+  // Full-detail plateau triangles are small and bounded, unlike overview runs.
+  for (const primitive of buildTerrainPresentation(surface, 'full')) {
+    if (primitive.kind === 'hill-slope') {
+      for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet })
+    } else if (primitive.kind === 'hill-plateau') {
+      for (const triangle of primitive.triangles) items.push({ kind: 'plateau', triangle })
     }
-    context.globalAlpha = 1
-  })
+  }
+  return indexBitmapItems(items, item => item.kind === 'bank'
+    ? [item.segment.start, item.segment.end] : item.triangle, WATER_SHALLOW_RADIUS + 2)
 }
 
-export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): { road: BitmapTiles; shoreline: BitmapTiles } | undefined {
+function appendTriangle(context: CanvasRenderingContext2D, [a, b, c]: TerrainTriangle): void {
+  context.moveTo(a.x, a.y)
+  context.lineTo(b.x, b.y)
+  context.lineTo(c.x, c.y)
+  context.closePath()
+}
+
+function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], width: number, style: string | CanvasPattern, alpha: number): void {
+  context.beginPath()
+  for (const item of items) {
+    if (item.kind !== 'bank') continue
+    context.moveTo(item.segment.start.x, item.segment.start.y)
+    context.lineTo(item.segment.end.x, item.segment.end.y)
+  }
+  context.strokeStyle = style
+  context.lineWidth = width
+  context.lineCap = 'round'
+  context.globalAlpha = alpha
+  context.stroke()
+  context.globalAlpha = 1
+}
+
+/** Painter order: sand outside, deep water, translucent shallow shelves
+ * clipped to water, narrow contact foam, then the textured mountain faces.
+ * All patterns are world anchored across tile boundaries. */
+export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: MeadowBitmapArt): void {
+  const night = art.night
+  bankStroke(context, items, WATER_BANK_RADIUS * 2, night ? '#586045' : '#9a9860', 0.6)
+  bankStroke(context, items, 20, repeatPattern(context, art.sand), 1)
+  bankStroke(context, items, 9, night ? '#676954' : '#c7b47f', 0.95)
+
+  context.save()
+  context.beginPath()
+  for (const item of items) {
+    if (item.kind === 'water') appendTriangle(context, item.triangle)
+  }
+  context.fillStyle = repeatPattern(context, art.water)
+  context.fill()
+  context.clip()
+  // Transparent navy glaze deepens the center without hiding the painted
+  // caustics. The two inner bands gradually restore the shallows.
+  // fillRect covers the current tile in world coordinates via its clip.
+  context.fillStyle = night ? 'rgba(5,20,38,0.72)' : 'rgba(4,46,76,0.66)'
+  context.fill()
+  bankStroke(context, items, WATER_SHALLOW_RADIUS * 2, night ? '#286371' : '#35a7b0', 0.28)
+  bankStroke(context, items, 42, night ? '#398184' : '#66c9bb', 0.35)
+  bankStroke(context, items, 22, night ? '#69988d' : '#9bd9b9', 0.47)
+  bankStroke(context, items, 4, night ? '#b2d1c8' : '#e6f5d8', 0.72)
+  context.restore()
+
+  // Batch slope facets by the existing nine directional shades. Adjacent
+  // triangles are drawn as a single path to avoid visible triangle seams.
+  const rock = repeatPattern(context, art.rock)
+  for (let bucket = 0; bucket < 9; bucket++) {
+    context.beginPath()
+    for (const item of items) {
+      if (item.kind === 'slope' && Math.max(0, Math.min(8, Math.round((item.shade + 1) * 4))) === bucket) {
+        appendTriangle(context, item.triangle)
+      }
+    }
+    context.fillStyle = rock
+    context.fill()
+    context.fillStyle = bucket < 4
+      ? `rgba(10,26,20,${(4 - bucket) * 0.095})`
+      : `rgba(246,224,173,${(bucket - 4) * 0.065})`
+    context.fill()
+  }
+  context.beginPath()
+  for (const item of items) {
+    if (item.kind === 'plateau') appendTriangle(context, item.triangle)
+  }
+  context.fillStyle = repeatPattern(context, art.ground)
+  context.fill()
+  context.fillStyle = night ? 'rgba(51,88,65,0.16)' : 'rgba(165,194,115,0.17)'
+  context.fill()
+}
+
+function terrainTiles(geometry: TrackGeometry, art: MeadowBitmapArt): BitmapTiles {
+  return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items) => paintTerrainBitmap(context, items, art))
+}
+
+export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): { road: BitmapTiles; terrain: BitmapTiles } | undefined {
   const art = environment === 'grass' ? getMeadowBitmapArt(night) : undefined
-  return art ? { road: roadTiles(geometry, art), shoreline: shorelineTiles(geometry, art) } : undefined
+  return art ? { road: roadTiles(geometry, art), terrain: terrainTiles(geometry, art) } : undefined
 }
 
 export function drawBitmapTiles(context: CanvasRenderingContext2D, tiles: BitmapTiles, view: GroundViewport): void {

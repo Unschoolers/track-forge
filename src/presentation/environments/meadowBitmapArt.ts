@@ -1,6 +1,7 @@
 import type { SurfaceId } from '@/domain/model'
 import materialsUrl from '@/assets/environments/meadow/materials.webp?url&no-inline'
 import patchesUrl from '@/assets/environments/meadow/patches.webp?url&no-inline'
+import terrainUrl from '@/assets/environments/meadow/terrain.webp?url&no-inline'
 import { createGroundTileRandom, GROUND_TILE_SIZE } from './groundTexture'
 
 export interface MeadowBitmapArt {
@@ -10,6 +11,9 @@ export interface MeadowBitmapArt {
   readonly tree: HTMLCanvasElement
   readonly sand: HTMLCanvasElement
   readonly foam: HTMLCanvasElement
+  readonly water: HTMLCanvasElement
+  readonly rock: HTMLCanvasElement
+  readonly night: boolean
 }
 
 let artwork: Readonly<Record<'day' | 'night', MeadowBitmapArt>> | undefined
@@ -53,12 +57,13 @@ function tint(source: HTMLCanvasElement, color: string): HTMLCanvasElement {
   return canvas
 }
 
-/** Decode the two bundled, generated WebP atlases before creating any scenes.
+/** Decode the three bundled, generated WebP atlases before creating any scenes.
  * No remote requests, per-frame image decoding or silent asset-load failures. */
 export function loadMeadowBitmapArt(): Promise<void> {
-  loading ??= Promise.all([loadImage(materialsUrl), loadImage(patchesUrl)]).then(([materials, patches]) => {
+  loading ??= Promise.all([loadImage(materialsUrl), loadImage(patchesUrl), loadImage(terrainUrl)]).then(([materials, patches, terrain]) => {
     if (materials.naturalWidth !== 192 || materials.naturalHeight !== 192 ||
-      patches.naturalWidth !== 128 || patches.naturalHeight !== 128) {
+      patches.naturalWidth !== 128 || patches.naturalHeight !== 128 ||
+      terrain.naturalWidth !== 128 || terrain.naturalHeight !== 64) {
       throw new Error('Unexpected Meadow artwork atlas dimensions')
     }
     const build = (night: boolean): MeadowBitmapArt => {
@@ -69,7 +74,9 @@ export function loadMeadowBitmapArt(): Promise<void> {
         ice: extract(materials, 96, 1, 1, night),
       }
       return {
-        ground, road,
+        ground, road, night,
+        water: extract(terrain, 64, 0, 0, night),
+        rock: extract(terrain, 64, 1, 0, night),
         patches: [extract(patches, 64, 0, 0, night), extract(patches, 64, 1, 0, night), extract(patches, 64, 0, 1, night)],
         tree: extract(patches, 64, 1, 1, night),
         sand: tint(road.dirt, night ? 'rgba(107, 108, 79, 0.45)' : 'rgba(222, 198, 143, 0.48)'),

@@ -87,3 +87,24 @@ introduced. Individual scenery props beyond the authored pine remain vector.
 Visual approval at driving zoom, day and night, and physical Android frame
 pacing remain release verification requirements. Rollback is a
 presentation-only revert; no serialized track changes.
+
+
+### Layered water and mountain materials
+
+Meadow now bundles a third generated bitmap atlas, `terrain.webp` (128×64,
+two 64px repeatable swatches of painted water and mossy rock). The existing
+bitmap cache renders water and hills together, not as additional GPU layers.
+Sand is painted first; the opaque water material covers its inner half.
+A deep navy translucent glaze and progressively brighter turquoise bands
+(32, 21 and 11 world units inside the boundary) are clipped to the original
+water components. A narrow contact highlight is also inside the water.
+Land islands are not filled by the water mask. Narrow channels naturally
+read as shallow water. These depths are visual, not new terrain levels.
+
+Rocky slopes use the existing directional facet shading, with grass on
+plateaus and the existing terrain shadow below. Water, hills and roads
+retain their authored boundaries, elevation, recovery behavior and saves.
+The existing vector overview and live-edit fallback remain available.
+The other environments keep their current palette and textures until
+they receive their own art passes. Day/night, in-game art approval and
+physical Android frame pacing require verification.
