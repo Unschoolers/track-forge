@@ -8,6 +8,7 @@ import materialsUrl from '@/assets/environments/meadow/materials.webp?url&no-inl
 import patchesUrl from '@/assets/environments/meadow/patches.webp?url&no-inline'
 import terrainUrl from '@/assets/environments/meadow/terrain.webp?url&no-inline'
 import { createGroundTileRandom, GROUND_TILE_SIZE } from './groundTexture'
+import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS } from './roadTextureVariants'
 
 export interface EnvironmentBitmapArt {
   readonly ground: HTMLCanvasElement
@@ -68,6 +69,23 @@ function tint(source: HTMLCanvasElement, color: string): HTMLCanvasElement {
   return canvas
 }
 
+/** Bake once at boot; the world-tile cache and GPU layer count stay unchanged. */
+function roadStrip(source: HTMLCanvasElement): HTMLCanvasElement {
+  const sourceContext = source.getContext('2d')
+  if (!sourceContext) throw new Error('Canvas 2D is unavailable for road artwork')
+  const size = source.width
+  const { canvas, context } = createArtCanvas(size, size * ROAD_TEXTURE_VARIANTS)
+  const pixels = sourceContext.getImageData(0, 0, size, size)
+  const strip = context.createImageData(canvas.width, canvas.height)
+  strip.data.set(buildRoadTextureStrip(pixels.data, size))
+  context.putImageData(strip, 0, 0)
+  return canvas
+}
+
+function roadStrips(road: EnvironmentBitmapArt['road']): EnvironmentBitmapArt['road'] {
+  return { street: roadStrip(road.street), dirt: roadStrip(road.dirt), ice: roadStrip(road.ice) }
+}
+
 /** Decode the bundled, generated WebP atlases before creating any scenes.
  * No remote requests, per-frame image decoding or silent asset-load failures. */
 export function loadEnvironmentBitmapArt(): Promise<void> {
@@ -94,7 +112,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
         ice: extract(materials, 96, 1, 1, night),
       }
       return {
-        ground, road,
+        ground, road: roadStrips(road),
         plateau: ground,
         terrainPalette: MEADOW_TERRAIN_ART[night ? 'night' : 'day'],
         water: extract(terrain, 64, 0, 0, night),
@@ -109,7 +127,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
       const dune = cell(2, 1)
       return {
         ground: cell(0, 0),
-        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
         water: cell(1, 1),
         slope: dune,
         plateau: dune,
@@ -124,7 +142,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
       const quay = cell(2, 1)
       return {
         ground: cobble,
-        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
         water: cell(1, 1),
         slope: quay,
         plateau: cobble,
@@ -149,7 +167,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
       const quilt = cell(2, 1)
       return {
         ground,
-        road: { street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) },
+        road: roadStrips({ street: cell(1, 0), dirt: cell(2, 0), ice: cell(0, 1) }),
         water: cell(1, 1),
         slope: quilt,
         plateau: quilt,
