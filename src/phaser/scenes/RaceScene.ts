@@ -77,8 +77,8 @@ export class RaceScene extends Phaser.Scene {
   private shadowGraphics?: Phaser.GameObjects.Graphics
   private vehicleGraphics?: Phaser.GameObjects.Graphics
   private upperVehicleGraphics?: Phaser.GameObjects.Graphics
-  private upperShadowGraphics?: Phaser.GameObjects.Graphics
-  private vehicleSprites?: VehicleSpriteRenderer
+  private upperShadowGraphics: Phaser.GameObjects.Graphics | undefined
+  private vehicleSprites: VehicleSpriteRenderer | undefined
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
