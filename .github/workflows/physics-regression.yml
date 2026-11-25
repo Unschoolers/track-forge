@@ -1,0 +1,90 @@
+name: Matched physics regression
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'src/domain/**'
+      - 'src/application/**'
+      - 'src/infrastructure/**'
+      - 'src/adapters/**'
+      - 'qa/lanes/**'
+      - 'qa/optimization/**'
+      - 'qa/race-analysis/**'
+      - 'tests/fixtures/**'
+      - 'tests/domain/**'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/physics-regression.yml'
+      - '.github/workflows/ai-optimization.yml'
+permissions:
+  contents: read
+
+concurrency:
+  group: trackforge-physics-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  matched-physics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BEHAVIOR_PRESERVING: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'behavior-preserving') }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture matched base physics
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_SHA"
+          baseline="$RUNNER_TEMP/trackforge-physics-baseline"
+          git worktree add --detach "$baseline" "$BASE_SHA"
+          # Use the candidate's harness and fixtures on both engines so the
+          # comparison isolates the code under review with identical inputs.
+          cp package.json package-lock.json vite.config.ts tsconfig*.json "$baseline/"
+          cp -R qa/optimization/. "$baseline/qa/optimization/"
+          cp -R qa/race-analysis/. "$baseline/qa/race-analysis/"
+          cp -R qa/lanes/. "$baseline/qa/lanes/"
+          cp tests/fixtures/*.trackforge.json "$baseline/tests/fixtures/"
+          behavior_flags=()
+          if [[ "$BEHAVIOR_PRESERVING" == true ]]; then behavior_flags+=(--behavior-preserving); fi
+          (
+            cd "$baseline"
+            npm ci
+            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --baseline-only --no-telemetry --workers 2 --trials 1 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/physics-regression/before" "${behavior_flags[@]}"
+          )
+      - name: Capture current physics outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          behavior_flags=()
+          if [[ "$BEHAVIOR_PRESERVING" == true ]]; then behavior_flags+=(--behavior-preserving); fi
+          npm run qa:optimize -- --baseline-only --no-telemetry --workers 2 --trials 1 --seeds 1,4331 --out qa/results/physics-regression/after "${behavior_flags[@]}"
+      - name: Compare matched physics outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s qa/results/physics-regression/before/summary.json
+          test -s qa/results/physics-regression/after/summary.json
+          flags=()
+          if [[ "$BEHAVIOR_PRESERVING" == true ]]; then flags+=(--behavior-preserving); fi
+          node qa/optimization/comparePhysics.mjs qa/results/physics-regression/before/summary.json qa/results/physics-regression/after/summary.json "${flags[@]}"
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: physics-regression-${{ github.sha }}
+          path: qa/results/physics-regression/
+          if-no-files-found: error
+          retention-days: 14

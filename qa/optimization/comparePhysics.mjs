@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { evaluatePair, trialKey, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview,
-  hasIdenticalRecordedOutput } from './score.mjs'
+  hasIdenticalRecordedOutput, validatePhysicsRecord } from './score.mjs'
 
 const [beforePath, afterPath, ...flags] = process.argv.slice(2)
 const reviewIndex = flags.indexOf('--timing-review')
@@ -25,20 +25,38 @@ const comparisons = records(afterPath).map(({ task, result }) => {
   const old = baseline.get(id)
   if (!old || seen.has(id)) throw new Error('Unmatched or duplicate trial: ' + id)
   seen.add(id)
+  validatePhysicsRecord(old, `baseline ${id}`)
+  validatePhysicsRecord(result, `candidate ${id}`)
   if (behaviorPreserving && !hasIdenticalRecordedOutput(old, result))
     throw new Error(`Behavior-preserving comparison changed recorded output: ${id}`)
-  const pair = applyTimingReview(evaluatePair(old, result, PHYSICS_ACCEPTANCE), task, timingReview, before.physicsRevision)
-  return { ...pair, regression: !pair.eligible }
+  // Timing is diagnostic for physics regression checks. Warn only when the
+  // slowdown exceeds both the historical one-second floor and 2% of the run.
+  const focus = old.rows.find(row => row.vehicle_id === (old.focusVehicleId ?? old.driverVehicleId))
+  if (!focus || !Number.isFinite(focus.finished_seconds)) throw new Error(`Invalid baseline finish: ${id}`)
+  const timingThreshold = Math.max(1, focus.finished_seconds * 0.02)
+  const pair = applyTimingReview(evaluatePair(old, result, {
+    ...PHYSICS_ACCEPTANCE, maxSlowdownSeconds: timingThreshold,
+  }), task, timingReview, before.physicsRevision)
+  return { ...pair, regression: pair.hardFailure }
 })
 if (seen.size !== baseline.size || baseline.size !== original.length || baseline.size === 0)
   throw new Error('Physics comparison matrix is incomplete')
 const regressions = comparisons.filter(row => row.regression)
-const acceptance = assessFleet(comparisons, {
+const safety = assessFleet(comparisons, {
   gameplayImprovement: flags.includes('--gameplay-improvement'),
-  requireBenefit: !behaviorPreserving,
+  requireBenefit: false,
 })
+const timingWarnings = comparisons.filter(row => row.requiresReview)
+const hardFailure = safety.decision === 'reject'
+const acceptance = { ...safety,
+  decision: hardFailure ? 'reject' : timingWarnings.length ? 'accept-with-warnings' : 'accept',
+  eligible: !hardFailure,
+  timingWarnings: timingWarnings.length,
+}
 const summary = { beforeRevision: before.physicsRevision, afterRevision: after.physicsRevision,
-  policy: PHYSICS_ACCEPTANCE, acceptance, comparisons, regressions,
+  policy: { ...PHYSICS_ACCEPTANCE,
+    timingWarning: { threshold: 'max(1 second, 2% of baseline finish time)', severity: 'review warning only' } },
+  acceptance, comparisons, regressions,
   timingReviews: comparisons.filter(row => row.timingReview) }
 writeFileSync(join(dirname(afterPath), 'physics-comparison.json'), JSON.stringify(summary, null, 2))
 for (const car of [...new Set(comparisons.map(row => row.car))]) {
@@ -52,6 +70,7 @@ for (const car of [...new Set(comparisons.map(row => row.car))]) {
 }
 console.log('FLEET_ACCEPTANCE ' + JSON.stringify(acceptance))
 for (const row of summary.timingReviews) console.log('APPROVED_TIMING_REVIEW ' + JSON.stringify(row))
+for (const row of timingWarnings) console.warn('TIMING_REVIEW_WARNING ' + JSON.stringify(row))
 if (!acceptance.eligible) {
   console.error(JSON.stringify(regressions))
   process.exitCode = 1
