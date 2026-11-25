@@ -7,23 +7,21 @@ import { VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 
 function fakeScene() {
   const keys = new Set<string>()
-  function makeImage(key: string) {
-    const sprite = {
-      texture: { key },
-      depth: 0,
-      visible: true,
-      setTexture: vi.fn((next: string) => { sprite.texture.key = next; return sprite }),
-      setDepth: vi.fn((depth: number) => { sprite.depth = depth; return sprite }),
-      setOrigin: vi.fn(() => sprite),
-      setPosition: vi.fn(() => sprite),
-      setRotation: vi.fn(() => sprite),
-      setDisplaySize: vi.fn(() => sprite),
-      setVisible: vi.fn((visible: boolean) => { sprite.visible = visible; return sprite }),
-      destroy: vi.fn(),
-    }
-    return sprite
+  class FakeSprite {
+    texture: { key: string }
+    depth = 0
+    visible = true
+    constructor(key: string) { this.texture = { key } }
+    setTexture = vi.fn((next: string) => { this.texture.key = next; return this })
+    setDepth = vi.fn((depth: number) => { this.depth = depth; return this })
+    setOrigin = vi.fn(() => this)
+    setPosition = vi.fn(() => this)
+    setRotation = vi.fn(() => this)
+    setDisplaySize = vi.fn(() => this)
+    setVisible = vi.fn((visible: boolean) => { this.visible = visible; return this })
+    destroy = vi.fn()
   }
-  const images: ReturnType<typeof makeImage>[] = []
+  const images: FakeSprite[] = []
   const scene = {
     textures: {
       exists: (key: string) => keys.has(key),
@@ -31,7 +29,7 @@ function fakeScene() {
     },
     add: {
       image: vi.fn((_x: number, _y: number, key: string) => {
-        const sprite = makeImage(key)
+        const sprite = new FakeSprite(key)
         images.push(sprite)
         return sprite
       }),
@@ -64,7 +62,7 @@ describe('generated vehicle sprite renderer', () => {
     expect(yellow?.depth).toBeGreaterThan(14.8)
     expect(yellow?.depth).toBeLessThan(15)
     const truckBounds = vehicleBitmapBounds('yellow')
-    expect(yellow?.setDisplaySize).toHaveBeenCalledWith(truckBounds.width * scale * 1.1, truckBounds.height * scale)
+    expect(yellow?.setDisplaySize).toHaveBeenCalledWith(truckBounds.width * (scale * 1.1), truckBounds.height * scale)
 
     renderer.beginFrame()
     renderer.draw('green', 1, 2, 0, scale, scale, 5)
