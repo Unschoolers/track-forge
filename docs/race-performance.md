@@ -168,3 +168,17 @@ active driving. Inspect frame-time spikes, GC, and render submission separately.
 The current five-second benchmark is insufficient for a robust periodic-stall
 comparison. Do not claim a measured FPS improvement until a matched capture
 exists.
+
+### Meadow bitmap tile uploads
+
+Meadow road, terrain and bridge bitmap layers queue missing textures through
+one post-render scheduler, uploading at most one tile per display frame. Tiles
+intersecting the current render window have priority; each layer may retain up
+to eight camera-forward prefetched tiles within the existing 48-texture limit.
+The existing vector road and terrain rendering remains underneath as the
+fallback while bitmap tiles are pending or when the viewport exceeds the tile
+budget. This bounds texture uploads and memory but does **not** guarantee that
+the initial camera area is fully textured before the countdown starts, nor
+does it establish a performance improvement. Verify startup readiness, camera
+movement and equivalent before/after captures on the target device before
+making either claim.
