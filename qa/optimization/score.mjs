@@ -15,6 +15,46 @@ export function trialKey(task) {
     task.duelOpponentSpeedLimit ?? 'default', 
     task.scenarioId, task.seed, task.difficulty, task.mode].join('|')
 }
+
+/**
+ * A behavior-preserving change must match all recorded run metrics, events,
+ * and sampled telemetry. Samples include path/section/lane/speed/state, not x/y.
+ * Build revision and runner wall time may differ between compared builds.
+ */
+export function hasIdenticalRecordedOutput(before, after) {
+  const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const validSample = sample => isObject(sample) &&
+    typeof sample.vehicle_id === 'string' && typeof sample.car_type === 'string' &&
+    Number.isFinite(sample.time) && Number.isInteger(sample.path_index) &&
+    (sample.section_id === null || typeof sample.section_id === 'string') &&
+    Number.isFinite(sample.speed) && Number.isFinite(sample.lane) &&
+    Number.isFinite(sample.target_lane) && typeof sample.on_road === 'boolean' &&
+    typeof sample.grounded === 'boolean' && typeof sample.ai_phase === 'string'
+  const valid = record => record &&
+    typeof record.focusVehicleId === 'string' && typeof record.driverVehicleId === 'string' &&
+    Number.isFinite(record.secondsSimulated) &&
+    Array.isArray(record.rows) && record.rows.length > 0 &&
+    record.rows.every(row => isObject(row) && typeof row.vehicle_id === 'string' &&
+      typeof row.car_type === 'string' &&
+      (row.finished_seconds === null || Number.isFinite(row.finished_seconds)) &&
+      Number.isInteger(row.recoveries) && row.recoveries >= 0 &&
+      Number.isFinite(row.offroad_seconds) && Number.isFinite(row.max_lane_error) &&
+      Number.isInteger(row.laps_completed) && Number.isFinite(row.passing_seconds) &&
+      Number.isInteger(row.pass_attempts)) &&
+    Array.isArray(record.events) && record.events.every(isObject) &&
+    Array.isArray(record.samples) && record.samples.length > 0 && record.samples.every(validSample)
+  if (!valid(before) || !valid(after)) return false
+  // Build revision and runner wall time are not recorded simulation output.
+  const comparable = record => ({
+    focusVehicleId: record.focusVehicleId,
+    driverVehicleId: record.driverVehicleId,
+    secondsSimulated: record.secondsSimulated,
+    rows: record.rows.map(({ physics_revision: _revision, ...row }) => row),
+    events: record.events.map(({ physics_revision: _revision, ...event }) => event),
+    samples: record.samples.map(({ physics_revision: _revision, ...sample }) => sample),
+  })
+  return JSON.stringify(comparable(before)) === JSON.stringify(comparable(after))
+}
 function driver(record) {
   return record.rows.find(row => row.vehicle_id === (record.focusVehicleId ?? record.driverVehicleId))
 }
