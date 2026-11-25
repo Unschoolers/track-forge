@@ -26,6 +26,9 @@ describe('last race storage', () => {
     expect(store.save(race)).toBe(true)
     expect(store.load()).toEqual(race)
     const saved = JSON.parse(data.get(STORAGE_KEYS.lastRace) ?? 'null') as { setup: Record<string, unknown> }
+    saved.setup.driftBoostRules = { ...DRIFT_BOOST_V1_RULES, revision: 'drift-boost-v1', secondsToFull: 5 }
+    data.set(STORAGE_KEYS.lastRace, JSON.stringify(saved))
+    expect(store.load()).toEqual(race)
     saved.setup.driftBoostRules = { ...DRIFT_BOOST_V1_RULES, secondsToFull: 4 }
     data.set(STORAGE_KEYS.lastRace, JSON.stringify(saved))
     expect(store.load()).toBeNull()

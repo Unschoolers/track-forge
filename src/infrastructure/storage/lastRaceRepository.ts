@@ -1,13 +1,16 @@
 import type { KeyValueStore, LastRace, LastRaceStore } from '@/application/ports/storage'
 import { asTrackId, isCarId, isDifficultyId, isLightingMode } from '@/domain/model'
-import { DRIFT_BOOST_V1_RULES, type DriftBoostRules } from '@/domain/race/driftBoost'
+import { DRIFT_BOOST_V1_RULES } from '@/domain/race/driftBoost'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 
-function isDriftBoostRules(value: unknown): value is DriftBoostRules {
+// Saved unranked practice shortcuts use the current tuning on launch.
+// Only the exact previous rules are accepted for compatibility.
+function isDriftBoostRules(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
-  return Object.entries(DRIFT_BOOST_V1_RULES)
-    .every(([key, expected]) => candidate[key] === expected)
+  const legacy = { ...DRIFT_BOOST_V1_RULES, revision: 'drift-boost-v1', secondsToFull: 5 }
+  return [DRIFT_BOOST_V1_RULES, legacy].some(rules =>
+    Object.entries(rules).every(([key, expected]) => candidate[key] === expected))
 }
 
 export class BrowserLastRaceRepository implements LastRaceStore {

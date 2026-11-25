@@ -47,9 +47,29 @@ describe('drift boost domain', () => {
 			0.21,
 		)
 		expect(result.snapshot.charge).toBeCloseTo(
-			((0.01 / 5) * Math.hypot(160, 70)) / 200,
+			(0.01 * Math.hypot(160, 70)) / 200,
 		)
 		expect(result.snapshot.phase).toBe('charging')
+	})
+
+	it('fills after one second of qualifying drift at the reference speed', () => {
+		const sample = { ...neutral, vx: 160, vy: 120 }
+		let state = initialDriftBoostSnapshot()
+		for (let tick = 0; tick < 12; tick++) {
+			state = advanceDriftBoost(state, DRIFT_BOOST_V1_RULES, sample, 1 / 60).snapshot
+		}
+		expect(state.charge).toBeCloseTo(0)
+		for (let tick = 0; tick < 59; tick++) {
+			state = advanceDriftBoost(state, DRIFT_BOOST_V1_RULES, sample, 1 / 60).snapshot
+		}
+		expect(state.charge).toBeCloseTo(59 / 60)
+		expect(state.phase).toBe('charging')
+		// Allow a tick for floating-point rounding at the full boundary.
+		for (let tick = 0; tick < 2; tick++) {
+			state = advanceDriftBoost(state, DRIFT_BOOST_V1_RULES, sample, 1 / 60).snapshot
+		}
+		expect(state.charge).toBe(1)
+		expect(state.phase).toBe('ready')
 	})
 
 	it.each([

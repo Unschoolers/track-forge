@@ -40,7 +40,7 @@ describe('race setup policies', () => {
     })
     expect(setup).toMatchObject({
       mode: 'boost-practice', lighting: 'night',
-      driftBoostRules: { revision: 'drift-boost-v1', enabled: true },
+      driftBoostRules: { revision: 'drift-boost-v1.1', enabled: true },
     })
     expect(setup.gridPositions).toBeUndefined()
     const open = raceSetupFromPreferences({ ...track, routeKind: 'point-to-point' },

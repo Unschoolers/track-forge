@@ -1,8 +1,8 @@
 export interface DriftBoostRules {
 	readonly enabled: true
-	readonly revision: 'drift-boost-v1'
+	readonly revision: 'drift-boost-v1.1'
 	readonly referenceSpeed: 200
-	readonly secondsToFull: 5
+	readonly secondsToFull: 1
 	readonly minimumSpeed: 90
 	readonly minimumSlipAngleDegrees: 12
 	readonly maximumSlipAngleDegrees: 45
@@ -16,9 +16,9 @@ export interface DriftBoostRules {
 
 export const DRIFT_BOOST_V1_RULES: DriftBoostRules = Object.freeze({
 	enabled: true,
-	revision: 'drift-boost-v1',
+	revision: 'drift-boost-v1.1',
 	referenceSpeed: 200,
-	secondsToFull: 5,
+	secondsToFull: 1,
 	minimumSpeed: 90,
 	minimumSlipAngleDegrees: 12,
 	maximumSlipAngleDegrees: 45,
