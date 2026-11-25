@@ -33,6 +33,7 @@ import '@/styles/editor-menus.css'
 import { RaceSession } from '@/application/race/raceSession'
 import { CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { mathRandom } from '@/infrastructure/random/mathRandom'
+import { startupArtworkReady } from './startupArtworkGate'
 import { inputForPedals, RaceInputController } from '@/phaser/input/raceInput'
 import { FeedbackRouter } from '@/application/feedback/feedbackRouter'
 import {
@@ -167,6 +168,7 @@ function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
 sceneHost.setRacePreparationForeground(!document.hidden)
 music.setForeground(!document.hidden)
 syncAudio(controller.snapshot())
+await startupArtworkReady
 application.start()
 
 // Android sends system Back through this cancelable event. When game navigation
