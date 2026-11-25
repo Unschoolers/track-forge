@@ -154,3 +154,27 @@ stain rather than sand, narrow translucent liquid shelves and a glossy
 contact edge. The vector overview palette is updated to the same identity.
 No terrain or collision rules change, and authored toys remain intact.
 All four current environments now use the same bitmap material interface.
+
+
+### Elevation-specific bitmap materials
+
+The bitmap material contract now owns a contiguous elevation material
+table starting at level 0. Each entry supplies a plateau texture, a slope
+texture (for the transition up to that level), directional shade colors
+and strengths, and a plateau glaze. All four environments currently
+author exactly two entries: normal ground and the first elevated terrain.
+Their existing day/night art and colors are preserved. The material
+selector intentionally reuses the highest authored entry if future
+geometry requests a higher level. Invalid nominal heights are rejected.
+Water, groundcover and roads are independent materials.
+
+Ground tiles select level 0. Terrain bitmap faces derive their integer
+level from the canonical mesh primitive's nominal top height divided by
+the existing level height (not from individual ramp samples). The tile
+painter groups faces by actual level, then draws low to high with each
+level's slope shading and plateau material. The bounded tile cache and
+vector overview fallback are unchanged. The latter still supports only
+the existing two physical levels; extending vector rendering, editor
+commands, terrain storage, surface meshes and physics for additional
+levels is deliberately out of scope. No new height is authorable or
+persisted by this change.
