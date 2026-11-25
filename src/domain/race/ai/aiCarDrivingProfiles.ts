@@ -46,7 +46,7 @@ export const CAR_DRIVING_PROFILES = {
     hardSteerGain: 2.4,
     hardCornerReserve: 0,
     hardIceApexPaceScale: 0.72,
-    hardLookAheadSamples: 10,
+    hardLookAheadSamples: 12,
     hardApexCutScale: 1,
     hardEdgeAvoidanceScale: 0.3,
     hardCornerTargetBonus: 0.12,

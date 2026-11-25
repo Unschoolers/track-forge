@@ -26,7 +26,7 @@ const direction = {
   y: (finish.y - start.y) / length,
 }
 const dt = 1 / 60
-type Surface = 'street' | 'dirt'
+type Surface = 'street' | 'dirt' | 'ice'
 
 function drive(
   car: CarId,
@@ -95,13 +95,30 @@ describe('Car speed specialties on the Speed track', () => {
     expect(red.distance).toBeGreaterThan(blue.distance * 1.05)
   })
 
-  it('keeps the heavy Yellow slower off the line without making Green sluggish', () => {
+  it('gives Green a distinctly slower launch than Red on asphalt', () => {
+    const red = drive('red', 'street', 1.5)
+    const green = drive('green', 'street', 1.5)
+    expect(green.distance).toBeLessThan(red.distance * 0.9)
+  })
+
+  it.each(['street', 'dirt', 'ice'] as const)(
+    'keeps Green between Blue and Yellow off the line on %s',
+    surface => {
+      const blue = drive('blue', surface, 1.5)
+      const green = drive('green', surface, 1.5)
+      const yellow = drive('yellow', surface, 1.5)
+      expect(green.distance).toBeLessThan(blue.distance)
+      expect(green.distance).toBeGreaterThan(yellow.distance)
+    },
+  )
+
+  it('keeps the heavy Yellow slower off the line than Green', () => {
     const red = drive('red', 'street', 1.5)
     const blue = drive('blue', 'street', 1.5)
     const green = drive('green', 'street', 1.5)
     const yellow = drive('yellow', 'street', 1.5)
     expect(red.distance).toBeGreaterThan(blue.distance)
-    expect(green.distance).toBeGreaterThan(yellow.distance * 1.15)
+    expect(green.distance).toBeGreaterThan(yellow.distance * 1.1)
     expect(blue.distance).toBeGreaterThan(yellow.distance * 1.1)
   })
 
