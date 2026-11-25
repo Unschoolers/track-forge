@@ -257,6 +257,13 @@ export function applyEditorCommand(
             : TERRAIN_CAPACITY_REJECTION,
       }
     }
+    // Reuse the validated result instead of rescanning the terrain field.
+    return {
+      state: plan.terrain === state.terrain
+        ? state
+        : patchEditorState(state, { terrain: plan.terrain }),
+      rejection: null,
+    }
   }
   if (command.type === 'expand') {
     const plan = planTerrainExpansionAroundBoundsCenter(

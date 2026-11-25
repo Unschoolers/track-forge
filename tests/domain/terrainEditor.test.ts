@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
+  applyEditorCommand,
   createEditorState,
   reduceEditor,
 } from '@/domain/editor/editorState'
@@ -52,6 +53,29 @@ describe('terrain editor transactions', () => {
         kind: 'ground',
       }),
     ).toBe(state)
+  })
+
+  it('uses one terrain scan to validate and apply a paint command', () => {
+    const terrain = normalizeTerrain({
+      cells: Array.from({ length: 5000 }, (_, index) => ({
+        column: index % 100,
+        row: Math.floor(index / 100),
+        kind: 'hill',
+      })),
+    })
+    const state = createEditorState([], [], undefined, terrain)
+    const iterator = vi.spyOn(terrain.cells, Symbol.iterator)
+
+    const result = applyEditorCommand(state, {
+      type: 'paint-terrain',
+      cells: [{ column: 150, row: 50 }],
+      kind: 'water',
+    })
+
+    expect(result.rejection).toBeNull()
+    expect(iterator).toHaveBeenCalledTimes(1)
+    expect(result.state.terrain.cells.find((cell) => cell.column === 150 && cell.row === 50)?.kind).toBe('water')
+    expect(reduceEditor(result.state, { type: 'undo' }).terrain).toBe(terrain)
   })
 
   it('clears terrain and restores it through undo', () => {

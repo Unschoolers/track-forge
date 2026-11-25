@@ -2,6 +2,7 @@ name: AI optimization lab
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - 'qa/optimization/**'
       - 'src/domain/race/ai/**'
@@ -43,6 +44,8 @@ jobs:
   optimize:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      BEHAVIOR_PRESERVING: ${{ contains(github.event.pull_request.labels.*.name, 'behavior-preserving') }}
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -62,21 +65,28 @@ jobs:
           baseline="$RUNNER_TEMP/trackforge-physics-baseline"
           git worktree add --detach "$baseline" "$BASE_SHA"
           cp qa/optimization/cli.mjs qa/optimization/score.mjs qa/optimization/scenarios.mjs "$baseline/qa/optimization/"
+          behavior_flags=()
+          if [[ "$BEHAVIOR_PRESERVING" == true ]]; then behavior_flags+=(--behavior-preserving); fi
           (
             cd "$baseline"
             npm ci
-            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --baseline-only --no-telemetry --workers 2 --trials 1 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/optimization/baseline"
+            GITHUB_SHA="$BASE_SHA" npm run qa:optimize -- --baseline-only --no-telemetry --workers 2 --trials 1 --seeds 1,4331 --out "$GITHUB_WORKSPACE/qa/results/optimization/baseline" "${behavior_flags[@]}"
           )
       - name: Run four-car parallel AI optimization study
-        run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization
+        run: |
+          behavior_flags=()
+          if [[ "$BEHAVIOR_PRESERVING" == true ]]; then behavior_flags+=(--behavior-preserving); fi
+          npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --out qa/results/optimization "${behavior_flags[@]}"
       - name: Report matched physics comparison
         env:
           GAMEPLAY_IMPROVEMENT: ${{ contains(github.event.pull_request.labels.*.name, 'gameplay-improvement') }}
+          # This label must be applied by a trusted maintainer after reviewing a behavior-preserving change.
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if test -f qa/results/optimization/baseline/summary.json; then
             flags=()
             if [[ "$GAMEPLAY_IMPROVEMENT" == true ]]; then flags+=(--gameplay-improvement); fi
+            if [[ "$BEHAVIOR_PRESERVING" == true ]]; then flags+=(--behavior-preserving); fi
             review="qa/optimization/reviews/pr-${PR_NUMBER}.json"
             if [[ -f "$review" ]]; then flags+=(--timing-review "$review"); fi
             node qa/optimization/comparePhysics.mjs qa/results/optimization/baseline/summary.json qa/results/optimization/summary.json "${flags[@]}"
