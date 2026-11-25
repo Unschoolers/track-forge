@@ -25,6 +25,7 @@ class RecordingGraphics {
   private fillAlpha = 1
   private stroke: number[] = []
   private path: (string | number)[] = []
+  private transformDepth = 0
 
   setDepth(depth: number) {
     this.depth = depth
@@ -52,6 +53,33 @@ class RecordingGraphics {
   lineBetween(x1: number, y1: number, x2: number, y2: number) {
     this.paints.push(['line', ...this.stroke, x1, y1, x2, y2])
   }
+  save() {
+    this.transformDepth++
+    this.paints.push(['save'])
+  }
+
+  restore() {
+    if (this.transformDepth === 0) throw new Error('Unbalanced graphics restore')
+    this.transformDepth--
+    this.paints.push(['restore'])
+  }
+
+  translateCanvas(x: number, y: number) {
+    this.paints.push(['translate', x, y])
+  }
+
+  rotateCanvas(angle: number) {
+    this.paints.push(['rotate', angle])
+  }
+
+  fillRoundedRect(x: number, y: number, width: number, height: number, radius: number) {
+    this.paints.push(['roundedRect', this.fillColor, this.fillAlpha, x, y, width, height, radius])
+  }
+
+  fillCircle(x: number, y: number, radius: number) {
+    this.paints.push(['circle', this.fillColor, this.fillAlpha, x, y, radius])
+  }
+
   beginPath() { this.path = [] }
   moveTo(x: number, y: number) { this.path.push('move', x, y) }
   lineTo(x: number, y: number) { this.path.push('line', x, y) }
@@ -129,6 +157,17 @@ describe('race road ribbon culling', () => {
       expect(update).toBeTypeOf('function')
       expect(graphics.flatMap(({ paints }) => paints)).toEqual(direct.paints)
       expect(graphics.some(({ paints }) => paints.some(([kind]) => kind === 'line'))).toBe(true)
+      const commands = direct.paints
+      const count = (kind: string) => commands.filter(([command]) => command === kind).length
+      if (environment === 'kids-room') {
+        expect(count('roundedRect')).toBeGreaterThan(0)
+        expect(count('circle')).toBeGreaterThan(0)
+        expect(count('save')).toBeGreaterThan(0)
+        expect(count('restore')).toBe(count('save'))
+      } else {
+        expect(count('roundedRect')).toBe(0)
+        expect(count('circle')).toBe(0)
+      }
     },
   )
 
