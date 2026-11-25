@@ -28,6 +28,8 @@ export interface MissedTimingGate {
 
 export interface RaceVehicle {
   readonly driftBoost?: DriftBoostSnapshot
+  /** Experimental brake gesture state, present only in Boost Practice. */
+  readonly driftTap?: { readonly heldSeconds: number; readonly assistSeconds: number; readonly direction: number } | undefined
   readonly id: string
   readonly car: CarId
   readonly player: boolean
