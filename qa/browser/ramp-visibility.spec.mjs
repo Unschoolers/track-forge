@@ -15,10 +15,17 @@ async function blueBodyPixels(page, image) {
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
     let blue = 0
     for (let index = 0; index < pixels.length; index += 4) {
-      // Blue's solid body is #3a8cff; the empty terrain has no blue objects.
-      if (Math.abs(pixels[index] - 58) <= 5 &&
-          Math.abs(pixels[index + 1] - 140) <= 5 &&
-          pixels[index + 2] >= 250) blue++
+      // The generated blue car has shaded, saturated blue paint rather than
+      // a single flat RGB value. The isolated grass/road/bridge fixture has
+      // no other saturated blue objects. Retain the same visible-pixel gate.
+      const red = pixels[index]
+      const green = pixels[index + 1]
+      const blueChannel = pixels[index + 2]
+      if (blueChannel >= 110 &&
+          blueChannel - red >= 65 &&
+          blueChannel - green >= 35 &&
+          blueChannel >= 1.35 * green &&
+          blueChannel >= 1.55 * red) blue++
     }
     return blue
   }, image.toString('base64'))
