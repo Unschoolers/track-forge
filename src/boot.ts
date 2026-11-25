@@ -35,10 +35,17 @@ const showRetry = () => {
 // The startup art stays available even if the game bundle cannot load.
 const timeout = window.setTimeout(showRetry, 30_000)
 try {
-  const { loadEnvironmentBitmapArt } = await import('./presentation/environments/meadowBitmapArt')
-  const { loadSceneryBitmapArt } = await import('./presentation/environments/sceneryBitmapArt')
-  await Promise.all([loadEnvironmentBitmapArt(), loadSceneryBitmapArt()])
-  const game = await import('./main')
+  const [{ loadEnvironmentBitmapArt }, { loadSceneryBitmapArt }] = await Promise.all([
+    import('./presentation/environments/meadowBitmapArt'),
+    import('./presentation/environments/sceneryBitmapArt'),
+  ])
+  const { finishStartupArtwork } = await import('./startupArtworkGate')
+  const artworkReady = Promise.all([loadEnvironmentBitmapArt(), loadSceneryBitmapArt()])
+  void artworkReady.then(
+    () => finishStartupArtwork({ ok: true }),
+    error => finishStartupArtwork({ ok: false, error }),
+  )
+  const [game] = await Promise.all([import('./main'), artworkReady])
   await game.gameReady
   enterGame = game.enterGame
   title.dataset.state = 'ready'
