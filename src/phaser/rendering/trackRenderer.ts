@@ -161,7 +161,7 @@ export function renderRaceTrackGeometryBase(
   const curbBatchSize = batchSize(curbs.length)
   for (let i = 0; i < curbs.length; i += curbBatchSize) {
     const batch = curbs.slice(i, i + curbBatchSize)
-    addBatch(batch, curb => [curb.start, curb.end], graphics => renderCurbSegments(graphics, batch, night))
+    addBatch(batch, curb => [curb.start, curb.end], graphics => renderCurbSegments(graphics, batch, night, environmentId))
   }
   const { path } = geometry
   const count = path.closed ? path.points.length : path.points.length - 1
@@ -210,7 +210,7 @@ function renderTrackGeometryMarkings(
   const segmentCount = path.closed
     ? path.points.length
     : path.points.length - 1
-  renderCurbs(graphics, path, night)
+  renderCurbs(graphics, path, night, environmentId)
 
   for (let index = 0; index < segmentCount; index += 3) {
     const previous = path.points[index]

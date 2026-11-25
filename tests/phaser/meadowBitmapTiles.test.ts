@@ -4,7 +4,7 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
 import { buildRoadRibbonQuads } from '@/presentation/environments/roadRibbonQuads'
 import { indexBitmapItems, roadBitmapTransform } from '@/presentation/environments/meadowBitmapTiles'
-import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS, roadTextureRepeat } from '@/presentation/environments/roadTextureVariants'
+import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS, roadTextureRepeat, ROAD_TEXTURE_SIZE, ROAD_TEXTURE_SURFACES, validateRoadAtlasDimensions } from '@/presentation/environments/roadTextureVariants'
 
 describe('Meadow bitmap geometry', () => {
   it('indexes an overlapping item in all relevant world tiles in paint order', () => {
@@ -78,5 +78,15 @@ describe('road bitmap variations', () => {
     expect(roadTextureRepeat(720, false)).toBe(96)
     const closed = roadTextureRepeat(720, true) * ROAD_TEXTURE_VARIANTS
     expect(720 / closed).toBeCloseTo(Math.round(720 / closed))
+  })
+})
+
+describe('high-resolution road atlases', () => {
+  it('uses three independent 256px cells in the stable street/mud/ice order', () => {
+    expect(ROAD_TEXTURE_SIZE).toBe(256)
+    expect(ROAD_TEXTURE_SURFACES).toEqual(['street', 'dirt', 'ice'])
+    expect(() => validateRoadAtlasDimensions(768, 256)).not.toThrow()
+    expect(() => validateRoadAtlasDimensions(144, 96)).toThrow('Unexpected road artwork atlas dimensions')
+    expect(() => validateRoadAtlasDimensions(256, 768)).toThrow()
   })
 })
