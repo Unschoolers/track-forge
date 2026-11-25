@@ -41,7 +41,7 @@ import {
 } from '@/phaser/rendering/lampPostRenderer'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { buildTerrainPresentation, renderTerrainPrimitives } from '@/phaser/rendering/terrainRenderer'
-import { chunkRaceTerrain, terrainChunkVisible, terrainVisibilityWindow } from '@/phaser/rendering/raceTerrainChunks'
+import { chunkRaceTerrain, chunkSpatialItems, terrainChunkVisible, terrainVisibilityWindow } from '@/phaser/rendering/raceTerrainChunks'
 import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
@@ -74,7 +74,8 @@ export class RaceScene extends Phaser.Scene {
   private upperVehicleGraphics?: Phaser.GameObjects.Graphics
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
-  private lampGraphics?: Phaser.GameObjects.Graphics
+  private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
   private lamps: readonly LampPost[] = []
@@ -136,9 +137,6 @@ export class RaceScene extends Phaser.Scene {
     this.upperVehicleGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.upperVehicle)
-    this.lampGraphics = this.add
-      .graphics()
-      .setDepth(WORLD_RENDER_DEPTH.lamp)
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
@@ -174,12 +172,16 @@ export class RaceScene extends Phaser.Scene {
     renderBridgeDeck(bridgeGraphics, geometry, night, 'terrain', structureUnderlayGraphics, normalizeTrackEnvironmentId(track.environmentId))
     renderBridgeSideWalls(wallGraphics, geometry, night, 'terrain', normalizeTrackEnvironmentId(track.environmentId))
     this.lamps = buildLampPosts(geometry)
-    renderLampPosts(
-      this.lampGraphics,
-      this.lamps,
-      this.raceSession.snapshot().setup?.lighting === 'night',
-    )
-    renderRecoveryCheckpoints(this.lampGraphics, geometry.path, this.raceSession.snapshot().state?.recoveryCheckpoints ?? [])
+    for (const batch of chunkSpatialItems(this.lamps, lamp => [lamp.position, lamp.shadowEnd], 64, 8)) {
+      const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
+      renderLampPosts(graphics, batch.items, night)
+      this.lampGraphics.push({ graphics, bounds: batch.bounds })
+    }
+    const checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
+    renderRecoveryCheckpoints(checkpointGraphics, geometry.path, this.raceSession.snapshot().state?.recoveryCheckpoints ?? [])
+    // The initial ground pass happens before lamp batches exist; force their
+    // first visibility update to use the race camera's actual viewport.
+    this.staticGraphicsVisibilityBounds = undefined
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     this.pointerBinding = bindRacePointer(
@@ -399,6 +401,14 @@ export class RaceScene extends Phaser.Scene {
         }
       }
     }
+    const nextStaticWindow = terrainVisibilityWindow(viewport, this.staticGraphicsVisibilityBounds)
+    if (nextStaticWindow) {
+      this.staticGraphicsVisibilityBounds = nextStaticWindow
+      for (const { graphics, bounds } of this.lampGraphics) {
+        const visible = terrainChunkVisible(bounds, nextStaticWindow)
+        if (graphics.visible !== visible) graphics.setVisible(visible)
+      }
+    }
     // Road markings and ribbons are static. Rechecking all their bounds every
     // animation frame is wasted CPU: a padded visibility window keeps incoming
     // road geometry visible until the camera moves beyond its coverage.
@@ -458,6 +468,8 @@ export class RaceScene extends Phaser.Scene {
     this.terrainVisibilityBounds = undefined
     this.lightVisibilityBounds = undefined
     this.roadVisibilityBounds = undefined
+    this.staticGraphicsVisibilityBounds = undefined
+    this.lampGraphics = []
     this.groundRenderer = undefined
     this.environmentSceneryRenderer?.destroy()
     this.environmentSceneryRenderer = undefined
