@@ -91,6 +91,33 @@ describe('track presentation geometry', () => {
     expect(buildTreePresentation([], false, terrainSurface)).toEqual([])
   })
 
+  it('culls trees only when both their canopy and projected shadow miss the view', () => {
+    const bounds = { left: 0, top: 0, right: 100, bottom: 100 }
+    const primitives = buildTreePresentation(
+      [
+        { x: 50, y: 50 },
+        // The canopy is outside, but its southeast shadow reaches the view.
+        { x: -20, y: 50 },
+        { x: 200, y: 200 },
+      ],
+      false,
+      undefined,
+      bounds,
+    )
+
+    expect(primitives).toHaveLength(6)
+    expect(primitives.filter(({ layer }) => layer === 'canopy')).toHaveLength(2)
+    expect(primitives.filter(({ layer }) => layer === 'shadow')).toHaveLength(2)
+    // Bitmap artwork is 34px across (radius 17) despite the 30-unit vector
+    // canopy, so its outer two pixels must remain inside the culling test.
+    expect(buildTreePresentation(
+      [{ x: 117, y: 50 }],
+      false,
+      undefined,
+      bounds,
+    )).toHaveLength(3)
+  })
+
   it('builds cached merged terrain presentation without grid-cell borders', () => {
     const water = paintTerrain(
       EMPTY_TERRAIN,

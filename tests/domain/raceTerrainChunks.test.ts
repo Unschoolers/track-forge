@@ -1,5 +1,16 @@
 import { expect, it } from 'vitest'
-import { chunkRaceTerrain, terrainChunkVisible, terrainVisibilityWindow } from '@/phaser/rendering/raceTerrainChunks'
+import { chunkRaceTerrain, chunkSpatialItems, terrainChunkVisible, terrainVisibilityWindow } from '@/phaser/rendering/raceTerrainChunks'
+
+it('chunks static objects in painter order and bounds every batch conservatively', () => {
+	const items = [0, 1, 2, 3, 4].map(x => ({ x, y: x * 2 }))
+	const chunks = chunkSpatialItems(items, item => [item], 2, 3)
+	expect(chunks.map(chunk => chunk.items)).toEqual([items.slice(0, 2), items.slice(2, 4), items.slice(4)])
+	expect(chunks.map(chunk => chunk.bounds)).toEqual([
+		{ left: -3, top: -3, right: 4, bottom: 5 },
+		{ left: -1, top: 1, right: 6, bottom: 9 },
+		{ left: 1, top: 5, right: 7, bottom: 11 },
+	])
+})
 
 it('preserves terrain draw order and computes conservative chunk bounds', () => {
 	const triangle = (x: number) =>

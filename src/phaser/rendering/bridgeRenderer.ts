@@ -10,6 +10,7 @@ import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadRibbonQuad } from '@/presentation/environments/roadRibbonQuads'
 import { bridgePaintCommands, type BridgePaintCommand } from '@/presentation/environments/bridgeMaterials'
 import type { RoadSurfaceSample } from '@/domain/track/roadSurface'
+import type { WorldBounds } from '@/presentation/environments/groundTexture'
 import {
   projectSunShadowOntoLocalGround,
   projectSunShadowOntoTerrain,
@@ -51,6 +52,59 @@ export interface BridgeLinePrimitive extends BridgePrimitiveBase {
 export type BridgePrimitive =
   | BridgePolygonPrimitive
   | BridgeLinePrimitive
+
+export interface BridgeRenderPasses {
+  readonly underlay: readonly BridgePrimitive[]
+  readonly rampApproach: readonly BridgePrimitive[]
+  readonly deck: readonly BridgePrimitive[]
+  readonly walls: readonly BridgePrimitive[]
+}
+
+/** Partitions presentation data into the renderer's depth passes without
+ * changing item order within a pass or allowing a primitive into two passes. */
+export function bridgeRenderPasses(primitives: readonly BridgePrimitive[]): BridgeRenderPasses {
+  const underlay: BridgePrimitive[] = []
+  const rampApproach: BridgePrimitive[] = []
+  const deck: BridgePrimitive[] = []
+  const walls: BridgePrimitive[] = []
+  for (const primitive of primitives) {
+    if (primitive.kind === 'wall') walls.push(primitive)
+    else if (primitive.kind === 'shadow-soft' || primitive.kind === 'shadow-core' || primitive.kind === 'pillar') underlay.push(primitive)
+    else if (primitive.rampApproach) rampApproach.push(primitive)
+    else deck.push(primitive)
+  }
+  return { underlay, rampApproach, deck, walls }
+}
+
+export interface BridgeSpatialBatch {
+  readonly items: readonly BridgePrimitive[]
+  readonly bounds: WorldBounds
+}
+
+/** Groups consecutive bridge commands so batching cannot change painter order. */
+export function chunkBridgePrimitives(
+  primitives: readonly BridgePrimitive[],
+  size = 64,
+): readonly BridgeSpatialBatch[] {
+  if (!Number.isInteger(size) || size < 1) throw new RangeError('Chunk size must be a positive integer')
+  const batches: BridgeSpatialBatch[] = []
+  for (let start = 0; start < primitives.length; start += size) {
+    const items = primitives.slice(start, start + size)
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity
+    for (const item of items) {
+      const points = 'polygon' in item ? item.polygon : [item.start, item.end]
+      for (const point of points) {
+        left = Math.min(left, point.x)
+        top = Math.min(top, point.y)
+        right = Math.max(right, point.x)
+        bottom = Math.max(bottom, point.y)
+      }
+    }
+    // Rails, bevels, and shadow softness can extend beyond the base primitive.
+    batches.push({ items, bounds: { left: left - 12, top: top - 12, right: right + 12, bottom: bottom + 12 } })
+  }
+  return batches
+}
 
 const presentationCaches: Record<TrackShadowMode, WeakMap<TrackGeometry, readonly BridgePrimitive[]>> = {
   terrain: new WeakMap(),
@@ -494,8 +548,9 @@ export function renderBridgeUnderlay(
   night = false,
   shadowMode: TrackShadowMode = 'terrain',
   environment: TrackEnvironmentId = 'grass',
+  presentation = buildBridgePresentation(geometry, shadowMode),
 ): void {
-  for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
+  for (const primitive of presentation) {
     if (primitive.kind === 'shadow-soft' || primitive.kind === 'shadow-core' || primitive.kind === 'pillar') {
       paint(graphics, bridgePaintCommands(primitive, environment, night))
     }
@@ -509,9 +564,10 @@ export function renderBridgeDeck(
   shadowMode: TrackShadowMode = 'terrain',
   rampApproachGraphics = deckGraphics,
   environment: TrackEnvironmentId = 'grass',
+  presentation = buildBridgePresentation(geometry, shadowMode),
 ): void {
   const loopLength = geometry.path.closed ? geometry.path.totalLength : undefined
-  for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
+  for (const primitive of presentation) {
     if (primitive.kind !== 'edge' && primitive.kind !== 'surface' && primitive.kind !== 'side-face' && primitive.kind !== 'marking') continue
     const graphics = primitive.rampApproach ? rampApproachGraphics : deckGraphics
     paint(graphics, bridgePaintCommands(primitive, environment, night, false, loopLength))
@@ -524,8 +580,9 @@ export function renderBridgeSideWalls(
   night: boolean,
   shadowMode: TrackShadowMode = 'terrain',
   environment: TrackEnvironmentId = 'grass',
+  presentation = buildBridgePresentation(geometry, shadowMode),
 ): void {
-  for (const primitive of buildBridgePresentation(geometry, shadowMode)) {
+  for (const primitive of presentation) {
     if (primitive.kind === 'wall') paint(graphics, bridgePaintCommands(primitive, environment, night))
   }
 }

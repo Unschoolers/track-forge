@@ -8,6 +8,36 @@ export interface RaceTerrainChunk {
 	readonly bounds: WorldBounds
 }
 
+export interface SpatialBatch<T> {
+	readonly items: readonly T[]
+	readonly bounds: WorldBounds
+}
+
+/** Keep paint order while grouping static objects for cheap viewport culling. */
+export function chunkSpatialItems<T>(
+	items: readonly T[],
+	pointsOf: (item: T) => readonly Vector2[],
+	size = 64,
+	padding = 4,
+): readonly SpatialBatch<T>[] {
+	if (!Number.isInteger(size) || size < 1) throw new RangeError('Chunk size must be a positive integer')
+	const result: SpatialBatch<T>[] = []
+	for (let start = 0; start < items.length; start += size) {
+		const batch = items.slice(start, start + size)
+		let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity
+		for (const item of batch) for (const point of pointsOf(item)) {
+			left = Math.min(left, point.x)
+			top = Math.min(top, point.y)
+			right = Math.max(right, point.x)
+			bottom = Math.max(bottom, point.y)
+		}
+		if (left !== Infinity) result.push({ items: batch, bounds: {
+			left: left - padding, top: top - padding, right: right + padding, bottom: bottom + padding,
+		} })
+	}
+	return result
+}
+
 /** Split consecutive drawing commands without changing their painter's order. */
 export function chunkRaceTerrain(
 	primitives: readonly TerrainPrimitive[],
