@@ -94,6 +94,7 @@ function createRenderingScenario() {
     controller: { snapshot: () => ({ preferences: { lighting } }) },
     raceSession: { advance() {}, snapshot: () => ({ state, setup: { lighting } }) },
     controls: {
+      consumeBoostRequest: () => false,
       snapshot: () => ({ steering: 0, throttle: 1, braking: false }),
     },
     game: { loop: { rawDelta: 16 } },

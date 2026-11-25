@@ -76,7 +76,8 @@ export function stepVehicle(
   const assistedSpeed = speedAssist
     ? Math.max(stockMaxSpeed, Math.min(stockMaxSpeed * speedAssist.multiplier, speedAssist.ceiling))
     : boost?.active ? boostCeiling : stockMaxSpeed
-  const engineSpeed = Math.min(boostCeiling, assistedSpeed)
+  // Practice boost limits must not cap the existing AI catch-up assist.
+  const engineSpeed = boost ? Math.min(boostCeiling, assistedSpeed) : assistedSpeed
   const maxSpeed = Math.min(physicsSpeedLimit, engineSpeed)
   let physicsVehicle = vehicle
   if (boost?.activated && !input.braking) {
