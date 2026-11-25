@@ -5,6 +5,7 @@ import type { RoadPath } from '@/domain/track/pathBuilder'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { roadGateGeometry, roadGateSpan } from '@/domain/track/trackGeometry'
 import { samplePathBehindStart } from '@/domain/race/raceFactory'
+import { renderToyCurb } from '@/presentation/environments/toyRoadBricks'
 
 export interface CurbSegment {
   readonly start: Vector2
@@ -132,11 +133,12 @@ export function renderCurbSegments(
   night: boolean,
   environment: TrackEnvironmentId = 'grass',
 ): void {
-  // Keep apex cues and geometry; use matching toy-plastic colors.
-  const palette = environment === 'kids-room'
-    ? (night ? { red: 0x9e4248, white: 0xb18b40 } : { red: 0xe84a43, white: 0xf5bf35 })
-    : (night ? CURB_COLORS.night : CURB_COLORS.day)
+  const palette = night ? CURB_COLORS.night : CURB_COLORS.day
   for (const curb of curbs) {
+    if (environment === 'kids-room') {
+      renderToyCurb(graphics, curb, night)
+      continue
+    }
     graphics.lineStyle(curb.width, palette[curb.color], 1)
     graphics.beginPath()
     graphics.moveTo(curb.start.x, curb.start.y)
