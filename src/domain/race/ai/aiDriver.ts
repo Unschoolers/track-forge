@@ -12,6 +12,7 @@ import type { TrafficState } from '@/domain/race/ai/traffic'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import {
   getVehicleStepContext,
+  type VehicleStepContext,
   turnAmountAt,
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
@@ -79,6 +80,7 @@ export function stepAiVehicle(
   passingPolicyOverride?: CarPassingPolicy,
   /** Test-only comparison switch; all production AI rivals use compact clearance. */
   aiAiTrafficMode: 'legacy' | 'compact' = 'compact',
+  resolvedContext?: VehicleStepContext,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
@@ -107,7 +109,7 @@ export function stepAiVehicle(
     passingPolicyOverride ?? CAR_PASSING_POLICIES[vehicle.car])
   ai = advanceMistake(ai, difficulty, deltaSeconds, random)
 
-  const context = getVehicleStepContext(path, vehicle)
+  const context = resolvedContext ?? getVehicleStepContext(path, vehicle)
   // Carry more speed on high-grip roads; loose surfaces need the usual braking margin.
   const arcadePavement = context.surface === 'street'
   const direction = reversed ? -1 : 1

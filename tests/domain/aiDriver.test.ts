@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
@@ -70,6 +70,25 @@ function driveWithTraffic(
 }
 
 describe('rival tendencies', () => {
+  it('reuses the road context already resolved by race orchestration', () => {
+    const [, rival] = cars()
+    if (!rival) throw new Error('Missing AI fixture')
+    const context = getVehicleStepContext(path, rival)
+    const roadSample = vi.spyOn(path.roadSurface, 'at')
+
+    const traffic = getTrafficState(rival, [], path)
+    stepAiVehicle(rival, path, traffic, 'normal', 1 / 60,
+      { next: () => 0.5 }, false, Number.POSITIVE_INFINITY, undefined,
+      undefined, undefined, 'compact', context)
+    const reusedContextSamples = roadSample.mock.calls.length
+
+    roadSample.mockClear()
+    stepAiVehicle(rival, path, traffic, 'normal', 1 / 60,
+      { next: () => 0.5 }, false, Number.POSITIVE_INFINITY)
+    expect(roadSample.mock.calls.length - reusedContextSamples).toBe(1)
+    roadSample.mockRestore()
+  })
+
   it('assigns the same profiles to grid rivals at every difficulty', () => {
     for (const difficulty of ['easy', 'normal', 'hard'] as const) {
       const race = createRace({ path, playerCar: 'blue', difficulty, laps: 1 })
