@@ -24,6 +24,7 @@ import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository
 import { BrowserTrackRepository } from '@/infrastructure/storage/trackRepository'
 import { PhaserSceneHost } from '@/phaser/sceneHost'
 import { DomUiHost } from '@/ui/uiHost'
+import { RaceFrameDiagnostics } from '@/infrastructure/qa/raceFrameDiagnostics'
 import { installRacePerformance } from '@/infrastructure/qa/racePerformance'
 import '@/styles/layout.css'
 import '@/styles/home-menu.css'
@@ -115,12 +116,21 @@ const controller = new AppController({
   raceSession,
   geometry,
 })
+const frameDiagnostics = new RaceFrameDiagnostics()
 const uiHost = new DomUiHost(uiRoot, controller, {
   nearby,
   ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),
   raceSession,
   raceControls,
   feedback,
+  frameDiagnostics: () => ({
+    timings: frameDiagnostics.report(raceSession.snapshot().runId),
+    device: {
+      userAgent: navigator.userAgent,
+      pixelRatio: window.devicePixelRatio,
+      viewport: [window.innerWidth, window.innerHeight],
+    },
+  }),
   geometry,
   prepareRace: (track, trackGeometry, lighting) => sceneHost.prepareRace(track, trackGeometry, lighting),
   previewAudioVolume: setAudioVolume,
@@ -142,6 +152,7 @@ const sceneHost = new PhaserSceneHost(
   raceControls,
   geometry,
   racePerformance,
+  frameDiagnostics,
 )
 const application = createApplication({ sceneHost, uiHost })
 

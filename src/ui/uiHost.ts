@@ -51,6 +51,7 @@ export interface UiRuntime {
   readonly nearby?: NearbyRace | undefined
   readonly nearbyConnections?: NearbyConnectionModes
   readonly raceSession: RaceSessionPort
+  readonly frameDiagnostics?: () => unknown
   readonly raceControls: RaceControlsPort
   readonly feedback: FeedbackPort
   readonly geometry: TrackGeometryService
@@ -170,7 +171,7 @@ export class DomUiHost implements UiHost {
     try {
       const saved = await saveJsonFile({
         filename,
-        content: JSON.stringify(report),
+        content: JSON.stringify({ ...report, performance: this.runtime.frameDiagnostics?.() ?? null }),
       })
       this.showRaceExportNotice(saved ? 'Race replay file saved.' : 'Race replay was not saved.', generation)
     } catch (error) {
