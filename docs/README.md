@@ -22,6 +22,7 @@ Start here for **current team/agent guidelines**. Older specs and plans under `d
 | [Vehicle artwork](vehicle-artwork.md) | Shared car silhouettes for race, flyover and selector; visual-only scope |
 | [Recovery and checkpoint authoring](recovery-and-checkpoints.md) | Last road-contact recovery, automatic editor markers, safety and rollback |
 | [Race replay exports](race-replays.md) | Hidden diagnostics trigger, all-car capture and export file contract |
+| [Track library storage](track-library-storage.md) | IndexedDB migration, durable writes and rollback |
 | [Nearby sharing](nearby-track-sharing.md) | Share tracks with approval and stay connected across rematches |
 | [Refactor history](refactorplan.md) | Shipped milestones and historical backlog |
 | [Parity audit](trackforge-parity-audit.md) | Earlier migration parity decisions |

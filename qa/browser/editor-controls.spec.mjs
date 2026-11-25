@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 import { EDITOR_FIXTURE_NAME, seedEditorFixture } from './editor-fixture.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
@@ -103,9 +104,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
 
-  const readTrack = () => page.evaluate(() =>
-    JSON.parse(localStorage.getItem('trackforge-library-v2')).find(track => track.id === 'environment-qa'),
-  )
+  const readTrack = async () => (await readSavedTracks(page)).find(track => track.id === 'environment-qa')
   const readDraft = () => page.evaluate(() => window.__trackForgeQa.snapshot().editor)
   async function enterEditor() {
     await page.goto('/?qa')
@@ -160,7 +159,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
     // All in-editor changes must remain drafts until this explicit save.
     expect((await readTrack()).scenery).toEqual([])
     await page.getByRole('button', { name: 'Save track', exact: true }).click()
-    expect((await readTrack()).scenery).toEqual(moved)
+    await expect.poll(async () => (await readTrack()).scenery).toEqual(moved)
 
     await enterEditor()
     await expect.poll(async () => (await readTrack()).environmentId).toBe('cityscape')

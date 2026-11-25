@@ -121,7 +121,16 @@ describe('AppController', () => {
       expect((await guest.diagnostics()).lastFailure).toMatchObject({ source: 'save_shared_track' })
       expect(guest.snapshot().phase).toBe('share-review')
       expect(host.snapshot().sharedCount).toBe(0)
+      trackStore.save.mockImplementationOnce(track => new Promise<boolean>(resolve => {
+        finish = saved => {
+          if (saved) trackStore.tracks.set(track.id, track)
+          resolve(saved)
+        }
+      }))
       controller.dispatch({ type: 'save-nearby-track' })
+      expect(host.snapshot().sharedCount).toBe(0)
+      expect(trackStore.find(asTrackId('created'))).toBeUndefined()
+      finish(true)
       await vi.waitFor(() => expect(host.snapshot().sharedCount).toBe(1))
       expect(trackStore.find(asTrackId('created'))?.name).toBe(source.name)
     } finally {

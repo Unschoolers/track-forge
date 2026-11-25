@@ -103,4 +103,4 @@ After selecting a normal race track or a Nearby Cup, the host can choose **DAY**
 
 ### Durable local saves
 
-Incoming track copies are acknowledged only after the IndexedDB transaction commits. On failure, the share remains available for retry and the diagnostic report records `save_shared_track` with the bounded storage error code. See [Track library storage](track-library-storage.md).
+Incoming track copies are acknowledged only after the IndexedDB transaction commits. On failure, the share remains available for retry and the diagnostic report records `save_shared_track` with the bounded storage error code. The exported report also includes browser storage usage and quota estimates when available. See [Track library storage](track-library-storage.md).

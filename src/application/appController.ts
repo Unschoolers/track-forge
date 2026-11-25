@@ -801,6 +801,7 @@ export class AppController {
 
   private deleteTrack(id: TrackId): void {
     const deletingCurrent = this.state.currentTrack?.id === id
+    const previousNotice = this.state.notice
     this.completePersistence(this.library.delete(id), deleted => {
       if (!deleted) {
         this.update({ ...this.state, notice: 'Track could not be deleted.' })
@@ -829,7 +830,7 @@ export class AppController {
                 currentTrack ?? {},
               )
             : this.state.editor,
-        notice: deletingCurrent ? null : this.state.notice,
+        notice: deletingCurrent ? null : previousNotice,
       })
     })
   }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 
 const trackId = 'mobile-open-route'
@@ -26,9 +27,8 @@ test('persists an open route and displays its ordered finish splits', async ({ p
   await page.getByRole('button', { name: 'Editor menu' }).click()
   await page.getByRole('button', { name: 'Point to point', exact: true }).click()
   await page.getByRole('button', { name: 'SAVE TRACK', exact: true }).click()
-  await expect.poll(() => page.evaluate(id =>
-    JSON.parse(localStorage.getItem('trackforge-library-v2'))
-      .find(track => track.id === id)?.routeKind, trackId)).toBe('point-to-point')
+  await expect.poll(async () => (await readSavedTracks(page))
+    .find(track => track.id === trackId)?.routeKind).toBe('point-to-point')
   await expect(page.locator('[data-tool="start"]')).toHaveCount(0)
 
   await page.reload()
