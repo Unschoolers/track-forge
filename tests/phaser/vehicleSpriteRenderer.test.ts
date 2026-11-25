@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest'
 import type Phaser from 'phaser'
 import { CAR_IDS, type CarId } from '@/domain/model'
@@ -25,7 +27,8 @@ function fakeScene() {
   const scene = {
     textures: {
       exists: (key: string) => keys.has(key),
-      addImage: vi.fn((key: string) => { keys.add(key); return {} }),
+      addImage: vi.fn(),
+      addCanvas: vi.fn((key: string, _canvas: HTMLCanvasElement) => { keys.add(key); return {} }),
     },
     add: {
       image: vi.fn((_x: number, _y: number, key: string) => {
@@ -41,9 +44,17 @@ function fakeScene() {
 describe('generated vehicle sprite renderer', () => {
   it('registers four textures once, preserves world scale and orders cars below their overlay and above their shadow', () => {
     const { scene, images } = fakeScene()
-    const image = {} as HTMLImageElement
+    const drawImage = vi.fn()
+    const context = { drawImage, imageSmoothingEnabled: false, imageSmoothingQuality: 'low' }
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D)
+    const image = { naturalWidth: 768, naturalHeight: 384 } as HTMLImageElement
     const renderer = new VehicleSpriteRenderer(scene as unknown as Phaser.Scene, () => image)
-    expect(scene.textures.addImage).toHaveBeenCalledTimes(4)
+    expect(scene.textures.addCanvas).toHaveBeenCalledTimes(4)
+    expect(scene.textures.addCanvas.mock.calls.map(([, canvas]) => [canvas.width, canvas.height]))
+      .toEqual(Array.from({ length: 4 }, () => [96, 48]))
+    expect(context).toMatchObject({ imageSmoothingEnabled: true, imageSmoothingQuality: 'high' })
+    expect(drawImage).toHaveBeenCalledWith(image, 0, 0, 96, 48)
     renderer.beginFrame()
     const scale = VEHICLE_VISUAL_SCALE
     expect(renderer.draw('blue', 12, 34, 0.5, scale, scale, 5)).toBe(true)
@@ -74,7 +85,9 @@ describe('generated vehicle sprite renderer', () => {
     renderer.destroy()
     for (const sprite of images) expect(sprite.destroy).toHaveBeenCalledOnce()
     new VehicleSpriteRenderer(scene as unknown as Phaser.Scene, () => image)
-    expect(scene.textures.addImage).toHaveBeenCalledTimes(4)
+    expect(scene.textures.addCanvas).toHaveBeenCalledTimes(4)
+    expect(drawImage).toHaveBeenCalledTimes(4)
+    getContext.mockRestore()
   })
 
   it('keeps dimensions bounded and preserves the forward-facing world length of all four cars', () => {
@@ -94,6 +107,6 @@ describe('generated vehicle sprite renderer', () => {
     const renderer = new VehicleSpriteRenderer(scene as unknown as Phaser.Scene, () => undefined)
     expect(renderer.draw('blue', 0, 0, 0, 1, 1, 5)).toBe(false)
     expect(scene.add.image).not.toHaveBeenCalled()
-    expect(scene.textures.addImage).not.toHaveBeenCalled()
+    expect(scene.textures.addCanvas).not.toHaveBeenCalled()
   })
 })

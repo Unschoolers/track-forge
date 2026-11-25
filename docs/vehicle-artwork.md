@@ -15,7 +15,10 @@ authored size. Existing light, shadow, topper and ghost geometry is retained.
   decodes all four assets once; failed loading is surfaced by the existing
   retry screen.
 - `src/phaser/rendering/vehicleSpriteRenderer.ts` registers four shared GPU
-  textures and reuses a scene-owned image pool. Bodies keep the same landing
+  textures and reuses a scene-owned image pool. The race textures are
+  downsampled to 96 px wide with smoothing at registration, so fine highlights
+  and silhouettes hold up at race zoom. The four uploaded RGBA textures use
+  about 71 KiB of base pixel data combined, down from 4.4 MiB. Bodies keep the same landing
   scale and bridge classification, with player-last ordering, shadows below
   and brake lights/topper/boost effects above. Scene teardown destroys images,
   not the reusable textures.
