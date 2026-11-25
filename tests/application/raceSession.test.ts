@@ -78,7 +78,7 @@ describe('RaceSession', () => {
     session.start(track, practiceSetup)
     expect(session.snapshot().state?.vehicles).toHaveLength(1)
     expect(session.snapshot().setup).toMatchObject(practiceSetup)
-    expect(session.snapshot().state?.driftBoostRules).toMatchObject({ revision: 'drift-boost-v1', enabled: true })
+    expect(session.snapshot().state?.driftBoostRules).toMatchObject({ revision: 'drift-boost-v1.1', enabled: true })
     session.advance(3.7, noInput)
     session.advance(0.02, noInput)
     expect(session.snapshot().result).toMatchObject({ mode: 'boost-practice', playerTime: 12, newRecord: false, highScores: [] })
