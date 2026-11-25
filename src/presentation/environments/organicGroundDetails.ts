@@ -65,16 +65,30 @@ function ellipse(context: CanvasRenderingContext2D, x: number, y: number, rx: nu
   context.fill()
 }
 
-function softLobe(context: CanvasRenderingContext2D, x: number, y: number, radius: number, color: string, opacity: number): void {
-  const gradient = context.createRadialGradient(x, y, 0, x, y, radius)
-  gradient.addColorStop(0, color)
-  gradient.addColorStop(1, color + '00')
-  context.fillStyle = gradient
-  context.globalAlpha = opacity
-  ellipse(context, x, y, radius, radius)
+/** Irregular micro-clusters instead of a smooth radial color wash. */
+function patchGrain(context: CanvasRenderingContext2D, patch: GroundDetailPatch, random: () => number): void {
+  const [base, detail] = patch.colors
+  const radius = patch.radius
+  const fibers = patch.kind === 'nap' || patch.kind === 'lint' || patch.kind === 'dry-grass' || patch.kind === 'sand'
+  for (let cluster = 0; cluster < 7; cluster++) {
+    const angle = random() * Math.PI * 2
+    const distance = random() * radius * 0.50
+    const cx = Math.cos(angle) * distance
+    const cy = Math.sin(angle) * distance * 0.66
+    for (let i = 0; i < 16; i++) {
+      const a = random() * Math.PI * 2
+      const d = Math.sqrt(random()) * radius * 0.29
+      const x = cx + Math.cos(a) * d
+      const y = cy + Math.sin(a) * d * 0.52
+      const length = 0.7 + random() * 2.5
+      context.globalAlpha = (0.10 + random() * 0.20) * (1 - Math.min(0.8, Math.hypot(x, y) / radius))
+      context.fillStyle = i % 4 === 0 ? detail : base
+      ellipse(context, x, y, fibers ? length : length * 0.55, 0.4 + random() * 0.5)
+    }
+  }
 }
 
-/** Paint broad, translucent tonal changes plus fine flat surface details.
+/** Paint irregular textured micro-clusters plus fine flat surface details.
  * Called only while baking a cached tile, never during rendering or physics. */
 export function paintOrganicGround(context: CanvasRenderingContext2D, theme: OrganicGroundTheme, variant: number, night: boolean, padding: number): void {
   for (const patch of groundDetailPatches(theme, variant, night)) {
@@ -84,14 +98,7 @@ export function paintOrganicGround(context: CanvasRenderingContext2D, theme: Org
     context.translate(padding + patch.x, padding + patch.y)
     context.rotate(patch.angle)
     const r = patch.radius
-    const broadOpacity = patch.kind === 'sand' || patch.kind === 'nap' || patch.kind === 'wear' ? 0.48 : 0.31
-    softLobe(context, 0, 0, r * 0.82, base, broadOpacity)
-    for (let i = 0; i < 5; i++) {
-      const angle = i * Math.PI * 2 / 5 + random() * 0.4
-      const distance = r * (0.28 + random() * 0.12)
-      softLobe(context, Math.cos(angle) * distance, Math.sin(angle) * distance * 0.68,
-        r * (0.38 + random() * 0.15), base, broadOpacity * 0.75)
-    }
+    patchGrain(context, patch, random)
 
     const count = patch.kind === 'cracks' ? 4 : patch.kind === 'sand' ? 18 : 42
     context.lineCap = 'round'
@@ -100,7 +107,7 @@ export function paintOrganicGround(context: CanvasRenderingContext2D, theme: Org
       const distance = Math.sqrt(random()) * r * 0.62
       const x = Math.cos(angle) * distance
       const y = Math.sin(angle) * distance * 0.72
-      context.globalAlpha = 0.18 + random() * 0.32
+      context.globalAlpha = 0.12 + random() * 0.28
       context.fillStyle = i % 3 === 0 ? base : detail
       context.strokeStyle = patch.kind === 'cracks' ? base : detail
       switch (patch.kind) {
