@@ -141,7 +141,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
         : DEFAULT_PREFERENCES.difficulty,
       pedalMode: pedalMode === 'manual' ? 'manual' : 'auto',
       raceLaps: raceLaps === '1' ? 1 : raceLaps === '3' ? 3 : 2,
-      raceMode: raceMode === 'ghost' || raceMode === 'time-trial' ? raceMode : 'normal',
+      raceMode: raceMode === 'ghost' || raceMode === 'time-trial' || raceMode === 'boost-practice' ? raceMode : 'normal',
       playerIdentity,
       favoriteTrackIds: parseFavoriteTrackIds(read(STORAGE_KEYS.favoriteTrackIds)),
       ...(displayName ? { displayName } : {}),

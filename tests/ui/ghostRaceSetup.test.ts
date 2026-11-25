@@ -61,6 +61,21 @@ describe('Shared race preparation', () => {
 })
 
 describe('Ghost Race setup', () => {
+  it('offers opt-in solo Boost Practice on circuit and point-to-point routes', () => {
+    const callbacks = actions()
+    const circuit = createRaceSetupModal(state, callbacks, null)
+    const choice = circuit.querySelector<HTMLButtonElement>('[data-action="mode-boost-practice"]')
+    expect(choice?.getAttribute('aria-pressed')).toBe('false')
+    choice?.click()
+    expect(callbacks.preferences).toHaveBeenCalledWith({ ...state.preferences, raceMode: 'boost-practice' })
+    const selected = createRaceSetupModal({ ...state, preferences: { ...state.preferences, raceMode: 'boost-practice' } }, callbacks, null)
+    expect(selected.textContent).toContain('unranked Arcade run')
+    expect(selected
+      .querySelector('[data-action="setup-start"]')?.textContent).toBe('START BOOST PRACTICE')
+    const open = createRaceSetupModal({ ...state, currentTrack: { ...track, routeKind: 'point-to-point' } }, callbacks, null)
+    expect(open.querySelector('[data-action="mode-boost-practice"]')).not.toBeNull()
+  })
+
   it('always shows a disabled Ghost Race button when no replay is available', () => {
     const modal = createRaceSetupModal(state, actions(), null)
     const ghost = modal.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')
@@ -101,6 +116,16 @@ describe('Ghost Race setup', () => {
     modal.querySelector<HTMLButtonElement>('[data-action="race-best-ghost"]')?.click()
     expect(raceBestGhost).toHaveBeenCalledOnce()
     expect(createResultsModal(result, { retry() {}, edit() {}, home() {} }).querySelector('[data-action="race-best-ghost"]')).toBeNull()
+  })
+  it('states Boost Practice is unranked without showing record or ghost save prompts', () => {
+    const result: RaceResult = { mode: 'boost-practice', outcome: 'finished', trackId: track.id, trackName: track.name,
+      playerPlace: 1, playerTime: 61, newRecord: false, standings: [], highScores: [] }
+    const modal = createResultsModal(result, { retry() {}, edit() {}, home() {}, exportRace: vi.fn() })
+    expect(modal.textContent).toContain('UNRANKED · BOOST ENABLED')
+    expect(modal.textContent).toContain('NO RECORD OR GHOST SAVED')
+    expect(modal.textContent).not.toContain('BEST GHOST SAVED')
+    expect(modal.querySelector('.race-finish-medal')).toBeNull()
+    expect(modal.querySelector('[data-action="race-diagnostics"]')).toBeNull()
   })
   it('compares the finish with the original ghost instead of awarding a solo-race medal', () => {
     const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,

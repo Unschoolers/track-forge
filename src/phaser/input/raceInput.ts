@@ -12,12 +12,15 @@ type PointerState =
   | { readonly role: 'button'; readonly direction: -1 | 1 }
   | { readonly role: 'brake' }
   | { readonly role: 'throttle' }
+  | { readonly role: 'boost' }
 
 export class RaceInputController implements RaceControlsPort {
   private readonly pointers = new Map<number, PointerState>()
   private readonly steeringKeys = new Map<string, -1 | 1>()
   private readonly brakeKeys = new Set<string>()
   private readonly throttleKeys = new Set<string>()
+  private readonly boostKeys = new Set<string>()
+  private boostRequested = false
   private activeSteeringPointer: number | undefined
   private readonly resetListeners = new Set<() => void>()
 
@@ -44,6 +47,7 @@ export class RaceInputController implements RaceControlsPort {
 
   setKeyboard(key: string, pressed: boolean): void {
     const normalized = key.toLowerCase()
+    if (normalized === 'shift') this.setBoostKeyboard(normalized, pressed)
     if (['arrowleft', 'arrowright', 'a', 'd'].includes(normalized)) {
       this.steeringKeys.delete(normalized)
       if (pressed) this.steeringKeys.set(normalized, normalized === 'arrowleft' || normalized === 'a' ? -1 : 1)
@@ -63,6 +67,29 @@ export class RaceInputController implements RaceControlsPort {
     const name = `pedal:${key}`
     if (pressed) keys.add(name)
     else keys.delete(name)
+  }
+
+  consumeBoostRequest(): boolean {
+    const requested = this.boostRequested
+    this.boostRequested = false
+    return requested
+  }
+
+  private requestBoostOnRise(wasHeld: boolean): void {
+    if (!wasHeld) this.boostRequested = true
+  }
+
+  beginBoost(id: number): void {
+    const wasHeld = this.boostKeys.size > 0 || [...this.pointers.values()].some((pointer) => pointer.role === 'boost')
+    this.pointers.set(id, { role: 'boost' })
+    this.requestBoostOnRise(wasHeld)
+  }
+
+  setBoostKeyboard(key: string, pressed: boolean): void {
+    const wasHeld = this.boostKeys.size > 0 || [...this.pointers.values()].some((pointer) => pointer.role === 'boost')
+    if (pressed) this.boostKeys.add(key)
+    else this.boostKeys.delete(key)
+    if (pressed) this.requestBoostOnRise(wasHeld)
   }
 
   beginSteeringButton(id: number, direction: -1 | 1): void {
@@ -118,6 +145,8 @@ export class RaceInputController implements RaceControlsPort {
     this.steeringKeys.clear()
     this.brakeKeys.clear()
     this.throttleKeys.clear()
+    this.boostKeys.clear()
+    this.boostRequested = false
     for (const listener of this.resetListeners) listener()
   }
 }

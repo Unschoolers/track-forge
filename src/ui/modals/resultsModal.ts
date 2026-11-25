@@ -23,25 +23,30 @@ export function createResultsModal(
   playerName?: string,
 ): HTMLElement {
   const timeTrial = result.mode === 'time-trial'
+  const boostPractice = result.mode === 'boost-practice'
   const headline = result.outcome === 'water'
     ? 'SUNK'
       : result.ghostTime !== undefined && result.playerTime !== null
         ? Math.abs(result.playerTime - result.ghostTime) < 0.0005 ? 'GHOST TIED'
           : result.playerTime < result.ghostTime ? 'GHOST BEATEN' : 'GHOST WINS'
+      : boostPractice && result.outcome === 'finished'
+        ? 'BOOST PRACTICE COMPLETE'
       : !timeTrial && result.playerPlace === 1 && result.outcome === 'finished' && result.ghostTime === undefined
       ? 'VICTORY!'
       : result.newRecord
       ? 'NEW RECORD'
       : timeTrial ? 'TIME TRIAL COMPLETE' : `FINISHED ${result.playerPlace}${ordinalSuffix(result.playerPlace)}`
-  const hasStandings = result.ghostTime === undefined && !timeTrial && result.standings.length > 0
+  const hasStandings = result.ghostTime === undefined && !timeTrial && !boostPractice && result.standings.length > 0
   const subtitle = result.playerTime === null || hasStandings
     ? result.trackName
     : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
   const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
+  if (boostPractice) frame.body.append(element('p', 'modal-subtitle', 'UNRANKED · BOOST ENABLED'))
   // The player's name and finish time are already visible in the standings.
   if (playerName && !hasStandings) frame.body.append(element('p', 'modal-subtitle', `DRIVER · ${playerName}`))
-  const medal = result.ghostTime === undefined && !timeTrial ? medalForFinish(result.outcome, result.playerPlace) : null
+  const medal = result.ghostTime === undefined && !timeTrial && !boostPractice
+    ? medalForFinish(result.outcome, result.playerPlace) : null
   if (medal) frame.body.append(createFinishCelebration(medal, result.newRecord, true))
   if (result.playerTime !== null && result.previousBestTime !== undefined) {
     const delta = result.playerTime - result.previousBestTime
@@ -72,7 +77,9 @@ export function createResultsModal(
   if (result.ghostSaved === false && !result.ghostSaveFailed) {
     frame.body.append(element('p', 'modal-subtitle', 'Best ghost could not be saved on this device.'))
   }
-  if (actions.exportRace) {
+  if (boostPractice) {
+    detailsBar.append(element('p', 'modal-subtitle race-diagnostics-label', 'UNRANKED · NO RECORD OR GHOST SAVED'))
+  } else if (actions.exportRace) {
     const target = element('div', 'race-diagnostics-target')
     target.dataset.action = 'race-diagnostics'
     target.setAttribute('role', 'button')

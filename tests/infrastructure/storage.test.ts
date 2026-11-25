@@ -107,6 +107,8 @@ it('persists the explicit race mode and rejects unknown stored modes', () => {
   expect(preferences.load().raceMode).toBe('normal')
   preferences.save({ ...preferences.load(), raceMode: 'ghost' })
   expect(preferences.load().raceMode).toBe('ghost')
+  preferences.save({ ...preferences.load(), raceMode: 'boost-practice' })
+  expect(preferences.load().raceMode).toBe('boost-practice')
   // Legacy corruption checks explicitly bypass the authoritative modern snapshot.
   memory.values.delete('trackforge-preferences-snapshot-v1')
   memory.values.set('trackforge-race-mode', 'invalid')

@@ -52,6 +52,8 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 .race-steering { min-width: 0; }
 .steering-buttons { gap: var(--race-control-gap); }
 .race-pedals { display: grid; flex: 0 0 auto; justify-items: center; gap: var(--race-control-gap); }
+.race-boost-control { display: grid; justify-items: center; gap: .25rem; }
+.race-boost-control[hidden] { display: none; }
 .race-pedals.manual { grid-template-columns: repeat(2, auto); }
 .race-controls[data-layout='buttons'] .race-pedals.manual {
   /* Leave room for both steering buttons and the three horizontal gaps. */

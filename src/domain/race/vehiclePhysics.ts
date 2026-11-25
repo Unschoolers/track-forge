@@ -9,6 +9,7 @@ import type { SurfaceId } from '@/domain/model'
 import type { VehicleStepContext } from '@/domain/race/trackContext'
 import type { DriverInput, RaceVehicle } from '@/domain/race/raceState'
 import { stepVehicleDynamics } from '@/domain/race/vehicleDynamics'
+import type { DriftBoostRules } from '@/domain/race/driftBoost'
 import {
   ARCADE_BRAKE_TIMING,
   BRAKE_CORNER_RESPONSE,
@@ -37,6 +38,7 @@ export function stepVehicle(
   deltaSeconds: number,
   speedLimit = Number.POSITIVE_INFINITY,
   speedAssist?: SpeedAssist,
+  boost?: { readonly rules: DriftBoostRules; readonly activated: boolean; readonly active: boolean; readonly speedCeilingMultiplier: number },
 ): RaceVehicle {
   if (vehicle.finishedAt !== null) {
     return {
@@ -70,10 +72,26 @@ export function stepVehicle(
   const terrain: TerrainPhysicsModifier = VEHICLE_TERRAIN_SPECS[vehicle.car][context.surface]
   const physicsSpeedLimit = vehicle.player ? Number.POSITIVE_INFINITY : speedLimit
   const stockMaxSpeed = car.max * surface.max * terrain.max
-  const engineSpeed = speedAssist
+  const boostCeiling = boost ? stockMaxSpeed * boost.speedCeilingMultiplier : stockMaxSpeed
+  const assistedSpeed = speedAssist
     ? Math.max(stockMaxSpeed, Math.min(stockMaxSpeed * speedAssist.multiplier, speedAssist.ceiling))
-    : stockMaxSpeed
+    : boost?.active ? boostCeiling : stockMaxSpeed
+  const engineSpeed = Math.min(boostCeiling, assistedSpeed)
   const maxSpeed = Math.min(physicsSpeedLimit, engineSpeed)
+  let physicsVehicle = vehicle
+  if (boost?.activated && !input.braking) {
+    const headingX = Math.cos(vehicle.angle)
+    const headingY = Math.sin(vehicle.angle)
+    const longitudinal = vehicle.vx * headingX + vehicle.vy * headingY
+    const lateral = -vehicle.vx * headingY + vehicle.vy * headingX
+    const ceiling = stockMaxSpeed * boost.rules.speedCeilingMultiplier
+    const boostedLongitudinal = Math.min(ceiling, Math.max(0, longitudinal) * boost.rules.initialSpeedMultiplier)
+    physicsVehicle = {
+      ...vehicle,
+      vx: boostedLongitudinal * headingX - lateral * headingY,
+      vy: boostedLongitudinal * headingY + lateral * headingX,
+    }
+  }
   const braking = input.braking || aiSpeedBrake
   const tuning = VEHICLE_DYNAMICS_TUNING
   const extraGrip = 1 + ((terrain.highSpeedGrip ?? 1) - 1) * clamp((vehicle.speed - 170) / 40, 0, 1)
@@ -87,10 +105,10 @@ export function stepVehicle(
     (previousGrip - targetGrip) * Math.exp(-dt / SURFACE_GRIP_TIME_CONSTANT)
   const dynamics = stepVehicleDynamics(
     {
-      angle: vehicle.angle,
-      vx: vehicle.vx,
-      vy: vehicle.vy,
-      yawRate: vehicle.yawRate,
+      angle: physicsVehicle.angle,
+      vx: physicsVehicle.vx,
+      vy: physicsVehicle.vy,
+      yawRate: physicsVehicle.yawRate,
     },
     {
       ...input,
@@ -116,6 +134,8 @@ export function stepVehicle(
       lateralStability: 1 + (car.lateralStability - 1) *
         Math.min(1, surfaceGrip * surfaceGrip),
       maxSpeed,
+      ...(boost ? { absoluteSpeedLimit: maxSpeed } : {}),
+      ...(boost?.active ? { accelerationMultiplier: boost.rules.accelerationMultiplier } : {}),
       safetySpeed: Math.min(physicsSpeedLimit, car.max),
       engineAcceleration:
         car.accel *

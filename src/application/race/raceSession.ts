@@ -44,8 +44,11 @@ import { interpolateRaceState } from '@/application/race/racePresentation'
 import { RaceDiagnosticsRecording, type RaceDiagnosticsReport } from '@/application/race/raceDiagnostics'
 import { createRaceResult, toRaceStanding } from '@/application/race/raceResultRecorder'
 import { routeRaceFeedback } from '@/application/race/raceFeedback'
+import { DRIFT_BOOST_V1_RULES } from '@/domain/race/driftBoost'
+import type { DriftBoostRules } from '@/domain/race/driftBoost'
+import { BOOST_PRACTICE_AVAILABLE } from '@/application/race/boostPracticeConfig'
 
-export type RaceMode = 'normal' | 'ghost' | 'time-trial' | 'nearby'
+export type RaceMode = 'normal' | 'ghost' | 'time-trial' | 'nearby' | 'boost-practice'
 
 export interface RaceSetup {
   readonly lighting?: LightingMode
@@ -55,6 +58,8 @@ export interface RaceSetup {
   readonly mode?: RaceMode
   /** Fixed for retry. New quick races get a fresh order from the controller. */
   readonly gridPositions?: readonly number[]
+  /** Frozen for this run; omitted for ordinary races. */
+  readonly driftBoostRules?: DriftBoostRules
 }
 
 export interface RaceSplit { readonly lap: number; readonly gate: number; readonly time: number }
@@ -207,6 +212,15 @@ export class RaceSession implements RaceSessionPort {
 
   start(track: Track, setup: RaceSetup, startsAt?: number): void {
     if (this.destroyed) return
+    if (setup.mode === 'boost-practice' && !BOOST_PRACTICE_AVAILABLE) return
+    if (setup.mode === 'boost-practice' && setup.driftBoostRules && !setup.driftBoostRules.enabled) return
+    if (setup.mode === 'boost-practice' && !setup.driftBoostRules) {
+      setup = { ...setup, driftBoostRules: DRIFT_BOOST_V1_RULES }
+    } else if (setup.mode !== 'boost-practice' && setup.driftBoostRules) {
+      const withoutBoostRules = { ...setup }
+      delete withoutBoostRules.driftBoostRules
+      setup = withoutBoostRules
+    }
     this.previousPresentationTick = null
     this.presentationDiscontinuities.clear()
     this.dependencies.feedback.silenceContinuous()
@@ -217,7 +231,8 @@ export class RaceSession implements RaceSessionPort {
     setup = oneRunForOpenRoute(track, setup)
     this.startsAt = setup.mode === 'nearby' ? startsAt : undefined
     const nearby = setup.mode === 'nearby'
-    this.bestGhost = nearby ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
+    const boostPractice = setup.mode === 'boost-practice'
+    this.bestGhost = nearby || boostPractice ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
       path: this.geometry.get(track).path,
@@ -229,6 +244,7 @@ export class RaceSession implements RaceSessionPort {
       routeKind,
       gridPositions: setup.gridPositions,
       recoveryCheckpoints: track.recoveryCheckpoints,
+      ...(setup.driftBoostRules ? { driftBoostRules: setup.driftBoostRules } : {}),
     })
     const gatesPerLap = (created.timingGates?.length ?? 0) + 1
     this.timing = new LapTiming(
@@ -236,12 +252,12 @@ export class RaceSession implements RaceSessionPort {
         ? this.bestGhost.splits : undefined,
       gatesPerLap,
     )
-    const state = nearby || resolved.mode === 'ghost' || resolved.mode === 'time-trial'
+    const state = nearby || resolved.mode === 'ghost' || resolved.mode === 'time-trial' || boostPractice
       ? { ...created, countdown: this.startsAt === undefined ? created.countdown : Math.max(0, (this.startsAt - this.monotonicNow()) / 1000),
           vehicles: created.vehicles.filter((vehicle) => vehicle.player) }
       : created
     const player = state.vehicles.find((vehicle) => vehicle.player)
-    this.recording = !nearby && player && this.dependencies.ghostStore
+    this.recording = !nearby && !boostPractice && player && this.dependencies.ghostStore
       ? new GhostRecording(player) : null
     this.diagnostics = nearby ? null : new RaceDiagnosticsRecording(state)
     this.runId += 1
@@ -264,6 +280,7 @@ export class RaceSession implements RaceSessionPort {
 
   ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
     setup = oneRunForOpenRoute(track, setup)
+    if (setup.mode === 'boost-practice') return { kind: 'none' }
     const store = this.dependencies.ghostStore
     if (store?.availability) return store.availability(track, setup)
     const time = store?.load(track, setup)?.time
@@ -271,6 +288,7 @@ export class RaceSession implements RaceSessionPort {
   }
 
   ghostTime(track: Track, setup: RaceSetup): number | null {
+    if (setup.mode === 'boost-practice') return null
     return this.dependencies.ghostStore?.load(track, oneRunForOpenRoute(track, setup))?.time ?? null
   }
 
@@ -374,7 +392,8 @@ export class RaceSession implements RaceSessionPort {
     let peakLanding = 0
     while (state.phase === 'running' && this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       const before = state.vehicles.find((vehicle) => vehicle.player)
-      const next = this.step(state, input, RACE_TICK_SECONDS, this.dependencies.random)
+      const tickInput = stepped ? { ...input, boostRequested: false } : input
+      const next = this.step(state, tickInput, RACE_TICK_SECONDS, this.dependencies.random)
       this.previousPresentationTick = state
       this.presentationDiscontinuities = new Set(next.events.flatMap((event) =>
         event.type === 'vehicle-recovered' ? [event.vehicleId] : [],
@@ -398,7 +417,7 @@ export class RaceSession implements RaceSessionPort {
           this.timing.accept(event.lap, event.gate, event.time)
         }
       }
-      this.diagnostics?.record(state, next.events, input)
+      this.diagnostics?.record(state, next.events, tickInput)
       if (player && state.phase !== 'finished') this.recording?.sample(player, state.elapsed)
       if (before && player && !before.grounded && player.grounded) {
         peakLanding = Math.max(peakLanding, player.landingIntensity)
@@ -440,7 +459,7 @@ export class RaceSession implements RaceSessionPort {
       const track = this.current.track
       const setup = this.current.setup
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
-      if (track && setup && setup.mode !== 'nearby' && player && this.dependencies.ghostStore &&
+      if (track && setup && setup.mode !== 'nearby' && setup.mode !== 'boost-practice' && player && this.dependencies.ghostStore &&
           result.outcome === 'finished' && result.playerTime !== null) {
         const frames = this.recording?.finish(player, resultState.elapsed)
         if (frames) {

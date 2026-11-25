@@ -1,10 +1,11 @@
 import type { RandomSource } from '@/domain/race/randomSource'
 import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
 import { getTrafficState } from '@/domain/race/ai/traffic'
-import type { DriverInput, RaceState, RaceVehicle } from '@/domain/race/raceState'
+import { manualRecoveryTicksRemaining, type DriverInput, type RaceState, type RaceVehicle } from '@/domain/race/raceState'
 import { gradeForTravel, getVehicleStepContext, type VehicleStepContext } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
+import { advanceDriftBoost } from '@/domain/race/driftBoost'
 
 export const PLAYER_ROUTE_WINDOW = 12
 
@@ -27,12 +28,40 @@ export function advanceVehicle(
   const previousContext = raceVehicleContext(race, vehicle)
   let moved: RaceVehicle
   if (input) {
+    const boost = race.driftBoostRules
+      ? advanceDriftBoost(vehicle.driftBoost, race.driftBoostRules, {
+          angle: vehicle.angle,
+          vx: vehicle.vx,
+          vy: vehicle.vy,
+          onRoad: previousContext.onRoad,
+          grounded: vehicle.grounded,
+          collision: false,
+          recovering: manualRecoveryTicksRemaining(vehicle, race.tick) > 0,
+          braking: input.braking,
+        }, deltaSeconds, input.boostRequested)
+      : undefined
     moved = stepVehicle(
       vehicle,
       input,
       previousContext,
       deltaSeconds,
+      undefined,
+      undefined,
+      boost && race.driftBoostRules
+        ? {
+            rules: race.driftBoostRules,
+            activated: boost.activated,
+            active: boost.snapshot.phase === 'active',
+            speedCeilingMultiplier: boost.snapshot.phase === 'active'
+              ? race.driftBoostRules.speedCeilingMultiplier
+              : boost.snapshot.phase === 'returning'
+                ? 1 + (race.driftBoostRules.speedCeilingMultiplier - 1) *
+                  boost.snapshot.remainingTicks / Math.max(1, Math.ceil(race.driftBoostRules.returnSeconds * 60))
+                : 1,
+          }
+        : undefined,
     )
+    if (boost) moved = { ...moved, driftBoost: boost.snapshot }
   } else {
     moved = stepAiVehicle(
       vehicle,

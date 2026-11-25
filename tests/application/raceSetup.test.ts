@@ -34,6 +34,20 @@ describe('race setup policies', () => {
     expect(setup.gridPositions).toBeUndefined()
   })
 
+  it('freezes Boost Practice rules while retaining solo setup on any route', () => {
+    const setup = raceSetupFromPreferences(track, { ...prefs, raceMode: 'boost-practice' }, 'night', () => {
+      throw new Error('Solo practice should not request an AI grid')
+    })
+    expect(setup).toMatchObject({
+      mode: 'boost-practice', lighting: 'night',
+      driftBoostRules: { revision: 'drift-boost-v1', enabled: true },
+    })
+    expect(setup.gridPositions).toBeUndefined()
+    const open = raceSetupFromPreferences({ ...track, routeKind: 'point-to-point' },
+      { ...prefs, raceMode: 'boost-practice' }, 'day', () => { throw new Error('Solo practice should not request a grid') })
+    expect(open).toMatchObject({ laps: 1, mode: 'boost-practice', driftBoostRules: setup.driftBoostRules })
+  })
+
   it('retains ghost and nearby setups, but renews a normal replay grid without modifying saved setup', () => {
     const saved = { car: 'red' as const, difficulty: 'normal' as const, laps: 2,
       mode: 'normal' as const, gridPositions: [0, 1, 2, 3] }

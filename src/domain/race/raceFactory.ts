@@ -4,6 +4,7 @@ import { ROAD_GEOMETRY } from '@/domain/config'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
+import type { DriftBoostRules } from '@/domain/race/driftBoost'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRaceEffectsState } from '@/domain/race/effects'
 import { EXTRA_NEARBY_GRID, validNearbyGridPositions } from '@/domain/race/startGrid'
@@ -16,6 +17,8 @@ export interface CreateRaceOptions {
   readonly playerCar: CarId
   readonly difficulty: DifficultyId
   readonly laps: number
+  /** Frozen, explicit opt-in boost rules; omitted means boost is off. */
+  readonly driftBoostRules?: DriftBoostRules
   readonly startRatio?: number | undefined
   readonly reversed?: boolean | undefined
   /** Vehicle index -> physical start slot, validated independently from vehicle IDs. */
@@ -199,6 +202,7 @@ export function createRace(options: CreateRaceOptions): RaceState {
     path: options.path,
     routeKind: options.routeKind ?? 'circuit',
     vehicles,
+    ...(options.driftBoostRules ? { driftBoostRules: options.driftBoostRules } : {}),
     difficulty: options.difficulty,
     totalLaps: open ? 1 : Math.max(1, Math.floor(options.laps)),
     startPathIndex: resolvedStartIndex,

@@ -59,6 +59,37 @@ function createScoreStore() {
 
 describe('RaceSession', () => {
 
+  it('keeps Boost Practice solo and never loads or saves ranked scores or ghosts, including retry', () => {
+    const scoreStore = {
+      forTrack: vi.fn(() => [{ car: 'blue' as const, difficulty: 'normal' as const, time: 10, recordedAt: 1 }]),
+      record: vi.fn(() => true), removeTrack: vi.fn(() => true),
+    }
+    const ghostStore = {
+      load: vi.fn(() => ({ car: 'blue' as const, time: 10, frames: [] })),
+      record: vi.fn(() => true),
+    }
+    const step: RaceStep = (state) => ({
+      state: { ...state, phase: 'finished', vehicles: state.vehicles.map(vehicle =>
+        vehicle.player ? { ...vehicle, finishedAt: 12 } : vehicle) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    })
+    const session = new RaceSession({ scoreStore, ghostStore, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    const practiceSetup = { ...setup, mode: 'boost-practice' as const }
+    session.start(track, practiceSetup)
+    expect(session.snapshot().state?.vehicles).toHaveLength(1)
+    expect(session.snapshot().setup).toMatchObject(practiceSetup)
+    expect(session.snapshot().state?.driftBoostRules).toMatchObject({ revision: 'drift-boost-v1', enabled: true })
+    session.advance(3.7, noInput)
+    session.advance(0.02, noInput)
+    expect(session.snapshot().result).toMatchObject({ mode: 'boost-practice', playerTime: 12, newRecord: false, highScores: [] })
+    expect(session.snapshot().result?.ghostSaved).toBeUndefined()
+    session.restart()
+    expect(scoreStore.forTrack).not.toHaveBeenCalled()
+    expect(scoreStore.record).not.toHaveBeenCalled()
+    expect(ghostStore.load).not.toHaveBeenCalled()
+    expect(ghostStore.record).not.toHaveBeenCalled()
+  })
+
   it('gives each rematch a fresh run identity without changing it during Nearby staging', () => {
     const { store } = createScoreStore()
     const session = new RaceSession({

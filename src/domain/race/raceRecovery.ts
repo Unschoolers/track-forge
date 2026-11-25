@@ -2,10 +2,11 @@ import { MANUAL_RECOVERY_TICKS, manualRecoveryTicksRemaining, type RaceState, ty
 import { authoredRecoveryTarget, lastRoadRecoveryTarget, missedGateRecoveryTarget, safeFallbackRecoveryTarget, type RecoveryCourse } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
 import { buildRaceCameraHints, findNearestSafeTrackIndex, resetVehicleToTrack, type VehicleStepContext } from '@/domain/race/trackContext'
+import type { DriftBoostRules } from '@/domain/race/driftBoost'
 
-export function resetRaceVehicle(
+function resetRaceVehicleWithoutBoostCancellation(
   vehicle: RaceVehicle,
-  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
+  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint' | 'driftBoostRules'>,
 ): RaceVehicle {
   const pending = vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint
   if (pending) return resetMissedCheckpoint(vehicle, { ...race, missedCheckpoint: pending })
@@ -29,6 +30,19 @@ export function resetRaceVehicle(
   const limit = lastSampleBeforeCheckpoint(race.path, vehicle.nextSector, race.timingGates)
   const pathIndex = findNearestSafeTrackIndex(race.path, vehicle, false, limit)
   return pathIndex === undefined ? vehicle : resetVehicleToTrack(vehicle, race.path, { pathIndex })
+}
+
+
+function cancelActiveBoostOnRecovery(vehicle: RaceVehicle, rules: DriftBoostRules | undefined): RaceVehicle {
+  if (!rules || vehicle.driftBoost?.phase !== 'active') return vehicle
+  return { ...vehicle, driftBoost: { ...vehicle.driftBoost, phase: 'returning', remainingTicks: Math.ceil(rules.returnSeconds * 60) } }
+}
+
+export function resetRaceVehicle(
+  vehicle: RaceVehicle,
+  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint' | 'driftBoostRules'>,
+): RaceVehicle {
+  return cancelActiveBoostOnRecovery(resetRaceVehicleWithoutBoostCancellation(vehicle, race), race.driftBoostRules)
 }
 
 export function recoverRacePlayer(state: RaceState): RaceState {
@@ -58,9 +72,9 @@ export function recoverRaceVehicle(state: RaceState, vehicleId: string): RaceSta
 }
 
 /** Respawn on the approach side of the pending timing stripe, never past it. */
-export function resetMissedCheckpoint(
+function resetMissedCheckpointWithoutBoostCancellation(
   vehicle: RaceVehicle,
-  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint'>,
+  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint' | 'driftBoostRules'>,
 ): RaceVehicle {
   const target = missedGateRecoveryTarget(race, (vehicle.player ? race.missedCheckpoint : vehicle.missedCheckpoint ?? race.missedCheckpoint)?.gate ?? vehicle.nextSector)
   if (!target) return vehicle
@@ -72,6 +86,14 @@ export function resetMissedCheckpoint(
     race.path,
     { pathIndex: target.index, reversed: race.reversed },
   )
+}
+
+
+export function resetMissedCheckpoint(
+  vehicle: RaceVehicle,
+  race: RecoveryCourse & Pick<Partial<RaceState>, 'missedCheckpoint' | 'driftBoostRules'>,
+): RaceVehicle {
+  return cancelActiveBoostOnRecovery(resetMissedCheckpointWithoutBoostCancellation(vehicle, race), race.driftBoostRules)
 }
 
 export function restoreFrameProgress(vehicle: RaceVehicle, previous: RaceVehicle): RaceVehicle {

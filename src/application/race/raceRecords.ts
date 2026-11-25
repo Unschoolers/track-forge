@@ -30,7 +30,9 @@ export function courseIdentity(track: Track): string {
 }
 
 export function raceCategory(track: Track, setup: RaceSetup): ScoreCategory {
-  if (setup.mode === 'nearby') throw new Error('Nearby races do not have a solo score category.')
+  if (setup.mode === 'nearby' || setup.mode === 'boost-practice') {
+    throw new Error(`${setup.mode} races do not have a ranked solo score category.`)
+  }
   return { course: courseIdentity(track), laps: setup.laps, mode: setup.mode ?? 'normal', routeKind: normalizeRouteKind(track.routeKind) }
 }
 

@@ -6,6 +6,7 @@ import { populateRacePreparation } from '@/ui/components/racePreparationLayout'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 import { formatRaceTime } from '@/ui/format'
+import { BOOST_PRACTICE_AVAILABLE } from '@/application/race/boostPracticeConfig'
 
 export function createRaceSetupModal(
   state: AppSnapshot,
@@ -23,7 +24,8 @@ export function createRaceSetupModal(
   const ghostTime = ghost.kind === 'exact' ? ghost.time : null
   const ghostAvailable = ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0
   const openRoute = state.currentTrack?.routeKind === 'point-to-point'
-  const preferredMode = state.preferences.raceMode
+  const preferredMode = state.preferences.raceMode === 'boost-practice' && !BOOST_PRACTICE_AVAILABLE
+    ? 'normal' : state.preferences.raceMode
   const raceMode = preferredMode === 'ghost' && !ghostAvailable
     ? openRoute ? 'time-trial' : 'normal'
     : preferredMode === 'time-trial' && !openRoute ? 'normal' : preferredMode ?? 'normal'
@@ -47,8 +49,10 @@ export function createRaceSetupModal(
   mode.append(element('h3', 'setup-label', 'RACE MODE'))
   const modeRow = element('div', 'choice-row race-mode-row')
   const modes = openRoute
-    ? [['normal', 'RACE AI'], ['time-trial', 'TIME TRIAL'], ['ghost', 'GHOST RACE']] as const
-    : [['normal', 'NORMAL RACE'], ['ghost', 'GHOST RACE']] as const
+    ? [['normal', 'RACE AI'], ['time-trial', 'TIME TRIAL'], ['ghost', 'GHOST RACE'],
+      ...(BOOST_PRACTICE_AVAILABLE ? [['boost-practice', 'BOOST PRACTICE']] as const : [])] as const
+    : [['normal', 'NORMAL RACE'], ['ghost', 'GHOST RACE'],
+      ...(BOOST_PRACTICE_AVAILABLE ? [['boost-practice', 'BOOST PRACTICE']] as const : [])] as const
   for (const [id, label] of modes) {
     const choice = button(label, `mode-${id}`,
       () => actions.preferences({ ...state.preferences, raceMode: id }),
@@ -60,10 +64,16 @@ export function createRaceSetupModal(
     modeRow.append(choice)
   }
   const description = element('p', 'modal-subtitle', ghostAvailable
-    ? `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; ${openRoute ? 'Race AI' : 'Normal Race'} has AI opponents.`
+    ? raceMode === 'boost-practice'
+      ? 'Boost Practice is a solo, unranked Arcade run with experimental drift boost.'
+      : `Best ghost: ${formatRaceTime(ghostTime)}. Ghost Race is you against your replay; ${openRoute ? 'Race AI' : 'Normal Race'} has AI opponents.`
     : ghost.kind === 'different-setup'
-      ? `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${openRoute ? 'single run' : `${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'}`}.`
-      : 'Finish a race on this layout to save a ghost.')
+      ? raceMode === 'boost-practice'
+        ? 'Boost Practice is a solo, unranked Arcade run with experimental drift boost.'
+        : `Saved ghost: ${CAR_SPECS[ghost.setup.car].name} · ${openRoute ? 'single run' : `${ghost.setup.laps} ${ghost.setup.laps === 1 ? 'lap' : 'laps'}`}.`
+      : raceMode === 'boost-practice'
+        ? 'Boost Practice is a solo, unranked Arcade run with experimental drift boost.'
+        : 'Finish a race on this layout to save a ghost.')
   description.id = 'ghost-availability'
   mode.append(modeRow, description)
   const laps = state.preferences.raceLaps ?? 2
@@ -79,7 +89,8 @@ export function createRaceSetupModal(
     button('BACK', 'setup-back', actions.close, 'button'),
     button('OPTIONS', 'setup-options', actions.options, 'button'),
     button(
-      raceMode === 'ghost' ? 'START GHOST RACE' : raceMode === 'time-trial' ? 'START TIME TRIAL' : 'START RACE',
+      raceMode === 'boost-practice' ? 'START BOOST PRACTICE'
+        : raceMode === 'ghost' ? 'START GHOST RACE' : raceMode === 'time-trial' ? 'START TIME TRIAL' : 'START RACE',
       'setup-start',
       actions.start,
       'button button-primary',
