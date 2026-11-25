@@ -147,3 +147,24 @@ performance. Repeat the documented physical-device protocol for device targets.
 ## Race prewarm failure diagnostics
 
 Optional presentation prewarming runs in short deferred slices before the race. If a texture or geometry prewarm fails, it now emits a bounded console error with the original exception and stops that prewarm job. The normal synchronous rendering path remains available; an exception is **not** evidence of a successful prewarm. Record the track, lighting, platform and console error when investigating first-frame stalls. Do not hide the error or reduce rendering quality to make the log disappear.
+
+## Papou night-race stutter investigation
+
+The reported course contains 36 authored road points, 2,627 terrain cells
+(2,082 hill and 545 water), 16 trees, a long elevated segment, and night
+lighting. The previous static-tree fix does not address per-frame lamp halo
+commands. Each visible lamp previously added five circle commands and five
+style changes on every frame, even though its transform and colors are fixed.
+The race now constructs those same commands once in additive batches of eight
+lamps, using bounds that cover both the road halo and the fixture. Existing
+padded static culling controls visibility; only moving vehicle lights are
+regenerated each frame. This reduces CPU-side command construction, not
+necessarily the GPU geometry submission cost of Phaser Graphics.
+
+This is an identified redundant workload, not a confirmed root cause of the
+reported two-to-three-second cadence. Reproduce on the same Android device in
+both lighting modes, dynamic zoom and audio fixed, for at least 30 seconds of
+active driving. Inspect frame-time spikes, GC, and render submission separately.
+The current five-second benchmark is insufficient for a robust periodic-stall
+comparison. Do not claim a measured FPS improvement until a matched capture
+exists.
