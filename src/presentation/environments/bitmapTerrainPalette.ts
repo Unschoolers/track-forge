@@ -22,15 +22,15 @@ export const MEADOW_TERRAIN_ART = {
     outerBank: '#9a9860', wetBank: '#c7b47f', deepGlaze: 'rgba(4,46,76,0.66)',
     shallow: ['#35a7b0', '#66c9bb', '#9bd9b9'], contact: '#e6f5d8',
     slopeShadow: '10,26,20', slopeLight: '246,224,173',
-    slopeShadowStrength: 0.095, slopeLightStrength: 0.065,
-    plateauGlaze: 'rgba(165,194,115,0.17)',
+    slopeShadowStrength: 0.135, slopeLightStrength: 0.095,
+    plateauGlaze: 'rgba(14,43,29,0.34)',
   },
   night: {
     outerBank: '#586045', wetBank: '#676954', deepGlaze: 'rgba(5,20,38,0.72)',
     shallow: ['#286371', '#398184', '#69988d'], contact: '#b2d1c8',
     slopeShadow: '10,26,20', slopeLight: '246,224,173',
-    slopeShadowStrength: 0.095, slopeLightStrength: 0.065,
-    plateauGlaze: 'rgba(51,88,65,0.16)',
+    slopeShadowStrength: 0.135, slopeLightStrength: 0.095,
+    plateauGlaze: 'rgba(5,19,15,0.28)',
   },
 } as const satisfies LightingProfiles
 
