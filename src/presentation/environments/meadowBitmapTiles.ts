@@ -10,7 +10,6 @@ import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
 import { roadTextureRepeat } from './roadTextureVariants'
 import { paintToyRoadBricks, toyBrickSpacing, toyRoadBricks } from './toyRoadBricks'
-import { WATER_TEXTURE_SIZE, waterMaterialPixels } from './waterMaterial'
 import { buildBridgePresentation, type BridgePrimitive } from '@/phaser/rendering/bridgeRenderer'
 import type { TrackShadowMode } from '@/phaser/rendering/lighting'
 import { bridgePaintCommands, paintBridgeCanvas } from './bridgeMaterials'
@@ -116,6 +115,14 @@ function repeatPattern(context: CanvasRenderingContext2D, source: HTMLCanvasElem
 
 /** Ordinary and elevated roads deliberately use the identical bitmap
  * swatches, width, variation count and canonical longitudinal phase. */
+function fillRoadPolygon(context: CanvasRenderingContext2D, [a, b, c, d]: RoadRibbonQuad['road']): void {
+  context.beginPath()
+  context.moveTo(a.x, a.y); context.lineTo(b.x, b.y)
+  context.lineTo(c.x, c.y); context.lineTo(d.x, d.y)
+  context.closePath()
+  context.fill()
+}
+
 function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, repeat: number): (quad: RoadRibbonQuad) => void {
   const patterns: Record<SurfaceId, CanvasPattern> = {
     street: repeatPattern(context, art.road.street),
@@ -129,12 +136,7 @@ function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentB
     const pattern = patterns[quad.surface]
     pattern.setTransform(transform)
     context.fillStyle = pattern
-    const [a, b, c, d] = quad.road
-    context.beginPath()
-    context.moveTo(a.x, a.y); context.lineTo(b.x, b.y)
-    context.lineTo(c.x, c.y); context.lineTo(d.x, d.y)
-    context.closePath()
-    context.fill()
+    fillRoadPolygon(context, quad.road)
   }
 }
 
@@ -164,15 +166,35 @@ export function bridgeBitmapPrimitives(primitives: readonly BridgePrimitive[], a
 function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean): BitmapTiles | undefined {
   const items = bridgeBitmapPrimitives(primitives, approach)
   if (items.length === 0) return undefined
-  const index = indexBitmapItems(items, p => 'polygon' in p ? p.polygon : [p.start, p.end], 5)
+  const index = indexBitmapItems(items, p => p.kind === 'surface' && p.roadQuad ? p.roadQuad.edge : 'polygon' in p ? p.polygon : [p.start, p.end], 5)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, visible) => {
     const paintRoad = roadPatternPainter(context, art, repeat)
+    const source = art.bridge
+    const structure = source ? repeatPattern(context, source) : undefined
     // Preserve canonical surface, marking and wall painter order per tile.
     for (const p of visible) {
       if (p.kind === 'surface') {
         if (!p.roadQuad) throw new Error('Bridge surface is missing its road texture quad')
-        paintRoad(p.roadQuad)
+        const quad = p.roadQuad
+        const transform = source && structure ? roadBitmapTransform(quad, repeat, source.width) : undefined
+        if (structure && transform) {
+          // Material is visible on the structural shoulders; the road covers
+          // the center in the next pass. Keep the exact authored footprint.
+          structure.setTransform(transform)
+          context.fillStyle = structure
+          fillRoadPolygon(context, quad.edge)
+        }
+        paintRoad(quad)
+        if (structure && transform && quad.surface === 'street' && !p.rampApproach) {
+          // A light material overlay only on standard elevated decks; mud
+          // and ice remain unambiguously the authored driving surface.
+          context.save()
+          context.globalAlpha = 0.28
+          context.fillStyle = structure
+          fillRoadPolygon(context, quad.road)
+          context.restore()
+        }
       }
       paintBridgeCanvas(context, bridgePaintCommands(p, environment, night, true))
     }
@@ -260,7 +282,7 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
 /** Painter order: sand outside, deep water, translucent shallow shelves
  * clipped to water, narrow contact foam, then the textured mountain faces.
  * All patterns are world anchored across tile boundaries. */
-export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile, water = art.water): void {
+export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile): void {
   const palette = art.terrainPalette
   const bankScale = palette.bankScale ?? 1
   const shallowScale = palette.shallowScale ?? 1
@@ -277,7 +299,7 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   for (const item of items) {
     if (item.kind === 'water') appendTriangle(context, item.triangle)
   }
-  context.fillStyle = repeatPattern(context, water)
+  context.fillStyle = repeatPattern(context, art.water)
   context.fill()
   context.clip()
   // Transparent navy glaze deepens the center without hiding the painted
@@ -344,26 +366,8 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   }
 }
 
-const waterCanvases = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>()
-
-function detailedWater(art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean): HTMLCanvasElement {
-  const cached = waterCanvases.get(art.water)
-  if (cached) return cached
-  const { canvas, context } = createArtCanvas(WATER_TEXTURE_SIZE)
-  const image = context.createImageData(WATER_TEXTURE_SIZE, WATER_TEXTURE_SIZE)
-  image.data.set(waterMaterialPixels(environment, night))
-  context.putImageData(image, 0, 0)
-  waterCanvases.set(art.water, canvas)
-  return canvas
-}
-
-function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean): BitmapTiles {
-  const index = terrainBitmapIndex(geometry)
-  return new CachedBitmapTiles(index, (context, items, tile) => {
-    // Lazily generate only if a visible tile actually contains water.
-    const water = items.some(item => item.kind === 'water') ? detailedWater(art, environment, night) : art.water
-    paintTerrainBitmap(context, items, art, tile, water)
-  })
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
+  return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items, tile) => paintTerrainBitmap(context, items, art, tile))
 }
 
 export interface EnvironmentBitmapLayers {
@@ -379,7 +383,7 @@ export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean
   const bridge = buildBridgePresentation(geometry, shadowMode)
   return {
     road: roadTiles(geometry, art, environment, night),
-    terrain: terrainTiles(geometry, art, environment, night),
+    terrain: terrainTiles(geometry, art),
     bridgeApproach: bridgeTiles(bridge, geometry, art, environment, night, true),
     bridgeDeck: bridgeTiles(bridge, geometry, art, environment, night, false),
   }
