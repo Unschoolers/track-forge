@@ -31,6 +31,7 @@ vi.mock('@/phaser/rendering/sceneryRenderer', () => ({ SceneryRenderer: class { 
 
 import { RaceInputController } from '@/phaser/input/raceInput'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
+import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceStep } from '@/domain/race/raceEngine'
 import { asTrackId } from '@/domain/model'
@@ -100,20 +101,28 @@ function recoverySession() {
 }
 
 describe('race canvas steering', () => {
-  it('resets tree culling bounds before a restarted race creates a fresh window', () => {
+  it('renders static trees once per race, even when the camera moves and zooms', () => {
+    vi.mocked(renderTrees).mockClear()
     const controls = new RaceInputController()
     const { session } = recoverySession()
     const { scene, camera, shutdown } = createScene(controls, session)
-    const state = scene as unknown as { treeVisibilityBounds?: { left: number } }
-    const initialLeft = state.treeVisibilityBounds?.left
-    expect(initialLeft).toBeTypeOf('number')
-
-    shutdown()
-    expect(state.treeVisibilityBounds).toBeUndefined()
-
-    camera.scrollX = 1_000
-    scene.create()
-    expect(state.treeVisibilityBounds?.left).toBeGreaterThan(initialLeft ?? Infinity)
+    const presentation = scene as unknown as { renderGroundPresentation(night: boolean, rotation?: number): void }
+    try {
+      expect(renderTrees).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(renderTrees).mock.calls[0]).toHaveLength(5)
+      for (let i = 1; i <= 10; i++) {
+        camera.scrollX = i * 1_000
+        camera.scrollY = i * 500
+        camera.zoom = i % 2 ? 0.8 : 1
+        presentation.renderGroundPresentation(false, i / 10)
+      }
+      expect(renderTrees).toHaveBeenCalledTimes(1)
+      shutdown()
+      scene.create()
+      expect(renderTrees).toHaveBeenCalledTimes(2)
+    } finally {
+      shutdown()
+    }
   })
 
   it.each(['canvas', 'pad'] as const)('backs off immediately after overtravel on the %s while braking', (surface) => {
