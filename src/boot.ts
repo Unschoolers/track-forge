@@ -36,7 +36,8 @@ const showRetry = () => {
 const timeout = window.setTimeout(showRetry, 30_000)
 try {
   const { loadEnvironmentBitmapArt } = await import('./presentation/environments/meadowBitmapArt')
-  await loadEnvironmentBitmapArt()
+  const { loadSceneryBitmapArt } = await import('./presentation/environments/sceneryBitmapArt')
+  await Promise.all([loadEnvironmentBitmapArt(), loadSceneryBitmapArt()])
   const game = await import('./main')
   await game.gameReady
   enterGame = game.enterGame

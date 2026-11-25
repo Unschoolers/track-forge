@@ -737,6 +737,7 @@ export class EditorScene extends Phaser.Scene {
     this.input.off('wheel', this.onWheel, this)
     this.game.renderer?.off(Phaser.Renderer.Events.RESTORE_WEBGL, this.invalidateRasters)
     this.groundRenderer = undefined
+    this.environmentSceneryRenderer?.destroy()
     this.environmentSceneryRenderer = undefined
     this.editorInput = undefined
     this.currentSnapshot = undefined

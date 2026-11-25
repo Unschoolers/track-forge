@@ -13,7 +13,8 @@ import type { RoadPathPoint } from '@/domain/track/pathBuilder'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { buildSceneryPresentation } from '@/presentation/environments/sceneryPresentation'
+import { buildSceneryRenderPlan } from '@/presentation/environments/sceneryPresentation'
+import { getSceneryBitmap } from '@/presentation/environments/sceneryBitmapArt'
 import { GRASS_TILE_PADDING } from '@/presentation/environments/grassTileImage'
 import { getEnvironmentTileImage } from '@/presentation/environments/environmentTileImage'
 import {
@@ -56,10 +57,10 @@ export function createRaceFlyoverRenderer(
     points: 'polygon' in primitive ? primitive.polygon : [primitive.start, primitive.end],
     commands: bridgePaintCommands(primitive, environmentId, night, false, path.closed ? path.totalLength : undefined),
   }))
-  const bitmapArt = environmentId === 'grass' ? getMeadowBitmapArt(night) : undefined
+  const treeBitmap = getSceneryBitmap('tree', night) ?? (environmentId === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined)
   const props = track.scenery ?? []
   let sceneryWindow = ''
-  let scenery = buildSceneryPresentation(environmentId, [], lighting, { left: 0, top: 0, right: 0, bottom: 0 })
+  let scenery = buildSceneryRenderPlan(environmentId, [], lighting, { left: 0, top: 0, right: 0, bottom: 0 })
   const stride = Math.max(1, Math.ceil(points.length / 1200))
   const sections: { a: RoadPathPoint; b: RoadPathPoint }[] = []
   for (let i = 0; i < points.length - 1; i += stride) {
@@ -255,12 +256,12 @@ export function createRaceFlyoverRenderer(
     const window = `${left}:${top}:${right}:${bottom}`
     if (window !== sceneryWindow) {
       sceneryWindow = window
-      scenery = buildSceneryPresentation(environmentId, props, lighting, {
+      scenery = buildSceneryRenderPlan(environmentId, props, lighting, {
         left: left * GROUND_TILE_SIZE, right: right * GROUND_TILE_SIZE,
         top: top * GROUND_TILE_SIZE, bottom: bottom * GROUND_TILE_SIZE,
       })
     }
-    for (const primitive of scenery) {
+    for (const primitive of scenery.primitives) {
       ctx.fillStyle = `#${primitive.color.toString(16).padStart(6, '0')}`
       ctx.globalAlpha = primitive.alpha ?? 1
       ctx.beginPath()
@@ -276,12 +277,15 @@ export function createRaceFlyoverRenderer(
       ctx.fill()
     }
     ctx.globalAlpha = 1
+    for (const sprite of scenery.sprites) {
+      ctx.drawImage(sprite.image, sprite.x - sprite.size / 2, sprite.y - sprite.size / 2, sprite.size, sprite.size)
+    }
     for (const tree of trees) {
       if (!visible(tree.x, tree.y)) continue
       ctx.fillStyle = night ? 'rgba(0, 0, 0, .26)' : 'rgba(21, 54, 31, .24)'
       ctx.beginPath(); ctx.ellipse(tree.x + 12, tree.y + 12, 23, 13, 0, 0, Math.PI * 2); ctx.fill()
-      if (bitmapArt) {
-        ctx.drawImage(bitmapArt.tree, tree.x - 17, tree.y - 17, 34, 34)
+      if (treeBitmap) {
+        ctx.drawImage(treeBitmap, tree.x - 17, tree.y - 17, 34, 34)
         continue
       }
       ctx.fillStyle = night ? '#1b4738' : '#2c6b3c'
