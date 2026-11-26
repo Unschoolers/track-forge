@@ -6,6 +6,7 @@ import { boundsVisible } from '@/phaser/rendering/roadRibbonRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { createRaceBitmapAtlas } from '@/phaser/rendering/raceBitmapAtlas'
 import { ROAD_MARKINGS_DEPTH } from '@/phaser/rendering/meadowBitmapRenderer'
+import { renderRoadTransitions } from '@/phaser/rendering/trackCues'
 import {
   renderRaceTrackGeometryBase,
   renderTrackGeometryBase,
@@ -201,6 +202,7 @@ describe('race road ribbon culling', () => {
     expect(geometry.path.crossings.some(({ upperSegment }) => upperSegment === null)).toBe(true)
     const base = new RecordingGraphics()
     renderTrackGeometryBase(base as unknown as Phaser.GameObjects.Graphics, geometry, night)
+    renderRoadTransitions(base as unknown as Phaser.GameObjects.Graphics, geometry.path, night)
 
     const { scene, graphics } = createRecordingScene()
     expect(renderRaceTrackGeometryBase(scene, geometry, night)).toBeTypeOf('function')
@@ -223,6 +225,7 @@ describe('race road ribbon culling', () => {
       })
       const direct = new RecordingGraphics()
       renderTrackGeometryBase(direct as unknown as Phaser.GameObjects.Graphics, geometry, false, environment)
+      renderRoadTransitions(direct as unknown as Phaser.GameObjects.Graphics, geometry.path, false)
       const { scene, graphics } = createRecordingScene()
       const update = renderRaceTrackGeometryBase(scene, geometry, false, environment)
       expect(update).toBeTypeOf('function')
@@ -321,6 +324,32 @@ describe('race road ribbon culling', () => {
     // At most 64 edge, 64 road, 64 material, 64 curb and 64
     // stripe batches, plus one marker layer.
     expect(graphics.length).toBeLessThanOrEqual(321)
+  })
+
+  it('keeps ramp approach cues outside the deck and culls them in bounded batches', () => {
+    const points = Array.from({ length: 145 }, (_, index) => ({
+      x: index * 80,
+      y: 0,
+      surface: 'street' as const,
+      structure: index % 2 === 0 ? 'surface' as const : 'overpass' as const,
+    }))
+    const geometry = buildTrackGeometry({ points, terrain: EMPTY_TERRAIN, routeKind: 'point-to-point' })
+    const { scene, graphics } = createRecordingScene()
+    const update = renderRaceTrackGeometryBase(scene, geometry, true)
+    if (!update) throw new Error('Expected bounded road cue batches')
+    const cues = graphics.filter(({ paints }) => paints.some(([kind]) => kind === 'circle'))
+    expect(cues.length).toBeGreaterThan(1)
+    expect(cues.length).toBeLessThanOrEqual(64)
+
+    const firstView = { centerX: 500, centerY: 0, width: 1_000, height: 400, zoom: 1, rotation: 0 }
+    update(firstView)
+    const firstVisible = cues.filter(({ visible }) => visible)
+    expect(firstVisible.length).toBeGreaterThan(0)
+    expect(firstVisible.length).toBeLessThan(cues.length)
+    update({ ...firstView, centerY: 5_000 })
+    expect(cues.every(({ visible }) => !visible)).toBe(true)
+    update(firstView)
+    expect(cues.filter(({ visible }) => visible)).toEqual(firstVisible)
   })
 
   it('uses the rotated, resized camera bounds', () => {

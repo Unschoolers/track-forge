@@ -1,10 +1,9 @@
 import Phaser from 'phaser'
-import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { renderCrossingUnderlay } from '@/phaser/rendering/crossingRenderer'
-import { roadGateGeometry, roadGateSpan, type TrackGeometry } from '@/domain/track/trackGeometry'
+import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import {
   boundsVisible,
   renderRaceRoadRibbon,
@@ -32,48 +31,13 @@ import {
   buildLampPosts,
   renderLampPosts,
 } from '@/phaser/rendering/lampPostRenderer'
+import { buildRoadTransitionCues, paintRoadTransitionCue, renderRoadTransitions } from '@/phaser/rendering/trackCues'
+export { renderRecoveryCheckpoints } from '@/phaser/rendering/trackCues'
 
 let nextToyCurbTexture = 0
 
 function color(value: string): number {
   return Phaser.Display.Color.HexStringToColor(value).color
-}
-
-export function renderRecoveryCheckpoints(
-  graphics: Phaser.GameObjects.Graphics,
-  path: RoadPath,
-  checkpoints: readonly number[],
-  editorZoom?: number,
-): void {
-  for (const index of checkpoints) {
-    const gate = roadGateGeometry(path, index)
-    if (!gate) continue
-    const { center: point, tangent } = gate
-    const span = roadGateSpan(path, index, ROAD_GEOMETRY.checkpointHalfWidth)
-    const left = { x: point.x - tangent.y * span.min, y: point.y + tangent.x * span.min }
-    const right = { x: point.x - tangent.y * span.max, y: point.y + tangent.x * span.max }
-    // Author-owned checkpoints use a bright transverse stripe with visible endpoints.
-    // No implicit race gates are painted anywhere.
-    graphics.lineStyle(editorZoom ? 6 / editorZoom : 8, 0x66d9ff, 1)
-    graphics.beginPath()
-    graphics.moveTo(left.x, left.y)
-    graphics.lineTo(right.x, right.y)
-    graphics.strokePath()
-    if (!editorZoom) {
-      graphics.fillStyle(0xffffff, 1)
-      graphics.fillCircle(left.x, left.y, 5)
-      graphics.fillCircle(right.x, right.y, 5)
-    }
-    if (editorZoom) {
-      const scale = 1 / Math.max(0.01, editorZoom)
-      graphics.fillStyle(0x112c3d, 1)
-      graphics.fillCircle(point.x, point.y, 8 * scale)
-      graphics.lineStyle(2 * scale, 0x66d9ff, 1)
-      graphics.strokeCircle(point.x, point.y, 8 * scale)
-      graphics.fillStyle(0xf4f7fb, 1)
-      graphics.fillCircle(point.x, point.y, 3.5 * scale)
-    }
-  }
 }
 
 export function renderTrackGeometry(
@@ -134,6 +98,7 @@ export function renderRaceTrackGeometryBase(
     const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
     renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
     renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
+    renderRoadTransitions(graphics, geometry.path, night)
     return undefined
   }
 
@@ -228,6 +193,18 @@ export function renderRaceTrackGeometryBase(
   }
   const graphics = scene.add.graphics().setDepth(markingsDepth)
   renderTrackMarkers(graphics, geometry, night)
+  const transitionCues = buildRoadTransitionCues(geometry.path, night)
+  const transitionBatchSize = batchSize(transitionCues.length)
+  const cueBoundsPoints = (cue: typeof transitionCues[number]): readonly [Vector2, Vector2] => [
+    { x: cue.center.x - 30, y: cue.center.y - 30 },
+    { x: cue.center.x + 30, y: cue.center.y + 30 },
+  ]
+  for (let index = 0; index < transitionCues.length; index += transitionBatchSize) {
+    const batch = transitionCues.slice(index, index + transitionBatchSize)
+    addBatch(batch, cueBoundsPoints, target => {
+      for (const cue of batch) paintRoadTransitionCue(target, cue)
+    })
+  }
   return withBitmap((view, paddedViewport) => {
     updateVisibility?.(view, paddedViewport)
     bitmap?.render(view, paddedViewport)
