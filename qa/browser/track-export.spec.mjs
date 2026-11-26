@@ -10,7 +10,7 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   })
   await page.goto('/?qa')
   await enterTrackForge(page)
-  await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.getByRole('button', { name: 'Track editor', exact: true }).click()
   await page.locator('.track-card-overflow summary').click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()

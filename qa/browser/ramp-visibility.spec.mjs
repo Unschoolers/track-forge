@@ -55,7 +55,7 @@ for (const reversed of [false, true]) {
     }, reversed)
     await page.goto('/?qa')
     await enterTrackForge(page)
-    await page.getByRole('button', { name: 'RACE', exact: true }).click()
+    await page.getByRole('button', { name: 'Race', exact: true }).click()
     await page.getByRole('button', { name: 'Race Ramp visibility regression', exact: true }).click()
     await page.evaluate(() => {
       window.__rampAirborneFrames = 0

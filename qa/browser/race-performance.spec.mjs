@@ -20,7 +20,7 @@ for (const scenario of scenarios) {
     await page.goto('/?racePerf')
     await enterTrackForge(page)
     const report = () => page.evaluate(() => window.__trackForgeRacePerformance.report())
-    const openPicker = () => page.getByRole('button', { name: 'RACE', exact: true }).click()
+    const openPicker = () => page.getByRole('button', { name: 'Race', exact: true }).click()
     const picker = page.getByRole('dialog', { name: 'Choose a track' })
 
     let trackName = scenario.name

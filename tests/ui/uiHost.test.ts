@@ -172,7 +172,7 @@ describe('DomUiHost', () => {
       root.querySelector<HTMLButtonElement>('[data-action="editor"]')
 
     expect(root.querySelector('h1')?.textContent).toContain('TRACKFORGE')
-    expect(race?.textContent).toContain('RACE')
+    expect(race?.textContent).toContain('Race')
     editor?.click()
     race?.click()
     root.querySelector<HTMLButtonElement>('[data-action="arcade-cup"]')?.click()
@@ -203,7 +203,7 @@ describe('DomUiHost', () => {
     })
     await vi.waitFor(() => expect(root.querySelector('[data-action="open-updates"]')).not.toBeNull())
     const indicator = root.querySelector<HTMLButtonElement>('[data-action="open-updates"]')
-    expect(indicator?.textContent).toContain('UPDATE AVAILABLE')
+    expect(indicator?.textContent).toContain('Update available')
     indicator?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
       type: 'open-options',

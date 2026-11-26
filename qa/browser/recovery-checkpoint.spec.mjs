@@ -17,7 +17,7 @@ test('places a checkpoint while arcade ignores physical scenery collisions', asy
   const qa = () => page.evaluate(() => window.__trackForgeQa?.snapshot())
   await page.goto('/?qa')
   await enterTrackForge(page)
-  await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.getByRole('button', { name: 'Track editor', exact: true }).click()
   await page.getByRole('button', { name: 'Edit Checkpoint QA', exact: true }).click()
   await page.locator('summary.editor-toolbox-summary').click()
   await page.getByRole('button', { name: 'Place checkpoint' }).click()

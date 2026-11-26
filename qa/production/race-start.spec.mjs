@@ -33,7 +33,7 @@ test('shows the title during startup and starts a mobile race in the production 
   await playerName.getByRole('textbox', { name: 'PLAYER NAME' }).fill('Production QA')
   await playerName.getByRole('button', { name: "LET'S RACE" }).tap()
   await expect(playerName).toHaveCount(0)
-  await page.getByRole('button', { name: 'RACE', exact: true }).tap()
+  await page.getByRole('button', { name: 'Race', exact: true }).tap()
   await page.getByRole('button', { name: 'Race Harbor Grid', exact: true }).tap()
   await page.getByRole('dialog', { name: 'Race setup' })
     .getByRole('button', { name: 'START RACE', exact: true }).tap()
@@ -57,7 +57,7 @@ test('supports keyboard entry and reduced motion in portrait', async ({ page }) 
   expect(glitch).toBe('none')
   await page.keyboard.press('Enter')
   await expect(page.locator('#title-screen')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'RACE', exact: true })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Race', exact: true })).toBeFocused()
 })
 
 test('offers a retry when the game bundle fails to load', async ({ page }) => {

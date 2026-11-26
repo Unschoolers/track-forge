@@ -22,7 +22,7 @@ test('persists an open route and displays its ordered finish splits', async ({ p
   }, trackId)
   await page.goto('/?qa')
   await enterTrackForge(page)
-  await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.getByRole('button', { name: 'Track editor', exact: true }).click()
   await page.getByRole('button', { name: 'Edit Open Stage', exact: true }).click()
   await page.getByRole('button', { name: 'Editor menu' }).click()
   await page.getByRole('combobox', { name: 'Route type' }).selectOption('point-to-point')
@@ -33,7 +33,7 @@ test('persists an open route and displays its ordered finish splits', async ({ p
 
   await page.reload()
   await enterTrackForge(page)
-  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  await page.getByRole('button', { name: 'Race', exact: true }).click()
   const selectStage = () => page.getByRole('button', { name: 'Race Open Stage', exact: true }).click()
   await selectStage()
   const setup = page.getByRole('dialog', { name: 'Race setup' })

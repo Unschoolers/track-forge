@@ -57,7 +57,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   await expect(soundtrack).toHaveValue('100')
   await expect(effects).toHaveValue('0')
   await options.getByRole('button', { name: 'DONE' }).tap()
-  await page.getByRole('button', { name: 'RACE', exact: true }).tap()
+  await page.getByRole('button', { name: 'Race', exact: true }).tap()
   await page.getByRole('button', { name: 'Race Harbor Grid' }).tap()
   await page.getByRole('button', { name: 'START RACE', exact: true }).tap()
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(raceTrack), paused: false })
@@ -81,7 +81,7 @@ for (const [environmentId, soundtrack] of [
     await page.goto('/')
     await enterTrackForge(page)
 
-    await page.getByRole('button', { name: 'RACE', exact: true }).tap()
+    await page.getByRole('button', { name: 'Race', exact: true }).tap()
     await page.getByRole('button', { name: `Race ${OWNED_TRACK_NAME}`, exact: true }).tap()
     await expect.poll(music).toMatchObject({ src: expect.stringMatching(menuTrack), paused: false })
     await page.getByRole('button', { name: 'START RACE', exact: true }).tap()
@@ -115,7 +115,7 @@ test('uses the final Cup circuit soundtrack when restoring standings', async ({ 
   await page.reload()
   await enterTrackForge(page)
 
-  await page.getByRole('button', { name: 'CUP', exact: true }).tap()
+  await page.getByRole('button', { name: 'Cup', exact: true }).tap()
   await page.getByRole('dialog', { name: 'CUP' }).getByRole('button', { name: 'RESUME CUP', exact: true }).tap()
   await expect(page.getByRole('dialog', { name: 'CUP STANDINGS' })).toBeVisible()
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(raceTrack), paused: false })

@@ -4,7 +4,7 @@ import { enterTrackForge } from '../enter-game.mjs'
 test('Race Again restores the original night race setup after reload', async ({ page }) => {
   await page.goto('/?qa')
   await enterTrackForge(page)
-  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  await page.getByRole('button', { name: 'Race', exact: true }).click()
   await page.getByRole('button', { name: 'Race Harbor Grid', exact: true }).click()
   const setup = page.getByRole('dialog', { name: 'Race setup' })
   await setup.locator('[data-car="red"]').click()
