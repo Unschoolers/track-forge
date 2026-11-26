@@ -36,3 +36,11 @@ Replay consumers should draw recorded vehicle coordinates against the included t
 ## Verification
 
 `tests/application/raceDiagnostics.test.ts` protects all-car capture and recovery/terminal boundaries. `tests/ui/raceDiagnostics.test.ts` protects hold vs tap, gesture cancellation, availability for non-record races and keyboard access. Verify typecheck/lint/build and Android export on device before merging.
+
+Optional `performance.timings.bitmapWork` records bounded deferred texture
+work samples: operation (prepare/upload), layer (0 road, 1 terrain, 2 bridge
+approach, 3 bridge deck), tile key, priority, CPU durationMs, and afterFrame
+(the one-based count of the preceding recorded frame; the following interval
+is the one potentially affected). `droppedBitmapWork` reports overflow. The
+existing five-column frame contract is unchanged. Startup prewarming is not
+included in these race-streaming samples.

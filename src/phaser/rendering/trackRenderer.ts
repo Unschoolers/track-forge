@@ -14,7 +14,7 @@ import {
 import { groundViewportBounds, type WorldBounds } from '@/presentation/environments/groundTexture'
 import type { Vector2 } from '@/domain/model'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
-import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH, type MeadowBitmapRenderer } from '@/phaser/rendering/meadowBitmapRenderer'
+import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH, type MeadowBitmapRenderer, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
 import {
   buildCurbSegments,
   renderCurbSegments,
@@ -119,8 +119,9 @@ export function renderRaceTrackGeometryBase(
   geometry: TrackGeometry,
   night: boolean,
   environmentId: TrackEnvironmentId = 'grass',
+  observeBitmapWork?: BitmapWorkObserver,
 ): RaceTrackVisibility | undefined {
-  const bitmap = createMeadowBitmapRenderer(scene, geometry, night, environmentId)
+  const bitmap = createMeadowBitmapRenderer(scene, geometry, night, environmentId, 'terrain', observeBitmapWork)
   const withBitmap = (update: UpdateRoadRibbonVisibility): RaceTrackVisibility =>
     bitmap ? Object.assign(update, { bitmap }) : update
   const markingsDepth = bitmap ? ROAD_MARKINGS_DEPTH : WORLD_RENDER_DEPTH.road

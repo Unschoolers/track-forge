@@ -165,7 +165,8 @@ export class RaceScene extends Phaser.Scene {
       geometry.path.terrainSurface,
       normalizeTrackEnvironmentId(track.environmentId),
     )
-    this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
+    this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId),
+      this.frameDiagnostics ? sample => this.frameDiagnostics?.recordBitmapWork(sample) : undefined)
     const bitmap = this.updateRoadRibbonVisibility?.bitmap
     if (bitmap && this.raceCamera) {
       const camera = this.cameras.main

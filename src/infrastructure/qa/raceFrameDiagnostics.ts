@@ -1,3 +1,5 @@
+import type { BitmapWorkSample } from '@/phaser/rendering/meadowBitmapRenderer'
+
 /** Bounded frame timing samples for the most recent race. Durations are CPU
  * timings; render submission does not measure GPU completion. */
 export class RaceFrameDiagnostics {
@@ -12,6 +14,8 @@ export class RaceFrameDiagnostics {
   private count = 0
   private dropped = 0
   private readonly frames: number[][] = []
+  private readonly bitmapWork: (BitmapWorkSample & { readonly afterFrame: number })[] = []
+  private droppedBitmapWork = 0
 
   constructor(private readonly now: () => number = () => performance.now()) {}
 
@@ -22,6 +26,8 @@ export class RaceFrameDiagnostics {
       this.count = 0
       this.dropped = 0
       this.frames.length = 0
+      this.bitmapWork.length = 0
+      this.droppedBitmapWork = 0
     }
     this.updateStart = this.now()
   }
@@ -44,6 +50,14 @@ export class RaceFrameDiagnostics {
     this.previous = time
   }
 
+  /** POST_RENDER texture work runs after the frame sample; its cost belongs
+   * to the interval leading into the next sample, not the current one. */
+  recordBitmapWork(sample: BitmapWorkSample): void {
+    if (this.runId === undefined || this.previous <= 0) return
+    if (this.bitmapWork.length >= 36000) { this.droppedBitmapWork++; return }
+    this.bitmapWork.push({ ...sample, afterFrame: this.count })
+  }
+
   report(runId: number | undefined) {
     if (this.runId === undefined || this.runId !== runId) return null
     return {
@@ -53,6 +67,8 @@ export class RaceFrameDiagnostics {
       frameCount: this.count,
       droppedFrames: this.dropped,
       frames: this.frames,
+      bitmapWork: this.bitmapWork,
+      droppedBitmapWork: this.droppedBitmapWork,
     }
   }
 }

@@ -226,9 +226,9 @@ the observed frame interval (capped at the 60 Hz interval) with 3 ms reserved.
 This is an admission budget, not a hard deadline: individual canvas painting
 and GPU registration cannot be preempted, and a persistently overloaded device
 may defer work until a frame has room. Current-window work outranks prefetch.
-The original 48 GPU texture cap remains strict. Spare frames retire at most
-one unused tile at a time until eight unused tiles per layer remain; CPU
-canvas caches remain bounded separately. Static road culling
+The original 48 GPU texture cap remains strict. Offscreen GPU textures are retained until the existing 48-tile-per-layer cap
+requires eviction; CPU canvas caches remain bounded separately. No eager
+retirement during spare frames. Static road culling
 is unchanged while bitmap selection refreshes on quantized heading and tile
 window changes. The editor skips tile enumeration when its grid is unchanged.
 
@@ -271,3 +271,18 @@ frame intervals and terrain/world/geometry/DOM call counts and CPU timings.
 Compare identical browser/device/viewport/track runs before and after changes;
 there are no wall-clock CI assertions. The existing road-edit browser test
 checks actual terrain redraw counts independently of timing.
+
+## Papou daytime stutter — 98-second capture
+
+10,569 frame intervals: median 8.3 ms, p95 8.4 ms, p99 33.4 ms,
+89 intervals above 50 ms and 22 above 100 ms; worst 308.2 ms. The worst
+stall follows a frame with only 13.7 ms of measured update + render submission.
+The largest stalls cluster in seconds 5–20, beyond the default five-second
+smoke benchmark. The cause is not established by the current CPU timings.
+The streaming scheduler previously retired textures above eight unused tiles
+even when below its existing hard cap, forcing unnecessary recreation on return.
+Retain them until actual capacity pressure. GPU and CPU limits are unchanged;
+average resident memory may increase. New replay diagnostics attribute deferred
+canvas painting and texture registration (including capacity-driven eviction)
+to the preceding rendered frame. Measure the following frame interval and
+compare both laps on the same device; GPU completion remains unmeasured.
