@@ -221,3 +221,17 @@ at gesture end, rather than reconstructing DOM for intermediate coordinates.
 The road raster is not captured every drag frame. This is an editor-only
 presentation optimization; committed geometry, recovery, undo and saving are
 unchanged. Elevation-dependent terrain shading catches up when the drag ends.
+
+Run the editor-specific diagnostic against a private exported track without
+committing that track to the repository:
+
+```sh
+TRACKFORGE_EDITOR_PERF_TRACK=/path/to/Nj.trackforge.json npm run qa:mobile -- editor-drag-performance.spec.mjs
+```
+
+Use `TRACKFORGE_PERFORMANCE_QA=1` instead for a synthetic 18,268-cell fixture.
+The report records idle, 24 live pointer moves, and release separately, with
+frame intervals and terrain/world/geometry/DOM call counts and CPU timings.
+Compare identical browser/device/viewport/track runs before and after changes;
+there are no wall-clock CI assertions. The existing road-edit browser test
+checks actual terrain redraw counts independently of timing.
