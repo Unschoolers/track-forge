@@ -265,7 +265,7 @@ describe('options category navigation', () => {
 
     const tabs = Array.from(modal.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
     expect(tabs.map(tab => tab.textContent)).toEqual([
-      'PROFILE', 'RACE', 'AUDIO', 'DISPLAY', 'CONTROLS', 'UPDATES',
+      'Profile', 'Race', 'Audio', 'Display', 'Controls', 'Updates',
     ])
     expect(modal.querySelector<HTMLElement>('[role="tablist"]')?.style.getPropertyValue('--options-tab-count')).toBe('6')
     for (const tab of tabs) {

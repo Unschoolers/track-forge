@@ -218,7 +218,7 @@ export function createOptionsModal(
     qualityRow.append(choice)
   }
   quality.append(qualityRow, element('p', 'modal-subtitle',
-    'Low: 1× · Medium: up to 2× · High: native display resolution. Applies next race.'))
+    'Low: 1× and opaque menus · Medium: up to 2× · High: native display resolution. Race resolution applies next race.'))
   frame.body.append(quality)
   capture('display', displayStart)
   const controlsStart = frame.body.children.length
@@ -507,7 +507,7 @@ export function createOptionsModal(
   }
   for (const tab of available) {
     const choice = button('', `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
-    choice.append(optionsTabIcon(tab), element('span', 'options-tab-label', tab.toUpperCase()))
+    choice.append(optionsTabIcon(tab), element('span', 'options-tab-label', tab[0]!.toUpperCase() + tab.slice(1)))
     choice.setAttribute('aria-label', tab === 'display' ? 'Display and feedback' : tab)
     choice.setAttribute('role', 'tab')
     choice.setAttribute('aria-controls', `options-panel-${tab}`)
