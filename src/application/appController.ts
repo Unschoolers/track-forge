@@ -705,6 +705,7 @@ export class AppController {
     if (!validation.ready) {
       this.update({
         ...this.state,
+        ...this.librarySnapshot(),
         ...(this.state.mode === 'editor' ? { overlay: { type: 'none' as const } } : {}),
         notice: validation.message,
       })
@@ -799,13 +800,25 @@ export class AppController {
   }
 
   private importTrack(content: string): void {
+    const overlay = this.state.overlay
     const imported = parseSharedTrackImport(content).then((parsed): Persistence<TrackMutationResult> => {
       if (!parsed.ok) return parsed
       if (this.destroyed) return { ok: false, message: 'Track import was canceled.' }
-      const track = parsed.signedSource ? { ...parsed.track, signedSource: parsed.signedSource } : parsed.track
+      const track = {
+        ...parsed.track,
+        ...(parsed.signedSource ? { signedSource: parsed.signedSource } : {}),
+        ...(parsed.signedChallengeSource ? { signedChallengeSource: parsed.signedChallengeSource } : {}),
+      }
       return this.library.importShared(track)
     })
-    this.completePersistence(imported, result => this.applyTrackMutation(result, true))
+    this.completePersistence(imported, result => {
+      if (result.ok && result.track.creatorChallenge && this.state.overlay === overlay &&
+          overlay.type === 'track-library' && overlay.purpose === 'race') {
+        this.selectTrackForRace(result.track.id)
+        return
+      }
+      this.applyTrackMutation(result, true)
+    })
   }
 
   private deleteTrack(id: TrackId): void {

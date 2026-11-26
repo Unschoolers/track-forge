@@ -8,6 +8,7 @@ import type {
 } from '@/application/ports/storage'
 import type {
   CarId,
+  CreatorGhostChallenge,
   DifficultyId,
   Track,
   TrackId,
@@ -40,6 +41,7 @@ import {
 } from '@/application/race/ghostReplay'
 import { LapTiming } from '@/application/race/lapTiming'
 import { GhostRecording } from '@/application/race/ghostRecording'
+import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChallenge'
 import { interpolateRaceState } from '@/application/race/racePresentation'
 import { RaceDiagnosticsRecording, type RaceDiagnosticsReport } from '@/application/race/raceDiagnostics'
 import { createRaceResult, toRaceStanding } from '@/application/race/raceResultRecorder'
@@ -130,6 +132,7 @@ export interface RaceSessionSnapshot {
 export interface RaceSessionPort {
   ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
+  creatorGhostChallenge?(track: Track, setup: RaceSetup, completedRun?: boolean): CreatorGhostChallenge | null
   diagnosticsReport?(): RaceDiagnosticsReport | null
   start(track: Track, setup: RaceSetup, startsAt?: number): void
   scheduleNearbyStart?(startsAt: number): void
@@ -200,6 +203,7 @@ export class RaceSession implements RaceSessionPort {
   private destroyed = false
   private readonly geometry: TrackGeometryService
   private bestGhost: GhostRun | null = null
+  private completedGhost: { readonly trackId: Track['id']; readonly car: CarId; readonly laps: number; readonly run: GhostRun } | null = null
   private recording: GhostRecording | null = null
   private diagnostics: RaceDiagnosticsRecording | null = null
   private timing = new LapTiming()
@@ -223,6 +227,7 @@ export class RaceSession implements RaceSessionPort {
       setup = withoutBoostRules
     }
     this.previousPresentationTick = null
+    this.completedGhost = null
     this.presentationDiscontinuities.clear()
     this.dependencies.feedback.silenceContinuous()
     this.remainder = 0
@@ -234,7 +239,10 @@ export class RaceSession implements RaceSessionPort {
     this.nearbyTimingOffset = 0
     const nearby = setup.mode === 'nearby'
     const boostPractice = setup.mode === 'boost-practice'
-    this.bestGhost = nearby || boostPractice ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
+    const challenge = setup.mode === 'ghost' ? track.creatorChallenge : undefined
+    this.bestGhost = nearby || boostPractice ? null
+      : challenge ? (challenge.laps === setup.laps ? challenge : null)
+        : this.dependencies.ghostStore?.load(track, setup) ?? null
     const resolved = { ...setup, lighting: setup.lighting ?? track.lighting, mode: setup.mode === 'ghost' && !this.bestGhost ? (routeKind === 'point-to-point' ? 'time-trial' as const : 'normal' as const) : setup.mode ?? 'normal' }
     const created = createRace({
       path: this.geometry.get(track).path,
@@ -283,6 +291,11 @@ export class RaceSession implements RaceSessionPort {
   ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
     setup = oneRunForOpenRoute(track, setup)
     if (setup.mode === 'boost-practice') return { kind: 'none' }
+    if (track.creatorChallenge) {
+      return track.creatorChallenge.laps === setup.laps
+        ? { kind: 'exact', time: track.creatorChallenge.time }
+        : { kind: 'different-setup', setup: { car: track.creatorChallenge.car, laps: track.creatorChallenge.laps } }
+    }
     const store = this.dependencies.ghostStore
     if (store?.availability) return store.availability(track, setup)
     const time = store?.load(track, setup)?.time
@@ -291,7 +304,23 @@ export class RaceSession implements RaceSessionPort {
 
   ghostTime(track: Track, setup: RaceSetup): number | null {
     if (setup.mode === 'boost-practice') return null
-    return this.dependencies.ghostStore?.load(track, oneRunForOpenRoute(track, setup))?.time ?? null
+    setup = oneRunForOpenRoute(track, setup)
+    if (track.creatorChallenge) {
+      return track.creatorChallenge.laps === setup.laps ? track.creatorChallenge.time : null
+    }
+    return this.dependencies.ghostStore?.load(track, setup)?.time ?? null
+  }
+
+  creatorGhostChallenge(track: Track, setup: RaceSetup, completedRun = false): CreatorGhostChallenge | null {
+    setup = oneRunForOpenRoute(track, setup)
+    const completed = this.completedGhost
+    const run = completedRun
+      ? completed?.trackId === track.id && completed.car === setup.car && completed.laps === setup.laps
+        ? completed.run : null
+      : this.dependencies.ghostStore?.load(track, setup) ?? null
+    if (!run || (!completedRun && run.frames.some(frame => frame.cut))) return null
+    return decodeCreatorGhostChallenge({ car: run.car, laps: setup.laps, time: run.time, frames: run.frames,
+      ...(run.splits ? { splits: run.splits } : {}) }) ?? null
   }
 
   restart(): void {
@@ -308,6 +337,7 @@ export class RaceSession implements RaceSessionPort {
     this.remainder = 0
     this.rivalFinishRemaining = 0
     this.bestGhost = null
+    this.completedGhost = null
     this.recording = null
     this.diagnostics = null
     this.timing = new LapTiming()
@@ -492,8 +522,12 @@ export class RaceSession implements RaceSessionPort {
           result.outcome === 'finished' && result.playerTime !== null) {
         const frames = this.recording?.finish(player, resultState.elapsed)
         if (frames) {
+          const splits = this.timing.complete(setup.laps)
+          this.completedGhost = { trackId: track.id, car: setup.car, laps: setup.laps,
+            run: { car: setup.car, time: result.playerTime, frames,
+              ...(splits ? { splits } : {}) } }
           const previous = this.dependencies.ghostStore.load(track, setup)
-          const saved = this.dependencies.ghostStore.record(track, setup, result.playerTime, frames, this.timing.complete(setup.laps))
+          const saved = this.dependencies.ghostStore.record(track, setup, result.playerTime, frames, splits)
           const best = this.dependencies.ghostStore.load(track, setup)
           const failed = !saved && (!previous || result.playerTime < previous.time)
           result = { ...result, ghostSaved: saved, ghostSaveFailed: failed,

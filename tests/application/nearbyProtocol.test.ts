@@ -5,6 +5,7 @@ import {
   POSE_BYTES, POSE_FAST_PERIOD_MS, POSE_PERIOD_MS, RemoteGhost,
 } from '@/application/multiplayer/raceWire'
 import { packTrack, TrackReceiver } from '@/application/multiplayer/trackTransfer'
+import { createTrackSigningKey, serializeSignedTrack } from '@/application/library/trackSignature'
 import type { Track } from '@/domain/model'
 import { nearbyCar as makeCar, nearbyTrack as track } from '../fixtures/nearbyRace'
 
@@ -29,6 +30,39 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(received?.name).toBe(scenicTrack.name)
     expect(received?.trees).toEqual(scenicTrack.trees)
     expect(received?.points).toEqual(scenicTrack.points)
+  })
+
+  it('keeps geometry-only race staging free of replay and signed source metadata', async () => {
+    const challenged: Track = { ...track, origin: 'imported', signedSource: 'canonical',
+      signedChallengeSource: 'reply', creatorChallenge: {
+      car: 'red', laps: 1, time: 1,
+      frames: [
+        { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+        { t: 1, x: 1, y: 1, angle: 0, z: 0, structureRunId: null },
+      ],
+    } }
+    const receiver = new TrackReceiver()
+    let received: Track | null = null
+    for (const packet of await packTrack(challenged)) received = await receiver.receive(new Uint8Array(packet))
+    expect(received?.creatorChallenge).toBeUndefined()
+    expect(received?.signedSource).toBeUndefined()
+    expect(received?.signedChallengeSource).toBeUndefined()
+  })
+
+  it('preserves a verified signed creator challenge in explicit Nearby track sharing', async () => {
+    const challenge = { car: 'red' as const, laps: 1 as const, time: 1, frames: [
+      { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+      { t: 1, x: 1, y: 1, angle: 0, z: 0, structureRunId: null },
+    ] }
+    const signedSource = await serializeSignedTrack({ ...track, creatorChallenge: challenge }, createTrackSigningKey)
+    const challenged: Track = { ...track, creatorChallenge: challenge, signedSource, origin: 'imported' }
+    const receiver = new TrackReceiver()
+    let received: Track | null = null
+    for (const packet of await packTrack(challenged, async () => signedSource)) {
+      received = await receiver.receive(new Uint8Array(packet))
+    }
+    expect(received?.creatorChallenge).toEqual(challenge)
+    expect(received?.signedSource).toBe(signedSource)
   })
 
   it('round-trips and validates eight-player batches without duplicate or malformed slots', () => {

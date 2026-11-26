@@ -52,6 +52,41 @@ function finishAt(time: number, recover = false): RaceStep {
 }
 
 describe('Arcade ghost racing', () => {
+  it('runs a shared creator replay as the target across player cars and requires matching laps', () => {
+    const shared = { ...track, creatorChallenge: {
+      car: 'red' as const, laps: 1 as const, time: 1, frames,
+    } }
+    const store = new BrowserGhostRepository(memory())
+    store.record(shared, { ...setup, laps: 2 }, 1, frames)
+    const race = session(store)
+    expect(race.ghostAvailability(shared, { ...setup, car: 'green' })).toEqual({ kind: 'exact', time: 1 })
+    expect(race.ghostAvailability(shared, { ...setup, laps: 2 })).toEqual({
+      kind: 'different-setup', setup: { car: 'red', laps: 1 },
+    })
+    race.start(shared, { ...setup, car: 'green', mode: 'ghost' })
+    expect(race.snapshot().ghostTime).toBe(1)
+    expect(race.snapshot().ghost?.car).toBe('red')
+    expect(race.snapshot().state?.vehicles.find((vehicle) => vehicle.player)?.car).toBe('green')
+    race.start(shared, { ...setup, mode: 'ghost', laps: 2 })
+    expect(race.snapshot().setup?.mode).toBe('normal')
+    expect(store.load(shared, { ...setup, laps: 2 })?.time).toBe(1)
+  })
+
+  it('exposes only the just-finished replay for the result share action', () => {
+    const store = new BrowserGhostRepository(memory())
+    store.record(track, setup, 5, frames)
+    const race = session(store, finishAt(0.2))
+    race.start(track, setup)
+    expect(race.creatorGhostChallenge(track, setup, true)).toBeNull()
+    race.advance(3.7, input)
+    race.advance(0.25, input)
+    const result = race.snapshot().result
+    const challenge = race.creatorGhostChallenge(track, setup, true)
+    expect(result?.outcome).toBe('finished')
+    expect(challenge?.time).toBe(result?.playerTime)
+    expect(challenge?.time).toBeLessThan(5)
+  })
+
   it('records the real manual hold after the recovery cut without a scoring surcharge', () => {
     const race = session(new BrowserGhostRepository(memory()))
     race.start(track, setup)
@@ -127,6 +162,8 @@ describe('Arcade ghost racing', () => {
     const saved = store.load(track, setup)
     expect(saved).not.toBeNull()
     expect(saved?.frames.some((frame) => frame.cut)).toBe(true)
+    expect(race.creatorGhostChallenge(track, setup)).toBeNull()
+    expect(race.creatorGhostChallenge(track, setup, true)?.frames.some((frame) => frame.cut)).toBe(true)
   })
   it('saves manual recoveries without interpolating across their teleport', () => {
     const store = new BrowserGhostRepository(memory())

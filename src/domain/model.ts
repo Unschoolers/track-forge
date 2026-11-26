@@ -60,6 +60,23 @@ export interface TrackStart {
   readonly reversed: boolean
 }
 
+/** A bounded replay attached to an explicitly shared creator time challenge. */
+export interface CreatorGhostChallenge {
+  readonly car: CarId
+  readonly laps: 1 | 2 | 3
+  readonly time: number
+  readonly frames: readonly {
+    readonly t: number
+    readonly x: number
+    readonly y: number
+    readonly angle: number
+    readonly z: number
+    readonly structureRunId: string | null
+    readonly cut?: boolean
+  }[]
+  readonly splits?: readonly number[]
+}
+
 export interface Track {
   readonly id: TrackId
   readonly name: string
@@ -69,6 +86,8 @@ export interface Track {
   readonly origin?: 'imported' | 'seeded' | 'local'
   /** Verified original file retained for forwarding an imported track. */
   readonly signedSource?: string
+  /** Independently signed reply for the canonical source, never a nested wrapper. */
+  readonly signedChallengeSource?: string
   readonly version: 8
   readonly points: readonly TrackPoint[]
   readonly routeKind?: RouteKind
@@ -81,6 +100,8 @@ export interface Track {
   readonly lighting: LightingMode
   readonly environmentId?: TrackEnvironmentId
   readonly scenery?: readonly SceneryProp[]
+  /** Present only when this track was imported from a creator ghost challenge. */
+  readonly creatorChallenge?: CreatorGhostChallenge
   readonly raceRevision?: number
   readonly createdAt: number
   readonly updatedAt: number

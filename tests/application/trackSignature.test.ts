@@ -1,8 +1,13 @@
 import { expect, it, vi } from 'vitest'
 import { parseSharedTrackImport } from '@/application/library/trackImport'
-import { createTrackSigningKey, serializeSignedTrack } from '@/application/library/trackSignature'
+import {
+  createTrackSigningKey,
+  serializeSignedTrack,
+  serializeSignedTrackReply,
+} from '@/application/library/trackSignature'
 import { asTrackId, type Track } from '@/domain/model'
 import { TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { MAX_CREATOR_GHOST_FRAMES } from '@/domain/track/creatorGhostChallenge'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 
 const track = createStarterTrack(asTrackId('signed-track'), 1)
@@ -49,4 +54,65 @@ it('accepts unsigned legacy files and ignores provenance fields supplied inside 
   expect(result).toMatchObject({ ok: true })
   expect(result).not.toHaveProperty('signedSource')
   expect(result).not.toHaveProperty('track.signedSource')
+})
+
+it('signs creator replay metadata as part of the track payload', async () => {
+  const key = await createTrackSigningKey()
+  const creatorChallenge = { car: 'red' as const, laps: 1 as const, time: 1, frames: [
+    { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+    { t: 1, x: 1, y: 1, angle: 0, z: 0, structureRunId: null },
+  ] }
+  const file = await serializeSignedTrack({ ...track, creatorChallenge }, async () => key)
+  const raw = JSON.parse(file) as { track: Track & { creatorChallenge: typeof creatorChallenge } }
+  expect(raw.track.creatorChallenge).toEqual(creatorChallenge)
+  expect(await parseSharedTrackImport(file)).toMatchObject({ ok: true })
+  const tampered = JSON.stringify({ ...JSON.parse(file), track: {
+    ...raw.track, creatorChallenge: { ...creatorChallenge, frames: [
+      ...creatorChallenge.frames.slice(0, 1), { ...creatorChallenge.frames[1], x: 99 },
+    ] },
+  } })
+  await expect(parseSharedTrackImport(tampered)).resolves.toMatchObject({ ok: false })
+})
+
+it('rejects a correctly signed v2 payload with oversized replay metadata', async () => {
+  const frames = Array.from({ length: MAX_CREATOR_GHOST_FRAMES + 1 }, (_, t) => ({
+    t, x: 0, y: 0, angle: 0, z: 0, structureRunId: null,
+  }))
+  const oversized = { car: 'blue' as const, laps: 1 as const, time: MAX_CREATOR_GHOST_FRAMES, frames }
+  const file = await serializeSignedTrack({ ...track, creatorChallenge: oversized }, createTrackSigningKey)
+  await expect(parseSharedTrackImport(file)).resolves.toMatchObject({ ok: false })
+})
+
+it('signs Send Back replies over the canonical creator file and keeps reply chains flat', async () => {
+  const creatorKey = await createTrackSigningKey()
+  const responderKey = await createTrackSigningKey()
+  const originalChallenge = { car: 'blue' as const, laps: 1 as const, time: 2, frames: [
+    { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+    { t: 2, x: 2, y: 0, angle: 0, z: 0, structureRunId: null },
+  ] }
+  const replyChallenge = { car: 'green' as const, laps: 1 as const, time: 3, frames: [
+    { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+    { t: 3, x: 3, y: 0, angle: 0, z: 0, structureRunId: null },
+  ] }
+  const original = await serializeSignedTrack({ ...track, creatorChallenge: originalChallenge }, async () => creatorKey)
+  const reply = await serializeSignedTrackReply(original, replyChallenge, async () => responderKey)
+  const imported = await parseSharedTrackImport(reply)
+  expect(imported).toMatchObject({ ok: true, signedSource: original, signedChallengeSource: reply,
+    track: { creatorChallenge: replyChallenge } })
+  if (!imported.ok || !imported.signedSource) throw new Error('Signed reply failed to import.')
+  const canonical = await parseSharedTrackImport(imported.signedSource)
+  expect(canonical.ok && canonical.track.creatorChallenge).toEqual(originalChallenge)
+
+  const raw = JSON.parse(reply) as Record<string, unknown>
+  const changedReply = JSON.stringify({ ...raw, creatorChallenge: {
+    ...replyChallenge,
+    frames: [...replyChallenge.frames.slice(0, 1), { ...replyChallenge.frames[1], x: 9 }],
+  } })
+  await expect(parseSharedTrackImport(changedReply)).resolves.toMatchObject({ ok: false })
+
+  const secondReply = await serializeSignedTrackReply(imported.signedSource, originalChallenge, async () => responderKey)
+  const second = JSON.parse(secondReply) as Record<string, unknown>
+  expect(second.original).toBe(original)
+  expect(typeof second.original).toBe('string')
+  expect(second.original).not.toContain('trackforge-track-reply')
 })
