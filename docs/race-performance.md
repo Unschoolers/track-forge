@@ -323,3 +323,25 @@ tracks may have lower sampling resolution or longer preparation. Bridge wall
 tile coverage is folded into the existing bridge-deck diagnostic group.
 Verify render submission, frame tails, visual seams and vehicle occlusion in
 matched day/night captures before asserting a performance gain.
+
+## Physical-device multiplayer comparison
+
+On the same APK, Android device, track and lighting, capture at least 60 seconds
+of active driving in a solo race, a four-car AI race, then a two- and four-player
+Nearby race. Keep display refresh rate and audio settings fixed. Export the
+normal race file for offline runs and **Download diagnostics** from the Nearby
+results screen on the host and each guest before starting a rematch.
+
+Nearby exports include the same `performance` object as offline race exports:
+frame intervals, simulation and render submission, presentation layer timings,
+bitmap work, long tasks and device/build metadata. This is local data, not sent
+to peers. The network report's `monotonicStartedAtMs` anchors its relative
+network timestamps to the local monotonic clock used by frame diagnostics.
+`performance` is null for lobby/failure exports or when the next round is being
+prepared; never attribute an earlier race's frame timings to a new round.
+
+Compare frame p95/p99, frames over 33/50 ms, vehicle and terrain CPU timing,
+pose arrival gaps, skipped samples and effective receive rate. The target pose
+rate is 30 Hz; arrival gaps are not round-trip latency or proof of radio packet
+loss. Rendering submission does not measure GPU completion. Only actual
+matched device captures establish whether the new artwork affects gameplay.

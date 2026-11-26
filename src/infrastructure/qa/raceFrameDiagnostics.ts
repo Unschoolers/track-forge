@@ -130,11 +130,13 @@ export class RaceFrameDiagnostics {
     return {
       version: 1,
       units: 'milliseconds',
+      runStartedAtMs: this.runStart,
       columns: ['simulationTick', 'frameInterval', 'raceUpdate', 'simulation', 'renderSubmission'],
       frameCount: this.count,
       droppedFrames: this.dropped,
-      frames: this.frames,
-      bitmapWork: this.bitmapWork,
+      // Keep an exported report stable even if a rematch resets the recorder.
+      frames: this.frames.slice(),
+      bitmapWork: this.bitmapWork.slice(),
       droppedBitmapWork: this.droppedBitmapWork,
       presentationColumns: PRESENTATION_COLUMNS,
       presentationFrames: Array.from({ length: this.frames.length }, (_, index) => {
@@ -143,7 +145,7 @@ export class RaceFrameDiagnostics {
       }),
       renderer: this.renderer,
       longTaskColumns: ['startTime', 'duration'],
-      longTasks: this.longTasks,
+      longTasks: this.longTasks.slice(),
       droppedLongTasks: this.droppedLongTasks,
     }
   }

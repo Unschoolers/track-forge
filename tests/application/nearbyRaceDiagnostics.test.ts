@@ -39,7 +39,7 @@ describe('NearbyRaceDiagnostics', () => {
     diagnostics.failure('test_failure', 'flow_error')
     const before = diagnostics.report(counters)
     expect(before).toMatchObject({
-      version: 2, role: 'host', phase: 'lobby', counts: { guests: 1, ready: 1 },
+      version: 2, monotonicStartedAtMs: 100, role: 'host', phase: 'lobby', counts: { guests: 1, ready: 1 },
       race: { round: 0, elapsedMs: 100, track: { id: track.id, laps: 2 },
         players: [
           { slot: 0, local: true, car: 'blue', name: 'Host' },

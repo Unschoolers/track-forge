@@ -195,8 +195,14 @@ export class DomUiHost implements UiHost {
     this.noticeTimers.add(timer)
   }
 
-  private async downloadNearbyDiagnostics(nearby: NearbyRace): Promise<boolean> {
+  private async downloadNearbyDiagnostics(nearby: NearbyRace, fromResults = false): Promise<boolean> {
     const capturedAt = new Date().toISOString()
+    // Capture the local frame report and JS network counters before any async work.
+    // The results overlay can remain visible while the next round is being prepared.
+    const performance = fromResults && nearby.snapshot().phase === 'racing' &&
+      this.runtime.raceSession.snapshot().setup?.mode === 'nearby'
+      ? this.runtime.frameDiagnostics?.() ?? null : null
+    const network = await nearby.diagnostics()
     let storage: Record<string, unknown>
     try {
       const estimate = await navigator.storage?.estimate?.()
@@ -206,7 +212,7 @@ export class DomUiHost implements UiHost {
       console.error('Could not estimate browser storage.', error)
       storage = { status: 'failed' }
     }
-    const report = { capturedAt, ...await nearby.diagnostics(), storage }
+    const report = { capturedAt, ...network, performance, storage }
     const timestamp = capturedAt.replace(/[:.]/g, '-')
     return saveJsonFile({ filename: `trackforge-nearby-${timestamp}.json`, content: JSON.stringify(report, null, 2) })
   }
@@ -450,7 +456,7 @@ export class DomUiHost implements UiHost {
             leave: () => this.controller.dispatch({ type: 'leave-nearby' }),
             race: () => this.controller.dispatch({ type: 'nearby-race-again' }),
             selectTrack: () => this.controller.dispatch({ type: 'nearby-select-next-track' }),
-            downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby),
+            downloadDiagnostics: () => this.downloadNearbyDiagnostics(nearby, true),
           })
           this.overlayCleanup = results.cleanup
           return results.element
