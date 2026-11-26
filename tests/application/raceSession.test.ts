@@ -183,6 +183,55 @@ describe('RaceSession', () => {
     expect(session.snapshot().telemetry.waitingForStart).toBe(true)
   })
 
+  it.each([60, 120])('timestamps Nearby laps and finishes independently of %i Hz frames', hz => {
+    const { store } = createScoreStore()
+    const goAt = 10_000
+    const tickSeconds = 1 / 60
+    let now = goAt
+    const finish = vi.fn()
+    const step: RaceStep = (state, _input, dt) => {
+      const tick = state.tick + 1
+      const elapsed = state.elapsed + dt
+      const done = tick === 9
+      const player = state.vehicles.find(vehicle => vehicle.player)
+      if (!player) throw new Error('Missing Nearby player')
+      const crossing = tick === 1 || done
+      const gate = (state.timingGates?.length ?? 0) + 1
+      return {
+        state: { ...state, tick, elapsed, phase: done ? 'finished' : 'running',
+          vehicles: [{ ...player, finishedAt: done ? elapsed : null }] },
+        events: crossing ? [{ type: 'gate-crossed', vehicleId: player.id, gate, lap: done ? 1 : 0, time: elapsed }] : [],
+        ...(crossing ? { playerGateFractions: [done ? 0.4 : 0.25] } : {}),
+      }
+    }
+
+    const session = new RaceSession({
+      scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(),
+      monotonicNow: () => now, step,
+      nearby: { update: vi.fn(), remotePoses: () => [], recovered: vi.fn(),
+        finish, captureFinalFrame: vi.fn(), synchronizedElapsed: () => (now - goAt) / 1000 },
+    })
+    session.start(track, { ...setup, laps: 2, mode: 'nearby' }, goAt)
+    session.advance(1 / hz, noInput)
+    for (let i = 1; i <= hz / 10; i++) {
+      now = goAt + i * 1000 / hz
+      session.advance(1 / hz, noInput)
+    }
+    const telemetry = session.snapshot().telemetry
+    expect(telemetry.elapsed).toBeCloseTo(0.1)
+    expect(telemetry.latestSplit?.time).toBeCloseTo(tickSeconds * 0.25)
+    expect(telemetry.currentLapTime).toBeCloseTo(0.1 - tickSeconds * 0.25)
+
+    // A 320 ms hitch retains 250 ms of physics budget. The official finish
+    // includes the 70 ms that physics dropped, and excludes the later ticks.
+    now += 320
+    session.advance(0.32, noInput)
+    const expected = 0.07 + 8.4 * tickSeconds
+    expect(session.snapshot().result?.playerTime).toBeCloseTo(expected)
+    expect(session.snapshot().telemetry.latestSplit?.time).toBeCloseTo(expected)
+    expect(finish).toHaveBeenCalledExactlyOnceWith(session.snapshot().result?.playerTime)
+  })
+
   it('sounds each displayed countdown cue once, including after pause and restart', () => {
     const { store } = createScoreStore()
     const feedback = createFeedback()

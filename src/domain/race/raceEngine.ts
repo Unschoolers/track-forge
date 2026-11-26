@@ -76,6 +76,8 @@ export interface RaceTickInput {
 export interface RaceStepResult {
   readonly state: RaceState
   readonly events: readonly RaceEvent[]
+  /** In event order, for the accepted player gate crossings on this tick. */
+  readonly playerGateFractions?: readonly number[]
 }
 
 export type RaceStep = (
@@ -138,6 +140,7 @@ function advanceTickCheckpointProgressAndRoadRecovery(
   dt: number,
   elapsed: number,
   events: RaceEvent[],
+  onPlayerGateCrossing: (fraction: number) => void,
 ): { vehicles: RaceVehicle[]; missedCheckpoint: RaceState['missedCheckpoint'] } {
   let missedCheckpoint = state.missedCheckpoint
   const progressed = moved.map((vehicle, index) => {
@@ -189,6 +192,7 @@ function advanceTickCheckpointProgressAndRoadRecovery(
     if (previous) {
       const progress = advanceArcadeTimingGate(
         state, previous, updated, elapsed, context.onRoad, wasOnRoad,
+        vehicle.player ? onPlayerGateCrossing : undefined,
       )
       updated = progress.vehicle
       if (vehicle.player) missedCheckpoint = progress.missedCheckpoint
@@ -363,9 +367,10 @@ function advanceRaceTickProgressAndRecovery(
   dt: number,
   elapsed: number,
   events: RaceEvent[],
+  onPlayerGateCrossing: (fraction: number) => void,
 ): { vehicles: RaceVehicle[]; missedCheckpoint: RaceState['missedCheckpoint'] } {
   const progress = advanceTickCheckpointProgressAndRoadRecovery(
-    state, moved, held, playerInput, controls, dt, elapsed, events,
+    state, moved, held, playerInput, controls, dt, elapsed, events, onPlayerGateCrossing,
   )
   let missedCheckpoint = progress.missedCheckpoint
   let vehicles = reconcileTickSupportAndRecoverFromWater(
@@ -419,8 +424,10 @@ function advanceRace(
     return advanceVehicle(vehicle, state, input, dt, random,
       input ? undefined : rivalCatchUp(state, vehicle))
   })
+  let playerGateFractions: number[] | undefined
   const tickProgress = advanceRaceTickProgressAndRecovery(
     state, moved, held, playerInput, controls, dt, elapsed, events,
+    fraction => (playerGateFractions ??= []).push(fraction),
   )
   let vehicles = tickProgress.vehicles
   const missedCheckpoint = tickProgress.missedCheckpoint
@@ -519,5 +526,7 @@ function advanceRace(
       ),
     },
     events,
+    ...(playerGateFractions && events.some(event => event.type === 'gate-crossed' && event.vehicleId === player?.id)
+      ? { playerGateFractions } : {}),
   }
 }

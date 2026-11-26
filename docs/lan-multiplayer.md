@@ -36,12 +36,13 @@ Per-peer presentation diagnostics include target/effective delay, clock hold,
 prediction caps, correction magnitude and estimated sample age. A synchronized
 sample's age includes clock-offset error, not an exact one-way latency.
 
-Nearby race HUD and finish use local monotonic elapsed from synchronized GO,
-rather than potentially capped physics catch-up. Physics and offline timing
-remain unchanged. Finish is sampled at the rendering frame that detects gate
-crossing, so normal uncertainty includes a frame interval and clock offset
-error. Diagnostics record simulation elapsed, frozen finish clock elapsed and
-their difference. During racing, guests repeat five probes every 15 seconds;
+Nearby race HUD, lap splits and finish use the timeline from synchronized GO.
+Lap and finish timestamps interpolate the accepted crossing within its 60 Hz
+physics tick and account for wall time dropped by capped catch-up. Local physics
+and offline timing retain their existing rules. Clock offset error and the
+within-tick motion estimate limit accuracy. Diagnostics retain simulation
+elapsed and the monotonic time of the frame that detected the finish for
+comparison. During racing, guests repeat five probes every 15 seconds;
 record the latest offset drift and minimum RTT plus audit timeout counts. Audit
 failure does not end a race, and an audit never moves the fixed GO epoch.
 Asymmetric transit can appear as drift; do not silently adjust physics or claim
