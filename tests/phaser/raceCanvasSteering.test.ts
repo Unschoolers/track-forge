@@ -104,9 +104,8 @@ function recoverySession() {
 describe('race canvas steering', () => {
   it.each([1, 2, 3])('initializes camera density at %sx without changing CSS steering travel', (ratio) => {
     const controls = new RaceInputController()
-    const { canvas, camera, shutdown } = createScene(controls, {
-      snapshot: () => ({ state: { vehicles: [] } }),
-    }, 1, ratio)
+    const { session } = recoverySession()
+    const { canvas, camera, shutdown } = createScene(controls, session, 1, ratio)
     try {
       expect(camera.zoom).toBe(ratio)
       expect(camera.width / camera.zoom).toBe(320)
