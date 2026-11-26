@@ -23,6 +23,10 @@ final class AdaptivePeerRates {
 
     boolean canSend(String peer, boolean progress, long now) {
         State current = state(peer);
+        // JavaScript already paces healthy poses at 30 Hz. Rechecking the
+        // interval after bridge dispatch drops valid samples due to clock rounding
+        // and scheduling jitter. The per-peer outstanding window still bounds work.
+        if (!progress && current.tier == 0) return true;
         long last = progress ? current.lastProgressAt : current.lastPoseAt;
         return last < 0 || now - last >= (progress
             ? Math.max(150, PERIOD_MS[current.tier]) : PERIOD_MS[current.tier]) - 2;

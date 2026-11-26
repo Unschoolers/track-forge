@@ -4,6 +4,25 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class AdaptivePeerRatesTest {
+    @Test public void healthyPosePacingBelongsToTheApplicationNotTheBridgeClock() {
+        AdaptivePeerRates rates = new AdaptivePeerRates();
+        // A correctly paced JS stream may arrive at 30/31 ms intervals after
+        // crossing the bridge. Do not discard those samples a second time.
+        long now = 1000;
+        for (int gap : new int[]{33, 30, 31, 39, 34, 33}) {
+            assertTrue(rates.canSend("peer", false, now));
+            rates.sent("peer", false, now);
+            rates.delivered("peer", false, now + 5);
+            now += gap;
+        }
+        rates.failed("peer", now);
+        rates.sent("peer", false, now);
+        assertFalse(rates.canSend("peer", false, now + 34));
+        assertTrue(rates.canSend("peer", false, now + 67));
+        rates.sent("healthy", true, now);
+        assertFalse(rates.canSend("healthy", true, now + 34));
+    }
+
     @Test public void reducesOnlyTheCongestedPeerThroughEveryRequestedRate() {
         AdaptivePeerRates rates = new AdaptivePeerRates();
         assertEquals(30, rates.rateHz("slow"));
