@@ -59,7 +59,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   await options.getByRole('button', { name: 'DONE' }).tap()
   await page.getByRole('button', { name: 'RACE', exact: true }).tap()
   await page.getByRole('button', { name: 'Race Harbor Grid' }).tap()
-  await page.getByRole('button', { name: 'START RACE', exact: true }).tap()
+  await page.getByRole('button', { name: 'Start Race', exact: true }).tap()
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(raceTrack), paused: false })
   await expect.poll(async () => (await music())?.time).toBeGreaterThan(0)
 
@@ -84,7 +84,7 @@ for (const [environmentId, soundtrack] of [
     await page.getByRole('button', { name: 'RACE', exact: true }).tap()
     await page.getByRole('button', { name: `Race ${OWNED_TRACK_NAME}`, exact: true }).tap()
     await expect.poll(music).toMatchObject({ src: expect.stringMatching(menuTrack), paused: false })
-    await page.getByRole('button', { name: 'START RACE', exact: true }).tap()
+    await page.getByRole('button', { name: 'Start Race', exact: true }).tap()
     const playing = { src: expect.stringMatching(soundtrack), paused: false }
     await expect.poll(music).toMatchObject(playing)
     const { plays } = await music()

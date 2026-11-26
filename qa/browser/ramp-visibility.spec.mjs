@@ -68,7 +68,7 @@ for (const reversed of [false, true]) {
       }
       requestAnimationFrame(monitor)
     })
-    await page.getByRole('button', { name: 'START RACE' }).click()
+    await page.getByRole('button', { name: 'Start Race' }).click()
     await expect(page.locator('[data-screen="race"]')).toBeVisible()
     await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
     for (const [stage, threshold] of [

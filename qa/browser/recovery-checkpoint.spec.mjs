@@ -42,8 +42,8 @@ test('places a checkpoint while arcade ignores physical scenery collisions', asy
 
   await page.getByRole('button', { name: 'Race', exact: true }).click()
   await page.getByRole('button', { name: 'Race Checkpoint QA' }).click()
-  await page.getByRole('button', { name: 'TIME TRIAL', exact: true }).click()
-  await page.getByRole('button', { name: 'START TIME TRIAL' }).click()
+  await page.getByRole('button', { name: 'Time Trial', exact: true }).click()
+  await page.getByRole('button', { name: 'Start Time Trial' }).click()
   await expect.poll(async () => (await qa()).race?.player?.y).toBe(-24)
   await page.evaluate(() => window.__trackForgeQa.advanceRace(4.7))
   // Arcade has no scenery collision: the car does not snap onto the centre

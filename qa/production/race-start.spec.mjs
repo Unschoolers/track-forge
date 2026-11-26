@@ -36,7 +36,7 @@ test('shows the title during startup and starts a mobile race in the production 
   await page.getByRole('button', { name: 'RACE', exact: true }).tap()
   await page.getByRole('button', { name: 'Race Harbor Grid', exact: true }).tap()
   await page.getByRole('dialog', { name: 'Race setup' })
-    .getByRole('button', { name: 'START RACE', exact: true }).tap()
+    .getByRole('button', { name: 'Start Race', exact: true }).tap()
 
   const race = page.locator('[data-screen="race"]')
   await expect(race).toBeVisible()

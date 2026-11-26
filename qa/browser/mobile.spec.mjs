@@ -29,7 +29,7 @@ async function enterEditor(page) {
 async function enterRace(page, { fastCountdown = false } = {}) {
   await page.getByRole('button', { name: 'RACE', exact: true }).click()
   await page.getByRole('button', { name: 'Race ' + EDITOR_FIXTURE_NAME, exact: true }).click()
-  await page.getByRole('button', { name: 'START RACE' }).click()
+  await page.getByRole('button', { name: 'Start Race' }).click()
   await expect(page.locator('[data-screen="race"]')).toBeVisible()
   if (fastCountdown) await page.evaluate(() => window.__trackForgeQa.advanceRace(3.7))
   await expect.poll(async () => (await telemetry(page)).race?.phase, {
