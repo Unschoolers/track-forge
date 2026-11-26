@@ -118,7 +118,7 @@ export class NearbyRaceDiagnostics {
     const rivals: NearbyTraceRival[] = []
     for (const [slot, racer] of context.racers) {
       if (slot === context.slot) continue
-      const pose = racer.left ? null : racer.ghost.pose(now)
+      const pose = racer.left ? null : racer.ghost.peekPose(now)
       rivals.push(pose ? {
         slot, car: racer.ghost.car, visible: true,
         x: pose.x, y: pose.y, z: pose.z, angle: pose.angle,
@@ -191,6 +191,7 @@ export class NearbyRaceDiagnostics {
           finished: typeof racer?.time === 'number',
           left: racer?.left ?? false,
           receive: streams[slot],
+          presentation: !local && racer ? racer.ghost.presentationDiagnostics() : null,
         }
       }),
     }
