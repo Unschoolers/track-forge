@@ -164,7 +164,7 @@ interface RacePaintTheme {
  * between antialiased texture quads. Editor tiles remain overlays. */
 function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme): BakeableBitmapTiles {
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
-  const index = indexBitmapItems(quads, quad => theme ? quad.edge : quad.road, theme ? 2 : 0)
+  const index = indexBitmapItems(quads, quad => theme ? quad.edge : quad.road, theme ? 32 : 0)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, items) => {
     if (theme) {
@@ -343,10 +343,12 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
 export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile, night = false): void {
   // Projected shadows were beneath the existing textured terrain overlay.
   // One combined path avoids double darkening on internal triangle edges.
-  context.beginPath()
-  for (const item of items) if (item.kind === 'hill-shadow') appendTriangle(context, item.triangle)
-  context.fillStyle = night ? 'rgba(8,18,13,0.16)' : 'rgba(8,18,13,0.24)'
-  context.fill()
+  if (items.some(item => item.kind === 'hill-shadow')) {
+    context.beginPath()
+    for (const item of items) if (item.kind === 'hill-shadow') appendTriangle(context, item.triangle)
+    context.fillStyle = night ? 'rgba(8,18,13,0.16)' : 'rgba(8,18,13,0.24)'
+    context.fill()
+  }
   const palette = art.terrainPalette
   const bankScale = palette.bankScale ?? 1
   const shallowScale = palette.shallowScale ?? 1

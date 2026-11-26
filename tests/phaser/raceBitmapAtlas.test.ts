@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { planRaceAtlas, RACE_ATLAS_BUDGET } from '@/phaser/rendering/raceBitmapAtlas'
+import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { planRaceAtlas, RACE_ATLAS_BUDGET, RACE_ATLAS_DEPTHS } from '@/phaser/rendering/raceBitmapAtlas'
 
 describe('race atlas memory budget', () => {
+  it('keeps baked approach shadows, deck and walls on the correct sides of vehicles', () => {
+    const [road, terrain, approach, deck, walls] = RACE_ATLAS_DEPTHS
+    expect(terrain).toBeLessThan(road)
+    expect(road).toBeLessThan(approach)
+    expect(approach).toBeLessThan(WORLD_RENDER_DEPTH.vehicleShadow)
+    expect(deck).toBeGreaterThan(WORLD_RENDER_DEPTH.lowerVehicle)
+    expect(walls).toBeGreaterThan(deck)
+    expect(walls).toBeLessThan(WORLD_RENDER_DEPTH.upperVehicle)
+  })
+
   it('keeps small tracks at native resolution', () => {
     const plan = planRaceAtlas(80)
     expect(plan.resolution).toBe(256)
