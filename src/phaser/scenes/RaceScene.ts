@@ -165,7 +165,7 @@ export class RaceScene extends Phaser.Scene {
     )).map(({ primitive, bounds }) => {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.terrain)
       renderTerrainPrimitives(graphics, [primitive], night, palette)
-      const hill = primitive.kind === 'hill-slope' || primitive.kind === 'hill-plateau'
+      const hill = primitive.kind === 'hill-shadow' || primitive.kind === 'hill-slope' || primitive.kind === 'hill-plateau'
       const primitives = primitive.kind === 'shoreline'
         ? primitive.rings.reduce((count, ring) => count + ring.length, 0)
         : primitive.kind === 'water' ? primitive.triangles.length + primitive.texture.length
@@ -545,6 +545,7 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private dispose(): void {
+    this.frameDiagnostics?.endRace()
     this.controls.reset()
     this.boostRequestPending = false
     this.pointerBinding?.destroy()
