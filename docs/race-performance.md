@@ -286,3 +286,21 @@ average resident memory may increase. New replay diagnostics attribute deferred
 canvas painting and texture registration (including capacity-driven eviction)
 to the preceding rendered frame. Measure the following frame interval and
 compare both laps on the same device; GPU completion remains unmeasured.
+
+## NJ race: eliminate runtime material streaming
+
+Android build 1827.1 captured 24,540 frame intervals over 367.9 seconds.
+Fully resident terrain: median 8.4 ms; partially resident: 16.7 ms; no visible
+terrain texture despite pending tiles: 24.9 ms (4,311 frames). A terrain upload
+lasted 85.9 ms, immediately before a 100 ms interval. The streaming scheduler
+requires spare CPU time; expensive vector fallback draws starve it, so missing
+textures can persist. The race now bakes immutable sparse road, terrain and
+bridge tiles into atlas pages before gameplay. Only sprite selection changes
+as the camera moves. Remove duplicate terrain fill/ripple/slope/plateau/shore
+vectors when the complete bitmap atlas exists; retain projected hill shadows,
+road shoulders and markings, bridge structures and vehicle depth ordering.
+The 128 MiB RGBA page allocation budget includes gutters and page padding;
+normal circuits retain native resolution and larger maps get a uniform
+budgeted resolution rather than missing artwork. CPU canvas backing and GPU
+copies can each consume memory; startup cost increases. Editor rendering is
+unchanged. Verify on Android before claiming frame-time improvement.

@@ -159,10 +159,13 @@ export class RaceScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD)
     const geometry = this.geometry.get(track)
     this.isCoveredByBridgeDeck = getBridgeDeckOcclusion(geometry)
+    this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
+    const bitmap = this.updateRoadRibbonVisibility?.bitmap
     const terrain = geometry.path.terrainSurface
-    this.terrainChunks = chunkRaceTerrain(buildTerrainPresentation(
-      terrain, terrainDetailForView(terrain.authoredCellCount, 1),
-    )).map(({ primitive, bounds }) => {
+    // The race atlas owns the complete water and hill material footprints.
+    // Keep only projected shadows, which are not included in those textures.
+    const terrainPrimitives = buildTerrainPresentation(terrain, terrainDetailForView(terrain.authoredCellCount, 1))
+    this.terrainChunks = chunkRaceTerrain(bitmap ? terrainPrimitives.filter(p => p.kind === 'hill-shadow') : terrainPrimitives).map(({ primitive, bounds }) => {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.terrain)
       renderTerrainPrimitives(graphics, [primitive], night, palette)
       const hill = primitive.kind === 'hill-shadow' || primitive.kind === 'hill-slope' || primitive.kind === 'hill-plateau'
@@ -181,9 +184,6 @@ export class RaceScene extends Phaser.Scene {
       geometry.path.terrainSurface,
       normalizeTrackEnvironmentId(track.environmentId),
     )
-    this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId),
-      this.frameDiagnostics ? sample => this.frameDiagnostics?.recordBitmapWork(sample) : undefined)
-    const bitmap = this.updateRoadRibbonVisibility?.bitmap
     if (bitmap && this.raceCamera) {
       const camera = this.cameras.main
       const view = {
