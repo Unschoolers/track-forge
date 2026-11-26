@@ -28,6 +28,20 @@ export function renderRaceEffects(
     )
   }
   for (const particle of effects.particles) {
+    if (particle.kind === 'speed-line') {
+      const speed = Math.hypot(particle.vx, particle.vy)
+      if (speed > 0) {
+        const length = particle.size * 8
+        graphics.lineStyle(particle.size, PARTICLE_COLORS[particle.kind], Math.max(0, particle.life / particle.maxLife))
+        graphics.lineBetween(
+          particle.x,
+          particle.y,
+          particle.x - particle.vx / speed * length,
+          particle.y - particle.vy / speed * length,
+        )
+      }
+      continue
+    }
     const progress = 1 - particle.life / particle.maxLife
     graphics.fillStyle(
       PARTICLE_COLORS[particle.kind],

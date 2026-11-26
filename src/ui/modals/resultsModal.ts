@@ -37,11 +37,18 @@ export function createResultsModal(
       ? 'NEW RECORD'
       : timeTrial ? 'TIME TRIAL COMPLETE' : `FINISHED ${result.playerPlace}${ordinalSuffix(result.playerPlace)}`
   const hasStandings = result.ghostTime === undefined && !timeTrial && !boostPractice && result.standings.length > 0
-  const subtitle = result.playerTime === null || hasStandings
-    ? result.trackName
-    : `${result.trackName} · ${formatRaceTime(result.playerTime)}`
-  const frame = createModalFrame(headline, subtitle, undefined, 'results-modal')
+  const frame = createModalFrame(headline, result.trackName, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
+  if (result.playerTime !== null) {
+    const finishTime = createFinishTime(result.playerTime)
+    if (hasStandings) {
+      finishTime.classList.add('results-finish-time-compact')
+      finishTime.setAttribute('aria-hidden', 'true')
+      frame.header.append(finishTime)
+    } else {
+      frame.body.append(finishTime)
+    }
+  }
   if (boostPractice) frame.body.append(element('p', 'modal-subtitle', 'UNRANKED · BOOST ENABLED'))
   // The player's name and finish time are already visible in the standings.
   if (playerName && !hasStandings) frame.body.append(element('p', 'modal-subtitle', `DRIVER · ${playerName}`))
@@ -142,6 +149,15 @@ export function createResultsModal(
   // All navigation stays fixed even when the results body needs to scroll.
   frame.footer.append(primary, secondary)
   return frame.overlay
+}
+
+function createFinishTime(time: number): HTMLElement {
+  const finishTime = element('p', 'results-finish-time')
+  finishTime.append(
+    element('span', undefined, 'FINISH TIME'),
+    element('strong', undefined, formatRaceTime(time)),
+  )
+  return finishTime
 }
 
 /**

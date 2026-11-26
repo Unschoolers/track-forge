@@ -36,6 +36,27 @@ describe('player names on finish screens', () => {
     expect(screen.querySelector('[data-results-standings]')).toBeNull()
   })
 
+  it('provides a compact duplicated finish time for standings results with a completed time', () => {
+    const screen = createResultsModal(result, actions)
+    const summary = screen.querySelector('.modal-header .results-finish-time')
+    expect(summary?.getAttribute('aria-hidden')).toBe('true')
+    expect(summary?.querySelector('strong')?.textContent).toBe('00:42.000')
+    expect(screen.querySelector('.modal-header .modal-subtitle')?.textContent).toBe('Figure eight')
+    expect(screen.querySelector('[data-results-standings] .player span')?.textContent).toBe('00:42.000')
+    const unfinished = createResultsModal({ ...result, playerTime: null }, actions)
+    expect(unfinished.querySelector('.modal-header .results-finish-time')).toBeNull()
+  })
+
+  it.each([
+    { mode: 'time-trial' },
+    { mode: 'boost-practice' },
+    { mode: 'normal', ghostTime: 45 },
+  ] as const)('gives the finish time its own primary readout without standings in $mode', (setup) => {
+    const screen = createResultsModal({ ...result, ...setup }, actions)
+    expect(screen.querySelector('.modal-header .modal-subtitle')?.textContent).toBe('Figure eight')
+    expect(screen.querySelector('.results-finish-time strong')?.textContent).toBe('00:42.000')
+  })
+
   it('shows the current player name on both Cup round and final standings', () => {
     const cup = recordCupResult(createCup(), result.standings)
     const round = createResultsModal(result, actions, { cup, next: vi.fn() }, null, 'JulienQC')

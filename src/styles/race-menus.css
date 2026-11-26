@@ -326,8 +326,36 @@
 
 /* The finish is the hero. The title names the outcome once; the podium owns
    placement and medal, while standings owns the player's final time. */
-.results-modal .modal-header { padding-block: .95rem .7rem; }
+.results-modal .modal-header { position: relative; padding-block: .95rem .7rem; }
+.results-modal .modal-header::after {
+  position: absolute;
+  right: 1.4rem;
+  bottom: 0;
+  width: 3rem;
+  height: .25rem;
+  background: var(--menu-accent);
+  clip-path: polygon(0 0, 100% 0, calc(100% - .3rem) 100%, 0 100%);
+  content: '';
+}
+.results-modal .modal-header .modal-subtitle { font-family: var(--menu-mono); font-variant-numeric: tabular-nums; }
 .results-modal .modal-body { padding-block: .8rem; }
+.results-finish-time {
+  display: grid;
+  gap: .2rem;
+  margin: 0;
+  padding: .65rem .8rem;
+  border-inline-start: .2rem solid var(--menu-accent);
+  background: var(--color-panel-raised);
+  font-family: var(--menu-mono);
+  font-variant-numeric: tabular-nums;
+}
+.results-finish-time span { color: var(--menu-accent); font-size: .68rem; font-weight: 800; letter-spacing: .12em; }
+.results-finish-time strong { color: var(--menu-ink); font-size: clamp(1.55rem, 6vw, 2.15rem); line-height: 1.1; }
+.results-modal .results-finish-time-compact { display: none; }
+@media (min-width: 640px) and (max-height: 500px) {
+  .results-modal .results-finish-time-compact { display: grid; flex: none; padding: .35rem .6rem; }
+  .results-modal .results-finish-time-compact strong { font-size: 1.25rem; }
+}
 .results-modal .results-celebration-compact {
   gap: .12rem;
   margin: .15rem 0 .6rem;
@@ -363,6 +391,7 @@
 }
 .results-modal .scoreboard-row strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .results-modal .scoreboard-row span { flex: none; font-size: .8rem; }
+.results-modal .scoreboard-row.player span { color: var(--menu-ink); font-family: var(--menu-mono); font-weight: 800; }
 .results-modal .results-details-bar {
   display: flex;
   flex-wrap: wrap;

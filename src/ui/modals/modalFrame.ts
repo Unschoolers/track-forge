@@ -2,6 +2,7 @@ import { button, element } from '@/ui/dom'
 
 export interface ModalFrame {
   readonly overlay: HTMLElement
+  readonly header: HTMLElement
   readonly body: HTMLElement
   readonly footer: HTMLElement
 }
@@ -36,5 +37,5 @@ export function createModalFrame(
   const footer = element('footer', 'modal-footer')
   dialog.append(header, body, footer)
   overlay.append(dialog)
-  return { overlay, body, footer }
+  return { overlay, header, body, footer }
 }
