@@ -577,7 +577,7 @@
   background: #ff925c; color: #20110a; font-weight: 800;
 }
 .race-setup-modal :is(.setup-choice, .car-choice, .button):hover:not(:disabled) { transform: translateY(-1px); }
-.race-setup-modal :is(.setup-choice, .car-choice, .button):disabled { opacity: .46; }
+.race-setup-modal :is(.setup-choice, .car-choice, .button):disabled { opacity: .45; }
 @media (min-width: 760px) and (min-height: 560px) {
   .race-setup-modal .modal-card { grid-template-rows: auto minmax(0, 1fr) auto; }
   .race-setup-modal .modal-body { overflow: auto; }
