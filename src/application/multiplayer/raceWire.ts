@@ -174,12 +174,22 @@ export function decodePoseBatch(bytes: Uint8Array): PosePacket[] | null {
   return packets
 }
 
+const REMOTE_INITIAL_DELAY_MS = 100
+const REMOTE_MIN_DELAY_MS = 50
+const REMOTE_MAX_DELAY_MS = 150
+const REMOTE_DELAY_WARMUP_SAMPLES = 4
+
 export class RemoteGhost {
   private frames: GhostPose[] = []
   private sequence: number | undefined
   private recovery: number | undefined
   private arrival = 0
   private estimatedPeriodMs = POSE_PERIOD_MS
+  private arrivalPeriodMs = POSE_PERIOD_MS
+  private arrivalJitterMs = 0
+  private arrivalSamples = 0
+  private interpolationDelayMs = REMOTE_INITIAL_DELAY_MS
+  private lastPresentationTime = Number.NEGATIVE_INFINITY
 
   constructor(readonly car: CarId) {}
 
@@ -191,8 +201,25 @@ export class RemoteGhost {
     if (!last || now - this.arrival > 500) {
       this.frames = []
       this.estimatedPeriodMs = POSE_PERIOD_MS
+      this.arrivalPeriodMs = POSE_PERIOD_MS
+      this.arrivalJitterMs = 0
+      this.arrivalSamples = 0
+      this.interpolationDelayMs = REMOTE_INITIAL_DELAY_MS
+      this.lastPresentationTime = Number.NEGATIVE_INFINITY
     } else {
-      const observedPeriod = (now - this.arrival) / advance
+      const arrivalGap = Math.max(0, now - this.arrival)
+      // Use actual arrival spacing, not spacing divided by sequence advance:
+      // missing samples consume interpolation buffer just like network jitter.
+      this.arrivalJitterMs = this.arrivalJitterMs * 0.8 +
+        Math.abs(arrivalGap - this.arrivalPeriodMs) * 0.2
+      this.arrivalPeriodMs = this.arrivalPeriodMs * 0.8 + arrivalGap * 0.2
+      if (++this.arrivalSamples >= REMOTE_DELAY_WARMUP_SAMPLES) {
+        const desired = Math.max(REMOTE_MIN_DELAY_MS, Math.min(REMOTE_MAX_DELAY_MS,
+          this.arrivalPeriodMs * 1.5 + this.arrivalJitterMs * 2))
+        // Increase immediately on jitter; shrink slowly to avoid visible jumps.
+        this.interpolationDelayMs = Math.max(desired, this.interpolationDelayMs - 2)
+      }
+      const observedPeriod = arrivalGap / advance
       if (observedPeriod >= POSE_FAST_PERIOD_MS * 0.5 && observedPeriod <= 200) {
         this.estimatedPeriodMs = Math.max(POSE_FAST_PERIOD_MS, Math.min(100,
           this.estimatedPeriodMs * 0.8 + observedPeriod * 0.2))
@@ -216,7 +243,9 @@ export class RemoteGhost {
     const last = this.frames.at(-1)
     const first = this.frames[0]
     if (!first || !last || now - this.arrival > REMOTE_POSE_EXPIRY_MS) return null
-    const target = Math.max(first.t, now - 100)
+    // Never rewind a displayed car when the adaptive buffer grows.
+    const target = Math.max(first.t, this.lastPresentationTime, now - this.interpolationDelayMs)
+    this.lastPresentationTime = target
     if (target <= last.t) return ghostPoseAt({ car: this.car, frames: this.frames, time: last.t }, target)
 
     // Brief dead reckoning hides intermittent radio gaps. Never predict across
