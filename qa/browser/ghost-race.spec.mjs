@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
@@ -72,4 +73,59 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await page.getByRole('button', { name: 'START RACE', exact: true }).click()
   await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.vehicleCount)).toBe(4)
   await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.ghostVisible)).toBe(false)
+})
+
+test('shares a saved creator ghost and opens the imported challenge with its lap count', async ({ page }) => {
+  await seedOwnedTrack(page)
+  await page.addInitScript(() => Object.defineProperty(navigator, 'canShare', { value: () => false }))
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  const savedTrack = (await readSavedTracks(page))[0]
+  await page.evaluate(track => {
+    const key = [track.id, track.updatedAt, 0, 'forward', 'blue', 1].join('|')
+    const { x, y } = track.points[0]
+    localStorage.setItem('trackforge-ghost-runs-v2', JSON.stringify({ [key]: {
+      car: 'blue', time: 31.5,
+      frames: [0, 31.5].map(t => ({ t, x: x + t, y, angle: 0, z: 0, structureRunId: null })),
+    } }))
+  }, savedTrack)
+  await page.reload()
+  await enterTrackForge(page)
+  await setupRace(page)
+  await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'OPTIONS' }).click()
+  await page.locator('[data-action="laps-1"]').click()
+  await page.getByRole('button', { name: 'DONE', exact: true }).click()
+  await page.getByRole('button', { name: 'BACK', exact: true }).click()
+  const garage = page.getByRole('dialog', { name: 'Choose a track' })
+  await expect(garage).toBeVisible()
+  await garage.locator('.track-card-overflow summary').click()
+  const download = page.waitForEvent('download')
+  await garage.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()
+  const challengeContent = await readFile(await (await download).path(), 'utf8')
+  const challenge = JSON.parse(challengeContent)
+  expect(challenge.formatVersion).toBe(2)
+  expect(challenge.signature).toMatchObject({ algorithm: 'ECDSA-P256-SHA256' })
+  expect(challenge.track.creatorChallenge).toMatchObject({ car: 'blue', time: 31.5, laps: 1 })
+  await garage.locator('input[type="file"]').setInputFiles({
+    name: `${OWNED_TRACK_NAME}.trackforge.json`, mimeType: 'application/json',
+    buffer: Buffer.from(challengeContent),
+  })
+  await expect(page.getByRole('dialog', { name: 'Race setup' })).toBeVisible()
+  await expect(page.getByText(/Creator challenge:.*Blue.*1 lap/)).toBeVisible()
+  await page.reload()
+  await enterTrackForge(page)
+  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  await garage.getByRole('button', { name: `Race ${OWNED_TRACK_NAME} (2)`, exact: true }).click()
+  const setup = page.getByRole('dialog', { name: 'Race setup' })
+  await setup.getByRole('button', { name: 'OPTIONS' }).click()
+  await page.locator('[data-action="laps-2"]').click()
+  await page.getByRole('button', { name: 'DONE', exact: true }).click()
+  await setup.locator('[data-car="red"]').click()
+  await expect(setup.getByText(/Creator (challenge|target):.*Blue.*1 lap/)).toBeVisible()
+  await setup.getByRole('button', { name: 'GHOST RACE', exact: true }).click()
+  await setup.getByRole('button', { name: 'START GHOST RACE', exact: true }).click()
+  await expect(page.getByText('GHOST TARGET', { exact: true })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup))
+    .toMatchObject({ mode: 'ghost', car: 'red', laps: 1 })
+  await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.ghostVisible)).toBe(true)
 })

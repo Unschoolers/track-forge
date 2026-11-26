@@ -1,5 +1,5 @@
 import { TERRAIN_LIMITS, WORLD_ELEVATION } from '@/domain/config'
-import { TERRAIN_KINDS, type Track, type Vector2 } from '@/domain/model'
+import { TERRAIN_KINDS, type CreatorGhostChallenge, type Track, type Vector2 } from '@/domain/model'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { CrossingWorkLimitError } from '@/domain/track/crossings'
@@ -7,10 +7,17 @@ import { roadPointsForPreview } from '@/domain/track/roadLength'
 import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
 import { MAX_SCENERY_PROPS, normalizeSceneryProps } from '@/domain/track/trackEnvironment'
 import { decodeTrack, MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
-import { SIGNED_TRACK_FORMAT_VERSION, verifyTrackSignature } from './trackSignature'
+import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChallenge'
+import {
+  SIGNED_TRACK_FORMAT_VERSION,
+  SIGNED_TRACK_REPLY_FORMAT,
+  SIGNED_TRACK_REPLY_FORMAT_VERSION,
+  verifySignedTrackReply,
+  verifyTrackSignature,
+} from './trackSignature'
 
 export type TrackImportResult =
-  | { readonly ok: true; readonly track: Track; readonly signedSource?: string }
+  | { readonly ok: true; readonly track: Track; readonly signedSource?: string; readonly signedChallengeSource?: string }
   | { readonly ok: false; readonly message: string }
 
 const MAX_POINTS = 2_000
@@ -65,7 +72,7 @@ function parseTrackFile(content: string):
   try { parsed = JSON.parse(content) as unknown }
   catch { return { ok: false, message: 'Invalid track JSON file.' } }
   const envelope = object(parsed)
-  return envelope?.format === TRACK_EXPORT_FORMAT
+  return envelope?.format === TRACK_EXPORT_FORMAT || envelope?.format === SIGNED_TRACK_REPLY_FORMAT
     ? { ok: true, envelope }
     : { ok: false, message: 'Not a supported Track Forge export.' }
 }
@@ -74,6 +81,28 @@ export async function parseSharedTrackImport(content: string): Promise<TrackImpo
   const parsed = parseTrackFile(content)
   if (!parsed.ok) return parsed
   const { envelope } = parsed
+  if (envelope.format === SIGNED_TRACK_REPLY_FORMAT &&
+      envelope.formatVersion === SIGNED_TRACK_REPLY_FORMAT_VERSION) {
+    if (!globalThis.crypto?.subtle) return { ok: false, message: 'Track signature verification is unavailable on this device.' }
+    if (!await verifySignedTrackReply(envelope)) {
+      return { ok: false, message: 'Invalid track reply signature. The original file is required.' }
+    }
+    const signedOriginal = envelope.original
+    if (typeof signedOriginal !== 'string') return { ok: false, message: 'The signed track reply is invalid or incomplete.' }
+    const original = await parseSharedTrackImport(signedOriginal)
+    const challenge = decodeCreatorGhostChallenge(envelope.creatorChallenge)
+    if (!original.ok || !original.signedSource || !challenge) {
+      return { ok: false, message: 'The signed track reply is invalid or incomplete.' }
+    }
+    if (original.track.routeKind === 'point-to-point' && challenge.laps !== 1) {
+      return { ok: false, message: 'A point-to-point creator ghost must use a single run.' }
+    }
+    return { ok: true,
+      track: { ...original.track, creatorChallenge: challenge, signedChallengeSource: content },
+      signedSource: original.signedSource,
+      signedChallengeSource: content,
+    }
+  }
   if (envelope.formatVersion !== SIGNED_TRACK_FORMAT_VERSION) return decodeTrackExport(envelope)
   if (!globalThis.crypto?.subtle) return { ok: false, message: 'Track signature verification is unavailable on this device.' }
   if (!await verifyTrackSignature(envelope)) {
@@ -89,13 +118,29 @@ export function decodeTrackExport(parsed: unknown): TrackImportResult {
       Object.hasOwn(envelope, 'signature')) {
     return { ok: false, message: 'Not a supported Track Forge export.' }
   }
-  return decodeTrackPayload(envelope.track)
+  if (Object.hasOwn(envelope, 'creatorChallenge')) {
+    return { ok: false, message: 'Creator ghost challenges require a signed track file.' }
+  }
+  const source = object(envelope.track)
+  if (!source) return { ok: false, message: 'Track contents are missing.' }
+  if (Object.hasOwn(source, 'creatorChallenge')) {
+    return { ok: false, message: 'Creator ghost challenges require a signed track file.' }
+  }
+  return decodeTrackPayload(source)
 }
 
 function decodeTrackPayload(payload: unknown): TrackImportResult {
   const source = object(payload)
   if (!source) return { ok: false, message: 'Track contents are missing.' }
+  const creatorChallenge: CreatorGhostChallenge | undefined = source.creatorChallenge === undefined
+    ? undefined : decodeCreatorGhostChallenge(source.creatorChallenge)
+  if (source.creatorChallenge !== undefined && !creatorChallenge) {
+    return { ok: false, message: 'The creator ghost challenge is invalid or oversized.' }
+  }
   const { points, trees } = source
+  if (creatorChallenge && source.routeKind === 'point-to-point' && creatorChallenge.laps !== 1) {
+    return { ok: false, message: 'A point-to-point creator ghost must use a single run.' }
+  }
   if (typeof source.name !== 'string' || !source.name.trim() ||
       !Array.isArray(points) || points.length > MAX_POINTS ||
       !Array.isArray(trees) || trees.length > MAX_TREES ||
@@ -116,8 +161,10 @@ function decodeTrackPayload(payload: unknown): TrackImportResult {
   const now = Date.now()
   const localSource = { ...source }
   delete localSource.signedSource
+  delete localSource.signedChallengeSource
   const track = decodeTrack({
     ...localSource,
+    ...(creatorChallenge ? { creatorChallenge } : {}),
     id: 'untrusted-shared-track',
     raceRevision: now,
     createdAt: now,

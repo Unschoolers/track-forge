@@ -124,6 +124,7 @@ export type AppCommand =
   | { readonly type: 'race-again' }
   | { readonly type: 'open-cup' }
   | { readonly type: 'cup-add-track' }
+  | { readonly type: 'cup-load-curated' }
   | { readonly type: 'cup-remove-track'; readonly index: number }
   | { readonly type: 'cup-move-track'; readonly index: number; readonly direction: -1 | 1 }
   | { readonly type: 'host-nearby-cup' }

@@ -1,4 +1,4 @@
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import { isSeededTrack } from '@/domain/track/trackCreator'
 import { isSharedTrack } from '@/domain/track/trackAccess'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
@@ -25,7 +25,7 @@ export interface TrackLibraryActions {
 }
 
 // Built-in tracks are immutable; reuse identity collections on each library redraw.
-const OFFICIAL_TRACKS = OFFICIAL_CIRCUITS.map(({ track }) => track)
+const OFFICIAL_TRACKS = OFFICIAL_COURSES.map(({ track }) => track)
 const OFFICIAL_TRACK_IDS = new Set(OFFICIAL_TRACKS.map(track => track.id))
 
 const ENVIRONMENT_NAMES = {

@@ -4,7 +4,8 @@ import { createNearbyLeaveConfirmation, createNearbyRaceMenu, createNearbyRaceMo
 import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
 import { raceDiagnosticsFilename } from '@/infrastructure/export/raceExportName'
 import { formatRaceTime } from '@/ui/format'
-import type { LightingMode, Track } from '@/domain/model'
+import type { CreatorGhostChallenge, LightingMode, Track } from '@/domain/model'
+import { CAR_SPECS } from '@/domain/config'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type {
   AppCommand,
@@ -154,10 +155,10 @@ export class DomUiHost implements UiHost {
     })
   }
 
-  private async exportTrackFile(track: Track): Promise<void> {
+  private async exportTrackFile(track: Track, creatorChallenge?: CreatorGhostChallenge): Promise<void> {
     const generation = this.noticeGeneration
     try {
-      if (await exportTrack(track)) this.showRaceExportNotice('Track file saved.', generation)
+      if (await exportTrack(track, creatorChallenge)) this.showRaceExportNotice('Track file saved.', generation)
     } catch (error) {
       console.error('Track Forge track export failed:', error)
       this.showRaceExportNotice('Export failed. Please try another save location.', generation)
@@ -218,22 +219,33 @@ export class DomUiHost implements UiHost {
     return saveJsonFile({ filename: `trackforge-nearby-${timestamp}.json`, content: JSON.stringify(report, null, 2) })
   }
 
-  private async shareTrackChallenge(track: Track): Promise<void> {
+  private async shareTrackChallenge(track: Track, challengeOverride?: CreatorGhostChallenge | null): Promise<void> {
     const generation = this.noticeGeneration
     if (isSeededTrack(track)) {
       this.showRaceExportNotice('Built-in tracks are already available to every player.')
       return
     }
+    const current = this.controller.snapshot()
+    const setup = {
+      car: current.preferences.car,
+      difficulty: current.preferences.difficulty,
+      laps: track.routeKind === 'point-to-point' ? 1 : current.preferences.raceLaps ?? 2,
+    }
+    const creatorChallenge = challengeOverride === undefined
+      ? this.runtime.raceSession.creatorGhostChallenge?.(track, setup) ?? undefined
+      : challengeOverride ?? undefined
     const best = this.controller.snapshot().scoresByTrack[track.id]?.[0]
-    const challenge = `Race "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win?'} Import the attached track file to play.`
+    const challenge = creatorChallenge
+      ? `Race "${track.name}" in Track Forge: ${creatorChallenge.laps} ${creatorChallenge.laps === 1 ? 'lap' : 'laps'}, Ghost Race against my ${CAR_SPECS[creatorChallenge.car].name} ghost (${formatRaceTime(creatorChallenge.time)}). Import the attached track file to play.`
+      : `Race "${track.name}" in Track Forge. ${best ? `Beat my ${formatRaceTime(best.time)}!` : 'Can you win?'} Import the attached track file to play.`
     try {
-      if (await shareTrack(track, challenge)) return
+      if (await shareTrack(track, challenge, creatorChallenge)) return
     } catch (error) {
       // Native sharing can fail without canceling a fallback track export.
       console.error('Track Forge share failed:', error)
     }
     if (!this.mounted || generation !== this.noticeGeneration) return
-    await this.exportTrackFile(track)
+    await this.exportTrackFile(track, creatorChallenge)
   }
 
   private readonly onIntent = (): void => {
@@ -440,6 +452,7 @@ export class DomUiHost implements UiHost {
         return createCupModal(state, {
           close,
           addTrack: () => this.controller.dispatch({ type: 'cup-add-track' }),
+          loadCurated: () => this.controller.dispatch({ type: 'cup-load-curated' }),
           removeTrack: (index) => this.controller.dispatch({ type: 'cup-remove-track', index }),
           moveTrack: (index, direction) => this.controller.dispatch({ type: 'cup-move-track', index, direction }),
           start: () => this.controller.dispatch({ type: 'start-cup' }),
@@ -470,6 +483,13 @@ export class DomUiHost implements UiHost {
             const { track, setup } = this.runtime.raceSession.snapshot()
             return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null
               ? () => this.controller.dispatch({ type: 'race-best-ghost' }) : undefined
+          })(),
+          shareChallengeResult: (() => {
+            const { track, setup } = this.runtime.raceSession.snapshot()
+            if (track?.origin !== 'imported' || !track.creatorChallenge ||
+                isSeededTrack(track) || setup?.mode !== 'ghost') return undefined
+            const challenge = this.runtime.raceSession.creatorGhostChallenge?.(track, setup, true)
+            return challenge ? () => { void this.shareTrackChallenge(track, challenge) } : undefined
           })(),
           changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           edit: () => this.controller.dispatch({ type: 'open-editor' }),

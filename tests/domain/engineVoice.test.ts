@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { CAR_IDS } from '@/domain/model'
 import {
   calculateEngineVoice,
   type EngineVoiceInput,
@@ -6,6 +7,7 @@ import {
 
 function input(overrides: Partial<EngineVoiceInput> = {}): EngineVoiceInput {
   return {
+    car: 'blue',
     frequency: 120,
     revRatio: 0.5,
     load: 0.4,
@@ -37,6 +39,7 @@ describe('engine voice', () => {
 
   it('normalizes invalid external values into finite audio parameters', () => {
     const voice = calculateEngineVoice({
+      car: 'blue',
       frequency: Number.NaN,
       revRatio: 4,
       load: -2,
@@ -45,5 +48,17 @@ describe('engine voice', () => {
     expect(Object.values(voice).every(Number.isFinite)).toBe(true)
     expect(voice.coreFrequency).toBeGreaterThanOrEqual(40)
     expect(voice.noiseGain).toBeGreaterThanOrEqual(0)
+  })
+
+  it('gives each car a distinct engine timbre at the same physical state', () => {
+    const state = input()
+    const voices = CAR_IDS.map((car) =>
+      calculateEngineVoice({ ...state, car }),
+    )
+    expect(new Set(voices.map((voice) => voice.pulseGain)).size).toBe(4)
+    expect(calculateEngineVoice({ ...state, car: 'red' }).filterFrequency)
+      .toBeGreaterThan(calculateEngineVoice({ ...state, car: 'yellow' }).filterFrequency)
+    expect(calculateEngineVoice({ ...state, car: 'green' }).noiseGain)
+      .toBeGreaterThan(calculateEngineVoice({ ...state, car: 'blue' }).noiseGain)
   })
 })

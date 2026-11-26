@@ -95,10 +95,13 @@ export class RaceScene extends Phaser.Scene {
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
+  private checkpointGraphics?: Phaser.GameObjects.Graphics
+  private renderedNextCheckpoint: number | undefined
   private snapshot: AppSnapshot | undefined
   private raceCamera: RaceCameraState | undefined
   private pointerBinding: RacePointerBinding | undefined
   private boostRequestPending = false
+  private cupCameraIntro = false
 
   constructor(
     private readonly controller: SceneControllerPort,
@@ -113,6 +116,8 @@ export class RaceScene extends Phaser.Scene {
 
   create(): void {
     this.snapshot = this.controller.snapshot()
+    this.cupCameraIntro = Boolean(this.snapshot.cup && this.snapshot.preferences.dynamicZoomEnabled &&
+      !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
     const track = this.snapshot.currentTrack
     if (!track) {
       this.controller.dispatch({ type: 'go-home' })
@@ -189,7 +194,10 @@ export class RaceScene extends Phaser.Scene {
       const view = {
         centerX: this.raceCamera.x, centerY: this.raceCamera.y,
         width: camera.width, height: camera.height,
-        zoom: this.snapshot.preferences.dynamicZoomEnabled ? this.raceCamera.zoom : RACE_CAMERA_TUNING.fixedZoom,
+        zoom: this.presentationZoom(
+          this.snapshot.preferences.dynamicZoomEnabled ? this.raceCamera.zoom : RACE_CAMERA_TUNING.fixedZoom,
+          this.raceSession.snapshot().state?.countdown ?? 0,
+        ),
         rotation: -this.raceCamera.angle - Math.PI / 2,
         minimumZoom: RACE_CAMERA_TUNING.minimumZoom,
       }
@@ -227,8 +235,12 @@ export class RaceScene extends Phaser.Scene {
     if (night) {
       this.lampGraphics.push(...createNightLampGraphics(this, lamps, Phaser.BlendModes.ADD))
     }
-    const checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
-    renderRecoveryCheckpoints(checkpointGraphics, geometry.path, this.raceSession.snapshot().state?.recoveryCheckpoints ?? [])
+    this.checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
+    const initialRace = this.raceSession.snapshot().state
+    this.renderedNextCheckpoint = initialPlayer && initialRace
+      ? initialRace.timingGates?.[initialPlayer.nextSector - 1]
+      : undefined
+    renderRecoveryCheckpoints(this.checkpointGraphics, geometry.path, initialRace?.recoveryCheckpoints ?? [], undefined, this.renderedNextCheckpoint)
     // The initial ground pass happens before lamp batches exist; force their
     // first visibility update to use the race camera's actual viewport.
     this.staticGraphicsVisibilityBounds = undefined
@@ -299,6 +311,12 @@ export class RaceScene extends Phaser.Scene {
     const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
     if (!race) return
     const player = race.vehicles.find((vehicle) => vehicle.player)
+    const nextCheckpoint = player ? race.timingGates?.[player.nextSector - 1] : undefined
+    if (nextCheckpoint !== this.renderedNextCheckpoint && this.checkpointGraphics) {
+      this.renderedNextCheckpoint = nextCheckpoint
+      this.checkpointGraphics.clear()
+      renderRecoveryCheckpoints(this.checkpointGraphics, race.path, race.recoveryCheckpoints ?? [], undefined, nextCheckpoint)
+    }
     if (player && this.raceCamera) {
       this.raceCamera = advanceRaceCamera(
         this.raceCamera,
@@ -314,7 +332,7 @@ export class RaceScene extends Phaser.Scene {
         this.raceCamera.x + this.raceCamera.shake.x,
         this.raceCamera.y + this.raceCamera.shake.y,
       )
-      this.cameras.main.setZoom(this.raceCamera.zoom)
+      this.cameras.main.setZoom(this.presentationZoom(this.raceCamera.zoom, race.countdown))
       this.cameras.main.setRotation(-this.raceCamera.angle - Math.PI / 2)
     }
     const cameraRotation = this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0
@@ -450,6 +468,13 @@ export class RaceScene extends Phaser.Scene {
         ...(this.updateRoadRibbonVisibility?.bitmap?.coverage() ?? EMPTY_BITMAP_COVERAGE),
       ])
     }
+  }
+
+  private presentationZoom(zoom: number, countdown: number): number {
+    if (!this.cupCameraIntro || countdown <= 1) return zoom
+    // Start wider to show the grid and surroundings, then settle before GO.
+    const remaining = Math.min(1, (countdown - 1) / 2.7)
+    return zoom * (1 - 0.14 * remaining * remaining)
   }
 
   private renderGroundPresentation(night: boolean, rotation = 0): void {

@@ -13,6 +13,7 @@ import {
   type Tree,
 } from '@/domain/model'
 import { normalizeTerrain } from '@/domain/terrain/terrainField'
+import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChallenge'
 
 export const TRACK_EXPORT_FORMAT = 'trackforge-track'
 export const TRACK_EXPORT_FORMAT_VERSION = 1
@@ -173,6 +174,9 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
     }),
   )
   const creator = normalizeTrackCreator(item.creator)
+  const creatorChallenge = item.creatorChallenge === undefined
+    ? undefined : decodeCreatorGhostChallenge(item.creatorChallenge)
+  if (item.creatorChallenge !== undefined && !creatorChallenge) return undefined
   return {
     id: asTrackId(item.id),
     name,
@@ -180,6 +184,8 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
     ...(item.origin === 'imported' || item.origin === 'seeded' || item.origin === 'local' ? { origin: item.origin } : {}),
     ...(item.origin === 'imported' && typeof item.signedSource === 'string' &&
       item.signedSource.length <= MAX_TRACK_EXPORT_CHARS ? { signedSource: item.signedSource } : {}),
+    ...(item.origin === 'imported' && typeof item.signedChallengeSource === 'string' &&
+      item.signedChallengeSource.length <= MAX_TRACK_EXPORT_CHARS ? { signedChallengeSource: item.signedChallengeSource } : {}),
     version: 8,
     points: migratedPoints,
     routeKind: normalizeRouteKind(item.routeKind),
@@ -192,6 +198,7 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
     start: decodeStart(item.start),
     environmentId: normalizeTrackEnvironmentId(item.environmentId),
     scenery: normalizeSceneryProps(item.scenery),
+    ...(creatorChallenge ? { creatorChallenge } : {}),
     ...(finite(item.raceRevision) && item.raceRevision >= 0 ? { raceRevision: item.raceRevision } : {}),
     lighting: isLightingMode(item.lighting)
       ? item.lighting

@@ -18,6 +18,22 @@ test('resumes an unfinished Arcade Cup round after closing the game', async ({ p
   expect(state.setup).toMatchObject({ mode: 'normal', laps: 1 })
 })
 
+test('loads the curated Cup and introduces the first round on the grid', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  await page.getByRole('button', { name: 'CUP', exact: true }).click()
+  await page.getByRole('button', { name: 'LOAD CURATED CUP', exact: true }).click()
+  const lineup = page.getByRole('list', { name: 'Cup track order' })
+  await expect(lineup.getByRole('listitem')).toHaveCount(3)
+  await expect(lineup.getByRole('listitem').last()).toContainText('Quarry Sprint')
+  await page.getByRole('button', { name: 'START NEW CUP', exact: true }).click()
+  await expect(page.locator('.cup-round-intro')).toContainText('Playroom Clover')
+  await expect(page.locator('.cup-round-intro')).toContainText('ROUND 1/3')
+  await expect(page.locator('.cup-round-intro')).toBeVisible()
+  await expect(page.locator('.cup-round-intro')).toBeHidden({ timeout: 12_000 })
+})
+
 test('restores and completes a scored Cup after a reload', async ({ page }) => {
   await page.addInitScript(() => {
     if (localStorage.getItem('trackforge-cup-v1')) return

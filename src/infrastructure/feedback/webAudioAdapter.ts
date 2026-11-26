@@ -2,10 +2,16 @@ import type {
   FeedbackEvent,
   FeedbackPort,
 } from '@/application/ports/feedback'
-import type { SurfaceId } from '@/domain/model'
-import type { CarId } from '@/domain/model'
+import type { CarId, SurfaceId } from '@/domain/model'
 import { calculateGearboxTone } from '@/domain/audio/gearbox'
 import { calculateEngineVoice } from '@/domain/audio/engineVoice'
+
+const CAR_MIX = {
+  blue: { suspensionPitch: 1, suspensionWeight: 1, roadTone: 1.08, roadGain: 0.86, slipTone: 1.12, slipGain: 0.72 },
+  red: { suspensionPitch: 1.1, suspensionWeight: 0.9, roadTone: 1.12, roadGain: 0.9, slipTone: 1.28, slipGain: 0.82 },
+  green: { suspensionPitch: 0.92, suspensionWeight: 1.05, roadTone: 0.84, roadGain: 1.12, slipTone: 0.72, slipGain: 1.28 },
+  yellow: { suspensionPitch: 0.68, suspensionWeight: 1.35, roadTone: 0.72, roadGain: 1.08, slipTone: 0.82, slipGain: 0.94 },
+} as const
 
 export interface ToneSink {
   unlock(): void
@@ -17,6 +23,7 @@ export interface ToneSink {
     delaySeconds?: number,
   ): void
   playLanding(strength: number): void
+  playBoostIgnition?(): void
   setEngine(
     car: CarId,
     speedRatio: number,
@@ -46,6 +53,7 @@ export class BrowserToneSink implements ToneSink {
   private roadFilter: BiquadFilterNode | undefined
   private roadGain: GainNode | undefined
   private engineGear: number | undefined
+  private activeCar: CarId = 'blue'
   private slip: AudioBufferSourceNode | undefined
   private slipFilter: BiquadFilterNode | undefined
   private slipGain: GainNode | undefined
@@ -202,6 +210,29 @@ export class BrowserToneSink implements ToneSink {
     oscillator.stop(startsAt + duration)
   }
 
+  playBoostIgnition(): void {
+    const context = this.context
+    const output = this.output
+    const buffer = this.road?.buffer
+    if (!context || !output || !buffer) return
+    const now = context.currentTime
+    const surge = context.createBufferSource()
+    const filter = context.createBiquadFilter()
+    const gain = context.createGain()
+    const pitch = CAR_MIX[this.activeCar].roadTone
+    surge.buffer = buffer
+    filter.type = 'bandpass'
+    filter.Q.value = 1.2
+    filter.frequency.setValueAtTime(460 * pitch, now)
+    filter.frequency.exponentialRampToValueAtTime(2_100 * pitch, now + 0.16)
+    gain.gain.setValueAtTime(0.045, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24)
+    surge.connect(filter).connect(gain).connect(output)
+    surge.start(now)
+    surge.stop(now + 0.24)
+    this.play(340 * pitch, 0.11, 0.04, 'triangle', 0.025)
+  }
+
   playLanding(strength: number): void {
     const context = this.context
     const output = this.output
@@ -213,10 +244,11 @@ export class BrowserToneSink implements ToneSink {
     const body = context.createOscillator()
     const bodyGain = context.createGain()
     body.type = 'triangle'
-    body.frequency.setValueAtTime(138 + 40 * force, now)
-    body.frequency.exponentialRampToValueAtTime(67, now + 0.08)
+    const { suspensionPitch, suspensionWeight } = CAR_MIX[this.activeCar]
+    body.frequency.setValueAtTime((138 + 40 * force) * suspensionPitch, now)
+    body.frequency.exponentialRampToValueAtTime(67 * suspensionPitch, now + 0.08)
     bodyGain.gain.setValueAtTime(0.001, now)
-    bodyGain.gain.linearRampToValueAtTime(0.05 + 0.20 * force, now + 0.006)
+    bodyGain.gain.linearRampToValueAtTime((0.05 + 0.20 * force) * suspensionWeight, now + 0.006)
     bodyGain.gain.exponentialRampToValueAtTime(0.001, end)
     body.connect(bodyGain).connect(output)
     body.start(now)
@@ -252,6 +284,7 @@ export class BrowserToneSink implements ToneSink {
       !this.engineFilter ||
       !this.engineGain
     ) return
+    this.activeCar = car
     const tone = calculateGearboxTone(
       car,
       speedRatio,
@@ -259,7 +292,7 @@ export class BrowserToneSink implements ToneSink {
       this.engineGear,
       cornering,
     )
-    const voice = calculateEngineVoice(tone)
+    const voice = calculateEngineVoice({ ...tone, car })
     this.engineGear = tone.gear
     this.engine.frequency.setTargetAtTime(
       voice.coreFrequency,
@@ -303,13 +336,14 @@ export class BrowserToneSink implements ToneSink {
     if (!context || !this.roadFilter || !this.roadGain) return
     const frequencies = { street: 820, dirt: 260, grass: 170, ice: 1_450 }
     const volumes = { street: 0.005, dirt: 0.012, grass: 0.014, ice: 0.004 }
+    const mix = CAR_MIX[this.activeCar]
     this.roadFilter.frequency.setTargetAtTime(
-      frequencies[surface],
+      frequencies[surface] * mix.roadTone,
       context.currentTime,
       0.06,
     )
     this.roadGain.gain.setTargetAtTime(
-      Math.max(0, Math.min(1, speedRatio)) * volumes[surface],
+      Math.max(0, Math.min(1, speedRatio)) * volumes[surface] * mix.roadGain,
       context.currentTime,
       0.08,
     )
@@ -321,9 +355,10 @@ export class BrowserToneSink implements ToneSink {
     const amount = Math.max(0, Math.min(1, strength))
     const speed = Math.max(0, Math.min(1, speedRatio))
     const frequency = { street: 1800, dirt: 850, grass: 600, ice: 2400 }[surface]
-    this.slipFilter.frequency.setTargetAtTime(frequency + speed * 500, context.currentTime, 0.08)
+    const { slipTone, slipGain } = CAR_MIX[this.activeCar]
+    this.slipFilter.frequency.setTargetAtTime((frequency + speed * 500) * slipTone, context.currentTime, 0.08)
     if (amount * speed > 0) this.slipGain.gain.cancelScheduledValues(context.currentTime)
-    this.slipGain.gain.setTargetAtTime(amount * speed * 0.035, context.currentTime, amount ? 0.06 : 0.09)
+    this.slipGain.gain.setTargetAtTime(amount * speed * 0.035 * slipGain, context.currentTime, amount ? 0.06 : 0.09)
     if (amount * speed === 0) this.slipGain.gain.setValueAtTime(0, context.currentTime + 0.9)
   }
 
@@ -346,6 +381,7 @@ export class BrowserToneSink implements ToneSink {
     this.fadeOut(this.enginePulseGain, context.currentTime)
     this.fadeOut(this.engineNoiseGain, context.currentTime)
     this.engineGear = undefined
+    this.activeCar = 'blue'
   }
 
   destroy(): void {
@@ -457,8 +493,11 @@ export class WebAudioAdapter implements FeedbackPort {
     } else if (event.type === 'curb') {
       this.sink.play(120, 0.025, 0.015, 'square')
     } else if (event.type === 'boost-ignition') {
-      this.sink.play(180, 0.09, 0.055, 'sawtooth')
-      this.sink.play(420, 0.13, 0.045, 'triangle', 0.035)
+      if (this.sink.playBoostIgnition) this.sink.playBoostIgnition()
+      else {
+        this.sink.play(180, 0.09, 0.055, 'sawtooth')
+        this.sink.play(420, 0.13, 0.045, 'triangle', 0.035)
+      }
     }
   }
 

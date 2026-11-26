@@ -87,8 +87,10 @@ export class TrackLibraryService {
     if (id === source.id || this.dependencies.trackStore.find(id)) {
       return { ok: false, message: 'Track copy could not be saved.' }
     }
-    const { creator: sourceCreator, signedSource, ...course } = source
+    const { creator: sourceCreator, signedSource, signedChallengeSource, creatorChallenge, ...course } = source
     void signedSource
+    void signedChallengeSource
+    void creatorChallenge
     const copyCreator = creator ?? (isSharedTrack(source) ? undefined : sourceCreator)
     const now = this.dependencies.now()
     const copy: Track = {

@@ -24,6 +24,7 @@ import {
   WORLD_LIGHTING,
 } from '@/phaser/rendering/lighting'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { renderRoadTransitions, renderRecoveryCheckpoints } from '@/phaser/rendering/trackCues'
 
 describe('race rendering contracts', () => {
   it('keeps terrain, structures, vehicles, lamps, effects, and night ordered', () => {
@@ -81,6 +82,50 @@ describe('race rendering contracts', () => {
     const path = buildRoadPath(track.points, track.terrain)
     expect(buildStartLineTiles(path)).toHaveLength(8)
     expect(buildCurbSegments(path).length).toBeGreaterThan(4)
+  })
+
+  it('marks grip and overpass transitions in the road ribbon at day and night', () => {
+    const track = createStarterTrack(asTrackId('road-cues'), 1)
+    const points = track.points.map((point, index) => index === 4
+      ? { ...point, surface: 'dirt' as const }
+      : index === 8 || index === 9
+        ? { ...point, structure: 'overpass' as const }
+        : point)
+    const path = buildRoadPath(points, track.terrain)
+    const colors: number[] = []
+    const lines: number[] = []
+    const graphics = {
+      lineStyle: (_width: number, color: number) => { colors.push(color) },
+      lineBetween: () => { lines.push(1) },
+      fillStyle: () => undefined,
+      fillCircle: () => undefined,
+    }
+    renderRoadTransitions(graphics as never, path, false)
+    const dayCount = lines.length
+    renderRoadTransitions(graphics as never, path, true)
+
+    expect(dayCount).toBeGreaterThan(3)
+    expect(lines.length).toBeGreaterThan(dayCount)
+    expect(new Set(colors).size).toBeGreaterThan(1)
+  })
+
+  it('emphasizes only the active authoritative timing gate', () => {
+    const track = createStarterTrack(asTrackId('next-gate-cue'), 1)
+    const path = buildRoadPath(track.points, track.terrain)
+    const widths: number[] = []
+    const graphics = {
+      lineStyle: (width: number) => { widths.push(width) },
+      beginPath: () => undefined,
+      moveTo: () => undefined,
+      lineTo: () => undefined,
+      strokePath: () => undefined,
+      fillStyle: () => undefined,
+      fillCircle: () => undefined,
+    }
+    const checkpoints = [4, 12]
+    renderRecoveryCheckpoints(graphics as never, path, checkpoints, undefined, 12)
+
+    expect(widths).toEqual([5, 11])
   })
 
   it('separates and softens a vehicle shadow as physical height increases', () => {

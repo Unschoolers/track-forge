@@ -41,6 +41,12 @@ export interface RaceEffectEvent {
 
 const MAX_PARTICLES = 180
 const MAX_SKIDS = 120
+const EFFECT_SIZE = {
+  blue: { dust: 0.92, smoke: 0.8, speed: 1, skid: 0.9, landing: 0.95 },
+  red: { dust: 0.96, smoke: 1, speed: 1.3, skid: 1, landing: 0.9 },
+  green: { dust: 1, smoke: 1.35, speed: 1, skid: 1.12, landing: 1 },
+  yellow: { dust: 1.35, smoke: 1.04, speed: 1, skid: 1.1, landing: 1.3 },
+} as const
 
 export function createRaceEffectsState(): RaceEffectsState {
   return { particles: [], skids: [], previousTires: {} }
@@ -89,6 +95,7 @@ export function advanceRaceEffects(
   }
 
   for (const vehicle of vehicles) {
+    const size = EFFECT_SIZE[vehicle.car]
     if (
       vehicle.grounded &&
       vehicle.speed > 50 &&
@@ -102,7 +109,7 @@ export function advanceRaceEffects(
           vehicle,
           random,
           vehicle.currentSurface === 'grass' ? 0.48 : 0.62,
-          vehicle.currentSurface === 'grass' ? 3 : 4,
+          (vehicle.currentSurface === 'grass' ? 3 : 4) * size.dust,
         ),
       )
     }
@@ -116,14 +123,14 @@ export function advanceRaceEffects(
       particles.push(particle('ice', vehicle, random, 0.42, 3))
     }
     if (vehicle.grounded && vehicle.braking && vehicle.speed > 70) {
-      particles.push(particle('tire-smoke', vehicle, random, 0.38, 3.5))
+      particles.push(particle('tire-smoke', vehicle, random, 0.38, 3.5 * size.smoke))
     }
     if (
       vehicle.player &&
       vehicle.speed > 215 &&
       random.next() < 0.45
     ) {
-      particles.push(particle('speed-line', vehicle, random, 0.22, 1.2))
+      particles.push(particle('speed-line', vehicle, random, 0.22, 1.2 * size.speed))
     }
     const skidThreshold =
       vehicle.currentSurface === 'ice'
@@ -151,7 +158,7 @@ export function advanceRaceEffects(
         end: tire,
         life: 2.2,
         maxLife: 2.2,
-        width: vehicle.currentSurface === 'ice' ? 1 : 1.8,
+        width: (vehicle.currentSurface === 'ice' ? 1 : 1.8) * size.skid,
       })
     }
     previousTires[vehicle.id] = tire
@@ -176,7 +183,7 @@ export function advanceRaceEffects(
             vy: -vehicle.vy * 0.04 + side * cosine * 28 * strength,
             life,
             maxLife: life,
-            size: 1.6 + strength * 2.4,
+            size: (1.6 + strength * 2.4) * EFFECT_SIZE[vehicle.car].landing,
           })
         }
       }

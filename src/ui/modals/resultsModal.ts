@@ -12,6 +12,7 @@ export function createResultsModal(
   actions: {
     readonly retry: () => void
     readonly raceBestGhost?: (() => void) | undefined
+    readonly shareChallengeResult?: (() => void) | undefined
     readonly exportRace?: (() => void) | undefined
     readonly diagnosticsOpened?: (() => void) | undefined
     readonly changeTrack?: () => void
@@ -137,11 +138,16 @@ export function createResultsModal(
   frame.footer.classList.add('results-footer')
   const primary = element('div', 'results-primary-actions')
   primary.append(button('RETRY', 'retry-race', actions.retry, 'button button-primary'))
-  if (actions.raceBestGhost) primary.append(
+  const shareChallengeResult = result.outcome === 'finished' && result.playerTime !== null
+    ? actions.shareChallengeResult : undefined
+  if (shareChallengeResult) {
+    primary.append(button('SEND BACK MY TIME', 'share-challenge-result', shareChallengeResult, 'button'))
+  }
+  const secondary = element('div', 'results-secondary')
+  if (actions.raceBestGhost) (shareChallengeResult ? secondary : primary).append(
     button('RACE GHOST', 'race-best-ghost', actions.raceBestGhost, 'button'),
   )
   primary.append(button('CHANGE TRACK', 'change-track', actions.changeTrack ?? actions.home, 'button'))
-  const secondary = element('div', 'results-secondary')
   secondary.append(
     button('EDIT TRACK', 'edit-race-track', actions.edit, 'button'),
     button('HOME', 'results-home', actions.home, 'button'),

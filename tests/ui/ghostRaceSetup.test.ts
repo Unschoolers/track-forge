@@ -109,6 +109,27 @@ describe('Ghost Race setup', () => {
     } }, callbacks, null)
     expect(stale.querySelector('[data-action="mode-normal"]')?.getAttribute('aria-pressed')).toBe('true')
   })
+  it('shows creator ghost time, car and lap rules before the recipient starts', () => {
+    const challenged = { ...track, creatorChallenge: {
+      car: 'red' as const, laps: 1 as const, time: 61.25,
+      frames: [
+        { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+        { t: 61.25, x: 1, y: 1, angle: 0, z: 0, structureRunId: null },
+      ],
+    } }
+    const modal = createRaceSetupModal({ ...state, currentTrack: challenged }, actions(), { kind: 'exact', time: 61.25 })
+    expect(modal.textContent).toContain('Creator challenge: 01:01.250 · Red · 1 lap')
+    expect(modal.textContent).toContain('solo against this replay')
+    const callbacks = actions()
+    const mismatchedLaps = createRaceSetupModal({ ...state, currentTrack: challenged }, callbacks, {
+      kind: 'different-setup', setup: { car: 'red', laps: 1 },
+    })
+    expect(mismatchedLaps.textContent).toContain('Choose Ghost Race to apply the target laps and race this replay.')
+    const ghost = mismatchedLaps.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')
+    expect(ghost?.disabled).toBe(false)
+    ghost?.click()
+    expect(callbacks.preferences).toHaveBeenCalledWith({ ...state.preferences, raceMode: 'ghost', raceLaps: 1 })
+  })
   it('offers and invokes the best ghost action when available', () => {
     const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
       playerPlace: 1, playerTime: 61, newRecord: false, standings: [], highScores: [] }
@@ -117,6 +138,20 @@ describe('Ghost Race setup', () => {
     modal.querySelector<HTMLButtonElement>('[data-action="race-best-ghost"]')?.click()
     expect(raceBestGhost).toHaveBeenCalledOnce()
     expect(createResultsModal(result, { retry() {}, edit() {}, home() {} }).querySelector('[data-action="race-best-ghost"]')).toBeNull()
+  })
+  it('keeps retry and sharing the challenge time together after a completed run', () => {
+    const result: RaceResult = { outcome: 'finished', trackId: track.id, trackName: track.name,
+      playerPlace: 1, playerTime: 61, newRecord: false, standings: [], highScores: [], ghostTime: 62 }
+    const shareChallengeResult = vi.fn()
+    const retry = vi.fn()
+    const actions = { retry, edit() {}, home() {}, shareChallengeResult }
+    const modal = createResultsModal(result, actions)
+    modal.querySelector<HTMLButtonElement>('.results-primary-actions [data-action="retry-race"]')?.click()
+    modal.querySelector<HTMLButtonElement>('.results-primary-actions [data-action="share-challenge-result"]')?.click()
+    expect(retry).toHaveBeenCalledOnce()
+    expect(shareChallengeResult).toHaveBeenCalledOnce()
+    expect(createResultsModal({ ...result, outcome: 'water', playerTime: null }, actions)
+      .querySelector('[data-action="share-challenge-result"]')).toBeNull()
   })
   it('states Boost Practice is unranked without showing record or ghost save prompts', () => {
     const result: RaceResult = { mode: 'boost-practice', outcome: 'finished', trackId: track.id, trackName: track.name,
