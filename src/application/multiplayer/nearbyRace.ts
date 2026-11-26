@@ -65,6 +65,7 @@ export const LOBBY_DELIVERY_TIMEOUT_MS = 10_000
 const LOBBY_ACK_TIMEOUT_MS = 30_000
 const CLOCK_AUDIT_INTERVAL_MS = 15_000
 const CLOCK_AUDIT_TIMEOUT_MS = 5000
+const CLOCK_STAGING_PROBE_TIMEOUT_MS = 1000
 
 class LobbyDeliveryTimeoutError extends Error {
   constructor() { super('Lobby delivery timed out.') }
@@ -133,6 +134,7 @@ export class NearbyRace {
   private receiver: TrackReceiver | null = null
   private prepared: Pick<Course, 'laps' | 'lighting'> | null = null
   private readonly clock = new NearbyClock()
+  private clockProbeTimer: ReturnType<typeof setTimeout> | undefined
   private readonly clockAudit = new NearbyClock(CLOCK_PROBE_COUNT)
   private clockAuditNextAt = Infinity
   private clockAuditDeadline: number | null = null
@@ -435,7 +437,7 @@ export class NearbyRace {
     this.racers.clear()
     this.lineup = null
     this.localSceneReady = false
-    this.clock.reset()
+    this.resetStagingClock()
     this.clockAudit.reset()
     this.clockAuditNextAt = Infinity
     this.clockAuditDeadline = null
@@ -561,7 +563,22 @@ export class NearbyRace {
       return
     }
     const request = this.clock.request(this.now())
-    if (request) this.sendControl([this.hostId], { type: 'clock-probe', round: this.round, probe: request.probe })
+    if (!request) {
+      this.fail('Could not synchronize the multiplayer clock. Rejoin the room and try again.', 'clock')
+      return
+    }
+    const { probe } = request
+    this.clockProbeTimer = setTimeout(() => {
+      if (!this.clock.expire(probe)) return
+      this.record('clock_probe_timeout', { probe })
+      this.probeClock()
+    }, CLOCK_STAGING_PROBE_TIMEOUT_MS)
+    this.sendControl([this.hostId], { type: 'clock-probe', round: this.round, probe })
+  }
+
+  private resetStagingClock(): void {
+    clearTimeout(this.clockProbeTimer)
+    this.clock.reset()
   }
 
   /** Low-rate diagnostic probes never move GO or change local physics speed. */
@@ -898,7 +915,10 @@ export class NearbyRace {
         receivedAt, sentAt: this.now() })
     } else if (fromHost && this.phase === 'staging' && message.type === 'clock-reply' &&
         incomingRound === this.round && this.localSceneReady) {
-      if (this.clock.receive(message.probe, message.receivedAt, message.sentAt, this.now())) this.probeClock()
+      if (this.clock.receive(message.probe, message.receivedAt, message.sentAt, this.now())) {
+        clearTimeout(this.clockProbeTimer)
+        this.probeClock()
+      }
     } else if (fromHost && this.phase === 'racing' && message.type === 'clock-reply' &&
         incomingRound === this.round && this.clockAuditDeadline !== null && this.now() <= this.clockAuditDeadline) {
       if (this.clockAudit.receive(message.probe, message.receivedAt, message.sentAt, this.now())) this.sendAuditProbe()
@@ -1068,10 +1088,9 @@ export class NearbyRace {
     }).catch((error: unknown) => {
       this.record('control', { kind: message.type, result: 'failed', error: this.errorKind(error) })
       if (active !== this.generation) return
-      // Audit failures are recorded above and retried by the audit deadline.
-      // They must not end an active race or a later round.
-      if ((message.type === 'clock-probe' || message.type === 'clock-reply') &&
-          (message.probe >= CLOCK_PROBE_COUNT || message.round !== this.round || this.phase !== 'staging')) return
+      // Each clock exchange has a guest-side deadline. A failed send consumes
+      // that attempt and the guest can continue with the remaining probes.
+      if (message.type === 'clock-probe' || message.type === 'clock-reply') return
       if (message.type === 'ready' && message.choice !== undefined &&
           (message.round !== this.round || this.phase !== 'lobby' ||
            message.choice < this.lobby.localChoice || this.lobby.acknowledgedChoice(this.slot, message.choice))) {
@@ -1149,7 +1168,7 @@ export class NearbyRace {
     this.armed.clear()
     this.localSceneReady = false
     this.lineup = null
-    this.clock.reset()
+    this.resetStagingClock()
     this.clockAudit.reset()
     this.clockAuditNextAt = Infinity
     this.clockAuditDeadline = null

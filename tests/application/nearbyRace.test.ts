@@ -20,6 +20,58 @@ async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): P
 }
 
 describe('Nearby Arcade', () => {
+  it.each([2, 3])('bounds staging when %i clock replies are unusable', async unavailable => {
+    const probes: number[] = []
+    const network = new NearbyNetwork((sender, _recipient, bytes) => {
+      const message = decodeControl(bytes)
+      if (sender === 'guest' && message?.type === 'clock-probe') probes.push(message.probe)
+      if (sender === 'host' && message?.type === 'clock-reply' && message.probe < unavailable) {
+        // First simulate a missing reply, then a reply with impossible host processing time.
+        return message.probe === 0 ? new Uint8Array([255]) :
+          encodeControl({ ...message, sentAt: message.receivedAt + 60_000 })
+      }
+      return bytes
+    })
+    const host = new NearbyRace(network.endpoint('host'), () => true, () => 40_000)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true, () => 10_000)
+    const countdown = vi.fn()
+    guest.onCountdown(countdown)
+    try {
+      host.host({ track, laps: 2, lighting: 'day', car: 'blue' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      await readyEveryone(host, [guest])
+      await vi.waitFor(() => {
+        expect(host.snapshot().phase).toBe('staging')
+        expect(guest.snapshot().phase).toBe('staging')
+      }, { interval: 5 })
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      host.sceneReady()
+      guest.sceneReady()
+      await vi.advanceTimersByTimeAsync(unavailable * 1000 - 1)
+      expect(countdown).not.toHaveBeenCalled()
+      expect(guest.snapshot().phase).toBe('staging')
+      await vi.advanceTimersByTimeAsync(1)
+      expect(probes).toEqual([0, 1, 2, 3, 4])
+
+      if (unavailable === 2) {
+        expect(countdown).toHaveBeenCalledExactlyOnceWith(14_000)
+        expect(guest.snapshot().phase).toBe('racing')
+      } else {
+        expect(countdown).not.toHaveBeenCalled()
+        expect(guest.snapshot()).toMatchObject({ phase: 'idle', error: expect.stringContaining('synchronize') })
+      }
+    } finally {
+      host.destroy()
+      guest.destroy()
+      vi.useRealTimers()
+    }
+  })
+
   it.each(['roster', 'choice', 'acknowledgement'] as const)('bounds a stalled %s without imposing a deadline on human choice', async kind => {
     let stall = false
     let blocked = false
