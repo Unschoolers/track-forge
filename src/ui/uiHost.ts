@@ -15,6 +15,7 @@ import type { AudioVolumeSetting } from '@/application/audioVolume'
 import type { UpdateInfo, UpdateProvider } from '@/application/updates/updateProvider'
 import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
+import { deferEditorDragChrome } from '@/ui/editor/editorDragRendering'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
 import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
@@ -67,6 +68,7 @@ export class DomUiHost implements UiHost {
   private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
   private readonly flyover = new RaceFlyoverLifecycle()
   private mounted = false
+  private previousSnapshot: AppSnapshot | undefined
   private readonly dialogs = new DialogController()
   private readonly environment: UiEnvironment
   private availableUpdate: UpdateInfo | null = null
@@ -115,6 +117,7 @@ export class DomUiHost implements UiHost {
     this.availableUpdate = null
     this.lastUpdateCheckAt = Number.NEGATIVE_INFINITY
     this.previousOverlayType = 'none'
+    this.previousSnapshot = undefined
     this.noticeGeneration++
     for (const timer of this.noticeTimers) clearTimeout(timer)
     this.noticeTimers.clear()
@@ -249,6 +252,9 @@ export class DomUiHost implements UiHost {
   }
 
   private render(state: AppSnapshot): void {
+    const previous = this.previousSnapshot
+    this.previousSnapshot = state
+    if (deferEditorDragChrome(previous, state)) return
     this.screenCleanup?.()
     this.screenCleanup = undefined
     this.overlayCleanup?.()

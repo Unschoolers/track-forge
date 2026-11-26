@@ -209,3 +209,15 @@ Compare the same Papou track, lighting, car and device for 30–60 seconds of
 active driving, cold and warm, including turns. Record p95/p99 frame intervals,
 spikes over 33/50 ms, startup latency and Android memory pressure. The component
 tests establish scheduling behavior, not a measured device improvement.
+
+## Editor point-drag invalidation
+
+Large authored terrain is static during a live point move: keep its previous
+mesh and raster, update road geometry through the frame loop, and rebuild the
+road-conditioned terrain once on release. A cancelled drag restores the
+original road and can reuse the unchanged terrain. Terrain/environment/lighting
+changes still invalidate the terrain. Diagnostics and selection panels refresh
+at gesture end, rather than reconstructing DOM for intermediate coordinates.
+The road raster is not captured every drag frame. This is an editor-only
+presentation optimization; committed geometry, recovery, undo and saving are
+unchanged. Elevation-dependent terrain shading catches up when the drag ends.
