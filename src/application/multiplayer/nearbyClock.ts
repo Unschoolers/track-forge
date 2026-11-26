@@ -1,7 +1,7 @@
 /** NTP-style exchange over independent monotonic clocks. No wall-clock dependency. */
 export const CLOCK_PROBE_COUNT = 5
 export const CLOCK_PROBE_MASK = 0xffff
-export interface ClockEstimate { offsetMs: number; roundTripMs: number }
+export type ClockEstimate = { readonly offsetMs: number; readonly roundTripMs: number }
 
 export class NearbyClock {
   private samples: ClockEstimate[] = []
