@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMenuLayout, createMenuDock } from '@/ui/menu/menuLayout'
 import { createMenuAction, createMenuChoices } from '@/ui/menu/menuControls'
+
+afterEach(() => document.body.replaceChildren())
 
 describe('menu design system', () => {
   it('separates decorative media, scrollable content and actions, and defaults to a live-safe backdrop', () => {
@@ -31,6 +33,8 @@ describe('menu design system', () => {
     const choices = [{ value: 'red', label: 'Red' }, { value: 'blue', label: 'Blue' }, { value: 'green', label: 'Green', disabled: true }] as const
     const first = createMenuChoices('Vehicle', choices, 'red', change)
     const second = createMenuChoices('Vehicle', choices, 'blue', vi.fn())
+    // Radio activation and change events require a mounted DOM in jsdom.
+    document.body.append(first.element, second.element)
     const inputs = Array.from(first.element.querySelectorAll('input'))
     const red = inputs[0]
     const blue = inputs[1]
