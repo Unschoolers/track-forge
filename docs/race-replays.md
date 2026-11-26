@@ -36,3 +36,24 @@ Replay consumers should draw recorded vehicle coordinates against the included t
 ## Verification
 
 `tests/application/raceDiagnostics.test.ts` protects all-car capture and recovery/terminal boundaries. `tests/ui/raceDiagnostics.test.ts` protects hold vs tap, gesture cancellation, availability for non-record races and keyboard access. Verify typecheck/lint/build and Android export on device before merging.
+
+Optional `performance.timings.bitmapWork` records bounded deferred texture
+work samples: operation (prepare/upload), layer (0 road, 1 terrain, 2 bridge
+approach, 3 bridge deck), tile key, priority, CPU durationMs, and afterFrame
+(the one-based count of the preceding recorded frame; the following interval
+is the one potentially affected). `droppedBitmapWork` reports overflow. The
+existing five-column frame contract is unchanged. Startup prewarming is not
+included in these race-streaming samples.
+
+Expanded performance exports also include `presentationColumns` and
+`presentationFrames` (one aligned row per legacy frame, null if unavailable).
+They record monotonic frame/update timestamps, ground/culling, vehicle/effect
+and lighting CPU durations, camera pose, visible hill/water/bridge vector batch
+and primitive counts, lamp batches, and needed/visible/resident tile counts by
+layer. Primitive counts are workload proxies, not draw calls or GPU timings.
+`longTasks` records browser main-thread tasks over 50 ms when supported, with
+monotonic start/duration timestamps; support is identified in device metadata.
+Build run/attempt and renderer type/initial canvas dimensions identify the
+capture. None of these measurements waits for GPU completion. This is a
+passive diagnostic: no layer toggles, quality changes or forced synchronous
+GPU queries. The existing frame and replay contracts remain readable.

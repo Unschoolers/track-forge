@@ -15,7 +15,6 @@ const PREFETCH_GUTTER_TILES = 1
 // texture budget remains shared with visible tiles, so large zoomed-out
 // views naturally disable prefetch rather than increasing memory use.
 const MAX_PREFETCH_TILES_PER_LAYER = 8
-const MAX_UNUSED_TILES_PER_LAYER = 8
 const FRAME_RESERVE_MS = 3
 const MAX_FRAME_INTERVAL_MS = 1000 / 60
 const HEADING_BUCKETS = 24
@@ -31,8 +30,16 @@ interface BitmapTileUploadOwner {
   wants(key: string): boolean
   prepare(tile: GroundTile): HTMLCanvasElement
   upload(tile: GroundTile, key: string, canvas: HTMLCanvasElement): void
-  retireUnused?(): boolean
 }
+
+export interface BitmapWorkSample {
+  readonly operation: 'prepare' | 'upload'
+  readonly layer: number
+  readonly tile: string
+  readonly priority: number
+  readonly durationMs: number
+}
+export type BitmapWorkObserver = (sample: BitmapWorkSample) => void
 
 export interface UploadRequest {
   readonly owner: BitmapTileUploadOwner
@@ -48,12 +55,12 @@ export interface UploadRequest {
 /** One bounded texture upload per display frame, shared across the bitmap layers. */
 export class BitmapTileUploadScheduler {
   private readonly requests = new Map<string, UploadRequest>()
-  private readonly retirement = new Set<BitmapTileUploadOwner>()
   private prepared: { request: UploadRequest; canvas: HTMLCanvasElement } | undefined
   private frameStart: number | undefined
   private destroyed = false
 
-  constructor(private readonly scene: Phaser.Scene, private readonly now = () => performance.now()) {
+  constructor(private readonly scene: Phaser.Scene, private readonly now = () => performance.now(),
+    private readonly observe?: BitmapWorkObserver) {
     scene.game.events.on('prestep', this.beginFrame)
     scene.game.events.on('postrender', this.processOne)
   }
@@ -64,7 +71,6 @@ export class BitmapTileUploadScheduler {
 
   replace(owner: BitmapTileUploadOwner, requests: readonly UploadRequest[]): void {
     if (this.destroyed) return
-    if (owner.retireUnused) this.retirement.add(owner)
     for (const [id, request] of this.requests) {
       if (request.owner === owner) this.requests.delete(id)
     }
@@ -74,7 +80,6 @@ export class BitmapTileUploadScheduler {
   }
 
   cancel(owner: BitmapTileUploadOwner): void {
-    this.retirement.delete(owner)
     if (this.prepared?.request.owner === owner) this.prepared = undefined
     for (const [id, request] of this.requests) {
       if (request.owner === owner) this.requests.delete(id)
@@ -85,7 +90,6 @@ export class BitmapTileUploadScheduler {
     if (this.destroyed) return
     this.destroyed = true
     this.requests.clear()
-    this.retirement.clear()
     this.prepared = undefined
     this.scene.game.events.off('prestep', this.beginFrame)
     this.scene.game.events.off('postrender', this.processOne)
@@ -135,12 +139,6 @@ export class BitmapTileUploadScheduler {
     const best = this.bestRequest()
     if (!best) {
       this.prepared = undefined
-      // Deleting GPU resources can also stall. Retire at most one stale tile
-      // per spare frame rather than destroying a batch during a camera update.
-      for (const owner of this.retirement) {
-        if (owner.retireUnused?.()) return
-        this.retirement.delete(owner)
-      }
       return
     }
     // Finish prepared visible work even if distance priorities moved slightly.
@@ -151,9 +149,19 @@ export class BitmapTileUploadScheduler {
     const canvas = this.takePrepared(next)
     if (canvas) {
       this.requests.delete(this.requestId(next))
-      next.owner.upload(next.tile, next.key, canvas)
+      this.measure(next, 'upload', () => next.owner.upload(next.tile, next.key, canvas))
     } else {
-      this.prepared = { request: next, canvas: next.owner.prepare(next.tile) }
+      this.prepared = { request: next, canvas: this.measure(next, 'prepare', () => next.owner.prepare(next.tile)) }
+    }
+  }
+
+  private measure<T>(request: UploadRequest, operation: BitmapWorkSample['operation'], work: () => T): T {
+    if (!this.observe) return work()
+    const start = this.now()
+    try { return work() }
+    finally {
+      this.observe({ operation, layer: request.layerOrder, tile: request.key,
+        priority: request.priority, durationMs: this.now() - start })
     }
   }
 }
@@ -219,6 +227,7 @@ export class BitmapTileRenderer {
   private wantedSignature = ''
   private clock = 0
   private destroyed = false
+  private visibleResident = 0
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -261,8 +270,10 @@ export class BitmapTileRenderer {
     for (const tile of currentTiles) this.current.add(tileKey(tile))
     for (const tile of candidates) this.wanted.add(tileKey(tile))
 
+    this.visibleResident = 0
     for (const [key, item] of this.images) {
       const visible = this.current.has(key)
+      if (visible) this.visibleResident++
       if (item.image.visible !== visible) item.image.setVisible(visible)
       if (this.wanted.has(key)) this.touch(key, item)
     }
@@ -293,6 +304,14 @@ export class BitmapTileRenderer {
     this.scheduler.replace(this, requests)
   }
 
+  /** Counts only; do not enumerate tiles or inspect GPU state in the hot path. */
+  writeCoverage(target: number[]): void {
+    const offset = this.layerOrder * 3
+    target[offset] = this.current.size
+    target[offset + 1] = this.visibleResident
+    target[offset + 2] = this.images.size
+  }
+
   wants(key: string): boolean {
     return !this.destroyed && this.wanted.has(key) && !this.images.has(key)
   }
@@ -312,6 +331,7 @@ export class BitmapTileRenderer {
       const image = this.scene.add.image(tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, texture)
         .setOrigin(0).setDepth(this.depth).setVisible(this.current.has(key))
       this.touch(key, { image, texture, lastUsed: ++this.clock })
+      if (this.current.has(key)) this.visibleResident++
     } catch (error) {
       this.scene.textures.remove(texture)
       throw error
@@ -331,13 +351,9 @@ export class BitmapTileRenderer {
     this.images.clear()
   }
 
-  retireUnused(): boolean {
-    let unused = 0
-    for (const key of this.images.keys()) if (!this.wanted.has(key)) unused++
-    return unused > MAX_UNUSED_TILES_PER_LAYER && this.evictOldest(key => !this.wanted.has(key))
-  }
-
   private ensureCapacity(): void {
+    // Retain offscreen textures within the existing hard cap. Evict only
+    // when an actual upload requires space, not merely because a tile left view.
     if (this.images.size < BITMAP_TILE_LIMIT) return
     // Evict stale tiles before any requested tile. Current tiles are never
     // sacrificed for speculation.
@@ -377,13 +393,14 @@ export class BitmapTileRenderer {
 export interface MeadowBitmapRenderer {
   render(view: GroundViewport, bounds?: WorldBounds): void
   warmVisible(): void
+  coverage(): readonly number[]
   destroy(): void
 }
 
-export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain'): MeadowBitmapRenderer | undefined {
+export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): MeadowBitmapRenderer | undefined {
   const layers = createMeadowBitmapLayers(geometry, night, environment, shadowMode)
   if (!layers) return undefined
-  const scheduler = new BitmapTileUploadScheduler(scene)
+  const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
   const renderers = [
     new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
     new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2, 1),
@@ -404,6 +421,11 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackG
       for (const renderer of renderers) renderer.render(view, bounds)
     },
     warmVisible: () => scheduler.warmVisible(),
+    coverage: () => {
+      const counts = Array<number>(12).fill(0)
+      for (const renderer of renderers) renderer.writeCoverage(counts)
+      return counts
+    },
     destroy,
   }
 }

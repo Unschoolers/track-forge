@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type Phaser from 'phaser'
-import { BitmapTileRenderer, BitmapTileUploadScheduler, selectAheadTiles, type UploadRequest } from '@/phaser/rendering/meadowBitmapRenderer'
+import { BitmapTileRenderer, BitmapTileUploadScheduler, selectAheadTiles, type UploadRequest, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
 
 const view = {
   centerX: 128,
@@ -37,7 +37,7 @@ describe('selectAheadTiles', () => {
   })
 })
 
-function schedulerFixture() {
+function schedulerFixture(observe?: BitmapWorkObserver) {
   let clock = 0
   const listeners = new Map<string, () => void>()
   const scene = { game: {
@@ -49,7 +49,7 @@ function schedulerFixture() {
       },
     },
   } } as unknown as Phaser.Scene
-  const scheduler = new BitmapTileUploadScheduler(scene, () => clock)
+  const scheduler = new BitmapTileUploadScheduler(scene, () => clock, observe)
   const frame = (elapsed = 2) => {
     listeners.get('prestep')?.()
     clock += elapsed
@@ -70,7 +70,7 @@ function schedulerFixture() {
     })
     return { owner, request, resident }
   }
-  return { scheduler, frame, makeOwner, listeners, scene }
+  return { scheduler, frame, makeOwner, listeners, scene, advance: (ms: number) => { clock += ms } }
 }
 
 describe('BitmapTileUploadScheduler', () => {
@@ -108,6 +108,27 @@ describe('BitmapTileUploadScheduler', () => {
     expect(road.owner.prepare).not.toHaveBeenCalled()
   })
 
+  it('attributes deferred canvas and GPU registration work to separate frames', () => {
+    const observe = vi.fn()
+    const { scheduler, frame, makeOwner, advance } = schedulerFixture(observe)
+    const road = makeOwner(0)
+    road.owner.prepare.mockImplementation(() => {
+      advance(7)
+      return {} as HTMLCanvasElement
+    })
+    road.owner.upload.mockImplementation(() => { advance(11) })
+    scheduler.replace(road.owner, [road.request(1, 0)])
+    frame()
+    expect(observe).toHaveBeenCalledExactlyOnceWith({
+      operation: 'prepare', layer: 0, tile: '1:0', priority: 0, durationMs: 7,
+    })
+    frame()
+    expect(observe).toHaveBeenLastCalledWith({
+      operation: 'upload', layer: 0, tile: '1:0', priority: 0, durationMs: 11,
+    })
+    scheduler.destroy()
+  })
+
   it('drops a canceled prepared tile and unregisters both callbacks on shutdown', () => {
     const { scheduler, makeOwner, frame, listeners } = schedulerFixture()
     const road = makeOwner(0)
@@ -136,7 +157,7 @@ describe('BitmapTileUploadScheduler', () => {
 })
 
 describe('BitmapTileRenderer', () => {
-  it('reuses stable windows and retires unused textures one per spare frame', () => {
+  it('retains offscreen textures within capacity and reuses them on return', () => {
     const { scheduler, scene, frame } = schedulerFixture()
     const registered = new Set<string>()
     const removed: string[] = []
@@ -177,13 +198,18 @@ describe('BitmapTileRenderer', () => {
     scheduler.warmVisible()
     expect(registered.size).toBe(24)
     expect(removed).toHaveLength(0)
-    frame(15)
+    for (let i = 0; i < 12; i++) frame()
+    expect(registered.size).toBe(24)
     expect(removed).toHaveLength(0)
-    frame()
-    expect(removed).toHaveLength(1)
-    for (let i = 0; i < 10; i++) frame()
-    expect(registered.size).toBe(20)
-    expect(removed).toHaveLength(4)
+    const coverage: number[] = []
+    renderer.writeCoverage(coverage)
+    expect(coverage).toEqual([12, 12, 24])
+    tileOffset = 0
+    renderer.render(initial)
+    scheduler.warmVisible()
+    expect(tiles.image).toHaveBeenCalledTimes(24)
+    expect(registered.size).toBe(24)
+    expect(removed).toHaveLength(0)
     renderer.destroy()
     scheduler.destroy()
     expect(registered.size).toBe(0)
