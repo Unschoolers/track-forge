@@ -6,6 +6,7 @@ import type { TrackId } from '@/domain/model'
 import {
   renderEditorGrid,
   renderEditorOverlay,
+  renderRoadPointPreview,
 } from '@/phaser/rendering/editorRenderer'
 import {
   renderTrackGeometryBase,
@@ -19,6 +20,7 @@ import {
 } from '@/phaser/rendering/bridgeRenderer'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { previewRoadPointMove } from '@/domain/track/pathBuilder'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import { resolveRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
 import {
@@ -90,6 +92,9 @@ export class EditorScene extends Phaser.Scene {
   private lampGraphics?: Phaser.GameObjects.Graphics
   private terrainPreviewGraphics?: Phaser.GameObjects.Graphics
   private overlayGraphics?: Phaser.GameObjects.Graphics
+  private roadPreviewGraphics?: Phaser.GameObjects.Graphics
+  private lastRoadPreview: ReturnType<EditorInputController['roadPointPreview']>
+  private lastRoadPreviewZoom = 0
   private editorInput: EditorInputController | undefined
   private pointerListeners: AbortController | undefined
   private currentSnapshot: AppSnapshot | undefined
@@ -153,6 +158,7 @@ export class EditorScene extends Phaser.Scene {
     this.overlayGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.editorOverlay)
+    this.roadPreviewGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.editorOverlay + 1)
     this.terrainRaster = new EditorWorldRaster(this, [this.terrainGraphics], WORLD_RENDER_DEPTH.terrain)
     const decorations = [this.roadMarkingGraphics, this.structureUnderlayGraphics,
       this.structureDeckGraphics, this.structureWallGraphics, this.lampGraphics]
@@ -246,6 +252,7 @@ export class EditorScene extends Phaser.Scene {
 
   override update(): void {
     this.renderPendingGeometry()
+    this.renderRoadDragPreview()
     const { width, height } = this.viewport()
     this.terrainRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
     if (this.meadowBitmapRenderer) {
@@ -628,6 +635,22 @@ export class EditorScene extends Phaser.Scene {
     )
   }
 
+  private renderRoadDragPreview(): void {
+    const graphics = this.roadPreviewGraphics
+    const editor = this.currentSnapshot?.editor
+    if (!graphics || !editor) return
+    const preview = this.editorInput?.roadPointPreview()
+    const { zoom } = this.editorCamera
+    if (preview === this.lastRoadPreview && (!preview || zoom === this.lastRoadPreviewZoom)) return
+    this.lastRoadPreview = preview
+    this.lastRoadPreviewZoom = zoom
+    graphics.clear()
+    if (preview) {
+      const spans = previewRoadPointMove(editor.points, editor.routeKind, preview.index, preview.position)
+      renderRoadPointPreview(graphics, spans, preview.position, zoom)
+    }
+  }
+
   private renderOverlayPresentation(geometry: TrackGeometry): void {
     if (!this.overlayGraphics || !this.currentSnapshot) return
     const snapshot = this.currentSnapshot
@@ -753,6 +776,7 @@ export class EditorScene extends Phaser.Scene {
     this.currentRenderState = undefined
     this.worldRenderPending = false
     this.overlayRenderPending = false
+    this.lastRoadPreview = undefined
     this.previewRenderPending = false
     this.compiledTerrainPreviewRevision = undefined
     this.terrainPreviewImpacts = []

@@ -14,6 +14,7 @@ import { EDITOR_ZOOM_LIMITS, minimumEditorZoomOut } from '@/phaser/camera/editor
 import type {
   RoadStructure,
   TerrainBrushKind,
+  TrackPoint,
   Vector2,
 } from '@/domain/model'
 import {
@@ -193,7 +194,8 @@ export class EditorInputController {
   private lastScreen: Vector2 | undefined
   private selectedPoint = -1
   private selectionStart: PointerSample | undefined
-  private selectionDragging = false
+  private selectionPoints: readonly TrackPoint[] | undefined
+  private roadPreview: { readonly index: number; readonly position: Vector2 } | undefined
   private checkpointGesture: { start: PointerSample; mark: number | undefined; dragging: boolean } | undefined
   private drawStartIndex = 0
   private pendingDrawStart: { screen: Vector2; world: Vector2 } | undefined
@@ -235,7 +237,8 @@ export class EditorInputController {
     this.activePointer = pointer.id
     this.gestureTool = this.dependencies.tool()
     this.selectionStart = this.gestureTool === 'select' ? pointer : undefined
-    this.selectionDragging = false
+    this.selectionPoints = undefined
+    this.roadPreview = undefined
     this.lastScreen = pointer
     this.drawStartIndex = this.dependencies.editor().points.length
     this.gestureHasTransaction = this.gestureTool !== 'pan' &&
@@ -287,10 +290,9 @@ export class EditorInputController {
     } else {
       const start = this.pendingDrawStart
       if (start && Math.hypot(pointer.x - start.screen.x, pointer.y - start.screen.y) < 4) return
-      if (this.gestureTool === 'select' && this.selectedPoint >= 0 && !this.selectionDragging) {
+      if (this.gestureTool === 'select' && this.selectedPoint >= 0 && !this.roadPreview) {
         const origin = this.selectionStart
         if (origin && Math.hypot(pointer.x - origin.x, pointer.y - origin.y) < SELECTION_DRAG_SCREEN_PIXELS) return
-        this.selectionDragging = true
       }
       this.commitPendingDrawStart()
       this.applyTool(pointer, 'move')
@@ -304,6 +306,19 @@ export class EditorInputController {
     }
     if (pointer.id === this.activePointer && this.gestureTool === 'checkpoint' && !this.navigating) {
       this.finishCheckpointGesture(pointer)
+    }
+    if (pointer.id === this.activePointer && this.gestureTool === 'select' && !this.navigating) {
+      const preview = this.roadPointPreview()
+      this.roadPreview = undefined
+      if (preview && this.dependencies.tool() === 'select') {
+        const position = this.worldPosition(pointer)
+        const original = this.selectionPoints?.[preview.index]
+        if (original && (position.x !== original.x || position.y !== original.y)) {
+          this.dependencies.dispatch({ type: 'move-point', index: preview.index, point: position })
+        }
+        // Clear the context panel after a drag so it cannot cover the next touch.
+        this.dependencies.onPointSelected?.(null)
+      }
     }
     this.releasePointer(pointer.id, true)
   }
@@ -354,7 +369,8 @@ export class EditorInputController {
     this.lastScreen = undefined
     this.selectedPoint = -1
     this.selectionStart = undefined
-    this.selectionDragging = false
+    this.selectionPoints = undefined
+    this.roadPreview = undefined
     this.drawStartIndex = 0
   }
 
@@ -387,10 +403,6 @@ export class EditorInputController {
       })
       this.dependencies.dispatch({ type: 'normalize-loop' })
     }
-    if (tool === 'select' && this.selectedPoint >= 0 && this.dependencies.editor().gestureChanged) {
-      // Clearing after a drag prevents the context panel from covering the next touch.
-      this.dependencies.onPointSelected?.(null)
-    }
     if (commitTerrain) {
       this.commitTerrainStroke()
     } else {
@@ -405,7 +417,8 @@ export class EditorInputController {
     this.lastScreen = undefined
     this.selectedPoint = -1
     this.selectionStart = undefined
-    this.selectionDragging = false
+    this.selectionPoints = undefined
+    this.roadPreview = undefined
     this.drawStartIndex = 0
     this.pendingDrawStart = undefined
     this.checkpointGesture = undefined
@@ -418,6 +431,10 @@ export class EditorInputController {
       EDITOR_ZOOM_LIMITS.maximum,
     )
     this.dependencies.onCameraChanged?.()
+  }
+
+  roadPointPreview(): typeof this.roadPreview {
+    return this.dependencies.editor().points === this.selectionPoints ? this.roadPreview : undefined
   }
 
   selectedControlPoint(): number {
@@ -811,15 +828,12 @@ export class EditorInputController {
             this.dependencies.onPointSelected?.(null)
           } else {
             this.selectedPoint = point
+            this.selectionPoints = editor.points
             this.dependencies.onCrossingSelected?.(null)
             this.dependencies.onPointSelected?.(point >= 0 ? point : null)
           }
         } else if (this.selectedPoint >= 0) {
-          this.dependencies.dispatch({
-            type: 'move-point',
-            index: this.selectedPoint,
-            point: world,
-          })
+          this.roadPreview = { index: this.selectedPoint, position: world }
         }
         break
       case 'paint': {

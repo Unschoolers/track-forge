@@ -3,7 +3,7 @@ import {
   EditorInputController,
   type EditorCamera,
 } from '@/phaser/input/editorInput'
-import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
+import { applyEditorCommand, createEditorState, reduceEditor } from '@/domain/editor/editorState'
 import {
   planTerrainPaint,
   type TerrainCellCoordinate,
@@ -391,8 +391,12 @@ describe('EditorInputController', () => {
     input.pointerMove({ id: 2, x: 5, y: 2 })
     expect(editor.points[0]).toMatchObject({ x: 0, y: 0 })
     input.pointerMove({ id: 2, x: 20, y: 4 })
-    input.pointerUp({ id: 2, x: 20, y: 4 })
-    expect(editor.points[0]).toMatchObject({ x: 20, y: 4 })
+    expect(input.roadPointPreview()).toEqual({ index: 0, position: { x: 20, y: 4 } })
+    expect(editor.points[0]).toMatchObject({ x: 0, y: 0 })
+    expect(editor.history).toHaveLength(0)
+    input.pointerUp({ id: 2, x: 23, y: 5 })
+    expect(input.roadPointPreview()).toBeUndefined()
+    expect(editor.points[0]).toMatchObject({ x: 23, y: 5 })
     expect(editor.history).toHaveLength(1)
     expect(onPointSelected).toHaveBeenLastCalledWith(null)
 
@@ -400,6 +404,41 @@ describe('EditorInputController', () => {
     input.pointerUp({ id: 3, x: 20, y: 4 })
     expect(onPointSelected).toHaveBeenLastCalledWith(0)
     expect(editor.history).toHaveLength(1)
+  })
+
+  it('discards a road drag on pinch and validates its final position only on release', () => {
+    const initial = createEditorState([
+      { x: 0, y: 0, surface: 'street' },
+      { x: 99_990, y: 0, surface: 'street' },
+    ])
+    let editor = initial
+    const dispatch = vi.fn((command: Parameters<typeof applyEditorCommand>[1]) => {
+      const result = applyEditorCommand(editor, command)
+      editor = result.state
+      return result.rejection
+    })
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 },
+      tool: () => 'select', surface: () => 'street', editor: () => editor, dispatch,
+    })
+    input.pointerDown({ id: 1, x: 0, y: 0 })
+    input.pointerMove({ id: 1, x: -50, y: 0 })
+    expect(input.roadPointPreview()?.position.x).toBe(-50)
+    input.pointerDown({ id: 2, x: 100, y: 0 })
+    expect(input.roadPointPreview()).toBeUndefined()
+    input.pointerUp({ id: 1, x: -60, y: 0 })
+    input.pointerUp({ id: 2, x: 100, y: 0 })
+    expect(dispatch.mock.calls.map(([command]) => command.type)).toEqual(['begin-gesture', 'cancel-gesture'])
+    expect(editor).toEqual(initial)
+    dispatch.mockClear()
+
+    input.pointerDown({ id: 3, x: 0, y: 0 })
+    input.pointerMove({ id: 3, x: -50, y: 0 })
+    input.pointerUp({ id: 3, x: -60, y: 0 })
+    expect(dispatch.mock.calls.map(([command]) => command.type)).toEqual(['begin-gesture', 'move-point', 'end-gesture'])
+    expect(dispatch).toHaveNthReturnedWith(2, expect.objectContaining({ code: 'road-too-long' }))
+    expect(editor).toEqual(initial)
+    expect(input.roadPointPreview()).toBeUndefined()
   })
 
   it('selects a crossing context instead of an unrelated control point', () => {

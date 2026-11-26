@@ -195,6 +195,56 @@ function cubicBezier(
   }
 }
 
+function roadCurve(p0: TrackPoint, p1: TrackPoint, p2: TrackPoint, p3: TrackPoint): (t: number) => Vector2 {
+  const startTangent = p1.curve === 'corner'
+    ? { x: 0, y: 0 }
+    : boundedTangent(p0, p1, p2, p1, p2, p1.tension ?? 0.5)
+  const endTangent = p2.curve === 'corner'
+    ? { x: 0, y: 0 }
+    : boundedTangent(p1, p2, p3, p1, p2, p2.tension ?? 0.5)
+  const startControl = { x: p1.x + startTangent.x / 3, y: p1.y + startTangent.y / 3 }
+  const endControl = { x: p2.x - endTangent.x / 3, y: p2.y - endTangent.y / 3 }
+  return t => cubicBezier(p1, startControl, endControl, p2, t)
+}
+
+function closesRoad(
+  routeKind: RouteKind, count: number, first: Vector2 | undefined, last: Vector2 | undefined,
+): boolean {
+  return routeKind === 'circuit' && count >= 3 && !!first && !!last &&
+    distance(first, last) < TRACK_CLOSE_DISTANCE
+}
+
+/** A control contributes to at most four spline spans. Sample only those
+ * spans for the editor overlay. Spacing normalization, elevation, crossing
+ * detection and distance resampling belong to the committed road. */
+export function previewRoadPointMove(
+  points: readonly TrackPoint[], routeKind: RouteKind, index: number, position: Vector2,
+): readonly (readonly Vector2[])[] {
+  const original = points[index]
+  if (!original || points.length < 2) return []
+  const moved = { ...original, ...position }
+  const at = (i: number) => i === index ? moved : points[i]
+  const closed = closesRoad(routeKind, points.length, at(0), at(points.length - 1))
+  const count = closed ? points.length - 1 : points.length
+  // The closing control is a duplicate and has no span while the loop is closed.
+  if (index >= count) return []
+  const control = (i: number) => at(closed ? ((i % count) + count) % count : Math.max(0, Math.min(i, count - 1)))
+  const first = closed ? index - 2 : Math.max(0, index - 2)
+  const last = closed ? first + Math.min(4, count) - 1 : Math.min(count - 2, index + 1)
+  const segments: Vector2[][] = []
+  for (let i = first; i <= last; i++) {
+    const p0 = control(i - 1)
+    const p1 = control(i)
+    const p2 = control(i + 1)
+    const p3 = control(i + 2)
+    if (!p0 || !p1 || !p2 || !p3) return []
+    const curve = roadCurve(p0, p1, p2, p3)
+    const divisions = Math.min(32, Math.max(4, Math.ceil(distance(p1, p2) / 9)))
+    segments.push(Array.from({ length: divisions + 1 }, (_, step) => curve(step / divisions)))
+  }
+  return segments
+}
+
 export function buildRoadPath(
   points: readonly TrackPoint[],
   terrain: TerrainMap,
@@ -219,14 +269,7 @@ export function buildRoadPath(
   }
   const samples: RoadPathPoint[] = []
   let totalLength = 0
-  const first = points[0]
-  const last = points.at(-1)
-  const closed =
-    routeKind === 'circuit' &&
-    first !== undefined &&
-    last !== undefined &&
-    points.length >= 3 &&
-    distance(first, last) < TRACK_CLOSE_DISTANCE
+  const closed = closesRoad(routeKind, points.length, points[0], points.at(-1))
   const controls = normalizePathControls(points, closed)
   const count = controls.length
   const segmentCount = closed ? count : count - 1
@@ -258,29 +301,9 @@ export function buildRoadPath(
 
     const segmentLength = distance(p1, p2)
     const divisions = Math.max(4, Math.ceil(segmentLength / 9))
+    const curve = roadCurve(p0, p1, p2, p3)
     for (let step = 0; step < divisions; step += 1) {
-      const t = step / divisions
-      const startTangent =
-        p1.curve === 'corner'
-          ? { x: 0, y: 0 }
-          : boundedTangent(p0, p1, p2, p1, p2, p1.tension ?? 0.5)
-      const endTangent =
-        p2.curve === 'corner'
-          ? { x: 0, y: 0 }
-          : boundedTangent(p1, p2, p3, p1, p2, p2.tension ?? 0.5)
-      const position = cubicBezier(
-        p1,
-        {
-          x: p1.x + startTangent.x / 3,
-          y: p1.y + startTangent.y / 3,
-        },
-        {
-          x: p2.x - endTangent.x / 3,
-          y: p2.y - endTangent.y / 3,
-        },
-        p2,
-        t,
-      )
+      const position = curve(step / divisions)
       const previous = samples.at(-1)
       if (previous) totalLength += distance(previous, position)
       samples.push({

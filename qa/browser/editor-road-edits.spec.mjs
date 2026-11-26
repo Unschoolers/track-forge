@@ -31,12 +31,18 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   await page.evaluate(async () => {
     const { EditorScene } = await import('/src/phaser/scenes/EditorScene.ts')
     const { TrackGeometryCache } = await import('/src/domain/track/trackGeometryCache.ts')
-    const work = { redraws: 0, terrainRedraws: 0, builds: 0, writes: 0 }
+    const work = { previews: 0, redraws: 0, terrainRedraws: 0, builds: 0, writes: 0 }
     window.roadEditWork = work
     const render = EditorScene.prototype.renderWorldPresentation
     EditorScene.prototype.renderWorldPresentation = function (...args) {
       work.redraws++
       return render.apply(this, args)
+    }
+    const preview = EditorScene.prototype.renderRoadDragPreview
+    EditorScene.prototype.renderRoadDragPreview = function (...args) {
+      const previous = this.lastRoadPreview
+      preview.apply(this, args)
+      if (this.lastRoadPreview && previous !== this.lastRoadPreview) work.previews++
     }
     const terrain = EditorScene.prototype.renderTerrainPresentation
     EditorScene.prototype.renderTerrainPresentation = function (...args) {
@@ -106,17 +112,18 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     before = await work()
     await touch(pointer, 'touchStart', [contact(1, screenX, screenY)])
     await touch(pointer, 'touchMove', [contact(1, screenX + 22, screenY)])
-    await expect.poll(async () => (await work()).redraws).toBeGreaterThan(before.redraws)
-    expect((await work()).terrainRedraws).toBe(before.terrainRedraws)
+    await expect.poll(async () => (await work()).previews).toBeGreaterThan(before.previews)
+    expect(await work()).toMatchObject({ redraws: before.redraws, terrainRedraws: before.terrainRedraws, builds: before.builds })
+    expect((await draft())[4].x).toBe(control.x)
     const firstMove = await work()
     await touch(pointer, 'touchMove', [contact(1, screenX + 45, screenY)])
-    await expect.poll(async () => (await work()).redraws).toBeGreaterThan(firstMove.redraws)
-    expect((await work()).terrainRedraws).toBe(before.terrainRedraws)
+    await expect.poll(async () => (await work()).previews).toBeGreaterThan(firstMove.previews)
+    expect(await work()).toMatchObject({ redraws: before.redraws, terrainRedraws: before.terrainRedraws, builds: before.builds })
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
     await expect.poll(async () => (await draft())[4].x).toBeGreaterThan(control.x + 100)
     await expect.poll(async () => (await work()).terrainRedraws - before.terrainRedraws).toBe(1)
-    expect((await work()).writes - before.writes).toBe(0)
+    await expectEditWork(before)
 
     before = await work()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
