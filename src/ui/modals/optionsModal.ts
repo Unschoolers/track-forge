@@ -507,7 +507,7 @@ export function createOptionsModal(
   }
   for (const tab of available) {
     const choice = button('', `options-tab-${tab}`, () => selectTab(tab), 'setup-choice')
-    choice.append(optionsTabIcon(tab), element('span', 'options-tab-label', tab.toUpperCase()))
+    choice.append(optionsTabIcon(tab), element('span', 'options-tab-label', tab[0]!.toUpperCase() + tab.slice(1)))
     choice.setAttribute('aria-label', tab === 'display' ? 'Display and feedback' : tab)
     choice.setAttribute('role', 'tab')
     choice.setAttribute('aria-controls', `options-panel-${tab}`)
