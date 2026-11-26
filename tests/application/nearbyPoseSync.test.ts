@@ -142,6 +142,7 @@ describe('nearby pose synchronizer', () => {
       sentAt.push(now)
       release = resolve
     }), () => now)
+    sync.setStartAt(0)
     sync.update(player, 1, 'host', ['host'], racers)
     for (now = 10; now <= 200; now += 10) sync.update(player, 1, 'host', ['host'], racers)
     expect(sentAt).toEqual([0])
@@ -156,6 +157,7 @@ describe('nearby pose synchronizer', () => {
   it('discards late sends after room reset and restores fresh sequence and metrics', async () => {
     let complete: (() => void) | undefined
     const sync = new NearbyPoseSync(() => new Promise<void>(resolve => { complete = resolve }), () => 0)
+    sync.setStartAt(0)
     sync.update(player, 1, 'host', ['host'], racers)
     expect(sync.counts.sent).toBe(1)
     sync.reset()

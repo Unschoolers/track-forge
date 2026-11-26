@@ -190,7 +190,8 @@ export class NearbyRace {
       targetPoseHz: this.poseSync.targetPoseHz,
     })
     const clockElapsed = this.synchronizedElapsed()
-    Object.assign(report, { synchronization: { clock: this.clock.estimate, sharedStartAtMs: this.sharedStartAt,
+    Object.assign(report, { synchronization: { clock: this.clock.estimate, localGoAtMs: this.sharedStartAt, hostGoAtMs: this.sharedStartAt === null ? null :
+        this.sharedStartAt + (this.clock.estimate?.offsetMs ?? 0),
       ranking: this.ranking.diagnostics(), simulationElapsedSeconds: this.lastSimulationElapsed,
       clockElapsedSeconds: clockElapsed,
       simulationDriftMs: this.lastSimulationElapsed === null || clockElapsed === null ? null :

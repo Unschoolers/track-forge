@@ -1,6 +1,6 @@
 import { decodeProgress, encodeProgress, isNewerWireSequence, PROGRESS_PERIOD_MS, WIRE_ROUND_MASK, type ProgressPacket } from './raceWire'
 
-/** A low-rate optional stream; old peers ignore these packets and still render poses. */
+/** Low-rate progress stream for host-authoritative standings and diagnostics. */
 export class NearbyProgressSync {
   private readonly remote = new Map<number, { sequence: number; value: number; at: number }>()
   private readonly relayed = new Map<number, number>()

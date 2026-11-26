@@ -163,7 +163,7 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(first.pose.x).toBeCloseTo(9_000_000.01, 1)
     expect(first.pose.z).toBeCloseTo(29.07, 1)
     expect(first.pose.angle).toBeCloseTo(2 * Math.PI - 0.01, 3)
-    expect(ghost.receive(first, 1000)).toBe(true)
+    expect(ghost.receive(first, 1000, 1000)).toBe(true)
     expect(ghost.receive(packet(0, 1, -75, 0, false), 1050, 1050)).toBe(true)
     expect(ghost.receive(first, 1060, 1000)).toBe(false)
     expect(ghost.pose(1125)?.x).toBe(first.pose.x)
