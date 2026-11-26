@@ -23,7 +23,7 @@ Both native hosts bind all local IPv4 interfaces; their listening port is not ex
 Both transports share a receiver-local interpolation buffer. Start at 100 ms,
 then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
 The playback clock slews at 0.8–1.2x instead of freezing; 24 history samples
-and 100 ms small prediction corrections preserve smoothness. Timed wire-v5
+and 100 ms small prediction corrections preserve smoothness. Timed wire-v6
 poses append a signed 32-bit millisecond offset from synchronized GO to the
 19-byte legacy pose (23 bytes total). Host relays preserve source timestamps.
 Receiver maps timestamps to its local clock, rejects missing/implausibly
@@ -45,13 +45,13 @@ error. Diagnostics record simulation elapsed, frozen finish clock elapsed and
 their difference. Long-race device oscillator drift still requires matched
 captures; do not silently adjust physics or claim exact simultaneous views.
 
-## Shared race clock and official live ranking (wire v5)
+## Shared race clock and official live ranking (introduced in wire v5)
 
 Five sequential monotonic clock probes run after each guest scene becomes ready.
 Use the lowest round-trip sample to estimate host-minus-guest clock offset;
 schedule GO from the host's absolute monotonic timestamp. Asymmetric latency
 still introduces uncertainty. Missing probes fail the existing staging deadline,
-rather than silently guessing a start. Both devices must update together.
+rather than silently guessing a start. Both devices must update together; wire v6 additionally requires timed poses.
 
 The host alone orders the field from its local progress and accepted guest
 progress (150 ms stream). Guests display the host's sequenced complete order;

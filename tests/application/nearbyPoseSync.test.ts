@@ -53,6 +53,8 @@ describe('nearby pose synchronizer', () => {
       [0, { ghost: new RemoteGhost(player.car), identity: DEFAULT_PLAYER_IDENTITY }],
       [1, { ghost: new RemoteGhost(rival.car), identity: DEFAULT_PLAYER_IDENTITY }],
     ])
+    expect(host.receive(encodePose(1, 0, 0, rival), false, 1, 0, localRacers)).toBe(true)
+    expect(host.counts.relayed).toBe(0)
     expect(host.receive(encodePose(1, 0, 0, rival, 0, 980), false, 1, 0, localRacers)).toBe(true)
     host.update(player, 0, null, ['guest'], localRacers)
     await flush()

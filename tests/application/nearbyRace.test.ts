@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { assert, describe, expect, it, vi } from 'vitest'
 import { LOBBY_DELIVERY_TIMEOUT_MS, NearbyRace, type NearbyEvent, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
-import { decodePoseBatch, Packet, POSE_BYTES } from '@/application/multiplayer/raceWire'
+import { decodePoseBatch, Packet, TIMED_POSE_BYTES } from '@/application/multiplayer/raceWire'
 import { decodeControl, encodeControl } from '@/application/multiplayer/controlProtocol'
 import { RaceSession } from '@/application/race/raceSession'
 import { createRace } from '@/domain/race/raceFactory'
@@ -533,11 +533,12 @@ describe('Nearby Arcade', () => {
       const posePackets = network.packets.filter(({ bytes }) => bytes[0] === Packet.Pose)
       const hostBatches = network.packets.filter(({ bytes }) => bytes[0] === Packet.PoseBatch)
       expect(posePackets).toHaveLength(3)
-      expect(posePackets.every(({ bytes }) => bytes.byteLength === POSE_BYTES)).toBe(true)
+      expect(posePackets.every(({ bytes }) => bytes.byteLength === TIMED_POSE_BYTES)).toBe(true)
       expect(hostBatches).toHaveLength(2)
-      expect(hostBatches.map(({ bytes }) => bytes.byteLength)).toEqual([1 + POSE_BYTES, 1 + 4 * POSE_BYTES])
+      expect(hostBatches.map(({ bytes }) => bytes.byteLength)).toEqual([1 + TIMED_POSE_BYTES, 1 + 4 * TIMED_POSE_BYTES])
       expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
       expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
+      expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ sampleTimeMs }) => sampleTimeMs)).toEqual([-3967, -4000, -4000, -4000])
 
       // Exports identify the actual race roster and packet quality without
       // leaking Nearby connection IDs or requiring packet-level logging.

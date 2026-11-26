@@ -5,8 +5,8 @@ import { Packet } from '@/application/multiplayer/raceWire'
 import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export const MAX_PLAYERS = NEARBY_START_GRID_SIZE
-/** Breaking change to compact pose/progress epochs. Enforce before any race starts. */
-export const NEARBY_WIRE_PROTOCOL_VERSION = 5
+/** Version 6 requires timed race poses. Enforce before any race starts. */
+export const NEARBY_WIRE_PROTOCOL_VERSION = 6
 // Eight fully named players may exceed 1 KiB in UTF-8 (24 Unicode letters each).
 const MAX_CONTROL_BYTES = 2048
 const encoder = new TextEncoder()

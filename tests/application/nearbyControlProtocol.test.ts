@@ -17,7 +17,7 @@ const lineup: Control = { type: 'lineup', cars: [...cars], identities, names, po
 describe('nearby eight-player control protocol', () => {
   it('round-trips an eight-player lobby and validates unique starting positions', () => {
     expect(MAX_PLAYERS).toBe(8)
-    expect(NEARBY_WIRE_PROTOCOL_VERSION).toBe(5)
+    expect(NEARBY_WIRE_PROTOCOL_VERSION).toBe(6)
     expect(validLineupPositions(cars, positions)).toBe(true)
     expect(decodeControl(encodeControl(lineup))).toEqual(lineup)
     expect(decodeControl(packet({ ...lineup, positions: [0, 0, 2, 3, 4, 5, 6, 7] }))).toBeNull()

@@ -189,11 +189,12 @@ export class NearbyRace {
       progressSendFailures: this.progressSync.failedSends,
       targetPoseHz: this.poseSync.targetPoseHz,
     })
+    const clockElapsed = this.synchronizedElapsed()
     Object.assign(report, { synchronization: { clock: this.clock.estimate, sharedStartAtMs: this.sharedStartAt,
       ranking: this.ranking.diagnostics(), simulationElapsedSeconds: this.lastSimulationElapsed,
-      clockElapsedSeconds: this.synchronizedElapsed(),
-      simulationDriftMs: this.lastSimulationElapsed === null || this.synchronizedElapsed() === null ? null :
-        (this.synchronizedElapsed()! - this.lastSimulationElapsed) * 1000 } })
+      clockElapsedSeconds: clockElapsed,
+      simulationDriftMs: this.lastSimulationElapsed === null || clockElapsed === null ? null :
+        (clockElapsed - this.lastSimulationElapsed) * 1000 } })
     if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
     try {
       return { ...report, native: { status: 'available', report: await this.transport.diagnostics() } }

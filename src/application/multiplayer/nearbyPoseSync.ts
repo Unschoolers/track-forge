@@ -142,7 +142,7 @@ export class NearbyPoseSync {
           (!fromHost && packet.slot !== guestSlot)) return true
       this.poseCounts.received++
       const now = this.now()
-      const accepted = racer.ghost.receive(packet, now)
+      const accepted = this.acceptPose(racer, packet, now)
       this.observePose?.(packet.slot, packet.sequence, accepted, now)
       if (accepted && !fromHost) {
         this.latestPoses.set(packet.slot, { bytes: new Uint8Array(bytes), receivedAt: now })
