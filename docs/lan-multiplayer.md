@@ -30,3 +30,12 @@ CI: JavaScript transport-selection/component regression tests, TypeScript/lint, 
 6. Restart/replace the EXE; saves and profiles survive. Verify layout fills a widescreen desktop and keyboard input works.
 
 The LAN transport is local-only; it is *not* an internet multiplayer server. Rollback removes the native LAN adapters and connection selector while preserving the prior Android Nearby plugin and desktop offline game.
+
+## Android Nearby pose pacing
+
+The application owns the healthy 30 Hz pose cadence. The Google Nearby bridge
+must not repeat that rate gate: arrival times can shift across the JS/native
+boundary. Keep the one-outstanding-payload window per peer and stream, and
+native adaptive rate limits for degraded peers (15 Hz down to 1 Hz). Progress
+pacing and reliable control messages are unchanged. Compare accepted pose rate,
+sequence gaps and native congestion counters in matched host/guest captures.
