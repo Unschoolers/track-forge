@@ -8,7 +8,7 @@ import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track 
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { raceProgress } from '@/domain/race/ranking'
 import { decodeProgress, Packet, RemoteGhost } from './raceWire'
-import { NearbyClock } from './nearbyClock'
+import { CLOCK_PROBE_COUNT, NearbyClock, type ClockEstimate } from './nearbyClock'
 import { NearbyRanking, rankNearby } from './nearbyRanking'
 import { NearbyProgressSync } from './nearbyProgressSync'
 import { awardNearbyCupRound, nearbyCupStandings } from './nearbyCupScoring'
@@ -63,6 +63,8 @@ type Purpose = 'race' | 'share'
 // Network operations have a finite deadline; human car selection does not.
 export const LOBBY_DELIVERY_TIMEOUT_MS = 10_000
 const LOBBY_ACK_TIMEOUT_MS = 30_000
+const CLOCK_AUDIT_INTERVAL_MS = 15_000
+const CLOCK_AUDIT_TIMEOUT_MS = 5000
 
 class LobbyDeliveryTimeoutError extends Error {
   constructor() { super('Lobby delivery timed out.') }
@@ -131,6 +133,11 @@ export class NearbyRace {
   private receiver: TrackReceiver | null = null
   private prepared: Pick<Course, 'laps' | 'lighting'> | null = null
   private readonly clock = new NearbyClock()
+  private readonly clockAudit = new NearbyClock(CLOCK_PROBE_COUNT)
+  private clockAuditNextAt = Infinity
+  private clockAuditDeadline: number | null = null
+  private clockAuditResult: (ClockEstimate & { atMs: number; offsetDriftMs: number }) | null = null
+  private clockAuditFailures = 0
   private readonly ranking = new NearbyRanking()
   private localProgress: number | null = null
   private sharedStartAt: number | null = null
@@ -192,6 +199,7 @@ export class NearbyRace {
     const clockElapsed = this.synchronizedElapsed()
     Object.assign(report, { synchronization: { clock: this.clock.estimate, localGoAtMs: this.sharedStartAt, hostGoAtMs: this.sharedStartAt === null ? null :
         this.sharedStartAt + (this.clock.estimate?.offsetMs ?? 0),
+      clockAudit: this.clockAuditResult, clockAuditFailures: this.clockAuditFailures,
       ranking: this.ranking.diagnostics(), simulationElapsedSeconds: this.lastSimulationElapsed,
       clockElapsedSeconds: clockElapsed,
       simulationDriftMs: this.lastSimulationElapsed === null || clockElapsed === null ? null :
@@ -428,6 +436,11 @@ export class NearbyRace {
     this.lineup = null
     this.localSceneReady = false
     this.clock.reset()
+    this.clockAudit.reset()
+    this.clockAuditNextAt = Infinity
+    this.clockAuditDeadline = null
+    this.clockAuditResult = null
+    this.clockAuditFailures = 0
     this.ranking.reset()
     this.localProgress = null
     this.sharedStartAt = null
@@ -498,6 +511,7 @@ export class NearbyRace {
 
   update(vehicle: RaceVehicle, state?: RaceState): void {
     if (this.phase !== 'racing') return
+    this.advanceClockAudit()
     if (state) this.diagnostic.captureTraceFrame(vehicle, state)
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
@@ -547,6 +561,40 @@ export class NearbyRace {
       return
     }
     const request = this.clock.request(this.now())
+    if (request) this.sendControl([this.hostId], { type: 'clock-probe', round: this.round, probe: request.probe })
+  }
+
+  /** Low-rate diagnostic probes never move GO or change local physics speed. */
+  private advanceClockAudit(): void {
+    if (!this.hostId || !this.clock.estimate) return
+    const now = this.now()
+    if (this.clockAuditDeadline !== null) {
+      if (now < this.clockAuditDeadline) return
+      this.clockAuditFailures++
+      this.record('clock_audit_timeout')
+      this.clockAuditDeadline = null
+      this.clockAuditNextAt = now + CLOCK_AUDIT_INTERVAL_MS
+      return
+    }
+    if (now < this.clockAuditNextAt) return
+    this.clockAudit.restart()
+    this.clockAuditDeadline = now + CLOCK_AUDIT_TIMEOUT_MS
+    this.sendAuditProbe()
+  }
+
+  private sendAuditProbe(): void {
+    if (!this.hostId || this.clockAuditDeadline === null) return
+    const now = this.now()
+    const estimate = this.clockAudit.estimate
+    const baseline = this.clock.estimate
+    if (estimate && baseline) {
+      this.clockAuditResult = { ...estimate, atMs: now, offsetDriftMs: estimate.offsetMs - baseline.offsetMs }
+      this.clockAuditDeadline = null
+      this.clockAuditNextAt = now + CLOCK_AUDIT_INTERVAL_MS
+      this.record('clock_audit', this.clockAuditResult)
+      return
+    }
+    const request = this.clockAudit.request(now)
     if (request) this.sendControl([this.hostId], { type: 'clock-probe', round: this.round, probe: request.probe })
   }
 
@@ -842,14 +890,18 @@ export class NearbyRace {
         incomingRound === this.round && this.course &&
         (this.lobby.localAccepted || this.lobby.unlockPending) && message.cars[0] && message.cars[this.slot] === this.localCar) {
       this.stage(this.course, message.cars, message.identities, message.positions, message.names)
-    } else if (guestSlot !== undefined && this.phase === 'staging' &&
-        message.type === 'clock-probe' && incomingRound === this.round) {
+    } else if (guestSlot !== undefined && message.type === 'clock-probe' && incomingRound === this.round &&
+        (this.phase === 'staging' && message.probe < CLOCK_PROBE_COUNT ||
+         this.phase === 'racing' && message.probe >= CLOCK_PROBE_COUNT)) {
       const receivedAt = this.now()
       this.sendControl([id], { type: 'clock-reply', round: this.round, probe: message.probe,
         receivedAt, sentAt: this.now() })
     } else if (fromHost && this.phase === 'staging' && message.type === 'clock-reply' &&
         incomingRound === this.round && this.localSceneReady) {
       if (this.clock.receive(message.probe, message.receivedAt, message.sentAt, this.now())) this.probeClock()
+    } else if (fromHost && this.phase === 'racing' && message.type === 'clock-reply' &&
+        incomingRound === this.round && this.clockAuditDeadline !== null && this.now() <= this.clockAuditDeadline) {
+      if (this.clockAudit.receive(message.probe, message.receivedAt, message.sentAt, this.now())) this.sendAuditProbe()
     } else if (fromHost && this.phase === 'racing' && message.type === 'ranking' &&
         incomingRound === this.round) {
       if (message.order.length && (message.order.length !== this.racers.size ||
@@ -942,6 +994,7 @@ export class NearbyRace {
     }
     this.clearTimeout()
     this.sharedStartAt = startsAt
+    this.clockAuditNextAt = startsAt + CLOCK_AUDIT_INTERVAL_MS
     this.poseSync.setStartAt(startsAt)
     this.setPhase('racing')
     this.record('countdown_scheduled', { remainingMs: Math.round(startsAt - this.now()) })
@@ -1015,6 +1068,10 @@ export class NearbyRace {
     }).catch((error: unknown) => {
       this.record('control', { kind: message.type, result: 'failed', error: this.errorKind(error) })
       if (active !== this.generation) return
+      // Audit failures are recorded above and retried by the audit deadline.
+      // They must not end an active race or a later round.
+      if ((message.type === 'clock-probe' || message.type === 'clock-reply') &&
+          (message.probe >= CLOCK_PROBE_COUNT || message.round !== this.round || this.phase !== 'staging')) return
       if (message.type === 'ready' && message.choice !== undefined &&
           (message.round !== this.round || this.phase !== 'lobby' ||
            message.choice < this.lobby.localChoice || this.lobby.acknowledgedChoice(this.slot, message.choice))) {
@@ -1093,6 +1150,11 @@ export class NearbyRace {
     this.localSceneReady = false
     this.lineup = null
     this.clock.reset()
+    this.clockAudit.reset()
+    this.clockAuditNextAt = Infinity
+    this.clockAuditDeadline = null
+    this.clockAuditResult = null
+    this.clockAuditFailures = 0
     this.ranking.reset()
     this.localProgress = null
     this.sharedStartAt = null

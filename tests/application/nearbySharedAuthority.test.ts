@@ -16,6 +16,18 @@ describe('shared nearby race authority', () => {
     expect(clock.estimate).toBeNull()
   })
 
+  it('uses unique probe IDs across audit windows and ignores late replies', () => {
+    const clock = new NearbyClock(5)
+    expect(clock.request(1000)?.probe).toBe(5)
+    clock.restart()
+    expect(clock.request(2000)?.probe).toBe(6)
+    expect(clock.receive(5, 1010, 1011, 2020)).toBe(false)
+    expect(clock.receive(6, 2010, 2011, 2021)).toBe(true)
+    expect(clock.request(2030)?.probe).toBe(7)
+    clock.reset()
+    expect(clock.request(3000)?.probe).toBe(5)
+  })
+
   it('publishes one order rather than allowing each peer to rank its newer local progress first', () => {
     const host = new NearbyRanking(), guest = new NearbyRanking()
     const order = rankNearby([

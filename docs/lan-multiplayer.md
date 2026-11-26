@@ -41,8 +41,11 @@ rather than potentially capped physics catch-up. Physics and offline timing
 remain unchanged. Finish is sampled at the rendering frame that detects gate
 crossing, so normal uncertainty includes a frame interval and clock offset
 error. Diagnostics record simulation elapsed, frozen finish clock elapsed and
-their difference. Long-race device oscillator drift still requires matched
-captures; do not silently adjust physics or claim exact simultaneous views.
+their difference. During racing, guests repeat five probes every 15 seconds;
+record the latest offset drift and minimum RTT plus audit timeout counts. Audit
+failure does not end a race, and an audit never moves the fixed GO epoch.
+Asymmetric transit can appear as drift; do not silently adjust physics or claim
+exact simultaneous views.
 
 ## Shared race clock and official live ranking (wire v6)
 
@@ -75,7 +78,8 @@ The LAN transport is local-only; it is *not* an internet multiplayer server. Rol
 
 ## Android Nearby pose pacing
 
-The application owns the healthy 30 Hz pose cadence using monotonic deadlines
+The application owns the healthy 30 Hz pose cadence using monotonic deadlines,
+keeping one admission in flight, spacing fresh samples by at least half a period,
 and skipping missed slots without catch-up bursts. The Google Nearby bridge
 must not repeat that rate gate: arrival times can shift across the JS/native
 boundary. Keep the one-outstanding-payload window per peer and stream, and

@@ -1,15 +1,25 @@
 /** NTP-style exchange over independent monotonic clocks. No wall-clock dependency. */
 export const CLOCK_PROBE_COUNT = 5
+export const CLOCK_PROBE_MASK = 0xffff
+export interface ClockEstimate { offsetMs: number; roundTripMs: number }
 
 export class NearbyClock {
-  private samples: { offsetMs: number; roundTripMs: number }[] = []
+  private samples: ClockEstimate[] = []
   private pending: { probe: number; sentAt: number } | null = null
 
-  reset(): void { this.samples = []; this.pending = null }
+  private nextProbe: number
+
+  constructor(private readonly firstProbe = 0) { this.nextProbe = firstProbe }
+
+  reset(): void { this.restart(); this.nextProbe = this.firstProbe }
+
+  /** Preserve probe IDs between audit windows so late replies cannot match. */
+  restart(): void { this.samples = []; this.pending = null }
 
   request(now: number) {
     if (this.pending || this.samples.length >= CLOCK_PROBE_COUNT) return null
-    this.pending = { probe: this.samples.length, sentAt: now }
+    this.pending = { probe: this.nextProbe, sentAt: now }
+    this.nextProbe = (this.nextProbe + 1) & CLOCK_PROBE_MASK
     return { ...this.pending }
   }
 

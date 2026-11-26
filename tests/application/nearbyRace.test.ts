@@ -591,6 +591,12 @@ describe('Nearby Arcade', () => {
       expect(trace.frames.at(-1)?.rivals.filter(rival => rival.visible)).toHaveLength(3)
       expect(JSON.stringify(trace)).not.toMatch(/guest-1|guest-2|guest-3/)
 
+      time += 20_000
+      red.update(progressCars[1]!, progressState)
+      await vi.waitFor(async () => expect(await red.diagnostics()).toMatchObject({
+        synchronization: { clockAudit: { offsetDriftMs: 0, roundTripMs: 0 }, clockAuditFailures: 0 },
+      }), { interval: 5 })
+      expect(red.synchronizedElapsed()).toBeCloseTo(host.synchronizedElapsed()!)
       red.finish(40.125)
       host.finish(42)
       time += 50

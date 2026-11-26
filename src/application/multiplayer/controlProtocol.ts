@@ -1,6 +1,7 @@
 import { CAR_IDS, type CarId, type LightingMode } from '@/domain/model'
 import { NEARBY_START_GRID_SIZE } from '@/domain/race/startGrid'
 import { isPlayerIdentity, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
+import { CLOCK_PROBE_MASK } from './nearbyClock'
 import { Packet } from '@/application/multiplayer/raceWire'
 import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
@@ -117,7 +118,7 @@ function validClockTime(value: unknown): value is number {
 }
 
 function validProbe(value: unknown): boolean {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < 5
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= CLOCK_PROBE_MASK
 }
 
 function isControl(value: unknown): value is Control {
