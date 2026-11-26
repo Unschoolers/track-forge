@@ -76,6 +76,31 @@ describe('shared checkpoint authority', () => {
     }
   })
 
+  it('rolls back a swept gate crossing before water recovery event reconciliation', () => {
+    const wetTerrain = {
+      cellSize: 32,
+      cells: Array.from({ length: 32 }, (_, column) => ({ column, row: 1, kind: 'water' as const })),
+    }
+    const stage = buildRoadPath([street(0, 16), street(1_000, 16)], wetTerrain, undefined, 'point-to-point')
+    const race = createRace({ path: stage, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'hard', laps: 1, recoveryCheckpoints: [0.25, 0.5, 0.75] })
+    const gate = race.timingGates?.[0]
+    if (gate === undefined) throw new Error('Missing timing gate fixture')
+    const geometry = roadGateGeometry(stage, gate)
+    if (!geometry) throw new Error('Missing timing gate geometry')
+    const player = race.vehicles.find(vehicle => vehicle.player)
+    if (!player) throw new Error('Missing player fixture')
+    const before = { ...player, x: geometry.center.x - 10, y: geometry.center.y, pathIndex: gate }
+    motion.clear()
+    motion.set(player.id, { x: geometry.center.x + 10, y: geometry.center.y + 44 })
+
+    const result = stepRace({ ...race, phase: 'running', vehicles: [before] }, input, 1 / 60, random)
+
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'vehicle-recovered', vehicleId: player.id, reason: 'water' }))
+    expect(result.events.some(event => event.type === 'gate-crossed' && event.vehicleId === player.id)).toBe(false)
+    expect(result.state.vehicles[0]).toMatchObject({ nextSector: 1, lap: 0, finishedAt: null })
+    motion.clear()
+  })
+
   it('keeps rival countdowns independent and returns a missed rival before its gate', () => {
     const stage = buildRoadPath([street(0, 0), street(800, 0)], EMPTY_TERRAIN, undefined, 'point-to-point')
     const race = createRace({ path: stage, routeKind: 'point-to-point', playerCar: 'blue', difficulty: 'hard', laps: 1, recoveryCheckpoints: [0.5] })
