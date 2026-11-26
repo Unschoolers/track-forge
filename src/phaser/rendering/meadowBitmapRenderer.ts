@@ -227,6 +227,7 @@ export class BitmapTileRenderer {
   private wantedSignature = ''
   private clock = 0
   private destroyed = false
+  private visibleResident = 0
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -269,8 +270,10 @@ export class BitmapTileRenderer {
     for (const tile of currentTiles) this.current.add(tileKey(tile))
     for (const tile of candidates) this.wanted.add(tileKey(tile))
 
+    this.visibleResident = 0
     for (const [key, item] of this.images) {
       const visible = this.current.has(key)
+      if (visible) this.visibleResident++
       if (item.image.visible !== visible) item.image.setVisible(visible)
       if (this.wanted.has(key)) this.touch(key, item)
     }
@@ -301,6 +304,14 @@ export class BitmapTileRenderer {
     this.scheduler.replace(this, requests)
   }
 
+  /** Counts only; do not enumerate tiles or inspect GPU state in the hot path. */
+  writeCoverage(target: number[]): void {
+    const offset = this.layerOrder * 3
+    target[offset] = this.current.size
+    target[offset + 1] = this.visibleResident
+    target[offset + 2] = this.images.size
+  }
+
   wants(key: string): boolean {
     return !this.destroyed && this.wanted.has(key) && !this.images.has(key)
   }
@@ -320,6 +331,7 @@ export class BitmapTileRenderer {
       const image = this.scene.add.image(tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, texture)
         .setOrigin(0).setDepth(this.depth).setVisible(this.current.has(key))
       this.touch(key, { image, texture, lastUsed: ++this.clock })
+      if (this.current.has(key)) this.visibleResident++
     } catch (error) {
       this.scene.textures.remove(texture)
       throw error
@@ -381,6 +393,7 @@ export class BitmapTileRenderer {
 export interface MeadowBitmapRenderer {
   render(view: GroundViewport, bounds?: WorldBounds): void
   warmVisible(): void
+  coverage(): readonly number[]
   destroy(): void
 }
 
@@ -408,6 +421,11 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackG
       for (const renderer of renderers) renderer.render(view, bounds)
     },
     warmVisible: () => scheduler.warmVisible(),
+    coverage: () => {
+      const counts = Array<number>(12).fill(0)
+      for (const renderer of renderers) renderer.writeCoverage(counts)
+      return counts
+    },
     destroy,
   }
 }

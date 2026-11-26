@@ -117,6 +117,12 @@ const controller = new AppController({
   geometry,
 })
 const frameDiagnostics = new RaceFrameDiagnostics()
+const supportsLongTasks = typeof PerformanceObserver !== 'undefined' &&
+  PerformanceObserver.supportedEntryTypes?.includes('longtask')
+const longTaskObserver = supportsLongTasks ? new PerformanceObserver(list => {
+  for (const entry of list.getEntries()) frameDiagnostics.recordLongTask(entry.startTime, entry.duration)
+}) : undefined
+longTaskObserver?.observe({ entryTypes: ['longtask'] })
 const uiHost = new DomUiHost(uiRoot, controller, {
   nearby,
   ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),
@@ -128,6 +134,9 @@ const uiHost = new DomUiHost(uiRoot, controller, {
     device: {
       userAgent: navigator.userAgent,
       pixelRatio: window.devicePixelRatio,
+      buildRun: import.meta.env.VITE_TRACKFORGE_BUILD_RUN ?? null,
+      buildAttempt: import.meta.env.VITE_TRACKFORGE_BUILD_ATTEMPT ?? null,
+      longTaskSupported: Boolean(supportsLongTasks),
       viewport: [window.innerWidth, window.innerHeight],
     },
   }),
@@ -337,6 +346,7 @@ window.addEventListener(
     application.destroy()
     music.destroy()
     feedback.destroy()
+    longTaskObserver?.disconnect()
   },
   { once: true },
 )

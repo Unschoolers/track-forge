@@ -66,11 +66,20 @@ import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
 import { bindRacePointer, type RacePointerBinding } from '@/phaser/input/racePointer'
 
 const EMPTY_SCENERY = [] as const
+const EMPTY_BITMAP_COVERAGE = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] as const
 
 export class RaceScene extends Phaser.Scene {
   private groundRenderer: GroundTextureRenderer | undefined
   private environmentSceneryRenderer: SceneryRenderer | undefined
-  private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  private terrainChunks: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds; hill: boolean; primitives: number }[] = []
+  // Updated only when the culling window changes, not for every display frame.
+  private hillBatches = 0
+  private hillPrimitives = 0
+  private waterBatches = 0
+  private waterPrimitives = 0
+  private bridgeBatches = 0
+  private bridgePrimitives = 0
+  private lampBatches = 0
   private terrainVisibilityBounds: WorldBounds | undefined
   private roadVisibilityBounds: WorldBounds | undefined
   private updateRoadRibbonVisibility: RaceTrackVisibility | undefined
@@ -82,7 +91,7 @@ export class RaceScene extends Phaser.Scene {
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
-  private bridgeGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  private bridgeGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds; primitives: number }[] = []
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
@@ -117,6 +126,8 @@ export class RaceScene extends Phaser.Scene {
       .snapshot()
       .state?.vehicles.find((vehicle) => vehicle.player)
     if (initialPlayer) this.raceCamera = createRaceCamera(initialPlayer)
+    this.frameDiagnostics?.setRenderer(this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas',
+      this.game.canvas.width, this.game.canvas.height)
     const night = this.raceSession.snapshot().setup?.lighting === 'night'
     const environment = getTrackEnvironment(track.environmentId)
     const palette = night ? environment.night : environment.day
@@ -154,7 +165,12 @@ export class RaceScene extends Phaser.Scene {
     )).map(({ primitive, bounds }) => {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.terrain)
       renderTerrainPrimitives(graphics, [primitive], night, palette)
-      return { graphics, bounds }
+      const hill = primitive.kind === 'hill-slope' || primitive.kind === 'hill-plateau'
+      const primitives = primitive.kind === 'shoreline'
+        ? primitive.rings.reduce((count, ring) => count + ring.length, 0)
+        : primitive.kind === 'water' ? primitive.triangles.length + primitive.texture.length
+        : primitive.kind === 'hill-slope' ? primitive.facets.length : primitive.triangles.length
+      return { graphics, bounds, hill, primitives }
     })
     // Trees are static during a race. Build once rather than rebuilding
     // shadow commands and reallocating sprites as the camera moves.
@@ -188,7 +204,7 @@ export class RaceScene extends Phaser.Scene {
       for (const batch of chunkBridgePrimitives(items)) {
         const graphics = this.add.graphics().setDepth(depth)
         draw(graphics, batch.items)
-        this.bridgeGraphics.push({ graphics, bounds: batch.bounds })
+        this.bridgeGraphics.push({ graphics, bounds: batch.bounds, primitives: batch.items.length })
       }
     }
     const bridgePasses = bridgeRenderPasses(bridgePresentation)
@@ -300,10 +316,12 @@ export class RaceScene extends Phaser.Scene {
       this.cameras.main.setRotation(-this.raceCamera.angle - Math.PI / 2)
     }
     const cameraRotation = this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0
+    this.frameDiagnostics?.beginGround()
     this.renderGroundPresentation(
       this.raceSession.snapshot().setup?.lighting === 'night',
       cameraRotation,
     )
+    this.frameDiagnostics?.endGround()
     this.vehicleGraphics.clear()
     this.shadowGraphics.clear()
     this.upperVehicleGraphics.clear()
@@ -409,6 +427,7 @@ export class RaceScene extends Phaser.Scene {
     if (player && !upperVehicles.has(player.id) && this.isCoveredByBridgeDeck?.(player)) {
       renderCoveredPlayerOutline(this.upperVehicleGraphics, player)
     }
+    this.frameDiagnostics?.endVehicles()
     this.nightLightGraphics?.clear()
     if (this.raceSession.snapshot().setup?.lighting === 'night' && this.nightLightGraphics) {
       const lights = visibleVehicles.map((vehicle) =>
@@ -420,6 +439,15 @@ export class RaceScene extends Phaser.Scene {
     }
     benchmark?.endUpdate()
     this.frameDiagnostics?.endUpdate()
+    if (this.frameDiagnostics) {
+      const camera = this.cameras.main
+      this.frameDiagnostics.recordPresentation([
+        camera.scrollX + camera.width / 2, camera.scrollY + camera.height / 2, camera.zoom, cameraRotation,
+        this.hillBatches, this.hillPrimitives, this.waterBatches, this.waterPrimitives,
+        this.bridgeBatches, this.bridgePrimitives, this.lampBatches,
+        ...(this.updateRoadRibbonVisibility?.bitmap?.coverage() ?? EMPTY_BITMAP_COVERAGE),
+      ])
+    }
   }
 
   private renderGroundPresentation(night: boolean, rotation = 0): void {
@@ -444,22 +472,30 @@ export class RaceScene extends Phaser.Scene {
       const next = terrainVisibilityWindow(viewport, this.terrainVisibilityBounds)
       if (next) {
         this.terrainVisibilityBounds = next
-        for (const { graphics, bounds } of this.terrainChunks) {
+        this.hillBatches = this.hillPrimitives = this.waterBatches = this.waterPrimitives = 0
+        for (const { graphics, bounds, hill, primitives } of this.terrainChunks) {
           const visible = terrainChunkVisible(bounds, next)
           if (graphics.visible !== visible) graphics.setVisible(visible)
+          if (visible) {
+            if (hill) { this.hillBatches++; this.hillPrimitives += primitives }
+            else { this.waterBatches++; this.waterPrimitives += primitives }
+          }
         }
       }
     }
     const nextStaticWindow = terrainVisibilityWindow(viewport, this.staticGraphicsVisibilityBounds)
     if (nextStaticWindow) {
       this.staticGraphicsVisibilityBounds = nextStaticWindow
+      this.lampBatches = this.bridgeBatches = this.bridgePrimitives = 0
       for (const { graphics, bounds } of this.lampGraphics) {
         const visible = terrainChunkVisible(bounds, nextStaticWindow)
         if (graphics.visible !== visible) graphics.setVisible(visible)
+        if (visible) this.lampBatches++
       }
-      for (const { graphics, bounds } of this.bridgeGraphics) {
+      for (const { graphics, bounds, primitives } of this.bridgeGraphics) {
         const visible = terrainChunkVisible(bounds, nextStaticWindow)
         if (graphics.visible !== visible) graphics.setVisible(visible)
+        if (visible) { this.bridgeBatches++; this.bridgePrimitives += primitives }
       }
     }
     // Road markings and ribbons are static. Rechecking all their bounds every
@@ -523,6 +559,8 @@ export class RaceScene extends Phaser.Scene {
     this.nightBeamRenderer?.destroy()
     this.nightBeamRenderer = undefined
     this.terrainChunks = []
+    this.hillBatches = this.hillPrimitives = this.waterBatches = this.waterPrimitives = 0
+    this.bridgeBatches = this.bridgePrimitives = this.lampBatches = 0
     this.terrainVisibilityBounds = undefined
     this.roadVisibilityBounds = undefined
     this.staticGraphicsVisibilityBounds = undefined

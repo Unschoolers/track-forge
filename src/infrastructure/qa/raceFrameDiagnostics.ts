@@ -1,5 +1,16 @@
 import type { BitmapWorkSample } from '@/phaser/rendering/meadowBitmapRenderer'
 
+const PRESENTATION_COLUMNS = [
+  'frameTime', 'updateStart', 'groundAndCullingMs', 'vehiclesAndEffectsMs', 'lightingMs',
+  'cameraX', 'cameraY', 'cameraZoom', 'cameraRotation',
+  'hillBatches', 'hillPrimitives', 'waterBatches', 'waterPrimitives',
+  'bridgeBatches', 'bridgePrimitives', 'lampBatches',
+  'roadTilesNeeded', 'roadTilesVisible', 'roadTilesResident',
+  'terrainTilesNeeded', 'terrainTilesVisible', 'terrainTilesResident',
+  'bridgeApproachTilesNeeded', 'bridgeApproachTilesVisible', 'bridgeApproachTilesResident',
+  'bridgeDeckTilesNeeded', 'bridgeDeckTilesVisible', 'bridgeDeckTilesResident',
+] as const
+
 /** Bounded frame timing samples for the most recent race. Durations are CPU
  * timings; render submission does not measure GPU completion. */
 export class RaceFrameDiagnostics {
@@ -16,6 +27,34 @@ export class RaceFrameDiagnostics {
   private readonly frames: number[][] = []
   private readonly bitmapWork: (BitmapWorkSample & { readonly afterFrame: number })[] = []
   private droppedBitmapWork = 0
+  private readonly presentationFrames: (number[] | null)[] = []
+  private presentation: readonly number[] | undefined
+  private groundStart = 0
+  private groundEnd = 0
+  private vehicleEnd = 0
+  private runStart = 0
+  private running = false
+  private readonly longTasks: number[][] = []
+  private droppedLongTasks = 0
+  private renderer: { type: string; width: number; height: number } | null = null
+
+  setRenderer(type: string, width: number, height: number): void {
+    this.renderer = { type, width, height }
+  }
+
+  beginGround(): void { this.groundStart = this.now() }
+  endGround(): void { this.groundEnd = this.now() }
+  endVehicles(): void { this.vehicleEnd = this.now() }
+
+  recordPresentation(values: readonly number[]): void {
+    this.presentation = values
+  }
+
+  recordLongTask(startTime: number, duration: number): void {
+    if (!this.running || startTime < this.runStart) return
+    if (this.longTasks.length >= 2048) { this.droppedLongTasks++; return }
+    this.longTasks.push([startTime, duration])
+  }
 
   constructor(private readonly now: () => number = () => performance.now()) {}
 
@@ -28,7 +67,13 @@ export class RaceFrameDiagnostics {
       this.frames.length = 0
       this.bitmapWork.length = 0
       this.droppedBitmapWork = 0
+      this.presentationFrames.length = 0
+      this.longTasks.length = 0
+      this.droppedLongTasks = 0
+      this.running = false
+      this.runStart = this.now()
     }
+    this.presentation = undefined
     this.updateStart = this.now()
   }
 
@@ -40,11 +85,17 @@ export class RaceFrameDiagnostics {
   afterRender(time: number, tick: number, running: boolean): void {
     if (!this.ready) return
     this.ready = false
+    this.running = running
     if (!running) { this.previous = 0; return }
     if (this.previous > 0 && time > this.previous) {
       this.count++
       if (this.frames.length < 36000) {
         this.frames.push([tick, time - this.previous, this.updateMs, this.simulationMs, this.now() - this.renderStart])
+        this.presentationFrames.push(this.presentation ? [
+          time, this.updateStart, this.groundEnd - this.groundStart,
+          this.vehicleEnd - this.groundEnd, this.updateStart + this.updateMs - this.vehicleEnd,
+          ...this.presentation,
+        ] : null)
       } else this.dropped++
     }
     this.previous = time
@@ -69,6 +120,12 @@ export class RaceFrameDiagnostics {
       frames: this.frames,
       bitmapWork: this.bitmapWork,
       droppedBitmapWork: this.droppedBitmapWork,
+      presentationColumns: PRESENTATION_COLUMNS,
+      presentationFrames: this.presentationFrames,
+      renderer: this.renderer,
+      longTaskColumns: ['startTime', 'duration'],
+      longTasks: this.longTasks,
+      droppedLongTasks: this.droppedLongTasks,
     }
   }
 }

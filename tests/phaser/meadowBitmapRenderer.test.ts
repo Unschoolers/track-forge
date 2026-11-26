@@ -201,6 +201,9 @@ describe('BitmapTileRenderer', () => {
     for (let i = 0; i < 12; i++) frame()
     expect(registered.size).toBe(24)
     expect(removed).toHaveLength(0)
+    const coverage: number[] = []
+    renderer.writeCoverage(coverage)
+    expect(coverage).toEqual([12, 12, 24])
     tileOffset = 0
     renderer.render(initial)
     scheduler.warmVisible()
