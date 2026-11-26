@@ -394,6 +394,32 @@ describe('RaceSession', () => {
     expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'finish')).toHaveLength(1)
   })
 
+  it('preserves the rival finish window after a stalled frame', () => {
+    const { store } = createScoreStore()
+    const step: RaceStep = (state) => ({
+      state: { ...state, phase: 'finished', elapsed: 1, vehicles: state.vehicles.map((vehicle) => {
+        if (vehicle.player) return { ...vehicle, finishedAt: 1 }
+        return vehicle.id === 'ai-1' ? {
+          ...vehicle, ...finishApproach(state), lap: state.totalLaps - 1,
+        } : vehicle
+      }) },
+      events: [{ type: 'race-finished', reason: 'finished' }],
+    })
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback(), step })
+    session.start(track, setup)
+    session.advance(3.7, noInput)
+    session.advance(0.25, noInput)
+    const elapsedAtPlayerFinish = session.snapshot().state?.elapsed ?? 0
+
+    // A 60-second frame can simulate only 250 ms because catch-up is capped.
+    session.advance(60, noInput)
+
+    const afterStall = session.snapshot()
+    expect(afterStall.result?.rivalsFinishing).toBe(true)
+    expect((afterStall.state?.elapsed ?? 0) - elapsedAtPlayerFinish).toBeGreaterThanOrEqual(0.24)
+    expect((afterStall.state?.elapsed ?? 0) - elapsedAtPlayerFinish).toBeLessThanOrEqual(0.26)
+  })
+
   it('resets a reverse-race player facing reverse travel', () => {
     const { store } = createScoreStore()
     const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })

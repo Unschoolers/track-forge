@@ -509,10 +509,11 @@ export class RaceSession implements RaceSessionPort {
   private advanceFinishingRivals(state: RaceState, deltaSeconds: number): void {
     const { track, setup, result } = this.current
     if (!result || this.rivalFinishRemaining === 0) return
-    const remainingTime = Math.min(deltaSeconds, this.rivalFinishRemaining)
+    // Spend only capped simulation time so stalls do not burn the finish window.
+    const remainingTime = Math.min(deltaSeconds, MAX_CATCH_UP, this.rivalFinishRemaining)
     this.rivalFinishRemaining -= remainingTime
     if (this.rivalFinishRemaining < 1e-10) this.rivalFinishRemaining = 0
-    this.remainder += Math.min(remainingTime, MAX_CATCH_UP)
+    this.remainder += remainingTime
     if (this.remainder + 1e-10 < RACE_TICK_SECONDS && this.rivalFinishRemaining > 0) return
     while (this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       state = stepFinishingRivals(state, this.dependencies.random)
