@@ -55,9 +55,10 @@
   gap: 1rem;
   min-height: 3.2rem;
   padding: .75rem 1rem;
-  border: 1px solid rgb(206 221 235 / 24%);
-  border-radius: 0;
-  background: rgb(15 21 29 / 78%);
+  border: 1px solid var(--menu-glass-edge);
+  border-radius: var(--menu-glass-radius);
+  background: var(--menu-glass-control);
+  box-shadow: var(--menu-glass-highlight);
   color: var(--home-ink);
   font: 800 .75rem/1.25 var(--home-mono);
   letter-spacing: .09em;
@@ -77,7 +78,7 @@
   border-color: var(--home-accent);
   background: var(--home-accent);
   color: #101017;
-  clip-path: polygon(0 0, 100% 0, 100% 75%, calc(100% - .8rem) 100%, 0 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%);
 }
 .home-actions .home-update-button {
   min-height: 2.75rem;
@@ -96,7 +97,11 @@
 }
 .home-actions .home-update-button { justify-content: flex-start; }
 .home-actions .home-update-button::after { margin-left: auto; }
-.home-actions .button:hover { translate: none; filter: brightness(1.16); }
+.home-actions .button:hover { translate: none; filter: brightness(1.12); }
+.home-actions .button:active:not(:disabled) { filter: brightness(.92); }
+@media (prefers-reduced-transparency: reduce) {
+  .home-actions .button:not(.button-primary):not(.home-update-button) { background: #1b2935; }
+}
 .home-actions .button:focus-visible { outline: 2px solid var(--home-ink); outline-offset: 3px; }
 .home-card .current-track {
   gap: .3rem;

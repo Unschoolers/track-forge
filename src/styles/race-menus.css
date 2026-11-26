@@ -21,7 +21,7 @@
   aspect-ratio: 1;
   background: #111c26;
   border: 1px solid #394b59;
-  border-radius: .35rem;
+  border-radius: var(--menu-glass-radius);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 .track-library-modal .track-card:is(:hover, :focus-within) { border-color: #768a99; z-index: 2; }
@@ -108,9 +108,10 @@
   height: 40px;
   padding: 0;
   border: 0;
-  border-radius: .25rem;
-  color: #c0ccd6;
-  background: #101b27e8;
+  border-radius: 50%;
+  color: #e0e9f1;
+  background: var(--menu-glass-control);
+  box-shadow: var(--menu-glass-highlight);
   font: 800 1.35rem/1 var(--menu-mono);
   cursor: pointer;
   touch-action: manipulation;
@@ -139,7 +140,7 @@
   background: #192936;
   border: 1px solid #60707b;
   box-shadow: 0 .6rem 1.4rem #000a;
-  border-radius: .3rem;
+  border-radius: var(--menu-glass-radius);
 }
 .track-library-modal .track-card-menu .track-icon-action {
   display: flex;
@@ -172,18 +173,19 @@
 .race-setup-modal .setup-section {
   gap: .7rem;
   border: 1px solid #344554;
-  border-radius: 0;
+  border-radius: var(--menu-glass-radius);
   background: #101923;
 }
 .race-setup-modal .setup-label { color: var(--menu-accent); }
-.race-setup-modal .race-flyover-panel { border-color: #465866; border-radius: 0; }
-.race-setup-modal .race-flyover-toggle { border-radius: 0; }
+.race-setup-modal .race-flyover-panel { border-color: #465866; border-radius: var(--menu-glass-radius); }
+.race-setup-modal .race-flyover-toggle { border-radius: var(--menu-glass-radius); }
 .race-setup-modal :is(.car-choice, .setup-choice),
 .nearby-race-modal .setup-choice {
   min-width: 0;
-  border: 1px solid #465767;
-  border-radius: 0;
-  background: #1b2935;
+  border: 1px solid var(--menu-glass-edge);
+  border-radius: var(--menu-glass-radius);
+  background: var(--menu-glass-control);
+  box-shadow: var(--menu-glass-highlight);
   color: var(--menu-ink);
   font: 800 .7rem/1.2 var(--menu-mono);
   letter-spacing: .035em;
@@ -533,3 +535,12 @@
   background: var(--topper-choice-color);
 }
 .results-modal .scoreboard-row .topper-marker { flex: 0 0 1.5rem; }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .track-library-modal :is(.track-card-favorite, .track-menu-trigger),
+  .race-setup-modal :is(.car-choice, .setup-choice):not(.active),
+  .nearby-race-modal .setup-choice:not(.active) {
+    background: #1b2935;
+    border-color: #8495a7;
+  }
+}

@@ -19,6 +19,7 @@ Start here for **current team/agent guidelines**. Older specs and plans under `d
 | [Night presentation](night-presentation.md) | Preview/race lighting parity and rendering budget |
 | [Kids' Room environment](kids-room-environment.md) | Toy props, carpet hills, juice spills and visual-only road skins |
 | [Environment material presentation](environment-materials.md) | Ground, road and terrain styling, visual parity, caching, and performance limits |
+| [Menu materials](menu-materials.md) | Glass-inspired navigation, readable content and render budget |
 | [Vehicle artwork](vehicle-artwork.md) | Shared car silhouettes for race, flyover and selector; visual-only scope |
 | [Recovery and checkpoint authoring](recovery-and-checkpoints.md) | Last road-contact recovery, automatic editor markers, safety and rollback |
 | [Race replay exports](race-replays.md) | Hidden diagnostics trigger, all-car capture and export file contract |

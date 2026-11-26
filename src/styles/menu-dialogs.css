@@ -5,12 +5,14 @@
   --menu-muted: #aab9c8;
   --menu-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   background: rgb(5 8 13 / 84%);
+  /* Do not blur the full live game canvas behind a dialog. */
+  backdrop-filter: none;
 }
 .modal-overlay .modal-card {
-  border: 1px solid #3c4c5b;
-  border-radius: 0;
-  background: linear-gradient(145deg, #18222d, #0b111a 72%);
-  box-shadow: 0 1.5rem 5rem #000b, inset 0 2px var(--menu-accent);
+  border: 1px solid var(--menu-glass-edge);
+  border-radius: var(--menu-glass-panel-radius);
+  background: linear-gradient(145deg, rgb(41 56 70 / 96%), rgb(11 17 26 / 98%) 72%);
+  box-shadow: 0 1.5rem 5rem #000b, inset 0 1px 0 rgb(237 247 255 / 20%);
   color: var(--menu-ink);
 }
 .modal-overlay .modal-header {
@@ -31,15 +33,17 @@
   flex: none;
   width: 44px;
   height: 44px;
-  border: 1px solid #53616c;
-  border-radius: 0;
-  background: #151e28;
+  border: 1px solid var(--menu-glass-edge);
+  border-radius: 50%;
+  background: var(--menu-glass-control);
+  box-shadow: var(--menu-glass-highlight);
   color: var(--menu-ink);
 }
 .modal-overlay .button {
-  border: 1px solid #50606d;
-  border-radius: 0;
-  background: #1b2834;
+  border: 1px solid var(--menu-glass-edge);
+  border-radius: var(--menu-glass-radius);
+  background: var(--menu-glass-control);
+  box-shadow: var(--menu-glass-highlight);
   color: var(--menu-ink);
   font: 800 .75rem/1.2 var(--menu-mono);
   letter-spacing: .08em;
@@ -48,7 +52,7 @@
   border-color: var(--menu-accent);
   background: var(--menu-accent);
   color: #101017;
-  clip-path: polygon(0 0, 100% 0, 100% 76%, calc(100% - .65rem) 100%, 0 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%);
 }
 .modal-overlay .button-danger { border-color: #784651; background: #302028; color: #ffadb3; }
 .modal-overlay :is(button, input):focus-visible { outline: 2px solid #edf2f8; outline-offset: 3px; }
@@ -61,7 +65,7 @@
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.modal-overlay .name-input { border-radius: 0; border-color: #53616c; background: #090f16; }
+.modal-overlay .name-input { border-radius: var(--menu-glass-radius); border-color: #53616c; background: #090f16; }
 
 /* Reserve the same available viewport height regardless of tab content.
    The shared modal grid keeps the header and footer fixed while its body scrolls. */
@@ -79,6 +83,7 @@
   min-width: 0;
   padding: .75rem 1.4rem;
   border-bottom: 1px solid #34414e;
+  background: rgb(8 14 22 / 42%);
 }
 .options-modal .options-tab-list .setup-choice {
   display: flex;
@@ -120,13 +125,14 @@
 .options-modal .setup-section {
   gap: .65rem;
   border: 1px solid #34414e;
-  border-radius: 0;
+  border-radius: var(--menu-glass-radius);
   background: #101923;
 }
 .options-modal .setup-choice, .options-modal .toggle-button {
-  border: 1px solid #465767;
-  border-radius: 0;
-  background: #1b2935;
+  border: 1px solid var(--menu-glass-edge);
+  border-radius: var(--menu-glass-radius);
+  background: var(--menu-glass-control);
+  box-shadow: var(--menu-glass-highlight);
   color: var(--menu-ink);
   font: 800 .7rem/1.2 var(--menu-mono);
   letter-spacing: .035em;
@@ -135,7 +141,12 @@
   border-color: var(--menu-accent);
   background: #563025;
   color: #ffd0bd;
-  box-shadow: inset 0 -2px var(--menu-accent);
+  box-shadow: inset 0 1px 0 rgb(255 213 190 / 20%), inset 0 -2px var(--menu-accent);
+}
+.options-modal .options-tab-list .setup-choice:not(.active) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 .options-modal .setting-row { border-color: #34414e; }
 .options-modal .setting-description, .options-modal .volume-value { color: var(--menu-muted); }
@@ -235,3 +246,18 @@
 }
 .options-modal .release-notes-list li + li { margin-top: .6rem; }
 .options-modal .release-notes-warning { color: #ffcc9f; line-height: 1.4; }
+
+/* Preserve readable opaque materials when transparency or contrast is reduced. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .modal-overlay { background: #080b10; }
+  .modal-overlay .modal-card { background: #141a24; border-color: #8495a7; }
+  .modal-overlay .button:not(.button-primary):not(.button-danger),
+  .modal-overlay .modal-close,
+  .options-modal :is(.setup-choice, .toggle-button):not(.active) {
+    background: #1b2935;
+    border-color: #8495a7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay :is(.button, .modal-close, .setup-choice, .toggle-button) { transition: none; }
+}

@@ -12,6 +12,12 @@
   --radius-sm: 0.5rem;
   --radius-md: 0.8rem;
   --radius-lg: 1.2rem;
+  /* Menu-only optical material; no live scene sampling or shader passes. */
+  --menu-glass-radius: .85rem;
+  --menu-glass-panel-radius: 1.35rem;
+  --menu-glass-edge: rgb(203 224 241 / 28%);
+  --menu-glass-control: linear-gradient(155deg, rgb(194 218 240 / 12%), transparent 55%), rgb(18 28 40 / 88%);
+  --menu-glass-highlight: inset 0 1px 0 rgb(237 247 255 / 16%), inset 0 -1px 0 rgb(0 0 0 / 24%);
   --shadow-deep: 0 1.4rem 4rem rgb(0 0 0 / 45%);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
