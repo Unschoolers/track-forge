@@ -10,7 +10,7 @@ test('resumes an unfinished Arcade Cup round after closing the game', async ({ p
   await expect(page.locator('[data-race-lap]')).toHaveText('1/1')
   await page.reload()
   await enterTrackForge(page)
-  await expect(page.getByText('Next Cup round: City Sprint')).toBeVisible()
+  await expect(page.getByText('Next Cup round: Harbor Grid')).toBeVisible()
   await page.getByRole('button', { name: 'CUP', exact: true }).click()
   await page.getByRole('button', { name: 'RESUME CUP', exact: true }).click()
   await expect(page.locator('[data-race-countdown]')).toBeVisible()
@@ -23,8 +23,9 @@ test('restores and completes a scored Cup after a reload', async ({ page }) => {
     if (localStorage.getItem('trackforge-cup-v1')) return
     localStorage.setItem('trackforge-cup-v1', JSON.stringify({
       version: 2, bestPlacement: null, checkpoint: {
-        car: 'blue', difficulty: 'normal', index: 2,
-        rounds: Array.from({ length: 3 }, () => [
+        car: 'blue', difficulty: 'normal', index: 3,
+        trackIds: ['official-harbor-grid', 'official-canyon-run', 'official-playroom-clover', 'official-greenway'],
+        rounds: Array.from({ length: 4 }, () => [
           { id: 'player', label: 'You', points: 10 },
           { id: 'ai-1', label: 'Red', points: 6 },
         ]),
@@ -36,7 +37,7 @@ test('restores and completes a scored Cup after a reload', async ({ page }) => {
   await page.getByRole('button', { name: 'CUP', exact: true }).click()
   await page.getByRole('button', { name: 'RESUME CUP', exact: true }).click()
   const final = page.getByRole('dialog', { name: 'CUP STANDINGS' })
-  await expect(final.getByText('1. Mobile QA · 30 points')).toBeVisible()
+  await expect(final.getByText('1. Mobile QA · 40 points')).toBeVisible()
   await final.getByRole('button', { name: 'FINISH CUP' }).click()
   await expect(page.getByText('Best Cup placement: 1')).toBeVisible()
   await page.reload()

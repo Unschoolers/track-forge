@@ -9,7 +9,7 @@ const scenarios = customTrack ? [{ name: 'custom', filename: customTrack, lighti
   { name: 'City Harbor', filename: 'City-Harbor.trackforge.json', lighting: 'night' },
   { name: 'Rally', filename: 'Rally.trackforge.json', lighting: 'day' },
   { name: 'Sandy Beach', filename: 'Sandy-Beach.trackforge.json', lighting: 'day' },
-] : [{ name: 'City Sprint', lighting: 'day' }]
+] : [{ name: 'Harbor Grid', lighting: 'day' }]
 
 for (const scenario of scenarios) {
   test(`records a four-car benchmark for ${scenario.name} (${scenario.lighting})`, async ({ page }, testInfo) => {

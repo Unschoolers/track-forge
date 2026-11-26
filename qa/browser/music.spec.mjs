@@ -58,7 +58,7 @@ test('plays the bundled soundtrack and resumes after the app returns to the fore
   await expect(effects).toHaveValue('0')
   await options.getByRole('button', { name: 'DONE' }).tap()
   await page.getByRole('button', { name: 'RACE', exact: true }).tap()
-  await page.getByRole('button', { name: 'Race City Sprint' }).tap()
+  await page.getByRole('button', { name: 'Race Harbor Grid' }).tap()
   await page.getByRole('button', { name: 'START RACE', exact: true }).tap()
   await expect.poll(music).toMatchObject({ src: expect.stringMatching(raceTrack), paused: false })
   await expect.poll(async () => (await music())?.time).toBeGreaterThan(0)
@@ -107,7 +107,7 @@ test('uses the final Cup circuit soundtrack when restoring standings', async ({ 
   await page.evaluate(() => {
     localStorage.setItem('trackforge-cup-v1', JSON.stringify({
       version: 2, bestPlacement: null, checkpoint: {
-        car: 'blue', difficulty: 'normal', index: 0, trackIds: ['official-city-sprint'],
+        car: 'blue', difficulty: 'normal', index: 0, trackIds: ['official-harbor-grid'],
         rounds: [[{ id: 'player', label: 'You', points: 10 }]],
       },
     }))

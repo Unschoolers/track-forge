@@ -16,11 +16,11 @@ describe('Cup lineup persistence', () => {
   it('remembers the most recently built lineup independently of the unfinished cup', () => {
     const repo = new BrowserCupRepository(memoryStore())
     expect(repo.load().lineup).toEqual(DEFAULT_CUP_TRACK_IDS)
-    const checkpoint = createCup('blue', 'hard', ['official-city-sprint', 'official-desert-sweep'])
-    expect(repo.save({ checkpoint, bestPlacement: null, lineup: ['official-toy-box'] })).toBe(true)
+    const checkpoint = createCup('blue', 'hard', ['official-harbor-grid', 'official-canyon-run'])
+    expect(repo.save({ checkpoint, bestPlacement: null, lineup: ['official-playroom-clover'] })).toBe(true)
     const reloaded = repo.load()
-    expect(reloaded.lineup).toEqual(['official-toy-box'])
-    expect(cupTrackIds(reloaded.checkpoint!)).toEqual(['official-city-sprint', 'official-desert-sweep'])
+    expect(reloaded.lineup).toEqual(['official-playroom-clover'])
+    expect(cupTrackIds(reloaded.checkpoint!)).toEqual(['official-harbor-grid', 'official-canyon-run'])
     expect(reloaded.checkpoint?.index).toBe(0)
     expect(repo.save({ checkpoint: null, bestPlacement: null, lineup: [] })).toBe(true)
     expect(repo.load().lineup).toEqual([])
@@ -62,7 +62,7 @@ describe('Cup lineup persistence', () => {
     })
     storage.set('trackforge-cup-v1', JSON.stringify({
       version: 1, bestPlacement: 1,
-      lineup: ['official-meadow', 'official-frost'],
+      lineup: ['official-meadow', 'official-frost', 'official-city-sprint', 'official-desert-sweep', 'official-toy-box'],
       checkpoint: null,
     }))
     expect(repo.load()).toEqual({
