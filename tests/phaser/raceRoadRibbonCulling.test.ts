@@ -131,6 +131,60 @@ describe('race road ribbon culling', () => {
     expect(bitmap.render).toHaveBeenCalledOnce()
   });
 
+  it('bakes atlas-backed toy curbs in texture-local coordinates and releases their textures on shutdown', () => {
+    vi.mocked(createRaceBitmapAtlas).mockReturnValueOnce({
+      render: vi.fn(), warmVisible: vi.fn(), destroy: vi.fn(), coverage: () => [],
+    })
+    const geometry = buildTrackGeometry({
+      points: [
+        { x: 1_000, y: 2_000, surface: 'street' },
+        { x: 1_300, y: 2_000, surface: 'street' },
+        { x: 1_300, y: 2_300, surface: 'street' },
+        { x: 1_000, y: 2_300, surface: 'street' },
+        { x: 1_000, y: 2_000, surface: 'street' },
+      ],
+      terrain: EMPTY_TERRAIN,
+    })
+    const textures = new Map<string, { firstPaint: readonly (string | number)[] | undefined; width: number; height: number }>()
+    const images: { x: number; y: number; key: string; object: RecordingGraphics }[] = []
+    const removed = vi.fn()
+    const onShutdown = vi.fn()
+    const scene = {
+      add: {
+        graphics: () => {
+          const graphics = new RecordingGraphics()
+          return Object.assign(graphics, {
+            generateTexture(key: string, width: number, height: number) {
+              textures.set(key, { firstPaint: graphics.paints[0], width, height })
+            },
+            destroy: vi.fn(),
+          })
+        },
+        image: (x: number, y: number, key: string) => {
+          const object = Object.assign(new RecordingGraphics(), { setOrigin: () => object })
+          images.push({ x, y, key, object })
+          return object
+        },
+      },
+      events: { once: onShutdown },
+      textures: { exists: (key: string) => textures.has(key), remove: removed },
+    }
+    const update = renderRaceTrackGeometryBase(scene as unknown as Phaser.Scene, geometry, false, 'kids-room')
+    expect(images.length).toBeGreaterThan(0)
+    for (const { x, y, key, object } of images) {
+      const texture = textures.get(key)
+      expect(texture?.firstPaint).toEqual(['translate', -x, -y])
+      expect(texture?.width).toBeLessThanOrEqual(2_048)
+      expect(texture?.height).toBeLessThanOrEqual(2_048)
+      expect(object.depth).toBe(ROAD_MARKINGS_DEPTH)
+    }
+    update?.({ centerX: 0, centerY: 0, width: 400, height: 400, zoom: 1, rotation: 0 })
+    expect(images.every(({ object }) => !object.visible)).toBe(true)
+    expect(onShutdown).toHaveBeenCalledWith('shutdown', expect.any(Function))
+    onShutdown.mock.calls[0]?.[1]()
+    expect(removed.mock.calls).toEqual(images.map(({ key }) => [key]))
+  })
+
   it.each([false, true])('keeps the original paint order at a circuit crossing (night=%s)', (night) => {
     const geometry = buildTrackGeometry({
       points: [

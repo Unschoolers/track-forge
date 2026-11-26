@@ -210,6 +210,24 @@ does it establish a performance improvement. Verify startup readiness, camera
 movement and equivalent before/after captures on the target device before
 making either claim.
 
+### Kids' Room static toy curbs
+
+With the race atlas available, Kids' Room curb bricks, shadows and studs are baked
+into small viewport-culled textures at setup. They use the original depth and
+paint order. The curb bake allows up to 2,048 pixels per side and 8 Mi pixels
+across all curb textures. A group that exceeds either limit
+uses the existing Graphics path. Generated textures are removed on race-scene
+shutdown.
+
+A local Playroom Clover normal-race capture in headless Chromium with SwiftShader
+(844 × 390) measured render submission p50/p95/p99 at 30.3/44.0/46.1 ms before
+and 1.9/2.7/3.2 ms after. Frame interval p99 changed from 133.3 to 33.4 ms, and
+Start-to-countdown changed from 731 to 428 ms. This single-pair comparison has
+host noise. Physical-device validation remains pending. A race
+screenshot confirmed the brick pattern remains visible after rasterization.
+Repeat matched captures, preferably in multiple pairs, and verify on a target
+device before making device-performance claims.
+
 ### Startup readiness and frame-budgeted bitmap streaming
 
 The race scene prepares the initial player camera's padded bitmap window
