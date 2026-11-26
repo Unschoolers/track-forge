@@ -61,7 +61,7 @@ for (const scenario of scenarios) {
         await expect(setup.getByRole('button', { name: /^(Double flyover speed|Pause flyover)$/ })).toBeVisible()
         await page.waitForTimeout(5_000)
       }
-      await setup.getByRole('button', { name: 'START RACE', exact: true }).click()
+      await setup.getByRole('button', { name: 'Start Race', exact: true }).click()
       await expect(page.locator('[data-screen="race"]')).toBeVisible()
 
       await expect.poll(async () => (await report()).status, { timeout: 25_000 }).toBe('complete')

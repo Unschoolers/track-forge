@@ -72,7 +72,7 @@ describe('Ghost Race setup', () => {
     expect(selected.textContent).toContain('unranked Arcade run')
     expect(selected.textContent).toContain('Tap and release BRAKE while turning at speed')
     expect(selected
-      .querySelector('[data-action="setup-start"]')?.textContent).toBe('START BOOST PRACTICE')
+      .querySelector('[data-action="setup-start"]')?.textContent).toBe('Start Boost Practice')
     const open = createRaceSetupModal({ ...state, currentTrack: { ...track, routeKind: 'point-to-point' } }, callbacks, null)
     expect(open.querySelector('[data-action="mode-boost-practice"]')).not.toBeNull()
   })
@@ -103,7 +103,7 @@ describe('Ghost Race setup', () => {
       ...state.preferences, raceMode: 'ghost',
     } }, callbacks, 62.345)
     expect(selected.querySelector('[data-action="mode-ghost"]')?.getAttribute('aria-pressed')).toBe('true')
-    expect(selected.querySelector('[data-action="setup-start"]')?.textContent).toBe('START GHOST RACE')
+    expect(selected.querySelector('[data-action="setup-start"]')?.textContent).toBe('Start Ghost Race')
     const stale = createRaceSetupModal({ ...state, preferences: {
       ...state.preferences, raceMode: 'ghost',
     } }, callbacks, null)
@@ -183,7 +183,7 @@ describe('Ghost Race setup', () => {
     const callbacks = actions()
     const modal = createRaceSetupModal(openState, callbacks, null)
     expect(modal.textContent).toContain('Single run')
-    expect(modal.textContent).toContain('RACE AI')
+    expect(modal.textContent).toContain('Race AI')
     expect(modal.querySelector('[data-action="mode-time-trial"]')?.getAttribute('aria-pressed')).toBe('true')
     expect(modal.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')?.disabled).toBe(true)
     modal.querySelector<HTMLButtonElement>('[data-action="mode-time-trial"]')?.click()
