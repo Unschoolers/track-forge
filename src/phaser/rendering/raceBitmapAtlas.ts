@@ -9,6 +9,8 @@ import { WORLD_RENDER_DEPTH } from './renderLayers'
 export const RACE_ATLAS_BUDGET = 128 * 1024 * 1024
 const PAGE_SIZE = 1024
 const GUTTER = 1
+// Two frames per axis, including gutters, on a full page.
+export const MAX_RACE_TILE_RESOLUTION = PAGE_SIZE / 2 - 2 * GUTTER
 let nextAtlas = 0
 
 interface AtlasPage {
@@ -26,13 +28,13 @@ export interface RaceAtlasPlan {
 }
 
 /** Bound actual RGBA page allocation, including edge gutters and the last row.
- * Small tracks retain native tile resolution; large tracks use the highest
- * uniform resolution that fits. No on-race texture allocation or eviction. */
+ * Small tracks can bake close to 2x world resolution; large tracks use the
+ * highest uniform resolution that fits. No on-race allocation or eviction. */
 export function planRaceAtlas(count: number, budget = RACE_ATLAS_BUDGET): RaceAtlasPlan {
   if (!Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(budget) || budget < 36) {
     throw new RangeError('Invalid race atlas budget or tile count')
   }
-  const start = Math.min(GROUND_TILE_SIZE, Math.floor(Math.sqrt(budget / (4 * Math.max(1, count)))) - 2 * GUTTER)
+  const start = Math.min(MAX_RACE_TILE_RESOLUTION, Math.floor(Math.sqrt(budget / (4 * Math.max(1, count)))) - 2 * GUTTER)
   for (let resolution = start; resolution >= 1; resolution--) {
     const stride = resolution + 2 * GUTTER
     const columns = Math.floor(PAGE_SIZE / stride)
@@ -158,7 +160,7 @@ export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeomet
       const slots = pageEntries.map((entry, i) => {
         const x = (i % page.columns) * plan.stride + GUTTER
         const y = Math.floor(i / page.columns) * plan.stride + GUTTER
-        drawTile(context, entry.source.image(entry.tile), x, y, plan.resolution)
+        drawTile(context, entry.source.bake(entry.tile, plan.resolution), x, y, plan.resolution)
         return { entry, x, y, frame: String(i) }
       })
       const key = `${prefix}:${pageIndex}`

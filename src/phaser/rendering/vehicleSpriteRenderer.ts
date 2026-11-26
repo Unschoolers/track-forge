@@ -6,22 +6,6 @@ export interface VehicleBodyPainter {
   draw(car: CarId, x: number, y: number, angle: number, scaleX: number, scaleY: number, depth: number): boolean
 }
 
-// The race camera draws cars at tens of pixels. Prefilter the full-size
-// artwork once so linear sampling in-game does not skip most source pixels.
-const RACE_TEXTURE_WIDTH = 96
-
-function makeRaceTexture(bitmap: HTMLImageElement): HTMLCanvasElement {
-  const canvas = document.createElement('canvas')
-  canvas.width = RACE_TEXTURE_WIDTH
-  canvas.height = Math.max(1, Math.round(RACE_TEXTURE_WIDTH * bitmap.naturalHeight / bitmap.naturalWidth))
-  const context = canvas.getContext('2d')
-  if (!context) throw new Error('Could not create the race vehicle texture canvas')
-  context.imageSmoothingEnabled = true
-  context.imageSmoothingQuality = 'high'
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  return canvas
-}
-
 const textureKey = (car: CarId): string => `trackforge-vehicle-${car}`
 
 /** Four shared textures, with a scene-owned pool reused across all race frames. */
@@ -36,7 +20,7 @@ export class VehicleSpriteRenderer implements VehicleBodyPainter {
       const bitmap = resolve(car)
       if (!bitmap) continue
       const key = textureKey(car)
-      if (!scene.textures.exists(key) && !scene.textures.addCanvas(key, makeRaceTexture(bitmap))) {
+      if (!scene.textures.exists(key) && !scene.textures.addImage(key, bitmap)) {
         throw new Error(`Could not register vehicle artwork for ${car}`)
       }
       this.available.add(car)
