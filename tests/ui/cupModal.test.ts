@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AppSnapshot } from '@/application/appState'
 import { createEditorState } from '@/domain/editor/editorState'
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { createCup } from '@/application/race/circuitCup'
 import { createCupModal } from '@/ui/modals/cupModal'
 
 const track = OFFICIAL_CIRCUITS[0]?.track
@@ -48,6 +49,27 @@ describe('Cup menu', () => {
     expect(actions.start).toHaveBeenCalledOnce()
     overlay.querySelector<HTMLButtonElement>('[data-action="host-nearby-cup"]')?.click()
     expect(actions.hostNearby).toHaveBeenCalledOnce()
+  })
+
+  it.each(['solo', 'nearby'] as const)('prioritizes the intended %s Cup action even with a saved solo checkpoint', (mode) => {
+    const actions = {
+      close: vi.fn(), addTrack: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
+      start: vi.fn(), resume: vi.fn(), hostNearby: vi.fn(),
+    }
+    const initial = state([track!.id])
+    const overlay = createCupModal({
+      ...initial,
+      overlay: mode === 'nearby' ? { type: 'cup', returnTo: 'nearby' } : { type: 'cup' },
+      cupProgress: { checkpoint: createCup(), bestPlacement: null, lineup: [track!.id] },
+    }, actions)
+    const primary = overlay.querySelectorAll<HTMLButtonElement>('.modal-footer .button-primary')
+    expect(primary).toHaveLength(1)
+    expect(primary[0]?.dataset.action).toBe(mode === 'nearby' ? 'host-nearby-cup' : 'start-cup')
+    primary[0]?.click()
+    expect(actions.hostNearby).toHaveBeenCalledTimes(mode === 'nearby' ? 1 : 0)
+    expect(actions.start).toHaveBeenCalledTimes(mode === 'solo' ? 1 : 0)
+    expect(actions.resume).not.toHaveBeenCalled()
+    expect(overlay.querySelector('[data-action="resume-cup"]')).not.toBeNull()
   })
 
   it('keeps cleared lineups editable but disallows starting an empty Cup', () => {

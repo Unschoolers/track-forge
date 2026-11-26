@@ -47,15 +47,17 @@ export function createCupModal(state: AppSnapshot, actions: CupMenuActions): HTM
   if (checkpoint) frame.body.append(element('p', 'modal-subtitle',
     `Unfinished cup · Race ${Math.min(checkpoint.index + 1, cupRoundCount(checkpoint))} of ${cupRoundCount(checkpoint)}. Its original lineup is preserved.`))
   const raceReady = lineup.length > 0 && lineup.every(id => tracks.some(track => track.id === id))
-  const start = button('START NEW CUP', 'start-cup', actions.start, 'button button-primary')
+  const hosting = state.overlay.type === 'cup' && state.overlay.returnTo === 'nearby' && !!actions.hostNearby
+  const start = button('START NEW CUP', 'start-cup', actions.start, hosting ? 'button' : 'button button-primary')
   start.disabled = !raceReady
+  const host = actions.hostNearby
+    ? button('HOST NEARBY CUP', 'host-nearby-cup', actions.hostNearby, hosting ? 'button button-primary' : 'button')
+    : null
+  if (host) host.disabled = !raceReady
+  if (hosting && host) frame.footer.append(host)
   if (checkpoint) frame.footer.append(button('RESUME CUP', 'resume-cup', actions.resume, 'button'))
   frame.footer.append(start)
-  if (actions.hostNearby) {
-    const host = button('HOST NEARBY CUP', 'host-nearby-cup', actions.hostNearby, 'button')
-    host.disabled = !raceReady
-    frame.footer.append(host)
-  }
+  if (!hosting && host) frame.footer.append(host)
   frame.footer.append(button('BACK', 'cup-back', actions.close, 'button'))
   return frame.overlay
 }

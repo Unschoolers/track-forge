@@ -22,21 +22,21 @@ import type {
   EditorTool,
 } from '@/domain/editor/editorGeometry'
 
+type TrackLibraryOverlay = {
+  readonly type: 'track-library'
+  readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
+  readonly cupReturnTo?: 'nearby'
+}
+
 export type OverlayReturn =
   | { readonly type: 'none' }
-  | {
-      readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup' | 'cup'
-    }
+  | TrackLibraryOverlay
   | { readonly type: 'editor-menu' }
   | { readonly type: 'editor-exit' }
 
 export type AppOverlay =
   | { readonly type: 'none' }
-  | {
-      readonly type: 'track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
-    }
+  | TrackLibraryOverlay
   | {
       readonly type: 'track-name'
       readonly purpose: 'create' | 'rename' | 'save-as'
