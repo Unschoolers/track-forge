@@ -86,6 +86,48 @@ describe('nearby pose synchronizer', () => {
     expect(sync.counts.sendFailed).toBe(1)
   })
 
+  it('maintains the target cadence across mixed refresh intervals without catch-up bursts', async () => {
+    let now = 0
+    const sentAt: number[] = []
+    const sync = new NearbyPoseSync(async () => { sentAt.push(now) }, () => now)
+    // Mixed 120/60/40/30 Hz render intervals, representative of mobile vsync.
+    const gaps = [8.3, 25, 16.7, 25, 8.3, 33.3, 8.4, 8.3]
+    for (let i = 0; i < 600; i++) {
+      now += gaps[i % gaps.length]!
+      sync.update(player, 1, 'host', ['host'], racers)
+      await flush()
+    }
+    const rate = sentAt.length / (now / 1000)
+    expect(rate).toBeGreaterThan(28)
+    expect(rate).toBeLessThanOrEqual(30.2)
+    expect(sentAt.slice(1).every((at, i) => at - sentAt[i]! >= 1000 / 60)).toBe(true)
+    const beforeStall = sentAt.length
+    now += 1000
+    sync.update(player, 1, 'host', ['host'], racers)
+    await flush()
+    sync.update(player, 1, 'host', ['host'], racers)
+    expect(sentAt).toHaveLength(beforeStall + 1)
+  })
+
+  it('does not queue stale poses while native admission is pending', async () => {
+    let now = 0
+    const sentAt: number[] = []
+    let release: (() => void) | undefined
+    const sync = new NearbyPoseSync(() => new Promise<void>(resolve => {
+      sentAt.push(now)
+      release = resolve
+    }), () => now)
+    sync.update(player, 1, 'host', ['host'], racers)
+    for (now = 10; now <= 200; now += 10) sync.update(player, 1, 'host', ['host'], racers)
+    expect(sentAt).toEqual([0])
+    release?.()
+    await flush()
+    sync.update(player, 1, 'host', ['host'], racers)
+    expect(sentAt).toEqual([0, 210])
+    release?.()
+    await flush()
+  })
+
   it('discards late sends after room reset and restores fresh sequence and metrics', async () => {
     let complete: (() => void) | undefined
     const sync = new NearbyPoseSync(() => new Promise<void>(resolve => { complete = resolve }), () => 0)
