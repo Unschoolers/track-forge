@@ -71,43 +71,60 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(ghost.pose(3161)).toBeNull()
   })
 
-  it('reduces presentation delay on a stable stream and grows it under jitter without rewinding', () => {
+  it.each([60, 120])('keeps the playback clock moving at %i FPS during jitter and recovers low delay', fps => {
     const ghost = new RemoteGhost('red')
-    let now = 1000
+    const step = 1000 / fps
     let sequence = 0
-    const receive = (gap: number) => {
-      now += gap
-      const packet = decodePose(encodePose(1, sequence++, 0, makeCar('red', (now - 1000) / 10)))
+    let nextPacket = 1000
+    let sentAt = 1000
+    let previous: number | undefined
+    let jitterIndex = 0
+    for (let now = 1000; now < 9500; now += step) {
+      if (now + 0.001 >= nextPacket) {
+        const packet = decodePose(encodePose(1, sequence++, 0, makeCar('red', (sentAt - 1000) / 10)))
+        assert(packet)
+        expect(ghost.receive(packet, nextPacket)).toBe(true)
+        sentAt += POSE_PERIOD_MS
+        nextPacket += now < 3500 || now > 5000 ? POSE_PERIOD_MS :
+          [149, 17, 17, 17, 17, 17, 33][jitterIndex++ % 7]!
+      }
+      const pose = ghost.pose(now)
+      assert(pose)
+      // The clock can warm up and prediction may legitimately cap after radio loss.
+      // During buffered playback it must never stop simply because delay increased.
+      if (now > 3000 && now < 3400) expect(now - pose.t).toBeLessThan(65)
+      if (now > 9000) expect(now - pose.t).toBeLessThan(65)
+      if (now > 3000 && now < 9000 && previous !== undefined &&
+          pose.t !== previous) expect(pose.t).toBeGreaterThan(previous)
+      previous = pose.t
+    }
+    const metrics = ghost.presentationDiagnostics()
+    expect(metrics.samples).toBeGreaterThan(400)
+    expect(metrics.clockHeldMs).toBe(0)
+    expect(metrics.maxDelayMs).toBeGreaterThan(80)
+    expect(metrics.targetDelayMs).toBeLessThan(60)
+  })
+
+  it('does not advance or count diagnostic peeks and blends small prediction corrections', () => {
+    const ghost = new RemoteGhost('red')
+    const receive = (sequence: number, now: number, x: number) => {
+      const packet = decodePose(encodePose(1, sequence, 0, makeCar('red', x)))
       assert(packet)
       expect(ghost.receive(packet, now)).toBe(true)
     }
-    receive(0)
-    for (let i = 0; i < 40; i++) receive(33)
-    const stable = ghost.pose(now)
-    assert(stable)
-    expect(now - stable.t).toBeGreaterThanOrEqual(49)
-    expect(now - stable.t).toBeLessThan(60)
-
-    // Simulate a missed update and a late arrival; the buffer grows but the
-    // presentation timeline must not move backwards at the same display time.
-    const before = ghost.pose(now + 100)
+    receive(1, 1000, 0)
+    receive(2, 1033, 10)
+    const before = ghost.pose(1180)
     assert(before)
-    receive(100)
-    const after = ghost.pose(now)
-    assert(after)
-    expect(after.t).toBeGreaterThanOrEqual(before.t)
-    for (let i = 0; i < 12; i++) {
-      receive(i % 2 === 0 ? 100 : 20)
-      ghost.pose(now)
-    }
-    const jittered = ghost.pose(now)
-    assert(jittered)
-    expect(now - jittered.t).toBeGreaterThan(90)
-    expect(now - jittered.t).toBeLessThanOrEqual(150)
-    for (let i = 0; i < 80; i++) { receive(33); ghost.pose(now) }
-    const recovered = ghost.pose(now)
-    assert(recovered)
-    expect(now - recovered.t).toBeLessThan(60)
+    const metrics = ghost.presentationDiagnostics()
+    ghost.peekPose(1185)
+    expect(ghost.presentationDiagnostics()).toEqual(metrics)
+    receive(3, 1180, 15)
+    const corrected = ghost.pose(1180)
+    assert(corrected)
+    expect(corrected.x).toBeCloseTo(before.x, 5)
+    expect(ghost.presentationDiagnostics().corrections).toBe(1)
+    expect(ghost.pose(1320)?.x).toBeLessThan(40)
   })
 
   it('round-trips a 19-byte pose and cuts interpolation on a recovery', () => {

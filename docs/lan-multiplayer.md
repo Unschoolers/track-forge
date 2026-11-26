@@ -22,10 +22,21 @@ Both native hosts bind all local IPv4 interfaces; their listening port is not ex
 
 Both transports share a receiver-local interpolation buffer. Start at 100 ms,
 then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
-Grow quickly when updates are irregular, shrink gradually on a healthy stream,
-and never rewind the presentation clock when the buffer grows. Existing recovery
-cuts, bounded extrapolation and two-second expiry remain unchanged. Verify on
-matched device captures; synthetic timing tests are not radio latency evidence.
+Grow the target quickly when updates are irregular, shrink it gradually on a
+healthy stream. The independent presentation clock slews at 0.8–1.2x real time
+toward that target instead of stopping or jumping when jitter changes. Retain
+24 pose samples for the 60 Hz / 150 ms case. Small prediction corrections blend
+out over 100 ms; recoveries and structure transitions clear the correction.
+Existing prediction limits (120 ms / 75 world units) and two-second expiry
+remain unchanged. Startup and prolonged radio outages can still hold a pose.
+
+Per-remote-player `presentation` diagnostics report effective clock delay
+(mean/min/max), target delay, render sample count, clock hold time, time requesting
+prediction, time prediction was capped/unavailable, and correction magnitude.
+Durations exclude startup and suspended render intervals over 500 ms. Trace
+peeks do not advance playback or increment render counters. These are receiver
+clock metrics, not measured end-to-end network latency. Verify on matched
+device captures; synthetic timing tests are not radio latency evidence.
 
 ## Validation
 

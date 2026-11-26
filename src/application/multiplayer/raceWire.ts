@@ -178,6 +178,17 @@ const REMOTE_INITIAL_DELAY_MS = 100
 const REMOTE_MIN_DELAY_MS = 50
 const REMOTE_MAX_DELAY_MS = 150
 const REMOTE_DELAY_WARMUP_SAMPLES = 4
+const REMOTE_HISTORY_LIMIT = 24
+const REMOTE_CLOCK_RESPONSE_MS = 250
+const REMOTE_CLOCK_MIN_RATE = 0.8
+const REMOTE_CLOCK_MAX_RATE = 1.2
+const REMOTE_CORRECTION_MS = 100
+const REMOTE_PREDICTION_MS = 120
+const REMOTE_PREDICTION_DISTANCE = 75
+
+function wrappedTurn(angle: number): number {
+  return Math.atan2(Math.sin(angle), Math.cos(angle))
+}
 
 export class RemoteGhost {
   private frames: GhostPose[] = []
@@ -190,6 +201,13 @@ export class RemoteGhost {
   private arrivalSamples = 0
   private interpolationDelayMs = REMOTE_INITIAL_DELAY_MS
   private lastPresentationTime = Number.NEGATIVE_INFINITY
+  private lastPresentationAt = Number.NEGATIVE_INFINITY
+  private correction: { x: number; y: number; angle: number; at: number } | null = null
+  private readonly metrics = {
+    samples: 0, delaySumMs: 0, minDelayMs: Infinity, maxDelayMs: -Infinity,
+    clockHeldMs: 0, predictionMs: 0, predictionHeldMs: 0, corrections: 0,
+    maxCorrectionDistance: 0,
+  }
 
   constructor(readonly car: CarId) {}
 
@@ -197,6 +215,14 @@ export class RemoteGhost {
     if (!isNewerWireSequence(packet.sequence, this.sequence)) return false
     const advance = this.sequence === undefined ? 1 : (packet.sequence - this.sequence) & POSE_SEQUENCE_MASK
     const last = this.frames.at(-1)
+    const continuous = !!last && now - this.arrival <= 500 &&
+      packet.recovery === this.recovery && packet.pose.structureRunId === last.structureRunId
+    // Capture the old predicted position at the same playback timestamp before
+    // replacing it with newly received data. No extra sampling on normal packets.
+    const oldPrediction = continuous && last && this.lastPresentationTime > last.t
+      ? this.correctedPose(this.sampleAt(this.lastPresentationTime), this.lastPresentationAt)
+      : null
+    if (!continuous) this.correction = null
     // Accept 30-60 Hz and packet losses without assuming a fixed send cadence.
     if (!last || now - this.arrival > 500) {
       this.frames = []
@@ -206,6 +232,7 @@ export class RemoteGhost {
       this.arrivalSamples = 0
       this.interpolationDelayMs = REMOTE_INITIAL_DELAY_MS
       this.lastPresentationTime = Number.NEGATIVE_INFINITY
+      this.lastPresentationAt = Number.NEGATIVE_INFINITY
     } else {
       const arrivalGap = Math.max(0, now - this.arrival)
       // Use actual arrival spacing, not spacing divided by sequence advance:
@@ -216,7 +243,7 @@ export class RemoteGhost {
       if (++this.arrivalSamples >= REMOTE_DELAY_WARMUP_SAMPLES) {
         const desired = Math.max(REMOTE_MIN_DELAY_MS, Math.min(REMOTE_MAX_DELAY_MS,
           this.arrivalPeriodMs * 1.5 + this.arrivalJitterMs * 2))
-        // Increase immediately on jitter; shrink slowly to avoid visible jumps.
+        // This is a target delay, not the actual playback clock.
         this.interpolationDelayMs = Math.max(desired, this.interpolationDelayMs - 2)
       }
       const observedPeriod = arrivalGap / advance
@@ -232,20 +259,107 @@ export class RemoteGhost {
       ...packet.pose, car: this.car, t: last && this.frames.length ? Math.max(last.t + 1, time) : time,
       cut: packet.recovery !== this.recovery,
     })
-    if (this.frames.length > 8) this.frames.shift()
+    if (this.frames.length > REMOTE_HISTORY_LIMIT) this.frames.shift()
+    if (oldPrediction) {
+      const fresh = this.sampleAt(this.lastPresentationTime)
+      if (fresh && fresh.structureRunId === oldPrediction.structureRunId) {
+        const dx = oldPrediction.x - fresh.x
+        const dy = oldPrediction.y - fresh.y
+        const distance = Math.hypot(dx, dy)
+        // Blend small prediction errors, never disguise a teleport or bridge cut.
+        if (distance <= REMOTE_PREDICTION_DISTANCE) {
+          const angle = wrappedTurn(oldPrediction.angle - fresh.angle)
+          this.correction = { x: dx, y: dy, angle, at: this.lastPresentationAt }
+          this.metrics.corrections++
+          this.metrics.maxCorrectionDistance = Math.max(this.metrics.maxCorrectionDistance, distance)
+        } else this.correction = null
+      } else this.correction = null
+    }
     this.sequence = packet.sequence
     this.recovery = packet.recovery
     this.arrival = now
     return true
   }
 
+  /** The trace samples this same clock without moving it or changing render metrics. */
+  peekPose(now: number): GhostPose | null {
+    const target = this.presentationTarget(now)
+    return target === null ? null : this.correctedPose(this.sampleAt(target), now)
+  }
+
   pose(now: number): GhostPose | null {
-    const last = this.frames.at(-1)
+    const target = this.presentationTarget(now)
+    if (target === null) return null
+    const previousTime = this.lastPresentationTime
+    const dt = now - this.lastPresentationAt
+    // Before the first buffered sample, wait for history instead of predicting
+    // from a single stationary packet. This is startup, not a playback stall.
+    if (Number.isFinite(previousTime) || now - this.interpolationDelayMs >= this.frames[0]!.t) {
+      this.lastPresentationTime = target
+      this.lastPresentationAt = Math.max(now, this.lastPresentationAt)
+      if (Number.isFinite(dt) && dt > 0 && dt <= 500) {
+        const delay = now - target
+        this.metrics.samples++
+        this.metrics.delaySumMs += delay
+        this.metrics.minDelayMs = Math.min(this.metrics.minDelayMs, delay)
+        this.metrics.maxDelayMs = Math.max(this.metrics.maxDelayMs, delay)
+        if (target <= previousTime) this.metrics.clockHeldMs += dt
+        const last = this.frames.at(-1)!
+        if (target > last.t) {
+          this.metrics.predictionMs += dt
+          const previous = this.frames.at(-2)
+          const gap = previous ? last.t - previous.t : 0
+          const distance = previous ? Math.hypot(last.x - previous.x, last.y - previous.y) : 0
+          if (!previous || last.cut || previous.structureRunId !== last.structureRunId || gap < 12 ||
+              target - last.t >= REMOTE_PREDICTION_MS ||
+              distance * (target - last.t) / gap >= REMOTE_PREDICTION_DISTANCE) {
+            this.metrics.predictionHeldMs += dt
+          }
+        }
+      }
+    }
+    return this.correctedPose(this.sampleAt(target), now)
+  }
+
+  presentationDiagnostics() {
+    const m = this.metrics
+    return {
+      samples: m.samples, targetDelayMs: this.interpolationDelayMs,
+      meanDelayMs: m.samples ? m.delaySumMs / m.samples : null,
+      minDelayMs: m.samples ? m.minDelayMs : null, maxDelayMs: m.samples ? m.maxDelayMs : null,
+      clockHeldMs: m.clockHeldMs, predictionMs: m.predictionMs,
+      predictionHeldMs: m.predictionHeldMs, corrections: m.corrections,
+      maxCorrectionDistance: m.maxCorrectionDistance,
+    }
+  }
+
+  private presentationTarget(now: number): number | null {
     const first = this.frames[0]
-    if (!first || !last || now - this.arrival > REMOTE_POSE_EXPIRY_MS) return null
-    // Never rewind a displayed car when the adaptive buffer grows.
-    const target = Math.max(first.t, this.lastPresentationTime, now - this.interpolationDelayMs)
-    this.lastPresentationTime = target
+    if (!first || now - this.arrival > REMOTE_POSE_EXPIRY_MS) return null
+    const desired = Math.max(first.t, now - this.interpolationDelayMs)
+    if (!Number.isFinite(this.lastPresentationTime)) return desired
+    const dt = Math.max(0, now - this.lastPresentationAt)
+    if (!dt) return this.lastPresentationTime
+    // Resume after a suspended render loop without spending seconds catching up.
+    if (dt > 500) return Math.max(this.lastPresentationTime, desired)
+    const predicted = this.lastPresentationTime + dt
+    const error = desired - predicted
+    const correction = Math.max((REMOTE_CLOCK_MIN_RATE - 1) * dt,
+      Math.min((REMOTE_CLOCK_MAX_RATE - 1) * dt, error * Math.min(1, dt / REMOTE_CLOCK_RESPONSE_MS)))
+    return Math.max(first.t, predicted + correction)
+  }
+
+  private correctedPose(pose: GhostPose | null, now: number): GhostPose | null {
+    if (!pose || !this.correction) return pose
+    const weight = Math.max(0, Math.min(1, 1 - (now - this.correction.at) / REMOTE_CORRECTION_MS))
+    if (!weight) return pose
+    return { ...pose, x: pose.x + this.correction.x * weight,
+      y: pose.y + this.correction.y * weight, angle: pose.angle + this.correction.angle * weight }
+  }
+
+  private sampleAt(target: number): GhostPose | null {
+    const last = this.frames.at(-1)
+    if (!last) return null
     if (target <= last.t) return ghostPoseAt({ car: this.car, frames: this.frames, time: last.t }, target)
 
     // Brief dead reckoning hides intermittent radio gaps. Never predict across
@@ -258,8 +372,8 @@ export class RemoteGhost {
     const dx = last.x - previous.x
     const dy = last.y - previous.y
     const distance = Math.hypot(dx, dy)
-    const fraction = Math.min(120, target - last.t) / deltaTime
-    const bounded = Math.min(fraction, 75 / Math.max(0.001, distance))
+    const fraction = Math.min(REMOTE_PREDICTION_MS, target - last.t) / deltaTime
+    const bounded = Math.min(fraction, REMOTE_PREDICTION_DISTANCE / Math.max(0.001, distance))
     const turn = Math.atan2(Math.sin(last.angle - previous.angle), Math.cos(last.angle - previous.angle))
     return {
       ...last, car: this.car, t: target,
