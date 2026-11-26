@@ -6,6 +6,7 @@ import type { RouteKind, Vector2 } from '@/domain/model'
 
 export interface EditorRenderState {
   readonly routeKind: RouteKind
+  readonly roadDrag?: boolean
   readonly points: object
   readonly terrain: object
   readonly trees: object
@@ -71,6 +72,7 @@ export function editorSnapshotRenderChanges(
   return {
     world:
       geometryChanged ||
+      (previous.roadDrag === true && current.roadDrag !== true) ||
       previous.environmentId !== current.environmentId ||
       previous.night !== current.night,
     appearance: previous.environmentId !== current.environmentId || previous.scenery !== current.scenery || previous.trees !== current.trees || previous.night !== current.night || (previous.tool !== current.tool && (previous.tool === 'tree' || current.tool === 'tree')),
@@ -90,6 +92,21 @@ export function editorSnapshotRenderChanges(
       previous.terrainMode !== current.terrainMode ||
       previous.terrainRadius !== current.terrainRadius,
   }
+}
+
+/** Terrain depends on the road corridor, but does not need to be recompiled
+ * for intermediate point-drag frames. Compare against the last actual terrain
+ * render, not the last snapshot, so commit and cancellation cannot go stale. */
+export function editorTerrainRenderRequired(
+  rendered: EditorRenderState | undefined,
+  current: EditorRenderState,
+  detailChanged: boolean,
+): boolean {
+  if (!rendered || rendered.terrain !== current.terrain ||
+    rendered.environmentId !== current.environmentId || rendered.night !== current.night ||
+    rendered.routeKind !== current.routeKind) return true
+  if (current.roadDrag) return false
+  return detailChanged || rendered.points !== current.points
 }
 
 export function editorPointerRenderChanges(

@@ -31,12 +31,17 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   await page.evaluate(async () => {
     const { EditorScene } = await import('/src/phaser/scenes/EditorScene.ts')
     const { TrackGeometryCache } = await import('/src/domain/track/trackGeometryCache.ts')
-    const work = { redraws: 0, builds: 0, writes: 0 }
+    const work = { redraws: 0, terrainRedraws: 0, builds: 0, writes: 0 }
     window.roadEditWork = work
     const render = EditorScene.prototype.renderWorldPresentation
     EditorScene.prototype.renderWorldPresentation = function (...args) {
       work.redraws++
       return render.apply(this, args)
+    }
+    const terrain = EditorScene.prototype.renderTerrainPresentation
+    EditorScene.prototype.renderTerrainPresentation = function (...args) {
+      work.terrainRedraws++
+      return terrain.apply(this, args)
     }
     const cache = TrackGeometryCache.prototype.set
     TrackGeometryCache.prototype.set = function (...args) {
@@ -100,11 +105,18 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
     const screenY = y + (control.y - moveCamera.y) * moveCamera.zoom
     before = await work()
     await touch(pointer, 'touchStart', [contact(1, screenX, screenY)])
+    await touch(pointer, 'touchMove', [contact(1, screenX + 22, screenY)])
+    await expect.poll(async () => (await work()).redraws).toBeGreaterThan(before.redraws)
+    expect((await work()).terrainRedraws).toBe(before.terrainRedraws)
+    const firstMove = await work()
     await touch(pointer, 'touchMove', [contact(1, screenX + 45, screenY)])
+    await expect.poll(async () => (await work()).redraws).toBeGreaterThan(firstMove.redraws)
+    expect((await work()).terrainRedraws).toBe(before.terrainRedraws)
     await releaseTouches(pointer)
     await expect.poll(async () => (await read()).editor.history).toBe(1)
     await expect.poll(async () => (await draft())[4].x).toBeGreaterThan(control.x + 100)
-    await expectEditWork(before)
+    await expect.poll(async () => (await work()).terrainRedraws - before.terrainRedraws).toBe(1)
+    expect((await work()).writes - before.writes).toBe(0)
 
     before = await work()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()

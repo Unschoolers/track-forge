@@ -3,6 +3,7 @@ import {
   editorPointerRenderChanges,
   editorSnapshotRenderChanges,
   editorTreeRenderRequired,
+  editorTerrainRenderRequired,
   treePreviewRenderRequired,
   terrainPreviewCompileRequired,
   type EditorRenderState,
@@ -59,6 +60,25 @@ describe('editor render invalidation', () => {
       overlay: true,
       preview: false,
     })
+  })
+
+  it('retains terrain during a road drag and refreshes it when the edit commits', () => {
+    const rendered = state()
+    const first = { ...rendered, points: [], roadDrag: true }
+    const last = { ...first, points: [] }
+    expect(editorTerrainRenderRequired(rendered, first, false)).toBe(false)
+    expect(editorTerrainRenderRequired(rendered, last, true)).toBe(false)
+    expect(editorTerrainRenderRequired(rendered, { ...last, terrain: {} }, false)).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, { ...last, environmentId: 'desert' }, false)).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, { ...last, night: true }, false)).toBe(true)
+    const committed = { ...last, roadDrag: false }
+    expect(editorSnapshotRenderChanges(last, committed, false).world).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, committed, false)).toBe(true)
+    expect(editorTerrainRenderRequired(committed, committed, false)).toBe(false)
+    const cancelled = { ...rendered, roadDrag: false }
+    expect(editorSnapshotRenderChanges(last, cancelled, false).world).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, cancelled, false)).toBe(false)
+    expect(editorTerrainRenderRequired(rendered, cancelled, true)).toBe(true)
   })
 
   it('limits camera and raw pointer updates to their dirty layers', () => {

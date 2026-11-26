@@ -5,7 +5,7 @@ import type { AppCommand, AppSnapshot } from '@/application/appState'
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import type { Preferences } from '@/application/ports/storage'
 import type { UpdateProvider } from '@/application/updates/updateProvider'
-import { createEditorState } from '@/domain/editor/editorState'
+import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import {
@@ -87,6 +87,40 @@ describe('DomUiHost', () => {
     expect(geometry.mock.calls[0]?.[0]).toMatchObject({
       points: track.points,
     })
+  })
+
+  it('keeps the editor DOM and diagnostics stable during point moves, then refreshes on release', () => {
+    const { root, host, update, geometry } = setup('editor')
+    const initial = snapshot('editor')
+    const selected = { ...initial, editorUi: { ...initial.editorUi, tool: 'select' as const, selectedPoint: 2 } }
+    const begun = { ...selected, editor: reduceEditor(selected.editor, { type: 'begin-gesture' }) }
+    update(begun)
+    const screen = root.firstElementChild
+    geometry.mockClear()
+    const first = { ...begun, editor: reduceEditor(begun.editor, { type: 'move-point', index: 2, point: { x: 120, y: 180 } }) }
+    const last = { ...first, editor: reduceEditor(first.editor, { type: 'move-point', index: 2, point: { x: 130, y: 190 } }) }
+    update(first)
+    update(last)
+    expect(root.firstElementChild).toBe(screen)
+    expect(geometry).not.toHaveBeenCalled()
+    const committed = { ...last, editor: reduceEditor(last.editor, { type: 'end-gesture' }) }
+    update(committed)
+    expect(root.firstElementChild).not.toBe(screen)
+    expect(geometry).toHaveBeenCalledOnce()
+    host.destroy()
+  })
+
+  it('does not defer a notice or menu during a point drag', () => {
+    const { root, host, update } = setup('editor')
+    const initial = snapshot('editor')
+    const begun = { ...initial, editorUi: { ...initial.editorUi, tool: 'select' as const }, editor: reduceEditor(initial.editor, { type: 'begin-gesture' }) }
+    update(begun)
+    const moved = { ...begun, editor: reduceEditor(begun.editor, { type: 'move-point', index: 2, point: { x: 120, y: 180 } }) }
+    update({ ...moved, notice: 'Road edit rejected' })
+    expect(root.textContent).toContain('Road edit rejected')
+    update({ ...moved, overlay: { type: 'editor-menu' } })
+    expect(root.querySelector('[role="dialog"][aria-label="Editor menu"]')).not.toBeNull()
+    host.destroy()
   })
 
   it('renders semantic home actions and dispatches typed commands', () => {

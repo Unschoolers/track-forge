@@ -50,6 +50,7 @@ import {
   editorPointerRenderChanges,
   editorSnapshotRenderChanges,
   editorTreeRenderRequired,
+  editorTerrainRenderRequired,
   treePreviewRenderRequired,
   terrainPreviewCompileRequired,
   type EditorRenderChanges,
@@ -103,6 +104,7 @@ export class EditorScene extends Phaser.Scene {
   private compiledTerrainPreviewRevision: number | undefined
   private terrainPreviewImpacts: readonly TerrainPreviewImpact[] = []
   private renderedTerrainDetail: TerrainPresentationDetail | undefined
+  private renderedTerrainState: EditorRenderState | undefined
   private terrainRaster: EditorWorldRaster | undefined
   private roadRaster: EditorWorldRaster | undefined
   private bitmapRoadRaster: EditorWorldRaster | undefined
@@ -257,7 +259,7 @@ export class EditorScene extends Phaser.Scene {
     } else {
       this.bitmapRoadRaster?.render(this.editorCamera, width, height, false)
       this.bitmapMarkingRaster?.render(this.editorCamera, width, height, false)
-      this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
+      this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld && !this.currentRenderState?.roadDrag)
     }
     this.renderGroundPresentation()
     this.renderSceneryPresentation()
@@ -426,7 +428,11 @@ export class EditorScene extends Phaser.Scene {
     this.structureDeckGraphics.clear()
     this.structureWallGraphics.clear()
     this.lampGraphics.clear()
-    this.renderTerrainPresentation(geometry)
+    const renderState = this.currentRenderState
+    if (renderState && editorTerrainRenderRequired(this.renderedTerrainState, renderState,
+      this.terrainDetail(geometry) !== this.renderedTerrainDetail)) {
+      this.renderTerrainPresentation(geometry)
+    }
     renderTrackGeometryBase(
       this.trackGraphics,
       geometry,
@@ -482,6 +488,7 @@ export class EditorScene extends Phaser.Scene {
     this.terrainGraphics.clear()
     renderTerrain(this.terrainGraphics, geometry.path.terrainSurface, night, detail, night ? environment.night : environment.day)
     this.renderedTerrainDetail = detail
+    this.renderedTerrainState = this.currentRenderState
     this.terrainRaster?.invalidate()
   }
 
@@ -507,7 +514,7 @@ export class EditorScene extends Phaser.Scene {
   /** Zooming only rebuilds terrain when crossing a detail threshold.
    * Road, bridges, and authored geometry stay exactly as they were. */
   private refreshTerrainForCamera(): void {
-    if (!this.terrainGraphics || !this.currentSnapshot || this.worldRenderPending) return
+    if (!this.terrainGraphics || !this.currentSnapshot || this.worldRenderPending || this.currentRenderState?.roadDrag) return
     const geometry = this.trackGeometry()
     const detail = this.terrainDetail(geometry)
     if (detail === this.renderedTerrainDetail) return
@@ -644,6 +651,8 @@ export class EditorScene extends Phaser.Scene {
   private editorRenderState(snapshot: AppSnapshot): EditorRenderState {
     return {
       routeKind: snapshot.editor.routeKind,
+      roadDrag: snapshot.editorUi.tool === 'select' && snapshot.editor.gestureStart !== null &&
+        snapshot.editor.points !== snapshot.editor.gestureStart.points,
       points: snapshot.editor.points,
       terrain: snapshot.editor.terrain,
       trees: snapshot.editor.trees,
@@ -748,6 +757,7 @@ export class EditorScene extends Phaser.Scene {
     this.compiledTerrainPreviewRevision = undefined
     this.terrainPreviewImpacts = []
     this.renderedTerrainDetail = undefined
+    this.renderedTerrainState = undefined
     this.terrainRaster = undefined
     this.roadRaster = undefined
     this.bitmapRoadRaster = undefined
