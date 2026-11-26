@@ -1,4 +1,5 @@
 import type { AppSnapshot } from '@/application/appState'
+import { CURATED_CUP_ROUNDS, cupRoundCount } from '@/application/race/circuitCup'
 import type { RaceControlsPort } from '@/application/ports/input'
 import type {
   RaceSessionPort,
@@ -67,6 +68,17 @@ export function createRaceHud(
   const countdownValue = element('span', 'countdown-value')
   countdownValue.dataset.raceCountdown = ''
   countdownValue.setAttribute('aria-live', 'polite')
+  const cupTrack = state.currentTrack
+  const roundIntro = cupTrack && state.cup ? element('div', 'cup-round-intro') : null
+  if (roundIntro && cupTrack && state.cup) {
+    roundIntro.append(
+      element('span', 'label', `CUP · ROUND ${state.cup.index + 1}/${cupRoundCount(state.cup)}`),
+      element('strong', undefined, cupTrack.name),
+    )
+    const focus = CURATED_CUP_ROUNDS.find(round => round.trackId === cupTrack.id)?.focus
+    if (focus) roundIntro.append(element('span', undefined, focus))
+    countdown.append(roundIntro)
+  }
   countdown.append(countdownLights, countdownValue)
 
   const controlsBar = element('footer', 'race-controls')
@@ -412,6 +424,7 @@ export function createRaceHud(
     if (countdownValue.textContent !== countdownText) countdownValue.textContent = countdownText
     countdown.dataset.signal = countdownText === 'GO' ? 'green' : countdownText === '3' ? 'red' : countdownText ? 'yellow' : ''
     countdown.classList.toggle('visible', countdownText !== '')
+    if (roundIntro) roundIntro.hidden = telemetry.phase !== 'countdown'
   }
   update(raceSession.snapshot())
   let unsubscribe: Unsubscribe | undefined = raceSession.subscribe(update)

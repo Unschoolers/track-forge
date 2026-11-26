@@ -16,6 +16,13 @@ export interface CircuitCup {
 }
 export const MAX_CUP_ROUNDS = 12
 export const DEFAULT_CUP_TRACK_IDS = CUP_CIRCUITS.map(({ track }) => track.id)
+/** A short, authored progression that leaves the legacy/default lineup intact. */
+export const CURATED_CUP_ROUNDS = [
+  { trackId: 'official-playroom-clover', focus: 'Tight cloverleaf turns' },
+  { trackId: 'official-harbor-grid', focus: 'Fast straights and late braking' },
+  { trackId: 'official-rally-finale', focus: 'Gravel sweeps and a paved sprint to the finish' },
+] as const
+export const CURATED_CUP_TRACK_IDS = CURATED_CUP_ROUNDS.map(({ trackId }) => trackId)
 export function validCupLineup(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length <= MAX_CUP_ROUNDS &&
     value.every(id => typeof id === 'string' && id.length > 0 && id.length <= 120)

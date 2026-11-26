@@ -1,12 +1,13 @@
-import { DEFAULT_CUP_TRACK_IDS, MAX_CUP_ROUNDS, cupRoundCount } from '@/application/race/circuitCup'
+import { CURATED_CUP_TRACK_IDS, DEFAULT_CUP_TRACK_IDS, MAX_CUP_ROUNDS, cupRoundCount } from '@/application/race/circuitCup'
 import type { AppSnapshot } from '@/application/appState'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from './modalFrame'
 
 export interface CupMenuActions {
   readonly close: () => void
   readonly addTrack: () => void
+  readonly loadCurated: () => void
   readonly removeTrack: (index: number) => void
   readonly moveTrack: (index: number, direction: -1 | 1) => void
   readonly start: () => void
@@ -18,7 +19,7 @@ export function createCupModal(state: AppSnapshot, actions: CupMenuActions): HTM
   const frame = createModalFrame('CUP', 'Build a series. Race every track. Win the championship.', actions.close, 'cup-modal')
   frame.overlay.dataset.modal = 'cup'
   const lineup = state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS
-  const tracks = [...state.tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)]
+  const tracks = [...state.tracks, ...OFFICIAL_COURSES.map(({ track }) => track)]
   const checkpoint = state.cupProgress?.checkpoint
   const list = element('ol', 'cup-track-list')
   list.setAttribute('aria-label', 'Cup track order')
@@ -41,6 +42,11 @@ export function createCupModal(state: AppSnapshot, actions: CupMenuActions): HTM
     list.append(row)
   })
   frame.body.append(element('h3', 'results-heading', `TRACK LINEUP · ${lineup.length}/${MAX_CUP_ROUNDS}`), list)
+  const curated = button('LOAD CURATED CUP', 'cup-load-curated', actions.loadCurated, 'button')
+  curated.setAttribute('aria-pressed', String(lineup.length === CURATED_CUP_TRACK_IDS.length &&
+    lineup.every((id, index) => id === CURATED_CUP_TRACK_IDS[index])))
+  frame.body.append(curated, element('p', 'modal-subtitle',
+    'Three stages: Kids Room tight turns · City Harbor speed and braking · Rally point-to-point finale.'))
   const add = button('+ ADD TRACK', 'cup-add-track', actions.addTrack, 'button')
   add.disabled = lineup.length >= MAX_CUP_ROUNDS
   frame.body.append(add)

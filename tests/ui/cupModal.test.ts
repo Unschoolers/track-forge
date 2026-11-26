@@ -31,7 +31,7 @@ function state(lineup: readonly string[]): AppSnapshot {
 describe('Cup menu', () => {
   it('shows ordered tracks and dispatches deliberate edit/start actions', () => {
     const actions = {
-      close: vi.fn(), addTrack: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
+      close: vi.fn(), addTrack: vi.fn(), loadCurated: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
       start: vi.fn(), resume: vi.fn(), hostNearby: vi.fn(),
     }
     const overlay = createCupModal(state([OFFICIAL_CIRCUITS[0]!.track.id, OFFICIAL_CIRCUITS[1]!.track.id]), actions)
@@ -45,6 +45,9 @@ describe('Cup menu', () => {
     expect(actions.removeTrack).toHaveBeenCalledExactlyOnceWith(1)
     overlay.querySelector<HTMLButtonElement>('[data-action="cup-add-track"]')?.click()
     expect(actions.addTrack).toHaveBeenCalledOnce()
+    expect(overlay.querySelector('[data-action="cup-load-curated"]')?.textContent).toBe('LOAD CURATED CUP')
+    overlay.querySelector<HTMLButtonElement>('[data-action="cup-load-curated"]')?.click()
+    expect(actions.loadCurated).toHaveBeenCalledOnce()
     overlay.querySelector<HTMLButtonElement>('[data-action="start-cup"]')?.click()
     expect(actions.start).toHaveBeenCalledOnce()
     overlay.querySelector<HTMLButtonElement>('[data-action="host-nearby-cup"]')?.click()
@@ -53,7 +56,7 @@ describe('Cup menu', () => {
 
   it.each(['solo', 'nearby'] as const)('prioritizes the intended %s Cup action even with a saved solo checkpoint', (mode) => {
     const actions = {
-      close: vi.fn(), addTrack: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
+      close: vi.fn(), addTrack: vi.fn(), loadCurated: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
       start: vi.fn(), resume: vi.fn(), hostNearby: vi.fn(),
     }
     const initial = state([track!.id])
@@ -74,7 +77,7 @@ describe('Cup menu', () => {
 
   it('keeps cleared lineups editable but disallows starting an empty Cup', () => {
     const overlay = createCupModal(state([]), {
-      close: vi.fn(), addTrack: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
+      close: vi.fn(), addTrack: vi.fn(), loadCurated: vi.fn(), removeTrack: vi.fn(), moveTrack: vi.fn(),
       start: vi.fn(), resume: vi.fn(), hostNearby: vi.fn(),
     })
     expect(overlay.querySelector<HTMLButtonElement>('[data-action="start-cup"]')?.disabled).toBe(true)

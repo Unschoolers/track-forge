@@ -33,7 +33,8 @@ import '@/styles/menu-dialogs.css'
 import '@/styles/race-menus.css'
 import '@/styles/editor-menus.css'
 import { RaceSession } from '@/application/race/raceSession'
-import { CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { cupTrackIds } from '@/application/race/circuitCup'
+import { OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import { mathRandom } from '@/infrastructure/random/mathRandom'
 import { startupArtworkReady } from './startupArtworkGate'
 import { inputForPedals, RaceInputController } from '@/phaser/input/raceInput'
@@ -176,8 +177,10 @@ function syncAudio(snapshot: ReturnType<typeof controller.snapshot>): void {
   feedback.setChannels({ audio: soundEffectsVolume > 0, haptics: snapshot.preferences.hapticsEnabled })
   toneSink.setVolume(soundEffectsVolume / 100)
   const cupFinal = snapshot.overlay.type === 'cup-final'
-  const track = cupFinal && snapshot.cup
-    ? CUP_CIRCUITS[snapshot.cup.index]?.track
+  const cupTrackId = cupFinal && snapshot.cup ? cupTrackIds(snapshot.cup)[snapshot.cup.index] : undefined
+  const track = cupTrackId
+    ? snapshot.tracks.find(track => track.id === cupTrackId) ??
+      OFFICIAL_COURSES.find(({ track }) => track.id === cupTrackId)?.track
     : raceSession.snapshot().track
   const soundtrack = snapshot.mode === 'race' || cupFinal
     ? normalizeTrackEnvironmentId(track?.environmentId)

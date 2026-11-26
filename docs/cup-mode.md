@@ -5,11 +5,21 @@
 - The Home menu has one **CUP** entry. It opens a builder, not a race.
 - Add any race-ready saved/official track, move entries up/down, or remove them. Repeats are allowed.
 - A lineup has 0–12 entries while editing; starting requires 1–12 valid tracks.
+- The builder offers an explicit **Load Curated Cup** preset: Playroom Clover for tight turns,
+  Harbor Grid for speed and braking, and the official point-to-point Rally finale. Loading the
+  preset replaces the editable lineup while an unfinished Cup keeps its frozen original lineup.
+- A point-to-point Cup round is a single run, as in other race modes; circuit rounds keep their
+  existing single-lap Cup format. The four legacy official circuits remain the default lineup.
 - The **last built lineup** is remembered on this device. There is no Cup save-preset library.
 - **Start new Cup** uses the current lineup. An unfinished **Resume Cup** continues with the
   original lineup, even if the player has edited the builder after starting.
 - Each solo Cup race retains existing 10/6/4/2 placement scoring; Cup checkpoints and best placement
   are saved. The original four official tracks remain the default/legacy sequence.
+
+Solo Cup rounds open on the real starting grid. The countdown identifies the
+round and track, and the curated stages describe the section to watch for.
+When dynamic zoom is enabled, the camera starts wider and settles before GO.
+Reduced-motion mode uses the regular race framing.
 
 ## Nearby Cup
 

@@ -440,6 +440,7 @@ export class DomUiHost implements UiHost {
         return createCupModal(state, {
           close,
           addTrack: () => this.controller.dispatch({ type: 'cup-add-track' }),
+          loadCurated: () => this.controller.dispatch({ type: 'cup-load-curated' }),
           removeTrack: (index) => this.controller.dispatch({ type: 'cup-remove-track', index }),
           moveTrack: (index, direction) => this.controller.dispatch({ type: 'cup-move-track', index, direction }),
           start: () => this.controller.dispatch({ type: 'start-cup' }),

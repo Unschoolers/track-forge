@@ -1,4 +1,4 @@
-import { asTrackId, type RoadStructure, type SurfaceId, type TerrainCell, type TerrainKind, type Track, type TrackPoint } from '@/domain/model'
+import { asTrackId, type RoadStructure, type RouteKind, type SurfaceId, type TerrainCell, type TerrainKind, type Track, type TrackPoint } from '@/domain/model'
 import type { SceneryPropKind, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { normalizeTerrain, terrainKindAt } from '@/domain/terrain/terrainField'
 import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
@@ -10,11 +10,13 @@ type Control = readonly [x: number, y: number, surface?: SurfaceId, structure?: 
 type Landform = readonly [kind: TerrainKind, x: number, y: number, radiusX: number, radiusY: number]
 type Landmark = readonly [kind: SceneryPropKind, x: number, y: number]
 
-interface CircuitDesign {
+interface CourseDesign {
   readonly id: string
   readonly name: string
   readonly environment: TrackEnvironmentId
   readonly scale: number
+  readonly routeKind?: RouteKind
+  readonly checkpoints?: readonly number[]
   readonly controls: readonly Control[]
   readonly props: readonly SceneryPropKind[]
   readonly landforms: readonly Landform[]
@@ -43,28 +45,28 @@ function buildLandscape(landforms: readonly Landform[], scale: number) {
   return normalizeTerrain({ cells })
 }
 
-/** Explicitly authored silhouettes. The final control repeats the first. */
-function officialTrack(design: CircuitDesign): Track {
-  const { id, name, environment, controls, scale, props, landforms, landmarks } = design
+function officialTrack(design: CourseDesign): Track {
+  const { id, name, environment, controls, scale, props, landforms, landmarks, routeKind = 'circuit' } = design
   const points: TrackPoint[] = controls.map(([x, y, surface, structure], index) => ({
     id: `${id}-${index}`, x: Math.round(x * scale), y: Math.round(y * scale),
     surface: surface ?? 'street', curve: 'smooth', tension: 0.5,
     structure: structure ?? 'surface',
   }))
   const terrain = buildLandscape(landforms, scale)
-  const path = buildRoadPath(points, terrain)
+  const path = buildRoadPath(points, terrain, undefined, routeKind)
   const clearOfRoad = (position: { x: number; y: number }) => {
     const nearest = nearestPathPoint(path, position)
     return nearest !== undefined && nearest.distance >= ROAD_GEOMETRY.edgeWidth / 2 + 85 &&
       terrainKindAt(terrain, position) !== 'water'
   }
-  const uniqueCount = points.length - 1
+  const circuit = routeKind === 'circuit'
+  const uniqueCount = circuit ? points.length - 1 : points.length
   // Scatter biome-specific props on the verge, never across a nearby road arm.
   const scenery = props.flatMap((kind, index) => {
     const vertex = Math.floor((index + 0.5) * uniqueCount / props.length) % uniqueCount
     const point = points[vertex]!
-    const before = points[(vertex + uniqueCount - 1) % uniqueCount]!
-    const after = points[(vertex + 1) % uniqueCount]!
+    const before = points[circuit ? (vertex + uniqueCount - 1) % uniqueCount : Math.max(0, vertex - 1)]!
+    const after = points[circuit ? (vertex + 1) % uniqueCount : Math.min(uniqueCount - 1, vertex + 1)]!
     const dx = after.x - before.x
     const dy = after.y - before.y
     const length = Math.hypot(dx, dy)
@@ -82,9 +84,9 @@ function officialTrack(design: CircuitDesign): Track {
   return {
     id: asTrackId(id), name, version: 8, points, environmentId: environment,
     terrain, trees, scenery,
-    recoveryCheckpoints: [0.25, 0.5, 0.75],
+    recoveryCheckpoints: design.checkpoints ?? [0.25, 0.5, 0.75],
     autoCheckpoints: true, start: { ratio: 0, reversed: false },
-    lighting: 'day', routeKind: 'circuit', createdAt: 0, updatedAt: 0,
+    lighting: 'day', routeKind, createdAt: 0, updatedAt: 0,
     origin: 'seeded', creator: TRACK_FORGE_CREATOR,
   }
 }
@@ -178,6 +180,33 @@ export const OFFICIAL_CIRCUITS = [
     }),
     target: 30,
   },
+] as const
+
+// The legacy Cup uses the four circuits above. Stages join the race catalog
+// without adding rounds to a saved Cup that omits its track IDs.
+export const RALLY_FINALE = officialTrack({
+  id: 'official-rally-finale', name: 'Quarry Sprint', environment: 'desert',
+  routeKind: 'point-to-point', scale: 20,
+  controls: [
+    [-320, 20], [-287, 20], [-252, 5, 'dirt'], [-222, -20, 'dirt'],
+    [-192, -35, 'dirt'], [-164, -35, 'dirt'], [-132, -16, 'dirt'],
+    [-105, 16, 'dirt'], [-77, 31, 'dirt'], [-43, 29, 'dirt'],
+    [-12, 10, 'dirt'], [12, -18, 'dirt'], [47, -30],
+    [83, -25], [114, -5], [151, 17], [190, 24], [236, 24], [285, 24],
+  ],
+  checkpoints: [0.19, 0.38, 0.61, 0.81],
+  props: ['desert-cactus', 'desert-rock-cluster', 'desert-boulder', 'desert-rock-spire',
+    'desert-cactus', 'desert-rock-cluster', 'desert-boulder', 'desert-rock-spire',
+    'desert-cactus', 'desert-boulder', 'desert-rock-cluster', 'desert-cactus'],
+  landforms: [['hill', -175, -69, 32, 21], ['hill', -23, 62, 31, 16],
+    ['hill', 61, -66, 25, 16], ['water', 123, 43, 29, 12]],
+  landmarks: [['desert-rock-spire', -175, -62], ['desert-rock-cluster', -96, 50],
+    ['desert-boulder', 61, -55], ['desert-cactus', 228, 6]],
+})
+
+export const OFFICIAL_COURSES = [
+  ...OFFICIAL_CIRCUITS,
+  { track: RALLY_FINALE },
 ] as const
 
 // Provisional single-lap Arcade targets; recalibrate with 60 Hz physical runs.

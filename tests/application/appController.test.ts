@@ -1,6 +1,6 @@
 import { courseIdentity } from '@/application/race/raceRecords'
 import { BrowserCupRepository } from '@/infrastructure/storage/cupRepository'
-import { DEFAULT_CUP_TRACK_IDS, createCup, recordCupResult, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
+import { CURATED_CUP_TRACK_IDS, DEFAULT_CUP_TRACK_IDS, createCup, recordCupResult, advanceCup, CUP_CIRCUITS } from '@/application/race/circuitCup'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   CupStore,
@@ -584,6 +584,47 @@ describe('AppController', () => {
     controller.dispatch({ type: 'next-cup-race' })
     expect(controller.snapshot()).toMatchObject({ mode: 'home', currentTrack: { id: 'starter' }, cup: null })
     expect(trackStore.list().map((track) => track.id)).toEqual(['starter'])
+  })
+
+  it('loads and resumes the curated progression through its unique official tracks', () => {
+    const values = new Map<string, string>()
+    const store = new BrowserCupRepository({ get: (key) => values.get(key) ?? null, set: (key, value) => { values.set(key, value); return true }, remove: (key) => values.delete(key) })
+    const input = { steering: 0, throttle: 1, braking: false }
+    const finish = (session: RaceSessionPort) => {
+      session.advance(3.7, input)
+      session.advance(0.02, input)
+    }
+    const first = setup(undefined, true, store)
+    let resumed: ReturnType<typeof setup> | undefined
+    try {
+      first.controller.dispatch({ type: 'open-cup' })
+      first.controller.dispatch({ type: 'cup-load-curated' })
+      expect(first.controller.snapshot().cupProgress?.lineup).toEqual(CURATED_CUP_TRACK_IDS)
+      first.controller.dispatch({ type: 'start-cup' })
+      expect(first.controller.snapshot().currentTrack?.id).toBe(CURATED_CUP_TRACK_IDS[0])
+      finish(first.raceSession)
+      first.controller.dispatch({ type: 'go-home' })
+      first.controller.dispatch({ type: 'open-cup' })
+      first.controller.dispatch({ type: 'cup-remove-track', index: 0 })
+      expect(first.controller.snapshot().cupProgress?.lineup).toEqual(CURATED_CUP_TRACK_IDS.slice(1))
+      expect(store.load().checkpoint?.trackIds).toEqual(CURATED_CUP_TRACK_IDS)
+
+      resumed = setup(undefined, true, store)
+      resumed.controller.dispatch({ type: 'resume-cup' })
+      expect(resumed.controller.snapshot().currentTrack?.id).toBe(CURATED_CUP_TRACK_IDS[1])
+      finish(resumed.raceSession)
+      resumed.controller.dispatch({ type: 'next-cup-race' })
+      expect(resumed.controller.snapshot().currentTrack?.id).toBe(CURATED_CUP_TRACK_IDS[2])
+      expect(resumed.raceSession.snapshot().setup?.laps).toBe(1)
+      finish(resumed.raceSession)
+      resumed.controller.dispatch({ type: 'next-cup-race' })
+      expect(resumed.controller.snapshot()).toMatchObject({ mode: 'home', cup: null })
+      expect(store.load().checkpoint).toBeNull()
+      expect(new Set(CURATED_CUP_TRACK_IDS).size).toBe(CURATED_CUP_TRACK_IDS.length)
+    } finally {
+      first.controller.destroy()
+      resumed?.controller.destroy()
+    }
   })
 
 

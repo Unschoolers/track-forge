@@ -4,11 +4,11 @@ import type { CupStore } from '@/application/ports/storage'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import type { Track } from '@/domain/model'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import { validateTrack } from '@/domain/track/trackValidation'
-import { DEFAULT_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
+import { DEFAULT_CUP_TRACK_IDS, CURATED_CUP_TRACK_IDS, cupTrackIds, cupRoundCount, validCupLineup, cupStandings, createCup, advanceCup, cupGridPositions, moveCupTrack, removeCupTrack, type CircuitCup, type CupProgress } from '@/application/race/circuitCup'
 
-type CupCommand = Extract<AppCommand, { type: 'open-cup' | 'cup-add-track' | 'cup-remove-track' | 'cup-move-track' | 'start-cup' | 'host-nearby-cup' | 'resume-cup' | 'next-cup-race' }>
+type CupCommand = Extract<AppCommand, { type: 'open-cup' | 'cup-add-track' | 'cup-load-curated' | 'cup-remove-track' | 'cup-move-track' | 'start-cup' | 'host-nearby-cup' | 'resume-cup' | 'next-cup-race' }>
 
 interface CupFlowDependencies {
   readonly snapshot: () => AppSnapshot
@@ -51,6 +51,14 @@ export class CupFlow {
             (this.state.cupProgress?.lineup?.length ?? DEFAULT_CUP_TRACK_IDS.length) < 12) {
           this.update({ ...this.state, overlay: { type: 'track-library', purpose: 'cup',
             ...(this.state.overlay.returnTo ? { cupReturnTo: this.state.overlay.returnTo } : {}) }, ...this.dependencies.librarySnapshot(), notice: null })
+        }
+        break
+      case 'cup-load-curated':
+        if (this.state.overlay.type === 'cup' &&
+            CURATED_CUP_TRACK_IDS.every(id => this.cupTrack(id))) {
+          this.setCupLineup(CURATED_CUP_TRACK_IDS)
+        } else if (this.state.overlay.type === 'cup') {
+          this.update({ ...this.state, notice: 'The curated Cup course is unavailable.' })
         }
         break
       case 'cup-remove-track': {
@@ -132,7 +140,7 @@ export class CupFlow {
   }
 
   private cupTrack(id: string): Track | undefined {
-    return OFFICIAL_CIRCUITS.find(({ track }) => track.id === id)?.track ??
+    return OFFICIAL_COURSES.find(({ track }) => track.id === id)?.track ??
       this.dependencies.tracks().find(track => track.id === id)
   }
 

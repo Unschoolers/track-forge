@@ -99,6 +99,7 @@ export class RaceScene extends Phaser.Scene {
   private raceCamera: RaceCameraState | undefined
   private pointerBinding: RacePointerBinding | undefined
   private boostRequestPending = false
+  private cupCameraIntro = false
 
   constructor(
     private readonly controller: SceneControllerPort,
@@ -113,6 +114,8 @@ export class RaceScene extends Phaser.Scene {
 
   create(): void {
     this.snapshot = this.controller.snapshot()
+    this.cupCameraIntro = Boolean(this.snapshot.cup && this.snapshot.preferences.dynamicZoomEnabled &&
+      !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
     const track = this.snapshot.currentTrack
     if (!track) {
       this.controller.dispatch({ type: 'go-home' })
@@ -189,7 +192,10 @@ export class RaceScene extends Phaser.Scene {
       const view = {
         centerX: this.raceCamera.x, centerY: this.raceCamera.y,
         width: camera.width, height: camera.height,
-        zoom: this.snapshot.preferences.dynamicZoomEnabled ? this.raceCamera.zoom : RACE_CAMERA_TUNING.fixedZoom,
+        zoom: this.presentationZoom(
+          this.snapshot.preferences.dynamicZoomEnabled ? this.raceCamera.zoom : RACE_CAMERA_TUNING.fixedZoom,
+          this.raceSession.snapshot().state?.countdown ?? 0,
+        ),
         rotation: -this.raceCamera.angle - Math.PI / 2,
         minimumZoom: RACE_CAMERA_TUNING.minimumZoom,
       }
@@ -314,7 +320,7 @@ export class RaceScene extends Phaser.Scene {
         this.raceCamera.x + this.raceCamera.shake.x,
         this.raceCamera.y + this.raceCamera.shake.y,
       )
-      this.cameras.main.setZoom(this.raceCamera.zoom)
+      this.cameras.main.setZoom(this.presentationZoom(this.raceCamera.zoom, race.countdown))
       this.cameras.main.setRotation(-this.raceCamera.angle - Math.PI / 2)
     }
     const cameraRotation = this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0
@@ -450,6 +456,13 @@ export class RaceScene extends Phaser.Scene {
         ...(this.updateRoadRibbonVisibility?.bitmap?.coverage() ?? EMPTY_BITMAP_COVERAGE),
       ])
     }
+  }
+
+  private presentationZoom(zoom: number, countdown: number): number {
+    if (!this.cupCameraIntro || countdown <= 1) return zoom
+    // Start wider to show the grid and surroundings, then settle before GO.
+    const remaining = Math.min(1, (countdown - 1) / 2.7)
+    return zoom * (1 - 0.14 * remaining * remaining)
   }
 
   private renderGroundPresentation(night: boolean, rotation = 0): void {
