@@ -21,6 +21,6 @@ test('first launch requires and persists a player name across reload', async ({ 
   await page.reload()
   await page.getByRole('button', { name: /^tap to start$/i }).click()
   await expect(naming).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'RACE', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Race', exact: true })).toBeVisible()
   expect(await page.evaluate(() => localStorage.getItem('trackforge-creator-id-v1'))).toBe(saved.id)
 })

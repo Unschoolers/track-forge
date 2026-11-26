@@ -2,7 +2,9 @@ import { cupTrackIds, cupRoundCount } from '@/application/race/circuitCup'
 import { courseIdentity, nextMedalTarget, scoreCategoryLabel, timeMedal } from '@/application/race/raceRecords'
 import { OFFICIAL_CIRCUITS, OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import type { AppSnapshot } from '@/application/appState'
-import { button, element } from '@/ui/dom'
+import { element } from '@/ui/dom'
+import { createMenuAction } from '@/ui/menu/menuControls'
+import { createMenuDock, createMenuLayout } from '@/ui/menu/menuLayout'
 import { formatRaceTime } from '@/ui/format'
 
 export function createHomeScreen(
@@ -17,53 +19,61 @@ export function createHomeScreen(
     readonly updates?: (() => void) | undefined
   },
 ): HTMLElement {
-  const screen = element('section', 'screen home-screen')
+  const { root: screen, media, header, content, actions: footer } = createMenuLayout('static')
+  screen.classList.add('screen', 'home-screen')
   screen.dataset.screen = 'home'
-  const card = element('div', 'home-card')
-  const eyebrow = element('p', 'eyebrow', 'BUILD IT · RACE IT · MASTER IT')
-  const title = element('h1', 'brand')
+
+  const trackArt = element('div', 'home-artwork')
+  trackArt.setAttribute('aria-hidden', 'true')
+  media.append(trackArt)
+
+  const eyebrow = element('p', 'home-eyebrow', 'BUILD IT · RACE IT · MASTER IT')
+  const title = element('h1', 'home-title')
   title.setAttribute('aria-label', 'Track Forge')
-  title.append(element('span', 'home-brand-track', 'TRACK'), element('span', 'brand-accent', 'FORGE'))
-  const trackCard = element('div', 'current-track')
-  const best = state.currentTrack
-    ? state.scoresByTrack[state.currentTrack.id]?.[0]
-    : undefined
-  trackCard.append(
-    element('span', 'label', 'CURRENT TRACK'),
-    element('strong', 'track-name', state.currentTrack?.name ?? 'No track'),
-    ...(state.currentTrack ? [element('span', 'track-meta', `Made by ${state.currentTrack.creator?.name ?? (state.currentTrack.id.startsWith('official-') ? 'Track Forge' : 'Unknown')}`)] : []),
-    element(
-      'span',
-      'track-meta',
-      state.currentTrack
-        ? `Best time: ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(state.currentTrack) ? ' · past layout' : ''})` : 'no time yet'}`
-        : 'Create your first circuit',
-    ),
+  title.append(element('span', 'home-brand-track', 'TRACK'), element('span', 'home-brand-accent', 'FORGE'))
+  header.append(eyebrow, title)
+
+  const track = state.currentTrack
+  const best = track ? state.scoresByTrack[track.id]?.[0] : undefined
+  const details = element('section', 'home-track')
+  details.setAttribute('aria-label', 'Current track')
+  details.append(
+    element('span', 'home-track-label', 'CURRENT TRACK'),
+    element('h2', 'home-track-name', track?.name ?? 'No track selected'),
   )
-  if (state.cupProgress?.bestPlacement) trackCard.append(element('span', 'track-meta', `Best Cup placement: ${state.cupProgress.bestPlacement}`))
+  if (track) {
+    details.append(element('p', 'home-track-credit', `Made by ${track.creator?.name ?? (track.id.startsWith('official-') ? 'Track Forge' : 'Unknown')}`))
+    details.append(element('p', 'home-track-best', `Best time: ${best ? `${formatRaceTime(best.time)} (${scoreCategoryLabel(best)}${best.category && best.category.course !== courseIdentity(track) ? ' · past layout' : ''})` : 'no time yet'}`))
+  } else {
+    details.append(element('p', 'home-track-best', 'Create your first circuit'))
+  }
+  if (state.cupProgress?.bestPlacement) details.append(element('p', 'home-track-progress', `Best Cup placement: ${state.cupProgress.bestPlacement}`))
   const checkpoint = state.cupProgress?.checkpoint
   if (checkpoint) {
     const nextIndex = Math.min(checkpoint.index + (checkpoint.rounds.length > checkpoint.index ? 1 : 0), cupRoundCount(checkpoint) - 1)
     const id = cupTrackIds(checkpoint)[nextIndex]
-    const next = [...state.tracks, ...OFFICIAL_COURSES.map(({ track }) => track)].find(track => track.id === id)
-    trackCard.append(element('span', 'track-meta', checkpoint.rounds.length === cupRoundCount(checkpoint) ? 'Cup standings ready' : `Next Cup round: ${next?.name ?? 'Track unavailable'}`))
+    const next = [...state.tracks, ...OFFICIAL_COURSES.map(({ track: course }) => course)].find(candidate => candidate.id === id)
+    details.append(element('p', 'home-track-progress', checkpoint.rounds.length === cupRoundCount(checkpoint) ? 'Cup standings ready' : `Next Cup round: ${next?.name ?? 'Track unavailable'}`))
   } else {
-    const circuit = OFFICIAL_CIRCUITS.map(({ track }) => ({ track, next: nextMedalTarget(track, timeMedal(track, state.scoresByTrack[track.id] ?? [])) })).find(({ next }) => next)
-    if (circuit?.next) trackCard.append(element('span', 'track-meta', `Next target: ${circuit.track.name} · ${circuit.next.tier.toUpperCase()} ${formatRaceTime(circuit.next.time)}`))
+    const circuit = OFFICIAL_CIRCUITS.map(({ track: course }) => ({ track: course, next: nextMedalTarget(course, timeMedal(course, state.scoresByTrack[course.id] ?? [])) })).find(({ next: target }) => target)
+    if (circuit?.next) details.append(element('p', 'home-track-progress', `Next target: ${circuit.track.name} · ${circuit.next.tier.toUpperCase()} ${formatRaceTime(circuit.next.time)}`))
   }
-  const actionsNode = element('div', 'home-actions')
-  actionsNode.append(
-    ...(state.raceAgainTrackName ? [button(`RACE AGAIN · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain, 'button button-primary button-large')] : []),
-    button('RACE', 'race', actions.race, 'button button-primary button-large'),
-    ...(actions.nearby ? [button('NEARBY RACE', 'nearby', actions.nearby, 'button button-large')] : []),
-    ...(actions.cup ? [button('CUP', 'arcade-cup', actions.cup, 'button button-large')] : []),
-    button('TRACK EDITOR', 'editor', actions.edit, 'button button-large'),
-    ...(actions.updates ? [button('UPDATE AVAILABLE', 'open-updates', actions.updates, 'button home-update-button')] : []),
-    button('OPTIONS', 'options', actions.options, 'button button-large'),
-  )
-  const heading = element('header', 'home-heading')
-  heading.append(title, eyebrow)
-  card.append(heading, actionsNode, trackCard)
-  screen.append(card)
+  content.append(details)
+
+  const primaryDock = createMenuDock('Race')
+  primaryDock.classList.add('home-primary-dock')
+  if (state.raceAgainTrackName) {
+    primaryDock.append(createMenuAction(`Race again · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain))
+  }
+  primaryDock.append(createMenuAction('Race', 'race', actions.race, 'primary'))
+
+  const navigationDock = createMenuDock('Main menu')
+  navigationDock.classList.add('home-navigation-dock')
+  if (actions.nearby) navigationDock.append(createMenuAction('Nearby race', 'nearby', actions.nearby))
+  if (actions.cup) navigationDock.append(createMenuAction('Cup', 'arcade-cup', actions.cup))
+  navigationDock.append(createMenuAction('Track editor', 'editor', actions.edit))
+  navigationDock.append(createMenuAction('Options', 'options', actions.options))
+  if (actions.updates) navigationDock.append(createMenuAction('Update available', 'open-updates', actions.updates))
+  footer.append(primaryDock, navigationDock)
   return screen
 }

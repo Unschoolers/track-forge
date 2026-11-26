@@ -1,137 +1,106 @@
-/* The menu continues the City Harbor title screen's visual language. */
+@import './menu-system.css';
+
 .home-screen {
-  --home-ink: #edf2f8;
-  --home-accent: #ff7846;
+  --home-accent: #ff925c;
   --home-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  isolation: isolate;
-  display: flex;
-  align-items: flex-start;
-  padding: max(2rem, env(safe-area-inset-top)) max(clamp(1.4rem, 6.25vw, 7rem), env(safe-area-inset-right))
-    max(2rem, env(safe-area-inset-bottom)) max(clamp(1.4rem, 6.25vw, 7rem), env(safe-area-inset-left));
-  background: #080b10 url('../assets/title/city-harbor.webp') 60% 56% / cover no-repeat;
-  color: var(--home-ink);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: auto;
+  padding: max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-top)) max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-right))
+    max(clamp(.75rem, 2vw, 1.5rem), env(safe-area-inset-bottom)) max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-left));
+  background: #080b10;
 }
-.home-screen::before, .home-screen::after {
-  position: fixed;
-  z-index: -1;
+.home-screen .tf-menu-media { z-index: -1; }
+.home-artwork {
+  position: absolute;
   inset: 0;
+  background: #080b10 url('../assets/title/city-harbor.webp') 60% 56% / cover no-repeat;
+}
+.home-artwork::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #080b10 0%, #080b10e8 14%, #080b10a8 37%, #080b1020 75%),
+    linear-gradient(0deg, #080b10d9, transparent 42%, #080b1030);
   content: '';
-  pointer-events: none;
 }
-.home-screen::before {
-  background: linear-gradient(90deg, #080b10 0%, rgb(8 11 16 / 96%) 18%, rgb(8 11 16 / 83%) 35%, rgb(8 11 16 / 18%) 72%),
-    linear-gradient(0deg, rgb(8 11 16 / 82%), transparent 38%, rgb(8 11 16 / 25%));
+.home-menu-header { align-self: end; max-width: 34rem; }
+.home-eyebrow {
+  margin: 0 0 .8rem;
+  color: #d5dce3;
+  font: 650 .72rem/1.4 var(--home-mono);
+  letter-spacing: .14em;
 }
-.home-screen::after { background: repeating-linear-gradient(0deg, rgb(4 6 9 / 8%) 0 1px, transparent 1px 5px); }
-.home-card {
-  width: min(25rem, 100%);
-  margin: auto 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-.home-heading { margin-bottom: clamp(1.5rem, 4vh, 2.5rem); }
-.home-card .brand {
-  font: italic 800 clamp(3.5rem, min(7vw, 13vh), 6rem)/.88 'Track Forge Title', system-ui, sans-serif;
+.home-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 .22em;
+  margin: 0;
+  font: italic 850 clamp(3.25rem, min(9vw, 17vh), 7.5rem)/.86 'Track Forge Title', Inter, system-ui, sans-serif;
   letter-spacing: -.075em;
+  text-shadow: 0 3px 28px #0008;
 }
-.home-card .brand span { display: block; width: max-content; padding-right: .09em; }
-.home-card .brand-accent { color: transparent; -webkit-text-stroke: .016em var(--home-ink); }
-.home-card .eyebrow {
-  margin: 1.1rem 0 0;
-  color: #aab8c7;
-  font: 600 .65rem/1.4 var(--home-mono);
-  letter-spacing: .16em;
-}
-.home-actions { gap: .45rem; }
-.home-actions .button {
-  position: relative;
+.home-brand-accent { color: var(--home-accent); }
+.home-menu-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 3.2rem;
-  padding: .75rem 1rem;
-  border: 1px solid rgb(206 221 235 / 24%);
-  border-radius: 0;
-  background: rgb(15 21 29 / 78%);
-  color: var(--home-ink);
-  font: 800 .75rem/1.25 var(--home-mono);
-  letter-spacing: .09em;
-  text-align: left;
-  touch-action: manipulation;
+  overflow: visible;
+  padding-block: clamp(1rem, 4vh, 3rem);
 }
-.home-actions .button::after {
-  flex: none;
-  width: .45rem;
-  height: .45rem;
-  border-top: .12rem solid;
-  border-right: .12rem solid;
-  transform: rotate(45deg);
-  content: '';
+.home-track {
+  width: min(33rem, 100%);
+  padding: .2rem 0 .2rem 1rem;
+  border-left: 2px solid var(--home-accent);
+  text-shadow: 0 2px 12px #000;
 }
-.home-actions .button-primary {
-  border-color: var(--home-accent);
-  background: var(--home-accent);
-  color: #101017;
-  clip-path: polygon(0 0, 100% 0, 100% 75%, calc(100% - .8rem) 100%, 0 100%);
+.home-track-label {
+  color: #ffd6c3;
+  font: 700 .68rem/1.35 var(--home-mono);
+  letter-spacing: .13em;
 }
-.home-actions .home-update-button {
-  min-height: 2.75rem;
-  border-color: #ff9b68;
-  background: rgb(67 34 25 / 92%);
-  color: #ffd8bd;
+.home-track-name {
+  margin: .4rem 0 .25rem;
+  font-size: clamp(1.4rem, 3vw, 2.5rem);
+  line-height: 1.05;
+  letter-spacing: -.035em;
 }
-.home-actions .home-update-button::before {
-  flex: none;
-  width: .5rem;
-  height: .5rem;
-  border-radius: 50%;
-  background: #ff9b68;
-  box-shadow: 0 0 .65rem rgb(255 155 104 / 60%);
-  content: '';
+.home-track-credit, .home-track-best, .home-track-progress {
+  margin: .35rem 0 0;
+  color: #e0e4e9;
+  font: 500 .78rem/1.5 var(--home-mono);
 }
-.home-actions .home-update-button { justify-content: flex-start; }
-.home-actions .home-update-button::after { margin-left: auto; }
-.home-actions .button:hover { translate: none; filter: brightness(1.16); }
-.home-actions .button:focus-visible { outline: 2px solid var(--home-ink); outline-offset: 3px; }
-.home-card .current-track {
-  gap: .3rem;
-  margin: 1.5rem 0 0;
-  padding: .85rem 0 0;
-  border: 0;
-  border-top: 1px solid rgb(206 221 235 / 28%);
-  border-radius: 0;
-  background: transparent;
+.home-menu-actions { align-self: end; gap: .65rem; }
+.home-menu-actions .tf-menu-dock { justify-content: center; }
+.home-primary-dock { min-width: min(26rem, 100%); }
+.home-primary-dock .tf-menu-action { flex: 1; }
+.home-primary-dock .tf-menu-action--primary { min-width: min(12rem, 48vw); font-size: 1.05rem; }
+.home-navigation-dock { gap: 2px; background: #182431ed; }
+.home-navigation-dock .tf-menu-action { min-height: 44px; padding-inline: clamp(.55rem, 2vw, 1rem); font-size: .82rem; }
+.home-navigation-dock [data-action='open-updates'] { color: #ffd1b6; }
+/* The host exposes the saved Options setting on the menu root. */
+.home-screen[data-graphics-quality='low'] .tf-menu-dock { background: #202a36; backdrop-filter: none; }
+@media (min-width: 900px) and (min-height: 600px) {
+  .home-screen { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .home-menu-header { align-self: center; margin-top: 4vh; }
+  .home-menu-content { align-items: end; padding-bottom: clamp(1rem, 7vh, 5rem); }
+  .home-menu-actions { justify-items: start; }
+  .home-navigation-dock { margin-left: 1rem; }
 }
-.home-card .label { color: var(--home-accent); font: 700 .62rem/1.3 var(--home-mono); letter-spacing: .15em; }
-.home-card .track-name { font-size: 1rem; letter-spacing: .01em; }
-.home-card .track-meta { color: #b3c0cd; font: 500 .7rem/1.45 var(--home-mono); }
-@media (orientation: portrait) {
-  .home-screen {
-    align-items: stretch;
-    background-image: url('../assets/title/city-harbor-portrait.webp');
-    background-position: center top;
-  }
-  .home-screen::before {
-    background: linear-gradient(0deg, #080b10 5%, rgb(8 11 16 / 96%) 35%, rgb(8 11 16 / 68%) 70%, rgb(8 11 16 / 28%));
-  }
-  .home-card { margin: auto 0 0; }
+@media (max-width: 600px) {
+  .home-artwork { background-image: url('../assets/title/city-harbor-portrait.webp'); background-position: center top; }
+  .home-artwork::after { background: linear-gradient(0deg, #080b10 4%, #080b10f2 31%, #080b1099 70%, #080b1033); }
+  .home-menu-header { align-self: start; }
+  .home-title { max-width: 9ch; font-size: clamp(3.1rem, 15vw, 5rem); }
+  .home-menu-content { align-items: end; padding-bottom: 1rem; }
+  .home-track { padding-left: .8rem; }
+  .home-menu-actions .tf-menu-dock { width: 100%; }
+  .home-navigation-dock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-height: 600px) and (orientation: landscape) {
-  .home-screen { align-items: flex-start; padding-top: max(1rem, env(safe-area-inset-top)); padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
-  .home-card { display: grid; grid-template-columns: minmax(10rem, 14rem) minmax(14rem, 21rem); column-gap: 2rem; width: min(40rem, 100%); margin: auto 0; }
-  .home-heading { grid-column: 1; margin-bottom: 1rem; }
-  .home-card .brand { font-size: clamp(2.8rem, 10vh, 4.5rem); }
-  .home-actions { grid-column: 2; grid-row: 1 / span 2; }
-  .home-actions .button { min-height: 2.75rem; }
-  .home-card .current-track { grid-column: 1; margin: 0; }
+@media (max-height: 520px) and (orientation: landscape) {
+  .home-screen { grid-template-columns: minmax(12rem, .9fr) minmax(14rem, 1.1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: 2rem; }
+  .home-menu-header { grid-column: 1; align-self: end; }
+  .home-menu-content { grid-column: 1; grid-row: 2; padding: .5rem 0 0; }
+  .home-menu-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .home-menu-actions .tf-menu-dock { width: 100%; }
+  .home-navigation-dock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-artwork { background-position: 60% center; }
 }
-@media (max-width: 340px) {
-  .home-screen { padding-left: 1rem; padding-right: 1rem; }
-  .home-card .brand { font-size: 3.25rem; }
-}
-@media (prefers-reduced-motion: reduce) { .home-actions .button { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .home-screen .tf-menu-action { transition: none; } }

@@ -20,14 +20,14 @@ async function launch(page) {
 }
 
 async function enterEditor(page) {
-  await page.getByRole('button', { name: 'TRACK EDITOR' }).click()
+  await page.getByRole('button', { name: 'Track editor' }).click()
   await page.getByRole('button', { name: 'Edit ' + EDITOR_FIXTURE_NAME, exact: true }).click()
   await expect(page.locator('[data-screen="editor"]')).toBeVisible()
   await expect.poll(async () => (await telemetry(page)).camera).not.toBeNull()
 }
 
 async function enterRace(page, { fastCountdown = false } = {}) {
-  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  await page.getByRole('button', { name: 'Race', exact: true }).click()
   await page.getByRole('button', { name: 'Race ' + EDITOR_FIXTURE_NAME, exact: true }).click()
   await page.getByRole('button', { name: 'START RACE' }).click()
   await expect(page.locator('[data-screen="race"]')).toBeVisible()

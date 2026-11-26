@@ -68,7 +68,7 @@ test('profiles live road dragging on a large track', async ({ page, context }, t
       report: () => Object.fromEntries(Object.entries(samples).map(([name, values]) => [name, summarize(values)])),
     }
   })
-  await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.getByRole('button', { name: 'Track editor', exact: true }).click()
   if (externalTrack) {
     await page.locator('input[type="file"]').setInputFiles(resolve(externalTrack))
   } else {

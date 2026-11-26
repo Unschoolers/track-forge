@@ -5,7 +5,7 @@ import { enterTrackForge } from '../enter-game.mjs'
 import { seedOwnedTrack, OWNED_TRACK_NAME } from './owned-track.mjs'
 
 async function setupRace(page) {
-  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  await page.getByRole('button', { name: 'Race', exact: true }).click()
   await page.getByRole('button', { name: `Race ${OWNED_TRACK_NAME}`, exact: true }).click()
 }
 
@@ -114,7 +114,7 @@ test('shares a saved creator ghost and opens the imported challenge with its lap
   await expect(page.getByText(/Creator challenge:.*Blue.*1 lap/)).toBeVisible()
   await page.reload()
   await enterTrackForge(page)
-  await page.getByRole('button', { name: 'RACE', exact: true }).click()
+  await page.getByRole('button', { name: 'Race', exact: true }).click()
   await garage.getByRole('button', { name: `Race ${OWNED_TRACK_NAME} (2)`, exact: true }).click()
   const setup = page.getByRole('dialog', { name: 'Race setup' })
   await setup.getByRole('button', { name: 'OPTIONS' }).click()

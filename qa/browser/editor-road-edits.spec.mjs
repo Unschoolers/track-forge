@@ -60,7 +60,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
       return put.apply(this, args)
     }
   })
-  await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
+  await page.getByRole('button', { name: 'Track editor', exact: true }).click()
   await page.getByRole('button', { name: 'Edit Elevated Road Edit', exact: true }).click()
   const work = () => page.evaluate(() => window.roadEditWork)
   const read = () => page.evaluate(() => window.__trackForgeQa.snapshot())
