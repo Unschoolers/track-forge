@@ -495,8 +495,8 @@ export class NearbyRace {
     if (state) {
       this.localProgress = raceProgress(vehicle, state.path.points.length, state.startPathIndex,
         state.reversed, normalizeRouteKind(state.routeKind))
-      if (this.role === 'guest') this.progressSync.update(this.slot, this.localProgress, recipients)
-      else this.publishRanking()
+      this.progressSync.update(this.slot, this.localProgress, recipients)
+      if (this.role === 'host') this.publishRanking()
     }
   }
 
@@ -717,7 +717,10 @@ export class NearbyRace {
           racer.time === undefined && (fromHost || guestSlot === packet.slot)) {
         const accepted = this.progressSync.receive(packet)
         this.diagnostic.recordProgress(packet.slot, packet.sequence, accepted, this.now())
-        if (accepted && !fromHost) this.publishRanking()
+        if (accepted && !fromHost) {
+          this.progressSync.relay(bytes, this.endpoints(id))
+          this.publishRanking()
+        }
       }
       return
     }

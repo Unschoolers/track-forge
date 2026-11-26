@@ -568,7 +568,7 @@ describe('Nearby Arcade', () => {
         expect(red.livePosition(progressCars[1]!, progressState)).toMatchObject({ position: 1, vehicleCount: 4 })
       }, { interval: 5 })
       const progressCount = network.packets.filter(({ bytes }) => bytes[0] === Packet.Progress).length
-      expect(progressCount).toBeGreaterThanOrEqual(3)
+      expect(progressCount).toBeGreaterThanOrEqual(4)
 
       time += 200
       const leadingHost = { ...progressCars[0]!, lap: 1 }
@@ -576,7 +576,7 @@ describe('Nearby Arcade', () => {
       await vi.waitFor(() => {
         expect(red.livePosition(progressCars[1]!, progressState)?.position).toBe(2)
         expect(host.livePosition(leadingHost, progressState)?.position).toBe(1)
-         expect(new Set(setups.map(({ device }, index) => device.livePosition(progressCars[index]!, progressState)?.position)).size).toBe(4)
+        expect(new Set(setups.map(({ device }, index) => device.livePosition(progressCars[index]!, progressState)?.position)).size).toBe(4)
       }, { interval: 5 })
 
 

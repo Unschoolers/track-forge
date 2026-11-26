@@ -25,15 +25,22 @@ export class NearbyRanking {
   private inFlight = false
   private generation = 0
   private sentAt = -Infinity
+  private pending: { order: number[]; now: number; send: (sequence: number, order: number[]) => Promise<void>; failed: () => void } | null = null
 
   reset(): void {
     this.generation++
     this.order = []; this.sequence = undefined; this.at = -Infinity
-    this.inFlight = false; this.sentAt = -Infinity
+    this.inFlight = false; this.sentAt = -Infinity; this.pending = null
   }
 
   publish(order: number[], now: number, send: (sequence: number, order: number[]) => Promise<void>, failed: () => void): void {
-    if (this.inFlight || (now - this.sentAt < 500 && order.join(',') === this.order.join(','))) return
+    if (this.inFlight) {
+      this.pending = { order, now, send, failed }
+      return
+    }
+    const changed = order.join(',') !== this.order.join(',')
+    const interval = changed ? (this.order.length && order.length ? 100 : 0) : 500
+    if (now - this.sentAt < interval) return
     // At most one reliable ranking update in flight. A later tick replaces the
     // pending intent; no backlog of obsolete standings.
     const sequence = ((this.sequence ?? -1) + 1) & 0xffff
@@ -42,11 +49,16 @@ export class NearbyRanking {
     this.sentAt = now
     this.receive(sequence, order, now)
     void send(sequence, order).then(() => {
-      if (active === this.generation) this.inFlight = false
+      if (active !== this.generation) return
+      this.inFlight = false
+      const pending = this.pending
+      this.pending = null
+      if (pending) this.publish(pending.order, pending.now, pending.send, pending.failed)
     }, () => {
       if (active !== this.generation) return
       this.inFlight = false
       this.sentAt = -Infinity
+      this.pending = null
       failed()
     })
   }

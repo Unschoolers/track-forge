@@ -38,8 +38,8 @@ rather than silently guessing a start. Both devices must update together.
 The host alone orders the field from its local progress and accepted guest
 progress (150 ms stream). Guests display the host's sequenced complete order;
 unknown/expired orders show LIVE. Reliable rank updates are bounded to one
-in-flight send with a 500 ms heartbeat and no stale queue. Guest progress is
-no longer relayed to other guests. Finish and disconnect status participate in
+in-flight send, at most one pending replacement, a 100 ms change cadence and
+500 ms heartbeat. Existing progress relays remain for diagnostics. Finish and disconnect status participate in
 the same order. The host's view can precede a guest's receipt by transit time;
 this is not a claim of instantaneous agreement. Local physics remain local.
 
