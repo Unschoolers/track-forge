@@ -58,6 +58,18 @@ migration, review the following alongside the existing interaction contracts:
 App icon variants and Apple-specific SDK APIs are outside this menu migration.
 Visual parity with native Liquid Glass and adaptive optics remain unverified.
 
+## Reference implementation: Landmarks
+
+Apple's [Landmarks sample](https://developer.apple.com/documentation/swiftui/landmarks-building-an-app-with-liquid-glass) is the reference for composition, not a dependency or a mandate to copy its appearance.
+
+- Background extension: keep decorative media separate from interactive content. Extend the image behind navigation; keep its headline and actions in their own safe, legible layout. Use existing artwork and static derivatives, not stretched text or live canvas copies.
+- Adaptive navigation: on a wide track library or race setup, a rail/list and detail pane may coexist. On compact displays the same selection opens a detail view using the existing application navigation. Preserve selection, back behavior and scroll restoration; do not duplicate state.
+- Horizontal browsing: allow circuit/vehicle artwork to extend to the visual edge when useful. Reserve leading and trailing scroll insets so the first and last interactive items can be fully visible and focused. If content passes behind navigation, add a protective scroll-edge treatment and verify pointer access.
+- Functional toolbar groups: separate sharing from collection/favorite actions and detail controls with real spacing. One optical surface per group; avoid one large indiscriminate pill or a glass border on every icon. Reference: [Landmarks toolbar grouping](https://developer.apple.com/documentation/swiftui/landmarks-refining-the-system-provided-glass-effect-in-toolbars).
+- Coordinated custom effects: Apple groups and identifies custom badge shapes for transitions. For Track Forge, keep stable control identities across state changes, share material geometry where practical, and reserve badge/medal animations for meaningful achievement states. Honor reduced motion and cancel transitions on navigation. Morphing is an optical-phase experiment, not a foundation feature.
+
+Each page review must show the compact and expanded compositions, actual artwork behind controls, and relevant interaction states. Do not add a native SwiftUI layer or change app icon packaging for this redesign.
+
 ## Delivery
 One production design, no theme switch, experiment flag or parallel UI. Each merged screen replaces its old layout for every player; unmigrated screens retain their current implementation until their turn. Remove legacy rules once their last consumer is migrated.
 
