@@ -99,3 +99,56 @@ test('the race flyover follows the selected track, car, lighting and motion pref
   await page.getByRole('dialog', { name: 'Race paused' }).getByRole('button', { name: 'OPTIONS' }).click()
   await expect(options.getByRole('button', { name: 'HARD', exact: true })).toHaveCount(0)
 })
+
+test('nearby lobby fits all four full car images inside their own cards on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  // Render the real lobby component with a local roster; no radio or native
+  // transport is needed to exercise the shared picker CSS in a browser.
+  await page.evaluate(async () => {
+    const { createNearbyRaceModal } = await import('/src/ui/modals/nearbyRaceModal.ts')
+    const snapshot = {
+      phase: 'lobby', purpose: 'race', role: 'guest', room: 'Room 7803',
+      track: 'City harbor', lighting: 'day', laps: 2, localCar: 'blue',
+      localReady: false, unlockPending: false, readyPending: false,
+      lobbyPlayers: [
+        { slot: 0, car: 'red', name: 'Host', accepted: true },
+        { slot: 1, car: 'blue', name: 'Guest', accepted: false },
+      ],
+    }
+    const noop = () => undefined
+    const nearby = { snapshot: () => snapshot, localSlot: () => 1, selectLobbyCar: noop, setLobbyReady: noop }
+    const lobby = createNearbyRaceModal(nearby, {
+      close: noop, chooseTrack: noop, configureCup: noop, scan: noop, scanTracks: noop,
+      saveTrack: noop, declineTrack: noop, connectByIp: noop, downloadDiagnostics: async () => true,
+    })
+    document.querySelector('#ui-root').replaceChildren(lobby)
+  })
+  const lobby = page.getByRole('dialog', { name: 'Race Lobby' })
+  const images = lobby.locator('.car-choice img.car-silhouette')
+  await expect(images).toHaveCount(4)
+  await expect.poll(() => images.evaluateAll(nodes => nodes.every(image => image.complete && image.naturalWidth > 0))).toBe(true)
+  for (const size of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(size)
+    const cards = await images.evaluateAll(nodes => nodes.map(image => {
+      const card = image.closest('.car-choice').getBoundingClientRect()
+      const bounds = image.getBoundingClientRect()
+      return {
+        contained: bounds.left >= card.left && bounds.right <= card.right &&
+          bounds.top >= card.top && bounds.bottom <= card.bottom,
+        imageHeight: bounds.height,
+        cardHeight: card.height,
+        objectFit: getComputedStyle(image).objectFit,
+      }
+    }))
+    for (const card of cards) {
+      expect(card.contained).toBe(true)
+      expect(card.imageHeight).toBeGreaterThan(0)
+      expect(card.cardHeight).toBeGreaterThanOrEqual(44)
+      expect(card.cardHeight).toBeLessThan(100)
+      expect(card.objectFit).toBe('contain')
+    }
+    await expect(lobby.getByRole('button', { name: 'I’M READY' })).toBeVisible()
+  }
+})

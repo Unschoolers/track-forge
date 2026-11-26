@@ -23,6 +23,8 @@ authored size. Existing light, shadow, topper and ghost geometry is retained.
   and brake lights/topper/boost effects above. Scene teardown destroys images,
   not the reusable textures.
 - The setup flyover and car picker use the same bitmap URLs and proportions.
+  The shared picker CSS constrains the image box and uses contain scaling in
+  both solo setup and the Nearby lobby, independent of source resolution.
   `vehicleArtwork.ts` retains the existing visual geometry for fixtures,
   covered-player outlines, translucent replay ghosts and pre-boot component
   tests. No generated textures or per-car canvas allocation in the render loop.
