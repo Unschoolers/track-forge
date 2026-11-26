@@ -1,6 +1,7 @@
 import type { TrackStore } from '@/application/ports/storage'
 import type { Track, TrackId } from '@/domain/model'
 import { decodeTrack } from '@/domain/track/trackCodec'
+import { isSharedTrack } from '@/domain/track/trackAccess'
 import { BrowserTrackRepository } from './trackRepository'
 import { STORAGE_KEYS } from './storageKeys'
 
@@ -120,18 +121,40 @@ export class IndexedDbTrackRepository implements TrackStore {
       return false
     }
     const valid = normalized.filter(track => track !== undefined)
+    if (new Set(valid.map(track => track.id)).size !== valid.length) {
+      this.failure = 'duplicate_track_id'
+      return false
+    }
+    let readOnlyCollision = false
     return this.write(store => {
-      for (const track of valid) store.put(track)
+      // Read the persisted record inside the same transaction to protect
+      // originals saved by another window after this cache was hydrated.
+      const transaction = store.transaction
+      for (const track of valid) {
+        const request: IDBRequest<Track | undefined> = store.get(track.id)
+        request.onsuccess = () => {
+          if (isSharedTrack(request.result)) {
+            readOnlyCollision = true
+            transaction.abort()
+          } else {
+            store.put(track)
+          }
+        }
+      }
     }, () => {
       for (const track of valid) this.tracks.set(track.id, track)
-    })
+    }, () => readOnlyCollision ? 'read_only_track' : null)
   }
 
   remove(id: TrackId): Promise<boolean> {
     return this.write(store => { store.delete(id) }, () => { this.tracks.delete(id) })
   }
 
-  private async write(enqueue: (store: IDBObjectStore) => void, apply: () => void): Promise<boolean> {
+  private async write(
+    enqueue: (store: IDBObjectStore) => void,
+    apply: () => void,
+    rejection?: () => string | null,
+  ): Promise<boolean> {
     this.failure = null
     try {
       const transaction = this.db.transaction(TRACKS, 'readwrite')
@@ -148,8 +171,9 @@ export class IndexedDbTrackRepository implements TrackStore {
       apply()
       return true
     } catch (error) {
-      this.failure = errorName(error)
-      console.error('Track storage write failed.', this.failure)
+      const expectedRejection = rejection?.()
+      this.failure = expectedRejection ?? errorName(error)
+      if (!expectedRejection) console.error('Track storage write failed.', this.failure)
       return false
     }
   }

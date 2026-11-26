@@ -111,7 +111,7 @@ export class NearbyRace {
   private lightingOverride: LightingMode | null = null
   private scoredCupIndex = -1
   private readonly cupPoints = new Map<number, number>()
-  private readonly share = new NearbyTrackShare()
+  private readonly share: NearbyTrackShare
   private readonly diagnostic: NearbyRaceDiagnostics
   private readonly operations = new NearbyOperationQueue()
   private get generation(): number { return this.operations.generation }
@@ -154,7 +154,11 @@ export class NearbyRace {
     private readonly transport: NearbyTransport,
     private readonly validateTrack: (track: Track) => boolean,
     private readonly now = () => performance.now(),
+    serializeSharedTrack: (track: Track) => Promise<string> = async () => {
+      throw new Error('Track signing is unavailable on this device.')
+    },
   ) {
+    this.share = new NearbyTrackShare(serializeSharedTrack)
     this.diagnostic = new NearbyRaceDiagnostics(this.now, () => ({
       phase: this.phase, purpose: this.purpose, role: this.role, round: this.round,
       cupTotal: this.cupTotal, cupIndex: this.cupIndex, slot: this.slot, hostId: this.hostId,

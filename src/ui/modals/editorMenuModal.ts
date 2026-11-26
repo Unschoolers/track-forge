@@ -40,19 +40,22 @@ export function createEditorMenuModal(
     readonly setRouteKind: (routeKind: RouteKind) => void
     readonly setEnvironment: (environmentId: TrackEnvironmentId) => void
   },
+  readOnly = false,
 ): HTMLElement {
-  const frame = createModalFrame('Editor menu', '', actions.close, 'editor-menu-modal')
+  const frame = createModalFrame('Editor menu',
+    readOnly ? 'This shared original is read-only. Save a new copy to edit it.' : '',
+    actions.close, 'editor-menu-modal')
   const identity = element('div', 'editor-menu-identity')
   const name = element('div', 'editor-menu-name')
   name.append(element('span', 'name-label', 'Track name'), element('strong', '', trackName))
-  const rename = iconAction('RENAME TRACK', 'edit', 'menu-rename', actions.rename)
   const share = iconAction('SHARE', 'share', 'menu-share', actions.share)
-  identity.append(name, rename, share)
+  identity.append(name)
+  if (!readOnly) identity.append(iconAction('RENAME TRACK', 'edit', 'menu-rename', actions.rename))
+  identity.append(share)
   const secondary = element('div', 'editor-menu-secondary')
-  secondary.append(
-    button('SAVE AS NEW TRACK', 'menu-save-as', actions.saveAs),
-    button('RACE TRACK', 'menu-race', actions.race),
-  )
+  const saveAs = button('SAVE AS NEW TRACK', 'menu-save-as', actions.saveAs, readOnly ? 'button button-primary' : 'button')
+  if (!readOnly) secondary.append(saveAs)
+  secondary.append(button('RACE TRACK', 'menu-race', actions.race))
   const ids = Object.keys(SCENERY_KINDS_BY_ENVIRONMENT) as TrackEnvironmentId[]
   const settings = element('section', 'editor-menu-settings')
   settings.append(
@@ -66,10 +69,10 @@ export function createEditorMenuModal(
   frame.body.classList.add('editor-menu-content')
   frame.body.append(
     identity,
-    button('SAVE TRACK', 'menu-save', actions.save, 'button button-primary'),
+    readOnly ? saveAs : button('SAVE TRACK', 'menu-save', actions.save, 'button button-primary'),
     secondary,
-    settings,
-    button('RETURN HOME', 'editor-home', actions.home, 'button button-danger'),
   )
+  if (!readOnly) frame.body.append(settings)
+  frame.body.append(button('RETURN HOME', 'editor-home', actions.home, 'button button-danger'))
   return frame.overlay
 }

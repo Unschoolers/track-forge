@@ -10,6 +10,26 @@ From Track Library choose **NEARBY** on a saved track. This advertises `Track ##
 - The sender only reports confirmed saves, with acknowledgement counts deduplicated by peer. Track bytes are bounded by existing transfer limits and malformed imports are rejected before storage.
 - **LEAVE/BACK** ends the sharing session; the host disconnects all peers.
 
+## Read-only originals and signed files
+
+File imports and saved Nearby shares are read-only library entries, including
+older unsigned shares. They can be raced or opened to inspect the course.
+**Save As** creates an editable track with a new ID and its own race records.
+
+New Nearby shares and exported files carry a version 2 envelope signed with
+the sending installation's ECDSA P-256 key. The private key is non-exportable
+and stored on that installation. Track Forge verifies the signed content
+before normalizing or saving it. A verified original is retained so forwarding
+it preserves its signature. A Save As copy gets its own signature when shared.
+Version 1 files still import without signature verification. Older app builds
+need an update to import new signed shares.
+
+The file includes its public key. Verification detects changes against that
+key. To establish the sender's identity independently, recipients need a
+trusted copy of the sender's public key. An entirely replaced file or a legacy
+file can still be supplied by a different sender. The race staging transfer
+continues to send geometry independently of the library sharing flow.
+
 ## Hosting a Nearby race
 
 From **Nearby**, choose **CHOOSE TRACK TO HOST** (the primary action), then select a race-ready saved or official circuit. Track selection opens the Nearby room directly: it must not enter the single-player race setup or start a solo session. Closing the picker returns to Nearby without advertising a room. **START RACE** in the host lobby is disabled until at least one guest has connected; only the Nearby session may start the multiplayer race. The chosen circuit's lighting and the saved lap preference apply, with a single run for point-to-point courses. The normal **RACE** flow remains single-player.

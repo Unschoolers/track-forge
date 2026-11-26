@@ -27,11 +27,20 @@ test('migrates large legacy tracks, exceeds the old quota and preserves committe
     localStorage.setItem('trackforge-library-v1-migrated', '1')
     localStorage.setItem('trackforge-highscores-v3', 'preserve-scores')
     const repo = await IndexedDbTrackRepository.open()
+    const staleRepo = await IndexedDbTrackRepository.open()
     const before = repo.find(source.id)
     const copies = Array.from({ length: 8 }, (_, i) => ({
       ...source, id: 'copy-' + i, name: 'Copy ' + i, origin: 'imported',
     }))
     const committed = await repo.saveMany(copies)
+    const overwrite = await staleRepo.saveMany([
+      { ...source, name: 'Batch rename' },
+      { ...copies[0], name: 'Modified original', origin: 'local' },
+    ])
+    const overwriteReason = staleRepo.failureReason()
+    const persisted = await IndexedDbTrackRepository.open()
+    const preservedOriginal = persisted.find('copy-0')?.name === 'Copy 0'
+    const preservedLocal = persisted.find(source.id)?.name === source.name
     const bytes = new TextEncoder().encode(JSON.stringify(repo.list())).length
     const put = IDBObjectStore.prototype.put
     let aborted
@@ -62,6 +71,7 @@ test('migrates large legacy tracks, exceeds the old quota and preserves committe
     return {
       revision: before?.raceRevision, creator: before?.creator, terrainCells: before?.terrain.cells.length,
       committed, bytes, aborted, reason, absent, removed,
+      overwrite, overwriteReason, preservedOriginal, preservedLocal,
       backupMatches: backup === raw, legacyRemoved: localStorage.getItem('trackforge-library-v2') === null,
       scoresPreserved: localStorage.getItem('trackforge-highscores-v3') === 'preserve-scores',
     }
@@ -69,6 +79,7 @@ test('migrates large legacy tracks, exceeds the old quota and preserves committe
   expect(result).toMatchObject({
     revision: 77, creator: { id: 'qa-owner', name: 'QA Owner' }, terrainCells: 20_000,
     committed: true, aborted: false, reason: 'AbortError', absent: true, removed: true,
+    overwrite: false, overwriteReason: 'read_only_track', preservedOriginal: true, preservedLocal: true,
     backupMatches: true, legacyRemoved: true, scoresPreserved: true,
   })
   expect(result.bytes).toBeGreaterThan(5 * 1024 * 1024)

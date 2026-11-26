@@ -67,6 +67,8 @@ export interface Track {
   readonly creator?: TrackCreator
   /** Explicit provenance; old saved tracks may be unclassified until first startup migration. */
   readonly origin?: 'imported' | 'seeded' | 'local'
+  /** Verified original file retained for forwarding an imported track. */
+  readonly signedSource?: string
   readonly version: 8
   readonly points: readonly TrackPoint[]
   readonly routeKind?: RouteKind

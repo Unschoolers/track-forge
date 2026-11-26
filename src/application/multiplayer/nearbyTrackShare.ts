@@ -13,6 +13,8 @@ export class NearbyTrackShare {
   private readonly sent = new Set<string>()
   private packed: Promise<Uint8Array[]> | null = null
 
+  constructor(private readonly serialize: (track: Track) => Promise<string>) {}
+
   get incoming(): Track | null { return this.incomingTrack }
   get status(): ShareStatus | null { return this.result }
   get sharedCount(): number { return this.savedPeers.size }
@@ -56,7 +58,7 @@ export class NearbyTrackShare {
     if (!track || this.sent.has(id)) return
     this.sent.add(id)
     try {
-      if (!this.packed) this.packed = packTrack(track)
+      if (!this.packed) this.packed = packTrack(track, this.serialize)
       const chunks = await this.packed
       if (!active()) return
       await send([id], encodeControl({ type: 'share-offer' }))

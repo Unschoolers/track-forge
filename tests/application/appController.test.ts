@@ -20,6 +20,7 @@ import { normalizeTerrain } from '@/domain/terrain/terrainField'
 import { TERRAIN_LIMITS } from '@/domain/config'
 import { NearbyRace, type NearbyStart, type NearbyTransport } from '@/application/multiplayer/nearbyRace'
 import { NearbyNetwork } from '../fixtures/nearbyNetwork'
+import { nearbyTestSigner } from '../fixtures/nearbyRace'
 
 class TrackMemory implements TrackStore {
   readonly tracks = new Map<TrackId, Track>()
@@ -95,10 +96,30 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('rejects a modified signed file before saving and retains the verified original', async () => {
+    const { controller, trackStore } = setup()
+    try {
+      const original = await nearbyTestSigner()(createStarterTrack(asTrackId('shared-file'), 1))
+      const changed = JSON.parse(original)
+      changed.track.name = 'Modified track'
+      controller.dispatch({ type: 'import-track', content: JSON.stringify(changed) })
+      await vi.waitFor(() => expect(controller.snapshot().notice).toContain('Invalid track signature'))
+      expect(trackStore.save).not.toHaveBeenCalled()
+
+      controller.dispatch({ type: 'import-track', content: original })
+      await vi.waitFor(() => expect(trackStore.find(asTrackId('created'))).toMatchObject({
+        origin: 'imported',
+        signedSource: original,
+      }))
+    } finally {
+      controller.destroy()
+    }
+  })
+
   it('acknowledges Nearby sharing only after persistence commits and retains failed transfers for retry', async () => {
     const network = new NearbyNetwork()
     const source = { ...createStarterTrack(asTrackId('shared'), 1), name: 'Large circuit' }
-    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const host = new NearbyRace(network.endpoint('host'), () => true, undefined, nearbyTestSigner())
     const guest = new NearbyRace(network.endpoint('guest'), () => true)
     const { controller, trackStore } = setup(undefined, false, undefined, guest)
     try {
@@ -132,7 +153,7 @@ describe('AppController', () => {
       expect(trackStore.find(asTrackId('created'))).toBeUndefined()
       finish(true)
       await vi.waitFor(() => expect(host.snapshot().sharedCount).toBe(1))
-      expect(trackStore.find(asTrackId('created'))?.name).toBe(source.name)
+      expect(trackStore.find(asTrackId('created'))).toMatchObject({ name: source.name, origin: 'imported' })
     } finally {
       controller.destroy()
       host.destroy()
@@ -875,6 +896,36 @@ describe('AppController', () => {
     expect(controller.snapshot()).toMatchObject({ mode: 'home', currentTrack: { id: 'created', name: 'New Circuit' } })
     expect(trackStore.find(asTrackId('created'))?.trees).toContainEqual({ x: 4, y: 5 })
     expect(trackStore.find(asTrackId('starter'))?.trees).not.toContainEqual({ x: 4, y: 5 })
+  })
+
+  it('keeps a shared original read-only and saves an independently editable copy', () => {
+    const original: Track = {
+      ...createStarterTrack(asTrackId('shared-original'), 1),
+      origin: 'imported',
+      creator: { id: 'remote-creator', name: 'Other Racer' },
+      signedSource: 'original signed export',
+    }
+    const { controller, trackStore } = setup(original)
+    const edit = { type: 'editor', command: { type: 'add-tree', tree: { x: 4, y: 5 } } } as const
+    controller.dispatch({ type: 'select-track-for-edit', id: original.id })
+    expect(controller.snapshot()).toMatchObject({ mode: 'editor', editorUi: { tool: 'pan' } })
+    controller.dispatch(edit)
+    controller.dispatch({ type: 'rename-track', name: 'Replacement' })
+    expect(controller.snapshot().currentTrack).toEqual(original)
+    expect(controller.snapshot().notice).toContain('read-only')
+
+    controller.dispatch({ type: 'save-current-track' })
+    expect(controller.snapshot().overlay).toMatchObject({ type: 'track-name', purpose: 'save-as' })
+    expect(trackStore.save).not.toHaveBeenCalled()
+    controller.dispatch({ type: 'save-as-track', name: 'New Circuit' })
+    const copy = trackStore.find(asTrackId('created'))
+    expect(copy).toMatchObject({ name: 'New Circuit', origin: 'local', points: original.points })
+    expect(copy).not.toHaveProperty('signedSource')
+    expect(copy).not.toHaveProperty('creator')
+    controller.dispatch(edit)
+    controller.dispatch({ type: 'save-current-track' })
+    expect(trackStore.find(asTrackId('created'))?.trees).toContainEqual({ x: 4, y: 5 })
+    expect(trackStore.find(original.id)).toEqual(original)
   })
 
   it('Save As resumes a pending race using the new track without overwriting the source', () => {

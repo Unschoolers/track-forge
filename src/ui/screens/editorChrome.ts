@@ -8,6 +8,7 @@ import type {
 import type { RoadStructure } from '@/domain/model'
 import type { TerrainBrushMode } from '@/domain/editor/terrainBrush'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { isSharedTrack } from '@/domain/track/trackAccess'
 import { createEditorContextDock } from '@/ui/editor/editorContextDock'
 import {
   createEditorDiagnostics,
@@ -40,17 +41,20 @@ export function createEditorChrome(
   const screen = element('section', 'screen editor-screen')
   screen.dataset.screen = 'editor'
   screen.dataset.editorTool = state.editorUi.tool
+  const readOnly = isSharedTrack(state.currentTrack)
+  screen.append(createEditorTopbar(state, actions))
+  if (!readOnly) screen.append(createEditorToolPalette(state, actions))
+  screen.append(
+    createEditorHistoryActions(state, actions, readOnly),
+    createEditorStatus(state, geometry),
+  )
+  if (readOnly) {
+    screen.append(createEditorTrackActions(actions, true))
+    return screen
+  }
   const dock = createEditorContextDock(state, actions)
   screen.dataset.editorDockLayout = dock.dataset.layout
-  screen.append(
-    createEditorTopbar(state, actions),
-    createEditorToolPalette(state, actions),
-    createEditorHistoryActions(state, actions),
-    createEditorStatus(state, geometry),
-    dock,
-    createEditorTrackActions(actions),
-    ...createEditorSelectionPanels(state, actions, geometry),
-  )
+  screen.append(dock, createEditorTrackActions(actions), ...createEditorSelectionPanels(state, actions, geometry))
   const diagnostics = createEditorDiagnostics(state, actions, geometry)
   if (diagnostics) screen.append(diagnostics)
   return screen

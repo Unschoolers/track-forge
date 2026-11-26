@@ -27,7 +27,7 @@ import {
   TrackLibraryService,
   type TrackMutationResult,
 } from '@/application/library/trackLibraryService'
-import { parseTrackImport } from '@/application/library/trackImport'
+import { parseSharedTrackImport } from '@/application/library/trackImport'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
@@ -43,6 +43,7 @@ import { EditorSession } from '@/application/editor/editorSession'
 import { EditorExitFlow } from '@/application/editor/editorExitFlow'
 import { reduceEditorUi } from '@/application/editor/editorUiReducer'
 import { isSeededTrack, normalizeDisplayName } from '@/domain/track/trackCreator'
+import { isSharedTrack, SHARED_TRACK_READ_ONLY_MESSAGE } from '@/domain/track/trackAccess'
 
 export interface AppControllerDependencies {
   readonly nearby?: NearbyRace | undefined
@@ -255,7 +256,7 @@ export class AppController {
         }
         break
       case 'open-editor':
-        if (this.state.currentTrack && isSeededTrack(this.state.currentTrack)) {
+        if (this.state.currentTrack && !isSharedTrack(this.state.currentTrack) && isSeededTrack(this.state.currentTrack)) {
           this.completePersistence(this.library.forkSeededForEdit(this.state.currentTrack, this.creator()), copy => this.applyTrackMutation(copy, true))
           break
         }
@@ -435,6 +436,10 @@ export class AppController {
         this.closeOverlay()
         break
       case 'open-track-name':
+        if (command.purpose === 'rename' && isSharedTrack(this.state.currentTrack)) {
+          this.update({ ...this.state, notice: SHARED_TRACK_READ_ONLY_MESSAGE })
+          break
+        }
         this.update({
           ...this.state,
           overlay: {
@@ -664,7 +669,7 @@ export class AppController {
   private selectTrackForEdit(id: TrackId): void {
     const source = this.library.select(id)
     if (!source) return
-    if (isSeededTrack(source)) {
+    if (!isSharedTrack(source) && isSeededTrack(source)) {
       this.completePersistence(this.library.forkSeededForEdit(source, this.creator()), result => this.applyTrackMutation(result, true))
       return
     }
@@ -793,12 +798,13 @@ export class AppController {
   }
 
   private importTrack(content: string): void {
-    const parsed = parseTrackImport(content)
-    if (!parsed.ok) {
-      this.update({ ...this.state, notice: parsed.message })
-      return
-    }
-    this.completePersistence(this.library.importShared(parsed.track), result => this.applyTrackMutation(result, true))
+    const imported = parseSharedTrackImport(content).then((parsed): Persistence<TrackMutationResult> => {
+      if (!parsed.ok) return parsed
+      if (this.destroyed) return { ok: false, message: 'Track import was canceled.' }
+      const track = parsed.signedSource ? { ...parsed.track, signedSource: parsed.signedSource } : parsed.track
+      return this.library.importShared(track)
+    })
+    this.completePersistence(imported, result => this.applyTrackMutation(result, true))
   }
 
   private deleteTrack(id: TrackId): void {
@@ -989,6 +995,10 @@ export class AppController {
   private saveCurrentTrack(): void {
     const track = this.state.currentTrack
     if (!track) return
+    if (isSharedTrack(track)) {
+      if (this.state.mode === 'editor') this.dispatch({ type: 'open-track-name', purpose: 'save-as' })
+      return
+    }
     this.completePersistence(this.editorSession.save(track), saved => {
       this.update({
         ...this.state,
@@ -1062,7 +1072,12 @@ export class AppController {
 
   private update(state: AppSnapshot): void {
     let editorUi = state.editorUi
-    if (editorUi.tool === 'start' && state.editor.routeKind === 'point-to-point') {
+    const readOnly = state.mode === 'editor' && isSharedTrack(state.currentTrack)
+    const leavingPreview = this.state.mode === 'editor' && isSharedTrack(this.state.currentTrack) && !readOnly
+    if (readOnly && editorUi.tool !== 'pan') {
+      editorUi = { ...editorUi, tool: 'pan' }
+    } else if ((leavingPreview && editorUi.tool === 'pan') ||
+        (editorUi.tool === 'start' && state.editor.routeKind === 'point-to-point')) {
       editorUi = { ...editorUi, tool: 'draw' }
     }
     if (editorUi.sceneryChoice !== undefined) {
