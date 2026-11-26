@@ -29,7 +29,7 @@ export type Control =
   | { type: 'clock-reply'; round: number; probe: number; receivedAt: number; sentAt: number }
   | { type: 'ranking'; round: number; sequence: number; order: number[] }
   | { type: 'armed'; round?: number }
-  | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number; hostStartsAt?: number; round?: number }
+  | { type: 'start'; cars: (CarId | null)[]; hostStartsAt: number; round: number }
   | { type: 'finish'; slot: number; time: number | null; round?: number }
   | { type: 'left'; slot: number; round?: number }
   | { type: 'share-offer' }
@@ -164,12 +164,7 @@ function isControl(value: unknown): value is Control {
         typeof slot === 'number' && Number.isInteger(slot) && slot >= 0 && slot < MAX_PLAYERS)
     case 'armed': return true
     case 'start':
-      return validCars(message.cars) &&
-        typeof message.delay === 'number' && Number.isFinite(message.delay) &&
-        message.delay >= 0 && message.delay <= 5000 &&
-        typeof message.readyAge === 'number' && Number.isFinite(message.readyAge) &&
-        message.readyAge >= 0 && message.readyAge <= 30_000 &&
-        (message.hostStartsAt === undefined || validClockTime(message.hostStartsAt))
+      return message.round !== undefined && validCars(message.cars) && validClockTime(message.hostStartsAt)
     case 'finish':
       return typeof message.slot === 'number' && Number.isInteger(message.slot) &&
         message.slot >= 0 && message.slot < MAX_PLAYERS &&

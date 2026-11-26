@@ -124,7 +124,7 @@ export class NearbyRace {
   private readonly guests = new Map<string, number>()
   private readonly lobby = new NearbyLobby()
   private readonly rosterDelivery = new NearbyRosterDelivery()
-  private readonly armed = new Map<string, number>()
+  private readonly armed = new Set<string>()
   private localSceneReady = false
   private lineup: (CarId | null)[] | null = null
   private readonly racers = new Map<number, PoseRacer>()
@@ -856,13 +856,13 @@ export class NearbyRace {
       this.ranking.receive(message.sequence, message.order, this.now())
     } else if (guestSlot !== undefined && this.phase === 'staging' &&
         message.type === 'armed' && incomingRound === this.round) {
-      if (!this.armed.has(id)) this.armed.set(id, this.now())
+      this.armed.add(id)
       this.scheduleHostCountdown()
     } else if (fromHost && this.phase === 'staging' && message.type === 'start' &&
         incomingRound === this.round && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar && this.localSceneReady) {
       const estimate = this.clock.estimate
-      if (!estimate || message.hostStartsAt === undefined) {
+      if (!estimate) {
         this.fail('Multiplayer clock synchronization incomplete.', 'clock')
         return
       }
@@ -925,10 +925,9 @@ export class NearbyRace {
     if (this.role !== 'host' || this.phase !== 'staging' || !this.localSceneReady ||
         this.armed.size !== this.guests.size || !this.lineup) return
     const startsAt = this.now() + 4000
-    for (const [id, receivedAt] of this.armed) {
-      const now = this.now()
+    for (const id of this.armed) {
       this.sendControl([id], {
-        type: 'start', cars: this.lineup, delay: startsAt - now, readyAge: now - receivedAt, hostStartsAt: startsAt, round: this.round,
+        type: 'start', cars: this.lineup, hostStartsAt: startsAt, round: this.round,
       })
     }
     this.beginCountdown(startsAt)

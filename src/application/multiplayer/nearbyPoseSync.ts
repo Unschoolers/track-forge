@@ -92,10 +92,10 @@ export class NearbyPoseSync {
     // render frame. Otherwise missed vsyncs permanently lower the send rate.
     // Do not burst after a stall; at most one fresh pose per update, separated
     // by at least half a period. Never queue while bridge admission is pending.
-    if (this.poseSending || !recipients.length || now + 2 < this.nextSendAt ||
+    if (this.startAt === null || this.poseSending || !recipients.length || now + 2 < this.nextSendAt ||
         now - this.lastSentAt < POSE_PERIOD_MS / 2) return
     const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle, this.round,
-      this.startAt === null ? undefined : Math.round(now - this.startAt))
+      Math.round(now - this.startAt))
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
     const bytes = hostId ? pose : encodePoseBatch(
@@ -154,8 +154,7 @@ export class NearbyPoseSync {
   }
 
   private acceptPose(racer: PoseRacer, packet: NonNullable<ReturnType<typeof decodePose>>, now: number): boolean {
-    if (this.startAt === null) return racer.ghost.receive(packet, now)
-    if (packet.sampleTimeMs === undefined) return false
+    if (this.startAt === null) return false
     return racer.ghost.receive(packet, now, this.startAt + packet.sampleTimeMs)
   }
 

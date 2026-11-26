@@ -63,7 +63,7 @@ describe('nearby eight-player control protocol', () => {
       { type: 'clock-reply', round: 9, probe: 4, receivedAt: 100, sentAt: 101 },
       { type: 'ranking', round: 9, sequence: 42, order: [1, 0, 7] },
       { type: 'armed', round: 9 },
-      { type: 'start', cars: [...cars], delay: 1000, readyAge: 20, hostStartsAt: 4000, round: 9 },
+      { type: 'start', cars: [...cars], hostStartsAt: 4000, round: 9 },
       { type: 'finish', slot: 7, time: 43.2, round: 9 },
       { type: 'left', slot: 7, round: 9 },
       { type: 'share-offer' }, { type: 'share-ready' }, { type: 'share-result', status: 'saved' },
@@ -76,7 +76,8 @@ describe('nearby eight-player control protocol', () => {
     expect(decodeControl(packet({ type: 'left', slot: 8 }))).toBeNull()
     expect(decodeControl(packet({ type: 'ranking', round: 9, sequence: 1, order: [0, 0] }))).toBeNull()
     expect(decodeControl(packet({ type: 'clock-reply', round: 9, probe: 4, receivedAt: 100, sentAt: 99 }))).toBeNull()
-    expect(decodeControl(packet({ type: 'start', cars: [...cars], delay: 6000, readyAge: 0 }))).toBeNull()
+    expect(decodeControl(packet({ type: 'start', cars: [...cars], delay: 4000, readyAge: 0, round: 9 }))).toBeNull()
+    expect(decodeControl(packet({ type: 'start', cars: [...cars], hostStartsAt: -1, round: 9 }))).toBeNull()
     for (const bad of [0, 256, '3', 1.5, null]) {
       expect(decodeControl(packet({ type: 'prepare', slot: 1, laps: 2, lighting: 'day', protocolVersion: bad }))).toBeNull()
     }

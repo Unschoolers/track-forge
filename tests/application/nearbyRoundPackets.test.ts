@@ -11,23 +11,23 @@ import { nearbyCar } from '../fixtures/nearbyRace'
 const rival = nearbyCar('red', 40)
 
 describe('Nearby rematch packet round isolation', () => {
-  it('encodes a 4-bit round epoch without increasing 19/8-byte packet sizes', () => {
-    const pose = encodePose(1, 1, 0, rival, 15)
+  it('encodes a 4-bit round epoch in 23/8-byte packet sizes', () => {
+    const pose = encodePose(1, 1, 0, rival, 15, 0)
     const progress = encodeProgress(1, 1, 13.25, 15)
     expect(pose).toHaveLength(POSE_BYTES)
     expect(progress).toHaveLength(PROGRESS_BYTES)
     expect(decodePose(pose)).toMatchObject({ slot: 1, round: 15, sequence: 1 })
     expect(decodeProgress(progress)).toEqual({ slot: 1, round: 15, sequence: 1, progress: 13.25 })
-    expect(decodePose(encodePose(1, 1, 0, rival))?.round).toBe(0)
+    expect(decodePose(encodePose(1, 1, 0, rival, 0, 0))?.round).toBe(0)
     expect(decodeProgress(encodeProgress(1, 1, 0))?.round).toBe(0)
     expect(decodeProgress(new Uint8Array([4, 0x80, 0, 0, 0, 0, 0, 0]))).toBeNull()
-    expect(() => encodePose(1, 1, 0, rival, -1)).toThrow(RangeError)
+    expect(() => encodePose(1, 1, 0, rival, -1, 0)).toThrow(RangeError)
     expect(() => encodeProgress(1, 1, 13, 65536)).toThrow(RangeError)
   })
 
   it('rejects mixing old and new rounds within a host pose batch', () => {
-    const old = encodePose(1, 30, 0, rival, 0)
-    const next = encodePose(2, 0, 0, rival, 1)
+    const old = encodePose(1, 30, 0, rival, 0, 0)
+    const next = encodePose(2, 0, 0, rival, 1, 0)
     expect(() => encodePoseBatch([old, next])).toThrow(RangeError)
     const valid = encodePoseBatch([next])
     expect(decodePoseBatch(valid)?.[0]?.round).toBe(1)
@@ -40,16 +40,18 @@ describe('Nearby rematch packet round isolation', () => {
       [1, { ghost: new RemoteGhost('red'), identity: DEFAULT_PLAYER_IDENTITY }],
     ])
     sync.setRound(1)
-    expect(sync.receive(encodePose(1, 65535, 0, rival, 0), false, 1, 0, racers)).toBe(true)
+    sync.setStartAt(0)
+    expect(sync.receive(encodePose(1, 65535, 0, rival, 0, 0), false, 1, 0, racers)).toBe(true)
     expect(sync.counts.relayed).toBe(0)
-    expect(sync.receive(encodePose(1, 0, 0, rival, 1), false, 1, 0, racers)).toBe(true)
+    expect(sync.receive(encodePose(1, 0, 0, rival, 1, now), false, 1, 0, racers)).toBe(true)
     expect(sync.counts.relayed).toBe(1)
     now += 20
-    expect(sync.receive(encodePose(1, 1, 0, rival, 1), false, 1, 0, racers)).toBe(true)
+    expect(sync.receive(encodePose(1, 1, 0, rival, 1, now), false, 1, 0, racers)).toBe(true)
     expect(sync.counts.relayed).toBe(2)
     sync.reset()
     sync.setRound(2)
-    expect(sync.receive(encodePose(1, 65535, 0, rival, 1), false, 1, 0, racers)).toBe(true)
+    sync.setStartAt(0)
+    expect(sync.receive(encodePose(1, 65535, 0, rival, 1, 0), false, 1, 0, racers)).toBe(true)
     expect(sync.counts.relayed).toBe(0)
   })
 

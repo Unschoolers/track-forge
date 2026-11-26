@@ -21,17 +21,16 @@ Both native hosts bind all local IPv4 interfaces; their listening port is not ex
 ## Remote car presentation
 
 Both transports share a receiver-local interpolation buffer. Start at 100 ms,
-then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
+then adapt between 25 and 100 ms using smoothed arrival jitter.
 The playback clock slews at 0.8–1.2x instead of freezing; 24 history samples
 and 100 ms small prediction corrections preserve smoothness. Timed wire-v6
-poses append a signed 32-bit millisecond offset from synchronized GO to the
-19-byte legacy pose (23 bytes total). Host relays preserve source timestamps.
+poses contain a signed 32-bit millisecond offset from synchronized GO
+(23 bytes total). Host relays preserve source timestamps.
 Receiver maps timestamps to its local clock, rejects missing/implausibly
 old/future/regressing samples, and targets 25–100 ms delay according to arrival
 jitter. Prediction toward the shared present is capped at 120 ms / 75 world
 units and never crosses recovery or structure transitions. Two-second expiry
-is unchanged. Legacy codecs are retained for unit tests but timed races reject
-untimestamped poses.
+is unchanged. Untimestamped poses and batches are invalid.
 
 Per-peer presentation diagnostics include target/effective delay, clock hold,
 prediction caps, correction magnitude and estimated sample age. A synchronized
@@ -45,13 +44,13 @@ error. Diagnostics record simulation elapsed, frozen finish clock elapsed and
 their difference. Long-race device oscillator drift still requires matched
 captures; do not silently adjust physics or claim exact simultaneous views.
 
-## Shared race clock and official live ranking (introduced in wire v5)
+## Shared race clock and official live ranking (wire v6)
 
 Five sequential monotonic clock probes run after each guest scene becomes ready.
 Use the lowest round-trip sample to estimate host-minus-guest clock offset;
 schedule GO from the host's absolute monotonic timestamp. Asymmetric latency
 still introduces uncertainty. Missing probes fail the existing staging deadline,
-rather than silently guessing a start. Both devices must update together; wire v6 additionally requires timed poses.
+rather than silently guessing a start. All devices must update together; there is no older race protocol fallback.
 
 The host alone orders the field from its local progress and accepted guest
 progress (150 ms stream). Guests display the host's sequenced complete order;

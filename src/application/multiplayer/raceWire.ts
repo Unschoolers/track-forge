@@ -2,8 +2,8 @@ import { captureGhost, ghostPoseAt, type GhostPose } from '@/application/race/gh
 import type { CarId } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 
-export const POSE_BYTES = 19
-export const TIMED_POSE_BYTES = POSE_BYTES + 4
+export const POSE_BYTES = 23
+const SAMPLE_TIME_OFFSET = 19
 const MIN_SAMPLE_TIME_MS = -5000
 const MAX_SAMPLE_TIME_MS = 86_400_000
 export const PROGRESS_BYTES = 8
@@ -12,7 +12,6 @@ export const POSE_SEQUENCE_MASK = 0xffff
 export const POSE_RECOVERY_MASK = 0xff
 /** Four header bits isolate in-flight packets across rematches for up to
  * 16 round epochs while reserving three bits for eight player slots.
- * Old clients understand round zero; later rounds require this protocol version.
  */
 export const WIRE_ROUND_MASK = 15
 export const WIRE_PLAYER_COUNT = 8
@@ -41,7 +40,7 @@ const TURN = 2 * Math.PI
 
 export const Packet = { Control: 0, Pose: 1, Track: 2, PoseBatch: 3, Progress: 4 } as const
 
-/** Separate, optional telemetry keeps legacy 19-byte car poses compatible. */
+/** Progress stream used by host ranking and diagnostics. */
 export interface ProgressPacket {
   readonly slot: number
   readonly round: number
@@ -82,7 +81,7 @@ export interface PosePacket {
   readonly round: number
   readonly sequence: number
   readonly recovery: number
-  readonly sampleTimeMs?: number
+  readonly sampleTimeMs: number
   readonly pose: Omit<GhostPose, 'car' | 't'>
 }
 
@@ -97,7 +96,7 @@ function poseCoordinate(value: number): number {
   return fixed
 }
 
-export function encodePose(slot: number, sequence: number, recovery: number, vehicle: RaceVehicle, round = 0, sampleTimeMs?: number): Uint8Array {
+export function encodePose(slot: number, sequence: number, recovery: number, vehicle: RaceVehicle, round: number, sampleTimeMs: number): Uint8Array {
   const epoch = roundBits(round)
   const pose = captureGhost(vehicle, 0)
   // DataView silently converts NaN to zero and wraps integer overflow.
@@ -111,11 +110,11 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
   const x = poseCoordinate(pose.x)
   const y = poseCoordinate(pose.y)
   const z = poseCoordinate(pose.z)
-  if (sampleTimeMs !== undefined && (!Number.isInteger(sampleTimeMs) ||
-      sampleTimeMs < MIN_SAMPLE_TIME_MS || sampleTimeMs > MAX_SAMPLE_TIME_MS)) {
+  if (!Number.isInteger(sampleTimeMs) ||
+      sampleTimeMs < MIN_SAMPLE_TIME_MS || sampleTimeMs > MAX_SAMPLE_TIME_MS) {
     throw new RangeError('Invalid nearby pose sample time.')
   }
-  const bytes = new Uint8Array(sampleTimeMs === undefined ? POSE_BYTES : TIMED_POSE_BYTES)
+  const bytes = new Uint8Array(POSE_BYTES)
   const view = new DataView(bytes.buffer)
   bytes[0] = Packet.Pose
   bytes[1] = slot | (pose.structureRunId === null ? 0 : 8) | (epoch << 4)
@@ -125,22 +124,22 @@ export function encodePose(slot: number, sequence: number, recovery: number, veh
   view.setInt32(9, y, true)
   view.setInt32(13, z, true)
   view.setUint16(17, Math.round(pose.angle / TURN * 65536), true)
-  if (sampleTimeMs !== undefined) view.setInt32(POSE_BYTES, sampleTimeMs, true)
+  view.setInt32(SAMPLE_TIME_OFFSET, sampleTimeMs, true)
   return bytes
 }
 
 export function decodePose(bytes: Uint8Array): PosePacket | null {
-  if ((bytes.length !== POSE_BYTES && bytes.length !== TIMED_POSE_BYTES) || bytes[0] !== Packet.Pose) return null
+  if (bytes.length !== POSE_BYTES || bytes[0] !== Packet.Pose) return null
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const flags = view.getUint8(1)
-  const sampleTimeMs = bytes.length === TIMED_POSE_BYTES ? view.getInt32(POSE_BYTES, true) : undefined
-  if (sampleTimeMs !== undefined && (sampleTimeMs < MIN_SAMPLE_TIME_MS || sampleTimeMs > MAX_SAMPLE_TIME_MS)) return null
+  const sampleTimeMs = view.getInt32(SAMPLE_TIME_OFFSET, true)
+  if (sampleTimeMs < MIN_SAMPLE_TIME_MS || sampleTimeMs > MAX_SAMPLE_TIME_MS) return null
   return {
     slot: flags & 7,
     round: flags >> 4,
     sequence: view.getUint16(3, true),
     recovery: view.getUint8(2),
-    ...(sampleTimeMs !== undefined ? { sampleTimeMs } : {}),
+    sampleTimeMs,
     pose: {
       x: view.getInt32(5, true) / SCALE,
       y: view.getInt32(9, true) / SCALE,
@@ -154,34 +153,31 @@ export function decodePose(bytes: Uint8Array): PosePacket | null {
 /** One host broadcast containing the latest unique slot positions. */
 export function encodePoseBatch(packets: readonly Uint8Array[]): Uint8Array {
   if (!packets.length || packets.length > WIRE_PLAYER_COUNT) throw new RangeError('Invalid nearby pose batch size.')
-  const size = packets[0]?.length ?? 0
-  if (size !== POSE_BYTES && size !== TIMED_POSE_BYTES) throw new RangeError('Invalid nearby pose size.')
-  const bytes = new Uint8Array(1 + packets.length * size)
+  const bytes = new Uint8Array(1 + packets.length * POSE_BYTES)
   const slots = new Set<number>()
   let round: number | undefined
   bytes[0] = Packet.PoseBatch
   packets.forEach((packet, index) => {
     const pose = decodePose(packet)
-    if (!pose || packet.length !== size || slots.has(pose.slot) || (round !== undefined && pose.round !== round)) {
+    if (!pose || slots.has(pose.slot) || (round !== undefined && pose.round !== round)) {
       throw new RangeError('Invalid, mixed-round or duplicate nearby pose.')
     }
     round = pose.round
     slots.add(pose.slot)
-    bytes.set(packet, 1 + index * size)
+    bytes.set(packet, 1 + index * POSE_BYTES)
   })
   return bytes
 }
 
 export function decodePoseBatch(bytes: Uint8Array): PosePacket[] | null {
   const length = bytes.length - 1
-  const size = length % TIMED_POSE_BYTES === 0 ? TIMED_POSE_BYTES : POSE_BYTES
-  if (bytes[0] !== Packet.PoseBatch || length < size ||
-      length > WIRE_PLAYER_COUNT * size || length % size !== 0) return null
+  if (bytes[0] !== Packet.PoseBatch || length < POSE_BYTES ||
+      length > WIRE_PLAYER_COUNT * POSE_BYTES || length % POSE_BYTES !== 0) return null
   const packets: PosePacket[] = []
   const slots = new Set<number>()
   let round: number | undefined
-  for (let offset = 1; offset < bytes.length; offset += size) {
-    const packet = decodePose(bytes.subarray(offset, offset + size))
+  for (let offset = 1; offset < bytes.length; offset += POSE_BYTES) {
+    const packet = decodePose(bytes.subarray(offset, offset + POSE_BYTES))
     if (!packet || slots.has(packet.slot) || (round !== undefined && packet.round !== round)) return null
     round = packet.round
     slots.add(packet.slot)
@@ -191,8 +187,8 @@ export function decodePoseBatch(bytes: Uint8Array): PosePacket[] | null {
 }
 
 const REMOTE_INITIAL_DELAY_MS = 100
-const REMOTE_MIN_DELAY_MS = 50
-const REMOTE_MAX_DELAY_MS = 150
+const REMOTE_MIN_DELAY_MS = 25
+const REMOTE_MAX_DELAY_MS = 100
 const REMOTE_DELAY_WARMUP_SAMPLES = 4
 const REMOTE_HISTORY_LIMIT = 24
 const REMOTE_CLOCK_RESPONSE_MS = 250
@@ -211,7 +207,6 @@ export class RemoteGhost {
   private sequence: number | undefined
   private recovery: number | undefined
   private arrival = 0
-  private estimatedPeriodMs = POSE_PERIOD_MS
   private arrivalPeriodMs = POSE_PERIOD_MS
   private arrivalJitterMs = 0
   private arrivalSamples = 0
@@ -227,15 +222,14 @@ export class RemoteGhost {
 
   constructor(readonly car: CarId) {}
 
-  receive(packet: PosePacket, now: number, sampleAt?: number): boolean {
+  receive(packet: PosePacket, now: number, sampleAt: number): boolean {
     if (!isNewerWireSequence(packet.sequence, this.sequence)) return false
-    const advance = this.sequence === undefined ? 1 : (packet.sequence - this.sequence) & POSE_SEQUENCE_MASK
     const last = this.frames.at(-1)
     // Timed samples are on the receiver's monotonic clock via shared GO.
     // Reject implausibly old/future or regressing samples before changing state.
-    if (sampleAt !== undefined && (!Number.isFinite(sampleAt) || sampleAt < 0 ||
+    if (!Number.isFinite(sampleAt) || sampleAt < 0 ||
         sampleAt > now + 100 || sampleAt < now - REMOTE_POSE_EXPIRY_MS ||
-        (last && sampleAt <= last.t))) return false
+        (last && sampleAt <= last.t)) return false
     const continuous = !!last && now - this.arrival <= 500 &&
       packet.recovery === this.recovery && packet.pose.structureRunId === last.structureRunId
     // Capture the old predicted position at the same playback timestamp before
@@ -247,7 +241,6 @@ export class RemoteGhost {
     // Accept 30-60 Hz and packet losses without assuming a fixed send cadence.
     if (!last || now - this.arrival > 500) {
       this.frames = []
-      this.estimatedPeriodMs = POSE_PERIOD_MS
       this.arrivalPeriodMs = POSE_PERIOD_MS
       this.arrivalJitterMs = 0
       this.arrivalSamples = 0
@@ -264,24 +257,14 @@ export class RemoteGhost {
       if (++this.arrivalSamples >= REMOTE_DELAY_WARMUP_SAMPLES) {
         // With actual source timestamps we can predict toward shared present,
         // rather than buffering the full arrival cadence on top of transit.
-        const desired = sampleAt === undefined
-          ? Math.max(REMOTE_MIN_DELAY_MS, Math.min(REMOTE_MAX_DELAY_MS,
-            this.arrivalPeriodMs * 1.5 + this.arrivalJitterMs * 2))
-          : Math.max(25, Math.min(100, 25 + this.arrivalJitterMs * 2))
+        const desired = Math.max(REMOTE_MIN_DELAY_MS, Math.min(REMOTE_MAX_DELAY_MS,
+          REMOTE_MIN_DELAY_MS + this.arrivalJitterMs * 2))
         // This is a target delay, not the actual playback clock.
         this.interpolationDelayMs = Math.max(desired, this.interpolationDelayMs - 2)
       }
-      const observedPeriod = arrivalGap / advance
-      if (observedPeriod >= POSE_FAST_PERIOD_MS * 0.5 && observedPeriod <= 200) {
-        this.estimatedPeriodMs = Math.max(POSE_FAST_PERIOD_MS, Math.min(100,
-          this.estimatedPeriodMs * 0.8 + observedPeriod * 0.2))
-      }
     }
-    const time = sampleAt ?? (this.frames.length && last
-      ? Math.max(now - 75, Math.min(now + 75, last.t + advance * this.estimatedPeriodMs))
-      : now)
     this.frames.push({
-      ...packet.pose, car: this.car, t: last && this.frames.length ? Math.max(last.t + 1, time) : time,
+      ...packet.pose, car: this.car, t: sampleAt,
       cut: packet.recovery !== this.recovery,
     })
     if (this.frames.length > REMOTE_HISTORY_LIMIT) this.frames.shift()
@@ -300,11 +283,9 @@ export class RemoteGhost {
         } else this.correction = null
       } else this.correction = null
     }
-    if (sampleAt !== undefined) {
-      this.metrics.timedSamples++
-      this.metrics.transitSumMs += now - sampleAt
-      this.metrics.maxTransitMs = Math.max(this.metrics.maxTransitMs, now - sampleAt)
-    }
+    this.metrics.timedSamples++
+    this.metrics.transitSumMs += now - sampleAt
+    this.metrics.maxTransitMs = Math.max(this.metrics.maxTransitMs, now - sampleAt)
     this.sequence = packet.sequence
     this.recovery = packet.recovery
     this.arrival = now
