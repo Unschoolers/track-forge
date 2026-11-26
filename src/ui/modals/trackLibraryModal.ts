@@ -68,8 +68,39 @@ export function createTrackLibraryModal(
     actions.close,
     'track-library-modal',
   )
+  frame.overlay.dataset.graphicsQuality = state.preferences.graphicsQuality ?? 'medium'
   const favorites = new Set(state.preferences.favoriteTrackIds ?? [])
+  const libraryContent = element('div', 'track-library-content')
+  const toolbar = element('div', 'track-library-toolbar')
+  const searchLabel = element('label', 'track-library-search-label', 'Find a circuit')
+  const search = document.createElement('input')
+  search.type = 'search'
+  search.className = 'track-library-search'
+  search.placeholder = 'Search circuits or creators'
+  search.setAttribute('aria-label', 'Search tracks')
+  searchLabel.append(search)
+  const filter = element('div', 'track-library-filter')
+  filter.setAttribute('role', 'group')
+  filter.setAttribute('aria-label', 'Filter circuits')
+  const allFilter = button('All circuits', 'library-filter-all', () => setFilter('all'), 'track-library-filter-button active')
+  const favoritesFilter = button('Favorites', 'library-filter-favorites', () => setFilter('favorites'), 'track-library-filter-button')
+  allFilter.setAttribute('aria-pressed', 'true')
+  favoritesFilter.setAttribute('aria-pressed', 'false')
+  filter.append(allFilter, favoritesFilter)
+  const count = element('p', 'track-library-count')
+  toolbar.append(searchLabel, filter, count)
   const list = element('div', 'track-list')
+  list.setAttribute('aria-live', 'polite')
+  libraryContent.append(toolbar, list)
+  let activeFilter: 'all' | 'favorites' = 'all'
+  const setFilter = (next: 'all' | 'favorites') => {
+    activeFilter = next
+    allFilter.classList.toggle('active', next === 'all')
+    favoritesFilter.classList.toggle('active', next === 'favorites')
+    allFilter.setAttribute('aria-pressed', String(next === 'all'))
+    favoritesFilter.setAttribute('aria-pressed', String(next === 'favorites'))
+    renderTracks()
+  }
 
   const cardFor = (track: Track, official = false): HTMLElement => {
     const readOnly = isSharedTrack(track)
@@ -153,10 +184,23 @@ export function createTrackLibraryModal(
 
   // A favorite official circuit ranks above non-favorite saved tracks as well.
   const libraryTracks = race ? [...state.tracks, ...OFFICIAL_TRACKS] : state.tracks
-  for (const track of orderLibraryTracks(libraryTracks, state.preferences.favoriteTrackIds)) {
-    list.append(cardFor(track, OFFICIAL_TRACK_IDS.has(track.id)))
+  const renderTracks = () => {
+    const query = search.value.trim().toLocaleLowerCase()
+    const tracks = orderLibraryTracks(libraryTracks, state.preferences.favoriteTrackIds).filter(track => {
+      if (activeFilter === 'favorites' && !favorites.has(track.id)) return false
+      if (!query) return true
+      return `${track.name} ${track.creator?.name ?? ''}`.toLocaleLowerCase().includes(query)
+    })
+    list.replaceChildren()
+    count.textContent = `${tracks.length} ${tracks.length === 1 ? 'circuit' : 'circuits'}`
+    if (tracks.length === 0) {
+      list.append(element('p', 'empty-state', libraryTracks.length === 0 ? 'No tracks saved yet.' : 'No circuits match this view.'))
+      return
+    }
+    for (const track of tracks) list.append(cardFor(track, OFFICIAL_TRACK_IDS.has(track.id)))
   }
-  if (libraryTracks.length === 0) list.append(element('p', 'empty-state', 'No tracks saved yet.'))
+  search.addEventListener('input', renderTracks)
+  renderTracks()
 
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
@@ -169,7 +213,7 @@ export function createTrackLibraryModal(
     void file.text().then(actions.importFile).catch(() => actions.importFile(''))
     fileInput.value = ''
   })
-  frame.body.append(list, fileInput)
+  frame.body.append(libraryContent, fileInput)
   if (!race) {
     frame.footer.append(
       button('IMPORT', 'import-track-file', () => fileInput.click(), 'button'),

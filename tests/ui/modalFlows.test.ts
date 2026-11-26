@@ -337,6 +337,44 @@ describe('modal application flows', () => {
     expect(cards[0]?.querySelector('.track-card-name')?.textContent).toBe('Starter Circuit')
   })
 
+  it('filters the library by favorites and circuit or creator name', () => {
+    const favoriteState = {
+      ...state({ type: 'track-library', purpose: 'edit' }),
+      tracks: [{ ...ready, creator: { id: 'creator-alex', name: 'Alex' } }, incomplete],
+      preferences: { ...preferences, favoriteTrackIds: [ready.id] },
+    }
+    const { root } = setup(favoriteState)
+    const favorites = root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')
+    favorites?.click()
+    expect(favorites?.getAttribute('aria-pressed')).toBe('true')
+    expect(root.querySelectorAll('.track-card')).toHaveLength(1)
+    expect(root.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
+
+    const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
+    if (!search) throw new Error('Missing track search')
+    search.value = 'Alex'
+    search.dispatchEvent(new Event('input'))
+    expect(root.querySelectorAll('.track-card')).toHaveLength(1)
+    expect(root.querySelector('.track-card-creator')?.textContent).toContain('Alex')
+    search.value = 'not found'
+    search.dispatchEvent(new Event('input'))
+    expect(root.querySelector('.track-list .empty-state')?.textContent).toBe('No circuits match this view.')
+    root.querySelector<HTMLButtonElement>('[data-action="library-filter-all"]')?.click()
+    expect(root.querySelectorAll('.track-card')).toHaveLength(0)
+  })
+
+  it('keeps imported shared tracks marked read-only and offers View as the main action', () => {
+    const shared = { ...ready, id: asTrackId('shared-track'), origin: 'imported' as const }
+    const { root, port } = setup({
+      ...state({ type: 'track-library', purpose: 'edit' }),
+      tracks: [shared],
+    })
+    expect(root.textContent).toContain('Shared original · read-only')
+    expect(root.querySelector('[data-action="select-edit-shared-track"]')?.getAttribute('aria-label')).toBe('View Starter Circuit')
+    root.querySelector<HTMLButtonElement>('[data-action="select-edit-shared-track"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: shared.id })
+  })
+
   it('shows the selected car and lighting in the race setup flyover', () => {
     const initial = state({ type: 'race-setup' })
     const { root, host, update, port } = setup(initial)
