@@ -95,6 +95,8 @@ export class RaceScene extends Phaser.Scene {
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
   private nightLightGraphics?: Phaser.GameObjects.Graphics
+  private checkpointGraphics?: Phaser.GameObjects.Graphics
+  private renderedNextCheckpoint: number | undefined
   private snapshot: AppSnapshot | undefined
   private raceCamera: RaceCameraState | undefined
   private pointerBinding: RacePointerBinding | undefined
@@ -227,8 +229,12 @@ export class RaceScene extends Phaser.Scene {
     if (night) {
       this.lampGraphics.push(...createNightLampGraphics(this, lamps, Phaser.BlendModes.ADD))
     }
-    const checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
-    renderRecoveryCheckpoints(checkpointGraphics, geometry.path, this.raceSession.snapshot().state?.recoveryCheckpoints ?? [])
+    this.checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
+    const initialRace = this.raceSession.snapshot().state
+    this.renderedNextCheckpoint = initialPlayer && initialRace
+      ? initialRace.timingGates?.[initialPlayer.nextSector - 1]
+      : undefined
+    renderRecoveryCheckpoints(this.checkpointGraphics, geometry.path, initialRace?.recoveryCheckpoints ?? [], undefined, this.renderedNextCheckpoint)
     // The initial ground pass happens before lamp batches exist; force their
     // first visibility update to use the race camera's actual viewport.
     this.staticGraphicsVisibilityBounds = undefined
@@ -299,6 +305,12 @@ export class RaceScene extends Phaser.Scene {
     const race = this.raceSession.presentationState?.() ?? this.raceSession.snapshot().state
     if (!race) return
     const player = race.vehicles.find((vehicle) => vehicle.player)
+    const nextCheckpoint = player ? race.timingGates?.[player.nextSector - 1] : undefined
+    if (nextCheckpoint !== this.renderedNextCheckpoint && this.checkpointGraphics) {
+      this.renderedNextCheckpoint = nextCheckpoint
+      this.checkpointGraphics.clear()
+      renderRecoveryCheckpoints(this.checkpointGraphics, race.path, race.recoveryCheckpoints ?? [], undefined, nextCheckpoint)
+    }
     if (player && this.raceCamera) {
       this.raceCamera = advanceRaceCamera(
         this.raceCamera,

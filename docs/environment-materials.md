@@ -266,3 +266,16 @@ world artwork, but not the underlying geometry contract.
 
 No bridge heights, grip, clearance, collision, recovery, track formats or
 authored points are modified. Visual/device verification remains required.
+
+### Race-speed road cues
+
+Race and flyover road ribbons add repeated material-specific edge slashes where
+the authored surface changes, and paired amber bars with endpoint studs on the
+ground approaches at overpass entry and exit. Each ground cue includes an arrow
+pointing toward the raised section. The marks follow the sampled road gate
+tangent and stay inside the driving surface. Night uses brighter contrast; the
+geometry is baked into the existing bounded static marking batches. In race,
+only the player's next authoritative timing
+gate is emphasized; other recovery markers remain subdued. The active marker
+updates when the gate changes, not on every draw frame. No implicit gate,
+physics or track data is introduced.
