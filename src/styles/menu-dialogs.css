@@ -99,6 +99,15 @@
   letter-spacing: .01em;
   touch-action: manipulation;
 }
+@supports (backdrop-filter: blur(8px)) {
+  [data-graphics-quality]:not([data-graphics-quality='low']) .options-modal .options-tab-list {
+    background: #344554b8;
+    backdrop-filter: blur(8px);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  [data-graphics-quality] .options-modal .options-tab-list { background: #26323e; backdrop-filter: none; }
+}
 .options-modal .options-tab-icon {
   flex: none;
   width: 1.15rem;

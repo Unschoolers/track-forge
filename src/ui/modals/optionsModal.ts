@@ -218,7 +218,7 @@ export function createOptionsModal(
     qualityRow.append(choice)
   }
   quality.append(qualityRow, element('p', 'modal-subtitle',
-    'Low: 1× · Medium: up to 2× · High: native display resolution. Applies next race.'))
+    'Low: 1× and opaque menus · Medium: up to 2× · High: native display resolution. Race resolution applies next race.'))
   frame.body.append(quality)
   capture('display', displayStart)
   const controlsStart = frame.body.children.length

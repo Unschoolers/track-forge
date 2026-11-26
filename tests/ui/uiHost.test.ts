@@ -82,6 +82,15 @@ function setup(
 }
 
 describe('DomUiHost', () => {
+  it('updates menu material quality when graphics settings change', () => {
+    const { root, update, host } = setup()
+    expect(root.dataset.graphicsQuality).toBe('medium')
+    update({ ...snapshot('home'), preferences: { ...preferences, graphicsQuality: 'low' } })
+    expect(root.dataset.graphicsQuality).toBe('low')
+    update({ ...snapshot('home'), preferences: { ...preferences, graphicsQuality: 'high' } })
+    expect(root.dataset.graphicsQuality).toBe('high')
+    host.destroy()
+  })
   it('exports matching frame and network diagnostics from multiplayer results, not a preparing rematch', async () => {
     let phase = 'racing'
     const network = { version: 2, race: { round: 3 } }

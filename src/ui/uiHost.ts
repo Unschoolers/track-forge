@@ -271,6 +271,7 @@ export class DomUiHost implements UiHost {
   }
 
   private render(state: AppSnapshot): void {
+    this.root.dataset.graphicsQuality = state.preferences.graphicsQuality ?? 'medium'
     const previous = this.previousSnapshot
     this.previousSnapshot = state
     if (deferEditorDragChrome(previous, state)) return
