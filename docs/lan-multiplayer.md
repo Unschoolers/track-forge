@@ -18,6 +18,15 @@ The host accepts up to seven guests. A two-sided pairing handshake must complete
 
 Both native hosts bind all local IPv4 interfaces; their listening port is not exposed publicly by TrackForge. This transport is intended only for trusted local networks. Do **not** forward TCP port 47832 to the internet; authentication/encryption would be required for internet play.
 
+## Remote car presentation
+
+Both transports share a receiver-local interpolation buffer. Start at 100 ms,
+then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
+Grow quickly when updates are irregular, shrink gradually on a healthy stream,
+and never rewind the presentation clock when the buffer grows. Existing recovery
+cuts, bounded extrapolation and two-second expiry remain unchanged. Verify on
+matched device captures; synthetic timing tests are not radio latency evidence.
+
 ## Validation
 
 CI: JavaScript transport-selection/component regression tests, TypeScript/lint, Android native unit/compile, Windows Rust release compile and executable upload. A manual end-to-end acceptance matrix is needed to confirm radio discovery, firewall prompts and real race feel:
@@ -30,12 +39,3 @@ CI: JavaScript transport-selection/component regression tests, TypeScript/lint, 
 6. Restart/replace the EXE; saves and profiles survive. Verify layout fills a widescreen desktop and keyboard input works.
 
 The LAN transport is local-only; it is *not* an internet multiplayer server. Rollback removes the native LAN adapters and connection selector while preserving the prior Android Nearby plugin and desktop offline game.
-
-## Remote car presentation
-
-Both transports share a receiver-local interpolation buffer. Start at 100 ms,
-then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
-Grow quickly when updates are irregular, shrink gradually on a healthy stream,
-and never rewind the presentation clock when the buffer grows. Existing recovery
-cuts, bounded extrapolation and two-second expiry remain unchanged. Verify on
-matched device captures; synthetic timing tests are not radio latency evidence.
