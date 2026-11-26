@@ -67,7 +67,10 @@ describe('race frame diagnostics', () => {
       bitmapWork: [{ operation: 'upload', layer: 1, tile: '2:3', priority: 0, durationMs: 12, afterFrame: 1 }],
     })
     expect(recorder.report(2)).toBeNull()
+    const exported = recorder.report(1)
     recorder.beginUpdate(2)
+    expect(exported).toMatchObject({ frameCount: 2, frames: [[2, 16, 4, 2, 3], [5, 34, 4, 2, 3]],
+      bitmapWork: [{ operation: 'upload' }] })
     expect(recorder.report(2)).toMatchObject({ frameCount: 0, frames: [], bitmapWork: [] })
   })
 })

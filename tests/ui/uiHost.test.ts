@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AppCommand, AppSnapshot } from '@/application/appState'
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
+import * as trackExport from '@/infrastructure/export/trackExport'
 import type { Preferences } from '@/application/ports/storage'
 import type { UpdateProvider } from '@/application/updates/updateProvider'
 import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
@@ -53,6 +54,7 @@ function setup(
   prepareRace?: UiRuntime['prepareRace'],
   updateProvider?: UpdateProvider,
   nearby?: NearbyRace,
+  runtimeOverrides: Partial<UiRuntime> = {},
 ) {
   const root = document.createElement('div')
   let listener: ((value: AppSnapshot) => void) | undefined
@@ -66,7 +68,7 @@ function setup(
       }
     }),
   }
-  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}), ...(updateProvider ? { updateProvider } : {}), ...(nearby ? { nearby } : {}) }
+  const runtime = { ...createUiRuntime(), ...(prepareRace ? { prepareRace } : {}), ...(updateProvider ? { updateProvider } : {}), ...(nearby ? { nearby } : {}), ...runtimeOverrides }
   const geometry = vi.spyOn(runtime.geometry, 'get')
   const host = new DomUiHost(root, port, runtime)
   host.mount()
@@ -80,6 +82,46 @@ function setup(
 }
 
 describe('DomUiHost', () => {
+  it('exports matching frame and network diagnostics from multiplayer results, not a preparing rematch', async () => {
+    let phase = 'racing'
+    const network = { version: 2, race: { round: 3 } }
+    const nearby = {
+      snapshot: () => ({ phase, role: 'guest', track: track.name }),
+      standings: () => [], subscribe: () => () => undefined,
+      diagnostics: vi.fn(async () => network),
+    } as unknown as NearbyRace
+    const runtime = createUiRuntime()
+    const original = runtime.raceSession.snapshot()
+    vi.spyOn(runtime.raceSession, 'snapshot').mockReturnValue({
+      ...original, runId: 7, track,
+      setup: { car: 'blue', laps: 2, difficulty: 'normal', mode: 'nearby' },
+      result: { outcome: 'finished', mode: 'nearby', trackId: track.id, trackName: track.name,
+        playerPlace: 1, playerTime: 42, newRecord: false, standings: [], highScores: [] },
+    })
+    const performance = { timings: { frames: [[1, 16, 4, 2, 3]] }, device: { buildRun: '42' } }
+    const frameDiagnostics = vi.fn(() => performance)
+    const save = vi.spyOn(trackExport, 'saveJsonFile').mockResolvedValue(true)
+    const { root, update, host } = setup('race', undefined, undefined, nearby, { ...runtime, frameDiagnostics })
+    try {
+      update({ ...snapshot('race'), overlay: { type: 'results' } })
+      const button = root.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')!
+      button.click()
+      await vi.waitFor(() => expect(button.disabled).toBe(false))
+      expect(save).toHaveBeenCalledTimes(1)
+      expect(JSON.parse(save.mock.calls[0]![0].content)).toMatchObject({ ...network, performance })
+      expect(frameDiagnostics).toHaveBeenCalledOnce()
+      phase = 'preparing'
+      button.click()
+      await vi.waitFor(() => expect(button.disabled).toBe(false))
+      expect(save).toHaveBeenCalledTimes(2)
+      expect(JSON.parse(save.mock.calls[1]![0].content)).toMatchObject({ ...network, performance: null })
+      expect(frameDiagnostics).toHaveBeenCalledOnce()
+    } finally {
+      host.destroy()
+      save.mockRestore()
+    }
+  })
+
   it('derives one shared live geometry for an editor render', () => {
     const { geometry } = setup('editor')
 

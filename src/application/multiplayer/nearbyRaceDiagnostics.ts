@@ -95,6 +95,7 @@ export class NearbyRaceDiagnostics {
       version: 2,
       exportedAtUtc: new Date().toISOString(),
       startedAtUtc: this.diagnosticStartedAtUtc,
+      monotonicStartedAtMs: this.diagnosticStartedAtUtc === null ? null : this.diagnosticStart,
       role: context.role,
       phase: context.phase,
       counts: this.counts(context),
