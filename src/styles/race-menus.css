@@ -1,38 +1,56 @@
-/* Track garage: the route is the hero, environment is a small color cue. */
-.track-library-modal .modal-card { width: min(52rem, 100%); }
-.track-library-modal .modal-header { padding-block: .85rem .65rem; }
-.track-library-modal .modal-title { font-size: clamp(1.4rem, 4.6vw, 2rem); }
-.track-library-modal .modal-subtitle { font-size: .8rem; }
-.track-library-modal .modal-footer { display: grid; grid-template-columns: 1fr 1.35fr; gap: .5rem; }
-.track-library-modal .modal-footer .button { min-width: 0; min-height: 46px; font-size: .75rem; }
+/* The route is the hero; filters and actions sit in a distinct functional layer. */
+.track-library-modal .modal-card { width: min(68rem, 100%); border-radius: 1.5rem; border-color: #71808c99; background: #111820f5; }
+.track-library-modal .modal-header { padding: 1.1rem 1.4rem .7rem; }
+.track-library-modal .modal-title { font-size: clamp(1.55rem, 4.6vw, 2.35rem); letter-spacing: -.045em; }
+.track-library-modal .modal-subtitle { font-size: .9rem; }
+.track-library-modal .modal-body { padding: .65rem 1.4rem 1rem; }
+.track-library-modal .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem 1.4rem max(1rem, env(safe-area-inset-bottom)); }
+.track-library-modal .modal-footer .button { min-width: 0; min-height: 48px; padding-inline: 1.1rem; border-radius: 999px; font-size: .85rem; }
+.track-library-modal .modal-footer .button-primary { background: #ff925c; color: #20110a; border-color: #ff925c; }
+.track-library-modal .track-library-content { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .8rem; min-height: 0; }
+.track-library-modal .track-library-toolbar { display: grid; grid-template-columns: minmax(10rem, 1fr) auto auto; align-items: end; gap: .8rem; padding: .65rem; border: 1px solid #8393a580; border-radius: 1.2rem; background: #202a36; box-shadow: inset 0 1px 1px #ffffff24, inset 0 -1px 1px #0006; }
+@supports (backdrop-filter: blur(8px)) {
+  .track-library-modal[data-graphics-quality='medium'] .track-library-toolbar,
+  .track-library-modal[data-graphics-quality='high'] .track-library-toolbar {
+    background: linear-gradient(145deg, #e4f2ff20, transparent 48%, #080c1640), #182431c9;
+    backdrop-filter: blur(10px);
+  }
+}
+.track-library-modal .track-library-search-label { display: grid; gap: .35rem; color: #c1cad4; font-size: .75rem; font-weight: 700; }
+.track-library-modal .track-library-search { width: 100%; min-height: 44px; padding: .6rem .85rem; border: 1px solid #71808c80; border-radius: 1rem; background: #202a36; color: #f4f6f8; font: inherit; }
+.track-library-modal .track-library-filter { display: flex; gap: .25rem; padding: .25rem; border: 1px solid #71808c70; border-radius: 999px; background: #202a36; }
+.track-library-modal .track-library-filter-button { min-height: 40px; padding: .45rem .85rem; border: 0; border-radius: 999px; background: transparent; color: #c1cad4; font: 650 .8rem/1.2 system-ui, sans-serif; cursor: pointer; }
+.track-library-modal .track-library-filter-button.active { background: #e8eff2; color: #141b25; }
+.track-library-modal .track-library-filter-button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+.track-library-modal .track-library-count { margin: 0 0 .5rem; color: #c1cad4; font: 650 .72rem/1.2 var(--menu-mono); white-space: nowrap; }
 .track-library-modal .track-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
-  gap: .65rem;
+  gap: .75rem;
 }
 .track-library-modal .track-list > :is(.results-heading, .empty-state) { grid-column: 1 / -1; }
-.track-library-modal .results-heading { margin: .75rem 0 .1rem; color: var(--menu-accent); }
-.track-library-modal .results-heading:first-child { margin-top: 0; }
 .track-library-modal .track-card {
   position: relative;
   display: flex;
   min-width: 0;
-  aspect-ratio: 1;
-  background: #111c26;
-  border: 1px solid #394b59;
-  border-radius: .35rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  min-height: 10rem;
+  background: linear-gradient(135deg, #202a36, #111820);
+  border: 1px solid #71808c55;
+  border-radius: 1.15rem;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
-.track-library-modal .track-card:is(:hover, :focus-within) { border-color: #768a99; z-index: 2; }
-.track-library-modal .track-card.selected { border-color: #b15c43; }
+.track-library-modal .track-card:is(:hover, :focus-within) { border-color: #c1cad4; z-index: 2; }
+.track-library-modal .track-card.selected { border-color: #ff925c; }
 .track-library-modal .track-card:has(.track-card-overflow[open]) { z-index: 5; }
 .track-library-modal .track-card-select {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(5rem, .9fr) minmax(0, 1.1fr);
+  align-items: stretch;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  padding: 0;
+  padding: .65rem;
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -44,26 +62,25 @@
 .track-library-modal .track-card-select:focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 2px; }
 .track-library-modal .track-card-copy {
   display: grid;
-  height: 100%;
   min-height: 0;
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  align-content: end;
-  gap: .2rem;
-  padding: .38rem;
+  grid-template-rows: auto auto 1fr auto;
+  align-content: center;
+  gap: .32rem;
+  padding: .45rem .55rem;
 }
 .track-library-modal .track-preview {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 8.5rem;
   min-width: 0;
   min-height: 0;
-  padding: .35rem;
+  padding: .6rem;
   background: transparent;
   color: #ff7952;
   overflow: visible;
 }
-.track-library-modal .track-preview-halo { opacity: .52; filter: blur(2.7px); }
-.track-library-modal .track-preview-route { stroke: #ff7952; filter: drop-shadow(0 0 2px #ff795280); }
+.track-library-modal .track-preview-halo { opacity: .28; filter: blur(2px); }
+.track-library-modal .track-preview-route { stroke: #ff925c; filter: drop-shadow(0 0 2px #ff925c55); }
 .track-library-modal .track-card-name {
   display: -webkit-box;
   min-width: 0;
@@ -71,7 +88,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-height: 1.18;
-  font-size: clamp(.79rem, 2.6vw, .98rem);
+  font-size: clamp(.9rem, 2.6vw, 1.15rem);
   font-weight: 850;
   overflow-wrap: anywhere;
 }
@@ -80,7 +97,7 @@
   align-items: center;
   min-width: 0;
   gap: .35rem;
-  color: #a8b9c7;
+  color: #c1cad4;
   font: 700 .62rem/1.4 var(--menu-mono);
 }
 .track-library-modal .track-creator-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -161,13 +178,27 @@
 .track-library-modal .track-card-menu .track-icon-action.danger { color: #ffabb2; }
 .track-library-modal .track-card-menu .track-icon-action:focus-visible { outline: 2px solid var(--menu-accent); }
 .track-library-modal .empty-state { color: var(--menu-muted); }
-@media (max-width: 520px) {
-  .track-library-modal .track-list { gap: .45rem; }
-  .track-library-modal .track-card { aspect-ratio: .94; }
-  .track-library-modal .track-card-copy { padding: .3rem; }
-  .track-library-modal .track-card-creator { font-size: .56rem; }
+@media (max-width: 700px) {
+  .track-library-modal .track-library-toolbar { grid-template-columns: 1fr; }
+  .track-library-modal .track-library-filter { justify-self: start; }
+  .track-library-modal .track-library-count { margin: 0; }
+  .track-library-modal .track-list { grid-template-columns: 1fr; gap: .55rem; }
+  .track-library-modal .track-card { min-height: 8rem; }
+  .track-library-modal .track-preview { height: 6.8rem; }
+  .track-library-modal .modal-header { padding: .9rem 1rem .55rem; }
+  .track-library-modal .modal-body { padding: .55rem 1rem .8rem; }
+  .track-library-modal .modal-footer { padding: .65rem 1rem max(.8rem, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 380px) {
+  .track-library-modal .track-card-select { grid-template-columns: minmax(4rem, .7fr) minmax(0, 1.3fr); padding: .45rem; }
+  .track-library-modal .track-card-copy { padding: .35rem; }
+  .track-library-modal .track-library-filter-button { padding-inline: .6rem; }
+  .track-library-modal .modal-footer { display: grid; grid-template-columns: 1fr 1.25fr; }
 }
 @media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .track-library-modal .track-library-toolbar { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
+}
 
 .race-setup-modal .setup-section {
   gap: .7rem;
