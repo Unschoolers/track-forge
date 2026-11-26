@@ -8,6 +8,7 @@
 import { mapPersistence, type Persistence, type KeyValueStore, type PreferencesStore, type TrackStore } from '@/application/ports/storage'
 import { isUntouchedLegacyStarter } from '@/migrations/legacyStarterIdentity'
 import type { Track } from '@/domain/model'
+import { isSharedTrack } from '@/domain/track/trackAccess'
 import { SYSTEM_STARTER_TRACK_ID, TRACK_FORGE_CREATOR } from '@/domain/track/trackCreator'
 
 const MIGRATION_MARKER = 'trackforge-creator-migration-v1'
@@ -49,14 +50,14 @@ export function migrateTrackCreatorCredits(
   const creator = { id, name: profile.displayName ?? 'Player' }
   const updated: Track[] = []
   for (const track of tracks.list()) {
+    if (isSharedTrack(track)) continue
     if (isBuiltIn(track)) {
       if (track.origin !== 'seeded' || track.creator?.id !== TRACK_FORGE_CREATOR.id ||
         track.creator.name !== TRACK_FORGE_CREATOR.name) {
         updated.push({ ...track, origin: 'seeded', creator: TRACK_FORGE_CREATOR })
       }
     } else if (!track.creator) {
-      // All other previously uncredited saved tracks are the local player's,
-      // per the release migration contract (even legacy uncredited imports).
+      // Unclassified and previously uncredited local tracks are the player's.
       updated.push({ ...track, origin: 'local', creator })
     }
   }

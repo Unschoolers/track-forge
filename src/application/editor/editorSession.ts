@@ -2,6 +2,7 @@ import type { Persistence, TrackStore } from '@/application/ports/storage'
 import { applyEditorCommand, type EditorCommand, type EditorState } from '@/domain/editor/editorState'
 import { type Track, type TrackId } from '@/domain/model'
 import { decodeTrack } from '@/domain/track/trackCodec'
+import { isSharedTrack, SHARED_TRACK_READ_ONLY_MESSAGE } from '@/domain/track/trackAccess'
 
 type EditorEdit =
   | { readonly rejection: string }
@@ -20,6 +21,7 @@ export class EditorSession {
   ) {}
 
   apply(previous: EditorState, currentTrack: Track, command: EditorCommand): EditorEdit {
+    if (isSharedTrack(currentTrack)) return { rejection: SHARED_TRACK_READ_ONLY_MESSAGE }
     const result = applyEditorCommand(previous, command)
     if (result.rejection) return { rejection: result.rejection.message }
     const editor = result.state
@@ -72,7 +74,7 @@ export class EditorSession {
 
   /** Only deliberate Save/Save As actions write an editor draft. */
   save(track: Track | null): Persistence<boolean> {
-    return !!track && this.trackStore.save(track)
+    return !!track && !isSharedTrack(track) && this.trackStore.save(track)
   }
 
   /** Compare editable content, not timestamps: undo back to the saved state is clean. */

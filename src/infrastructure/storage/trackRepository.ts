@@ -1,6 +1,7 @@
 import type { KeyValueStore, TrackStore } from '@/application/ports/storage'
 import { asTrackId, type Track, type TrackId } from '@/domain/model'
 import { decodeTrack } from '@/domain/track/trackCodec'
+import { isSharedTrack } from '@/domain/track/trackAccess'
 import { STORAGE_KEYS } from '@/infrastructure/storage/storageKeys'
 
 interface RepositoryDependencies {
@@ -95,6 +96,7 @@ export class BrowserTrackRepository implements TrackStore {
     const normalized = decodeTrack(track, this.dependencies.now())
     if (!normalized) return false
     const index = tracks.findIndex((item) => item.id === normalized.id)
+    if (isSharedTrack(tracks[index])) return false
     if (index >= 0) tracks[index] = normalized
     else tracks.push(normalized)
     const serialized = JSON.stringify(tracks)
@@ -109,7 +111,8 @@ export class BrowserTrackRepository implements TrackStore {
     if (decoded.some((track) => !track)) return false
     const tracks = new Map(this.list().map((track) => [track.id, track]))
     for (const track of decoded) {
-      if (track) tracks.set(track.id, track)
+      if (!track || isSharedTrack(tracks.get(track.id))) return false
+      tracks.set(track.id, track)
     }
     const savedTracks = [...tracks.values()]
     const serialized = JSON.stringify(savedTracks)

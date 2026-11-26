@@ -16,6 +16,7 @@ import { normalizeTerrain } from '@/domain/terrain/terrainField'
 
 export const TRACK_EXPORT_FORMAT = 'trackforge-track'
 export const TRACK_EXPORT_FORMAT_VERSION = 1
+export const MAX_TRACK_EXPORT_CHARS = 2_000_000
 
 interface LegacyTrackElevation {
   readonly firstSegment: number
@@ -177,6 +178,8 @@ export function decodeTrack(value: unknown, now: number): Track | undefined {
     name,
     ...(creator ? { creator } : {}),
     ...(item.origin === 'imported' || item.origin === 'seeded' || item.origin === 'local' ? { origin: item.origin } : {}),
+    ...(item.origin === 'imported' && typeof item.signedSource === 'string' &&
+      item.signedSource.length <= MAX_TRACK_EXPORT_CHARS ? { signedSource: item.signedSource } : {}),
     version: 8,
     points: migratedPoints,
     routeKind: normalizeRouteKind(item.routeKind),

@@ -146,6 +146,22 @@ it('round-trips a validated display name and stable creator ID', () => {
 })
 
 describe('BrowserTrackRepository', () => {
+  it('rejects writing over an imported original and rolls back an entire colliding batch', () => {
+    const storage = new MemoryStore()
+    const repository = new BrowserTrackRepository(storage)
+    const original = { ...createStarterTrack(asTrackId('shared-original'), 10), origin: 'imported' as const }
+    const other = createStarterTrack(asTrackId('personal'), 20)
+    expect(repository.save(original)).toBe(true)
+    expect(repository.save(other)).toBe(true)
+    const reloaded = new BrowserTrackRepository(storage)
+    const before = reloaded.find(original.id)
+    const overwrite = { ...original, origin: 'local' as const, name: 'Replacement' }
+    expect(reloaded.save(overwrite)).toBe(false)
+    expect(reloaded.saveMany([{ ...other, name: 'Batch rename' }, overwrite])).toBe(false)
+    expect(reloaded.find(original.id)).toEqual(before)
+    expect(reloaded.find(other.id)?.name).toBe(other.name)
+  })
+
   it('saves attribution updates in one batch, validates imported metadata and leaves geometry unchanged', () => {
     const storage = new MemoryStore()
     const repository = new BrowserTrackRepository(storage)

@@ -30,6 +30,7 @@ import { createPauseModal } from '@/ui/modals/pauseModal'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
 import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
 import { isSeededTrack } from '@/domain/track/trackCreator'
+import { isSharedTrack } from '@/domain/track/trackAccess'
 import { createToast } from '@/ui/toast'
 import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
@@ -649,7 +650,7 @@ export class DomUiHost implements UiHost {
               purpose: 'rename',
             }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
-        })
+        }, isSharedTrack(state.currentTrack))
     }
   }
 }

@@ -30,7 +30,7 @@ function setup() {
 }
 
 describe('one-time track creator release migration', () => {
-  it('claims every uncredited player track but preserves fixed system attribution and racing identity', () => {
+  it('claims uncredited local tracks and preserves imported originals, system attribution and racing identity', () => {
     const { storage, tracks, preferences, migrate } = setup()
     // Old bundled starters predate authored checkpoint serialization.
     const { recoveryCheckpoints: _markers, autoCheckpoints: _auto, ...builtIn } =
@@ -58,18 +58,20 @@ describe('one-time track creator release migration', () => {
       expect(tracks.save(track)).toBe(true)
     }
     const beforeCourse = courseIdentity(userTrack)
-    expect(migrate()).toEqual({ ok: true, changed: 4 })
+    expect(migrate()).toEqual({ ok: true, changed: 3 })
     expect(storage.get('trackforge-creator-migration-v1')).toBe('1')
 
     const seeded = tracks.find(builtIn.id)
     expect(seeded).toMatchObject({ id: builtIn.id, origin: 'seeded', creator: TRACK_FORGE_CREATOR })
     expect(isSeededTrack(seeded!)).toBe(true)
     expect(tracks.find(official!.id)).toMatchObject({ creator: TRACK_FORGE_CREATOR, origin: 'seeded' })
-    for (const track of [userTrack, oldImported, editedStarter]) {
+    for (const track of [userTrack, editedStarter]) {
       expect(tracks.find(track.id)?.creator).toEqual({ id: 'local-player-id-123', name: 'Player' })
       expect(tracks.find(track.id)?.origin).toBe('local')
       expect(isSeededTrack(tracks.find(track.id)!)).toBe(false)
     }
+    expect(tracks.find(oldImported.id)?.creator).toBeUndefined()
+    expect(tracks.find(oldImported.id)?.origin).toBe('imported')
     expect(courseIdentity(tracks.find(userTrack.id)!)).toBe(beforeCourse)
     expect(tracks.find(userTrack.id)?.raceRevision).toBe(12345)
     expect(tracks.find(userTrack.id)?.updatedAt).toBe(34)

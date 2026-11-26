@@ -2,6 +2,12 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { asTrackId } from '@/domain/model'
 import { shareTrack } from '@/infrastructure/export/trackExport'
+import { parseSharedTrackImport } from '@/application/library/trackImport'
+
+vi.mock('@/infrastructure/storage/trackSigningKeyStore', async () => {
+  const { createTrackSigningKey } = await import('@/application/library/trackSignature')
+  return { getTrackSigningKeys: createTrackSigningKey }
+})
 
 const track = createStarterTrack(asTrackId('share'), 1)
 afterEach(() => vi.unstubAllGlobals())
@@ -11,7 +17,10 @@ it('shares a portable track file with the challenge text', async () => {
   vi.stubGlobal('navigator', { canShare: () => true, share: async (data: ShareData) => { payload = data } })
   expect(await shareTrack(track, 'Beat my time')).toBe(true)
   expect(payload?.text).toBe('Beat my time')
-  expect(payload?.files?.[0]?.name).toMatch(/\.trackforge\.json$/)
+  const file = payload?.files?.[0]
+  expect(file?.name).toMatch(/\.trackforge\.json$/)
+  const content = await file?.text()
+  expect(await parseSharedTrackImport(content ?? '')).toMatchObject({ ok: true, signedSource: content })
 })
 
 it('returns false when sharing fails and true when the user cancels', async () => {

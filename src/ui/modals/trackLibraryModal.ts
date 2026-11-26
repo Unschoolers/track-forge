@@ -1,5 +1,6 @@
 import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
 import { isSeededTrack } from '@/domain/track/trackCreator'
+import { isSharedTrack } from '@/domain/track/trackAccess'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { AppSnapshot } from '@/application/appState'
 import { timeMedal } from '@/application/race/raceRecords'
@@ -63,7 +64,7 @@ export function createTrackLibraryModal(
     cupSelection ? 'Choose a track to add to your Cup.' : nearbyHosting ? 'Select a circuit to open your nearby room.'
       : nearbySelection ? 'Pick a track for everyone in the room.'
         : race ? 'Choose a circuit to race.'
-          : 'Tap a track to edit. Star your favorites.',
+          : 'Tap a track to open it. Star your favorites.',
     actions.close,
     'track-library-modal',
   )
@@ -71,12 +72,14 @@ export function createTrackLibraryModal(
   const list = element('div', 'track-list')
 
   const cardFor = (track: Track, official = false): HTMLElement => {
+    const readOnly = isSharedTrack(track)
     const path = geometry.get(track).path
     const validation = validateTrack(track, path.totalLength)
     const card = element('article', `track-card${race ? '' : ' edit'}${track.id === state.currentTrack?.id ? ' selected' : ''}`)
     const select = button('', race ? `select-race-${track.id}` : `select-edit-${track.id}`,
       () => race ? actions.selectForRace(track.id) : actions.selectForEdit(track.id), 'track-card-select')
-    select.setAttribute('aria-label', `${race ? cupSelection ? 'Add' : nearbyHosting ? 'Host' : 'Race' : 'Edit'} ${track.name}`)
+    const action = race ? cupSelection ? 'Add' : nearbyHosting ? 'Host' : 'Race' : readOnly ? 'View' : 'Edit'
+    select.setAttribute('aria-label', `${action} ${track.name}`)
     select.disabled = race && !validation.ready
 
     const copy = element('span', 'track-card-copy')
@@ -89,6 +92,7 @@ export function createTrackLibraryModal(
     dot.setAttribute('aria-label', `${ENVIRONMENT_NAMES[environment]} environment`)
     creator.append(dot, element('span', 'track-creator-name', track.creator?.name ?? (official ? 'Track Forge' : 'Unknown creator')))
     copy.append(creator)
+    if (readOnly) copy.append(element('span', 'track-card-creator', 'Shared original · read-only'))
     if (!validation.ready) {
       const status = element('span', 'track-card-unavailable',
         validation.code === 'missing-checkpoints' ? 'INCOMPLETE · Add checkpoints' : validation.message)
@@ -115,8 +119,8 @@ export function createTrackLibraryModal(
       trigger.title = `More actions for ${track.name}`
       const menu = element('div', 'track-card-menu')
       if (racePicker) {
-        const edit = iconAction('EDIT', 'edit', `edit-${track.id}`, () => { options.open = false; actions.selectForEdit(track.id) })
-        edit.setAttribute('aria-label', `Edit ${track.name}`)
+        const edit = iconAction(readOnly ? 'VIEW' : 'EDIT', 'edit', `edit-${track.id}`, () => { options.open = false; actions.selectForEdit(track.id) })
+        edit.setAttribute('aria-label', `${readOnly ? 'View' : 'Edit'} ${track.name}`)
         menu.append(edit)
       }
       if (!isSeededTrack(track)) {

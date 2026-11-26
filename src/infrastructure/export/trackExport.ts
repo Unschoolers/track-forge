@@ -2,22 +2,32 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { Track } from '@/domain/model'
 import { isSeededTrack } from '@/domain/track/trackCreator'
 import { TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { serializeSignedTrack } from '@/application/library/trackSignature'
+import { getTrackSigningKeys } from '@/infrastructure/storage/trackSigningKeyStore'
 
 const nativeExporter = registerPlugin<{
   save(options: { filename: string; content: string }): Promise<{ saved: boolean }>
   share(options: { filename: string; content: string; text?: string }): Promise<{ shared: boolean }>
 }>('TrackExport')
 
-export function serializeTrack(track: Track): { filename: string; content: string } {
+function trackFilename(track: Track): string {
   const name = track.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'track'
+  return `${name}.trackforge.json`
+}
+
+export function serializeTrack(track: Track): { filename: string; content: string } {
   return {
-    filename: `${name}.trackforge.json`,
+    filename: trackFilename(track),
     content: JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION, track }),
   }
 }
 
-export function exportTrack(track: Track): Promise<boolean> {
-  return saveJsonFile(serializeTrack(track))
+export function serializeSharedTrack(track: Track): Promise<string> {
+  return serializeSignedTrack(track, getTrackSigningKeys, track.signedSource)
+}
+
+export async function exportTrack(track: Track): Promise<boolean> {
+  return saveJsonFile({ filename: trackFilename(track), content: await serializeSharedTrack(track) })
 }
 
 export async function saveJsonFile(file: { filename: string; content: string }): Promise<boolean> {
@@ -36,7 +46,7 @@ export async function saveJsonFile(file: { filename: string; content: string }):
 /** Returns false when sharing is unavailable so the caller can offer a file export. */
 export async function shareTrack(track: Track, text?: string): Promise<boolean> {
   if (isSeededTrack(track)) throw new Error('Built-in tracks cannot be shared.')
-  const file = serializeTrack(track)
+  const file = { filename: trackFilename(track), content: await serializeSharedTrack(track) }
   if (Capacitor.isNativePlatform()) return (await nativeExporter.share({ ...file, ...(text === undefined ? {} : { text }) })).shared
   const attachment = new File([file.content], file.filename, { type: 'application/json' })
   try {

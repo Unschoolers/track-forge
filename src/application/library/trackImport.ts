@@ -6,13 +6,13 @@ import { CrossingWorkLimitError } from '@/domain/track/crossings'
 import { roadPointsForPreview } from '@/domain/track/roadLength'
 import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
 import { MAX_SCENERY_PROPS, normalizeSceneryProps } from '@/domain/track/trackEnvironment'
-import { decodeTrack, TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { decodeTrack, MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { SIGNED_TRACK_FORMAT_VERSION, verifyTrackSignature } from './trackSignature'
 
 export type TrackImportResult =
-  | { readonly ok: true; readonly track: Track }
+  | { readonly ok: true; readonly track: Track; readonly signedSource?: string }
   | { readonly ok: false; readonly message: string }
 
-const MAX_FILE_CHARS = 2_000_000
 const MAX_POINTS = 2_000
 const MAX_TREES = 5_000
 const MAX_CROSSING_PAIR_CHECKS = 100_000
@@ -52,21 +52,48 @@ function validSharedTerrain(value: unknown): boolean {
 
 /** Shared-file imports are treated as untrusted; the library supplies a fresh ID. */
 export function parseTrackImport(content: string): TrackImportResult {
-  if (content.length > MAX_FILE_CHARS) {
+  const parsed = parseTrackFile(content)
+  return parsed.ok ? decodeTrackExport(parsed.envelope) : parsed
+}
+
+function parseTrackFile(content: string):
+  { readonly ok: true; readonly envelope: Record<string, unknown> } | { readonly ok: false; readonly message: string } {
+  if (content.length > MAX_TRACK_EXPORT_CHARS) {
     return { ok: false, message: 'Track file is too large to import.' }
   }
   let parsed: unknown
   try { parsed = JSON.parse(content) as unknown }
   catch { return { ok: false, message: 'Invalid track JSON file.' } }
-  return decodeTrackExport(parsed)
+  const envelope = object(parsed)
+  return envelope?.format === TRACK_EXPORT_FORMAT
+    ? { ok: true, envelope }
+    : { ok: false, message: 'Not a supported Track Forge export.' }
+}
+
+export async function parseSharedTrackImport(content: string): Promise<TrackImportResult> {
+  const parsed = parseTrackFile(content)
+  if (!parsed.ok) return parsed
+  const { envelope } = parsed
+  if (envelope.formatVersion !== SIGNED_TRACK_FORMAT_VERSION) return decodeTrackExport(envelope)
+  if (!globalThis.crypto?.subtle) return { ok: false, message: 'Track signature verification is unavailable on this device.' }
+  if (!await verifyTrackSignature(envelope)) {
+    return { ok: false, message: 'Invalid track signature. The original file is required.' }
+  }
+  const decoded = decodeTrackPayload(envelope.track)
+  return decoded.ok ? { ...decoded, signedSource: content } : decoded
 }
 
 export function decodeTrackExport(parsed: unknown): TrackImportResult {
   const envelope = object(parsed)
-  if (envelope?.format !== TRACK_EXPORT_FORMAT || envelope.formatVersion !== TRACK_EXPORT_FORMAT_VERSION) {
+  if (envelope?.format !== TRACK_EXPORT_FORMAT || envelope.formatVersion !== TRACK_EXPORT_FORMAT_VERSION ||
+      Object.hasOwn(envelope, 'signature')) {
     return { ok: false, message: 'Not a supported Track Forge export.' }
   }
-  const source = object(envelope.track)
+  return decodeTrackPayload(envelope.track)
+}
+
+function decodeTrackPayload(payload: unknown): TrackImportResult {
+  const source = object(payload)
   if (!source) return { ok: false, message: 'Track contents are missing.' }
   const { points, trees } = source
   if (typeof source.name !== 'string' || !source.name.trim() ||
@@ -87,8 +114,10 @@ export function decodeTrackExport(parsed: unknown): TrackImportResult {
     return { ok: false, message: 'The shared track has invalid or oversized geometry.' }
   }
   const now = Date.now()
+  const localSource = { ...source }
+  delete localSource.signedSource
   const track = decodeTrack({
-    ...source,
+    ...localSource,
     id: 'untrusted-shared-track',
     raceRevision: now,
     createdAt: now,

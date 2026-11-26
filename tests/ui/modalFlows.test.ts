@@ -259,6 +259,22 @@ describe('modal application flows', () => {
     host.destroy()
   })
 
+  it('shows Save As and view controls for a shared original', () => {
+    const { root, port, host } = setup({
+      ...state({ type: 'editor-menu' }),
+      mode: 'editor', currentTrack: { ...ready, origin: 'imported' },
+    })
+    expect(root.querySelector('.status-pill')?.textContent).toContain('read-only')
+    for (const action of ['save-track', 'clear-track', 'menu-save', 'menu-rename', 'menu-environment', 'undo', 'expand-track']) {
+      expect(root.querySelector(`[data-action="${action}"]`)).toBeNull()
+    }
+    expect(root.querySelector('[data-action="zoom-in"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="save-as-track"]')?.getAttribute('aria-label')).toBe('Save as new track')
+    root.querySelector<HTMLButtonElement>('[data-action="menu-save-as"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-track-name', purpose: 'save-as' })
+    host.destroy()
+  })
+
   it('offers RACE TRACK in the editor menu without starting racing directly', () => {
     const { root, port } = setup({ ...state({ type: 'editor-menu' }), mode: 'editor' })
     const button = root.querySelector<HTMLButtonElement>('[data-action="menu-race"]')

@@ -2,12 +2,18 @@ import { assert } from 'vitest'
 import { createRace } from '@/domain/race/raceFactory'
 import { decodeTrack } from '@/domain/track/trackCodec'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import type { CarId } from '@/domain/model'
+import type { CarId, Track } from '@/domain/model'
+import { createTrackSigningKey, serializeSignedTrack } from '@/application/library/trackSignature'
 import trackExport from './figureEight.trackforge.json'
 import { requireFixture } from './requireFixture'
 
 export const nearbyTrack = requireFixture(decodeTrack(trackExport, 1))
 export const nearbyPath = new TrackGeometryService().get(nearbyTrack).path
+
+export function nearbyTestSigner(): (track: Track) => Promise<string> {
+  let keys: Promise<CryptoKeyPair> | undefined
+  return track => serializeSignedTrack(track, () => keys ??= createTrackSigningKey(), track.signedSource)
+}
 
 /** Valid gameplay vehicle used by orchestration and wire-contract tests. */
 export function nearbyCar(car: CarId, x: number, z = 0, structureRunId: string | null = null) {

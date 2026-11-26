@@ -1,4 +1,4 @@
-import { parseTrackImport } from '@/application/library/trackImport'
+import { parseSharedTrackImport } from '@/application/library/trackImport'
 import type { Track } from '@/domain/model'
 import { TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
 import { Packet } from './raceWire'
@@ -8,8 +8,14 @@ const MAX_TRACK_BYTES = 2_000_000
 const MAX_COMPRESSED_BYTES = MAX_TRACK_BYTES + 4096
 export const MAX_TRACK_CHUNKS = Math.ceil(MAX_COMPRESSED_BYTES / CHUNK_BYTES)
 
-export async function packTrack(track: Track): Promise<Uint8Array[]> {
-  const input = JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION, track })
+export async function packTrack(
+  track: Track,
+  serialize?: (track: Track) => Promise<string>,
+): Promise<Uint8Array[]> {
+  // Race staging needs the geometry only. A share carries the original signature.
+  const { signedSource: _signedSource, ...geometry } = track
+  const input = serialize ? await serialize(track) :
+    JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION, track: geometry })
   const bytes = new TextEncoder().encode(input)
   if (bytes.length > MAX_TRACK_BYTES) throw new Error('This track is too large for Nearby Race.')
   const packed = new Uint8Array(await new Response(
@@ -54,9 +60,9 @@ export class TrackReceiver {
         if (size > MAX_TRACK_BYTES) throw new Error('Nearby track exceeds the maximum size.')
         content += decoder.decode(value, { stream: true })
       }
-      const imported = parseTrackImport(content + decoder.decode())
+      const imported = await parseSharedTrackImport(content + decoder.decode())
       if (!imported.ok) throw new Error(imported.message)
-      return imported.track
+      return imported.signedSource ? { ...imported.track, signedSource: imported.signedSource } : imported.track
     } finally {
       await reader.cancel()
     }

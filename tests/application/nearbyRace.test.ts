@@ -6,7 +6,7 @@ import { decodeControl, encodeControl } from '@/application/multiplayer/controlP
 import { RaceSession } from '@/application/race/raceSession'
 import { createRace } from '@/domain/race/raceFactory'
 import { gridPositionsForPlayer } from '@/domain/race/startGrid'
-import { nearbyCar as makeCar, nearbyPath as path, nearbyTrack as track } from '../fixtures/nearbyRace'
+import { nearbyCar as makeCar, nearbyPath as path, nearbyTrack as track, nearbyTestSigner } from '../fixtures/nearbyRace'
 import { NearbyNetwork } from '../fixtures/nearbyNetwork'
 
 async function readyEveryone(host: NearbyRace, guests: readonly NearbyRace[]): Promise<void> {
@@ -806,7 +806,7 @@ describe('Nearby Arcade', () => {
 describe('Nearby track sharing and rematches', () => {
   it('keeps sharing capped at three connected guests when racing supports eight', async () => {
     const network = new NearbyNetwork()
-    const host = new NearbyRace(network.endpoint('host'), () => true)
+    const host = new NearbyRace(network.endpoint('host'), () => true, undefined, nearbyTestSigner())
     const guests = Array.from({ length: 4 }, (_, index) =>
       new NearbyRace(network.endpoint(`guest-${index}`), () => true))
     try {
@@ -833,7 +833,7 @@ describe('Nearby track sharing and rematches', () => {
 
   it('shares a track without starting a race and waits for explicit save confirmation', async () => {
     const network = new NearbyNetwork()
-    const host = new NearbyRace(network.endpoint('sender'), () => true)
+    const host = new NearbyRace(network.endpoint('sender'), () => true, undefined, nearbyTestSigner())
     // A draft circuit may be shared even when it is not yet race-ready.
     const recipient = new NearbyRace(network.endpoint('friend'), () => false)
     const racer = new NearbyRace(network.endpoint('racer'), () => true)
@@ -847,6 +847,7 @@ describe('Nearby track sharing and rematches', () => {
       recipient.connect('sender')
       await vi.waitFor(() => expect(recipient.snapshot().phase).toBe('share-review'), { interval: 5 })
       expect(recipient.pendingSharedTrack()?.points).toEqual(track.points)
+      expect(recipient.pendingSharedTrack()?.signedSource).toBeTypeOf('string')
       expect(recipient.snapshot().incomingTrack).toBe(track.name)
       expect(host.snapshot().sharedCount).toBe(0)
       recipient.respondToShare(true)

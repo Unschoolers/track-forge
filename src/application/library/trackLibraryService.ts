@@ -9,6 +9,7 @@ import {
   type TrackNameResult,
 } from '@/application/library/trackName'
 import type { Track, TrackId } from '@/domain/model'
+import { isSharedTrack, SHARED_TRACK_READ_ONLY_MESSAGE } from '@/domain/track/trackAccess'
 import { isSeededTrack, type TrackCreator } from '@/domain/track/trackCreator'
 import { allocateUniqueTrackName } from '@/application/library/uniqueTrackName'
 import { DEFAULT_TRACK_ENVIRONMENT_ID } from '@/domain/track/trackEnvironment'
@@ -63,15 +64,16 @@ export class TrackLibraryService {
   }
 
   importShared(source: Track): Persistence<TrackMutationResult> {
-    // A shared track is always a copy. Never overwrite the sender's or
-    // receiver's existing circuit, scores or best-time ghosts.
+    // The read-only original gets a separate library entry and race records.
     const now = this.dependencies.now()
     const name = allocateUniqueTrackName(
       source.name,
       this.dependencies.trackStore.list().map(track => track.name),
     )
+    const id = this.dependencies.createId()
+    if (this.dependencies.trackStore.find(id)) return { ok: false, message: 'Shared track could not be saved.' }
     const track: Track = {
-      ...source, id: this.dependencies.createId(), name, origin: 'imported',
+      ...source, id, name, origin: 'imported',
       createdAt: now, updatedAt: now, raceRevision: now,
     }
     return this.persist(track, 'Shared track could not be saved.')
@@ -81,13 +83,20 @@ export class TrackLibraryService {
   saveAs(source: Track, value: string, creator?: TrackCreator): Persistence<TrackMutationResult> {
     const validated = this.validateName(value)
     if (!validated.ok) return validated
+    const id = this.dependencies.createId()
+    if (id === source.id || this.dependencies.trackStore.find(id)) {
+      return { ok: false, message: 'Track copy could not be saved.' }
+    }
+    const { creator: sourceCreator, signedSource, ...course } = source
+    void signedSource
+    const copyCreator = creator ?? (isSharedTrack(source) ? undefined : sourceCreator)
     const now = this.dependencies.now()
     const copy: Track = {
-      ...source,
-      id: this.dependencies.createId(),
+      ...course,
+      id,
       name: validated.name,
       origin: 'local',
-      ...(creator ? { creator } : {}),
+      ...(copyCreator ? { creator: copyCreator } : {}),
       createdAt: now,
       updatedAt: now,
       raceRevision: now,
@@ -98,7 +107,7 @@ export class TrackLibraryService {
   /** Update only tracks with this installation's stable creator ID. */
   recredit(creator: TrackCreator): Persistence<{ readonly ok: boolean; readonly count: number }> {
     const updated = this.dependencies.trackStore.list()
-      .filter((track) => !isSeededTrack(track) && track.creator?.id === creator.id)
+      .filter((track) => !isSharedTrack(track) && !isSeededTrack(track) && track.creator?.id === creator.id)
       .filter((track) => track.creator?.name !== creator.name || !track.creator)
       .map((track) => ({ ...track, creator }))
     if (updated.length === 0) return { ok: true, count: 0 }
@@ -137,6 +146,7 @@ export class TrackLibraryService {
 
   /** Validate a rename without persisting an editor draft. */
   renameDraft(source: Track, value: string): TrackMutationResult {
+    if (isSharedTrack(source)) return { ok: false, message: SHARED_TRACK_READ_ONLY_MESSAGE }
     const validated = this.validateName(value, source.id)
     return validated.ok
       ? { ok: true, track: { ...source, name: validated.name } }
@@ -148,6 +158,7 @@ export class TrackLibraryService {
     if (!existing) {
       return { ok: false, message: 'Track unavailable.' }
     }
+    if (isSharedTrack(existing)) return { ok: false, message: SHARED_TRACK_READ_ONLY_MESSAGE }
     const validated = this.validateName(value, id)
     if (!validated.ok) return validated
     if (validated.name === existing.name) {
