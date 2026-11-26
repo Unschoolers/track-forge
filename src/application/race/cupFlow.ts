@@ -49,7 +49,8 @@ export class CupFlow {
       case 'cup-add-track':
         if (this.state.overlay.type === 'cup' &&
             (this.state.cupProgress?.lineup?.length ?? DEFAULT_CUP_TRACK_IDS.length) < 12) {
-          this.update({ ...this.state, overlay: { type: 'track-library', purpose: 'cup' }, ...this.dependencies.librarySnapshot(), notice: null })
+          this.update({ ...this.state, overlay: { type: 'track-library', purpose: 'cup',
+            ...(this.state.overlay.returnTo ? { cupReturnTo: this.state.overlay.returnTo } : {}) }, ...this.dependencies.librarySnapshot(), notice: null })
         }
         break
       case 'cup-remove-track': {

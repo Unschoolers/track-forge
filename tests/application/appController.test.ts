@@ -234,6 +234,31 @@ describe('AppController', () => {
     controller.destroy()
   })
 
+  it.each(['solo', 'nearby'] as const)('preserves %s Cup entry context when adding or cancelling a track', (mode) => {
+    const network = new NearbyNetwork()
+    const nearby = new NearbyRace(network.endpoint('host'), () => true)
+    const { controller, raceSession } = setup(undefined, false, undefined, nearby)
+    const expected = mode === 'nearby' ? { type: 'cup', returnTo: 'nearby' } : { type: 'cup' }
+    try {
+      if (mode === 'nearby') controller.dispatch({ type: 'open-nearby' })
+      controller.dispatch({ type: 'open-cup' })
+      expect(controller.snapshot().overlay).toEqual(expected)
+      controller.dispatch({ type: 'cup-add-track' })
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay).toEqual(expected)
+      controller.dispatch({ type: 'cup-add-track' })
+      controller.dispatch({ type: 'select-track-for-race', id: asTrackId('starter') })
+      expect(controller.snapshot().overlay).toEqual(expected)
+      expect(controller.snapshot().cupProgress?.lineup).toContain('starter')
+      expect(raceSession.start).not.toHaveBeenCalled()
+      controller.dispatch({ type: 'close-overlay' })
+      expect(controller.snapshot().overlay).toEqual({ type: mode === 'nearby' ? 'nearby' : 'none' })
+    } finally {
+      controller.destroy()
+      nearby.destroy()
+    }
+  })
+
   it('hosts only after selecting a race-ready track, never starts a solo race', async () => {
     const advertise = vi.fn(async (_room: string) => undefined)
     const transport: NearbyTransport = {

@@ -15,6 +15,10 @@
 
 - From **Nearby Race → Host Cup** or the Cup builder, the host opens one Nearby room
   using the current ordered lineup. Guests find/join it the usual way.
+- Entering from Nearby makes **Host Nearby Cup** the primary action; entering
+  from Home keeps **Start New Cup** primary. Adding or cancelling a track
+  preserves the entry context, including the Back destination. Solo resume
+  and start remain available as secondary actions when hosting.
 - The host starts round one once guests join. After all participants finish, **Next Cup Race**
   sends the next track to everyone via the existing reliable prepare/track-transfer lifecycle;
   the room is not dropped between rounds.
