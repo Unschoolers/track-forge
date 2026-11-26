@@ -1,0 +1,14 @@
+/* Reference composition, not a production page. */
+.tf-menu-media::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,#080b12ba,#080b1233 35%,#080b12e0); }
+.lab-eyebrow { margin: 0; font-size: .7rem; font-weight: 700; letter-spacing: .16em; color: #dbe4ee; }
+.lab-hero { min-height: 100%; display: grid; align-content: center; justify-items: center; gap: clamp(1rem, 4vw, 3rem); }
+.lab-copy { width: min(100%, 36rem); text-align: center; }
+.lab-title { font-size: clamp(2.7rem, 8vw, 6rem); letter-spacing: -.07em; line-height: .96; margin: .5rem 0; }
+.lab-description { max-width: 30rem; margin: .8rem auto; color: #e0e7ed; line-height: 1.45; }
+.lab-car { display: block; width: min(80%, 32rem); max-height: 40dvh; object-fit: contain; filter: drop-shadow(0 16px 24px #000a); }
+.lab-status { margin: 0; font-size: .75rem; color: #dbe4ee; text-align: center; }
+@media (min-width: 720px) and (orientation: landscape) {
+  .lab-hero { grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: center; }
+  .lab-copy { text-align: left; }
+  .lab-description { margin-left: 0; }
+}
