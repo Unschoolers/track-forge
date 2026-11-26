@@ -427,7 +427,10 @@ function advanceRace(
   let playerGateFractions: number[] | undefined
   const tickProgress = advanceRaceTickProgressAndRecovery(
     state, moved, held, playerInput, controls, dt, elapsed, events,
-    fraction => (playerGateFractions ??= []).push(fraction),
+    fraction => {
+      playerGateFractions ??= []
+      playerGateFractions.push(fraction)
+    },
   )
   let vehicles = tickProgress.vehicles
   const missedCheckpoint = tickProgress.missedCheckpoint

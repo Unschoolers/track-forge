@@ -370,13 +370,12 @@ export class RaceSession implements RaceSessionPort {
         this.startsAt === undefined) return
     const previouslyMissedGate = state.missedCheckpoint?.gate
 
+    const nearbyElapsed = this.startsAt === undefined ? undefined : (this.monotonicNow() - this.startsAt) / 1000
     let runningTime = deltaSeconds
     let countdownChanged = false
     if (state.phase === 'countdown') {
       const previousCue = countdownCue(state.countdown)
-      const remaining = this.startsAt === undefined
-        ? state.countdown - deltaSeconds
-        : (this.startsAt - this.monotonicNow()) / 1000
+      const remaining = nearbyElapsed === undefined ? state.countdown - deltaSeconds : -nearbyElapsed
       const countdown = Math.max(0, remaining)
       const cue = countdownCue(countdown)
       if (cue !== previousCue) {
@@ -391,7 +390,14 @@ export class RaceSession implements RaceSessionPort {
     const retainedTime = Math.min(runningTime, MAX_CATCH_UP)
     // Account for wall time dropped by the catch-up cap before timestamping
     // the retained ticks. A peer cannot gain race time by dropping frames.
-    if (this.startsAt !== undefined) this.nearbyTimingOffset += runningTime - retainedTime
+    if (nearbyElapsed !== undefined) {
+      this.nearbyTimingOffset += runningTime - retainedTime
+      // The frame loop can reset its delta when the app resumes. Restore a
+      // missed wall-clock interval without reacting to ordinary frame jitter.
+      const projectedElapsed = state.elapsed + this.remainder + retainedTime + this.nearbyTimingOffset
+      const unreportedTime = nearbyElapsed - projectedElapsed
+      if (unreportedTime >= 3 * RACE_TICK_SECONDS) this.nearbyTimingOffset += unreportedTime
+    }
     this.remainder += retainedTime
     const events: ReturnType<RaceStep>['events'][number][] = []
     let stepped = false

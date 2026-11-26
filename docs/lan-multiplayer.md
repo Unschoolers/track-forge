@@ -38,8 +38,9 @@ sample's age includes clock-offset error, not an exact one-way latency.
 
 Nearby race HUD, lap splits and finish use the timeline from synchronized GO.
 Lap and finish timestamps interpolate the accepted crossing within its 60 Hz
-physics tick and account for wall time dropped by capped catch-up. Local physics
-and offline timing retain their existing rules. Clock offset error and the
+physics tick and account for wall time dropped by capped catch-up or a frame
+clock reset after device suspension. Local physics and offline timing retain
+their existing rules. Clock offset error and the
 within-tick motion estimate limit accuracy. Diagnostics retain simulation
 elapsed and the monotonic time of the frame that detected the finish for
 comparison. During racing, guests repeat five probes every 15 seconds;
