@@ -38,22 +38,22 @@ export function createRaceSetupModal(
   )
   const lighting = state.raceLighting ?? state.currentTrack?.lighting ?? 'day'
   const lightingSection = element('section', 'setup-section')
-  lightingSection.append(element('h3', 'setup-label', 'LIGHTING'))
+  lightingSection.append(element('h3', 'setup-label', 'Lighting'))
   const lightingRow = element('div', 'choice-row')
   for (const value of ['day', 'night'] as const) {
-    const choice = button(value.toUpperCase(), `lighting-${value}`, () => actions.lighting(value), `setup-choice${value === lighting ? ' active' : ''}`)
+    const choice = button(value === 'day' ? 'Day' : 'Night', `lighting-${value}`, () => actions.lighting(value), `setup-choice${value === lighting ? ' active' : ''}`)
     choice.setAttribute('aria-pressed', String(value === lighting))
     lightingRow.append(choice)
   }
   lightingSection.append(lightingRow)
   const mode = element('section', 'setup-section')
-  mode.append(element('h3', 'setup-label', 'RACE MODE'))
+  mode.append(element('h3', 'setup-label', 'Race Mode'))
   const modeRow = element('div', 'choice-row race-mode-row')
   const modes = openRoute
-    ? [['normal', 'RACE AI'], ['time-trial', 'TIME TRIAL'], ['ghost', 'GHOST RACE'],
-      ...(BOOST_PRACTICE_AVAILABLE ? [['boost-practice', 'BOOST PRACTICE']] as const : [])] as const
-    : [['normal', 'NORMAL RACE'], ['ghost', 'GHOST RACE'],
-      ...(BOOST_PRACTICE_AVAILABLE ? [['boost-practice', 'BOOST PRACTICE']] as const : [])] as const
+    ? [['normal', 'Race AI'], ['time-trial', 'Time Trial'], ['ghost', 'Ghost Race'],
+      ...(BOOST_PRACTICE_AVAILABLE ? [['boost-practice', 'Boost Practice']] as const : [])] as const
+    : [['normal', 'Normal Race'], ['ghost', 'Ghost Race'],
+      ...(BOOST_PRACTICE_AVAILABLE ? [['boost-practice', 'Boost Practice']] as const : [])] as const
   for (const [id, label] of modes) {
     const choice = button(label, `mode-${id}`,
       () => actions.preferences({ ...state.preferences, raceMode: id,
@@ -88,11 +88,11 @@ export function createRaceSetupModal(
     sections: [lightingSection, mode],
   })
   frame.footer.append(
-    button('BACK', 'setup-back', actions.close, 'button'),
-    button('OPTIONS', 'setup-options', actions.options, 'button'),
+    button('Back', 'setup-back', actions.close, 'button'),
+    button('Options', 'setup-options', actions.options, 'button'),
     button(
-      raceMode === 'boost-practice' ? 'START BOOST PRACTICE'
-        : raceMode === 'ghost' ? 'START GHOST RACE' : raceMode === 'time-trial' ? 'START TIME TRIAL' : 'START RACE',
+      raceMode === 'boost-practice' ? 'Start Boost Practice'
+        : raceMode === 'ghost' ? 'Start Ghost Race' : raceMode === 'time-trial' ? 'Start Time Trial' : 'Start Race',
       'setup-start',
       actions.start,
       'button button-primary',
