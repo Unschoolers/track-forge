@@ -30,3 +30,12 @@ CI: JavaScript transport-selection/component regression tests, TypeScript/lint, 
 6. Restart/replace the EXE; saves and profiles survive. Verify layout fills a widescreen desktop and keyboard input works.
 
 The LAN transport is local-only; it is *not* an internet multiplayer server. Rollback removes the native LAN adapters and connection selector while preserving the prior Android Nearby plugin and desktop offline game.
+
+## Remote car presentation
+
+Both transports share a receiver-local interpolation buffer. Start at 100 ms,
+then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
+Grow quickly when updates are irregular, shrink gradually on a healthy stream,
+and never rewind the presentation clock when the buffer grows. Existing recovery
+cuts, bounded extrapolation and two-second expiry remain unchanged. Verify on
+matched device captures; synthetic timing tests are not radio latency evidence.

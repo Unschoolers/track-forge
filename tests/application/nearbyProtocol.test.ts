@@ -71,6 +71,45 @@ describe('Nearby wire and track transfer contracts', () => {
     expect(ghost.pose(3161)).toBeNull()
   })
 
+  it('reduces presentation delay on a stable stream and grows it under jitter without rewinding', () => {
+    const ghost = new RemoteGhost('red')
+    let now = 1000
+    let sequence = 0
+    const receive = (gap: number) => {
+      now += gap
+      const packet = decodePose(encodePose(1, sequence++, 0, makeCar('red', (now - 1000) / 10)))
+      assert(packet)
+      expect(ghost.receive(packet, now)).toBe(true)
+    }
+    receive(0)
+    for (let i = 0; i < 40; i++) receive(33)
+    const stable = ghost.pose(now)
+    assert(stable)
+    expect(now - stable.t).toBeGreaterThanOrEqual(49)
+    expect(now - stable.t).toBeLessThan(60)
+
+    // Simulate a missed update and a late arrival; the buffer grows but the
+    // presentation timeline must not move backwards at the same display time.
+    const before = ghost.pose(now + 100)
+    assert(before)
+    receive(100)
+    const after = ghost.pose(now)
+    assert(after)
+    expect(after.t).toBeGreaterThanOrEqual(before.t)
+    for (let i = 0; i < 12; i++) {
+      receive(i % 2 === 0 ? 100 : 20)
+      ghost.pose(now)
+    }
+    const jittered = ghost.pose(now)
+    assert(jittered)
+    expect(now - jittered.t).toBeGreaterThan(90)
+    expect(now - jittered.t).toBeLessThanOrEqual(150)
+    for (let i = 0; i < 80; i++) { receive(33); ghost.pose(now) }
+    const recovered = ghost.pose(now)
+    assert(recovered)
+    expect(now - recovered.t).toBeLessThan(60)
+  })
+
   it('round-trips a 19-byte pose and cuts interpolation on a recovery', () => {
     const ghost = new RemoteGhost('red')
     const packet = (sequence: number, reset: number, x: number, z: number, bridge: boolean) => {
