@@ -23,6 +23,10 @@ export interface BitmapTiles {
   image(tile: GroundTile): HTMLCanvasElement
 }
 
+export interface BakeableBitmapTiles extends BitmapTiles {
+  all(): readonly GroundTile[]
+}
+
 /** Index static geometry into world tiles; each short quad or bank segment
  * belongs only to the tiles it intersects. Preserve original paint order. */
 export function indexBitmapItems<T>(items: readonly T[], points: (item: T) => readonly Vector2[], padding = 0): Map<string, T[]> {
@@ -50,11 +54,21 @@ export function indexBitmapItems<T>(items: readonly T[], points: (item: T) => re
   return index
 }
 
-class CachedBitmapTiles<T> implements BitmapTiles {
+class CachedBitmapTiles<T> implements BakeableBitmapTiles {
   private readonly cache = new Map<string, HTMLCanvasElement>()
 
   constructor(private readonly index: ReadonlyMap<string, readonly T[]>,
     private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[], tile: GroundTile) => void) {}
+
+  all(): readonly GroundTile[] {
+    return Array.from(this.index.keys(), key => {
+      const [x, y] = key.split(':').map(Number)
+      if (x === undefined || y === undefined || !Number.isSafeInteger(x) || !Number.isSafeInteger(y)) {
+        throw new Error('Invalid bitmap tile index')
+      }
+      return { x, y, variant: 0 }
+    })
+  }
 
   visible(view: GroundViewport, bounds = groundViewportBounds(view)): readonly GroundTile[] {
     // Preserve the inexpensive vector overview at extreme zooms. Texture
@@ -139,7 +153,7 @@ function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentB
   }
 }
 
-function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
+function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BakeableBitmapTiles {
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
   const index = indexBitmapItems(quads, quad => quad.road)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
@@ -157,7 +171,7 @@ export function bridgeBitmapPrimitives(primitives: readonly BridgePrimitive[], a
     (p.kind === 'surface' || p.kind === 'marking' || p.kind === 'wall'))
 }
 
-function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean): BitmapTiles | undefined {
+function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean): BakeableBitmapTiles | undefined {
   const items = bridgeBitmapPrimitives(primitives, approach)
   if (items.length === 0) return undefined
   const index = indexBitmapItems(items, p => p.kind === 'surface' && p.roadQuad ? p.roadQuad.edge : 'polygon' in p ? p.polygon : [p.start, p.end], 5)
@@ -360,15 +374,15 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   }
 }
 
-function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BitmapTiles {
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BakeableBitmapTiles {
   return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items, tile) => paintTerrainBitmap(context, items, art, tile))
 }
 
 export interface EnvironmentBitmapLayers {
-  readonly road: BitmapTiles
-  readonly terrain: BitmapTiles
-  readonly bridgeApproach: BitmapTiles | undefined
-  readonly bridgeDeck: BitmapTiles | undefined
+  readonly road: BakeableBitmapTiles
+  readonly terrain: BakeableBitmapTiles
+  readonly bridgeApproach: BakeableBitmapTiles | undefined
+  readonly bridgeDeck: BakeableBitmapTiles | undefined
 }
 
 export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain'): EnvironmentBitmapLayers | undefined {
