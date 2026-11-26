@@ -1,4 +1,6 @@
 import type Phaser from 'phaser'
+import { ROAD_GEOMETRY } from '@/domain/config'
+import type { Vector2 } from '@/domain/model'
 import type { EditorState } from '@/domain/editor/editorState'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 
@@ -111,4 +113,28 @@ export function renderEditorOverlay(
     graphics.closePath()
     graphics.strokePath()
   }
+}
+
+
+export function renderRoadPointPreview(
+  graphics: Phaser.GameObjects.Graphics,
+  spans: readonly (readonly Vector2[])[],
+  point: Vector2,
+  zoom: number,
+): void {
+  const scale = 1 / Math.max(0.01, zoom)
+  const first = spans[0]?.[0]
+  if (first) {
+    graphics.lineStyle(Math.max(ROAD_GEOMETRY.surfaceWidth, 8 * scale), 0x54d6bf, 0.65)
+    graphics.beginPath()
+    graphics.moveTo(first.x, first.y)
+    for (const span of spans) {
+      for (const vertex of span.slice(1)) graphics.lineTo(vertex.x, vertex.y)
+    }
+    graphics.strokePath()
+  }
+  graphics.fillStyle(0xffd43b, 1)
+  graphics.fillCircle(point.x, point.y, 9 * scale)
+  graphics.lineStyle(2 * scale, 0x20242a, 0.9)
+  graphics.strokeCircle(point.x, point.y, 10 * scale)
 }

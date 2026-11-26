@@ -102,8 +102,10 @@ test('profiles live road dragging on a large track', async ({ page, context }, t
   await page.waitForTimeout(1000)
   const idle = await report()
   const pointer = await context.newCDPSession(page)
+  let touchActive = false
   try {
     await touch(pointer, 'touchStart', [contact(1, target.x, target.y)])
+    touchActive = true
     await nextFrame()
     await reset()
     for (let step = 1; step <= 24; step++) {
@@ -114,6 +116,7 @@ test('profiles live road dragging on a large track', async ({ page, context }, t
     const dragging = await report()
     await reset()
     await releaseTouches(pointer)
+    touchActive = false
     await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().editor.history)).toBe(before.history + 1)
     await nextFrame()
     const commit = await report()
@@ -127,7 +130,7 @@ test('profiles live road dragging on a large track', async ({ page, context }, t
     })
     console.log(JSON.stringify({ idle, dragging, commit }))
   } finally {
-    await releaseTouches(pointer)
+    if (touchActive) await releaseTouches(pointer)
     await pointer.detach()
   }
 })

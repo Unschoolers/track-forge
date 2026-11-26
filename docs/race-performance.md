@@ -266,15 +266,16 @@ TRACKFORGE_RACE_PERF_TRACK=/path/to/Nj.trackforge.json npm run qa:mobile -- race
 
 ## Editor point-drag invalidation
 
-Large authored terrain is static during a live point move: keep its previous
-mesh and raster, update road geometry through the frame loop, and rebuild the
-road-conditioned terrain once on release. A cancelled drag restores the
-original road and can reuse the unchanged terrain. Terrain/environment/lighting
-changes still invalidate the terrain. Diagnostics and selection panels refresh
-at gesture end, rather than reconstructing DOM for intermediate coordinates.
-The road raster is not captured every drag frame. This is an editor-only
-presentation optimization; committed geometry, recovery, undo and saving are
-unchanged. Elevation-dependent terrain shading catches up when the drag ends.
+The Move Points tool stores the candidate position in the pointer gesture.
+During the drag, it overlays up to four neighboring spline spans and the
+moving handle on the committed world. The overlay uses authored controls and
+the same spline as the road builder. Control spacing, elevation, bridge
+profiles and crossing geometry are resolved for the committed edit.
+
+Release submits the final point once through the regular edit and validation
+path, with one undo entry for an accepted move. Pointer cancellation and pinch
+discard the overlay. Terrain, road, bridge and DOM state can be reused during
+the drag because the draft stays committed until release.
 
 Run the editor-specific diagnostic against a private exported track without
 committing that track to the repository:
@@ -288,7 +289,7 @@ The report records idle, 24 live pointer moves, and release separately, with
 frame intervals and terrain/world/geometry/DOM call counts and CPU timings.
 Compare identical browser/device/viewport/track runs before and after changes;
 there are no wall-clock CI assertions. The existing road-edit browser test
-checks actual terrain redraw counts independently of timing.
+checks preview, world rebuild and terrain redraw counts independently of timing.
 
 ## Papou daytime stutter — 98-second capture
 

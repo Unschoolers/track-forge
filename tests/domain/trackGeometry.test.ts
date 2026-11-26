@@ -9,7 +9,7 @@ import {
   type TrackGeometry,
 } from '@/domain/track/trackGeometry'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import { buildRoadPath } from '@/domain/track/pathBuilder'
+import { buildRoadPath, previewRoadPointMove } from '@/domain/track/pathBuilder'
 
 function square(): Track {
   return {
@@ -66,6 +66,23 @@ describe('TrackGeometry', () => {
       4,
     )
     expect('sectors' in geometry).toBe(false)
+  })
+
+  it('previews only neighboring spline spans, including across the circuit seam', () => {
+    const points = [
+      ...Array.from({ length: 10 }, (_, index) => {
+        const angle = index * Math.PI / 5
+        return { x: 300 * Math.cos(angle), y: 300 * Math.sin(angle), surface: 'street' as const }
+      }),
+      { x: 300, y: 0, surface: 'street' as const },
+    ]
+    const moved = { x: 310, y: 0 }
+    const spans = previewRoadPointMove(points, 'circuit', 0, moved)
+    expect(spans).toHaveLength(4)
+    const coordinates = points.map(({ x, y }) => ({ x, y }))
+    expect(spans.map(span => span[0])).toEqual([coordinates[8], coordinates[9], moved, coordinates[1]])
+    expect(spans.at(-1)?.at(-1)).toEqual(coordinates[2])
+    expect(spans.every(span => span.length <= 33)).toBe(true)
   })
 
   it('caches unchanged shapes and invalidates geometry changes', () => {
