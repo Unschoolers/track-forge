@@ -33,6 +33,8 @@ import {
   renderLampPosts,
 } from '@/phaser/rendering/lampPostRenderer'
 
+let nextToyCurbTexture = 0
+
 function color(value: string): number {
   return Phaser.Display.Color.HexStringToColor(value).color
 }
@@ -137,7 +139,15 @@ export function renderRaceTrackGeometryBase(
 
   // Keep the original paint order (all curbs, then stripes, then markers),
   // while allowing Phaser to skip off-screen marking commands each frame.
-  const batches: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  const batches: { drawable: { visible: boolean; setVisible(visible: boolean): unknown }; bounds: WorldBounds }[] = []
+  const bakeToyCurbs = bitmap !== undefined && environmentId === 'kids-room'
+  const staticCurbTextures: string[] = []
+  let staticCurbTexturePixels = 0
+  if (bakeToyCurbs) {
+    scene.events.once('shutdown', () => {
+      for (const texture of staticCurbTextures) scene.textures.remove(texture)
+    })
+  }
   const addBatch = <T>(
     items: readonly T[],
     endpoints: (item: T) => readonly [Vector2, Vector2],
@@ -154,16 +164,52 @@ export function renderRaceTrackGeometryBase(
         bottom = Math.max(bottom, point.y)
       }
     }
-    batches.push({ graphics, bounds: {
+    batches.push({ drawable: graphics, bounds: {
       left: left - 8, top: top - 8, right: right + 8, bottom: bottom + 8,
     } })
   }
   const batchSize = (count: number) => Math.max(128, Math.ceil(count / 64))
   const curbs = buildCurbSegments(geometry.path)
-  const curbBatchSize = batchSize(curbs.length)
+  const renderCurbBatch = (batch: typeof curbs) => {
+    addBatch(batch, curb => [curb.start, curb.end], graphics => renderCurbSegments(graphics, batch, night, environmentId))
+  }
+  const curbBatchSize = bakeToyCurbs ? 16 : batchSize(curbs.length)
   for (let i = 0; i < curbs.length; i += curbBatchSize) {
     const batch = curbs.slice(i, i + curbBatchSize)
-    addBatch(batch, curb => [curb.start, curb.end], graphics => renderCurbSegments(graphics, batch, night, environmentId))
+    if (bakeToyCurbs) {
+      let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity
+      for (const curb of batch) {
+        left = Math.min(left, curb.start.x, curb.end.x)
+        top = Math.min(top, curb.start.y, curb.end.y)
+        right = Math.max(right, curb.start.x, curb.end.x)
+        bottom = Math.max(bottom, curb.start.y, curb.end.y)
+      }
+      const bounds = { left: left - 8, top: top - 8, right: right + 8, bottom: bottom + 8 }
+      const width = Math.ceil(bounds.right - bounds.left)
+      const height = Math.ceil(bounds.bottom - bounds.top)
+      const pixels = width * height
+      if (width > 0 && height > 0 && width <= 2048 && height <= 2048 &&
+        staticCurbTexturePixels + pixels <= 8 * 1024 * 1024) {
+        const graphics = scene.add.graphics()
+        const texture = `race-toy-curbs-${++nextToyCurbTexture}`
+        try {
+          graphics.translateCanvas(-bounds.left, -bounds.top)
+          renderCurbSegments(graphics, batch, night, environmentId)
+          graphics.generateTexture(texture, width, height)
+        } finally {
+          graphics.destroy()
+        }
+        if (!scene.textures.exists(texture)) throw new Error('Could not create static toy curb texture')
+        staticCurbTextures.push(texture)
+        staticCurbTexturePixels += pixels
+        const image = scene.add.image(bounds.left, bounds.top, texture).setOrigin(0).setDepth(markingsDepth)
+        batches.push({ drawable: image, bounds })
+      } else {
+        renderCurbBatch(batch)
+      }
+    } else {
+      renderCurbBatch(batch)
+    }
   }
   const { path } = geometry
   const count = path.closed ? path.points.length : path.points.length - 1
@@ -186,9 +232,9 @@ export function renderRaceTrackGeometryBase(
     updateVisibility?.(view, paddedViewport)
     bitmap?.render(view, paddedViewport)
     const viewport = paddedViewport ?? groundViewportBounds(view)
-    for (const { graphics, bounds } of batches) {
+    for (const { drawable, bounds } of batches) {
       const visible = boundsVisible(bounds, viewport)
-      if (graphics.visible !== visible) graphics.setVisible(visible)
+      if (drawable.visible !== visible) drawable.setVisible(visible)
     }
   })
 }

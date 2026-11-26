@@ -58,7 +58,7 @@ for (const scenario of scenarios) {
       await setup.getByRole('button', { name: scenario.lighting.toUpperCase(), exact: true }).click()
       await setup.getByRole('button', { name: /^(NORMAL RACE|RACE AI)$/ }).click()
       if (scenario.filename) {
-        await expect(setup.getByRole('button', { name: 'Pause flyover' })).toBeVisible()
+        await expect(setup.getByRole('button', { name: /^(Double flyover speed|Pause flyover)$/ })).toBeVisible()
         await page.waitForTimeout(5_000)
       }
       await setup.getByRole('button', { name: 'START RACE', exact: true }).click()
