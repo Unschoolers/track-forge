@@ -705,12 +705,14 @@ export class AppController {
       return
     }
     if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'cup') {
+      const returnTo = this.state.overlay.cupReturnTo
+      const cupOverlay = { type: 'cup' as const, ...(returnTo ? { returnTo } : {}) }
       const lineup = this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS
       if (lineup.length >= 12) {
-        this.update({ ...this.state, overlay: { type: 'cup' }, notice: 'Cup is limited to 12 races.' })
+        this.update({ ...this.state, overlay: cupOverlay, notice: 'Cup is limited to 12 races.' })
       } else {
         this.cupFlow.setCupLineup([...lineup, track.id])
-        this.update({ ...this.state, overlay: { type: 'cup' } })
+        this.update({ ...this.state, overlay: cupOverlay })
       }
       return
     }
@@ -879,7 +881,8 @@ export class AppController {
       return
     }
     if (overlay.type === 'track-library' && overlay.purpose === 'cup') {
-      this.update({ ...this.state, overlay: { type: 'cup' }, notice: null })
+      this.update({ ...this.state, overlay: { type: 'cup',
+        ...(overlay.cupReturnTo ? { returnTo: overlay.cupReturnTo } : {}) }, notice: null })
       return
     }
     if (overlay.type === 'track-library' && overlay.purpose === 'nearby') {
