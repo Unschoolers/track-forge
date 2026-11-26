@@ -195,6 +195,7 @@ export class RaceSession implements RaceSessionPort {
   private previousPresentationTick: RaceState | null = null
   private presentationDiscontinuities = new Set<string>()
   private startsAt: number | undefined
+  private nearbyTimingOffset = 0
   private rivalFinishRemaining = 0
   private destroyed = false
   private readonly geometry: TrackGeometryService
@@ -230,6 +231,7 @@ export class RaceSession implements RaceSessionPort {
     const routeKind = normalizeRouteKind(track.routeKind)
     setup = oneRunForOpenRoute(track, setup)
     this.startsAt = setup.mode === 'nearby' ? startsAt : undefined
+    this.nearbyTimingOffset = 0
     const nearby = setup.mode === 'nearby'
     const boostPractice = setup.mode === 'boost-practice'
     this.bestGhost = nearby || boostPractice ? null : this.dependencies.ghostStore?.load(track, setup) ?? null
@@ -368,29 +370,41 @@ export class RaceSession implements RaceSessionPort {
         this.startsAt === undefined) return
     const previouslyMissedGate = state.missedCheckpoint?.gate
 
+    const nearbyElapsed = this.startsAt === undefined ? undefined : (this.monotonicNow() - this.startsAt) / 1000
     let runningTime = deltaSeconds
     let countdownChanged = false
     if (state.phase === 'countdown') {
       const previousCue = countdownCue(state.countdown)
-      const remaining = this.startsAt === undefined
-        ? state.countdown - deltaSeconds
-        : (this.startsAt - this.monotonicNow()) / 1000
+      const remaining = nearbyElapsed === undefined ? state.countdown - deltaSeconds : -nearbyElapsed
       const countdown = Math.max(0, remaining)
       const cue = countdownCue(countdown)
       if (cue !== previousCue) {
         this.dependencies.feedback.handle({ type: 'countdown', cue })
       }
       runningTime = Math.min(deltaSeconds, Math.max(0, -remaining))
+      if (this.startsAt !== undefined) this.nearbyTimingOffset = Math.max(0, -remaining - runningTime)
       state = { ...state, countdown, phase: cue === 'go' ? 'running' : 'countdown' }
       countdownChanged = true
     }
 
-    this.remainder += Math.min(runningTime, MAX_CATCH_UP)
+    const retainedTime = Math.min(runningTime, MAX_CATCH_UP)
+    // Account for wall time dropped by the catch-up cap before timestamping
+    // the retained ticks. A peer cannot gain race time by dropping frames.
+    if (nearbyElapsed !== undefined) {
+      this.nearbyTimingOffset += runningTime - retainedTime
+      // The frame loop can reset its delta when the app resumes. Restore a
+      // missed wall-clock interval without reacting to ordinary frame jitter.
+      const projectedElapsed = state.elapsed + this.remainder + retainedTime + this.nearbyTimingOffset
+      const unreportedTime = nearbyElapsed - projectedElapsed
+      if (unreportedTime >= 3 * RACE_TICK_SECONDS) this.nearbyTimingOffset += unreportedTime
+    }
+    this.remainder += retainedTime
     const events: ReturnType<RaceStep>['events'][number][] = []
     let stepped = false
     let peakShake = 0
     let peakLanding = 0
     let boostIgnited = false
+    let nearbyFinishTime: number | undefined
     while (state.phase === 'running' && this.remainder + 1e-10 >= RACE_TICK_SECONDS) {
       const before = state.vehicles.find((vehicle) => vehicle.player)
       const tickInput = stepped ? { ...input, boostRequested: false } : input
@@ -412,13 +426,19 @@ export class RaceSession implements RaceSessionPort {
       if (before && player && player.lap === before.lap && player.nextSector < before.nextSector) {
         this.timing.abandonLap(player.lap)
       }
+      let playerGateIndex = 0
       for (const event of next.events) {
         if (event.type === 'vehicle-recovered' && event.vehicleId === player?.id) {
           this.timing.recover()
           nearby?.recovered()
           if (before && player) this.recording?.recover(before, player, state.elapsed)
         } else if (event.type === 'gate-crossed' && event.vehicleId === player?.id) {
-          this.timing.accept(event.lap, event.gate, event.time)
+          const time = this.startsAt === undefined ? event.time :
+            event.time + this.nearbyTimingOffset -
+              (1 - (next.playerGateFractions?.[playerGateIndex++] ?? 1)) * RACE_TICK_SECONDS
+          this.timing.accept(event.lap, event.gate, time)
+          if (this.startsAt !== undefined && state.phase === 'finished' &&
+              event.gate === (state.timingGates?.length ?? 0) + 1) nearbyFinishTime = time
         }
       }
       this.diagnostics?.record(state, next.events, tickInput)
@@ -453,9 +473,8 @@ export class RaceSession implements RaceSessionPort {
       if (player && !result) nearby.update(player, resultState)
       if (player && result && !this.current.result) nearby.captureFinalFrame(player, resultState)
       if (result && !this.current.result) {
-        const elapsed = nearby.synchronizedElapsed?.()
-        if (result.playerTime !== null && elapsed !== null && elapsed !== undefined && elapsed > 0) {
-          result = { ...result, playerTime: elapsed }
+        if (result.playerTime !== null) {
+          result = { ...result, playerTime: nearbyFinishTime ?? result.playerTime + this.nearbyTimingOffset }
         }
         nearby.finish(result.playerTime)
       }

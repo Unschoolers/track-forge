@@ -39,6 +39,8 @@ it('does not accept a grass bypass or emit timing, then accepts a crossing after
   movement.x = gateX + 1
   const crossing = stepRace({ ...rejoin.state, vehicles: [recovered] }, input, 0.01, { next: () => 0.5 })
   expect(crossing.events).toContainEqual({ type: 'gate-crossed', vehicleId: 'player', gate: 1, lap: 0, time: crossing.state.elapsed })
+  expect(crossing.playerGateFractions?.[0]).toBeGreaterThan(0)
+  expect(crossing.playerGateFractions?.[0]).toBeLessThan(1)
 })
 
 it('counts down after a missed gate, freezes while paused, and recovers before the gate', () => {

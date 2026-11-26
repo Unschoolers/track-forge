@@ -72,6 +72,7 @@ export function advanceArcadeTimingGate(
   elapsed: number,
   onRoad: boolean,
   wasOnRoad: () => boolean,
+  onCrossing?: (fraction: number) => void,
 ): { vehicle: RaceVehicle; missedCheckpoint: RaceState['missedCheckpoint'] } {
   const { path, startPathIndex, reversed } = race
   const missedCheckpoint = previous.player ? race.missedCheckpoint : previous.missedCheckpoint
@@ -88,6 +89,7 @@ export function advanceArcadeTimingGate(
     const position = pendingTimingGateIndex(race, gate)
     const crossing = roadGateCrossingFraction(path, previous, vehicle, position, radius, reversed, ROAD_GEOMETRY.onRoadRadius)
     if (crossing === undefined || crossing <= lastCrossing) break
+    onCrossing?.(crossing)
     lastCrossing = crossing
     pending = undefined
     if (finish) {
