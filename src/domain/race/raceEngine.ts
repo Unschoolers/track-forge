@@ -126,28 +126,20 @@ export function stepRaceTick(
   return advanceRace(beforeStep, NEUTRAL_INPUT, RACE_TICK_SECONDS, random, input.controls)
 }
 
-function advanceRace(
+/** Projects road support and bridge-fall state, then updates gate progress and
+ * applies off-road recovery after rolling back any progress made on this tick.
+ */
+function advanceTickCheckpointProgressAndRoadRecovery(
   state: RaceState,
+  moved: readonly RaceVehicle[],
+  held: ReadonlySet<string>,
   playerInput: DriverInput,
-  deltaSeconds: number,
-  random: RandomSource,
-  controls?: RaceTickInput['controls'],
-): RaceStepResult {
-  if (state.phase !== 'running' || state.paused || deltaSeconds <= 0) {
-    return { state, events: [] }
-  }
-  const dt = Math.min(0.05, deltaSeconds)
-  const elapsed = state.elapsed + dt
-  const events: RaceEvent[] = []
+  controls: RaceTickInput['controls'] | undefined,
+  dt: number,
+  elapsed: number,
+  events: RaceEvent[],
+): { vehicles: RaceVehicle[]; missedCheckpoint: RaceState['missedCheckpoint'] } {
   let missedCheckpoint = state.missedCheckpoint
-  const held = new Set(state.vehicles.filter(vehicle => manualRecoveryTicksRemaining(vehicle, state.tick) > 0).map(vehicle => vehicle.id))
-  const moved = state.vehicles.map((vehicle) => {
-    if (vehicle.finishedAt !== null || held.has(vehicle.id)) return vehicle
-    const directInput = controls && controlsForVehicle(controls, vehicle.id)
-    const input = directInput ?? (vehicle.player ? playerInput : undefined)
-    return advanceVehicle(vehicle, state, input, dt, random,
-      input ? undefined : rivalCatchUp(state, vehicle))
-  })
   const progressed = moved.map((vehicle, index) => {
     if (held.has(vehicle.id) || vehicle.finishedAt !== null) return state.vehicles[index] ?? vehicle
     const context = raceVehicleContext(state, vehicle)
@@ -266,7 +258,18 @@ function advanceRace(
     }
     return updated
   })
-  let vehicles = progressed.map((collided, index) => {
+  return { vehicles: progressed, missedCheckpoint }
+}
+
+/** Reconciles post-motion support and applies water recovery after gate progress. */
+function reconcileTickSupportAndRecoverFromWater(
+  state: RaceState,
+  progressed: readonly RaceVehicle[],
+  held: ReadonlySet<string>,
+  missedCheckpoint: RaceState['missedCheckpoint'],
+  events: RaceEvent[],
+): RaceVehicle[] {
+  const vehicles = progressed.map((collided, index) => {
     const prior = state.vehicles[index]
     if (prior && (held.has(prior.id) || (!prior.player && prior.finishedAt !== null))) return prior
     const context = raceVehicleContext(state, collided)
@@ -344,6 +347,30 @@ function advanceRace(
       reversed: state.reversed,
     })
   })
+  return vehicles
+}
+
+/** Owns one tick's ordered progress/recovery phases: project road support and
+ * bridge-fall state; update gates; roll back before off-road recovery; reconcile
+ * support and water recovery; then expire missed-gate countdowns.
+ */
+function advanceRaceTickProgressAndRecovery(
+  state: RaceState,
+  moved: readonly RaceVehicle[],
+  held: ReadonlySet<string>,
+  playerInput: DriverInput,
+  controls: RaceTickInput['controls'] | undefined,
+  dt: number,
+  elapsed: number,
+  events: RaceEvent[],
+): { vehicles: RaceVehicle[]; missedCheckpoint: RaceState['missedCheckpoint'] } {
+  const progress = advanceTickCheckpointProgressAndRoadRecovery(
+    state, moved, held, playerInput, controls, dt, elapsed, events,
+  )
+  let missedCheckpoint = progress.missedCheckpoint
+  let vehicles = reconcileTickSupportAndRecoverFromWater(
+    state, progress.vehicles, held, missedCheckpoint, events,
+  )
   // Both human and AI countdowns use the same clock and recovery target.
   vehicles = vehicles.map((vehicle, index) => {
     const pending = vehicle.player ? missedCheckpoint : vehicle.missedCheckpoint
@@ -368,6 +395,35 @@ function advanceRace(
     if (vehicle.player) { missedCheckpoint = countdown; return vehicle }
     return { ...vehicle, missedCheckpoint: countdown }
   })
+  return { vehicles, missedCheckpoint }
+}
+
+function advanceRace(
+  state: RaceState,
+  playerInput: DriverInput,
+  deltaSeconds: number,
+  random: RandomSource,
+  controls?: RaceTickInput['controls'],
+): RaceStepResult {
+  if (state.phase !== 'running' || state.paused || deltaSeconds <= 0) {
+    return { state, events: [] }
+  }
+  const dt = Math.min(0.05, deltaSeconds)
+  const elapsed = state.elapsed + dt
+  const events: RaceEvent[] = []
+  const held = new Set(state.vehicles.filter(vehicle => manualRecoveryTicksRemaining(vehicle, state.tick) > 0).map(vehicle => vehicle.id))
+  const moved = state.vehicles.map((vehicle) => {
+    if (vehicle.finishedAt !== null || held.has(vehicle.id)) return vehicle
+    const directInput = controls && controlsForVehicle(controls, vehicle.id)
+    const input = directInput ?? (vehicle.player ? playerInput : undefined)
+    return advanceVehicle(vehicle, state, input, dt, random,
+      input ? undefined : rivalCatchUp(state, vehicle))
+  })
+  const tickProgress = advanceRaceTickProgressAndRecovery(
+    state, moved, held, playerInput, controls, dt, elapsed, events,
+  )
+  let vehicles = tickProgress.vehicles
+  const missedCheckpoint = tickProgress.missedCheckpoint
   let player = vehicles.find((vehicle) => vehicle.player)
   const playerContext = player
     ? raceVehicleContext(state, player)
