@@ -49,11 +49,13 @@ exact simultaneous views.
 
 ## Shared race clock and official live ranking (wire v6)
 
-Five sequential monotonic clock probes run after each guest scene becomes ready.
-Use the lowest round-trip sample to estimate host-minus-guest clock offset;
+Up to five sequential monotonic clock probes run after each guest scene becomes
+ready. A probe without a valid reply expires after one second and the guest
+advances to the next ID. Three valid replies are required. Use the lowest
+round-trip sample to estimate host-minus-guest clock offset;
 schedule GO from the host's absolute monotonic timestamp. Asymmetric latency
-still introduces uncertainty. Missing probes fail the existing staging deadline,
-rather than silently guessing a start. All devices must update together; there is no older race protocol fallback.
+still introduces uncertainty. Insufficient replies end staging with a clock
+synchronization error. Wire v6 compatibility is preserved.
 
 The host alone orders the field from its local progress and accepted guest
 progress (150 ms stream). Guests display the host's sequenced complete order;
