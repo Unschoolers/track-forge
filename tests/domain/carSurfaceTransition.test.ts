@@ -7,6 +7,7 @@ import { stepVehicle } from '@/domain/race/vehiclePhysics'
 import { decodeTrack } from '@/domain/track/trackCodec'
 import { buildRoadPath } from '@/domain/track/pathBuilder'
 import { validateTrack } from '@/domain/track/trackValidation'
+import { OFFROAD_SURFACE, SURFACE_SPECS, VEHICLE_TERRAIN_SPECS } from '@/domain/config'
 
 // Keep the creator's exported straight untouched. Its two-point "circuit"
 // cannot race or encode a transition: the final control inherits the first
@@ -38,6 +39,24 @@ const after = path.points[dirtIndex + 18]
 const dt = 1 / 60
 
 describe('actual street-to-dirt driving on the creator Speed straight', () => {
+  it.each(['blue', 'red', 'green', 'yellow'] as const)(
+    '%s immediately applies the new surface grip while braking or coasting',
+    car => {
+      const player = createRace({ path, playerCar: car, difficulty: 'normal', laps: 1 }).vehicles[0]
+      if (!player || !before) throw new Error('Missing player or path')
+      const context = getVehicleStepContext(path, { ...player, x: before.x, y: before.y })
+      for (const braking of [true, false]) {
+        for (const [from, to] of [['ice', 'street'], ['dirt', 'street'], ['grass', 'street']] as const) {
+          const vehicle = { ...player, speed: 100, vx: 100, currentSurface: from,
+            surfaceGrip: (from === 'grass' ? OFFROAD_SURFACE : SURFACE_SPECS[from]).grip * VEHICLE_TERRAIN_SPECS[car][from].grip }
+          const next = stepVehicle(vehicle, { steering: 0, throttle: 0, braking },
+            { ...context, surface: to, onRoad: true }, dt)
+          const expected = SURFACE_SPECS[to].grip * VEHICLE_TERRAIN_SPECS[car][to].grip
+          expect(next.surfaceGrip, `${from} to ${to}`).toBeCloseTo(expected)
+        }
+      }
+    },
+  )
   it('builds a race-ready open scenario with a genuine surface boundary', () => {
     expect(validateTrack(scenario, path.totalLength).ready).toBe(true)
     expect(path.closed).toBe(false)

@@ -145,7 +145,7 @@ export function stepVehicle(
     : vehicle.surfaceGrip ??
       getSurfaceSpec(vehicle.currentSurface).grip *
         VEHICLE_TERRAIN_SPECS[vehicle.car][vehicle.currentSurface].grip
-  const surfaceGrip = targetGrip +
+  const surfaceGrip = context.surface !== vehicle.currentSurface && targetGrip > previousGrip ? targetGrip : targetGrip +
     (previousGrip - targetGrip) * Math.exp(-dt / SURFACE_GRIP_TIME_CONSTANT)
   const dynamics = stepVehicleDynamics(
     {
