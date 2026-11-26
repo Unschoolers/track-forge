@@ -4,6 +4,8 @@ import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
 import { boundsVisible } from '@/phaser/rendering/roadRibbonRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { createRaceBitmapAtlas } from '@/phaser/rendering/raceBitmapAtlas'
+import { ROAD_MARKINGS_DEPTH } from '@/phaser/rendering/meadowBitmapRenderer'
 import {
   renderRaceTrackGeometryBase,
   renderTrackGeometryBase,
@@ -16,6 +18,8 @@ vi.mock('phaser', () => ({
     },
   },
 }))
+
+vi.mock('@/phaser/rendering/raceBitmapAtlas', () => ({ createRaceBitmapAtlas: vi.fn() }))
 
 class RecordingGraphics {
   readonly paints: (string | number)[][] = []
@@ -114,6 +118,19 @@ function lineGeometry(halfLength: number) {
 }
 
 describe('race road ribbon culling', () => {
+  it.each([120, 1800])('uses the complete road atlas without duplicate ribbon graphics (halfLength=%s)', halfLength => {
+    const bitmap = { render: vi.fn(), warmVisible: vi.fn(), destroy: vi.fn(), coverage: () => [] }
+    vi.mocked(createRaceBitmapAtlas).mockReturnValueOnce(bitmap)
+    const { scene, graphics } = createRecordingScene()
+    const update = renderRaceTrackGeometryBase(scene, lineGeometry(halfLength), false)
+    expect(update?.bitmap).toBe(bitmap)
+    expect(graphics.length).toBeGreaterThan(0)
+    expect(graphics.every(object => object.depth === ROAD_MARKINGS_DEPTH)).toBe(true)
+    const view = { centerX: 0, centerY: -240, width: 640, height: 480, zoom: 1, rotation: 0 }
+    update?.(view)
+    expect(bitmap.render).toHaveBeenCalledOnce()
+  });
+
   it.each([false, true])('keeps the original paint order at a circuit crossing (night=%s)', (night) => {
     const geometry = buildTrackGeometry({
       points: [

@@ -304,3 +304,22 @@ normal circuits retain native resolution and larger maps get a uniform
 budgeted resolution rather than missing artwork. CPU canvas backing and GPU
 copies can each consume memory; startup cost increases. Editor rendering is
 unchanged. Verify on Android before claiming frame-time improvement.
+
+## Complete static race material passes
+
+Follow-up to the resident race atlas: the Android Face 2 ecaF capture still
+spent a median 5.9 ms in render submission, with bridge-heavy windows at
+7.5 ms. Bake the road shoulders and opaque base underneath the existing road
+texture, and the complete bridge underlay/approach/deck/wall passes (including
+projected shadows and pillars). Preserve the wall depth between lower and
+upper vehicles and the approach depth below both. Projected hill shadows are
+spatially tiled from the canonical projected contours before painting terrain.
+The atlas path no longer allocates race road-ribbon, terrain or bridge vector
+graphics. Road curbs, stripes, gates, lamps and dynamic vehicle/effect graphics
+are unchanged. If bitmap art is unavailable, the original vector renderer
+remains intact. The editor and flyover use the existing overlay source.
+Additional material footprint shares the same 128 MiB page budget; the largest
+tracks may have lower sampling resolution or longer preparation. Bridge wall
+tile coverage is folded into the existing bridge-deck diagnostic group.
+Verify render submission, frame tails, visual seams and vehicle occlusion in
+matched day/night captures before asserting a performance gain.

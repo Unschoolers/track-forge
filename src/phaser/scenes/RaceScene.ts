@@ -162,10 +162,10 @@ export class RaceScene extends Phaser.Scene {
     this.updateRoadRibbonVisibility = renderRaceTrackGeometryBase(this, geometry, night, normalizeTrackEnvironmentId(track.environmentId))
     const bitmap = this.updateRoadRibbonVisibility?.bitmap
     const terrain = geometry.path.terrainSurface
-    // The race atlas owns the complete water and hill material footprints.
-    // Keep only projected shadows, which are not included in those textures.
-    const terrainPrimitives = buildTerrainPresentation(terrain, terrainDetailForView(terrain.authoredCellCount, 1))
-    this.terrainChunks = chunkRaceTerrain(bitmap ? terrainPrimitives.filter(p => p.kind === 'hill-shadow') : terrainPrimitives).map(({ primitive, bounds }) => {
+    // Complete race atlas includes terrain and projected hill shadows.
+    // Do not allocate any duplicate vector graphics when artwork is available.
+    const terrainPrimitives = bitmap ? [] : buildTerrainPresentation(terrain, terrainDetailForView(terrain.authoredCellCount, 1))
+    this.terrainChunks = chunkRaceTerrain(terrainPrimitives).map(({ primitive, bounds }) => {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.terrain)
       renderTerrainPrimitives(graphics, [primitive], night, palette)
       const hill = primitive.kind === 'hill-shadow' || primitive.kind === 'hill-slope' || primitive.kind === 'hill-plateau'
@@ -197,25 +197,27 @@ export class RaceScene extends Phaser.Scene {
       bitmap.render(view, bounds ?? undefined)
       bitmap.warmVisible()
     }
-    const bridgePresentation = buildBridgePresentation(geometry)
-    const bridgeEnvironment = normalizeTrackEnvironmentId(track.environmentId)
-    const bridgeNight = this.raceSession.snapshot().setup?.lighting === 'night'
-    const drawBridgeBatches = (items: typeof bridgePresentation, depth: number, draw: (graphics: Phaser.GameObjects.Graphics, items: typeof bridgePresentation) => void) => {
-      for (const batch of chunkBridgePrimitives(items)) {
-        const graphics = this.add.graphics().setDepth(depth)
-        draw(graphics, batch.items)
-        this.bridgeGraphics.push({ graphics, bounds: batch.bounds, primitives: batch.items.length })
+    if (!bitmap) {
+      const bridgePresentation = buildBridgePresentation(geometry)
+      const bridgeEnvironment = normalizeTrackEnvironmentId(track.environmentId)
+      const bridgeNight = this.raceSession.snapshot().setup?.lighting === 'night'
+      const drawBridgeBatches = (items: typeof bridgePresentation, depth: number, draw: (graphics: Phaser.GameObjects.Graphics, items: typeof bridgePresentation) => void) => {
+        for (const batch of chunkBridgePrimitives(items)) {
+          const graphics = this.add.graphics().setDepth(depth)
+          draw(graphics, batch.items)
+          this.bridgeGraphics.push({ graphics, bounds: batch.bounds, primitives: batch.items.length })
+        }
       }
+      const bridgePasses = bridgeRenderPasses(bridgePresentation)
+      drawBridgeBatches(bridgePasses.underlay, WORLD_RENDER_DEPTH.structureUnderlay, (graphics, items) =>
+        renderBridgeUnderlay(graphics, geometry, bridgeNight, 'terrain', bridgeEnvironment, items))
+      drawBridgeBatches(bridgePasses.rampApproach, WORLD_RENDER_DEPTH.structureUnderlay, (graphics, items) =>
+        renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
+      drawBridgeBatches(bridgePasses.deck, WORLD_RENDER_DEPTH.structureDeck, (graphics, items) =>
+        renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
+      drawBridgeBatches(bridgePasses.walls, WORLD_RENDER_DEPTH.structureWall, (graphics, items) =>
+        renderBridgeSideWalls(graphics, geometry, night, 'terrain', bridgeEnvironment, items))
     }
-    const bridgePasses = bridgeRenderPasses(bridgePresentation)
-    drawBridgeBatches(bridgePasses.underlay, WORLD_RENDER_DEPTH.structureUnderlay, (graphics, items) =>
-      renderBridgeUnderlay(graphics, geometry, bridgeNight, 'terrain', bridgeEnvironment, items))
-    drawBridgeBatches(bridgePasses.rampApproach, WORLD_RENDER_DEPTH.structureUnderlay, (graphics, items) =>
-      renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
-    drawBridgeBatches(bridgePasses.deck, WORLD_RENDER_DEPTH.structureDeck, (graphics, items) =>
-      renderBridgeDeck(graphics, geometry, night, 'terrain', graphics, bridgeEnvironment, items))
-    drawBridgeBatches(bridgePasses.walls, WORLD_RENDER_DEPTH.structureWall, (graphics, items) =>
-      renderBridgeSideWalls(graphics, geometry, night, 'terrain', bridgeEnvironment, items))
     const lamps = buildLampPosts(geometry)
     for (const batch of chunkSpatialItems(lamps, lamp => [lamp.position, lamp.shadowEnd], 64, 8)) {
       const graphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
