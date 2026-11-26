@@ -515,6 +515,7 @@ describe('Nearby Arcade', () => {
         expect(device.snapshot().phase).toBe('racing')
       }
 
+      for (const { device } of setups) expect(device.synchronizedElapsed()).toBe(0)
       for (const [index, { device, car }] of setups.entries()) {
         device.update(makeCar(car, index * 10, index * 5, index === 1 ? 'bridge' : null))
       }

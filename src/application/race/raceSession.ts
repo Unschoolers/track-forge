@@ -147,7 +147,7 @@ export interface RaceSessionPort {
 }
 
 export interface RaceSessionDependencies {
-  readonly nearby?: (Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish' | 'captureFinalFrame'> & Partial<Pick<NearbyRace, 'livePosition'>>) | undefined
+  readonly nearby?: (Pick<NearbyRace, 'update' | 'remotePoses' | 'recovered' | 'finish' | 'captureFinalFrame'> & Partial<Pick<NearbyRace, 'livePosition' | 'synchronizedElapsed'>>) | undefined
   readonly scoreStore: ScoreStore
   readonly random: RandomSource
   readonly feedback: FeedbackPort
@@ -452,7 +452,13 @@ export class RaceSession implements RaceSessionPort {
       const player = resultState.vehicles.find((vehicle) => vehicle.player)
       if (player && !result) nearby.update(player, resultState)
       if (player && result && !this.current.result) nearby.captureFinalFrame(player, resultState)
-      if (result && !this.current.result) nearby.finish(result.playerTime)
+      if (result && !this.current.result) {
+        const elapsed = nearby.synchronizedElapsed?.()
+        if (result.playerTime !== null && elapsed !== null && elapsed !== undefined && elapsed > 0) {
+          result = { ...result, playerTime: elapsed }
+        }
+        nearby.finish(result.playerTime)
+      }
     }
     if (stepped) routeRaceFeedback(this.dependencies.feedback, resultState, events, input, peakLanding, boostIgnited)
     if (result && !this.current.result) {
@@ -588,7 +594,8 @@ export class RaceSession implements RaceSessionPort {
     const nearbyPosition = setup?.mode === 'nearby' && player
       ? this.dependencies.nearby?.livePosition?.(player, state) : null
     const latestSplit = this.timing.accepted.at(-1)
-    const elapsed = result?.playerTime ?? state.elapsed
+    const elapsed = result?.playerTime ?? (setup?.mode === 'nearby' && state.phase === 'running'
+      ? this.dependencies.nearby?.synchronizedElapsed?.() ?? state.elapsed : state.elapsed)
     return {
       runId: this.runId,
       track,

@@ -134,6 +134,8 @@ export class NearbyRace {
   private readonly ranking = new NearbyRanking()
   private localProgress: number | null = null
   private sharedStartAt: number | null = null
+  private lastSimulationElapsed: number | null = null
+  private finalClockElapsed: number | null = null
   private slot = 0
   private readonly poseSync: NearbyPoseSync
   private readonly progressSync: NearbyProgressSync
@@ -188,7 +190,10 @@ export class NearbyRace {
       targetPoseHz: this.poseSync.targetPoseHz,
     })
     Object.assign(report, { synchronization: { clock: this.clock.estimate, sharedStartAtMs: this.sharedStartAt,
-      ranking: this.ranking.diagnostics() } })
+      ranking: this.ranking.diagnostics(), simulationElapsedSeconds: this.lastSimulationElapsed,
+      clockElapsedSeconds: this.synchronizedElapsed(),
+      simulationDriftMs: this.lastSimulationElapsed === null || this.synchronizedElapsed() === null ? null :
+        (this.synchronizedElapsed()! - this.lastSimulationElapsed) * 1000 } })
     if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
     try {
       return { ...report, native: { status: 'available', report: await this.transport.diagnostics() } }
@@ -424,6 +429,8 @@ export class NearbyRace {
     this.ranking.reset()
     this.localProgress = null
     this.sharedStartAt = null
+    this.lastSimulationElapsed = null
+    this.finalClockElapsed = null
     this.receiver = null
     this.prepared = null
     this.poseSync.reset()
@@ -493,6 +500,7 @@ export class NearbyRace {
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
     if (state) {
+      this.lastSimulationElapsed = state.elapsed
       this.localProgress = raceProgress(vehicle, state.path.points.length, state.startPathIndex,
         state.reversed, normalizeRouteKind(state.routeKind))
       this.progressSync.update(this.slot, this.localProgress, recipients)
@@ -502,7 +510,11 @@ export class NearbyRace {
 
   /** The finishing sample remains available after the room stops sending poses. */
   captureFinalFrame(vehicle: RaceVehicle, state: RaceState): void {
-    if (this.phase === 'racing') this.diagnostic.captureTraceFrame(vehicle, state, true)
+    if (this.phase === 'racing') {
+      this.lastSimulationElapsed = state.elapsed
+      this.finalClockElapsed = this.synchronizedElapsed()
+      this.diagnostic.captureTraceFrame(vehicle, state, true)
+    }
   }
 
   /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
@@ -534,6 +546,12 @@ export class NearbyRace {
     }
     const request = this.clock.request(this.now())
     if (request) this.sendControl([this.hostId], { type: 'clock-probe', round: this.round, probe: request.probe })
+  }
+
+  /** Real elapsed race time; independent of capped physics catch-up. */
+  synchronizedElapsed(): number | null {
+    if (this.finalClockElapsed !== null) return this.finalClockElapsed
+    return this.sharedStartAt === null ? null : Math.max(0, (this.now() - this.sharedStartAt) / 1000)
   }
 
   recovered(): void { this.poseSync.recovered() }
@@ -923,6 +941,7 @@ export class NearbyRace {
     }
     this.clearTimeout()
     this.sharedStartAt = startsAt
+    this.poseSync.setStartAt(startsAt)
     this.setPhase('racing')
     this.record('countdown_scheduled', { remainingMs: Math.round(startsAt - this.now()) })
     this.countdownStarts.publish(startsAt)
@@ -1076,6 +1095,8 @@ export class NearbyRace {
     this.ranking.reset()
     this.localProgress = null
     this.sharedStartAt = null
+    this.lastSimulationElapsed = null
+    this.finalClockElapsed = null
     this.racers.clear()
     this.receiver = null
     this.prepared = null

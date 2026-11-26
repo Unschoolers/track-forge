@@ -22,10 +22,28 @@ Both native hosts bind all local IPv4 interfaces; their listening port is not ex
 
 Both transports share a receiver-local interpolation buffer. Start at 100 ms,
 then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
-Grow quickly when updates are irregular, shrink gradually on a healthy stream,
-and never rewind the presentation clock when the buffer grows. Existing recovery
-cuts, bounded extrapolation and two-second expiry remain unchanged. Verify on
-matched device captures; synthetic timing tests are not radio latency evidence.
+The playback clock slews at 0.8–1.2x instead of freezing; 24 history samples
+and 100 ms small prediction corrections preserve smoothness. Timed wire-v5
+poses append a signed 32-bit millisecond offset from synchronized GO to the
+19-byte legacy pose (23 bytes total). Host relays preserve source timestamps.
+Receiver maps timestamps to its local clock, rejects missing/implausibly
+old/future/regressing samples, and targets 25–100 ms delay according to arrival
+jitter. Prediction toward the shared present is capped at 120 ms / 75 world
+units and never crosses recovery or structure transitions. Two-second expiry
+is unchanged. Legacy codecs are retained for unit tests but timed races reject
+untimestamped poses.
+
+Per-peer presentation diagnostics include target/effective delay, clock hold,
+prediction caps, correction magnitude and estimated sample age. A synchronized
+sample's age includes clock-offset error, not an exact one-way latency.
+
+Nearby race HUD and finish use local monotonic elapsed from synchronized GO,
+rather than potentially capped physics catch-up. Physics and offline timing
+remain unchanged. Finish is sampled at the rendering frame that detects gate
+crossing, so normal uncertainty includes a frame interval and clock offset
+error. Diagnostics record simulation elapsed, frozen finish clock elapsed and
+their difference. Long-race device oscillator drift still requires matched
+captures; do not silently adjust physics or claim exact simultaneous views.
 
 ## Shared race clock and official live ranking (wire v5)
 
@@ -58,7 +76,8 @@ The LAN transport is local-only; it is *not* an internet multiplayer server. Rol
 
 ## Android Nearby pose pacing
 
-The application owns the healthy 30 Hz pose cadence. The Google Nearby bridge
+The application owns the healthy 30 Hz pose cadence using monotonic deadlines
+and skipping missed slots without catch-up bursts. The Google Nearby bridge
 must not repeat that rate gate: arrival times can shift across the JS/native
 boundary. Keep the one-outstanding-payload window per peer and stream, and
 native adaptive rate limits for degraded peers (15 Hz down to 1 Hz). Progress

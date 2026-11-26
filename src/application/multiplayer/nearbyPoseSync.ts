@@ -41,7 +41,9 @@ export class NearbyPoseSync {
   private sequence = 0
   private recovery = 0
   private lastSentAt = -Infinity
+  private nextSendAt = -Infinity
   private poseSending = false
+  private startAt: number | null = null
 
   constructor(
     private readonly send: (recipients: string[], bytes: Uint8Array) => Promise<void>,
@@ -65,8 +67,12 @@ export class NearbyPoseSync {
     this.sequence = 0
     this.recovery = 0
     this.lastSentAt = -Infinity
+    this.nextSendAt = -Infinity
     this.poseSending = false
+    this.startAt = null
   }
+
+  setStartAt(localStartsAt: number): void { this.startAt = localStartsAt }
 
   setRound(round: number): void { this.round = round & WIRE_ROUND_MASK }
 
@@ -82,12 +88,21 @@ export class NearbyPoseSync {
     const now = this.now()
     // One compact batch is broadcast to all connected guests. Native Nearby
     // drops obsolete per-endpoint poses if a recipient is still congested.
-    if (this.poseSending || now - this.lastSentAt < POSE_PERIOD_MS - 2 || !recipients.length) return
-    const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle, this.round)
+    // Retain the 30 Hz deadline instead of resetting the cadence to each late
+    // render frame. Otherwise missed vsyncs permanently lower the send rate.
+    // Do not burst after a stall; at most one fresh pose per update, separated
+    // by at least half a period. Never queue while bridge admission is pending.
+    if (this.poseSending || !recipients.length || now + 2 < this.nextSendAt ||
+        now - this.lastSentAt < POSE_PERIOD_MS / 2) return
+    const pose = encodePose(localSlot, this.sequence, this.recovery, vehicle, this.round,
+      this.startAt === null ? undefined : Math.round(now - this.startAt))
     this.sequence = (this.sequence + 1) & POSE_SEQUENCE_MASK
     if (!hostId) this.latestPoses.set(localSlot, { bytes: pose, receivedAt: now })
     const bytes = hostId ? pose : encodePoseBatch(
       activePosePackets(this.latestPoses, racers, now))
+    const deadline = Number.isFinite(this.nextSendAt) ? this.nextSendAt : now
+    const periods = Math.max(1, Math.floor((now + 2 - deadline) / POSE_PERIOD_MS) + 1)
+    this.nextSendAt = deadline + periods * POSE_PERIOD_MS
     this.lastSentAt = now
     this.poseSending = true
     this.poseCounts.sent++
@@ -115,7 +130,7 @@ export class NearbyPoseSync {
         const racer = racers.get(packet.slot)
         if (!racer || racer.left || packet.slot === localSlot) continue
         this.poseCounts.received++
-        const accepted = racer.ghost.receive(packet, now)
+        const accepted = this.acceptPose(racer, packet, now)
         this.observePose?.(packet.slot, packet.sequence, accepted, now)
       }
       return true
@@ -136,6 +151,12 @@ export class NearbyPoseSync {
       return true
     }
     return false
+  }
+
+  private acceptPose(racer: PoseRacer, packet: NonNullable<ReturnType<typeof decodePose>>, now: number): boolean {
+    if (this.startAt === null) return racer.ghost.receive(packet, now)
+    if (packet.sampleTimeMs === undefined) return false
+    return racer.ghost.receive(packet, now, this.startAt + packet.sampleTimeMs)
   }
 
   remotePoses(racers: ReadonlyMap<number, PoseRacer>, localSlot: number): GhostPose[] {
