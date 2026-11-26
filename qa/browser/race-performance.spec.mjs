@@ -29,7 +29,7 @@ for (const scenario of scenarios) {
       await picker.locator('input[type="file"]').setInputFiles(resolve(trackDirectory, scenario.filename))
       const editor = page.locator('[data-screen="editor"]')
       await expect(editor).toBeVisible()
-      trackName = await editor.locator('[data-action="rename-track"]').textContent()
+      trackName = await editor.locator('.topbar-title').textContent()
       expect(trackName).toBeTruthy()
       // Older Sandy Beach exports have a recoverable tail after the closed loop.
       const repair = editor.getByRole('button', { name: 'Remove extra road', exact: true })

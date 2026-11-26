@@ -161,3 +161,51 @@
     overflow: auto;
   }
 }
+
+/* The editor menu has one compact track-specific action surface. */
+.editor-menu-modal .modal-card { width: min(30rem, 100%); }
+.editor-menu-modal .modal-subtitle:empty { display: none; }
+.editor-menu-modal .modal-header { padding: .75rem 1rem; }
+.editor-menu-modal .editor-menu-content {
+  display: grid;
+  gap: .5rem;
+  padding: .75rem 1rem;
+}
+.editor-menu-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  gap: .4rem;
+  align-items: center;
+}
+.editor-menu-name { display: grid; gap: .2rem; min-width: 0; }
+.editor-menu-name strong { overflow-wrap: anywhere; }
+.editor-menu-identity .track-icon-action {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #53616c;
+  border-radius: 0;
+  background: #1b2834;
+  color: var(--menu-ink);
+}
+.editor-menu-identity .track-icon-action svg { width: 22px; height: 22px; }
+.editor-menu-identity .track-icon-action span { display: none; }
+.editor-menu-secondary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
+.editor-menu-content .button { min-height: 44px; padding: .5rem; white-space: normal; text-align: center; }
+.editor-menu-settings { display: grid; gap: .3rem; border-block: 1px solid #34414e; padding-block: .5rem; }
+.editor-menu-settings .results-heading { margin: 0; }
+.editor-menu-setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: center; gap: .5rem; font-size: .85rem; }
+.editor-menu-select {
+  min-width: 0;
+  min-height: 44px;
+  padding: .4rem;
+  border: 1px solid #53616c;
+  border-radius: 0;
+  background: #1b2834;
+  color: var(--menu-ink);
+  color-scheme: dark;
+  font: inherit;
+}
+.editor-menu-select:focus-visible { outline: 2px solid var(--menu-ink); outline-offset: 2px; }
