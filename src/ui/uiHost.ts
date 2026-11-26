@@ -646,11 +646,6 @@ export class DomUiHost implements UiHost {
               type: 'open-track-library',
               purpose: 'edit',
             }),
-          options: () =>
-            this.controller.dispatch({
-              type: 'open-options',
-              returnTo: 'editor',
-            }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
         })
     }

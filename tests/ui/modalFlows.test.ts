@@ -232,6 +232,12 @@ describe('modal application flows', () => {
     expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'select-track-for-race', id: incomplete.id })
   })
 
+  it('keeps global options out of the editor menu', () => {
+    const { root } = setup({ ...state({ type: 'editor-menu' }), mode: 'editor' })
+    expect(root.querySelector('[data-action="editor-options"]')).toBeNull()
+    expect(root.textContent).not.toContain('OPTIONS')
+  })
+
   it('offers RACE TRACK in the editor menu without starting racing directly', () => {
     const { root, port } = setup({ ...state({ type: 'editor-menu' }), mode: 'editor' })
     const button = root.querySelector<HTMLButtonElement>('[data-action="menu-race"]')
