@@ -113,14 +113,17 @@ describe('modal application flows', () => {
   it('chooses the track environment and shows its scenery in the editor', () => {
     const initial: AppSnapshot = { ...state({ type: 'editor-menu' }), mode: 'editor' }
     const { root, port, update, host } = setup(initial)
-    const environment = root.querySelector('[role="group"][aria-label="Environment"]')
-    expect(environment?.textContent).toBe("GrassCityscapeDesertKids' Room")
-    root.querySelector<HTMLButtonElement>('[data-environment="kids-room"]')?.click()
+    const environment = root.querySelector<HTMLSelectElement>('[data-action="menu-environment"]')
+    if (!environment) throw new Error('Missing environment selector')
+    expect([...environment.options].map(option => option.textContent)).toEqual(['Grass', 'Cityscape', 'Desert', "Kids' Room"])
+    expect(environment.value).toBe('grass')
+    environment.value = 'kids-room'
+    environment.dispatchEvent(new Event('change'))
     expect(port.dispatch).toHaveBeenCalledWith({
       type: 'editor', command: { type: 'set-environment', environmentId: 'kids-room' },
     })
-    expect(environment?.querySelector('[data-environment="grass"]')?.getAttribute('aria-pressed')).toBe('true')
-    root.querySelector<HTMLButtonElement>('[data-environment="cityscape"]')?.click()
+    environment.value = 'cityscape'
+    environment.dispatchEvent(new Event('change'))
     expect(port.dispatch).toHaveBeenCalledWith({
       type: 'editor', command: { type: 'set-environment', environmentId: 'cityscape' },
     })
@@ -230,6 +233,30 @@ describe('modal application flows', () => {
     expect(overflow.open).toBe(false)
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'select-track-for-edit', id: incomplete.id })
     expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'select-track-for-race', id: incomplete.id })
+  })
+
+  it('keeps track management in one compact editor menu and the map title read-only', () => {
+    const { root, port, host } = setup({ ...state({ type: 'editor-menu' }), mode: 'editor' })
+    const menu = root.querySelector('[role="dialog"][aria-label="Editor menu"]')
+    expect(menu?.querySelector('.editor-menu-name strong')?.textContent).toBe(ready.name)
+    expect(root.querySelector('.topbar-title')?.tagName).toBe('SPAN')
+    for (const action of ['editor-options', 'menu-choose', 'menu-export', 'rename-track']) {
+      expect(root.querySelector(`[data-action="${action}"]`)).toBeNull()
+    }
+    expect(menu?.querySelector('[data-action="menu-share"] svg path')).not.toBeNull()
+    menu?.querySelector<HTMLButtonElement>('[data-action="menu-rename"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-track-name', purpose: 'rename' })
+    menu?.querySelector<HTMLButtonElement>('[data-action="menu-save-as"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-track-name', purpose: 'save-as' })
+    const route = menu?.querySelector<HTMLSelectElement>('[data-action="menu-route-kind"]')
+    if (!route) throw new Error('Missing route selector')
+    expect(route.value).toBe('circuit')
+    route.value = 'point-to-point'
+    route.dispatchEvent(new Event('change'))
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'editor', command: { type: 'set-route-kind', routeKind: 'point-to-point' },
+    })
+    host.destroy()
   })
 
   it('offers RACE TRACK in the editor menu without starting racing directly', () => {

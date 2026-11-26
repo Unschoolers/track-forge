@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest'
-import { exportTrack } from '@/infrastructure/export/trackExport'
+import { exportTrack, shareTrack } from '@/infrastructure/export/trackExport'
 import { DomUiHost, type UiControllerPort } from '@/ui/uiHost'
 import { createUiRuntime } from './uiRuntime'
 import { createEditorState } from '@/domain/editor/editorState'
@@ -47,14 +47,27 @@ function setup() {
 }
 
 describe('async UI export teardown', () => {
+  it('does not export when the shared track workflow succeeds', async () => {
+    vi.mocked(exportTrack).mockClear()
+    vi.mocked(shareTrack).mockResolvedValueOnce(true)
+    const { root, host } = setup()
+    root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')?.click()
+    await Promise.resolve()
+    expect(shareTrack).toHaveBeenCalledWith(track, expect.any(String))
+    expect(exportTrack).not.toHaveBeenCalled()
+    host.destroy()
+  })
   it('does not reinsert a toast into an unmounted host when export finishes late', async () => {
     let finish: ((value: boolean) => void) | undefined
     vi.mocked(exportTrack).mockImplementationOnce(() =>
       new Promise(resolve => { finish = resolve }))
+    vi.mocked(shareTrack).mockResolvedValueOnce(false)
     const { root, host } = setup()
-    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-export"]')
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')
     if (!exportButton) throw new Error('Editor export button missing')
     exportButton.click()
+    expect(shareTrack).toHaveBeenCalledWith(track, expect.any(String))
+    await vi.waitFor(() => expect(finish).toBeDefined())
     expect(exportTrack).toHaveBeenCalledWith(track)
 
     host.destroy()
@@ -68,10 +81,12 @@ describe('async UI export teardown', () => {
     let finish: ((value: boolean) => void) | undefined
     vi.mocked(exportTrack).mockImplementationOnce(() =>
       new Promise(resolve => { finish = resolve }))
+    vi.mocked(shareTrack).mockResolvedValueOnce(false)
     const { root, host } = setup()
-    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-export"]')
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')
     if (!exportButton) throw new Error('Editor export button missing')
     exportButton.click()
+    await vi.waitFor(() => expect(finish).toBeDefined())
 
     host.destroy()
     host.mount()
@@ -84,8 +99,9 @@ describe('async UI export teardown', () => {
 
   it('still displays a success notice when the host is mounted', async () => {
     vi.mocked(exportTrack).mockResolvedValueOnce(true)
+    vi.mocked(shareTrack).mockResolvedValueOnce(false)
     const { root, host } = setup()
-    root.querySelector<HTMLButtonElement>('[data-action="menu-export"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')?.click()
     await vi.waitFor(() => expect(root.textContent).toContain('Track file saved.'))
     host.destroy()
   })

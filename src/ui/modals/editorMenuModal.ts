@@ -2,67 +2,74 @@ import type { RouteKind } from '@/domain/model'
 import { SCENERY_KINDS_BY_ENVIRONMENT, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { button, element } from '@/ui/dom'
-import { createSegmentedButtons } from '@/ui/editor/editorContextDock'
+import { iconAction } from '@/ui/components/trackActionButton'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 
-export function createEditorMenuModal(environmentId: TrackEnvironmentId, routeKind: RouteKind, actions: {
-  readonly close: () => void
-  readonly export: () => void
-  readonly save: () => void
-  readonly race: () => void
-  readonly saveAs: () => void
-  readonly rename: () => void
-  readonly choose: () => void
-  readonly options: () => void
-  readonly home: () => void
-  readonly setRouteKind: (routeKind: RouteKind) => void
-  readonly setEnvironment: (environmentId: TrackEnvironmentId) => void
-}): HTMLElement {
-  const frame = createModalFrame(
-    'Editor menu',
-    'Track and application actions.',
-    actions.close,
+function settingSelect<Value extends string>(
+  label: string, action: string, selected: Value,
+  choices: readonly { value: Value; label: string }[],
+  onChange: (value: Value) => void,
+): HTMLElement {
+  const row = element('label', 'editor-menu-setting')
+  const select = element('select', 'editor-menu-select')
+  select.dataset.action = action
+  select.setAttribute('aria-label', label)
+  for (const choice of choices) {
+    const option = element('option', '', choice.label)
+    option.value = choice.value
+    select.append(option)
+  }
+  select.value = selected
+  select.addEventListener('change', () => {
+    const choice = choices.find(item => item.value === select.value)
+    if (choice) onChange(choice.value)
+  })
+  row.append(element('span', '', label), select)
+  return row
+}
+
+export function createEditorMenuModal(
+  trackName: string, environmentId: TrackEnvironmentId, routeKind: RouteKind, actions: {
+    readonly close: () => void
+    readonly share: () => void
+    readonly save: () => void
+    readonly race: () => void
+    readonly saveAs: () => void
+    readonly rename: () => void
+    readonly home: () => void
+    readonly setRouteKind: (routeKind: RouteKind) => void
+    readonly setEnvironment: (environmentId: TrackEnvironmentId) => void
+  },
+): HTMLElement {
+  const frame = createModalFrame('Editor menu', '', actions.close, 'editor-menu-modal')
+  const identity = element('div', 'editor-menu-identity')
+  const name = element('div', 'editor-menu-name')
+  name.append(element('span', 'name-label', 'Track name'), element('strong', '', trackName))
+  const rename = iconAction('RENAME TRACK', 'edit', 'menu-rename', actions.rename)
+  const share = iconAction('SHARE', 'share', 'menu-share', actions.share)
+  identity.append(name, rename, share)
+  const secondary = element('div', 'editor-menu-secondary')
+  secondary.append(
+    button('SAVE AS NEW TRACK', 'menu-save-as', actions.saveAs),
+    button('RACE TRACK', 'menu-race', actions.race),
   )
-  const environment = element('section', 'editor-menu-environment')
   const ids = Object.keys(SCENERY_KINDS_BY_ENVIRONMENT) as TrackEnvironmentId[]
-  environment.append(
-    element('h3', 'results-heading', 'Environment'),
-    createSegmentedButtons('Environment', ids.map((id) => ({
-      value: id,
-      label: getTrackEnvironment(id).label,
-      action: `environment-${id}`,
-      pressed: environmentId === id,
-      data: { environment: id },
-      select: () => actions.setEnvironment(id),
-    }))),
+  const settings = element('section', 'editor-menu-settings')
+  settings.append(
+    element('h3', 'results-heading', 'Track settings'),
+    settingSelect('Environment', 'menu-environment', environmentId,
+      ids.map(id => ({ value: id, label: getTrackEnvironment(id).label })), actions.setEnvironment),
+    settingSelect<RouteKind>('Route type', 'menu-route-kind', routeKind,
+      [{ value: 'circuit', label: 'Circuit' }, { value: 'point-to-point', label: 'Point to point' }],
+      actions.setRouteKind),
   )
-  frame.body.classList.add('menu-buttons')
+  frame.body.classList.add('editor-menu-content')
   frame.body.append(
-    environment,
-    element('h3', 'results-heading', 'Route type'),
-    createSegmentedButtons('Route type', ([['circuit', 'Circuit'], ['point-to-point', 'Point to point']] as const).map(([value, label]) => ({
-      value, label, action: `route-kind-${value}`, pressed: routeKind === value,
-      select: () => actions.setRouteKind(value),
-    }))),
-    element('p', '', 'Point-to-point races start and finish at the road endpoints.'),
-    button(
-      'SAVE TRACK',
-      'menu-save',
-      actions.save,
-      'button button-primary',
-    ),
-    button('RACE TRACK', 'menu-race', actions.race, 'button'),
-    button('SAVE AS NEW TRACK', 'menu-save-as', actions.saveAs, 'button'),
-    button('EXPORT TRACK', 'menu-export', actions.export, 'button'),
-    button('RENAME TRACK', 'menu-rename', actions.rename, 'button'),
-    button('CHOOSE ANOTHER TRACK', 'menu-choose', actions.choose, 'button'),
-    button('OPTIONS', 'editor-options', actions.options, 'button'),
-    button(
-      'RETURN HOME',
-      'editor-home',
-      actions.home,
-      'button button-danger',
-    ),
+    identity,
+    button('SAVE TRACK', 'menu-save', actions.save, 'button button-primary'),
+    secondary,
+    settings,
+    button('RETURN HOME', 'editor-home', actions.home, 'button button-danger'),
   )
   return frame.overlay
 }
