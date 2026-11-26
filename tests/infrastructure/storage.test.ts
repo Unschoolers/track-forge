@@ -530,6 +530,18 @@ it('round-trips route topology and defaults legacy tracks to circuits', () => {
   expect(repository.find(track.id)?.routeKind).toBe('circuit')
 })
 
+it('persists an imported creator challenge across repository reloads', () => {
+  const storage = new MemoryStore()
+  const repository = new BrowserTrackRepository(storage)
+  const track = createStarterTrack(asTrackId('creator-challenge'), 10)
+  const creatorChallenge = { car: 'green' as const, laps: 1 as const, time: 2, frames: [
+    { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+    { t: 2, x: 20, y: 0, angle: 0, z: 0, structureRunId: null },
+  ] }
+  expect(repository.save({ ...track, creatorChallenge })).toBe(true)
+  expect(new BrowserTrackRepository(storage).find(track.id)?.creatorChallenge).toEqual(creatorChallenge)
+})
+
 it('stores favorite track ids locally and rejects malformed preference data', () => {
   const memory = new MemoryStore()
   const repo = new BrowserPreferencesRepository(memory)

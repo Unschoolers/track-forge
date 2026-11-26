@@ -1,17 +1,49 @@
 import { serializeTrack } from '@/infrastructure/export/trackExport'
 import { describe, expect, it } from 'vitest'
-import { asTrackId, type Track } from '@/domain/model'
+import { asTrackId, type CreatorGhostChallenge, type Track } from '@/domain/model'
 import { TERRAIN_LIMITS } from '@/domain/config'
 import { createStarterTrack } from '@/domain/track/starterTrack'
-import { parseTrackImport } from '@/application/library/trackImport'
+import { parseSharedTrackImport, parseTrackImport } from '@/application/library/trackImport'
 import { TrackLibraryService } from '@/application/library/trackLibraryService'
 import { medalForFinish } from '@/ui/components/finishMedal'
+import { createTrackSigningKey, serializeSignedTrack } from '@/application/library/trackSignature'
 
 const track = createStarterTrack(asTrackId('original'), 10)
 const exported = (value: unknown): string =>
   JSON.stringify({ format: 'trackforge-track', formatVersion: 1, track: value })
 
 describe('shareable track challenges', () => {
+  it('round-trips signed creator ghost data while ordinary v1 exports remain track-only', async () => {
+    const creatorChallenge: CreatorGhostChallenge = {
+      car: 'red' as const, laps: 1 as const, time: 1,
+      frames: [
+        { t: 0, x: 2, y: 3, angle: 0.2, z: 0, structureRunId: null },
+        { t: 1, x: 12, y: 13, angle: 0.3, z: 0, structureRunId: null, cut: true },
+      ],
+      splits: [1],
+    }
+    const legacy = JSON.parse(serializeTrack({ ...track, creatorChallenge }).content) as Record<string, unknown>
+    expect(legacy.creatorChallenge).toBeUndefined()
+    const importedLegacy = parseTrackImport(JSON.stringify(legacy))
+    expect(importedLegacy.ok && importedLegacy.track.creatorChallenge).toBeUndefined()
+    const signed = await serializeSignedTrack({ ...track, creatorChallenge }, createTrackSigningKey)
+    const signedEnvelope = JSON.parse(signed) as { track: Record<string, unknown>; formatVersion: number; signature: object }
+    expect(signedEnvelope.formatVersion).toBe(2)
+    expect(signedEnvelope.signature).toBeDefined()
+    expect(signedEnvelope.track.creatorChallenge).toEqual(creatorChallenge)
+    const imported = await parseSharedTrackImport(signed)
+    expect(imported.ok && imported.track.creatorChallenge).toEqual(creatorChallenge)
+    if (!imported.ok) return
+    const reExported = JSON.parse(serializeTrack(imported.track).content) as Record<string, unknown>
+    expect(reExported.creatorChallenge).toBeUndefined()
+  })
+
+  it('rejects creator replay metadata in unsigned v1 envelope and track placements', () => {
+    expect(parseTrackImport(JSON.stringify({ format: 'trackforge-track', formatVersion: 1, track,
+      creatorChallenge: { tampered: true } })).ok).toBe(false)
+    expect(parseTrackImport(exported({ ...track, creatorChallenge: { tampered: true } })).ok).toBe(false)
+  })
+
   it('imports the existing exported document format without trusting the sender ID', () => {
     const decoded = parseTrackImport(exported(track))
     expect(decoded.ok).toBe(true)

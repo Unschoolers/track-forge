@@ -34,6 +34,13 @@ Open the URL printed by Vite, normally <http://localhost:5173>.
   length, lighting, difficulty, and driving style.
 - Use the track's share icon to send its importable file. On browsers without
   file sharing it downloads a copy.
+- A share can include your saved recovery-free ghost for the selected car and
+  lap count. Import it from the Race picker to see the target time, car and lap
+  rule in Race Setup. The creator replay stays separate from your private best.
+  After finishing an imported challenge, **SEND BACK MY TIME** shares that
+  completed replay through the same private file share flow. Explicit Nearby
+  track sharing preserves the verified original file; Nearby race staging
+  sends geometry without replay metadata.
 - Race: steer with `A`/`D` or `ArrowLeft`/`ArrowRight` and brake with `S`, `ArrowDown`,
   or `Space`. On touchscreens, place a finger on the steering pad or canvas,
   then slide left or right from that starting point to steer. Hold the separate

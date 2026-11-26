@@ -13,7 +13,10 @@ export async function packTrack(
   serialize?: (track: Track) => Promise<string>,
 ): Promise<Uint8Array[]> {
   // Race staging needs the geometry only. A share carries the original signature.
-  const { signedSource: _signedSource, ...geometry } = track
+  const geometry = { ...track }
+  delete geometry.signedSource
+  delete geometry.signedChallengeSource
+  delete geometry.creatorChallenge
   const input = serialize ? await serialize(track) :
     JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION, track: geometry })
   const bytes = new TextEncoder().encode(input)

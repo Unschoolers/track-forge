@@ -135,4 +135,23 @@ describe('TrackLibraryService', () => {
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.track.creator).toEqual(creator)
   })
+
+  it('forks shared courses without carrying signed provenance or creator replay metadata', async () => {
+    const shared = { ...createStarterTrack(asTrackId('signed-original'), 30), origin: 'imported' as const,
+      signedSource: 'canonical-signed-source', signedChallengeSource: 'single-reply-wrapper',
+      creatorChallenge: { car: 'red' as const, laps: 1 as const, time: 2, frames: [
+        { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+        { t: 2, x: 2, y: 1, angle: 0, z: 0, structureRunId: null },
+      ] },
+    }
+    const { service } = setup([shared])
+    const fork = await service.saveAs(shared, 'My Copy')
+    expect(fork.ok).toBe(true)
+    if (!fork.ok) return
+    expect(fork.track).toMatchObject({ origin: 'local', name: 'My Copy' })
+    expect(fork.track).not.toHaveProperty('signedSource')
+    expect(fork.track).not.toHaveProperty('signedChallengeSource')
+    expect(fork.track).not.toHaveProperty('creatorChallenge')
+    expect(service.select(shared.id)).toMatchObject({ creatorChallenge: { time: 2 }, signedSource: 'canonical-signed-source' })
+  })
 })

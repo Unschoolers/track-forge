@@ -55,8 +55,10 @@ export class EditorSession {
       return { editor }
     }
     const now = this.now()
+    const updatedTrackBase = { ...currentTrack }
+    if (raceChanged) delete updatedTrackBase.creatorChallenge
     const updatedTrack = {
-      ...currentTrack,
+      ...updatedTrackBase,
       points: editor.points,
       trees: editor.trees,
       start: editor.start ?? { ratio: 0, reversed: false },

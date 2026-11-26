@@ -45,7 +45,7 @@ describe('track share fallback', () => {
       if (!share) throw new Error('Personal track share action missing')
       share.click()
       await vi.waitFor(() => {
-        expect(exportTrack).toHaveBeenCalledWith(track)
+        expect(exportTrack).toHaveBeenCalledWith(track, undefined)
         expect(errorLog).toHaveBeenCalledWith('Track Forge share failed:', failure)
       })
     } finally {
