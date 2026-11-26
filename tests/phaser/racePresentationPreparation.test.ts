@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { asTrackId, type Track } from '@/domain/model'
+import { createStarterTrack } from '@/domain/track/starterTrack'
 import { buildTrackGeometry } from '@/domain/track/trackGeometry'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { buildBridgePresentation } from '@/phaser/rendering/bridgeRenderer'
@@ -34,10 +35,24 @@ function scheduler() {
   return { preparation, callbacks, frame }
 }
 
+// Preparation tests need fixed geometry, not the evolving player-facing catalog.
+const baseTrack = createStarterTrack(asTrackId('presentation-fixture'), 0)
+const flatTrack: Track = {
+  ...baseTrack,
+  points: baseTrack.points.map(point => ({ ...point, x: point.x * 4, y: point.y * 4 })),
+}
+const bridgeTrack: Track = {
+  ...flatTrack,
+  id: asTrackId('presentation-bridge-fixture'),
+  points: flatTrack.points.map((point, index) => ({ ...point, structure: index >= 4 && index < 10 ? 'overpass' : 'surface' })),
+}
+
 describe('race presentation preparation', () => {
-  it('reuses prepared geometry and lamps for a simple crossing-free circuit', () => {
+  it.each([
+    { track: flatTrack, hasBridge: false },
+    { track: bridgeTrack, hasBridge: true },
+  ])('reuses prepared geometry, bridges and lamps (bridge=$hasBridge)', ({ track, hasBridge }) => {
     const { preparation, callbacks, frame } = scheduler()
-    const track = OFFICIAL_CIRCUITS[0].track
     const geometryService = new TrackGeometryService()
     const selectionGeometry = geometryService.get(track)
     const heightAt = vi.spyOn(selectionGeometry.path.terrainSurface, 'heightAt')
@@ -52,7 +67,9 @@ describe('race presentation preparation', () => {
     const coldGeometry = buildTrackGeometry(track)
     const warmedBridge = buildBridgePresentation(raceGeometry)
     const warmedLamps = buildLampPosts(raceGeometry)
-    expect(warmedBridge).toHaveLength(0)
+    if (hasBridge) expect(warmedBridge.length).toBeGreaterThan(0)
+    else expect(warmedBridge).toHaveLength(0)
+    expect(raceGeometry).toBe(selectionGeometry)
     expect(warmedLamps.length).toBeGreaterThan(0)
     expect(heightAt).not.toHaveBeenCalled()
     expect(warmedBridge).toEqual(buildBridgePresentation(coldGeometry))
@@ -62,7 +79,7 @@ describe('race presentation preparation', () => {
 
   it('slices texture registration and ignores callbacks from an old selection or foreground state', () => {
     const { preparation, frame } = scheduler()
-    const geometry = buildTrackGeometry(OFFICIAL_CIRCUITS[0].track)
+    const geometry = buildTrackGeometry(flatTrack)
     const keys = new Set<string>()
     const textures = {
       exists: (key: string) => keys.has(key),

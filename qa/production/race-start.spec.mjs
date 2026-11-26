@@ -34,7 +34,7 @@ test('shows the title during startup and starts a mobile race in the production 
   await playerName.getByRole('button', { name: "LET'S RACE" }).tap()
   await expect(playerName).toHaveCount(0)
   await page.getByRole('button', { name: 'RACE', exact: true }).tap()
-  await page.getByRole('button', { name: 'Race City Sprint', exact: true }).tap()
+  await page.getByRole('button', { name: 'Race Harbor Grid', exact: true }).tap()
   await page.getByRole('dialog', { name: 'Race setup' })
     .getByRole('button', { name: 'START RACE', exact: true }).tap()
 

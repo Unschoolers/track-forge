@@ -6,6 +6,7 @@ const KEY = 'trackforge-cup-v1'
 const RETIRED_OFFICIAL_TRACKS = new Set([
   'official-meadow', 'official-hairpin', 'official-frost',
   'official-bridge', 'official-quarry', 'official-switchback',
+  'official-city-sprint', 'official-desert-sweep', 'official-toy-box',
 ])
 function includesRetired(ids: readonly string[]): boolean {
   return ids.some(id => RETIRED_OFFICIAL_TRACKS.has(id))

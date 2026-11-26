@@ -30,7 +30,7 @@ const scenarios: readonly Scenario[] = [
     startRatio: 0.21932299012693934, reversed: false, laps: 2, seconds: 145 },
   { name: 'Hairpin circuit', qa: 'hairpin',
     startRatio: 0, reversed: false, laps: 1, seconds: 80 },
-  { name: 'City Sprint', official: 'City Sprint',
+  { name: 'Harbor Grid', official: 'Harbor Grid',
     startRatio: 0, reversed: false, laps: 2, seconds: 70 },
 ]
 const pathCache = scenarios.map(scenario => {
