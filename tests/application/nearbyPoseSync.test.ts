@@ -28,6 +28,7 @@ describe('nearby pose synchronizer', () => {
     let now = 0
     const payloads: Uint8Array[] = []
     const sync = new NearbyPoseSync(async (_ids, bytes) => { payloads.push(bytes) }, () => now)
+    sync.setStartAt(0)
     sync.update(player, 1, 'host', ['host'], racers)
     await flush()
     sync.update(player, 1, 'host', ['host'], racers)
@@ -44,14 +45,36 @@ describe('nearby pose synchronizer', () => {
     expect(sync.counts.sent).toBe(2)
   })
 
+  it('timestamps on shared GO and keeps guest sample time through host batches', async () => {
+    let now = 5000
+    const sent: Uint8Array[] = []
+    const host = new NearbyPoseSync(async (_ids, bytes) => { sent.push(bytes) }, () => now)
+    host.setStartAt(4000)
+    const localRacers = new Map<number, PoseRacer>([
+      [0, { ghost: new RemoteGhost(player.car), identity: DEFAULT_PLAYER_IDENTITY }],
+      [1, { ghost: new RemoteGhost(rival.car), identity: DEFAULT_PLAYER_IDENTITY }],
+    ])
+    expect(host.receive(encodePose(1, 0, 0, rival, 0, 980).subarray(0, 19), false, 1, 0, localRacers)).toBe(true)
+    expect(host.counts.relayed).toBe(0)
+    expect(host.receive(encodePose(1, 0, 0, rival, 0, 980), false, 1, 0, localRacers)).toBe(true)
+    host.update(player, 0, null, ['guest'], localRacers)
+    await flush()
+    expect(decodePoseBatch(sent[0]!)?.map(p => [p.slot, p.sampleTimeMs])).toEqual([[1, 980], [0, 1000]])
+    expect(localRacers.get(1)?.ghost.presentationDiagnostics().meanSampleAgeMs).toBe(20)
+    now += 100
+    host.reset()
+    expect(host.counts.sent).toBe(0)
+  })
+
   it('rejects guest slot spoofing, deduplicates relays and batches active host and rival positions', async () => {
     let now = 200
     const payloads: Uint8Array[] = []
     const sync = new NearbyPoseSync(async (_ids, bytes) => { payloads.push(bytes) }, () => now)
-    const bad = encodePose(2, 1, 0, rival)
+    sync.setStartAt(0)
+    const bad = encodePose(2, 1, 0, rival, 0, 0)
     expect(sync.receive(bad, false, 1, 0, racers)).toBe(true)
     expect(sync.counts.relayed).toBe(0)
-    const valid = encodePose(1, 1, 0, rival)
+    const valid = encodePose(1, 1, 0, rival, 0, now)
     expect(sync.receive(valid, false, 1, 0, racers)).toBe(true)
     expect(sync.receive(valid, false, 1, 0, racers)).toBe(true)
     expect(sync.counts.relayed).toBe(1)
@@ -72,6 +95,7 @@ describe('nearby pose synchronizer', () => {
     const sync = new NearbyPoseSync(async () => {
       if (fail) throw new Error('radio failure')
     }, () => now)
+    sync.setStartAt(0)
     for (let i = 0; i < 40; i++) {
       now = i * 17
       sync.update(player, 1, 'host', ['host'], racers)
@@ -90,6 +114,7 @@ describe('nearby pose synchronizer', () => {
     let now = 0
     const sentAt: number[] = []
     const sync = new NearbyPoseSync(async () => { sentAt.push(now) }, () => now)
+    sync.setStartAt(0)
     // Mixed 120/60/40/30 Hz render intervals, representative of mobile vsync.
     const gaps = [8.3, 25, 16.7, 25, 8.3, 33.3, 8.4, 8.3]
     for (let i = 0; i < 600; i++) {
@@ -117,6 +142,7 @@ describe('nearby pose synchronizer', () => {
       sentAt.push(now)
       release = resolve
     }), () => now)
+    sync.setStartAt(0)
     sync.update(player, 1, 'host', ['host'], racers)
     for (now = 10; now <= 200; now += 10) sync.update(player, 1, 'host', ['host'], racers)
     expect(sentAt).toEqual([0])
@@ -131,6 +157,7 @@ describe('nearby pose synchronizer', () => {
   it('discards late sends after room reset and restores fresh sequence and metrics', async () => {
     let complete: (() => void) | undefined
     const sync = new NearbyPoseSync(() => new Promise<void>(resolve => { complete = resolve }), () => 0)
+    sync.setStartAt(0)
     sync.update(player, 1, 'host', ['host'], racers)
     expect(sync.counts.sent).toBe(1)
     sync.reset()
@@ -138,6 +165,9 @@ describe('nearby pose synchronizer', () => {
     await flush()
     expect(sync.counts).toEqual({ sent: 0, received: 0, sendFailed: 0, relayed: 0 })
     expect(sync.targetPoseHz).toBe(30)
+    sync.update(player, 1, 'host', ['host'], racers)
+    expect(sync.counts.sent).toBe(0)
+    sync.setStartAt(0)
     sync.update(player, 1, 'host', ['host'], racers)
     expect(sync.counts.sent).toBe(1)
   })
@@ -147,6 +177,7 @@ describe('nearby pose synchronizer', () => {
     const sync = new NearbyPoseSync(async (ids, bytes) => {
       sends.push({ ids, bytes })
     }, () => now)
+    sync.setStartAt(0)
     sync.update(player, 0, null, ['guest-1', 'guest-2', 'guest-3'], racers)
     await flush()
     now = 34

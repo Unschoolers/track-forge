@@ -21,22 +21,47 @@ Both native hosts bind all local IPv4 interfaces; their listening port is not ex
 ## Remote car presentation
 
 Both transports share a receiver-local interpolation buffer. Start at 100 ms,
-then adapt between 50 and 150 ms using smoothed actual arrival gaps and jitter.
-Grow the target quickly when updates are irregular, shrink it gradually on a
-healthy stream. The independent presentation clock slews at 0.8–1.2x real time
-toward that target instead of stopping or jumping when jitter changes. Retain
-24 pose samples for the 60 Hz / 150 ms case. Small prediction corrections blend
-out over 100 ms; recoveries and structure transitions clear the correction.
-Existing prediction limits (120 ms / 75 world units) and two-second expiry
-remain unchanged. Startup and prolonged radio outages can still hold a pose.
+then adapt between 25 and 100 ms using smoothed arrival jitter.
+The playback clock slews at 0.8–1.2x instead of freezing; 24 history samples
+and 100 ms small prediction corrections preserve smoothness. Timed wire-v6
+poses contain a signed 32-bit millisecond offset from synchronized GO
+(23 bytes total). Host relays preserve source timestamps.
+Receiver maps timestamps to its local clock, rejects missing/implausibly
+old/future/regressing samples, and targets 25–100 ms delay according to arrival
+jitter. Prediction toward the shared present is capped at 120 ms / 75 world
+units and never crosses recovery or structure transitions. Two-second expiry
+is unchanged. Untimestamped poses and batches are invalid.
 
-Per-remote-player `presentation` diagnostics report effective clock delay
-(mean/min/max), target delay, render sample count, clock hold time, time requesting
-prediction, time prediction was capped/unavailable, and correction magnitude.
-Durations exclude startup and suspended render intervals over 500 ms. Trace
-peeks do not advance playback or increment render counters. These are receiver
-clock metrics, not measured end-to-end network latency. Verify on matched
-device captures; synthetic timing tests are not radio latency evidence.
+Per-peer presentation diagnostics include target/effective delay, clock hold,
+prediction caps, correction magnitude and estimated sample age. A synchronized
+sample's age includes clock-offset error, not an exact one-way latency.
+
+Nearby race HUD and finish use local monotonic elapsed from synchronized GO,
+rather than potentially capped physics catch-up. Physics and offline timing
+remain unchanged. Finish is sampled at the rendering frame that detects gate
+crossing, so normal uncertainty includes a frame interval and clock offset
+error. Diagnostics record simulation elapsed, frozen finish clock elapsed and
+their difference. During racing, guests repeat five probes every 15 seconds;
+record the latest offset drift and minimum RTT plus audit timeout counts. Audit
+failure does not end a race, and an audit never moves the fixed GO epoch.
+Asymmetric transit can appear as drift; do not silently adjust physics or claim
+exact simultaneous views.
+
+## Shared race clock and official live ranking (wire v6)
+
+Five sequential monotonic clock probes run after each guest scene becomes ready.
+Use the lowest round-trip sample to estimate host-minus-guest clock offset;
+schedule GO from the host's absolute monotonic timestamp. Asymmetric latency
+still introduces uncertainty. Missing probes fail the existing staging deadline,
+rather than silently guessing a start. All devices must update together; there is no older race protocol fallback.
+
+The host alone orders the field from its local progress and accepted guest
+progress (150 ms stream). Guests display the host's sequenced complete order;
+unknown/expired orders show LIVE. Reliable rank updates are bounded to one
+in-flight send, at most one pending replacement, a 100 ms change cadence and
+500 ms heartbeat. Existing progress relays remain for diagnostics. Finish and disconnect status participate in
+the same order. The host's view can precede a guest's receipt by transit time;
+this is not a claim of instantaneous agreement. Local physics remain local.
 
 ## Validation
 
@@ -53,12 +78,9 @@ The LAN transport is local-only; it is *not* an internet multiplayer server. Rol
 
 ## Android Nearby pose pacing
 
-The application owns the healthy 30 Hz pose cadence. Schedule against a
-monotonic deadline rather than time since the last rendered frame. Skip missed
-deadlines instead of replaying stale poses; keep one admission in flight and
-space fresh samples by at least half a period. This preserves the average
-cadence across variable display refresh intervals without unbounded bursts.
- The Google Nearby bridge
+The application owns the healthy 30 Hz pose cadence using monotonic deadlines,
+keeping one admission in flight, spacing fresh samples by at least half a period,
+and skipping missed slots without catch-up bursts. The Google Nearby bridge
 must not repeat that rate gate: arrival times can shift across the JS/native
 boundary. Keep the one-outstanding-payload window per peer and stream, and
 native adaptive rate limits for degraded peers (15 Hz down to 1 Hz). Progress

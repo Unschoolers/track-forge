@@ -4,11 +4,11 @@ import { decodePose, decodeProgress, encodePose, encodeProgress, Packet, POSE_BY
 import { nearbyCar } from '../fixtures/nearbyRace'
 
 describe('nearby progress telemetry', () => {
-  it('round-trips a bounded eight-byte packet without changing legacy poses', () => {
+  it('round-trips a bounded eight-byte packet alongside timestamped poses', () => {
     const packet = encodeProgress(2, 65_535, 123.5)
     expect(packet).toHaveLength(PROGRESS_BYTES)
     expect(decodeProgress(packet)).toEqual({ slot: 2, round: 0, sequence: 65_535, progress: 123.5 })
-    const pose = encodePose(2, 1, 0, nearbyCar('red', 40))
+    const pose = encodePose(2, 1, 0, nearbyCar('red', 40), 0, 0)
     expect(pose).toHaveLength(POSE_BYTES)
     expect(decodePose(pose)?.slot).toBe(2)
     expect(decodeProgress(pose)).toBeNull()

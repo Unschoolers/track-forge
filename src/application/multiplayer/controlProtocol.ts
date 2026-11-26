@@ -1,12 +1,13 @@
 import { CAR_IDS, type CarId, type LightingMode } from '@/domain/model'
 import { NEARBY_START_GRID_SIZE } from '@/domain/race/startGrid'
 import { isPlayerIdentity, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
+import { CLOCK_PROBE_MASK } from './nearbyClock'
 import { Packet } from '@/application/multiplayer/raceWire'
 import { normalizeDisplayName } from '@/domain/track/trackCreator'
 
 export const MAX_PLAYERS = NEARBY_START_GRID_SIZE
-/** Breaking change to compact pose/progress epochs. Enforce before any race starts. */
-export const NEARBY_WIRE_PROTOCOL_VERSION = 4
+/** Version 6 requires timed race poses. Enforce before any race starts. */
+export const NEARBY_WIRE_PROTOCOL_VERSION = 6
 // Eight fully named players may exceed 1 KiB in UTF-8 (24 Unicode letters each).
 const MAX_CONTROL_BYTES = 2048
 const encoder = new TextEncoder()
@@ -25,8 +26,11 @@ export type Control =
   | { type: 'ready'; car: CarId; identity: PlayerIdentity; round?: number; protocolVersion?: number; name?: string; accepted?: boolean; choice?: number }
   | { type: 'lobby'; round: number; revision: number; players: LobbyPlayer[] }
   | { type: 'lineup'; cars: (CarId | null)[]; identities: (PlayerIdentity | null)[]; positions: (number | null)[]; round?: number; names?: (string | null)[] }
+  | { type: 'clock-probe'; round: number; probe: number }
+  | { type: 'clock-reply'; round: number; probe: number; receivedAt: number; sentAt: number }
+  | { type: 'ranking'; round: number; sequence: number; order: number[] }
   | { type: 'armed'; round?: number }
-  | { type: 'start'; cars: (CarId | null)[]; delay: number; readyAge: number; round?: number }
+  | { type: 'start'; cars: (CarId | null)[]; hostStartsAt: number; round: number }
   | { type: 'finish'; slot: number; time: number | null; round?: number }
   | { type: 'left'; slot: number; round?: number }
   | { type: 'share-offer' }
@@ -109,6 +113,14 @@ function validLobbyPlayers(value: unknown): value is LobbyPlayer[] {
   return slots.has(0)
 }
 
+function validClockTime(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER
+}
+
+function validProbe(value: unknown): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= CLOCK_PROBE_MASK
+}
+
 function isControl(value: unknown): value is Control {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const message = value as Record<string, unknown>
@@ -143,13 +155,17 @@ function isControl(value: unknown): value is Control {
         ? identity === null : isPlayerIdentity(identity)) &&
         validLineupPositions(cars, positions) && validLineupNames(message.names, cars)
     }
+    case 'clock-probe': return message.round !== undefined && validProbe(message.probe)
+    case 'clock-reply': return message.round !== undefined && validProbe(message.probe) &&
+      validClockTime(message.receivedAt) && validClockTime(message.sentAt) && message.sentAt >= message.receivedAt
+    case 'ranking': return message.round !== undefined && typeof message.sequence === 'number' &&
+      Number.isInteger(message.sequence) && message.sequence >= 0 && message.sequence <= 65535 &&
+      Array.isArray(message.order) && message.order.length <= MAX_PLAYERS &&
+      new Set(message.order).size === message.order.length && message.order.every(slot =>
+        typeof slot === 'number' && Number.isInteger(slot) && slot >= 0 && slot < MAX_PLAYERS)
     case 'armed': return true
     case 'start':
-      return validCars(message.cars) &&
-        typeof message.delay === 'number' && Number.isFinite(message.delay) &&
-        message.delay >= 0 && message.delay <= 5000 &&
-        typeof message.readyAge === 'number' && Number.isFinite(message.readyAge) &&
-        message.readyAge >= 0 && message.readyAge <= 30_000
+      return message.round !== undefined && validCars(message.cars) && validClockTime(message.hostStartsAt)
     case 'finish':
       return typeof message.slot === 'number' && Number.isInteger(message.slot) &&
         message.slot >= 0 && message.slot < MAX_PLAYERS &&

@@ -515,6 +515,7 @@ describe('Nearby Arcade', () => {
         expect(device.snapshot().phase).toBe('racing')
       }
 
+      for (const { device } of setups) expect(device.synchronizedElapsed()).toBe(0)
       for (const [index, { device, car }] of setups.entries()) {
         device.update(makeCar(car, index * 10, index * 5, index === 1 ? 'bridge' : null))
       }
@@ -537,6 +538,7 @@ describe('Nearby Arcade', () => {
       expect(hostBatches.map(({ bytes }) => bytes.byteLength)).toEqual([1 + POSE_BYTES, 1 + 4 * POSE_BYTES])
       expect(hostBatches.every(({ from, to }) => from === 'host' && to.length === 3)).toBe(true)
       expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ slot }) => slot)).toEqual([0, 1, 2, 3])
+      expect(decodePoseBatch(hostBatches[1]!.bytes)?.map(({ sampleTimeMs }) => sampleTimeMs)).toEqual([-3967, -4000, -4000, -4000])
 
       // Exports identify the actual race roster and packet quality without
       // leaking Nearby connection IDs or requiring packet-level logging.
@@ -569,12 +571,14 @@ describe('Nearby Arcade', () => {
       }, { interval: 5 })
       const progressCount = network.packets.filter(({ bytes }) => bytes[0] === Packet.Progress).length
       expect(progressCount).toBeGreaterThanOrEqual(4)
+
       time += 200
       const leadingHost = { ...progressCars[0]!, lap: 1 }
       host.update(leadingHost, progressState)
       await vi.waitFor(() => {
         expect(red.livePosition(progressCars[1]!, progressState)?.position).toBe(2)
         expect(host.livePosition(leadingHost, progressState)?.position).toBe(1)
+        expect(new Set(setups.map(({ device }, index) => device.livePosition(progressCars[index]!, progressState)?.position)).size).toBe(4)
       }, { interval: 5 })
 
 
@@ -587,6 +591,12 @@ describe('Nearby Arcade', () => {
       expect(trace.frames.at(-1)?.rivals.filter(rival => rival.visible)).toHaveLength(3)
       expect(JSON.stringify(trace)).not.toMatch(/guest-1|guest-2|guest-3/)
 
+      time += 20_000
+      red.update(progressCars[1]!, progressState)
+      await vi.waitFor(async () => expect(await red.diagnostics()).toMatchObject({
+        synchronization: { clockAudit: { offsetDriftMs: 0, roundTripMs: 0 }, clockAuditFailures: 0 },
+      }), { interval: 5 })
+      expect(red.synchronizedElapsed()).toBeCloseTo(host.synchronizedElapsed()!)
       red.finish(40.125)
       host.finish(42)
       time += 50
