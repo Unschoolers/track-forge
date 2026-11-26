@@ -8,6 +8,8 @@ import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track 
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { raceProgress } from '@/domain/race/ranking'
 import { decodeProgress, Packet, RemoteGhost } from './raceWire'
+import { NearbyClock } from './nearbyClock'
+import { NearbyRanking, rankNearby } from './nearbyRanking'
 import { NearbyProgressSync } from './nearbyProgressSync'
 import { awardNearbyCupRound, nearbyCupStandings } from './nearbyCupScoring'
 import { NearbyPoseSync, type PoseRacer } from './nearbyPoseSync'
@@ -128,7 +130,10 @@ export class NearbyRace {
   private readonly racers = new Map<number, PoseRacer>()
   private receiver: TrackReceiver | null = null
   private prepared: Pick<Course, 'laps' | 'lighting'> | null = null
-  private readySentAt = 0
+  private readonly clock = new NearbyClock()
+  private readonly ranking = new NearbyRanking()
+  private localProgress: number | null = null
+  private sharedStartAt: number | null = null
   private slot = 0
   private readonly poseSync: NearbyPoseSync
   private readonly progressSync: NearbyProgressSync
@@ -182,6 +187,8 @@ export class NearbyRace {
       progressSendFailures: this.progressSync.failedSends,
       targetPoseHz: this.poseSync.targetPoseHz,
     })
+    Object.assign(report, { synchronization: { clock: this.clock.estimate, sharedStartAtMs: this.sharedStartAt,
+      ranking: this.ranking.diagnostics() } })
     if (!this.transport.diagnostics) return { ...report, native: { status: 'unavailable' } }
     try {
       return { ...report, native: { status: 'available', report: await this.transport.diagnostics() } }
@@ -413,7 +420,10 @@ export class NearbyRace {
     this.racers.clear()
     this.lineup = null
     this.localSceneReady = false
-    this.readySentAt = 0
+    this.clock.reset()
+    this.ranking.reset()
+    this.localProgress = null
+    this.sharedStartAt = null
     this.receiver = null
     this.prepared = null
     this.poseSync.reset()
@@ -482,10 +492,12 @@ export class NearbyRace {
     if (state) this.diagnostic.captureTraceFrame(vehicle, state)
     const recipients = this.endpoints()
     this.poseSync.update(vehicle, this.slot, this.hostId, recipients, this.racers)
-    if (state) this.progressSync.update(this.slot, raceProgress(
-      vehicle, state.path.points.length, state.startPathIndex, state.reversed,
-      normalizeRouteKind(state.routeKind),
-    ), recipients)
+    if (state) {
+      this.localProgress = raceProgress(vehicle, state.path.points.length, state.startPathIndex,
+        state.reversed, normalizeRouteKind(state.routeKind))
+      if (this.role === 'guest') this.progressSync.update(this.slot, this.localProgress, recipients)
+      else this.publishRanking()
+    }
   }
 
   /** The finishing sample remains available after the room stops sending poses. */
@@ -494,19 +506,34 @@ export class NearbyRace {
   }
 
   /** Unknown peers keep the HUD on LIVE instead of showing a fabricated rank. */
-  livePosition(vehicle: RaceVehicle, state: RaceState): { position: number; vehicleCount: number } | null {
+  livePosition(_vehicle: RaceVehicle, _state: RaceState): { position: number; vehicleCount: number } | null {
     if (this.phase !== 'racing' || !this.racers.has(this.slot)) return null
-    const local = raceProgress(vehicle, state.path.points.length, state.startPathIndex,
-      state.reversed, normalizeRouteKind(state.routeKind))
-    let ahead = 0
-    for (const [slot, racer] of this.racers) {
-      if (slot === this.slot || racer.left || racer.time === null) continue
-      if (typeof racer.time === 'number') { ahead++; continue }
-      const remote = this.progressSync.latest(slot)
-      if (remote === null) return null
-      if (remote > local + 0.25 || (Math.abs(remote - local) <= 0.25 && slot < this.slot)) ahead++
+    if (this.role === 'guest' && !this.hostId) return null
+    return this.ranking.position(this.slot, this.now())
+  }
+
+  private publishRanking(): void {
+    if (this.role !== 'host' || this.phase !== 'racing') return
+    const order = rankNearby([...this.racers].map(([slot, racer]) => ({
+      slot, progress: slot === this.slot ? this.localProgress : this.progressSync.latest(slot),
+      finish: racer.time, left: !!racer.left,
+    })))
+    const round = this.round
+    this.ranking.publish(order, this.now(), (sequence, order) =>
+      this.transport.send(this.endpoints(), encodeControl({ type: 'ranking', round, sequence, order })),
+    () => this.record('ranking_delivery_failed'))
+  }
+
+  private probeClock(): void {
+    if (!this.hostId || this.phase !== 'staging') return
+    const estimate = this.clock.estimate
+    if (estimate) {
+      this.record('clock_synchronized', estimate)
+      this.sendControl([this.hostId], { type: 'armed', round: this.round })
+      return
     }
-    return { position: ahead + 1, vehicleCount: this.racers.size }
+    const request = this.clock.request(this.now())
+    if (request) this.sendControl([this.hostId], { type: 'clock-probe', round: this.round, probe: request.probe })
   }
 
   recovered(): void { this.poseSync.recovered() }
@@ -545,8 +572,7 @@ export class NearbyRace {
     this.localSceneReady = true
     this.record('scene_ready')
     if (this.role === 'guest' && this.hostId) {
-      this.readySentAt = this.now()
-      this.sendControl([this.hostId], { type: 'armed', round: this.round })
+      this.probeClock()
     } else if (this.role === 'host') {
       this.scheduleHostCountdown()
     }
@@ -691,7 +717,7 @@ export class NearbyRace {
           racer.time === undefined && (fromHost || guestSlot === packet.slot)) {
         const accepted = this.progressSync.receive(packet)
         this.diagnostic.recordProgress(packet.slot, packet.sequence, accepted, this.now())
-        if (accepted && !fromHost) this.progressSync.relay(bytes, this.endpoints(id))
+        if (accepted && !fromHost) this.publishRanking()
       }
       return
     }
@@ -794,17 +820,31 @@ export class NearbyRace {
         (this.lobby.localAccepted || this.lobby.unlockPending) && message.cars[0] && message.cars[this.slot] === this.localCar) {
       this.stage(this.course, message.cars, message.identities, message.positions, message.names)
     } else if (guestSlot !== undefined && this.phase === 'staging' &&
+        message.type === 'clock-probe' && incomingRound === this.round) {
+      const receivedAt = this.now()
+      this.sendControl([id], { type: 'clock-reply', round: this.round, probe: message.probe,
+        receivedAt, sentAt: this.now() })
+    } else if (fromHost && this.phase === 'staging' && message.type === 'clock-reply' &&
+        incomingRound === this.round && this.localSceneReady) {
+      if (this.clock.receive(message.probe, message.receivedAt, message.sentAt, this.now())) this.probeClock()
+    } else if (fromHost && this.phase === 'racing' && message.type === 'ranking' &&
+        incomingRound === this.round) {
+      if (message.order.length && (message.order.length !== this.racers.size ||
+          message.order.some(slot => !this.racers.has(slot)))) return
+      this.ranking.receive(message.sequence, message.order, this.now())
+    } else if (guestSlot !== undefined && this.phase === 'staging' &&
         message.type === 'armed' && incomingRound === this.round) {
       if (!this.armed.has(id)) this.armed.set(id, this.now())
       this.scheduleHostCountdown()
     } else if (fromHost && this.phase === 'staging' && message.type === 'start' &&
         incomingRound === this.round && this.course &&
         message.cars[0] && message.cars[this.slot] === this.localCar && this.localSceneReady) {
-      const now = this.now()
-      // Estimate one-way transit after the scene-ready packet, excluding time
-      // spent at the host. Device clocks may have arbitrary independent origins.
-      const halfRoundTrip = Math.max(0, now - this.readySentAt - message.readyAge) / 2
-      this.beginCountdown(now + message.delay - halfRoundTrip)
+      const estimate = this.clock.estimate
+      if (!estimate || message.hostStartsAt === undefined) {
+        this.fail('Multiplayer clock synchronization incomplete.', 'clock')
+        return
+      }
+      this.beginCountdown(message.hostStartsAt - estimate.offsetMs)
     } else if (this.phase === 'racing' && incomingRound === this.round && message.type === 'finish' &&
         message.slot !== this.slot && (fromHost || message.slot === guestSlot)) {
       if (this.recordFinish(message.slot, message.time) && !fromHost) this.sendControl(this.endpoints(id), message)
@@ -866,7 +906,7 @@ export class NearbyRace {
     for (const [id, receivedAt] of this.armed) {
       const now = this.now()
       this.sendControl([id], {
-        type: 'start', cars: this.lineup, delay: startsAt - now, readyAge: now - receivedAt, round: this.round,
+        type: 'start', cars: this.lineup, delay: startsAt - now, readyAge: now - receivedAt, hostStartsAt: startsAt, round: this.round,
       })
     }
     this.beginCountdown(startsAt)
@@ -879,6 +919,7 @@ export class NearbyRace {
       return
     }
     this.clearTimeout()
+    this.sharedStartAt = startsAt
     this.setPhase('racing')
     this.record('countdown_scheduled', { remainingMs: Math.round(startsAt - this.now()) })
     this.countdownStarts.publish(startsAt)
@@ -888,6 +929,7 @@ export class NearbyRace {
     const racer = this.racers.get(slot)
     if (!racer || racer.time !== undefined || racer.left) return false
     racer.time = time
+    this.publishRanking()
     this.scoreCupRound()
     this.changed()
     return true
@@ -932,7 +974,7 @@ export class NearbyRace {
 
   private markLeft(slot: number): void {
     const racer = this.racers.get(slot)
-    if (racer) { racer.left = true; this.scoreCupRound(); this.changed() }
+    if (racer) { racer.left = true; this.publishRanking(); this.scoreCupRound(); this.changed() }
   }
 
   private endpoints(exclude?: string): string[] {
@@ -1027,7 +1069,10 @@ export class NearbyRace {
     this.armed.clear()
     this.localSceneReady = false
     this.lineup = null
-    this.readySentAt = 0
+    this.clock.reset()
+    this.ranking.reset()
+    this.localProgress = null
+    this.sharedStartAt = null
     this.racers.clear()
     this.receiver = null
     this.prepared = null

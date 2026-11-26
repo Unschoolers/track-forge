@@ -27,6 +27,22 @@ and never rewind the presentation clock when the buffer grows. Existing recovery
 cuts, bounded extrapolation and two-second expiry remain unchanged. Verify on
 matched device captures; synthetic timing tests are not radio latency evidence.
 
+## Shared race clock and official live ranking (wire v5)
+
+Five sequential monotonic clock probes run after each guest scene becomes ready.
+Use the lowest round-trip sample to estimate host-minus-guest clock offset;
+schedule GO from the host's absolute monotonic timestamp. Asymmetric latency
+still introduces uncertainty. Missing probes fail the existing staging deadline,
+rather than silently guessing a start. Both devices must update together.
+
+The host alone orders the field from its local progress and accepted guest
+progress (150 ms stream). Guests display the host's sequenced complete order;
+unknown/expired orders show LIVE. Reliable rank updates are bounded to one
+in-flight send with a 500 ms heartbeat and no stale queue. Guest progress is
+no longer relayed to other guests. Finish and disconnect status participate in
+the same order. The host's view can precede a guest's receipt by transit time;
+this is not a claim of instantaneous agreement. Local physics remain local.
+
 ## Validation
 
 CI: JavaScript transport-selection/component regression tests, TypeScript/lint, Android native unit/compile, Windows Rust release compile and executable upload. A manual end-to-end acceptance matrix is needed to confirm radio discovery, firewall prompts and real race feel:
