@@ -1,5 +1,32 @@
 # Race performance baseline
 
+## Imported track editor profiling
+
+Use the opt-in SSR profiler to separate JSON import, domain geometry, terrain
+mesh compilation, and representative editor mutations for a saved or imported
+track. It accepts either a Track Forge export wrapper (`{ "track": ... }`) or
+the track object directly and prints one JSON report:
+
+```sh
+node qa/perf/track-profile.mjs path/to/track.trackforge.json
+```
+
+The report includes JSON parsing and `decodeTrack`, cold and warm
+`TrackGeometryService` lookups, full and overview terrain presentation builds,
+a 16-cell terrain paint and a one-point move, plus geometry rebuilds after each
+edit. Timings are single-process Node/Vite SSR samples; they exclude Vite module
+startup, Phaser rendering, browser layout, GPU work, and pointer sampling. They
+are useful for finding expensive domain stages, not for claiming an editor FPS
+or device improvement. Compare the same file, Node version, and machine before
+and after changes. Use browser/device profiling for rendering and interaction
+latency.
+
+Run its focused contract test with:
+
+```sh
+node --test qa/perf/track-profile.test.mjs
+```
+
 Record City Harbor in both lighting modes and use daytime for Rally and Sandy
 Beach. Use the same saved track files before and after a change.
 
@@ -209,6 +236,15 @@ Compare the same Papou track, lighting, car and device for 30–60 seconds of
 active driving, cold and warm, including turns. Record p95/p99 frame intervals,
 spikes over 33/50 ms, startup latency and Android memory pressure. The component
 tests establish scheduling behavior, not a measured device improvement.
+
+To benchmark one specific exported track in the browser, set
+`TRACKFORGE_RACE_PERF_TRACK` to its path. The test imports it and records cold
+and warm runs in daytime, using the imported track name:
+
+```sh
+TRACKFORGE_RACE_PERF_TRACK=/path/to/Nj.trackforge.json npm run qa:mobile -- race-performance
+```
+
 
 ## Editor point-drag invalidation
 

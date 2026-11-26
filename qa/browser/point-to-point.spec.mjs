@@ -25,7 +25,7 @@ test('persists an open route and displays its ordered finish splits', async ({ p
   await page.getByRole('button', { name: 'TRACK EDITOR', exact: true }).click()
   await page.getByRole('button', { name: 'Edit Open Stage', exact: true }).click()
   await page.getByRole('button', { name: 'Editor menu' }).click()
-  await page.getByRole('button', { name: 'Point to point', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Route type' }).selectOption('point-to-point')
   await page.getByRole('button', { name: 'SAVE TRACK', exact: true }).click()
   await expect.poll(async () => (await readSavedTracks(page))
     .find(track => track.id === trackId)?.routeKind).toBe('point-to-point')

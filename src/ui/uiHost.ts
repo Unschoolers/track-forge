@@ -308,11 +308,6 @@ export class DomUiHost implements UiHost {
               race: () => openLibrary('race'),
               menu: () =>
                 this.controller.dispatch({ type: 'open-editor-menu' }),
-              rename: () =>
-                this.controller.dispatch({
-                  type: 'open-track-name',
-                  purpose: 'rename',
-                }),
               save: () =>
                 this.controller.dispatch({
                   type: 'save-current-track',
@@ -623,7 +618,7 @@ export class DomUiHost implements UiHost {
           cancel: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'cancel' }),
         }, state.notice)
       case 'editor-menu':
-        return createEditorMenuModal(state.editor.environmentId, state.editor.routeKind, {
+        return createEditorMenuModal(state.currentTrack?.name ?? 'NO TRACK', state.editor.environmentId, state.editor.routeKind, {
           close,
           setRouteKind: (routeKind) =>
             this.controller.dispatch({ type: 'editor', command: { type: 'set-route-kind', routeKind } }),
@@ -632,9 +627,9 @@ export class DomUiHost implements UiHost {
               type: 'editor',
               command: { type: 'set-environment', environmentId },
             }),
-          export: () => {
+          share: () => {
             const track = this.controller.snapshot().currentTrack
-            if (track) void this.exportTrackFile(track)
+            if (track) void this.shareTrackChallenge(track)
           },
           save: () =>
             this.controller.dispatch({ type: 'save-current-track' }),
@@ -646,16 +641,6 @@ export class DomUiHost implements UiHost {
             this.controller.dispatch({
               type: 'open-track-name',
               purpose: 'rename',
-            }),
-          choose: () =>
-            this.controller.dispatch({
-              type: 'open-track-library',
-              purpose: 'edit',
-            }),
-          options: () =>
-            this.controller.dispatch({
-              type: 'open-options',
-              returnTo: 'editor',
             }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
         })

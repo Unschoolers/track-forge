@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
 
 const trackDirectory = process.env.TRACKFORGE_RACE_PERF_TRACKS
-const scenarios = trackDirectory ? [
+const customTrack = process.env.TRACKFORGE_RACE_PERF_TRACK
+const scenarios = customTrack ? [{ name: 'custom', filename: customTrack, lighting: 'day' }] : trackDirectory ? [
   { name: 'City Harbor', filename: 'City-Harbor.trackforge.json', lighting: 'day' },
   { name: 'City Harbor', filename: 'City-Harbor.trackforge.json', lighting: 'night' },
   { name: 'Rally', filename: 'Rally.trackforge.json', lighting: 'day' },
@@ -24,12 +25,12 @@ for (const scenario of scenarios) {
 
     let trackName = scenario.name
     if (scenario.filename) {
-      test.setTimeout(90_000)
+      test.setTimeout(180_000)
       await openPicker()
-      await picker.locator('input[type="file"]').setInputFiles(resolve(trackDirectory, scenario.filename))
+      await picker.locator('input[type="file"]').setInputFiles(resolve(trackDirectory ?? '.', scenario.filename))
       const editor = page.locator('[data-screen="editor"]')
       await expect(editor).toBeVisible()
-      trackName = await editor.locator('[data-action="rename-track"]').textContent()
+      trackName = await editor.locator('.topbar-title').textContent()
       expect(trackName).toBeTruthy()
       // Older Sandy Beach exports have a recoverable tail after the closed loop.
       const repair = editor.getByRole('button', { name: 'Remove extra road', exact: true })

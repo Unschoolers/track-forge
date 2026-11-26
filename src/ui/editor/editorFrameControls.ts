@@ -11,7 +11,6 @@ export interface EditorFrameActions {
   readonly home: () => void
   readonly race: () => void
   readonly menu: () => void
-  readonly rename: () => void
   readonly save: () => void
   readonly load: () => void
   readonly camera: (action: EditorCameraAction) => void
@@ -21,17 +20,12 @@ export interface EditorFrameActions {
 
 export function createEditorTopbar(
   state: Pick<AppSnapshot, 'currentTrack'>,
-  actions: Pick<EditorFrameActions, 'home' | 'menu' | 'rename'>,
+  actions: Pick<EditorFrameActions, 'home' | 'menu'>,
 ): HTMLElement {
   const topbar = element('header', 'topbar')
   topbar.append(
     editorIconButton('home', 'home', 'Home', actions.home),
-    button(
-      state.currentTrack?.name ?? 'NO TRACK',
-      'rename-track',
-      actions.rename,
-      'topbar-title title-button',
-    ),
+    element('span', 'topbar-title', state.currentTrack?.name ?? 'NO TRACK'),
     editorIconButton('menu', 'editor-menu', 'Editor menu', actions.menu),
   )
   return topbar

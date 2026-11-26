@@ -79,7 +79,7 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await assertClearEditorControls(page, 'terrain')
 
     await editor.getByRole('button', { name: 'Editor menu' }).click()
-    await page.getByRole('button', { name: 'Cityscape', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Environment' }).selectOption('cityscape')
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await editor.locator('summary.editor-toolbox-summary').click()
     await editor.getByRole('button', { name: 'Scenery', exact: true }).click()
@@ -115,9 +115,9 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
   }
   async function setEnvironment(name) {
     await page.getByRole('button', { name: 'Editor menu' }).click()
-    const choice = page.getByRole('button', { name, exact: true })
-    await choice.click()
-    await expect(choice).toHaveAttribute('aria-pressed', 'true')
+    const choice = page.getByRole('combobox', { name: 'Environment' })
+    await choice.selectOption({ label: name })
+    await expect(choice.locator('option:checked')).toHaveText(name)
     await page.getByRole('button', { name: 'Close', exact: true }).click()
   }
 
