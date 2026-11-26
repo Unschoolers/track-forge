@@ -57,6 +57,8 @@ export interface ScoreStore {
 
 export type PedalMode = 'auto' | 'manual'
 
+export type GraphicsQuality = 'low' | 'medium' | 'high'
+
 export type SteeringSensitivity = 0.75 | 1 | 1.5
 
 export interface Preferences {
@@ -67,6 +69,7 @@ export interface Preferences {
   readonly soundEffectsVolume?: number
   readonly hapticsEnabled: boolean
   readonly dynamicZoomEnabled: boolean
+  readonly graphicsQuality?: GraphicsQuality
   readonly steeringLayout?: 'drag' | 'buttons'
   readonly steeringHand?: 'left' | 'right'
   readonly controlSize?: 'standard' | 'large'

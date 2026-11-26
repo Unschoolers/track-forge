@@ -110,6 +110,7 @@ export class RaceScene extends Phaser.Scene {
     private readonly geometry: TrackGeometryService,
     private readonly racePerformance?: RacePerformance,
     private readonly frameDiagnostics?: RaceFrameDiagnostics,
+    private readonly renderPixelRatio: () => number = () => 1,
   ) {
     super({ key: 'RaceScene' })
   }
@@ -137,6 +138,7 @@ export class RaceScene extends Phaser.Scene {
     const environment = getTrackEnvironment(track.environmentId)
     const palette = night ? environment.night : environment.day
     this.cameras.main.setBackgroundColor(palette.raceGround)
+    this.cameras.main.setZoom(this.renderPixelRatio())
     this.groundRenderer = new GroundTextureRenderer(this)
     this.renderGroundPresentation(night)
     this.environmentSceneryRenderer = new SceneryRenderer(this.add.graphics().setDepth(WORLD_RENDER_DEPTH.environmentScenery))
@@ -193,7 +195,7 @@ export class RaceScene extends Phaser.Scene {
       const camera = this.cameras.main
       const view = {
         centerX: this.raceCamera.x, centerY: this.raceCamera.y,
-        width: camera.width, height: camera.height,
+        width: camera.width / this.renderPixelRatio(), height: camera.height / this.renderPixelRatio(),
         zoom: this.presentationZoom(
           this.snapshot.preferences.dynamicZoomEnabled ? this.raceCamera.zoom : RACE_CAMERA_TUNING.fixedZoom,
           this.raceSession.snapshot().state?.countdown ?? 0,
@@ -324,7 +326,10 @@ export class RaceScene extends Phaser.Scene {
         {
           dynamicZoom: this.snapshot.preferences.dynamicZoomEnabled,
           steering: this.controls.snapshot().steering,
-          viewport: this.cameras.main,
+          viewport: {
+            width: this.cameras.main.width / this.renderPixelRatio(),
+            height: this.cameras.main.height / this.renderPixelRatio(),
+          },
         },
         Math.min(0.033, frameSeconds),
       )
@@ -332,7 +337,7 @@ export class RaceScene extends Phaser.Scene {
         this.raceCamera.x + this.raceCamera.shake.x,
         this.raceCamera.y + this.raceCamera.shake.y,
       )
-      this.cameras.main.setZoom(this.presentationZoom(this.raceCamera.zoom, race.countdown))
+      this.cameras.main.setZoom(this.presentationZoom(this.raceCamera.zoom, race.countdown) * this.renderPixelRatio())
       this.cameras.main.setRotation(-this.raceCamera.angle - Math.PI / 2)
     }
     const cameraRotation = this.raceCamera ? -this.raceCamera.angle - Math.PI / 2 : 0
@@ -357,7 +362,7 @@ export class RaceScene extends Phaser.Scene {
       graphics.save()
       graphics.translateCanvas(player.x, player.y)
       graphics.rotateCanvas(-cameraRotation)
-      graphics.scaleCanvas(1 / camera.zoom, 1 / camera.zoom)
+      graphics.scaleCanvas(this.renderPixelRatio() / camera.zoom, this.renderPixelRatio() / camera.zoom)
       graphics.fillStyle(0x101820, 0.9 * restart.alpha)
       graphics.fillRoundedRect(-24, -54, 48, 22, 8)
       graphics.fillStyle(restart.color, restart.alpha)
@@ -462,7 +467,7 @@ export class RaceScene extends Phaser.Scene {
     if (this.frameDiagnostics) {
       const camera = this.cameras.main
       this.frameDiagnostics.recordPresentation([
-        camera.scrollX + camera.width / 2, camera.scrollY + camera.height / 2, camera.zoom, cameraRotation,
+        camera.scrollX + camera.width / 2, camera.scrollY + camera.height / 2, camera.zoom / this.renderPixelRatio(), cameraRotation,
         this.hillBatches, this.hillPrimitives, this.waterBatches, this.waterPrimitives,
         this.bridgeBatches, this.bridgePrimitives, this.lampBatches,
         ...(this.updateRoadRibbonVisibility?.bitmap?.coverage() ?? EMPTY_BITMAP_COVERAGE),
@@ -484,9 +489,9 @@ export class RaceScene extends Phaser.Scene {
     const view = {
         centerX: camera.scrollX + camera.width / 2,
         centerY: camera.scrollY + camera.height / 2,
-        width: camera.width,
-        height: camera.height,
-        zoom: camera.zoom,
+        width: camera.width / this.renderPixelRatio(),
+        height: camera.height / this.renderPixelRatio(),
+        zoom: camera.zoom / this.renderPixelRatio(),
         rotation,
         minimumZoom: RACE_CAMERA_TUNING.minimumZoom,
       }

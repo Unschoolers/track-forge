@@ -204,6 +204,22 @@ export function createOptionsModal(
         }),
     ),
   )
+  const quality = element('section', 'setup-section')
+  quality.append(element('h3', 'setup-label', 'GRAPHICS QUALITY'))
+  const qualityRow = element('div', 'choice-row')
+  qualityRow.setAttribute('role', 'group')
+  qualityRow.setAttribute('aria-label', 'Graphics quality')
+  for (const value of ['low', 'medium', 'high'] as const) {
+    const selected = (state.preferences.graphicsQuality ?? 'medium') === value
+    const choice = button(value.toUpperCase(), `graphics-quality-${value}`,
+      () => actions.preferences({ ...state.preferences, graphicsQuality: value }),
+      `setup-choice${selected ? ' active' : ''}`)
+    choice.setAttribute('aria-pressed', String(selected))
+    qualityRow.append(choice)
+  }
+  quality.append(qualityRow, element('p', 'modal-subtitle',
+    'Low: 1× · Medium: up to 2× · High: native display resolution. Applies next race.'))
+  frame.body.append(quality)
   capture('display', displayStart)
   const controlsStart = frame.body.children.length
   const controlChoices = <K extends 'steeringLayout' | 'steeringHand' | 'controlSize' | 'pedalMode'>(

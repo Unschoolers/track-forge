@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   controlSize: 'trackforge-control-size',
   steeringSensitivity: 'trackforge-steering-sensitivity',
   dynamicZoom: 'trackforge-dynamic-zoom',
+  graphicsQuality: 'trackforge-graphics-quality',
   pedalMode: 'trackforge-pedal-mode',
   raceLaps: 'trackforge-race-laps',
   raceMode: 'trackforge-race-mode',
