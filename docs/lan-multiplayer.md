@@ -42,7 +42,12 @@ The LAN transport is local-only; it is *not* an internet multiplayer server. Rol
 
 ## Android Nearby pose pacing
 
-The application owns the healthy 30 Hz pose cadence. The Google Nearby bridge
+The application owns the healthy 30 Hz pose cadence. Schedule against a
+monotonic deadline rather than time since the last rendered frame. Skip missed
+deadlines instead of replaying stale poses; keep one admission in flight and
+space fresh samples by at least half a period. This preserves the average
+cadence across variable display refresh intervals without unbounded bursts.
+ The Google Nearby bridge
 must not repeat that rate gate: arrival times can shift across the JS/native
 boundary. Keep the one-outstanding-payload window per peer and stream, and
 native adaptive rate limits for degraded peers (15 Hz down to 1 Hz). Progress
