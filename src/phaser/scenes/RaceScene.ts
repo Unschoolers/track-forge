@@ -131,8 +131,14 @@ export class RaceScene extends Phaser.Scene {
       .snapshot()
       .state?.vehicles.find((vehicle) => vehicle.player)
     if (initialPlayer) this.raceCamera = createRaceCamera(initialPlayer)
-    this.frameDiagnostics?.setRenderer(this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas',
-      this.game.canvas.width, this.game.canvas.height)
+    if (this.frameDiagnostics) {
+      const canvas = this.game.canvas
+      const display = canvas.getBoundingClientRect()
+      this.frameDiagnostics.setRenderer(this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas',
+        canvas.width, canvas.height, {
+          cssWidth: display.width, cssHeight: display.height, devicePixelRatio: window.devicePixelRatio,
+        })
+    }
     const night = this.raceSession.snapshot().setup?.lighting === 'night'
     const environment = getTrackEnvironment(track.environmentId)
     const palette = night ? environment.night : environment.day

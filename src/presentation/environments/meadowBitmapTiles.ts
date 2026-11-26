@@ -27,6 +27,7 @@ export interface BitmapTiles {
 
 export interface BakeableBitmapTiles extends BitmapTiles {
   all(): readonly GroundTile[]
+  bake(tile: GroundTile, resolution: number): HTMLCanvasElement
 }
 
 /** Index static geometry into world tiles; each short quad or bank segment
@@ -88,16 +89,26 @@ class CachedBitmapTiles<T> implements BakeableBitmapTiles {
       this.cache.set(key, cached)
       return cached
     }
-    const items = this.index.get(key)
-    if (!items) throw new Error('No Meadow bitmap geometry for tile')
-    const { canvas, context } = createArtCanvas(TILE)
-    context.translate(-tile.x * TILE, -tile.y * TILE)
-    this.paint(context, items, tile)
+    const canvas = this.bake(tile, TILE)
     this.cache.set(key, canvas)
     if (this.cache.size > BITMAP_TILE_LIMIT) {
       const oldest = this.cache.keys().next().value
       if (oldest !== undefined) this.cache.delete(oldest)
     }
+    return canvas
+  }
+
+  /** Race atlas pages are painted once at their final pixel density, without
+   * retaining a second cache of high-resolution source canvases. */
+  bake(tile: GroundTile, resolution: number): HTMLCanvasElement {
+    const items = this.index.get(keyFor(tile))
+    if (!items) throw new Error('No Meadow bitmap geometry for tile')
+    if (!Number.isSafeInteger(resolution) || resolution < 1) throw new RangeError('Invalid bitmap resolution')
+    const { canvas, context } = createArtCanvas(resolution)
+    context.imageSmoothingQuality = 'high'
+    context.scale(resolution / TILE, resolution / TILE)
+    context.translate(-tile.x * TILE, -tile.y * TILE)
+    this.paint(context, items, tile)
     return canvas
   }
 }

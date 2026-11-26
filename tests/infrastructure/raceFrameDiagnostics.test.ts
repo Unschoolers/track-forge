@@ -5,7 +5,7 @@ describe('race frame diagnostics', () => {
   it('aligns camera and layer workload with the frame sample and bounds long tasks to the run', () => {
     let now = 100
     const recorder = new RaceFrameDiagnostics(() => now)
-    recorder.setRenderer('webgl', 844, 390)
+    recorder.setRenderer('webgl', 844, 390, { cssWidth: 844, cssHeight: 390, devicePixelRatio: 2 })
     const frame = (time: number) => {
       recorder.beginUpdate(7)
       recorder.beginSimulation()
@@ -31,7 +31,7 @@ describe('race frame diagnostics', () => {
     expect(report?.presentationFrames).toEqual([[116, 115, 2, 3, 4, ...Array.from({ length: 23 }, (_, i) => i)]])
     expect(report?.presentationColumns).toHaveLength(28)
     expect(report?.longTasks).toEqual([[110, 65]])
-    expect(report?.renderer).toEqual({ type: 'webgl', width: 844, height: 390 })
+    expect(report?.renderer).toEqual({ type: 'webgl', width: 844, height: 390, cssWidth: 844, cssHeight: 390, devicePixelRatio: 2 })
     recorder.endRace()
     recorder.recordLongTask(150, 80)
     expect(recorder.report(7)?.longTasks).toEqual([[110, 65]])

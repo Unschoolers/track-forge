@@ -19,6 +19,18 @@ Each environment should be identifiable from its material treatment at **driving
 - `createGroundTileRandom(variant, salt)` generates repeatable world-tile grain. Material tiles are baked once per environment, lighting and variant, rather than generated on every rendered frame.
 - Editor, race and flyover use the same base ground color. Preview/flyover retains its simplified hill rectangles; the race uses the authoritative terrain mesh and shading.
 
+## Race material fidelity
+
+Base ground swatches are already baked at 256 pixels per 256 world units.
+Race-only sparse road, water, elevation and bridge tiles are baked directly at
+their final atlas resolution (up to 510 pixels per 256 world units) within the
+existing 128 MiB page budget, including gutters. Large tracks may still use a
+lower resolution to stay within that cap. Editor and flyover retain their
+existing native tile cache. No texture baking or eviction occurs while driving.
+Race diagnostics record canvas backing dimensions, CSS dimensions and device
+pixel ratio to distinguish source detail from display upscaling. High-DPI
+canvas changes require separate camera, input and physical GPU validation.
+
 ## Performance and compatibility
 
 - Do not allocate material textures or strokes during physics steps or editor pointer movement.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
-import { planRaceAtlas, RACE_ATLAS_BUDGET, RACE_ATLAS_DEPTHS } from '@/phaser/rendering/raceBitmapAtlas'
+import { planRaceAtlas, MAX_RACE_TILE_RESOLUTION, RACE_ATLAS_BUDGET, RACE_ATLAS_DEPTHS } from '@/phaser/rendering/raceBitmapAtlas'
 
 describe('race atlas memory budget', () => {
   it('keeps baked approach shadows, deck and walls on the correct sides of vehicles', () => {
@@ -13,10 +13,13 @@ describe('race atlas memory budget', () => {
     expect(walls).toBeLessThan(WORLD_RENDER_DEPTH.upperVehicle)
   })
 
-  it('keeps small tracks at native resolution', () => {
+  it('bakes small tracks above world resolution without exceeding the page or memory budget', () => {
     const plan = planRaceAtlas(80)
-    expect(plan.resolution).toBe(256)
+    expect(plan.resolution).toBe(MAX_RACE_TILE_RESOLUTION)
+    expect(plan.resolution).toBeGreaterThan(256)
     expect(plan.pages.reduce((count, page) => count + page.count, 0)).toBe(80)
+    expect(plan.pages.every(page => page.width <= 1024 && page.height <= 1024)).toBe(true)
+    expect(plan.bytes).toBeLessThanOrEqual(RACE_ATLAS_BUDGET)
   })
 
   it('bakes every sparse tile for an NJ-scale race within the actual page budget', () => {

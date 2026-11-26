@@ -40,10 +40,11 @@ export class RaceFrameDiagnostics {
   private running = false
   private readonly longTasks: number[][] = []
   private droppedLongTasks = 0
-  private renderer: { type: string; width: number; height: number } | null = null
+  private renderer: { type: string; width: number; height: number; cssWidth?: number; cssHeight?: number; devicePixelRatio?: number } | null = null
 
-  setRenderer(type: string, width: number, height: number): void {
-    this.renderer = { type, width, height }
+  setRenderer(type: string, width: number, height: number,
+    display?: { cssWidth: number; cssHeight: number; devicePixelRatio: number }): void {
+    this.renderer = { type, width, height, ...display }
   }
 
   beginGround(): void { this.groundStart = this.now() }
