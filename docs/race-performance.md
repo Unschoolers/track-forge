@@ -51,6 +51,17 @@ first five seconds after **GO**.
 3. Capture three pairs per scenario on each build. Compare the median of the
    three first runs and the median of the three warm runs separately.
 
+## Race graphics quality
+
+Options → Display → Graphics quality changes the race canvas backing density:
+Low = 1×, Medium = min(device pixel ratio, 2), High = native device pixel ratio
+(at least 1). The setting is persisted, defaults to Medium, and is applied
+when a new race scene starts. The editor and menu stay at 1×. CSS dimensions,
+logical camera framing, world geometry, culling budgets and DOM steering
+coordinates stay independent of the backing resolution. No extra physics work.
+Compare identical tracks and frame timings at each quality level on Android.
+Higher settings increase fill rate and framebuffer memory; Low is the fallback.
+
 ## Visual frame pacing and high-refresh motion
 
 Race physics stays fixed at 60 Hz for deterministic handling, collision,

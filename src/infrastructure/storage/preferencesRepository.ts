@@ -20,6 +20,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   soundEffectsVolume: DEFAULT_SOUND_EFFECTS_VOLUME,
   hapticsEnabled: true,
   dynamicZoomEnabled: true,
+  graphicsQuality: 'medium',
   steeringLayout: 'drag',
   steeringHand: 'left',
   controlSize: 'standard',
@@ -62,6 +63,7 @@ const SNAPSHOT_KEYS = [
   STORAGE_KEYS.playerIdentity, STORAGE_KEYS.displayName, STORAGE_KEYS.creatorId,
   STORAGE_KEYS.favoriteTrackIds, STORAGE_KEYS.audio, STORAGE_KEYS.musicVolume,
   STORAGE_KEYS.soundEffectsVolume, STORAGE_KEYS.haptics, STORAGE_KEYS.dynamicZoom,
+  STORAGE_KEYS.graphicsQuality,
 ] as const
 
 const LEGACY_HANDLING_KEY = 'trackforge-handling-mode'
@@ -77,8 +79,12 @@ function snapshotValues(raw: string | null): Record<string, string> | null {
     const record = values as Record<string, unknown>
     const legacy = !Object.hasOwn(record, STORAGE_KEYS.pedalMode) &&
       Object.hasOwn(record, LEGACY_HANDLING_KEY)
-    const keys = legacy ? SNAPSHOT_KEYS.map(key =>
-      key === STORAGE_KEYS.pedalMode ? LEGACY_HANDLING_KEY : key) : SNAPSHOT_KEYS
+    // Older committed snapshots predate graphics quality. Keep them
+    // authoritative even when their individual mirrors were not written.
+    const presentKeys = Object.hasOwn(record, STORAGE_KEYS.graphicsQuality)
+      ? SNAPSHOT_KEYS : SNAPSHOT_KEYS.filter(key => key !== STORAGE_KEYS.graphicsQuality)
+    const keys = legacy ? presentKeys.map(key =>
+      key === STORAGE_KEYS.pedalMode ? LEGACY_HANDLING_KEY : key) : presentKeys
     if (Object.keys(record).length !== keys.length ||
       !keys.every(key => Object.hasOwn(record, key) &&
         typeof record[key] === 'string' && (record[key] as string).length <= 4096)) return null
@@ -106,6 +112,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       ? committed[key] ?? null : this.storage.get(key)
     const car = read(STORAGE_KEYS.car)
     const difficulty = read(STORAGE_KEYS.difficulty)
+    const graphicsQuality = read(STORAGE_KEYS.graphicsQuality)
     const pedalMode = read(STORAGE_KEYS.pedalMode) ??
       (read(LEGACY_HANDLING_KEY) === 'simulation' ? 'manual' : 'auto')
     const raceLaps = read(STORAGE_KEYS.raceLaps)
@@ -153,6 +160,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
         read(STORAGE_KEYS.haptics),
         DEFAULT_PREFERENCES.hapticsEnabled,
       ),
+      graphicsQuality: graphicsQuality === 'low' || graphicsQuality === 'high' ? graphicsQuality : 'medium',
       dynamicZoomEnabled: boolean(
         read(STORAGE_KEYS.dynamicZoom),
         DEFAULT_PREFERENCES.dynamicZoomEnabled,
@@ -181,6 +189,7 @@ export class BrowserPreferencesRepository implements PreferencesStore {
       [STORAGE_KEYS.soundEffectsVolume]: String(soundEffectsVolume),
       [STORAGE_KEYS.haptics]: preferences.hapticsEnabled ? '1' : '0',
       [STORAGE_KEYS.dynamicZoom]: preferences.dynamicZoomEnabled ? '1' : '0',
+      [STORAGE_KEYS.graphicsQuality]: preferences.graphicsQuality ?? 'medium',
     }
     // A failed authoritative commit leaves every visible preference unchanged.
     if (!this.storage.set(STORAGE_KEYS.preferencesSnapshot,

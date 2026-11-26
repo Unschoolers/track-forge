@@ -37,6 +37,22 @@ describe('durable preferences snapshot', () => {
     expect(new BrowserPreferencesRepository(store).load()).toMatchObject({ car: 'green', raceLaps: 1 })
   })
 
+  it('preserves legacy committed settings and defaults quality, then persists new choices', () => {
+    const store = new FailingStore()
+    const repo = new BrowserPreferencesRepository(store)
+    expect(repo.save({ ...repo.load(), car: 'red', graphicsQuality: 'high' })).toBe(true)
+    expect(repo.load().graphicsQuality).toBe('high')
+    const raw = store.get(STORAGE_KEYS.preferencesSnapshot)
+    if (!raw) throw new Error('Missing committed preferences')
+    const snapshot = JSON.parse(raw) as { values: Record<string, string> }
+    delete snapshot.values[STORAGE_KEYS.graphicsQuality]
+    store.values.set(STORAGE_KEYS.preferencesSnapshot, JSON.stringify(snapshot))
+    store.values.set(STORAGE_KEYS.car, 'green')
+    expect(repo.load()).toMatchObject({ car: 'red', graphicsQuality: 'medium' })
+    expect(repo.save({ ...repo.load(), graphicsQuality: 'low' })).toBe(true)
+    expect(new BrowserPreferencesRepository(store).load().graphicsQuality).toBe('low')
+  })
+
   it('recovers safely from malformed snapshot while retaining legacy preference decoding', () => {
     const store = new FailingStore()
     store.values.set(STORAGE_KEYS.car, 'yellow')

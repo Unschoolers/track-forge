@@ -15,6 +15,7 @@ import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { RacePresentationPreparation } from '@/phaser/rendering/racePresentationPreparation'
+import { graphicsPixelRatio, backingSize } from '@/phaser/rendering/graphicsQuality'
 
 export class PhaserSceneHost implements SceneHost {
   private game: Phaser.Game | undefined
@@ -23,6 +24,8 @@ export class PhaserSceneHost implements SceneHost {
   private raceRunId: number | undefined
   private raceLighting: string | undefined
   private readonly racePreparation = new RacePresentationPreparation()
+  private racePixelRatio = 1
+  private resizeObserver: ResizeObserver | undefined
 
   constructor(
     private readonly parent: HTMLElement,
@@ -39,11 +42,12 @@ export class PhaserSceneHost implements SceneHost {
     const modeChanged = this.mode !== mode
     this.mode = mode
     if (!this.game) {
+      const initial = backingSize(this.parent.clientWidth || 1024, this.parent.clientHeight || 768, 1)
       this.game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: this.parent,
-        width: 1024,
-        height: 768,
+        width: initial.width,
+        height: initial.height,
         backgroundColor: '#2d7344',
         scene: [
           new BootScene(),
@@ -55,14 +59,20 @@ export class PhaserSceneHost implements SceneHost {
             this.geometry,
             this.racePerformance,
             this.frameDiagnostics,
+            () => this.racePixelRatio,
           ),
         ],
         input: { activePointers: 3 },
         scale: {
-          mode: Phaser.Scale.RESIZE,
-          autoCenter: Phaser.Scale.CENTER_BOTH,
+          // CSS owns display size; resize the backing buffer explicitly.
+          mode: Phaser.Scale.NONE,
         },
       })
+      if (typeof ResizeObserver !== 'undefined') {
+        this.resizeObserver = new ResizeObserver(this.resizeCanvas)
+        this.resizeObserver.observe(this.parent)
+      }
+      window.addEventListener('resize', this.resizeCanvas)
       const frameDiagnostics = this.frameDiagnostics
       if (frameDiagnostics) {
         this.game.events.on(Phaser.Core.Events.PRE_RENDER, () => frameDiagnostics.beginRender())
@@ -89,10 +99,28 @@ export class PhaserSceneHost implements SceneHost {
     this.raceLighting = lighting
     this.raceTrackId = trackId
     this.raceRunId = race?.runId
+    if (modeChanged || sceneChanged) {
+      this.racePixelRatio = mode === 'race'
+        ? graphicsPixelRatio(this.controller.snapshot().preferences?.graphicsQuality, window.devicePixelRatio)
+        : 1
+      this.resizeCanvas()
+    }
     if (modeChanged) this.syncScene()
     else if (sceneChanged) {
       this.game.scene.stop('RaceScene')
       this.game.scene.start('RaceScene')
+    }
+  }
+
+  private readonly resizeCanvas = (): void => {
+    const game = this.game
+    if (!game?.isRunning) return
+    const width = this.parent.clientWidth
+    const height = this.parent.clientHeight
+    if (width <= 0 || height <= 0) return
+    const size = backingSize(width, height, this.racePixelRatio)
+    if (game.scale.width !== size.width || game.scale.height !== size.height) {
+      game.scale.resize(size.width, size.height)
     }
   }
 
@@ -126,6 +154,9 @@ export class PhaserSceneHost implements SceneHost {
 
   destroy(): void {
     this.racePreparation.cancel()
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = undefined
+    window.removeEventListener('resize', this.resizeCanvas)
     this.game?.destroy(true)
     this.game = undefined
   }

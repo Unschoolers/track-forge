@@ -15,8 +15,9 @@ vi.mock('phaser', () => ({
   default: {
     Game: class {
       scene = { start: sceneStart, stop: sceneStop }
+      destroy = vi.fn()
     },
-    Scale: { RESIZE: 0, CENTER_BOTH: 0 },
+    Scale: { NONE: 0 },
   },
 }))
 vi.mock('@/phaser/scenes/BootScene', () => ({ BootScene: class {} }))
@@ -32,7 +33,7 @@ describe('PhaserSceneHost', () => {
   it('recreates the race scene for a same-track Nearby rematch, but not for countdown or frame updates', () => {
     let runId = 1
     const controller = {
-      snapshot: () => ({ currentTrack: { id: 'same-circuit' } }),
+      snapshot: () => ({ currentTrack: { id: 'same-circuit' }, preferences: { graphicsQuality: 'low' } }),
     } as unknown as SceneControllerPort
     const raceSession = {
       snapshot: () => ({ runId, setup: { lighting: 'day' } }),
@@ -67,5 +68,6 @@ describe('PhaserSceneHost', () => {
     host.start('race')
     expect(sceneStart).not.toHaveBeenCalled()
     expect(sceneStop).not.toHaveBeenCalled()
+    host.destroy()
   })
 })

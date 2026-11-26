@@ -47,7 +47,7 @@ function pointer(type: string, id: number, clientX = 0): Event {
 
 afterEach(() => document.body.replaceChildren())
 
-function createScene(controls: RaceInputController, session: Pick<RaceSessionPort, 'snapshot'>, steeringSensitivity?: 0.75 | 1 | 1.5) {
+function createScene(controls: RaceInputController, session: Pick<RaceSessionPort, 'snapshot'>, steeringSensitivity?: 0.75 | 1 | 1.5, pixelRatio = 1) {
   const canvas = document.createElement('canvas')
   canvas.width = 2000
   canvas.style.width = '500px'
@@ -56,16 +56,17 @@ function createScene(controls: RaceInputController, session: Pick<RaceSessionPor
   const geometry = { get: () => ({ path: { terrainSurface: {} } }) }
   const graphics = { setDepth() { return this }, setBlendMode() { return this } }
   const camera = {
-    width: 320,
-    height: 180,
+    width: 320 * pixelRatio,
+    height: 180 * pixelRatio,
     scrollX: 0,
     scrollY: 0,
     zoom: 1,
     rotation: 0,
     setBackgroundColor: vi.fn(),
+    setZoom(zoom: number) { this.zoom = zoom },
   }
   let shutdown: (() => void) | undefined
-  const scene = new RaceScene(controller as never, session as never, controls, geometry as never)
+  const scene = new RaceScene(controller as never, session as never, controls, geometry as never, undefined, undefined, () => pixelRatio)
   Object.assign(scene, {
     game: { canvas },
     add: { graphics: () => graphics },
@@ -101,6 +102,22 @@ function recoverySession() {
 }
 
 describe('race canvas steering', () => {
+  it.each([1, 2, 3])('initializes camera density at %sx without changing CSS steering travel', (ratio) => {
+    const controls = new RaceInputController()
+    const { session } = recoverySession()
+    const { canvas, camera, shutdown } = createScene(controls, session, 1, ratio)
+    try {
+      expect(camera.zoom).toBe(ratio)
+      expect(camera.width / camera.zoom).toBe(320)
+      expect(camera.height / camera.zoom).toBe(180)
+      canvas.dispatchEvent(pointer('pointerdown', 1, 100))
+      canvas.dispatchEvent(pointer('pointermove', 1, 148))
+      expect(controls.snapshot().steering).toBe(1)
+    } finally {
+      shutdown()
+    }
+  })
+
   it('renders static trees once per race, even when the camera moves and zooms', () => {
     vi.mocked(renderTrees).mockClear()
     const controls = new RaceInputController()
