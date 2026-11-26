@@ -1,6 +1,6 @@
 import { cupTrackIds, cupRoundCount } from '@/application/race/circuitCup'
 import { courseIdentity, nextMedalTarget, scoreCategoryLabel, timeMedal } from '@/application/race/raceRecords'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { OFFICIAL_CIRCUITS, OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import type { AppSnapshot } from '@/application/appState'
 import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
@@ -45,7 +45,7 @@ export function createHomeScreen(
   if (checkpoint) {
     const nextIndex = Math.min(checkpoint.index + (checkpoint.rounds.length > checkpoint.index ? 1 : 0), cupRoundCount(checkpoint) - 1)
     const id = cupTrackIds(checkpoint)[nextIndex]
-    const next = [...state.tracks, ...OFFICIAL_CIRCUITS.map(({ track }) => track)].find(track => track.id === id)
+    const next = [...state.tracks, ...OFFICIAL_COURSES.map(({ track }) => track)].find(track => track.id === id)
     trackCard.append(element('span', 'track-meta', checkpoint.rounds.length === cupRoundCount(checkpoint) ? 'Cup standings ready' : `Next Cup round: ${next?.name ?? 'Track unavailable'}`))
   } else {
     const circuit = OFFICIAL_CIRCUITS.map(({ track }) => ({ track, next: nextMedalTarget(track, timeMedal(track, state.scoresByTrack[track.id] ?? [])) })).find(({ next }) => next)

@@ -3,7 +3,7 @@ import { CupFlow } from '@/application/race/cupFlow'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal, promotedTimeMedal } from '@/application/race/raceRecords'
 import { collectTrackScores } from '@/application/race/trackScoreCollection'
-import { OFFICIAL_CIRCUITS } from '@/domain/track/officialCircuits'
+import { OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import { DEFAULT_CUP_TRACK_IDS, recordCupResult, retryCupRace } from '@/application/race/circuitCup'
 import type {
   CupStore,
@@ -92,7 +92,7 @@ export class AppController {
     })
     const tracks = this.library.list()
     // New installations can race a built-in without persisting a legacy starter.
-    const currentTrack = tracks[0] ?? OFFICIAL_CIRCUITS[0]?.track ?? null
+    const currentTrack = tracks[0] ?? OFFICIAL_COURSES[0]?.track ?? null
     this.state = {
       mode: 'home',
       raceAgainTrackName: this.resolveLastRace()?.track.name,
@@ -264,6 +264,7 @@ export class AppController {
         break
       case 'open-cup':
       case 'cup-add-track':
+      case 'cup-load-curated':
       case 'cup-remove-track':
       case 'cup-move-track':
       case 'start-cup':
@@ -531,7 +532,7 @@ export class AppController {
       case 'toggle-track-favorite': {
         if (this.state.overlay.type !== 'track-library') break
         const track = this.library.select(command.id) ??
-          OFFICIAL_CIRCUITS.find(({ track: candidate }) => candidate.id === command.id)?.track
+          OFFICIAL_COURSES.find(({ track: candidate }) => candidate.id === command.id)?.track
         if (!track) break
         const previous = this.state.preferences.favoriteTrackIds ?? []
         const favoriteTrackIds = previous.includes(track.id)
@@ -599,7 +600,7 @@ export class AppController {
   private resolveLastRace(): { race: LastRace; track: Track } | null {
     const race = this.dependencies.lastRaceStore?.load()
     if (!race) return null
-    const track = this.dependencies.trackStore.find(race.trackId) ?? OFFICIAL_CIRCUITS.find((entry) => entry.track.id === race.trackId)?.track
+    const track = this.dependencies.trackStore.find(race.trackId) ?? OFFICIAL_COURSES.find((entry) => entry.track.id === race.trackId)?.track
     if (!track || courseIdentity(track) !== race.course || !validateTrack(track, this.dependencies.geometry.get(track).path.totalLength).ready) return null
     if (race.setup.mode === 'ghost' && this.dependencies.raceSession.ghostTime?.(track, race.setup) == null) return null
     return { race, track }
@@ -695,7 +696,7 @@ export class AppController {
   }
 
   private selectTrackForRace(id: TrackId): void {
-    const track = OFFICIAL_CIRCUITS.find((entry) => entry.track.id === id)?.track ?? this.library.select(id)
+    const track = OFFICIAL_COURSES.find((entry) => entry.track.id === id)?.track ?? this.library.select(id)
     if (!track) return
     const validation = validateTrack(
       track,
@@ -1030,7 +1031,7 @@ export class AppController {
   ): Readonly<Record<string, readonly ScoreEntry[]>> {
     return collectTrackScores(
       tracks,
-      OFFICIAL_CIRCUITS.map(({ track }) => track),
+      OFFICIAL_COURSES.map(({ track }) => track),
       this.dependencies.scoreStore,
     )
   }
