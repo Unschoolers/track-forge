@@ -125,16 +125,14 @@ export function renderRaceTrackGeometryBase(
   const withBitmap = (update: UpdateRoadRibbonVisibility): RaceTrackVisibility =>
     bitmap ? Object.assign(update, { bitmap }) : update
   const markingsDepth = bitmap ? ROAD_MARKINGS_DEPTH : WORLD_RENDER_DEPTH.road
-  const updateVisibility = renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night, environmentId)
-  if (!updateVisibility) {
+  // Complete atlas tiles include shoulders, road base and textured fill.
+  // Only the untextured fallback needs the original ribbon graphics.
+  const updateVisibility = bitmap ? undefined : renderRaceRoadRibbon(scene, geometry.path, geometry.ribbon, night, environmentId)
+  if (!bitmap && !updateVisibility) {
     const graphics = scene.add.graphics().setDepth(WORLD_RENDER_DEPTH.road)
     renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
-    if (!bitmap) {
-      renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
-      return undefined
-    }
-    renderTrackGeometryMarkings(scene.add.graphics().setDepth(markingsDepth), geometry, night, environmentId)
-    return withBitmap((view, paddedViewport) => bitmap.render(view, paddedViewport))
+    renderTrackGeometryMarkings(graphics, geometry, night, environmentId)
+    return undefined
   }
 
   // Keep the original paint order (all curbs, then stripes, then markers),
@@ -185,7 +183,7 @@ export function renderRaceTrackGeometryBase(
   const graphics = scene.add.graphics().setDepth(markingsDepth)
   renderTrackMarkers(graphics, geometry, night)
   return withBitmap((view, paddedViewport) => {
-    updateVisibility(view, paddedViewport)
+    updateVisibility?.(view, paddedViewport)
     bitmap?.render(view, paddedViewport)
     const viewport = paddedViewport ?? groundViewportBounds(view)
     for (const { graphics, bounds } of batches) {

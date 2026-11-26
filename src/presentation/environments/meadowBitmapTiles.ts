@@ -1,16 +1,18 @@
-import { ROAD_GEOMETRY } from '@/domain/config'
+import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
 import type { SurfaceId, Vector2 } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { GROUND_TILE_SIZE, groundViewportBounds, visibleGroundTiles, type GroundTile, type GroundViewport, type WorldBounds } from './groundTexture'
 import { buildRoadRibbonQuads, type RoadRibbonQuad } from './roadRibbonQuads'
 import { createArtCanvas, getEnvironmentBitmapArt, type EnvironmentBitmapArt } from './meadowBitmapArt'
-import { buildTerrainComponents, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
+import { buildTerrainComponents, mapTerrainComponent, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
 import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
 import { roadTextureRepeat } from './roadTextureVariants'
-import { buildBridgePresentation, type BridgePrimitive } from '@/phaser/rendering/bridgeRenderer'
-import type { TrackShadowMode } from '@/phaser/rendering/lighting'
+import { buildBridgePresentation, bridgeRenderPasses, type BridgePrimitive } from '@/phaser/rendering/bridgeRenderer'
+import { projectSunShadow, type TrackShadowMode } from '@/phaser/rendering/lighting'
+import { roadColorsForEnvironment } from './roadMaterials'
+import { environmentRoadStrokes } from './environmentRoadStrokes'
 import { bridgePaintCommands, paintBridgeCanvas } from './bridgeMaterials'
 import { elevationLevelForHeight, elevationMaterialForLevel, groupElevationFaces } from './elevationMaterials'
 
@@ -153,11 +155,34 @@ function roadPatternPainter(context: CanvasRenderingContext2D, art: EnvironmentB
   }
 }
 
-function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BakeableBitmapTiles {
+interface RacePaintTheme {
+  readonly environment: TrackEnvironmentId
+  readonly night: boolean
+}
+
+/** Race tiles own the shoulders and opaque base too, including pixels
+ * between antialiased texture quads. Editor tiles remain overlays. */
+function roadTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme): BakeableBitmapTiles {
   const quads = buildRoadRibbonQuads(geometry.path, geometry.ribbon)
-  const index = indexBitmapItems(quads, quad => quad.road)
+  const index = indexBitmapItems(quads, quad => theme ? quad.edge : quad.road, theme ? 2 : 0)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, items) => {
+    if (theme) {
+      for (const pass of ['edge', 'road'] as const) {
+        for (const quad of items) {
+          const spec = roadColorsForEnvironment(quad.surface, theme.environment)
+          context.fillStyle = pass === 'edge' ? (theme.night ? spec.nightEdge : spec.edge) : (theme.night ? spec.nightRoad : spec.road)
+          fillRoadPolygon(context, quad[pass])
+        }
+      }
+      // Keep the existing material underpaint underneath the textured surface.
+      const loopLength = geometry.path.closed ? geometry.path.totalLength : undefined
+      for (const quad of items) {
+        for (const stroke of environmentRoadStrokes(theme.environment, quad.surface, quad.from, quad.to, theme.night, loopLength)) {
+          paintBridgeCanvas(context, [{ kind: 'line', ...stroke }])
+        }
+      }
+    }
     const paint = roadPatternPainter(context, art, repeat)
     for (const quad of items) paint(quad)
   })
@@ -171,17 +196,33 @@ export function bridgeBitmapPrimitives(primitives: readonly BridgePrimitive[], a
     (p.kind === 'surface' || p.kind === 'marking' || p.kind === 'wall'))
 }
 
-function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean): BakeableBitmapTiles | undefined {
-  const items = bridgeBitmapPrimitives(primitives, approach)
+function bridgeTiles(primitives: readonly BridgePrimitive[], geometry: TrackGeometry, art: EnvironmentBitmapArt, environment: TrackEnvironmentId, night: boolean, approach: boolean, complete = false): BakeableBitmapTiles | undefined {
+  const items = complete ? primitives : bridgeBitmapPrimitives(primitives, approach)
   if (items.length === 0) return undefined
-  const index = indexBitmapItems(items, p => p.kind === 'surface' && p.roadQuad ? p.roadQuad.edge : 'polygon' in p ? p.polygon : [p.start, p.end], 5)
+  const index = indexBitmapItems(items, p => p.kind === 'surface' && p.roadQuad ? p.roadQuad.edge : 'polygon' in p ? p.polygon : [p.start, p.end], complete ? 12 : 5)
   const repeat = roadTextureRepeat(geometry.path.totalLength, geometry.path.closed)
   return new CachedBitmapTiles(index, (context, visible) => {
     const paintRoad = roadPatternPainter(context, art, repeat)
     const source = art.bridge
     const structure = source ? repeatPattern(context, source) : undefined
+    // A complete race pass first paints the structural underlay, side faces,
+    // edge colors and opaque surface base. The texture overlay then keeps the
+    // previous deck footprint without submitting the same geometry to Phaser.
+    if (complete) {
+      for (const p of visible) {
+        if (p.kind === 'marking') continue
+        if (p.kind === 'surface') {
+          const spec = roadColorsForEnvironment(p.surface, environment)
+          context.fillStyle = night ? spec.nightRoad : spec.road
+          fillRoadPolygon(context, p.polygon)
+        } else {
+          paintBridgeCanvas(context, bridgePaintCommands(p, environment, night))
+        }
+      }
+    }
     // Preserve canonical surface, marking and wall painter order per tile.
     for (const p of visible) {
+      if (complete && p.kind !== 'surface' && p.kind !== 'marking') continue
       if (p.kind === 'surface') {
         if (!p.roadQuad) throw new Error('Bridge surface is missing its road texture quad')
         const quad = p.roadQuad
@@ -221,6 +262,7 @@ type TerrainBitmapItem =
   | { readonly kind: 'bank'; readonly segment: BankSegment }
   | { readonly kind: 'hill-bank'; readonly segment: BankSegment }
   | { readonly kind: 'water'; readonly triangle: TerrainTriangle }
+  | { readonly kind: 'hill-shadow'; readonly triangle: TerrainTriangle }
   | ElevationFace
 
 /** Subdivide long compacted contour edges before spatial indexing. The
@@ -234,7 +276,7 @@ export function splitBankSegment(start: Vector2, end: Vector2): readonly BankSeg
   return Array.from({ length: count }, (_, i) => ({ start: at(i / count), end: at((i + 1) / count) }))
 }
 
-function terrainBitmapIndex(geometry: TrackGeometry): Map<string, TerrainBitmapItem[]> {
+function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false): Map<string, TerrainBitmapItem[]> {
   const surface = geometry.path.terrainSurface
   const items: TerrainBitmapItem[] = []
   for (const contour of surface.contours) {
@@ -249,6 +291,14 @@ function terrainBitmapIndex(geometry: TrackGeometry): Map<string, TerrainBitmapI
   // as one primitive. Component holes remain empty, including land islands.
   for (const component of buildTerrainComponents(surface.contours, 'water')) {
     for (const triangle of tileTerrainComponent(component, TILE)) items.push({ kind: 'water', triangle })
+  }
+  // Tile the projected component rather than indexing a potentially huge
+  // shadow triangle. The same projection and holes as the vector pass remain.
+  if (includeShadows) {
+    for (const component of buildTerrainComponents(surface.contours, 'hill')) {
+      const projected = mapTerrainComponent(component, point => projectSunShadow(point, WORLD_ELEVATION.levelHeight))
+      for (const triangle of tileTerrainComponent(projected, TILE)) items.push({ kind: 'hill-shadow', triangle })
+    }
   }
   // Reuse the canonical full-detail facets and their directional lighting.
   // Full-detail plateau triangles are small and bounded, unlike overview runs.
@@ -290,7 +340,13 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
 /** Painter order: sand outside, deep water, translucent shallow shelves
  * clipped to water, narrow contact foam, then the textured mountain faces.
  * All patterns are world anchored across tile boundaries. */
-export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile): void {
+export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile, night = false): void {
+  // Projected shadows were beneath the existing textured terrain overlay.
+  // One combined path avoids double darkening on internal triangle edges.
+  context.beginPath()
+  for (const item of items) if (item.kind === 'hill-shadow') appendTriangle(context, item.triangle)
+  context.fillStyle = night ? 'rgba(8,18,13,0.16)' : 'rgba(8,18,13,0.24)'
+  context.fill()
   const palette = art.terrainPalette
   const bankScale = palette.bankScale ?? 1
   const shallowScale = palette.shallowScale ?? 1
@@ -374,8 +430,8 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   }
 }
 
-function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt): BakeableBitmapTiles {
-  return new CachedBitmapTiles(terrainBitmapIndex(geometry), (context, items, tile) => paintTerrainBitmap(context, items, art, tile))
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme): BakeableBitmapTiles {
+  return new CachedBitmapTiles(terrainBitmapIndex(geometry, Boolean(theme)), (context, items, tile) => paintTerrainBitmap(context, items, art, tile, theme?.night))
 }
 
 export interface EnvironmentBitmapLayers {
@@ -394,6 +450,26 @@ export function createMeadowBitmapLayers(geometry: TrackGeometry, night: boolean
     terrain: terrainTiles(geometry, art),
     bridgeApproach: bridgeTiles(bridge, geometry, art, environment, night, true),
     bridgeDeck: bridgeTiles(bridge, geometry, art, environment, night, false),
+  }
+}
+
+/** Complete immutable race passes; streaming/editor/flyover keep their
+ * original overlay sources and vector fallback. Walls keep their own depth. */
+export interface RaceBitmapLayers extends EnvironmentBitmapLayers {
+  readonly bridgeWalls: BakeableBitmapTiles | undefined
+}
+
+export function createRaceBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): RaceBitmapLayers | undefined {
+  const art = getEnvironmentBitmapArt(environment, night)
+  if (!art) return undefined
+  const theme = { environment, night }
+  const passes = bridgeRenderPasses(buildBridgePresentation(geometry))
+  return {
+    road: roadTiles(geometry, art, theme),
+    terrain: terrainTiles(geometry, art, theme),
+    bridgeApproach: bridgeTiles([...passes.underlay, ...passes.rampApproach], geometry, art, environment, night, true, true),
+    bridgeDeck: bridgeTiles(passes.deck, geometry, art, environment, night, false, true),
+    bridgeWalls: bridgeTiles(passes.walls, geometry, art, environment, night, false, true),
   }
 }
 

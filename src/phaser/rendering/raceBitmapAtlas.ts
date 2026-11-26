@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { createMeadowBitmapLayers, type BakeableBitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { createRaceBitmapLayers, type BakeableBitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
 import { GROUND_TILE_SIZE, groundViewportBounds, visibleGroundTiles, type GroundTile, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { BRIDGE_APPROACH_BITMAP_DEPTH, BRIDGE_DECK_BITMAP_DEPTH, ROAD_BITMAP_DEPTH, type MeadowBitmapRenderer } from './meadowBitmapRenderer'
 import { WORLD_RENDER_DEPTH } from './renderLayers'
@@ -77,7 +77,7 @@ function drawTile(context: CanvasRenderingContext2D, source: HTMLCanvasElement, 
   context.drawImage(source, w - 1, h - 1, 1, 1, x + size, y + size, 1, 1)
 }
 
-const depths = [ROAD_BITMAP_DEPTH, WORLD_RENDER_DEPTH.terrain + 0.2, BRIDGE_APPROACH_BITMAP_DEPTH, BRIDGE_DECK_BITMAP_DEPTH] as const
+export const RACE_ATLAS_DEPTHS = [ROAD_BITMAP_DEPTH, WORLD_RENDER_DEPTH.terrain + 0.2, BRIDGE_APPROACH_BITMAP_DEPTH, BRIDGE_DECK_BITMAP_DEPTH, WORLD_RENDER_DEPTH.structureWall] as const
 
 class AtlasLayer {
   readonly frames = new Map<string, AtlasFrame>()
@@ -126,11 +126,11 @@ class AtlasLayer {
  * The editor keeps its dynamic, bounded streaming renderer. */
 export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean,
   environment: TrackEnvironmentId): MeadowBitmapRenderer | undefined {
-  const sources = createMeadowBitmapLayers(geometry, night, environment)
+  const sources = createRaceBitmapLayers(geometry, night, environment)
   if (!sources) return undefined
   const entries: AtlasEntry[] = []
-  const layers = depths.map(depth => new AtlasLayer(scene, depth))
-  const ordered = [sources.road, sources.terrain, sources.bridgeApproach, sources.bridgeDeck]
+  const layers = RACE_ATLAS_DEPTHS.map(depth => new AtlasLayer(scene, depth))
+  const ordered = [sources.road, sources.terrain, sources.bridgeApproach, sources.bridgeDeck, sources.bridgeWalls]
   ordered.forEach((source, layer) => {
     if (source) for (const tile of source.all()) entries.push({ tile, source, layer })
   })
@@ -181,7 +181,13 @@ export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeomet
       if (!destroyed) for (const layer of layers) layer.render(bounds)
     },
     warmVisible() { /* All texture pages are already resident. */ },
-    coverage: () => layers.flatMap(layer => layer.coverage()),
+    // Preserve the diagnostic's four material groups; bridge walls belong
+    // to the deck group even though their rendering depth is independent.
+    coverage: () => {
+      const counts = layers.slice(0, 4).flatMap(layer => layer.coverage())
+      layers[4]!.coverage().forEach((value, i) => { counts[9 + i] = (counts[9 + i] ?? 0) + value })
+      return counts
+    },
     destroy,
   }
 }
