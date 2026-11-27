@@ -76,7 +76,7 @@ export function createHomeScreen(
 
   const navigationDock = element('nav', 'home-navigation')
   navigationDock.setAttribute('aria-label', 'Main menu')
-  if (actions.nearby) navigationDock.append(createMenuAction('Nearby race', 'nearby', actions.nearby))
+  if (actions.nearby) navigationDock.append(createMenuAction('Multiplayer', 'nearby', actions.nearby))
   if (actions.cup) navigationDock.append(createMenuAction('Cup', 'arcade-cup', actions.cup))
   navigationDock.append(createMenuAction('Track editor', 'editor', actions.edit))
   navigationDock.append(createMenuAction('Options', 'options', actions.options))
