@@ -1,6 +1,8 @@
 import { CAR_IDS, type CarId } from '@/domain/model'
 import { CAR_SPECS } from '@/domain/config'
 import { vehicleBitmapUrl } from '@/presentation/vehicleBitmapArt'
+import type { GhostSetup } from '@/application/race/ghostReplay'
+import { appendGhostIndicator } from '@/ui/components/ghostIndicator'
 import { button, element } from '@/ui/dom'
 
 function carSilhouette(car: CarId): HTMLImageElement {
@@ -16,7 +18,7 @@ function carSilhouette(car: CarId): HTMLImageElement {
 export function createCarPicker(
   selected: CarId,
   select: (car: CarId) => void,
-  options: { disabled?: boolean } = {},
+  options: { disabled?: boolean; ghostSetups?: readonly GhostSetup[] | undefined } = {},
 ): HTMLElement {
   const section = element('section', 'setup-section')
   section.append(element('h3', 'setup-label', 'CHOOSE YOUR CAR'))
@@ -37,6 +39,10 @@ export function createCarPicker(
       'aria-pressed',
       String(car === selected),
     )
+    const ghostLaps = options.ghostSetups?.filter(setup => setup.car === car).map(setup => setup.laps)
+    if (ghostLaps?.length) {
+      appendGhostIndicator(choice, `Ghost available for ${ghostLaps.join(', ')} ${ghostLaps.length === 1 && ghostLaps[0] === 1 ? 'lap' : 'laps'}`)
+    }
     row.append(choice)
   }
   const spec = CAR_SPECS[selected]
