@@ -435,6 +435,15 @@ export class DomUiHost implements UiHost {
     const lobbyScroll = previousLobby?.querySelector<HTMLElement>('.modal-body')?.scrollTop
     const diagnostics = previousLobby?.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')
     const overlay = this.renderOverlay(state)
+    // Lighting changes rebuild this modal. Carry only this interaction into
+    // the new button, not into a different track or a fresh visit.
+    if (previous?.overlay.type === 'race-setup' && state.overlay.type === 'race-setup' &&
+        previous.currentTrack?.id === state.currentTrack?.id &&
+        (previous.raceLighting ?? previous.currentTrack?.lighting ?? 'day') !==
+          (state.raceLighting ?? state.currentTrack?.lighting ?? 'day')) {
+      const lightingToggle = overlay?.querySelector<HTMLButtonElement>('.lighting-toggle')
+      if (lightingToggle) lightingToggle.dataset.lightingTransition = 'true'
+    }
     if (diagnostics && overlay?.classList.contains('nearby-lobby-modal')) {
       overlay.querySelector('.nearby-lobby-diagnostics')?.replaceWith(diagnostics)
     }

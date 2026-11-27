@@ -1,0 +1,68 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { attachLightingArtwork, createLightingToggle } from '@/ui/components/lightingToggle'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  document.body.replaceChildren()
+})
+
+describe('race lighting toggle', () => {
+  it.each(['day', 'night'] as const)('renders one native button and selects the opposite of %s', lighting => {
+    const select = vi.fn()
+    const toggle = createLightingToggle(lighting, select)
+    expect(toggle.textContent).toBe(lighting === 'day' ? 'Day' : 'Night')
+    expect(toggle.getAttribute('aria-pressed')).toBe(String(lighting === 'night'))
+    toggle.click()
+    expect(select).toHaveBeenCalledWith(lighting === 'day' ? 'night' : 'day')
+  })
+
+  it.each(['day', 'night'] as const)('crossfades the %s transition with bounded optical updates and stops', async lighting => {
+    const toggle = createLightingToggle(lighting, vi.fn())
+    toggle.dataset.lightingTransition = 'true'
+    const update = vi.fn()
+    const destroy = vi.fn()
+    let nextFrame: FrameRequestCallback | undefined
+    const raf = vi.fn((callback: FrameRequestCallback) => { nextFrame = callback; return 1 })
+    vi.stubGlobal('requestAnimationFrame', raf)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const createGlass = vi.fn(() => ({ update, destroy }))
+    const cleanup = attachLightingArtwork(toggle, true, async () => ({ createGlass }))
+    await Promise.resolve()
+    const [base, overlay] = toggle.querySelectorAll<HTMLElement>('.lighting-frame')
+    expect(createGlass).toHaveBeenCalledOnce()
+    expect(base?.dataset.skyFrame).toBe(lighting === 'day' ? 'night:11' : 'day:11')
+    nextFrame?.(100)
+    nextFrame?.(700)
+    expect(base?.dataset.skyFrame).toBe(lighting + ':4')
+    expect(Number(overlay?.style.opacity)).toBeCloseTo(0.4)
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ lightAngle: 90 }))
+    nextFrame?.(1600)
+    expect(base?.dataset.skyFrame).toBe(lighting + ':11')
+    expect(toggle.textContent).toBe(lighting === 'day' ? 'Day' : 'Night')
+    expect(raf).toHaveBeenCalledTimes(3)
+    expect(update).toHaveBeenCalledTimes(2)
+    cleanup()
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(toggle.dataset.lightingArt).toBeUndefined()
+  })
+
+  it('skips motion and ignores a late library load after disposal', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const raf = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', raf)
+    const createGlass = vi.fn(() => ({ update: vi.fn(), destroy: vi.fn() }))
+    const toggle = createLightingToggle('night', vi.fn())
+    toggle.dataset.lightingTransition = 'true'
+    const cleanup = attachLightingArtwork(toggle, false, async () => ({ createGlass }))
+    await Promise.resolve()
+    expect(toggle.textContent).toBe('Night')
+    expect(raf).not.toHaveBeenCalled()
+    cleanup()
+    const late = attachLightingArtwork(toggle, false, async () => ({ createGlass }))
+    late()
+    await Promise.resolve()
+    expect(createGlass).toHaveBeenCalledOnce()
+  })
+})

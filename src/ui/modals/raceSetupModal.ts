@@ -6,6 +6,7 @@ import { populateRacePreparation } from '@/ui/components/racePreparationLayout'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 import { appendGhostIndicator } from '@/ui/components/ghostIndicator'
+import { createLightingToggle } from '@/ui/components/lightingToggle'
 import { formatRaceTime } from '@/ui/format'
 import { BOOST_PRACTICE_AVAILABLE } from '@/application/race/boostPracticeConfig'
 
@@ -41,13 +42,7 @@ export function createRaceSetupModal(
   const lighting = state.raceLighting ?? state.currentTrack?.lighting ?? 'day'
   const lightingSection = element('section', 'setup-section')
   lightingSection.append(element('h3', 'setup-label', 'Lighting'))
-  const lightingRow = element('div', 'choice-row')
-  for (const value of ['day', 'night'] as const) {
-    const choice = button(value === 'day' ? 'Day' : 'Night', `lighting-${value}`, () => actions.lighting(value), `setup-choice${value === lighting ? ' active' : ''}`)
-    choice.setAttribute('aria-pressed', String(value === lighting))
-    lightingRow.append(choice)
-  }
-  lightingSection.append(lightingRow)
+  lightingSection.append(createLightingToggle(lighting, actions.lighting))
   const mode = element('section', 'setup-section')
   mode.append(element('h3', 'setup-label', 'Race Mode'))
   const modeRow = element('div', 'choice-row race-mode-row')

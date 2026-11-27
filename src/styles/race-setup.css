@@ -188,3 +188,39 @@
   inline-size: 100%;
   block-size: 100%;
 }
+
+/* The toggle owns a content lens over its animated artwork rather than a
+   second panel sampling the modal backdrop. Only its decorative sky bends. */
+#app .race-setup-modal .lighting-toggle {
+  width: 100%;
+  min-height: 48px;
+  position: relative;
+  isolation: isolate;
+}
+#app .race-setup-modal .lighting-toggle .lighting-sky { display: none; }
+#app .race-setup-modal[data-menu-material] .lighting-toggle[data-lighting-art] {
+  background: #111b2a;
+  border-color: #c6e3fa66;
+  color: #fff;
+  box-shadow: none;
+  text-shadow: 0 1px 4px #000, 0 0 7px #000;
+}
+#app .race-setup-modal .lighting-toggle[data-lighting-art] .lighting-sky {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.lighting-frame {
+  position: absolute;
+  inset: 0;
+  background-size: 400% 300%;
+  background-repeat: no-repeat;
+}
+#app .race-setup-modal .lighting-toggle .lighting-label {
+  position: relative;
+  pointer-events: none;
+}
