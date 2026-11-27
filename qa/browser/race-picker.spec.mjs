@@ -158,7 +158,7 @@ test('the race flyover follows the selected track, car, lighting and motion pref
   await expect(options.getByRole('button', { name: 'HARD', exact: true })).toHaveCount(0)
 })
 
-test('race setup actions stay visible and reachable at narrow portrait and landscape sizes', async ({ page }) => {
+test('race setup actions stay visible and reachable at narrow portrait and landscape sizes', async ({ page }, testInfo) => {
   for (const viewport of [{ width: 320, height: 640 }, { width: 640, height: 320 }]) {
     await page.setViewportSize(viewport)
     const picker = await openPicker(page)
@@ -181,6 +181,19 @@ test('race setup actions stay visible and reachable at narrow portrait and lands
     })
     expect(layout.bodyBottom).toBeLessThanOrEqual(layout.footerTop)
     expect(layout.footerBottom).toBeLessThanOrEqual(layout.height)
+    const cars = setup.locator('.car-picker .car-choice')
+    await expect(cars).toHaveCount(4)
+    const carBounds = await cars.evaluateAll(nodes => nodes.map(node => {
+      const { x, y, width, height } = node.getBoundingClientRect()
+      return { x, y, width, height }
+    }))
+    for (const bounds of carBounds) {
+      expect(bounds.width).toBeGreaterThanOrEqual(44)
+      expect(bounds.height).toBeGreaterThanOrEqual(48)
+      expect(bounds.y).toBe(carBounds[0].y)
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
+    }
+    await testInfo.attach(`race-setup-${viewport.width}x${viewport.height}`, { body: await setup.screenshot(), contentType: 'image/png' })
     await actions[0].focus()
     await expect(actions[0]).toBeFocused()
     await page.keyboard.press('Tab')
