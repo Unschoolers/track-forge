@@ -1,0 +1,224 @@
+/* The route is the hero; filters and actions sit in a distinct functional layer. */
+.track-library-modal { isolation: isolate; background: linear-gradient(145deg, #070d1655, #080d1680), #080d14 url('../assets/title/city-harbor.webp') center / cover no-repeat; backdrop-filter: none; }
+.track-library-modal .modal-card { width: min(68rem, 100%); border-radius: 1.25rem; border-color: #71808c66; background: rgb(17 24 32 / 44%); box-shadow: 0 1.5rem 5rem #0008; }
+.track-library-modal .modal-header { padding: 1.1rem 1.4rem .7rem; }
+.track-library-modal .modal-title { font-size: clamp(1.55rem, 4.6vw, 2.35rem); letter-spacing: -.045em; }
+.track-library-modal .modal-subtitle { font-size: .9rem; }
+.track-library-modal .modal-close { border-radius: 50%; }
+.track-library-modal .modal-body { padding: .65rem 1.4rem 1rem; }
+.track-library-modal .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem 1.4rem max(1rem, env(safe-area-inset-bottom)); }
+.track-library-modal .modal-footer .button { min-width: 0; padding-inline: 1.1rem; }
+.track-library-modal .track-library-content { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .8rem; min-height: 0; }
+.track-library-modal .track-library-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .4rem; padding: .3rem; border: 1px solid #8393a580; border-radius: 1.2rem; background: linear-gradient(145deg, #e4f2ff14, transparent 36%, #080c1620), rgb(24 36 49 / 20%); box-shadow: inset 0 1px 1px #ffffff40, inset 0 -1px 1px #0006; }
+.track-library-modal .track-library-search { grid-column: 1 / -1; width: 100%; min-width: 0; min-height: 44px; padding: .6rem .85rem; border: 1px solid #71808c80; border-radius: .8rem; background: rgb(15 28 41 / 40%); color: #f4f6f8; font: inherit; user-select: text; }
+.track-library-modal .track-library-search[hidden] { display: none; }
+.track-library-modal .track-library-search-toggle { display: grid; place-items: center; width: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 0; background: transparent; color: #e8eff2; box-shadow: none; }
+.track-library-modal .track-library-search-toggle svg { width: 1.2rem; height: 1.2rem; }
+.track-library-modal .track-library-search-toggle span { display: none; }
+.track-library-modal .track-library-search-toggle[aria-expanded='true'] { background: #e8eff2; color: #141b25; }
+.track-library-modal .track-library-filter { display: flex; justify-self: start; min-width: 0; gap: .15rem; padding: 0; border: 0; border-radius: 999px; background: transparent; }
+.track-library-modal .track-library-filter-button { min-height: 44px; padding: .35rem .65rem; border: 0; border-radius: 999px; background: transparent; color: #c1cad4; font: 650 .8rem/1.2 system-ui, sans-serif; cursor: pointer; }
+.track-library-modal .track-library-filter-button.active { background: rgb(232 239 242 / 76%); color: #141b25; box-shadow: inset 0 1px 1px #fff9; }
+.track-library-modal .track-library-filter-button:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+.track-library-modal .track-library-count { margin: 0; color: #c1cad4; font: 650 .72rem/1.2 var(--menu-mono); white-space: nowrap; }
+.track-library-modal .track-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: .75rem;
+}
+.track-library-modal .track-list > :is(.results-heading, .empty-state) { grid-column: 1 / -1; }
+.track-library-modal .track-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 10rem;
+  background: linear-gradient(145deg, #d4ebff12, transparent 42%, #080d1424), rgb(15 28 41 / 30%);
+  border: 1px solid #a2bed15c;
+  box-shadow: inset 0 1px 1px #d5ebff30;
+  border-radius: 1.15rem;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.track-library-modal .track-card.edit { flex-direction: row; }
+.track-library-modal .track-card:is(:hover, :focus-within) { border-color: #c1cad4; z-index: 2; }
+.track-library-modal .track-card.selected { border-color: #ff925c; box-shadow: inset 0 0 0 1px #ff925c66; }
+.track-library-modal .track-card:has(.track-card-overflow[open]) { z-index: 5; }
+.track-library-modal .track-card-select {
+  display: grid;
+  grid-template-columns: minmax(5rem, .9fr) minmax(0, 1.1fr);
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: .65rem;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.track-library-modal .track-card-select:disabled { cursor: not-allowed; opacity: .58; }
+.track-library-modal .track-card-select:focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 2px; }
+.track-library-modal .track-card-copy {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto auto 1fr auto;
+  align-content: center;
+  gap: .32rem;
+  padding: .45rem .55rem;
+}
+.track-library-modal .track-preview {
+  display: block;
+  width: 100%;
+  height: 8.5rem;
+  min-width: 0;
+  min-height: 0;
+  padding: .6rem;
+  background: transparent;
+  color: #ff7952;
+  overflow: visible;
+}
+.track-library-modal .track-preview-halo { opacity: .28; filter: blur(2px); }
+.track-library-modal .track-preview-route { stroke: #ff925c; filter: drop-shadow(0 0 2px #ff925c55); }
+.track-library-modal .track-card-name {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.18;
+  font-size: clamp(.9rem, 2.6vw, 1.15rem);
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+.track-library-modal .track-card-creator {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: .35rem;
+  color: #c1cad4;
+  font: 700 .62rem/1.4 var(--menu-mono);
+}
+.track-library-modal .track-creator-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-library-modal .track-environment-dot {
+  display: block;
+  flex: 0 0 .48rem;
+  width: .48rem;
+  height: .48rem;
+  border-radius: 50%;
+  background: #7fbf83;
+  box-shadow: 0 0 .32rem #7fbf833d;
+}
+.track-library-modal .track-environment-dot[data-environment='cityscape'] { background: #9aabb9; box-shadow: 0 0 .32rem #9aabb93d; }
+.track-library-modal .track-environment-dot[data-environment='desert'] { background: #e5c066; box-shadow: 0 0 .32rem #e5c0663d; }
+.track-library-modal .track-environment-dot[data-environment='kids-room'] { background: #d7b4a1; box-shadow: 0 0 .32rem #d7b4a13d; }
+.track-library-modal .track-card-unavailable,
+.track-library-modal .track-card-medal { color: #e8ad86; font: 800 .57rem/1.1 var(--menu-mono); text-transform: uppercase; }
+.track-library-modal .track-card-medal { color: #d9c18c; }
+.track-library-modal .track-card-favorite,
+.track-library-modal .track-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #d6e1ec;
+  background: transparent;
+  box-shadow: none;
+  font: 800 1.35rem/1 var(--menu-mono);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.track-library-modal .track-card-favorite {
+  position: absolute;
+  top: .3rem;
+  left: .3rem;
+  z-index: 1;
+}
+.track-library-modal .track-card-favorite[aria-pressed='true'] { color: #ffc56a; text-shadow: 0 0 .6rem #ffc56a66; }
+.track-library-modal .track-card-overflow { position: absolute; top: .3rem; right: .3rem; z-index: 3; }
+.track-library-modal .track-menu-trigger { list-style: none; font-size: 1.55rem; }
+.track-library-modal .track-menu-trigger::-webkit-details-marker { display: none; }
+.track-library-modal :is(.track-card-favorite, .track-menu-trigger):active { background: #ffffff16; }
+@media (hover: hover) {
+  .track-library-modal :is(.track-card-favorite, .track-menu-trigger):hover { background: #ffffff12; }
+}
+.track-library-modal :is(.track-card-favorite, .track-menu-trigger):focus-visible {
+  outline: 2px solid var(--menu-accent);
+  outline-offset: 2px;
+}
+.track-library-modal .track-card-menu {
+  position: absolute;
+  top: calc(100% + .2rem);
+  right: 0;
+  width: max-content;
+  min-width: 9.4rem;
+  padding: .25rem;
+  background: #192936ed;
+  border: 1px solid #8ca2b680;
+  box-shadow: 0 .6rem 1.4rem #000a, inset 0 1px 1px #ffffff30;
+  border-radius: .85rem;
+}
+.track-library-modal .track-card-menu .track-icon-action {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  width: 100%;
+  min-height: 44px;
+  padding: .45rem .65rem;
+  background: none;
+  border: 0;
+  border-radius: .2rem;
+  color: #f2f5f8;
+  font: 750 .7rem/1.15 var(--menu-mono);
+  cursor: pointer;
+  text-align: left;
+}
+.track-library-modal .track-card-menu .track-icon-action:hover { background: #293c4c; }
+.track-library-modal .track-card-menu .track-icon-action svg { width: 1rem; height: 1rem; flex: none; }
+.track-library-modal .track-card-menu .track-icon-action.danger { color: #ffabb2; }
+.track-library-modal .track-card-menu .track-icon-action:focus-visible { outline: 2px solid var(--menu-accent); }
+.track-library-modal .empty-state { color: var(--menu-muted); }
+@media (max-width: 700px) {
+  .track-library-modal .track-library-toolbar { grid-template-columns: minmax(0, 1fr) auto auto; gap: .25rem; }
+  .track-library-modal .track-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+  .track-library-modal .track-card { min-height: 10rem; }
+  .track-library-modal { background-image: linear-gradient(0deg, #080d1680, #080d1655), url('../assets/title/city-harbor-portrait.webp'); }
+  .track-library-modal .track-card-select {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 4.25rem auto;
+    padding: 3.15rem .35rem .35rem;
+  }
+  .track-library-modal .track-preview { height: 4.25rem; padding: .25rem; }
+  .track-library-modal .track-card-copy { padding: .25rem .35rem; }
+  .track-library-modal .modal-header { padding: .9rem 1rem .55rem; }
+  .track-library-modal .modal-body { padding: .55rem 1rem .8rem; }
+  .track-library-modal .modal-footer { padding: .65rem 1rem max(.8rem, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 380px) {
+  .track-library-modal .track-card-select { padding: 3.15rem .3rem .3rem; }
+  .track-library-modal .track-card-copy { padding: .35rem; }
+  .track-library-modal .track-library-filter-button { padding-inline: .35rem; font-size: .75rem; }
+  .track-library-modal .track-library-count { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .track-library-modal .track-library-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .track-library-modal .modal-footer { display: grid; grid-template-columns: 1fr 1.25fr; }
+}
+@media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .track-library-modal .modal-card { background: #111820f5; }
+  .track-library-modal[data-graphics-quality] .track-library-toolbar { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
+  .track-library-modal .track-card { background: #1b2733; border-color: #aab9c8; }
+  .track-library-modal .track-library-search { background: #202a36; }
+  .track-library-modal .track-library-filter-button.active { background: #e8eff2; }
+  .track-library-modal .track-card-menu { background: #192936; }
+}
+[data-graphics-quality='low'] .track-library-modal .modal-card { background: #111820f5; }
+.track-library-modal[data-graphics-quality='low'] .track-library-toolbar { background: #202a36; backdrop-filter: none; }
+.track-library-modal[data-graphics-quality='low'] .track-card { background: #1b2733; }
+.track-library-modal[data-graphics-quality='low'] .track-library-search { background: #202a36; }
+.track-library-modal[data-graphics-quality='low'] .track-library-filter-button.active { background: #e8eff2; }
+.track-library-modal[data-graphics-quality='low'] .track-card-menu { background: #192936; }
