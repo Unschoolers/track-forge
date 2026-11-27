@@ -77,6 +77,9 @@ export function renderTrackGeometryBase(
 ): void {
   renderRoadRibbon(graphics, geometry.path, geometry.ribbon, night, environmentId)
   renderTrackGeometryMarkings(markings, geometry, night, environmentId)
+  for (const cue of buildRoadTransitionCues(geometry.path, night)) {
+    if (cue.kind === 'jump-lip') paintRoadTransitionCue(markings, cue)
+  }
 }
 
 export type RaceTrackVisibility = UpdateRoadRibbonVisibility & { readonly bitmap?: MeadowBitmapRenderer }
