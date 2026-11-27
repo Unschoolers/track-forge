@@ -24,7 +24,7 @@
 }
 .home-menu-header { align-self: end; max-width: 34rem; }
 .home-eyebrow {
-  margin: 0 0 .8rem;
+  margin: 0 0 .55rem;
   color: #d5dce3;
   font: 650 .72rem/1.4 var(--home-mono);
   letter-spacing: .14em;
@@ -34,7 +34,7 @@
   flex-wrap: wrap;
   gap: 0 .22em;
   margin: 0;
-  font: italic 850 clamp(3.25rem, min(9vw, 17vh), 7.5rem)/.86 'Track Forge Title', Inter, system-ui, sans-serif;
+  font: italic 850 clamp(2.75rem, min(7vw, 13vh), 6rem)/.9 'Track Forge Title', Inter, system-ui, sans-serif;
   letter-spacing: -.075em;
   text-shadow: 0 3px 28px #0008;
 }
@@ -47,31 +47,35 @@
 }
 .home-track {
   width: min(33rem, 100%);
-  padding: .2rem 0 .2rem 1rem;
+  padding: .1rem 0 .15rem 1rem;
   border-left: 2px solid var(--home-accent);
-  text-shadow: 0 2px 12px #000;
+  text-shadow: 0 2px 14px #000, 0 1px 3px #000;
 }
 .home-track-label {
   color: #ffd6c3;
   font: 700 .68rem/1.35 var(--home-mono);
   letter-spacing: .13em;
+  text-shadow: 0 1px 5px #000;
 }
 .home-track-name {
-  margin: .4rem 0 .25rem;
-  font-size: clamp(1.4rem, 3vw, 2.5rem);
+  margin: .3rem 0 .2rem;
+  font-size: clamp(1.35rem, 2.8vw, 2.15rem);
+  font-weight: 750;
   line-height: 1.05;
   letter-spacing: -.035em;
 }
 .home-track-credit, .home-track-best, .home-track-progress {
   margin: .35rem 0 0;
-  color: #e0e4e9;
-  font: 500 .78rem/1.5 var(--home-mono);
+  color: #f0f3f7;
+  font: 550 .75rem/1.45 var(--home-mono);
 }
 .home-menu-actions { align-self: end; gap: .65rem; }
 .home-menu-actions .tf-menu-dock { justify-content: center; }
 .home-primary-dock { min-width: min(26rem, 100%); }
 .home-primary-dock .tf-menu-action { flex: 1; }
 .home-primary-dock .tf-menu-action--primary { min-width: min(12rem, 48vw); font-size: 1.05rem; }
+.home-primary-dock [data-action='race-again'] { min-width: 0; }
+.home-race-again-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-navigation-dock { gap: 2px; background: #182431ed; }
 .home-navigation-dock .tf-menu-action { min-height: 44px; padding-inline: clamp(.55rem, 2vw, 1rem); font-size: .82rem; }
 .home-navigation-dock [data-action='open-updates'] { color: #ffd1b6; }
@@ -103,10 +107,15 @@
   .home-artwork { background-image: url('../assets/title/city-harbor-portrait.webp'); background-position: center top; }
   .home-artwork::after { background: linear-gradient(0deg, #080b10 4%, #080b10f2 31%, #080b1099 70%, #080b1033); }
   .home-menu-header { align-self: start; }
-  .home-title { max-width: 9ch; font-size: clamp(3.1rem, 15vw, 5rem); }
-  .home-menu-content { align-items: end; padding-bottom: 1rem; }
-  .home-track { padding-left: .8rem; }
+  .home-title { max-width: 10ch; font-size: clamp(2.25rem, 10vw, 3.25rem); }
+  .home-menu-content { align-items: end; padding-bottom: .35rem; }
+  .home-track { padding: .1rem 0 .15rem .8rem; }
+  .home-track-credit, .home-track-best, .home-track-progress { font-size: .72rem; }
   .home-menu-actions .tf-menu-dock { width: 100%; }
+  .home-primary-dock { min-width: 0; }
+  .home-primary-dock .tf-menu-action { flex: 1 1 0; min-width: 0; padding-inline: .6rem; font-size: .8rem; }
+  .home-primary-dock .tf-menu-action--primary { min-width: 6rem; font-size: .95rem; }
+  .home-primary-dock [data-action='race-again'] { justify-content: flex-start; }
   .home-navigation-dock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-height: 520px) and (orientation: landscape) {

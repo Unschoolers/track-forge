@@ -170,7 +170,7 @@ html { background: #080b10; }
       linear-gradient(0deg, #080b10 23%, rgb(8 11 16 / 88%) 33%, transparent 65%),
       linear-gradient(180deg, rgb(8 11 16 / 64%), transparent 23%);
   }
-  .title-screen__brand { font-size: clamp(3rem, min(17vw, 14vh), 8rem); }
+  .title-screen__brand { font-size: clamp(2.6rem, min(12vw, 10vh), 5.25rem); }
   .title-screen__circuit { top: max(1.4rem, env(safe-area-inset-top)); bottom: auto; }
 }
 

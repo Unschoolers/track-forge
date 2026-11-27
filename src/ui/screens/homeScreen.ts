@@ -63,7 +63,10 @@ export function createHomeScreen(
   const primaryDock = createMenuDock('Race')
   primaryDock.classList.add('home-primary-dock')
   if (state.raceAgainTrackName) {
-    primaryDock.append(createMenuAction(`Race again · ${state.raceAgainTrackName}`, 'race-again', actions.raceAgain))
+    const label = `Race again · ${state.raceAgainTrackName}`
+    const raceAgain = createMenuAction(label, 'race-again', actions.raceAgain)
+    raceAgain.replaceChildren(element('span', 'home-race-again-label', label))
+    primaryDock.append(raceAgain)
   }
   primaryDock.append(createMenuAction('Race', 'race', actions.race, 'primary'))
 
