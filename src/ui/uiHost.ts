@@ -29,7 +29,7 @@ import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
 import { createOptionsModal } from '@/ui/modals/optionsModal'
 import { createPauseModal } from '@/ui/modals/pauseModal'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
-import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
+import { createTrackLibraryModal, type TrackLibraryViewState } from '@/ui/modals/trackLibraryModal'
 import { isSeededTrack } from '@/domain/track/trackCreator'
 import { isSharedTrack } from '@/domain/track/trackAccess'
 import { createToast } from '@/ui/toast'
@@ -78,6 +78,7 @@ export class DomUiHost implements UiHost {
   private lastUpdateCheckAt = Number.NEGATIVE_INFINITY
   private updateCheckGeneration = 0
   private previousOverlayType: AppSnapshot['overlay']['type'] = 'none'
+  private trackLibraryViewState: TrackLibraryViewState | undefined
   private readonly noticeTimers = new Set<ReturnType<typeof setTimeout>>()
   private noticeGeneration = 0
 
@@ -391,6 +392,18 @@ export class DomUiHost implements UiHost {
     const libraryScroll = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
       ? this.root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop
       : undefined
+    const currentLibrary = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
+      ? this.root.querySelector<HTMLElement>('.track-library-modal')
+      : null
+    const librarySearch = currentLibrary?.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
+    this.trackLibraryViewState = currentLibrary
+      ? {
+        searchQuery: librarySearch?.value ?? '',
+        filter: currentLibrary.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed') === 'true'
+          ? 'favorites'
+          : 'all',
+      }
+      : undefined
     // Keep the local player's scroll and diagnostic export across roster updates.
     const previousLobby = lobbyTrack && this.previousOverlayType === 'nearby'
       ? this.root.querySelector<HTMLElement>('.nearby-lobby-modal') : null
@@ -539,7 +552,7 @@ export class DomUiHost implements UiHost {
               })
             }
           },
-        }, this.runtime.geometry)
+        }, this.runtime.geometry, this.trackLibraryViewState)
       case 'player-name':
         return createPlayerNameModal(state, (name) =>
           this.controller.dispatch({ type: 'set-player-name', name }))

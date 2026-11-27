@@ -192,7 +192,7 @@ describe('modal application flows', () => {
     expect(share?.getAttribute('aria-label')).toBe('Share Starter Circuit')
     expect(share?.textContent).toBe('SHARE')
     expect(share?.querySelector('svg path')).not.toBeNull()
-    expect(raceTile?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
+    expect(raceTile?.firstElementChild?.classList.contains('track-preview')).toBe(true)
     expect(root.querySelectorAll('.track-list > .results-heading')).toHaveLength(0)
     expect(raceTile?.contains(share ?? null)).toBe(false)
     const overflow = share?.closest<HTMLDetailsElement>('details.track-card-overflow')
@@ -293,7 +293,9 @@ describe('modal application flows', () => {
       expect(action.querySelector('svg path')).not.toBeNull()
       expect(action.getAttribute('aria-label')).toBeTruthy()
     }
-    expect(card?.querySelector('.track-card-copy')?.firstElementChild?.classList.contains('track-preview')).toBe(true)
+    const select = card?.querySelector('.track-card-select')
+    expect(select?.children[0]?.classList.contains('track-preview')).toBe(true)
+    expect(select?.children[1]?.classList.contains('track-card-copy')).toBe(true)
     expect(root.textContent).not.toContain('RACE READY')
     expect(root.textContent).not.toContain('BEST')
     expect(root.querySelector('[data-environment="grass"]')).not.toBeNull()
@@ -361,6 +363,27 @@ describe('modal application flows', () => {
     expect(root.querySelector('.track-list .empty-state')?.textContent).toBe('No circuits match this view.')
     root.querySelector<HTMLButtonElement>('[data-action="library-filter-all"]')?.click()
     expect(root.querySelectorAll('.track-card')).toHaveLength(0)
+  })
+
+  it('keeps the search query and favorites filter when a favorite update rerenders the library', () => {
+    const initial = {
+      ...state({ type: 'track-library', purpose: 'edit' }),
+      tracks: [{ ...ready, creator: { id: 'creator-alex', name: 'Alex' } }, incomplete],
+    }
+    const { root, update, host } = setup(initial)
+    root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.click()
+    const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
+    if (!search) throw new Error('Missing track search')
+    search.value = 'Alex'
+    search.dispatchEvent(new Event('input'))
+
+    update({ ...initial, preferences: { ...preferences, favoriteTrackIds: [ready.id] } })
+
+    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Alex')
+    expect(root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(root.querySelectorAll('.track-card')).toHaveLength(1)
+    expect(root.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
+    host.destroy()
   })
 
   it('keeps imported shared tracks marked read-only and offers View as the main action', () => {
