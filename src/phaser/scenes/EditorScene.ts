@@ -44,7 +44,7 @@ import {
   renderLampPosts,
 } from '@/phaser/rendering/lampPostRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
-import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH, type MeadowBitmapRenderer } from '@/phaser/rendering/meadowBitmapRenderer'
+import { createMeadowBitmapRenderer, ROAD_MARKINGS_DEPTH, type EditorMeadowBitmapRenderer } from '@/phaser/rendering/meadowBitmapRenderer'
 import { GroundTextureRenderer } from '@/phaser/rendering/environmentRenderer'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
@@ -88,7 +88,7 @@ export class EditorScene extends Phaser.Scene {
   private sceneryGraphics?: Phaser.GameObjects.Graphics
   private trackGraphics?: Phaser.GameObjects.Graphics
   private roadMarkingGraphics?: Phaser.GameObjects.Graphics
-  private meadowBitmapRenderer: MeadowBitmapRenderer | undefined
+  private meadowBitmapRenderer: EditorMeadowBitmapRenderer | undefined
   private structureUnderlayGraphics?: Phaser.GameObjects.Graphics
   private structureDeckGraphics?: Phaser.GameObjects.Graphics
   private structureWallGraphics?: Phaser.GameObjects.Graphics
