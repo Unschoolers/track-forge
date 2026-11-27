@@ -27,7 +27,7 @@ test('home uses the bundled LiquidGlass.dev optical component and keeps native a
   await expect(page.locator('.home-screen lg-panel')).toHaveCount(0)
 })
 
-test('Options keeps its full available height and fixed chrome across categories', async ({ page }) => {
+test('Options keeps its full available height and fixed chrome across categories', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/?qa')
   await enterTrackForge(page)
@@ -53,7 +53,9 @@ test('Options keeps its full available height and fixed chrome across categories
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport)
     await options.getByRole('tab', { name: 'race', exact: true }).click()
+    await expect(options.locator('.options-tab-list > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
     const baseline = await measure()
+    await testInfo.attach(`options-glass-${viewport.width}x${viewport.height}`, { body: await options.screenshot(), contentType: 'image/png' })
     expect(baseline.top).toBeCloseTo(baseline.availableTop, 0)
     expect(baseline.bottom).toBeCloseTo(baseline.availableBottom, 0)
     for (const tab of await tabs.all()) {
@@ -84,7 +86,13 @@ test('track cards stay in two columns with reachable controls on narrow and land
     await expect(picker.locator('.track-card-favorite').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(picker.locator('.track-menu-trigger').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(picker.locator('.track-card').first()).toHaveCSS('background-color', 'rgba(15, 28, 41, 0.3)')
-    await expect(picker.locator('.modal-footer [data-action="library-back"]')).toHaveCSS('background-color', 'rgba(15, 28, 41, 0.2)')
+    const back = picker.locator('.modal-footer [data-action="library-back"]')
+    await expect(back).toHaveAttribute('data-liquid-glass', '')
+    await expect(back).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(back.locator('lg-panel .lg-surface__tint')).toHaveCSS('background-color', 'rgba(15, 28, 41, 0.2)')
+    await expect(back.locator('lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    await expect(picker.locator('.track-library-toolbar > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    await expect(picker.locator('.track-card lg-panel')).toHaveCount(0)
     await expect(picker.locator('.modal-footer [data-action="library-back"]')).toHaveCSS('clip-path', 'none')
     const searchToggle = picker.getByRole('button', { name: 'Search circuits' })
     await expect(searchToggle).toHaveAttribute('aria-expanded', 'false')
@@ -223,6 +231,8 @@ test('the race flyover follows the selected track, car, lighting and motion pref
   await setup.getByRole('button', { name: 'Options' }).click()
   const options = page.getByRole('dialog', { name: 'Options' })
   await expect(options.getByRole('button', { name: 'HARD', exact: true })).toBeVisible()
+  await expect(options.locator('.options-tab-list > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+  await expect(options.locator('[data-action="options-done"] > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
   await expect(options.getByRole('button', { name: 'Night', exact: true })).toHaveCount(0)
   await options.getByRole('button', { name: 'DONE', exact: true }).click()
   await expect(preview).toHaveAccessibleName('Nighttime flyover of Harbor Grid')
@@ -274,6 +284,9 @@ test('race setup actions stay visible and reachable at narrow portrait and lands
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
     }
     await expect(setup).toHaveCSS('background-color', 'rgba(17, 25, 35, 0.72)')
+    await expect(setup.locator('[data-action="setup-start"] > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    await expect(setup.locator('[data-action="lighting-day"] > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    await expect(setup.locator('.race-flyover-panel lg-panel')).toHaveCount(0)
     await testInfo.attach(`race-setup-${viewport.width}x${viewport.height}`, { body: await setup.screenshot(), contentType: 'image/png' })
     await actions[0].focus()
     await expect(actions[0]).toBeFocused()

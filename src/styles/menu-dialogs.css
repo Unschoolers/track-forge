@@ -8,7 +8,9 @@
 }
 .options-modal {
   isolation: isolate;
-  background: linear-gradient(145deg, #070d16b8, #080d16c9), url('../assets/title/city-harbor.webp') center / cover no-repeat;
+  background: #080d14 linear-gradient(145deg, #070d1655, #080d1680) center / cover no-repeat;
+  background-image: linear-gradient(145deg, #070d1655, #080d1680), url('../assets/title/city-harbor.webp');
+  backdrop-filter: none;
 }
 .modal-overlay .modal-card {
   border: 1px solid #3c4c5b;
@@ -174,7 +176,7 @@
   box-shadow: 0 3px 12px #ff784633, inset 0 1px #fff6;
 }
 .options-modal .modal-close { border-radius: 50%; }
-.options-modal .modal-footer .button { border-radius: 999px; clip-path: none; }
+.options-modal .modal-footer .button { border-radius: 999px; clip-path: none; min-height: 48px; font: 650 .88rem/1.15 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
 .options-modal .setup-label { font-family: system-ui, sans-serif; letter-spacing: .02em; text-transform: none; }
 .options-modal .setting-row { border-color: #34414e; }
 .options-modal .setting-description, .options-modal .volume-value { color: var(--menu-muted); }
@@ -183,6 +185,7 @@
   .modal-overlay .modal-header { padding: 1rem; }
   .modal-overlay .modal-body { padding: 1rem; }
   .modal-overlay .modal-footer { padding: .8rem 1rem 1rem; }
+  .options-modal { background-image: linear-gradient(0deg, #080d1680, #080d1655), url('../assets/title/city-harbor-portrait.webp'); }
   .options-modal .choice-row { flex-wrap: wrap; }
   .options-modal .modal-card { width: 100%; }
   .options-modal .options-tab-list { gap: .15rem; margin-inline: .7rem; padding: .25rem; }
