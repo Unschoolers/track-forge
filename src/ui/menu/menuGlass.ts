@@ -1,3 +1,5 @@
+import { attachLightingArtwork } from '@/ui/components/lightingToggle'
+
 /** Static artwork is a screen capability, not a per-button allowlist.
  * All standard actions share one policy; content cards and live canvases are
  * deliberately excluded. Choices in settings remain paint-only. */
@@ -23,7 +25,7 @@ export function attachMenuGlass(
   // when a browser cannot render SVG lenses.
   screen.dataset.menuMaterial = 'static'
   const actionsSelector = screen.matches('.race-setup-modal')
-    ? standardActions + ', .race-preparation-sections .setup-choice'
+    ? standardActions + ', .race-preparation-sections .setup-choice:not(.lighting-toggle)'
     : standardActions
   if (root.dataset.graphicsQuality === 'low' ||
       typeof ResizeObserver === 'undefined' || !window.CSS?.supports?.('filter', 'url(#liquidglass)')) return () => undefined
@@ -33,9 +35,12 @@ export function attachMenuGlass(
   let disposed = false
   let loading = false
   let loaded = false
+  let lightingCleanup: (() => void) | undefined
   const dynamic = screen.matches('.options-modal, .nearby-static-modal')
 
   const clear = () => {
+    lightingCleanup?.()
+    lightingCleanup = undefined
     for (const [surface, panel] of panels) {
       panel.remove()
       delete surface.dataset.liquidGlass
@@ -46,6 +51,10 @@ export function attachMenuGlass(
 
   const sync = () => {
     if (disposed || !loaded || preference.matches || !root.contains(screen)) return
+    const lighting = screen.querySelector<HTMLButtonElement>('.lighting-toggle')
+    if (lighting && !lightingCleanup) {
+      lightingCleanup = attachLightingArtwork(lighting, root.dataset.graphicsQuality === 'high')
+    }
     const visible = (surface: HTMLElement) => !surface.closest('[hidden], details:not([open])')
     const groups = config.groups ? [...screen.querySelectorAll<HTMLElement>(config.groups)].filter(visible) : []
     const actions = [...screen.querySelectorAll<HTMLElement>(actionsSelector)]
