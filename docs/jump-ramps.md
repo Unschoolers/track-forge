@@ -1,67 +1,56 @@
-# Directional jump ramps — delivery plan
+# Directional jump ramps
 
-## Contract
+## User contract
 
-A Jump road structure is an authored ascending ramp with an abrupt high
-lip. The next ordinary road starts at its local terrain elevation. Use the
-existing bridge relative height in V1; ramp length sets inclination.
-The ramp is a physical structure, not a speed boost or a visual-only effect.
+Select **Structure → Jump** and paint a contiguous road section in the editor.
+The ramp ascends in authored forward direction and ends in an abrupt lip;
+the road immediately following it is ordinary surface. Use the existing
+24-world-unit relative elevation, with ramp length determining slope.
+There is no height slider or speed boost.
 
-Keep the existing deterministic 60 Hz XY and Z vehicle simulation. Phaser
-Arcade and Matter are planar solvers; neither represents the independent
-elevation coordinate and composed road support used here. Phaser remains
-the presentation adapter for ramp meshes, shadows, cues and landing effects.
+V1 is directional: a circuit containing jumps must be raced forward.
+Invalid or unsupported placements (missing approach/landing, short sections,
+water on the ramp, crossing conflicts, start-grid overlap) report an explicit
+race-readiness error. Surface painting removes the jump. Existing editor
+section commands own history and serialization.
 
-## Slices
+## Implementation boundary
 
-1. **Takeoff physics foundation (this draft).** A grounded driver crossing
-   an authored lip receives the lip height and positive travel grade in the
-   vertical step. Convert actual longitudinal speed to vertical velocity,
-   release tire contact and use existing ballistic flight and landing.
-   No production caller emits the signal yet. Existing bridges behave as
-   before. Keep this draft open through integration or review the foundation
-   separately before merging; it does not expose a playable jump.
-2. **Canonical structure and authoring.** Extend the road structure model,
-   codec, editor paint/undo/redo, serialization, stable IDs and geometry
-   cache. Audit all surface/overpass checks rather than treating Jump as
-   Overpass. Preserve legacy saves; explicitly negotiate compatibility of
-   jump-capable shared tracks with older peers instead of silently flattening
-   a ramp. Geometry must expose both sides of a discontinuity; a sampled
-   linear interpolation or centered finite difference across the lip must
-   not fabricate a downhill approach. Reject empty, all-loop, too short,
-   crossing-conflicted or unsupported jump placements with useful diagnostics.
-3. **Playable vertical slice.** Detect swept crossing of the finite lip in
-   the launch direction with prior grounded support and forward velocity.
-   Pass the canonical lip height and travel grade to the vertical step;
-   never emit for lateral exits, reverse motion or stale nearest-road
-   samples. Distinguish intentional flight from bridge-fall recovery, retain
-   water-contact, checkpoint order, landing and explicit recovery semantics.
-   Verify road support, airborne tire unloading and safe recovery targets.
-   Directional ramps stay physically fixed. Proposed V1: disallow reverse
-   racing on a jump track, including imported tracks, with an explanation;
-   don't mirror the structure dynamically or allow cars to teleport up the
-   back face. Confirm this product choice before exposing the tool.
-4. **Presentation.** Reuse the bridge ribbon/material/shadow builders with
-   an explicit lip face and correct depth ordering. Avoid drawing a
-   descending connecting triangle across the discontinuity. Editor shows
-   the direction and a readable takeoff stripe; no per-frame static mesh
-   generation. Reuse existing car height, landing intensity and effects.
-5. **AI and release.** Use the existing AI optimization/tuning and lane
-   checker tools for a representative straight ramp and varied approaches,
-   all four cars, Hard first, then Medium/Easy. Measure pace, landings,
-   recoveries and gate completion; no car speed cheat or track-specific
-   production special cases. Verify ghosts and nearby peer compatibility,
-   native frame pacing and visible jump cues before merge/release.
+- RoadStructure, track codec, path profile and stable section identity own
+  authored geometry. The profile exposes both sides of the lip and avoids
+  treating the discontinuity as a downhill grade.
+- The deterministic 60 Hz race tick checks a finite swept forward crossing
+  from grounded ramp support. The existing vertical dynamics owns flight,
+  gravity and landing. Intentional launch skips bridge-fall recovery;
+  ordinary lateral raised-road departures keep their existing policy.
+- Phaser uses the existing cached bridge presentation with a discontinuous
+  lip face, no jump rails, and a directional takeoff cue. Physics never
+  depends on Phaser.
+- Local tracks retain schema 8. Unsigned/signed jump exports use envelope
+  versions 3/4; ordinary tracks keep 1/2. Older importers therefore reject
+  new jump exports rather than silently flattening them. Nearby geometry
+  transfer uses the same envelope selection. Do not downgrade an installed
+  app with jump tracks in its local library: older local codecs do not know
+  the new structure value. Export before any rollback.
 
-## Verification
+## Verification and release gate
 
-Narrow domain tests for faster vs slower launch, landing, repeated events,
-ordinary bridge fall, malformed lip signals; then authored profile/codec
-round trips and editor command tests, race takeoff/recovery scenarios,
-component render checks, deterministic AI lane and optimization runs and
-the normal verify gate. Android visual/frame-pacing evidence is separate.
+Run focused domain/component tests, the full verify gate, native/mobile
+verification, and the existing optimizer against both jump and ordinary
+holdout tracks:
 
-The first slice intentionally adds no persisted structure, new gameplay
-setting, Phaser physics dependency or runtime jump trigger. Existing
-track behavior is unchanged. Revert the foundation to remove the unused
-takeoff input; later integration must include a migration/rollback review.
+```sh
+npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --scenarios jump-straight,jump-gravel,pine-hairpins,meadow-loop --out qa/results/jump-optimization
+npm run verify
+npm run qa:mobile
+```
+
+The AI optimization workflow runs that study separately from the matched
+legacy-physics baseline so an older engine never receives a jump fixture.
+Inspect every car's matched pace, recovery and finish metrics before promoting
+any driving-policy changes. Then verify Easy/Normal/Hard ordering and real
+Android flight/readability. No speed cheats or track-specific production AI.
+
+PR #459 remains draft until CI, the jump study, independent review and
+Android visual checks are confirmed. No claim of passing checks or tuned AI
+is made by this document.
