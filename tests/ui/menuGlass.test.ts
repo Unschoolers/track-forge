@@ -56,6 +56,34 @@ describe('LiquidGlass.dev menu adapter', () => {
     expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
   })
 
+  it('reconciles asynchronous Options actions without remounting existing lenses', async () => {
+    const { root } = setup()
+    const screen = document.createElement('div')
+    screen.className = 'options-modal'
+    screen.innerHTML = '<nav class="options-tab-list"><button class="setup-choice">Updates</button></nav><section class="options-tab-panel"><div class="options-update-actions"><button class="button">Check</button><button class="button options-release-notes-button" hidden>Notes</button></div><section class="options-download-panel"></section></section>'
+    root.append(screen)
+    const cleanup = attachMenuGlass(root, screen, async () => undefined)
+    const check = screen.querySelector('.options-update-actions .button')!
+    const notes = screen.querySelector<HTMLButtonElement>('.options-release-notes-button')!
+    const downloadPanel = screen.querySelector('.options-download-panel')!
+    await vi.waitFor(() => expect(check.querySelector('lg-panel')).not.toBeNull())
+    const originalLens = check.querySelector('lg-panel')
+    expect(notes.querySelector('lg-panel')).toBeNull()
+    notes.hidden = false
+    downloadPanel.innerHTML = '<progress></progress><button class="button button-primary">Install</button><button class="button">Remove</button>'
+    await vi.waitFor(() => expect(downloadPanel.querySelectorAll('lg-panel')).toHaveLength(2))
+    expect(notes.querySelector('lg-panel')?.getAttribute('radius')).toBe('capsule')
+    expect(check.querySelector('lg-panel')).toBe(originalLens)
+    const install = downloadPanel.querySelector('.button-primary')!
+    downloadPanel.replaceChildren()
+    await vi.waitFor(() => expect(install.querySelector('lg-panel')).toBeNull())
+    expect(check.querySelector('lg-panel')).toBe(originalLens)
+    notes.hidden = true
+    await vi.waitFor(() => expect(notes.querySelector('lg-panel')).toBeNull())
+    cleanup()
+    expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
+  })
+
   it('does not load optics on an unsupported or live screen', () => {
     const { root } = setup()
     const screen = document.createElement('div')
