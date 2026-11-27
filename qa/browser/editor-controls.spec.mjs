@@ -64,6 +64,12 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await expect(save.locator('svg.editor-icon')).toBeVisible()
     await expect(editor.locator('.editor-context-dock')).toHaveAttribute('data-layout', 'one-row')
     await assertClearEditorControls(page, 'road')
+    if (width === 390) {
+      // Assert the real compositing filter, not a rounded painted fallback.
+      await expect(save).toHaveCSS('backdrop-filter', /url\(/)
+      await expect(editor.locator('.editor-context-dock')).toHaveCSS('backdrop-filter', /url\(/)
+      await expect(editor.locator('.editor-context-dock button').first()).toHaveCSS('backdrop-filter', 'none')
+    }
 
     // The toolbar must remain clickable, not just visually present.
     await editor.locator('summary.editor-view-summary').click()
@@ -75,6 +81,10 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await save.click()
 
     await editor.locator('summary.editor-toolbox-summary').click()
+    if (width === 390) {
+      await expect(editor.locator('.editor-toolbox-items')).toHaveCSS('backdrop-filter', /url\(/)
+      await expect(editor.locator('.editor-toolbox-items button').first()).toHaveCSS('backdrop-filter', 'none')
+    }
     await editor.getByRole('button', { name: 'Paint terrain' }).click()
     await expect(editor.locator('.editor-context-dock')).toHaveAttribute('data-layout', 'two-row')
     await assertClearEditorControls(page, 'terrain')

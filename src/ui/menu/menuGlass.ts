@@ -12,6 +12,8 @@ const menuSurfaces = [
   { screen: '.options-modal', backdrop: '.options-modal', groups: '.options-tab-list' },
   { screen: '.cup-modal', backdrop: '.cup-modal', groups: '' },
   { screen: '.nearby-static-modal', backdrop: '.nearby-static-modal', groups: '' },
+  { screen: '.editor-menu-modal', backdrop: '.editor-menu-modal .modal-card', groups: '.editor-menu-select-surface' },
+  { screen: '.track-share-modal', backdrop: '.track-share-modal .modal-card', groups: '' },
 ] as const
 
 /** One upstream lens per independent action or semantic group, never nested. */
@@ -27,7 +29,9 @@ export function attachMenuGlass(
   screen.dataset.menuMaterial = 'static'
   const actionsSelector = screen.matches('.race-setup-modal')
     ? standardActions + ', .race-preparation-sections .setup-choice:not(.lighting-toggle)'
-    : standardActions
+    : screen.matches('.editor-menu-modal, .track-share-modal')
+      ? standardActions + ', button.track-icon-action'
+      : standardActions
   if (root.dataset.graphicsQuality === 'low' ||
       typeof ResizeObserver === 'undefined' || !window.CSS?.supports?.('filter', 'url(#liquidglass)')) return () => undefined
 
@@ -75,7 +79,7 @@ export function attachMenuGlass(
       const panel = document.createElement('lg-panel')
       panel.setAttribute('aria-hidden', 'true')
       panel.setAttribute('backdrop', config.backdrop)
-      panel.setAttribute('radius', surface.matches('.modal-close, .options-release-notes-button') ? 'capsule' : '18')
+      panel.setAttribute('radius', surface.matches('.modal-close, .options-release-notes-button, .track-icon-action') ? 'capsule' : '18')
       const optics = glassOptics(group ? 'group' : 'action', root.dataset.graphicsQuality === 'high')
       for (const [name, value] of Object.entries(optics)) {
         panel.setAttribute(name === 'specularWidth' ? 'specular-width' : name, String(value))

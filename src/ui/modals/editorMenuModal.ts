@@ -24,7 +24,9 @@ function settingSelect<Value extends string>(
     const choice = choices.find(item => item.value === select.value)
     if (choice) onChange(choice.value)
   })
-  row.append(element('span', '', label), select)
+  const surface = element('span', 'editor-menu-select-surface')
+  surface.append(select)
+  row.append(element('span', '', label), surface)
   return row
 }
 
