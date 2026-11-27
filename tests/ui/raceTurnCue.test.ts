@@ -27,6 +27,11 @@ function pathFrom(
 			gradeAt: () => 0,
 		},
 		roadSurface: {
+			jumpLips: [],
+			atSegmentEnd: () => ({
+				terrainHeight: 0, structureHeight: 0, height: 0, grade: 0,
+				material: 'grass', structureRunId: null,
+			}),
 			at: () => ({
 				terrainHeight: 0,
 				structureHeight: 0,
