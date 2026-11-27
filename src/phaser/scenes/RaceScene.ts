@@ -36,6 +36,7 @@ import {
   type RaceCameraState,
 } from '@/phaser/camera/raceCamera'
 import { renderRaceEffects } from '@/phaser/rendering/raceEffectsRenderer'
+import { NativeRaceParticles } from '@/phaser/rendering/nativeRaceParticles'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import {
   buildLampPosts,
@@ -90,6 +91,7 @@ export class RaceScene extends Phaser.Scene {
   private vehicleSprites: VehicleSpriteRenderer | undefined
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
+  private nativeParticles: NativeRaceParticles | undefined
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
   private bridgeGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds; primitives: number }[] = []
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
@@ -165,6 +167,9 @@ export class RaceScene extends Phaser.Scene {
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
+    if (this.game.renderer && this.game.renderer.type === Phaser.WEBGL && typeof this.add.particles === 'function') {
+      this.nativeParticles = new NativeRaceParticles(this, WORLD_RENDER_DEPTH.effect + 0.01)
+    }
     if (night) this.nightBeamRenderer = new NightBeamRenderer(this, Phaser.BlendModes.ADD)
     this.nightLightGraphics = this.add
       .graphics()
@@ -359,7 +364,8 @@ export class RaceScene extends Phaser.Scene {
     this.upperShadowGraphics?.clear()
     this.vehicleSprites?.beginFrame()
     this.effectGraphics.clear()
-    renderRaceEffects(this.effectGraphics, race.effects)
+    this.nativeParticles?.render(race.effects, race.tick)
+    renderRaceEffects(this.effectGraphics, race.effects, this.nativeParticles !== undefined)
     const restart = manualRecoverySignal(race)
     if (player && restart) {
       // Counter-rotate and scale to keep the local signal upright and legible.
@@ -583,6 +589,8 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private dispose(): void {
+    this.nativeParticles?.destroy()
+    this.nativeParticles = undefined
     this.frameDiagnostics?.endRace()
     this.controls.reset()
     this.boostRequestPending = false

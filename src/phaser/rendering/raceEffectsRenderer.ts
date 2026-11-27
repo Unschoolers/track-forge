@@ -13,6 +13,7 @@ const PARTICLE_COLORS: Record<RaceParticleKind, number> = {
 export function renderRaceEffects(
   graphics: Phaser.GameObjects.Graphics,
   effects: RaceEffectsState,
+  nativeRoundParticles = false,
 ): void {
   for (const skid of effects.skids) {
     graphics.lineStyle(
@@ -42,6 +43,7 @@ export function renderRaceEffects(
       }
       continue
     }
+    if (nativeRoundParticles) continue
     const progress = 1 - particle.life / particle.maxLife
     graphics.fillStyle(
       PARTICLE_COLORS[particle.kind],

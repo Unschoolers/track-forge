@@ -12,6 +12,8 @@ export type RaceParticleKind =
 
 export interface RaceParticle extends Vector2 {
   readonly kind: RaceParticleKind
+  /** Stable identity across simulation snapshots for native visual emitters. */
+  readonly emissionId?: number
   readonly vx: number
   readonly vy: number
   readonly life: number
@@ -31,6 +33,7 @@ export interface RaceEffectsState {
   readonly particles: readonly RaceParticle[]
   readonly skids: readonly SkidMark[]
   readonly previousTires: Readonly<Record<string, Vector2>>
+  readonly nextEmissionId?: number
 }
 
 export interface RaceEffectEvent {
@@ -191,9 +194,12 @@ export function advanceRaceEffects(
     }
   }
 
+  let nextEmissionId = state.nextEmissionId ?? 0
   return {
-    particles: particles.slice(-MAX_PARTICLES),
+    particles: particles.slice(-MAX_PARTICLES).map(item => item.emissionId === undefined
+      ? { ...item, emissionId: nextEmissionId++ } : item),
     skids: skids.slice(-MAX_SKIDS),
     previousTires,
+    nextEmissionId,
   }
 }
