@@ -100,6 +100,40 @@ test('the race flyover follows the selected track, car, lighting and motion pref
   await expect(options.getByRole('button', { name: 'HARD', exact: true })).toHaveCount(0)
 })
 
+test('race setup actions stay visible and reachable at narrow portrait and landscape sizes', async ({ page }) => {
+  for (const viewport of [{ width: 320, height: 640 }, { width: 640, height: 320 }]) {
+    await page.setViewportSize(viewport)
+    const picker = await openPicker(page)
+    await picker.getByRole('button', { name: 'Race Harbor Grid', exact: true }).click()
+    const setup = page.getByRole('dialog', { name: 'Race setup' })
+    const footer = setup.locator('.modal-footer')
+    const actions = [
+      footer.getByRole('button', { name: 'Back', exact: true }),
+      footer.getByRole('button', { name: 'Options', exact: true }),
+      footer.getByRole('button', { name: 'Start Race', exact: true }),
+    ]
+    for (const action of actions) {
+      await expect(action).toBeVisible()
+      expect((await action.boundingBox()).height).toBeGreaterThanOrEqual(44)
+    }
+    const layout = await setup.evaluate((dialog) => {
+      const body = dialog.querySelector('.modal-body').getBoundingClientRect()
+      const footer = dialog.querySelector('.modal-footer').getBoundingClientRect()
+      return { bodyBottom: body.bottom, footerTop: footer.top, footerBottom: footer.bottom, height: innerHeight }
+    })
+    expect(layout.bodyBottom).toBeLessThanOrEqual(layout.footerTop)
+    expect(layout.footerBottom).toBeLessThanOrEqual(layout.height)
+    await actions[0].focus()
+    await page.keyboard.press('Tab')
+    await expect(actions[0]).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(actions[1]).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(actions[2]).toBeFocused()
+    await setup.getByRole('button', { name: 'Back', exact: true }).click()
+  }
+})
+
 test('short landscape keeps the flyover legible and race actions reachable', async ({ page }) => {
   await page.setViewportSize({ width: 844, height: 390 })
   await page.emulateMedia({ reducedMotion: 'reduce' })

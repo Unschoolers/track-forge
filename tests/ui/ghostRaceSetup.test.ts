@@ -52,6 +52,12 @@ describe('Shared race preparation', () => {
     }
     expect(solo.querySelector('.race-preparation-picker')?.outerHTML).toEqual(multi.querySelector('.race-preparation-picker')?.outerHTML)
     expect(solo.querySelector('[data-action="setup-start"]')).not.toBeNull()
+    const footerButtons = [...solo.querySelectorAll('.modal-footer button')]
+    expect(footerButtons).toHaveLength(3)
+    expect(footerButtons.map(button => button.textContent)).toEqual([
+      'Back', 'Options', 'Start Race',
+    ])
+    expect(footerButtons.every(button => !button.hidden && button.tabIndex >= 0)).toBe(true)
     expect(solo.querySelector('[data-action="nearby-ready"]')).toBeNull()
     expect(multi.querySelector('[data-action="nearby-ready"]')).not.toBeNull()
     expect(multi.querySelector('[data-action="setup-start"]')).toBeNull()
