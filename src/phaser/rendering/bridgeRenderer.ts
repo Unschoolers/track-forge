@@ -233,14 +233,16 @@ export function* prepareBridgePresentation(
       !current ||
       !next ||
       (current.center.structure !== 'overpass' &&
-        next.center.structure !== 'overpass')
+        next.center.structure !== 'overpass' && current.center.structure !== 'jump')
     ) {
       continue
     }
     yield
     const currentRoad = path.roadSurface.at(index)
     const nextIndex = (index + 1) % path.points.length
-    const nextRoad = path.roadSurface.at(nextIndex)
+    const jump = current.center.structure === 'jump'
+    const jumpLip = jump && next.center.structure !== 'jump'
+    const nextRoad = jumpLip ? path.roadSurface.atSegmentEnd(index) : path.roadSurface.at(nextIndex)
     const currentHeight = currentRoad.structureHeight
     const nextHeight = nextRoad.structureHeight
     const visibleHeight = Math.max(currentHeight, nextHeight)
@@ -252,8 +254,8 @@ export function* prepareBridgePresentation(
 
     const currentLeftRoad = path.roadSurface.at(index, current.edgeLeft)
     const currentRightRoad = path.roadSurface.at(index, current.edgeRight)
-    const nextLeftRoad = path.roadSurface.at(nextIndex, next.edgeLeft)
-    const nextRightRoad = path.roadSurface.at(nextIndex, next.edgeRight)
+    const nextLeftRoad = jumpLip ? path.roadSurface.atSegmentEnd(index, next.edgeLeft) : path.roadSurface.at(nextIndex, next.edgeLeft)
+    const nextRightRoad = jumpLip ? path.roadSurface.atSegmentEnd(index, next.edgeRight) : path.roadSurface.at(nextIndex, next.edgeRight)
     const softCurrentLeft = projectShadow(
       current.edgeLeft,
       currentLeftRoad,
@@ -385,6 +387,16 @@ export function* prepareBridgePresentation(
         nextFaceGround.terrainHeight,
       ],
     })
+    if (jumpLip) {
+      // The ramp ends here, not on a fabricated descending road strip.
+      sideFaces.push({
+        kind: 'side-face',
+        ...elevationBase(current.surface, nextRoad.height, nextRoad.terrainHeight, shadowDistance(nextHeight)),
+        polygon: [next.edgeLeft, next.edgeRight, nextRightShadow.point, nextLeftShadow.point],
+        deckHeights: [nextRoad.height, nextRoad.height],
+        terrainHeights: [nextLeftRoad.terrainHeight, nextRightRoad.terrainHeight],
+      })
+    }
     const deck: BridgePolygonPrimitive = {
       kind: 'edge',
       rampApproach,
@@ -452,7 +464,7 @@ export function* prepareBridgePresentation(
         end: next.center,
       })
     }
-    if (!rampApproach) {
+    if (!rampApproach && !jump) {
       walls.push(
         {
           kind: 'wall',
