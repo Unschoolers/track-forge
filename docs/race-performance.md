@@ -77,6 +77,18 @@ coordinates stay independent of the backing resolution. No extra physics work.
 Compare identical tracks and frame timings at each quality level on Android.
 Higher settings increase fill rate and framebuffer memory; Low is the fallback.
 
+## Local race countdown presentation
+
+The local countdown does not consume time before the first RaceScene update
+has reached Phaser's post-render event. During the countdown only, each
+display frame contributes at most 100 ms, so loading stalls cannot skip an
+entire cue or release the cars before the player can see the start. The
+running simulation retains its existing raw-delta and fixed-step policy.
+Nearby continues using its shared monotonic start time, not this local
+presentation clock. RaceSession emits the initial local audio cue only on
+the first positive countdown advance after that render gate, once per run.
+Loading, paused frames and zero-time advances do not emit the beep.
+
 ## Startup and race atlas preparation
 
 The title screen waits for shared artwork, Phaser readiness and the

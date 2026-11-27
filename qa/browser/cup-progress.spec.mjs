@@ -27,6 +27,14 @@ test('loads the curated Cup and introduces the first round on the grid', async (
   await expect(curated).toHaveAttribute('data-liquid-glass', '')
   await expect(curated).toHaveCSS('border-top-left-radius', '18px')
   await expect(curated.locator('lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+  // A native highlight may use an ancestor or a dynamically inserted optical
+  // descendant. The entire hit-test chain must inherit the transparent color.
+  const highlightColors = await curated.evaluate(button => {
+    const nodes = [button, ...button.querySelectorAll('*')]
+    for (let parent = button.parentElement; parent; parent = parent.parentElement) nodes.push(parent)
+    return [...new Set(nodes.map(node => getComputedStyle(node).getPropertyValue('-webkit-tap-highlight-color')))]
+  })
+  expect(highlightColors).toEqual(['rgba(0, 0, 0, 0)'])
   await curated.click()
   const lineup = page.getByRole('list', { name: 'Cup track order' })
   await expect(lineup.getByRole('listitem')).toHaveCount(3)
