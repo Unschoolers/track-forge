@@ -30,6 +30,7 @@ export function routeRaceFeedback(
         type: 'surface',
         surface: player.currentSurface,
         speedRatio: airborneJump ? 0 : speedRatio,
+        grounded: player.grounded,
       })
       feedback.handle({
         type: 'tire-slip',

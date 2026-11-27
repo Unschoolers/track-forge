@@ -36,12 +36,12 @@ describe('feedback adapters', () => {
 
   it('uses one brief ignition vibration only when haptics are enabled', () => {
     const vibrate = vi.fn(() => true)
-    const haptics = new HapticsAdapter(vibrate, true)
+    const haptics = new HapticsAdapter(vibrate, true, () => 0)
     haptics.handle({ type: 'boost-ignition' })
     expect(vibrate).toHaveBeenCalledWith([18])
     haptics.setEnabled(false)
     haptics.handle({ type: 'boost-ignition' })
-    expect(vibrate).toHaveBeenCalledOnce()
+    expect(vibrate.mock.calls).toEqual([[[18]], [0]])
   })
 
   it('routes the jump release to its own sound only while enabled', () => {
@@ -120,7 +120,7 @@ describe('feedback adapters', () => {
     }
     const audio = new WebAudioAdapter(() => sink, true)
     const vibrate = vi.fn(() => true)
-    const haptics = new HapticsAdapter(vibrate, true)
+    const haptics = new HapticsAdapter(vibrate, true, () => 0)
     audio.unlock()
     audio.handle({ type: 'position-change', direction: 'gain', place: 1 })
     haptics.handle({ type: 'position-change', direction: 'gain', place: 1 })
@@ -142,12 +142,12 @@ describe('feedback adapters', () => {
 
   it('degrades safely when vibration is unavailable or disabled', () => {
     const vibrate = vi.fn(() => true)
-    const haptics = new HapticsAdapter(vibrate, true)
+    const haptics = new HapticsAdapter(vibrate, true, () => 0)
     haptics.handle({ type: 'curb', speed: 100 })
     expect(vibrate).toHaveBeenCalledWith([12])
     haptics.setEnabled(false)
     haptics.handle({ type: 'finish', place: 1, newRecord: false })
-    expect(vibrate).toHaveBeenCalledOnce()
+    expect(vibrate.mock.calls).toEqual([[[12]], [0]])
 
     expect(() =>
       new HapticsAdapter(undefined, true).handle({
@@ -159,15 +159,73 @@ describe('feedback adapters', () => {
   })
 })
 
-it('vibrates only on surface transitions and resets after silence', () => {
-  const vibrate = vi.fn(() => true)
-  const haptics = new HapticsAdapter(vibrate, true)
-  haptics.handle({ type: 'surface', surface: 'grass', speedRatio: 0.5 })
-  haptics.handle({ type: 'surface', surface: 'grass', speedRatio: 0.5 })
+it('rumbles gently on grass at a speed-dependent cadence and stops on pavement', () => {
+  let now = 0
+  const vibrate = vi.fn((_pattern: number | number[]) => true)
+  const haptics = new HapticsAdapter(vibrate, true, () => now)
+  const grass = { type: 'surface', surface: 'grass', speedRatio: 0.5 } as const
+  haptics.handle(grass)
+  haptics.handle(grass)
+  expect(vibrate).toHaveBeenCalledExactlyOnceWith([23])
+  now = 169
+  haptics.handle(grass)
   expect(vibrate).toHaveBeenCalledOnce()
-  haptics.silenceContinuous()
-  haptics.handle({ type: 'surface', surface: 'grass', speedRatio: 0.5 })
+  now = 170
+  haptics.handle(grass)
   expect(vibrate).toHaveBeenCalledTimes(2)
+  haptics.handle({ type: 'surface', surface: 'street', speedRatio: 0.5 })
+  expect(vibrate).toHaveBeenLastCalledWith(0)
+  now = 500
+  haptics.handle({ type: 'surface', surface: 'street', speedRatio: 1 })
+  expect(vibrate).toHaveBeenCalledTimes(3)
+  haptics.handle({ ...grass, speedRatio: 1 })
+  expect(vibrate).toHaveBeenLastCalledWith([28])
+  now = 620
+  haptics.handle({ ...grass, speedRatio: 1 })
+  expect(vibrate).toHaveBeenCalledTimes(5)
+})
+
+it('keeps a landing pulse intact through grass, curb and position feedback', () => {
+  let now = 0
+  const vibrate = vi.fn((_pattern: number | number[]) => true)
+  const haptics = new HapticsAdapter(vibrate, true, () => now)
+  const grass = { type: 'surface', surface: 'grass', speedRatio: 0.8 } as const
+  haptics.handle(grass)
+  haptics.handle({ type: 'landing', strength: 1 })
+  expect(vibrate).toHaveBeenLastCalledWith(100)
+  now = 20
+  haptics.handle(grass)
+  haptics.handle({ type: 'curb', speed: 250 })
+  haptics.handle({ type: 'position-change', direction: 'gain', place: 1 })
+  haptics.handle({ type: 'surface', surface: 'street', speedRatio: 0.8 })
+  expect(vibrate).toHaveBeenCalledTimes(2)
+  now = 100
+  haptics.handle(grass)
+  expect(vibrate).toHaveBeenLastCalledWith([26])
+  haptics.silenceContinuous()
+  expect(vibrate).toHaveBeenLastCalledWith(0)
+  haptics.handle({ ...grass, speedRatio: 0 })
+  haptics.handle({ ...grass, grounded: false })
+  expect(vibrate).toHaveBeenCalledTimes(4)
+})
+
+it('does not rumble at rest and resumes after silence or re-enabling', () => {
+  const vibrate = vi.fn((_pattern: number | number[]) => true)
+  const haptics = new HapticsAdapter(vibrate, true, () => 0)
+  const grass = { type: 'surface', surface: 'grass', speedRatio: 0.5 } as const
+  haptics.handle({ ...grass, speedRatio: 0 })
+  expect(vibrate).not.toHaveBeenCalled()
+  haptics.handle(grass)
+  haptics.silenceContinuous()
+  haptics.handle(grass)
+  haptics.setEnabled(false)
+  haptics.handle(grass)
+  expect(vibrate.mock.calls).toEqual([[[23]], [0], [[23]], [0]])
+  haptics.setEnabled(true)
+  haptics.handle(grass)
+  expect(vibrate).toHaveBeenLastCalledWith([23])
+  haptics.destroy()
+  expect(vibrate).toHaveBeenLastCalledWith(0)
 })
 
 it('brings the slip voice to exact silence after grip returns', () => {
