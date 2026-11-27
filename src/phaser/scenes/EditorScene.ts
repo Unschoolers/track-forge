@@ -448,7 +448,8 @@ export class EditorScene extends Phaser.Scene {
     this.lampGraphics.clear()
     const renderState = this.currentRenderState
     if (renderState && editorTerrainRenderRequired(this.renderedTerrainState, renderState,
-      this.terrainDetail(geometry) !== this.renderedTerrainDetail)) {
+      this.terrainDetail(geometry) !== this.renderedTerrainDetail,
+      snapshot.editor.terrain.cells.some(cell => cell.kind === 'hill'))) {
       this.renderTerrainPresentation(geometry)
     }
     renderTrackGeometryBase(
