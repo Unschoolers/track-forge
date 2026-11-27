@@ -191,6 +191,8 @@ describe('ramp vehicle rendering', () => {
 				upperVehicleGraphics: upper,
 				shadowGraphics: new Graphics(),
 				effectGraphics: new Graphics(),
+				lowerRaceEffects: new Graphics(),
+				upperRaceEffects: new Graphics(),
 				game: { loop: { rawDelta: 16 } },
 				raceSession: { advance() {}, snapshot: () => ({ state: current }) },
 			}
@@ -261,6 +263,8 @@ describe('ramp vehicle rendering', () => {
       upperVehicleGraphics: upper,
       shadowGraphics: new Graphics(),
       effectGraphics: new Graphics(),
+      lowerRaceEffects: new Graphics(),
+      upperRaceEffects: new Graphics(),
       game: { loop: { rawDelta: 16 } },
       raceSession: { advance() {}, snapshot: () => ({ state }) },
     }
@@ -307,6 +311,8 @@ describe('ramp vehicle rendering', () => {
       upperVehicleGraphics: upper,
       shadowGraphics: new Graphics(),
       effectGraphics: new Graphics(),
+      lowerRaceEffects: new Graphics(),
+      upperRaceEffects: new Graphics(),
       game: { loop: { rawDelta: 16 } },
       raceSession: { advance() {}, snapshot: () => ({ state: current, setup: { mode: 'boost-practice', lighting: 'day' } }) },
     }
@@ -376,6 +382,8 @@ describe('ramp vehicle rendering', () => {
 			upperVehicleGraphics: upper,
 			shadowGraphics: new Graphics(),
 			effectGraphics: new Graphics(),
+			lowerRaceEffects: new Graphics(),
+			upperRaceEffects: new Graphics(),
 			game: { loop: { rawDelta: 16 } },
 			isCoveredByBridgeDeck: getBridgeDeckOcclusion(buildTrackGeometry(track)),
 			raceSession: { advance() {}, snapshot: () => ({ state }) },

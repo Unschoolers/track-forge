@@ -326,8 +326,9 @@ function createDiagnosticsControl(save: () => Promise<boolean>): HTMLElement {
   return section
 }
 
-export function createNearbyRaceMenu(resume: () => void, leave: () => void): HTMLElement {
+export function createNearbyRaceMenu(resume: () => void, leave: () => void, downloadDiagnostics?: () => Promise<boolean>): HTMLElement {
   const frame = createModalFrame('Nearby Race', 'The race keeps running.', resume, 'nearby-race-modal')
+  if (downloadDiagnostics) frame.body.append(createDiagnosticsControl(downloadDiagnostics))
   frame.footer.append(
     button('RESUME', 'resume-race', resume, 'button button-primary'),
     button('LEAVE RACE', 'quit-race', leave, 'button button-danger'),

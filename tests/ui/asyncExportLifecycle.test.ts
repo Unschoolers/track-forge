@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest'
-import { exportTrack, shareTrack } from '@/infrastructure/export/trackExport'
-import { DomUiHost, type UiControllerPort } from '@/ui/uiHost'
+import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
+import { DomUiHost, type UiControllerPort, type UiRuntime } from '@/ui/uiHost'
 import { createUiRuntime } from './uiRuntime'
 import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
+import { RaceSession } from '@/application/race/raceSession'
 import type { AppSnapshot } from '@/application/appState'
 
 vi.mock('@/infrastructure/export/trackExport', () => ({
@@ -33,17 +34,17 @@ const state: AppSnapshot = {
   notice: null,
 }
 
-function setup() {
+function setup(snapshot = state, runtime: UiRuntime = createUiRuntime()) {
   const root = document.createElement('div')
   document.body.replaceChildren(root)
   const controller: UiControllerPort = {
-    snapshot: () => state,
+    snapshot: () => snapshot,
     dispatch: vi.fn(),
     subscribe: () => () => undefined,
   }
-  const host = new DomUiHost(root, controller, createUiRuntime())
+  const host = new DomUiHost(root, controller, runtime)
   host.mount()
-  return { root, host }
+  return { root, host, controller }
 }
 
 describe('async UI export teardown', () => {
@@ -105,4 +106,34 @@ describe('async UI export teardown', () => {
     await vi.waitFor(() => expect(root.textContent).toContain('Track file saved.'))
     host.destroy()
   })
+})
+
+it('saves an unfinished race and current performance from the pause menu without dispatching navigation', async () => {
+  const runtime = createUiRuntime()
+  const session = new RaceSession({
+    scoreStore: { forTrack: () => [], record: vi.fn(() => true), removeTrack: vi.fn(() => true) },
+    random: { next: () => 0.5 }, feedback: runtime.feedback, geometry: runtime.geometry,
+  })
+  session.start(track, { car: 'blue', difficulty: 'normal', laps: 2 })
+  session.setPaused(true)
+  const performance = { timings: { frames: [[0, 16, 2, 1, 3]] } }
+  vi.mocked(saveJsonFile).mockClear()
+  vi.mocked(saveJsonFile).mockResolvedValueOnce(true)
+  const { root, host, controller } = setup({ ...state, mode: 'race', paused: true, overlay: { type: 'pause' } }, {
+    ...runtime, raceSession: session, frameDiagnostics: () => performance,
+  })
+  try {
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="export-race-diagnostics"]')
+    expect(exportButton).not.toBeNull()
+    exportButton?.click()
+    await vi.waitFor(() => expect(root.textContent).toContain('Race replay file saved.'))
+    const request = vi.mocked(saveJsonFile).mock.calls[0]?.[0]
+    expect(request?.filename).toMatch(/^trackforge-race-/)
+    expect(JSON.parse(request?.content ?? '')).toMatchObject({ formatVersion: 1, result: null, performance })
+    expect(controller.dispatch).not.toHaveBeenCalled()
+    expect(session.snapshot().state?.paused).toBe(true)
+  } finally {
+    host.destroy()
+    session.destroy()
+  }
 })

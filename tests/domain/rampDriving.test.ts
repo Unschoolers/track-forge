@@ -4,6 +4,7 @@ import { ROAD_GEOMETRY } from '@/domain/config'
 import { CAR_IDS } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
+import { advanceVehicle } from '@/domain/race/raceVehicleStepper'
 import type { RaceState } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { EMPTY_TERRAIN } from '@/domain/terrain/terrainField'
@@ -77,7 +78,7 @@ describe('driving onto a raised road', () => {
     expect(reachedDeck).toBe(true)
   })
 
-  it('drops the car when it drives off the side of a rising ramp', () => {
+  it('drops the car off a rising ramp and recovers it before a long fall lands', () => {
     const pathIndex = path.points.findIndex((point) => point.x >= 48)
     const point = requireFixture(path.points[pathIndex])
     const position = { x: point.x, y: ROAD_GEOMETRY.onRoadRadius - 1 }
@@ -109,19 +110,37 @@ describe('driving onto a raised road', () => {
     expect(departed.verticalVelocity).toBeLessThanOrEqual(0)
     expect(departed.z).toBeCloseTo(ramp.height)
 
+    // Verify the full physical trajectory independently of the race's recovery policy.
+    let falling = departed
+    for (let frame = 0; frame < 90 && !falling.grounded; frame++) {
+      const next = advanceVehicle(falling, race, { steering: 0, throttle: 0, braking: false },
+        1 / 60, { next: () => 0.5 }, undefined)
+      expect(next.z).toBeLessThan(falling.z)
+      falling = next
+    }
+    expect(falling.grounded).toBe(true)
+    expect(falling.z).toBe(0)
+    expect(falling.landingIntensity).toBeGreaterThan(0.1)
+
+    // The first departure tick already counts toward the 250 ms deadline.
+    expect(departed.bridgeFallSeconds).toBeCloseTo(1 / 60)
     let car = departed
-    let landings = 0
-    for (let frame = 0; frame < 90 && !car.grounded; frame++) {
+    for (let tick = 2; tick <= 15; tick++) {
       const step = drive(race)
       race = step.state
       const next = requireFixture(race.vehicles[0])
-      expect(next.z).toBeLessThan(car.z)
-      landings += step.events.filter(({ type }) => type === 'vehicle-landed').length
+      expect(step.events.some(({ type }) => type === 'vehicle-recovered')).toBe(tick === 15)
+      expect(step.events.some(({ type }) => type === 'vehicle-landed')).toBe(false)
+      if (tick < 15) {
+        expect(next.grounded).toBe(false)
+        expect(next.z).toBeLessThan(car.z)
+      } else {
+        expect(next.grounded).toBe(true)
+        expect(next.bridgeFallSeconds).toBeUndefined()
+        expect(next.z).toBeCloseTo(path.roadSurface.at(next.pathIndex, next).height)
+      }
       car = next
     }
-    expect(car.grounded).toBe(true)
-    expect(car.z).toBe(0)
-    expect(landings).toBe(1)
   })
 
   it.each([1, -1])('samples a continuous height and grade on the ramp (direction=%s)', (direction) => {

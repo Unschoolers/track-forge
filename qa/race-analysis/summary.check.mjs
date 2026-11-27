@@ -195,3 +195,15 @@ test('legacy files retain strict telemetry validation and unknown rulesets are r
   assert.throws(() => summarizeRace(old), /invalid legacy race handling/)
   assert.throws(() => summarizeRace({ ...replay(), formatVersion: 0 }), /formatVersion/)
 })
+
+test('unfinished captures use the observation end and never invent finish times', () => {
+  const partial = { ...replay(), result: null }
+  const stats = summarizeRace(partial)
+  assert.equal(stats.observationType, 'unfinished-race')
+  assert.equal(stats.observationEnd, 2)
+  assert.ok(stats.vehicles.every(v => v.finishTime === null))
+  assert.ok(compareRaces(partial, replay()).warnings.some(w => w.includes('Unfinished race')))
+  const startup = summarizeRace({ ...partial, frames: partial.frames.slice(0, 1), events: [] })
+  assert.equal(startup.observationEnd, 0)
+  assert.ok(startup.vehicles.every(v => v.observedSeconds === 0))
+})

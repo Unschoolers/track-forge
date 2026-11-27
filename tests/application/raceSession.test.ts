@@ -58,6 +58,28 @@ function createScoreStore() {
 }
 
 describe('RaceSession', () => {
+  it('exports before finishing, including during pause, without changing race state or writing scores', () => {
+    const { store } = createScoreStore()
+    const session = new RaceSession({ scoreStore: store, random: { next: () => 0.5 }, feedback: createFeedback() })
+    expect(session.diagnosticsReport()).toBeNull()
+    session.start(track, setup)
+    expect(session.diagnosticsReport()?.result).toBeNull()
+    session.advance(3.7, noInput)
+    session.advance(0.2, noInput)
+    session.setPaused(true)
+    const before = session.snapshot()
+    const report = session.diagnosticsReport()
+    expect(report?.result).toBeNull()
+    expect(report?.frames.length).toBeGreaterThan(1)
+    expect(session.snapshot()).toBe(before)
+    expect(store.record).not.toHaveBeenCalled()
+    session.setPaused(false)
+    session.advance(0.2, noInput)
+    expect(session.diagnosticsReport()?.frames.length).toBeGreaterThan(report?.frames.length ?? 0)
+    session.stop()
+    expect(session.diagnosticsReport()).toBeNull()
+  })
+
 
   it('keeps Boost Practice solo and never loads or saves ranked scores or ghosts, including retry', () => {
     const scoreStore = {

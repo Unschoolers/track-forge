@@ -1,11 +1,11 @@
 import type Phaser from 'phaser'
-import { ROAD_GEOMETRY, WORLD_ELEVATION } from '@/domain/config'
+import { WORLD_ELEVATION } from '@/domain/config'
 import type { CarId, Vector2 } from '@/domain/model'
 import type { RaceVehicle } from '@/domain/race/raceState'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import { projectSunShadow } from '@/phaser/rendering/lighting'
 import type { RoadPath } from '@/domain/track/pathBuilder'
-import { getVehicleStepContext } from '@/domain/race/trackContext'
+export { isVehicleAboveStructures } from '@/domain/race/trackContext'
 import type { GhostPose } from '@/application/race/ghostReplay'
 import { DEFAULT_PLAYER_IDENTITY, TOPPER_COLORS, type PlayerIdentity } from '@/application/multiplayer/playerIdentity'
 import { getVehicleArtwork, vehiclePaintColor, VEHICLE_VISUAL_SCALE, type VehicleArtwork } from '@/presentation/vehicleArtwork'
@@ -36,32 +36,6 @@ export function getVehicleGeometry(car: CarId): VehicleGeometry {
   return getVehicleArtwork(car)
 }
 
-/** Supported ramps share the deck's draw layer even near ground level. */
-export function isVehicleAboveStructures(
-  vehicle: Pick<RaceVehicle, 'x' | 'y' | 'z' | 'player' | 'grounded' | 'pathIndex' | 'structureRunId'>,
-  path: RoadPath,
-): boolean {
-  // A car can briefly be matched to the underpass at a 2D crossing even
-  // while its last supported road sample is on the ramp. Trust that authored
-  // support only while the car is physically near its sample and at deck height.
-  const supported = path.points[vehicle.pathIndex]
-  if (supported && vehicle.structureRunId !== null) {
-    const support = path.roadSurface.at(vehicle.pathIndex, vehicle)
-    if (
-      support.structureRunId === vehicle.structureRunId &&
-      support.structureHeight > 0.005 &&
-      Math.hypot(vehicle.x - supported.x, vehicle.y - supported.y) <=
-        ROAD_GEOMETRY.onRoadRadius &&
-      vehicle.z >= support.height - 2
-    ) return true
-  }
-  const context = getVehicleStepContext(path, vehicle)
-  if (context.onRoad && context.structureRunId !== null) return true
-  // Preserve elevated/airborne rendering without lifting underpass traffic
-  // just because an overhead road has been authored at the same position.
-  return vehicle.z - path.terrainSurface.heightAt(vehicle) >=
-    WORLD_ELEVATION.levelHeight * 0.45
-}
 
 function transform(point: Vector2, pose: Vector2 & { readonly angle: number }): Vector2 {
   const cosine = Math.cos(pose.angle)

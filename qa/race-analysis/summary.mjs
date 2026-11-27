@@ -95,7 +95,8 @@ export function summarizeRace(exported, options = {}) {
   const frames = exported.frames
   const last = frames.at(-1).t
   const end = options.full ? last : Math.min(last, exported.result?.playerTime ?? last)
-  assert(finite(end) && end > 0, 'invalid observation end')
+  const unfinished = exported.result === null
+  assert(finite(end) && (end > 0 || (unfinished && end === 0)), 'invalid observation end')
   const statsById = new Map()
   assert(Array.isArray(frames[0]?.vehicles), 'missing vehicles in frame 0')
   for (const v of frames[0].vehicles) {
@@ -221,7 +222,7 @@ export function summarizeRace(exported, options = {}) {
   return {
     formatVersion: exported.formatVersion, ruleset,
     track: summarizeTrack(exported), setup: exported.setup,
-    observationEnd: round(end), observationType: options.full ? 'full-recording' : 'player-finish',
+    observationEnd: round(end), observationType: unfinished ? 'unfinished-race' : options.full ? 'full-recording' : 'player-finish',
     droppedEvents: exported.droppedEvents ?? 0, vehicles,
     hotspots: groupHotspots(locations, options.hotspotBin ?? 50),
   }
@@ -231,6 +232,7 @@ export function summarizeRace(exported, options = {}) {
 export function compareRaces(before, after) {
   const a = summarizeRace(before), b = summarizeRace(after)
   const warnings = []
+  if (a.observationType === 'unfinished-race' || b.observationType === 'unfinished-race') warnings.push('Unfinished race capture; observation lengths and finish times may differ')
   if (a.ruleset !== b.ruleset) warnings.push('Different handling rulesets (Arcade vs Simulation)')
   if (a.track.fingerprint !== b.track.fingerprint) warnings.push('Different track geometry/terrain')
   for (const key of ['difficulty', 'laps', 'mode', 'car']) {

@@ -12,6 +12,7 @@ import {
 import {
   buildRaceCameraHints,
   findNearestSafeTrackIndex,
+  isVehicleAboveStructures,
   reconcileSupportAfterCollision,
   resetVehicleToTrack,
 } from '@/domain/race/trackContext'
@@ -20,7 +21,7 @@ import { ROAD_GEOMETRY } from '@/domain/config'
 import { hasVehicleWaterContact, isSafeRoadRecoverySample } from '@/domain/track/waterExposure'
 import { resetRaceVehicle, recoverRacePlayer, recoverRaceVehicle, resetMissedCheckpoint, restoreFrameProgress, RECOVERY_TUNING, advanceRivalOffRoadRecovery } from '@/domain/race/raceRecovery'
 import { advanceArcadeTimingGate, finishGateNumber } from '@/domain/race/arcadeTimingGate'
-import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
+import { hasBridgeFallExpired, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { advanceVehicle, raceVehicleContext, PLAYER_ROUTE_WINDOW } from '@/domain/race/raceVehicleStepper'
 
 // Preserve existing engine imports after moving recovery rules to their owner.
@@ -215,7 +216,7 @@ function advanceTickCheckpointProgressAndRoadRecovery(
     const playerStuck = updated.player && updated.bridgeFallSeconds === undefined &&
       updated.stuckDuration >= RECOVERY_TUNING.playerStuckSeconds - 1e-9
     const bridgeFallExpired = updated.player &&
-      (updated.bridgeFallSeconds ?? 0) >= BRIDGE_FALL_RESPAWN_SECONDS
+      hasBridgeFallExpired(updated.bridgeFallSeconds)
     const rivalBelowDeck = !updated.player && !context.onRoad &&
       context.nearest.distance <= ROAD_GEOMETRY.onRoadRadius
     const offRoadRecovery = advanceRivalOffRoadRecovery(updated, context, dt)
@@ -284,10 +285,10 @@ function reconcileTickSupportAndRecoverFromWater(
       terrainMaterial: context.terrainMaterial,
       safeAboveWater: context.safeAboveWater,
     })
-    // A bridge plunge (including into water) gets the full two-second
+    // A bridge plunge (including into water) gets the bridge-fall
     // recovery window rather than teleporting as soon as it hits the surface.
     if (vehicle.player && vehicle.bridgeFallSeconds !== undefined &&
-        vehicle.bridgeFallSeconds < BRIDGE_FALL_RESPAWN_SECONDS) return vehicle
+        !hasBridgeFallExpired(vehicle.bridgeFallSeconds)) return vehicle
     const previous = state.vehicles[index]
     if (usesCheckpoints && waterContact && !vehicle.waterRecoveryProtected) {
       const candidate = previous
@@ -442,7 +443,7 @@ function advanceRace(
     player !== undefined &&
     playerContext !== undefined &&
     !player.waterRecoveryProtected &&
-    (player.bridgeFallSeconds === undefined || player.bridgeFallSeconds >= BRIDGE_FALL_RESPAWN_SECONDS) &&
+    (player.bridgeFallSeconds === undefined || hasBridgeFallExpired(player.bridgeFallSeconds)) &&
     hasVehicleWaterContact({
       grounded: player.grounded,
       terrainMaterial: playerContext.terrainMaterial,
@@ -527,6 +528,7 @@ function advanceRace(
         dt,
         random,
         state.tick,
+        vehicle => isVehicleAboveStructures(vehicle, state.path),
       ),
     },
     events,

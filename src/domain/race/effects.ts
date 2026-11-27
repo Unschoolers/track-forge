@@ -13,6 +13,8 @@ export type RaceParticleKind =
 
 export interface RaceParticle extends Vector2 {
   readonly kind: RaceParticleKind
+  /** Immutable birth layer; never follow the emitting vehicle onto another deck. */
+  readonly raised?: true
   /** Stable identity across simulation snapshots for native visual emitters. */
   readonly emissionId?: number
   readonly vx: number
@@ -23,6 +25,7 @@ export interface RaceParticle extends Vector2 {
 }
 
 export interface SkidMark {
+  readonly raised?: true
   readonly start: Vector2
   readonly end: Vector2
   readonly life: number
@@ -101,6 +104,7 @@ export function advanceRaceEffects(
   deltaSeconds: number,
   random: RandomSource,
   tick = 0,
+  isRaised: (vehicle: RaceVehicle) => boolean = () => false,
 ): RaceEffectsState {
   const dt = Math.max(0, deltaSeconds)
   const particles: RaceParticle[] = state.particles
@@ -117,6 +121,8 @@ export function advanceRaceEffects(
   const previousTires: Record<string, readonly [Vector2, Vector2]> = {}
 
   for (const vehicle of vehicles) {
+    const particleStart = particles.length
+    const skidStart = skids.length
     const size = EFFECT_SIZE[vehicle.car]
     const intensity = Math.min(1, vehicle.speed / 260 + vehicle.slip / 100)
     const activeBoost = vehicle.driftBoost?.phase === 'active'
@@ -191,6 +197,16 @@ export function advanceRaceEffects(
       }
     }
     if (vehicle.grounded) previousTires[vehicle.id] = tires
+    if ((particles.length > particleStart || skids.length > skidStart) && isRaised(vehicle)) {
+      for (let i = particleStart; i < particles.length; i++) {
+        const item = particles[i]
+        if (item) particles[i] = { ...item, raised: true }
+      }
+      for (let i = skidStart; i < skids.length; i++) {
+        const item = skids[i]
+        if (item) skids[i] = { ...item, raised: true }
+      }
+    }
   }
 
   for (const event of events) {
@@ -210,6 +226,7 @@ export function advanceRaceEffects(
       const vehicle = vehicles.find(({ id }) => id === event.vehicleId)
       if (!vehicle) continue
       const strength = event.strength ?? 0
+      const raised = isRaised(vehicle)
       const cosine = Math.cos(vehicle.angle)
       const sine = Math.sin(vehicle.angle)
       const kind = vehicle.currentSurface === 'street' ? 'landing-dust' : vehicle.currentSurface
@@ -218,6 +235,7 @@ export function advanceRaceEffects(
           const life = 0.18 + strength * 0.14
           particles.push({
             kind,
+            ...(raised ? { raised: true as const } : {}),
             x: vehicle.x + axle * cosine * 10 - side * sine * 7,
             y: vehicle.y + axle * sine * 10 + side * cosine * 7,
             vx: -vehicle.vx * 0.04 - side * sine * 28 * strength,

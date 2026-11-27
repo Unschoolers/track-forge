@@ -641,7 +641,7 @@ export class RaceSession implements RaceSessionPort {
 
   diagnosticsReport(): RaceDiagnosticsReport | null {
     const { track, setup, result } = this.current
-    return track && setup && result && this.diagnostics
+    return track && setup && this.diagnostics
       ? this.diagnostics.report(track, setup, result) : null
   }
 
