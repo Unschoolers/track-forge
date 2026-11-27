@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest'
+import { HapticsAdapter } from '@/infrastructure/feedback/hapticsAdapter'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import { routeRaceFeedback } from '@/application/race/raceFeedback'
 import { asTrackId } from '@/domain/model'
@@ -38,6 +39,33 @@ it('routes only the local jump cue and silences tire contact while airborne', ()
     { type: 'vehicle-jumped', vehicleId: player.id, speed: 180, x: 0, y: 0 },
   ], input, 0)
   expect(vi.mocked(feedback.handle).mock.calls.filter(([event]) => event.type === 'jump-takeoff')).toHaveLength(1)
-  expect(feedback.handle).toHaveBeenCalledWith({ type: 'surface', surface: player.currentSurface, speedRatio: 0 })
+  expect(feedback.handle).toHaveBeenCalledWith({ type: 'surface', surface: player.currentSurface, speedRatio: 0, grounded: false })
   expect(feedback.handle).toHaveBeenCalledWith({ type: 'tire-slip', surface: player.currentSurface, speedRatio: 0, strength: 0 })
+})
+
+it('plays the jump impact when the player touches grass, then resumes the grass rumble', () => {
+  const track = createStarterTrack(asTrackId('grass-landing-feedback'), 1)
+  const state = createRace({ path: buildRoadPath(track.points, track.terrain), playerCar: 'red', difficulty: 'normal', laps: 1 })
+  const player = state.vehicles.find(vehicle => vehicle.player)
+  if (!player) throw new Error('Missing player fixture')
+  let now = 0
+  const vibrate = vi.fn((_pattern: number | number[]) => true)
+  const feedback = new HapticsAdapter(vibrate, true, () => now)
+  const input = { steering: 0, throttle: 1, braking: false }
+  const grassPlayer = { ...player, currentSurface: 'grass' as const, grounded: true, speed: 180 }
+  const flight = { ...state, vehicles: [{ ...grassPlayer, grounded: false, jumpFlight: true }] }
+  routeRaceFeedback(feedback, flight, [], input, 0)
+  expect(vibrate).not.toHaveBeenCalled()
+  const landed = { ...state, vehicles: [grassPlayer] }
+  routeRaceFeedback(feedback, landed, [
+    { type: 'vehicle-landed', vehicleId: player.id, strength: 1, jump: true },
+    { type: 'curb-hit', vehicleId: player.id, speed: 180 },
+  ], input, 1)
+  expect(vibrate).toHaveBeenLastCalledWith(100)
+  now = 50
+  routeRaceFeedback(feedback, landed, [], input, 0)
+  expect(vibrate).toHaveBeenLastCalledWith(100)
+  now = 250
+  routeRaceFeedback(feedback, landed, [], input, 0)
+  expect(vibrate).toHaveBeenLastCalledWith([expect.any(Number)])
 })
