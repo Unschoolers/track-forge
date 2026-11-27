@@ -19,6 +19,19 @@ const initial = createRace({
 const input = { throttle: 1, braking: false, steering: 0.2 }
 
 describe('all-car race diagnostics', () => {
+  it('takes an immutable unfinished snapshot and continues recording', () => {
+    const recording = new RaceDiagnosticsRecording(initial)
+    recording.record({ ...initial, tick: 3, elapsed: 0.05 }, [], input)
+    const partial = recording.report(track, setup, null)
+    recording.record({ ...initial, tick: 6, elapsed: 0.1 }, [], input)
+    const completed = recording.report(track, setup, result)
+    expect(partial.result).toBeNull()
+    expect(partial.frames.map(frame => frame.tick)).toEqual([0, 3])
+    expect(partial.playerControls).toHaveLength(1)
+    expect(completed.result?.playerTime).toBe(42)
+    expect(completed.frames.map(frame => frame.tick)).toEqual([0, 3, 6])
+  })
+
   it('exports a replay with every rival and the exact track independently of the best ghost', () => {
     const recording = new RaceDiagnosticsRecording(initial)
     const next = {
@@ -32,7 +45,7 @@ describe('all-car race diagnostics', () => {
     expect(report.track).toEqual(track)
     expect(report.formatVersion).toBe(1)
     expect(report.setup).toEqual({ ...setup, handling: 'arcade' })
-    expect(report.result.playerWrecked).toBe(false)
+    expect(report.result?.playerWrecked).toBe(false)
     expect(report.frames.flatMap(frame => frame.vehicles).every(vehicle => vehicle.wrecked === false)).toBe(true)
     expect(report.frames).toHaveLength(2)
     expect(report.frames[1]?.vehicles.map(vehicle => vehicle.id)).toEqual(initial.vehicles.map(vehicle => vehicle.id))
