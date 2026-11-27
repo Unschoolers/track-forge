@@ -3,7 +3,9 @@ import type Phaser from 'phaser'
 import { BitmapTileRenderer, BitmapTileUploadScheduler, createMeadowBitmapRenderer, selectAheadTiles, type UploadRequest, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
 
 import * as bitmapLayers from '@/presentation/environments/meadowBitmapTiles'
-import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import { buildTrackGeometry, type TrackGeometry } from '@/domain/track/trackGeometry'
+import * as bitmapArt from '@/presentation/environments/meadowBitmapArt'
+import { GROUND_TILE_SIZE } from '@/presentation/environments/groundTexture'
 import type { TerrainMap } from '@/domain/model'
 
 const view = {
@@ -420,6 +422,62 @@ describe('editor water cache lifecycle', () => {
       renderer.destroy()
       createWater.mockRestore()
       createRoad.mockRestore()
+    }
+  })
+})
+
+
+describe('regional terrain cache identity with real geometry', () => {
+  it('changes hill painter inputs only near a road edit and leaves water unchanged', () => {
+    // No GPU or canvas is needed to compare the actual ordered geometry fed
+    // into each tile painter. Keep two separated hills on the same terrain.
+    const cells = Array.from({ length: 64 }, (_, index) => ({
+      column: 2 + index % 8, row: 2 + Math.floor(index / 8), kind: 'hill' as const,
+    }))
+    const distantColumn = Math.ceil(6 * GROUND_TILE_SIZE / 32)
+    const terrain: TerrainMap = {
+      cellSize: 32,
+      cells: [
+        ...cells,
+        ...cells.map(cell => ({ ...cell, column: cell.column + distantColumn })),
+        { column: 14, row: 14, kind: 'water' },
+      ],
+    }
+    const geometry = (y: number) => buildTrackGeometry({
+      routeKind: 'point-to-point', terrain,
+      points: [
+        { x: -400, y, surface: 'street' },
+        { x: 600, y, surface: 'street' },
+      ],
+    })
+    const art = vi.spyOn(bitmapArt, 'getEnvironmentBitmapArt')
+      .mockReturnValue({} as bitmapArt.EnvironmentBitmapArt)
+    try {
+      const before = geometry(144)
+      const after = geometry(-400)
+      const oldHill = bitmapLayers.createEditorHillBitmapTiles(before, false, 'grass', 24)
+      const newHill = bitmapLayers.createEditorHillBitmapTiles(after, false, 'grass', 24)
+      const oldWater = bitmapLayers.createEditorWaterBitmapTiles(before, false, 'grass', 24)
+      const newWater = bitmapLayers.createEditorWaterBitmapTiles(after, false, 'grass', 24)
+      if (!oldHill || !newHill || !oldWater || !newWater) throw new Error('Missing terrain tile source')
+      const keys = (source: bitmapLayers.BakeableBitmapTiles) =>
+        source.all().map(tile => `${tile.x}:${tile.y}`).sort()
+      const local = keys(oldHill).filter(key => Number(key.split(':')[0]) < 3)
+      const distant = keys(oldHill).filter(key => Number(key.split(':')[0]) >= 3)
+      expect(local.length).toBeGreaterThan(0)
+      expect(distant.length).toBeGreaterThan(0)
+      expect(local.some(key => oldHill.tileContentKey?.(key) !== newHill.tileContentKey?.(key))).toBe(true)
+      for (const key of distant) {
+        expect(oldHill.tileContentKey?.(key)).toBeDefined()
+        expect(newHill.tileContentKey?.(key)).toBe(oldHill.tileContentKey?.(key))
+      }
+      expect(keys(newWater)).toEqual(keys(oldWater))
+      expect(keys(oldWater).length).toBeGreaterThan(0)
+      for (const key of keys(oldWater)) {
+        expect(newWater.tileContentKey?.(key)).toBe(oldWater.tileContentKey?.(key))
+      }
+    } finally {
+      art.mockRestore()
     }
   })
 })
