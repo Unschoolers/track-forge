@@ -3,6 +3,8 @@
   --menu-accent: #ff7846;
   --menu-ink: #edf2f8;
   --menu-muted: #aab9c8;
+  --menu-control-radius: 18px;
+  --menu-field-radius: 12px;
   --menu-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   background: rgb(5 8 13 / 84%);
 }
@@ -14,9 +16,9 @@
 }
 .modal-overlay .modal-card {
   border: 1px solid #3c4c5b;
-  border-radius: 0;
+  border-radius: 24px;
   background: linear-gradient(145deg, #18222d, #0b111a 72%);
-  box-shadow: 0 1.5rem 5rem #000b, inset 0 2px var(--menu-accent);
+  box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff18;
   color: var(--menu-ink);
 }
 .modal-overlay .modal-header {
@@ -38,23 +40,34 @@
   width: 44px;
   height: 44px;
   border: 1px solid #53616c;
-  border-radius: 0;
+  border-radius: 50%;
   background: #151e28;
   color: var(--menu-ink);
 }
-.modal-overlay .button {
-  border: 1px solid #50606d;
-  border-radius: 0;
-  background: #1b2834;
+/* Default for every dialog, including newly added actions. Screen-specific
+   optical layers may enhance this paint, never replace its basic geometry. */
+.modal-overlay :is(.button, .setup-choice, .toggle-button) {
+  min-height: 44px;
+  border: 1px solid #627382;
+  border-radius: var(--menu-control-radius);
+  background: #202a36;
   color: var(--menu-ink);
-  font: 800 .75rem/1.2 var(--menu-mono);
-  letter-spacing: .08em;
+  font: 650 .88rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+  touch-action: manipulation;
+  clip-path: none;
 }
-.modal-overlay .button-primary {
-  border-color: var(--menu-accent);
-  background: var(--menu-accent);
-  color: #101017;
-  clip-path: polygon(0 0, 100% 0, 100% 76%, calc(100% - .65rem) 100%, 0 100%);
+.modal-overlay .button { min-height: 48px; }
+.modal-overlay :is(.setup-choice, .toggle-button) { border-radius: 999px; }
+.modal-overlay .button-primary,
+.modal-overlay :is(.setup-choice, .toggle-button)[aria-pressed='true'] {
+  border-color: #ffc4a5;
+  background: #ff925c;
+  color: #20130f;
+}
+.modal-overlay :is(.button, .setup-choice, .toggle-button):disabled { cursor: not-allowed; opacity: .45; }
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay :is(.button, .setup-choice, .toggle-button, .modal-close) { transition: none; }
 }
 .modal-overlay .button-danger { border-color: #784651; background: #302028; color: #ffadb3; }
 .modal-overlay :is(button, input):focus-visible { outline: 2px solid #edf2f8; outline-offset: 3px; }
@@ -67,7 +80,18 @@
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.modal-overlay .name-input { border-radius: 0; border-color: #53616c; background: #090f16; }
+.modal-overlay .name-input {
+  min-height: 48px;
+  border-radius: var(--menu-field-radius);
+  border-color: #627382;
+  background: #0b131c;
+  font: 500 1rem/1.3 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.modal-overlay .name-label {
+  font: 650 .8rem/1.25 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
 
 /* Reserve the same available viewport height regardless of tab content.
    The shared modal grid keeps the header and footer fixed while its body scrolls. */
