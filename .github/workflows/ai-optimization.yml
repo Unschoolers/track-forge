@@ -92,6 +92,8 @@ jobs:
       - run: npm ci
       - name: Tune all four cars on authored jumps and ordinary-track holdouts
         run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --scenarios jump-straight,jump-gravel,pine-hairpins,meadow-loop --out qa/results/jump-optimization
+      - name: Verify intentional jump flight and report difficulty ordering
+        run: node qa/optimization/jump-flight-matrix.mjs qa/results/jump-optimization
       - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
