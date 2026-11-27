@@ -80,6 +80,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  jump-ramps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tune all four cars on authored jumps and ordinary-track holdouts
+        run: npm run qa:optimize -- --workers 2 --trials 14 --seeds 1,4331 --scenarios jump-straight,jump-gravel,pine-hairpins,meadow-loop --out qa/results/jump-optimization
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: jump-optimization-${{ github.sha }}
+          path: qa/results/jump-optimization/
+          if-no-files-found: error
+          retention-days: 14
+
   passing:
     runs-on: ubuntu-latest
     timeout-minutes: 25

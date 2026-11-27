@@ -1,3 +1,4 @@
+import { WORLD_ELEVATION } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { Vector2 } from '@/domain/model'
 import type {
@@ -18,7 +19,22 @@ export interface RoadSurfaceSample {
   readonly structureRunId: string | null
 }
 
+export interface JumpLip {
+  readonly runId: string
+  readonly startIndex: number
+  readonly length: number
+  readonly beforeIndex: number
+  readonly afterIndex: number
+  readonly center: Vector2
+  readonly tangent: Vector2
+  readonly height: number
+  readonly grade: number
+}
+
 export interface RoadSurfaceProfile {
+  readonly jumpLips: readonly JumpLip[]
+  /** Incoming side of a road boundary, including the raised side of a jump lip. */
+  atSegmentEnd(pathIndex: number, position?: Vector2): RoadSurfaceSample
   at(pathIndex: number, position?: Vector2): RoadSurfaceSample
   gradeAt(pathIndex: number): number
 }
@@ -78,6 +94,24 @@ export function buildRoadSurfaceProfile(
       structureRunId: relative.runId,
     }
   })
+  const jumpRuns = new Map(structure.runs.filter(run => run.kind === 'jump').map(run => [run.id, run]))
+  const jumpLips = structure.runs.flatMap((run): JumpLip[] => {
+    if (run.kind !== 'jump' || run.length <= 0) return []
+    const afterIndex = run.endIndex + 1 < path.points.length ? run.endIndex + 1 : path.closed ? 0 : -1
+    const before = path.points[run.endIndex]
+    const after = path.points[afterIndex]
+    if (!before || !after || after.structure !== 'surface') return []
+    const length = Math.hypot(after.x - before.x, after.y - before.y)
+    if (length < 0.001) return []
+    const height = terrainSurface.heightAt(after) + WORLD_ELEVATION.levelHeight
+    const grade = Math.atan2(height - terrainSurface.heightAt(before) - structure.at(run.endIndex).height, length)
+    return [{
+      runId: run.id, startIndex: run.startIndex, length: run.length, beforeIndex: run.endIndex, afterIndex,
+      center: { x: after.x, y: after.y },
+      tangent: { x: (after.x - before.x) / length, y: (after.y - before.y) / length },
+      height, grade,
+    }]
+  })
   const gradeAt = (pathIndex: number): number => {
     if (path.points.length < 2) return 0
     const index = sampleIndex(path, pathIndex)
@@ -92,14 +126,34 @@ export function buildRoadSurfaceProfile(
       afterPoint.x - beforePoint.x,
       afterPoint.y - beforePoint.y,
     )
-    return horizontalDistance <= 0.000_1
-      ? 0
-      : Math.atan2(after.height - before.height, horizontalDistance)
+    if (horizontalDistance <= 0.000_1) return 0
+    // A discontinuous lip must not contaminate the running grade on either side.
+    const current = composed[index]
+    const currentJump = current?.structureRunId ? jumpRuns.get(current.structureRunId) : undefined
+    if (currentJump || (before.structureRunId && jumpRuns.has(before.structureRunId)) ||
+        (after.structureRunId && jumpRuns.has(after.structureRunId))) {
+      return Math.atan2(after.terrainHeight - before.terrainHeight, horizontalDistance) +
+        (currentJump && currentJump.length > 0 ? Math.atan2(WORLD_ELEVATION.levelHeight, currentJump.length) : 0)
+    }
+    return Math.atan2(after.height - before.height, horizontalDistance)
   }
   const samples: readonly RoadSurfaceSample[] = composed.map(
     (sample, index) => ({ ...sample, grade: gradeAt(index) }),
   )
   return {
+    jumpLips,
+    atSegmentEnd(pathIndex: number, position?: Vector2): RoadSurfaceSample {
+      const index = sampleIndex(path, pathIndex)
+      const nextIndex = sampleIndex(path, index + 1)
+      const point = position ?? path.points[nextIndex]
+      if (!point) return { terrainHeight: 0, structureHeight: 0, height: 0, grade: 0, material: 'grass', structureRunId: null }
+      const relative = structure.at(index, 1)
+      const terrainHeight = terrainSurface.heightAt(point)
+      return {
+        terrainHeight, structureHeight: relative.height, height: terrainHeight + relative.height,
+        grade: gradeAt(index), material: terrainSurface.materialAt(point), structureRunId: relative.runId,
+      }
+    },
     at(pathIndex: number, position?: Vector2): RoadSurfaceSample {
       if (!position) {
         return samples[sampleIndex(path, pathIndex)] ?? {
@@ -118,7 +172,8 @@ export function buildRoadSurfaceProfile(
       const relative = structure.at(segment.index, segment.ratio)
       const terrainHeight = terrainSurface.heightAt(position)
       const startGrade = samples[segment.index]?.grade ?? 0
-      const endGrade = samples[sampleIndex(path, segment.index + 1)]?.grade ?? startGrade
+      const endGrade = relative.runId && jumpRuns.has(relative.runId)
+        ? startGrade : samples[sampleIndex(path, segment.index + 1)]?.grade ?? startGrade
       return {
         terrainHeight,
         structureHeight: relative.height,

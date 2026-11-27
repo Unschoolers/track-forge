@@ -15,7 +15,7 @@ const tools: readonly {
   { id: 'start', icon: 'start', label: 'Place start line', shortLabel: 'Start' },
   { id: 'checkpoint', icon: 'checkpoint', label: 'Place checkpoint', shortLabel: 'Checkpoint' },
   { id: 'paint', icon: 'paint', label: 'Paint surface', shortLabel: 'Surface' },
-  { id: 'structure', icon: 'structure', label: 'Paint structure', shortLabel: 'Bridge' },
+  { id: 'structure', icon: 'structure', label: 'Paint structure', shortLabel: 'Structure' },
   { id: 'terrain', icon: 'terrain', label: 'Paint terrain', shortLabel: 'Terrain' },
   { id: 'pan', icon: 'pan', label: 'Pan map', shortLabel: 'Pan' },
   { id: 'tree', icon: 'tree', label: 'Scenery', shortLabel: 'Props' },

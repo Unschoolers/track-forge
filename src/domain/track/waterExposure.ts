@@ -95,7 +95,7 @@ export function isSafeRoadRecoverySample(
   pathIndex: number,
 ): boolean {
   const point = path.points[pathIndex]
-  if (!point) return false
+  if (!point || point.structure === 'jump') return false
   const surface = path.roadSurface.at(pathIndex, point)
   return (
     surface.material !== 'water' ||

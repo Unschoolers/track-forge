@@ -519,7 +519,7 @@ describe('DomUiHost', () => {
     })
   })
 
-  it('shows SURFACE and OVERPASS brushes for the structure tool', () => {
+  it('shows SURFACE, OVERPASS and JUMP brushes for the structure tool', () => {
     const { root, port, update } = setup('editor')
     update({
       ...snapshot('editor'),
@@ -539,6 +539,10 @@ describe('DomUiHost', () => {
     expect(
       root.querySelector('[data-structure-brush="surface"]')?.textContent,
     ).toBe('SURFACE')
+    const jump = root.querySelector<HTMLButtonElement>('[data-structure-brush="jump"]')
+    expect(jump?.textContent).toBe('JUMP')
+    jump?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-editor-structure', structure: 'jump' })
     expect(overpass?.textContent).toBe('OVERPASS')
     overpass?.click()
     expect(port.dispatch).toHaveBeenCalledWith({

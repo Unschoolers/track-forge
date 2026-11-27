@@ -1,6 +1,6 @@
 import { parseSharedTrackImport } from '@/application/library/trackImport'
 import type { Track } from '@/domain/model'
-import { TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { TRACK_EXPORT_FORMAT, trackExportFormatVersion } from '@/domain/track/trackCodec'
 import { Packet } from './raceWire'
 
 const CHUNK_BYTES = 16_000
@@ -18,7 +18,7 @@ export async function packTrack(
   delete geometry.signedChallengeSource
   delete geometry.creatorChallenge
   const input = serialize ? await serialize(track) :
-    JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION, track: geometry })
+    JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: trackExportFormatVersion(geometry), track: geometry })
   const bytes = new TextEncoder().encode(input)
   if (bytes.length > MAX_TRACK_BYTES) throw new Error('This track is too large for Nearby Race.')
   const packed = new Uint8Array(await new Response(

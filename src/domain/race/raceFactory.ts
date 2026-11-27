@@ -122,6 +122,9 @@ export function createRace(options: CreateRaceOptions): RaceState {
       : CAR_IDS.filter((car) => car !== options.playerCar)
 
   const open = options.routeKind === 'point-to-point'
+  if (!open && options.reversed && options.path.roadSurface.jumpLips.length) {
+    throw new Error('Jump ramps can only be raced in the authored direction.')
+  }
   const startDistance =
     options.path.totalLength *
     (open ? 0 : Math.max(0, Math.min(0.999_999, options.startRatio ?? 0)))

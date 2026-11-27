@@ -1,8 +1,9 @@
 import type { Track } from '@/domain/model'
-import { MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT } from '@/domain/track/trackCodec'
+import { MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, trackHasJumpRamps } from '@/domain/track/trackCodec'
 import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChallenge'
 
 export const SIGNED_TRACK_FORMAT_VERSION = 2
+export const SIGNED_JUMP_TRACK_FORMAT_VERSION = 4
 export const SIGNED_TRACK_REPLY_FORMAT = 'trackforge-track-reply'
 export const SIGNED_TRACK_REPLY_FORMAT_VERSION = 1
 const ALGORITHM = 'ECDSA-P256-SHA256'
@@ -15,7 +16,7 @@ export function createTrackSigningKey(): Promise<CryptoKeyPair> {
 }
 
 function trackEnvelope(track: unknown) {
-  return { format: TRACK_EXPORT_FORMAT, formatVersion: SIGNED_TRACK_FORMAT_VERSION, track }
+  return { format: TRACK_EXPORT_FORMAT, formatVersion: trackHasJumpRamps(track) ? SIGNED_JUMP_TRACK_FORMAT_VERSION : SIGNED_TRACK_FORMAT_VERSION, track }
 }
 
 function canonicalBytes(value: unknown): Uint8Array<ArrayBuffer> {
@@ -44,7 +45,7 @@ function decodeBytes(value: unknown, length: number): Uint8Array<ArrayBuffer> | 
 
 /** Verifies the received data before the import codec normalizes or assigns local IDs. */
 export async function verifyTrackSignature(envelope: Record<string, unknown>): Promise<boolean> {
-  if (envelope.format !== TRACK_EXPORT_FORMAT || envelope.formatVersion !== SIGNED_TRACK_FORMAT_VERSION ||
+  if (envelope.format !== TRACK_EXPORT_FORMAT || envelope.formatVersion !== trackEnvelope(envelope.track).formatVersion ||
       Object.keys(envelope).length !== 4 || !envelope.track) return false
   const raw = envelope.signature
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false
