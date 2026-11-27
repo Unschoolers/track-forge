@@ -57,8 +57,12 @@ export class SceneryRenderer {
       if (!sprite) {
         sprite = scene.add.image(prop.x, prop.y, texture, native?.frame).setDepth(depth)
         this.sprites.push(sprite)
-      } else if (sprite.depth !== depth) sprite.setDepth(depth)
-      (native ? sprite.setTexture(texture, native.frame) : sprite.setTexture(texture)).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size).setRotation(prop.rotation)
+      } else if (sprite.depth !== depth) {
+        sprite.setDepth(depth)
+      }
+      if (native) sprite.setTexture(texture, native.frame)
+      else sprite.setTexture(texture)
+      sprite.setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size).setRotation(prop.rotation)
     }
     for (const sprite of this.sprites.splice(plan.sprites.length)) sprite.destroy()
 
