@@ -12,7 +12,7 @@ const labelFor = (lighting: LightingMode): string => lighting === 'day' ? 'Day' 
 const sheetFor = (lighting: LightingMode): string => lighting === 'day' ? sunrise : sunset
 
 export function createLightingToggle(lighting: LightingMode, select: (lighting: LightingMode) => void): HTMLButtonElement {
-  const toggle = button('', 'lighting-toggle', () => select(opposite(lighting)), 'setup-choice lighting-toggle')
+  const toggle = button('', 'lighting-toggle', () => select(opposite(toggle.dataset.lightingMode === 'night' ? 'night' : 'day')), 'setup-choice lighting-toggle')
   toggle.dataset.lightingMode = lighting
   toggle.setAttribute('aria-label', 'Night lighting (Day / Night)')
   toggle.setAttribute('aria-pressed', String(lighting === 'night'))
@@ -23,6 +23,15 @@ export function createLightingToggle(lighting: LightingMode, select: (lighting: 
   reflection.setAttribute('aria-hidden', 'true')
   toggle.append(sky, reflection, element('span', 'lighting-label', labelFor(lighting)))
   return toggle
+}
+
+export function updateLightingToggle(toggle: HTMLButtonElement, lighting: LightingMode): void {
+  if (toggle.dataset.lightingMode === lighting) return
+  toggle.dataset.lightingMode = lighting
+  toggle.setAttribute('aria-pressed', String(lighting === 'night'))
+  const label = toggle.querySelector('.lighting-label')
+  if (!toggle.hasAttribute('data-lighting-art') && label) label.textContent = labelFor(lighting)
+  toggle.dispatchEvent(new Event('lighting-art-change'))
 }
 
 // Both directions share canonical endpoints, so a completed transition and a
@@ -58,9 +67,9 @@ export function attachLightingArtwork(
   const label = toggle.querySelector<HTMLElement>('.lighting-label')
   if (!sky || !base || !next || !label) return () => undefined
 
-  const lighting = toggle.dataset.lightingMode === 'night' ? 'night' : 'day'
+  let lighting: LightingMode = toggle.dataset.lightingMode === 'night' ? 'night' : 'day'
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-  const animate = toggle.dataset.lightingTransition === 'true' && !motion?.matches
+  let animate = toggle.dataset.lightingTransition === 'true' && !motion?.matches
   delete toggle.dataset.lightingTransition
   let disposed = false
   let request: number | undefined
@@ -94,6 +103,20 @@ export function attachLightingArtwork(
     if (progress < 1) request = requestAnimationFrame(tick)
   }
 
+  const onChange = () => {
+    lighting = toggle.dataset.lightingMode === 'night' ? 'night' : 'day'
+    if (request !== undefined) cancelAnimationFrame(request)
+    request = undefined
+    started = undefined
+    stage = -1
+    animate = !motion?.matches
+    paint(animate ? 0 : 1)
+    if (glass) {
+      applyOptics(animate ? 0 : 1)
+      if (animate) request = requestAnimationFrame(tick)
+    }
+  }
+  toggle.addEventListener('lighting-art-change', onChange)
   paint(animate ? 0 : 1)
   toggle.dataset.lightingArt = ''
   void load().then(module => {
@@ -108,6 +131,7 @@ export function attachLightingArtwork(
     if (animate) request = requestAnimationFrame(tick)
   }).catch((error: unknown) => {
     if (disposed) return
+    toggle.removeEventListener('lighting-art-change', onChange)
     paint(1)
     clearGlassIllumination(toggle)
     delete toggle.dataset.lightingArt
@@ -116,6 +140,7 @@ export function attachLightingArtwork(
 
   return () => {
     disposed = true
+    toggle.removeEventListener('lighting-art-change', onChange)
     if (request !== undefined) cancelAnimationFrame(request)
     glass?.destroy()
     paint(1)

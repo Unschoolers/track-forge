@@ -294,6 +294,19 @@ export class DomUiHost implements UiHost {
     const previous = this.previousSnapshot
     this.previousSnapshot = state
     if (isSceneryRotationPreviewOnly(previous, state) || deferEditorDragChrome(previous, state)) return
+    // Same setup: keep the shell, focused controls, canvas and SVG lenses connected.
+    if (previous?.overlay.type === 'race-setup' && state.overlay.type === 'race-setup' &&
+      previous.currentTrack === state.currentTrack && previous.mode === state.mode &&
+      previous.notice === state.notice && previous.preferences.graphicsQuality === state.preferences.graphicsQuality) {
+      const existing = this.root.querySelector<HTMLElement>('.race-setup-modal')
+      if (existing) {
+        if (this.racePreparation?.lighting !== (state.raceLighting ?? state.currentTrack?.lighting)) this.cancelRacePreparation()
+        this.flyover.begin(state.currentTrack ? 'solo:' + state.currentTrack.id : undefined)
+        this.renderOverlay(state, existing)
+        this.flyover.end()
+        return
+      }
+    }
     if (state.mode !== 'editor') this.editorDiagnosticsMemo.clear()
     this.screenCleanup?.()
     this.screenCleanup = undefined
@@ -478,7 +491,7 @@ export class DomUiHost implements UiHost {
     if (state.mode === 'home' && state.overlay.type === 'none') this.checkForUpdates()
   }
 
-  private renderOverlay(state: AppSnapshot): HTMLElement | undefined {
+  private renderOverlay(state: AppSnapshot, existingRaceSetup?: HTMLElement): HTMLElement | undefined {
     const close = () => this.controller.dispatch({ type: 'close-overlay' })
     switch (state.overlay.type) {
       case 'none':
@@ -656,6 +669,7 @@ export class DomUiHost implements UiHost {
               preferences.car,
               lighting,
               preferences.raceMode === 'ghost' && ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0,
+              true,
             )
           : undefined
         if (currentTrack && geometry && flyover && !this.racePreparation) {
@@ -673,7 +687,7 @@ export class DomUiHost implements UiHost {
             }),
           start: () =>
             this.controller.dispatch({ type: 'start-race' }),
-        }, availability, flyover, currentTrack ? this.runtime.raceSession.ghostSetups?.(currentTrack) : undefined)
+        }, availability, flyover, currentTrack ? this.runtime.raceSession.ghostSetups?.(currentTrack) : undefined, existingRaceSetup)
       }
       case 'options':
         return createOptionsModal(state, {
