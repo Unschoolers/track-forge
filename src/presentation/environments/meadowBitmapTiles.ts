@@ -62,7 +62,7 @@ class CachedBitmapTiles<T> implements BakeableBitmapTiles {
 
   constructor(private readonly index: ReadonlyMap<string, readonly T[]>,
     private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[], tile: GroundTile) => void,
-    private readonly limit = BITMAP_TILE_LIMIT) {}
+    private readonly limit: number = BITMAP_TILE_LIMIT) {}
 
   all(): readonly GroundTile[] {
     return Array.from(this.index.keys(), key => {
@@ -315,7 +315,7 @@ function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, par
   }
   // Reuse the canonical full-detail facets and their directional lighting.
   // Full-detail plateau triangles are small and bounded, unlike overview runs.
-  for (const primitive of part === 'water' ? [] : buildTerrainPresentation(surface, 'full')) {
+  for (const primitive of part === 'water' || !surface.contours.some(contour => contour.kind === 'hill') ? [] : buildTerrainPresentation(surface, 'full')) {
     if (primitive.kind === 'hill-slope') {
       const level = elevationLevelForHeight(primitive.height)
       for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet, level })
@@ -445,7 +445,7 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   }
 }
 
-function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme, part: 'all' | 'water' | 'hill' = 'all', limit = BITMAP_TILE_LIMIT): BakeableBitmapTiles {
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme, part: 'all' | 'water' | 'hill' = 'all', limit: number = BITMAP_TILE_LIMIT): BakeableBitmapTiles {
   return new CachedBitmapTiles(terrainBitmapIndex(geometry, Boolean(theme), part), (context, items, tile) => paintTerrainBitmap(context, items, art, tile, theme?.night), limit)
 }
 
