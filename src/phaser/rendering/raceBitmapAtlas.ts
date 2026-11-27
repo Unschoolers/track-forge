@@ -154,8 +154,7 @@ interface AtlasJob {
   readonly textures: RaceAtlasTextureManager
   readonly keys: string[]
   readonly frames: PreparedFrame[]
-  work: Generator<number, boolean, void>
-  progress: number
+  work: Generator<number, boolean, void> | undefined
   ready: boolean
   available: boolean
   users: number
@@ -170,7 +169,8 @@ function releaseAtlas(job: AtlasJob): void {
   if (!job.retired || job.users > 0) return
   for (const key of job.keys.splice(0)) job.textures.remove(key)
   job.frames.length = 0
-  job.work.return(false)
+  job.work?.return(false)
+  job.work = undefined
 }
 
 function* bakeAtlas(job: AtlasJob): Generator<number, boolean, void> {
@@ -222,9 +222,9 @@ function atlasJob(textures: RaceAtlasTextureManager, geometry: TrackGeometry, ni
     releaseAtlas(current)
   }
   const job: AtlasJob = {
-    textures, geometry, night, environment, keys: [], frames: [], progress: 0,
+    textures, geometry, night, environment, keys: [], frames: [],
     ready: false, available: false, users: 0, retired: false,
-    work: (function* () { return false })(),
+    work: undefined,
   }
   job.work = bakeAtlas(job)
   atlasJobs.set(textures, job)
@@ -238,14 +238,15 @@ export function* prepareRaceAtlas(textures: RaceAtlasTextureManager, geometry: T
   const job = atlasJob(textures, geometry, night, environment)
   try {
     while (!job.ready && !job.retired) {
-      const next = job.work.next()
+      const work = job.work
+      if (!work) throw new Error('Missing race atlas bake job')
+      const next = work.next()
       if (next.done) {
         job.ready = true
         job.available = next.value
-        job.progress = 1
+        job.work = undefined
       } else {
-        job.progress = next.value
-        yield job.progress
+        yield next.value
       }
     }
   } catch (error) {
