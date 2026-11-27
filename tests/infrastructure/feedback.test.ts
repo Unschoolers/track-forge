@@ -205,6 +205,7 @@ it('keeps a landing pulse intact through grass, curb and position feedback', () 
   haptics.silenceContinuous()
   expect(vibrate).toHaveBeenLastCalledWith(0)
   haptics.handle({ ...grass, speedRatio: 0 })
+  haptics.handle({ ...grass, grounded: false })
   expect(vibrate).toHaveBeenCalledTimes(4)
 })
 
