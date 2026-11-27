@@ -21,6 +21,7 @@ import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
 import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
+import { attachEdgeRefraction } from '@/ui/menu/edgeRefraction'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createEditorExitModal } from '@/ui/modals/editorExitModal'
@@ -67,6 +68,7 @@ export class DomUiHost implements UiHost {
   private unsubscribe: Unsubscribe | undefined
   private screenCleanup: (() => void) | undefined
   private overlayCleanup: (() => void) | undefined
+  private materialCleanup: (() => void) | undefined
   private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
   private readonly flyover = new RaceFlyoverLifecycle()
   private mounted = false
@@ -112,6 +114,8 @@ export class DomUiHost implements UiHost {
     this.screenCleanup = undefined
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
+    this.materialCleanup?.()
+    this.materialCleanup = undefined
     this.cancelRacePreparation()
     this.flyover.destroy()
     this.dialogs.destroy()
@@ -280,6 +284,8 @@ export class DomUiHost implements UiHost {
     this.screenCleanup = undefined
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
+    this.materialCleanup?.()
+    this.materialCleanup = undefined
     if (
       state.overlay.type !== 'race-setup' ||
       this.racePreparation?.track !== state.currentTrack ||
@@ -420,6 +426,10 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
+    this.materialCleanup = attachEdgeRefraction(
+      this.root,
+      '.home-screen .tf-menu-dock, .track-library-modal .track-library-toolbar, .options-modal .options-tab-list',
+    )
     const scroll = libraryScroll ?? lobbyScroll
     if (scroll !== undefined) {
       const body = overlay?.querySelector<HTMLElement>('.modal-body')

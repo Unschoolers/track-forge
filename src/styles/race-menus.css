@@ -1,5 +1,6 @@
 /* The route is the hero; filters and actions sit in a distinct functional layer. */
-.track-library-modal .modal-card { width: min(68rem, 100%); border-radius: 1.5rem; border-color: #71808c99; background: #111820f5; }
+.track-library-modal { isolation: isolate; background: linear-gradient(145deg, #070d16a8, #080d16bd), url('../assets/title/city-harbor.webp') center / cover no-repeat; }
+.track-library-modal .modal-card { width: min(68rem, 100%); border-radius: 1.5rem; border-color: #71808c99; background: #111820cc; }
 .track-library-modal .modal-header { padding: 1.1rem 1.4rem .7rem; }
 .track-library-modal .modal-title { font-size: clamp(1.55rem, 4.6vw, 2.35rem); letter-spacing: -.045em; }
 .track-library-modal .modal-subtitle { font-size: .9rem; }
@@ -8,14 +9,7 @@
 .track-library-modal .modal-footer .button { min-width: 0; min-height: 48px; padding-inline: 1.1rem; border-radius: 999px; font-size: .85rem; }
 .track-library-modal .modal-footer .button-primary { background: #ff925c; color: #20110a; border-color: #ff925c; }
 .track-library-modal .track-library-content { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .8rem; min-height: 0; }
-.track-library-modal .track-library-toolbar { display: grid; grid-template-columns: minmax(10rem, 1fr) auto auto; align-items: end; gap: .8rem; padding: .65rem; border: 1px solid #8393a580; border-radius: 1.2rem; background: #202a36; box-shadow: inset 0 1px 1px #ffffff24, inset 0 -1px 1px #0006; }
-@supports (backdrop-filter: blur(8px)) {
-  .track-library-modal[data-graphics-quality='medium'] .track-library-toolbar,
-  .track-library-modal[data-graphics-quality='high'] .track-library-toolbar {
-    background: linear-gradient(145deg, #e4f2ff20, transparent 48%, #080c1640), #182431c9;
-    backdrop-filter: blur(10px);
-  }
-}
+.track-library-modal .track-library-toolbar { display: grid; grid-template-columns: minmax(10rem, 1fr) auto auto; align-items: end; gap: .8rem; padding: .65rem; border: 1px solid #8393a580; border-radius: 1.2rem; background: linear-gradient(145deg, #e4f2ff20, transparent 48%, #080c1640), #182431c9; box-shadow: inset 0 1px 1px #ffffff24, inset 0 -1px 1px #0006; }
 .track-library-modal .track-library-search-label { display: grid; gap: .35rem; color: #c1cad4; font-size: .75rem; font-weight: 700; }
 .track-library-modal .track-library-search { width: 100%; min-height: 44px; padding: .6rem .85rem; border: 1px solid #71808c80; border-radius: 1rem; background: #202a36; color: #f4f6f8; font: inherit; }
 .track-library-modal .track-library-filter { display: flex; gap: .25rem; padding: .25rem; border: 1px solid #71808c70; border-radius: 999px; background: #202a36; }
@@ -199,8 +193,11 @@
 }
 @media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .track-library-modal .modal-card { background: #111820f5; }
   .track-library-modal[data-graphics-quality] .track-library-toolbar { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
 }
+[data-graphics-quality='low'] .track-library-modal .modal-card { background: #111820f5; }
+.track-library-modal[data-graphics-quality='low'] .track-library-toolbar { background: #202a36; backdrop-filter: none; }
 
 .results-modal .modal-title { font-size: clamp(1.5rem, 5vw, 2.3rem); letter-spacing: .06em; }
 .results-celebration {

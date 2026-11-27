@@ -14,7 +14,7 @@ The layout is a full-bleed media layer, semantic header, scrollable main content
 
 ## Material contract
 Use one material per grouped dock, not per child. Content stays opaque or directly on art with a scrim. Regular glass prioritizes readability; clear glass is reserved for intentionally composed static art. Default to opaque with live/unknown backdrops. CSS feature detection, reduced transparency and increased contrast restore readable opaque surfaces. No live canvas sampling, WebGL context, full-screen backdrop filters or JS frame loops. Respect reduced motion; controls retain visible focus and 44px minimum targets (48px primary).
-The foundation implements CSS tint, edge lighting and bounded static blur, not physical refraction. A subsequent isolated optical spike should test cached SVG displacement maps against this fallback on Android WebView before enabling them. No assertion of GPU performance or native fidelity until measured.
+Menu glass keeps a translucent tint and edge lighting as its fallback. On Home, Track Library and Options, medium/high graphics quality may add cached SVG edge refraction over visible static artwork; low quality and reduced-transparency/high-contrast preferences keep the opaque fallback. The effect uses bounded normal maps rebuilt only when a surface resizes, never samples the live race canvas, and does not run an animation loop. Android WebView fidelity and frame pacing still require device review.
 
 ## Adoption review gates
 
