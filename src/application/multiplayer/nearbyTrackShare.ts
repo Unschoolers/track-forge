@@ -1,4 +1,4 @@
-import type { Track } from '@/domain/model'
+import type { CreatorGhostChallenge, Track } from '@/domain/model'
 import { encodeControl } from './controlProtocol'
 import { packTrack } from './trackTransfer'
 
@@ -13,7 +13,11 @@ export class NearbyTrackShare {
   private readonly sent = new Set<string>()
   private packed: Promise<Uint8Array[]> | null = null
 
-  constructor(private readonly serialize: (track: Track) => Promise<string>) {}
+  private challenge: CreatorGhostChallenge | undefined
+
+  constructor(private readonly serialize: (track: Track, challenge?: CreatorGhostChallenge) => Promise<string>) {}
+
+  setChallenge(challenge: CreatorGhostChallenge | undefined): void { this.challenge = challenge }
 
   get incoming(): Track | null { return this.incomingTrack }
   get status(): ShareStatus | null { return this.result }
@@ -46,6 +50,7 @@ export class NearbyTrackShare {
     this.sent.clear()
     this.result = null
     this.packed = null
+    this.challenge = undefined
   }
 
   async send(
@@ -58,7 +63,8 @@ export class NearbyTrackShare {
     if (!track || this.sent.has(id)) return
     this.sent.add(id)
     try {
-      if (!this.packed) this.packed = packTrack(track, this.serialize)
+      const challenge = this.challenge
+      if (!this.packed) this.packed = packTrack(track, source => this.serialize(source, challenge))
       const chunks = await this.packed
       if (!active()) return
       await send([id], encodeControl({ type: 'share-offer' }))
