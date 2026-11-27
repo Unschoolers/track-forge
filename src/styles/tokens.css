@@ -27,19 +27,71 @@
   --menu-control-rim: inset 0 1px 1px #ffffff60, inset 0 -1px 1px #b7d4ef36, 0 2px 6px #0003;
   --menu-control-panel: linear-gradient(145deg, #e6f3ff16, transparent 48%), #101923ed;
   --menu-control-rounding: 18px;
+  --menu-static-action-fill: radial-gradient(ellipse at 18% -12%, #f1faff80, transparent 38%),
+    radial-gradient(ellipse at 88% 115%, #b6d8f24d, transparent 32%),
+    linear-gradient(175deg, #ffffff12, transparent 26%, transparent 74%, #07101b24), rgb(15 28 41 / 20%);
+  --menu-static-action-rim: inset 0 1px 1px #ffffffcc, inset 1px 0 2px #d3edff55,
+    inset 0 -2px 3px #070d18b0, inset -1px -1px 1px #b7d4ef60, 0 4px 10px #0005;
+  --menu-static-action-border: #c6e3fa80;
+  --menu-static-action-filter: blur(2px);
+  --menu-static-primary-fill: radial-gradient(ellipse at 20% 0%, #fff5d7b3, transparent 45%),
+    radial-gradient(ellipse at 90% 100%, #ffe4c94d, transparent 40%),
+    linear-gradient(175deg, #ffffff20, transparent 35%, transparent 80%, #b743171f), rgb(255 146 92 / 74%);
+  --menu-static-primary-border: #ffe0c58f;
+  --menu-static-primary-rim: inset 0 1px 2px #fff8, inset 0 -2px 3px #8c32175c, 0 4px 12px #0005;
+  --menu-static-choice-fill: linear-gradient(165deg, #e9f6ff28, transparent 30%, transparent 75%, #b6d8f21a), rgb(15 28 41 / 20%);
+  --menu-static-choice-rim: inset 0 1px 1px #ffffff55, inset 0 -1px 1px #b7d4ef36;
+  --menu-static-selection-fill: radial-gradient(ellipse at 15% 0%, #ffffff70, transparent 48%), rgb(255 146 92 / 74%);
+  --menu-static-selection-rim: inset 0 1px 1px #fff9, inset 0 -2px 2px #0003, 0 2px 7px #0003;
+  --menu-static-race-selection: rgb(227 237 247 / 72%);
+  --menu-static-tabs-fill: rgb(38 50 62 / 25%);
+  --menu-static-card-fill: rgb(16 24 33 / 44%);
+  --menu-static-card-border: #b4c8d54d;
+  --menu-static-section-fill: rgb(24 35 45 / 15%);
 }
 [data-graphics-quality='low'] {
   --menu-control-fill: #202a36;
   --menu-control-selected-fill: #ff925c;
   --menu-control-rim: none;
   --menu-control-panel: #101923;
+  --menu-static-action-border: #627382;
+  --menu-static-action-fill: #202a36;
+  --menu-static-action-rim: none;
+  --menu-static-action-filter: none;
+  --menu-static-primary-fill: #ff925c;
+  --menu-static-primary-rim: none;
+  --menu-static-primary-border: var(--menu-static-action-border);
+  --menu-static-choice-fill: #22313e;
+  --menu-static-choice-rim: none;
+  --menu-static-selection-fill: #ff925c;
+  --menu-static-selection-rim: none;
+  --menu-static-race-selection: #e3edf7;
+  --menu-static-tabs-fill: #26323e;
+  --menu-static-card-fill: #101821;
+  --menu-static-section-fill: #18232d;
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  :root {
+  :root, [data-graphics-quality] {
     --menu-control-fill: #202a36;
     --menu-control-selected-fill: #ff925c;
     --menu-control-rim: none;
     --menu-control-panel: #101923;
     --menu-control-border: #c1cad4;
+    --menu-static-action-border: #c1cad4;
+    --menu-static-card-border: #aab9c8;
+    --menu-static-action-fill: #202a36;
+    --menu-static-action-rim: none;
+    --menu-static-action-filter: none;
+    --menu-static-primary-fill: #ff925c;
+    --menu-static-primary-rim: none;
+    --menu-static-primary-border: var(--menu-static-action-border);
+    --menu-static-choice-fill: #22313e;
+    --menu-static-choice-rim: none;
+    --menu-static-selection-fill: #ff925c;
+    --menu-static-selection-rim: none;
+    --menu-static-race-selection: #e3edf7;
+    --menu-static-tabs-fill: #26323e;
+    --menu-static-card-fill: #101821;
+    --menu-static-section-fill: #18232d;
   }
 }
