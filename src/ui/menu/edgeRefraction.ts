@@ -1,7 +1,9 @@
 const MAX_WIDTH = 512
 const MAX_HEIGHT = 384
 const MAX_PIXELS = 160_000
-const MAX_CACHED_MAPS = 8
+const MAX_CACHED_MAPS = 16
+// SVG displacement ranges from -scale/2 to +scale/2 CSS pixels.
+const REFRACTION_SCALE = 24
 const normalMapCache = new Map<string, string>()
 let nextFilterId = 0
 
@@ -39,7 +41,7 @@ export function attachEdgeRefraction(root: HTMLElement, selector: string): () =>
     const displacement = document.createElementNS(svg.namespaceURI, 'feDisplacementMap')
     displacement.setAttribute('in', 'SourceGraphic')
     displacement.setAttribute('in2', 'edge-map')
-    displacement.setAttribute('scale', '10')
+    displacement.setAttribute('scale', String(REFRACTION_SCALE))
     displacement.setAttribute('xChannelSelector', 'R')
     displacement.setAttribute('yChannelSelector', 'G')
     filter.append(image, displacement)
@@ -109,12 +111,20 @@ export function attachEdgeRefraction(root: HTMLElement, selector: string): () =>
 function drawMap(surface: HTMLElement, image: SVGFEImageElement, previousSizes: WeakMap<HTMLElement, string>): boolean {
   const rect = surface.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return false
-  const size = `${rect.width}x${rect.height}`
+  const corner = getComputedStyle(surface).borderTopLeftRadius
+  const parsed = Number.parseFloat(corner)
+  const cssRadius = Number.isFinite(parsed)
+    ? corner.endsWith('%') ? Math.min(rect.width, rect.height) * parsed / 100 : parsed
+    : 28
+  const cornerRadius = Math.max(0, Math.min(rect.width / 2, rect.height / 2, cssRadius))
+  const size = `${rect.width}x${rect.height}:${cornerRadius}`
   if (previousSizes.get(surface) === size) return image.hasAttribute('href')
   const fit = Math.min(1, MAX_WIDTH / rect.width, MAX_HEIGHT / rect.height, Math.sqrt(MAX_PIXELS / (rect.width * rect.height)))
   const width = Math.max(1, Math.round(rect.width * fit))
   const height = Math.max(1, Math.round(rect.height * fit))
-  const cacheKey = `${width}x${height}:${fit}`
+  const radius = cornerRadius * fit
+  const edgeWidth = Math.max(1, Math.min(16, rect.width / 4, rect.height / 4) * fit)
+  const cacheKey = `${width}x${height}:${fit}:${radius}:${edgeWidth}`
   const cachedMap = normalMapCache.get(cacheKey)
   image.setAttribute('width', String(rect.width))
   image.setAttribute('height', String(rect.height))
@@ -129,8 +139,6 @@ function drawMap(surface: HTMLElement, image: SVGFEImageElement, previousSizes: 
   const context = canvas.getContext('2d')
   if (!context) return false
   const pixels = context.createImageData(width, height)
-  const radius = Math.min(height / 2, 28 * fit)
-  const edgeWidth = Math.max(1, 12 * fit)
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const qx = Math.abs(x + 0.5 - width / 2) - (width / 2 - radius)
@@ -140,7 +148,7 @@ function drawMap(surface: HTMLElement, image: SVGFEImageElement, previousSizes: 
       const cornerLength = Math.hypot(outsideX, outsideY)
       const distance = cornerLength + Math.min(Math.max(qx, qy), 0) - radius
       const edge = Math.max(0, 1 - Math.abs(distance) / edgeWidth)
-      const strength = 5 * edge * edge * (3 - 2 * edge)
+      const strength = edge * edge * (3 - 2 * edge)
       const normalX = cornerLength > 0
         ? outsideX / cornerLength * Math.sign(x + 0.5 - width / 2)
         : qx > qy ? Math.sign(x + 0.5 - width / 2) : 0
@@ -148,8 +156,8 @@ function drawMap(surface: HTMLElement, image: SVGFEImageElement, previousSizes: 
         ? outsideY / cornerLength * Math.sign(y + 0.5 - height / 2)
         : qy >= qx ? Math.sign(y + 0.5 - height / 2) : 0
       const offset = (y * width + x) * 4
-      pixels.data[offset] = clampByte(128 + normalX * strength / 10 * 127)
-      pixels.data[offset + 1] = clampByte(128 + normalY * strength / 10 * 127)
+      pixels.data[offset] = clampByte(128 + normalX * strength * 127)
+      pixels.data[offset + 1] = clampByte(128 + normalY * strength * 127)
       pixels.data[offset + 2] = 128
       pixels.data[offset + 3] = 255
     }
