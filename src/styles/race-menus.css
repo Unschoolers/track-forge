@@ -1,5 +1,5 @@
 /* The route is the hero; filters and actions sit in a distinct functional layer. */
-.track-library-modal { isolation: isolate; background: linear-gradient(145deg, #070d1655, #080d1680), url('../assets/title/city-harbor.webp') center / cover no-repeat; backdrop-filter: none; }
+.track-library-modal { isolation: isolate; background: linear-gradient(145deg, #070d1655, #080d1680), #080d14 url('../assets/title/city-harbor.webp') center / cover no-repeat; backdrop-filter: none; }
 .track-library-modal .modal-card { width: min(68rem, 100%); border-radius: 1.25rem; border-color: #71808c66; background: rgb(17 24 32 / 44%); box-shadow: 0 1.5rem 5rem #0008; }
 .track-library-modal .modal-header { padding: 1.1rem 1.4rem .7rem; }
 .track-library-modal .modal-title { font-size: clamp(1.55rem, 4.6vw, 2.35rem); letter-spacing: -.045em; }
@@ -552,7 +552,7 @@
    The live preview is content; never sample its canvas for glass effects. */
 .modal-overlay.race-setup-modal {
   isolation: isolate;
-  background: linear-gradient(145deg, #070d1666, #080d1699), url('../assets/title/city-harbor.webp') center / cover no-repeat;
+  background: linear-gradient(145deg, #070d1666, #080d1699), #080d14 url('../assets/title/city-harbor.webp') center / cover no-repeat;
   backdrop-filter: none;
 }
 .race-setup-modal .modal-card {
