@@ -20,7 +20,7 @@
 .track-library-modal .modal-title { font-size: clamp(1.55rem, 4.6vw, 2.35rem); letter-spacing: -.045em; }
 .track-library-modal .modal-subtitle { font-size: .9rem; }
 .track-library-modal .modal-close { border-radius: 50%; }
-.track-library-modal .modal-body { min-height: 0; padding: .65rem 1.4rem 1rem; overscroll-behavior-y: contain; }
+.track-library-modal .modal-body { min-height: 0; padding: .65rem 1.4rem 1rem; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
 .track-library-modal .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem 1.4rem 1rem; }
 .track-library-modal .modal-footer .button { min-width: 0; padding-inline: 1.1rem; }
 .track-library-modal .track-library-content { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .8rem; min-height: 0; }
