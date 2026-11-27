@@ -32,6 +32,15 @@ function state(
 }
 
 describe('editor render invalidation', () => {
+  it('does not invalidate water-only vector terrain for road edits', () => {
+    const rendered = state()
+    const edited = { ...rendered, points: [] }
+    expect(editorTerrainRenderRequired(rendered, edited, false, false)).toBe(false)
+    expect(editorTerrainRenderRequired(rendered, { ...edited, terrain: {} }, false, false)).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, { ...edited, night: true }, false, false)).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, edited, false, true)).toBe(true)
+  })
+
   it('does not redraw immutable world data for gesture-only snapshots', () => {
     const current = state()
 
