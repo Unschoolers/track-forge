@@ -105,6 +105,10 @@ export class RaceScene extends Phaser.Scene {
   private pointerBinding: RacePointerBinding | undefined
   private boostRequestPending = false
   private cupCameraIntro = false
+  private localCountdownFrame: 'waiting' | 'submitted' | 'presented' = 'waiting'
+  private readonly onLocalCountdownRender = (): void => {
+    this.localCountdownFrame = 'presented'
+  }
 
   constructor(
     private readonly controller: SceneControllerPort,
@@ -119,6 +123,7 @@ export class RaceScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.localCountdownFrame = 'waiting'
     this.snapshot = this.controller.snapshot()
     this.cupCameraIntro = Boolean(this.snapshot.cup && this.snapshot.preferences.dynamicZoomEnabled &&
       !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
@@ -294,6 +299,20 @@ export class RaceScene extends Phaser.Scene {
     // following. Phaser's smoothed scene delta can diverge at high refresh.
     const frameSeconds = Math.max(0, this.game.loop.rawDelta / 1000)
     const sessionBeforeAdvance = this.raceSession.snapshot()
+    let simulationSeconds = frameSeconds
+    if (sessionBeforeAdvance.state?.phase === 'countdown' && sessionBeforeAdvance.setup?.mode !== 'nearby') {
+      // Scene creation and the initial GPU submission can consume a whole
+      // display interval. Do not charge them against the player's countdown.
+      if (this.localCountdownFrame === 'waiting') {
+        this.localCountdownFrame = 'submitted'
+        this.game.events.once(Phaser.Core.Events.POST_RENDER, this.onLocalCountdownRender)
+      }
+      // A subsequent stalled frame must not skip an entire visible cue.
+      // Keep the normal running delta and the shared Nearby clock untouched.
+      simulationSeconds = this.localCountdownFrame === 'presented'
+        ? Math.min(frameSeconds, 0.1)
+        : 0
+    }
     const boostPractice = sessionBeforeAdvance.setup?.mode === 'boost-practice'
     const boostInputOpen = boostPractice && !this.snapshot.paused &&
       !sessionBeforeAdvance.state?.paused && sessionBeforeAdvance.state?.phase === 'running'
@@ -307,7 +326,7 @@ export class RaceScene extends Phaser.Scene {
       ? { steering: 0, throttle: 0, braking: false }
       : inputForPedals(this.controls.snapshot(), this.snapshot.preferences.pedalMode)
     this.raceSession.advance(
-      frameSeconds,
+      simulationSeconds,
       boostInputOpen
         ? { ...input, boostRequested: this.boostRequestPending }
         : input,
@@ -593,6 +612,8 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private dispose(): void {
+    this.game.events.off(Phaser.Core.Events.POST_RENDER, this.onLocalCountdownRender)
+    this.localCountdownFrame = 'waiting'
     this.nativeParticles?.destroy()
     this.nativeParticles = undefined
     this.frameDiagnostics?.endRace()
