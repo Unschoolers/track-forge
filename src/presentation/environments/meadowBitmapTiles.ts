@@ -274,7 +274,7 @@ export const WATER_BANK_RADIUS = 13
 export const WATER_SHALLOW_RADIUS = 32
 
 type ElevationFace =
-  | { readonly kind: 'plateau'; readonly triangle: TerrainTriangle; readonly level: number }
+  | { readonly kind: 'hill-mask'; readonly triangle: TerrainTriangle; readonly level: number }
   | { readonly kind: 'slope'; readonly triangle: TerrainTriangle; readonly shade: number; readonly level: number }
 
 type TerrainBitmapItem =
@@ -295,10 +295,11 @@ export function splitBankSegment(start: Vector2, end: Vector2): readonly BankSeg
   return Array.from({ length: count }, (_, i) => ({ start: at(i / count), end: at((i + 1) / count) }))
 }
 
-function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, part: 'all' | 'water' | 'hill' = 'all', regionalCache?: RegionalTerrainMeshCache): Map<string, TerrainBitmapItem[]> {
+export function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, part: 'all' | 'water' | 'hill' = 'all', regionalCache?: RegionalTerrainMeshCache): Map<string, TerrainBitmapItem[]> {
   const surface = geometry.path.terrainSurface
   const items: TerrainBitmapItem[] = []
-  for (const contour of surface.contours) {
+  const contours = surface.visualContours ?? surface.contours
+  for (const contour of contours) {
     if ((contour.kind !== 'water' && contour.kind !== 'hill') || contour.points.length < 3) continue
     if (part !== 'all' && contour.kind !== part) continue
     for (let i = 0; i < contour.points.length; i++) {
@@ -312,23 +313,23 @@ function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, par
   for (const component of part === 'hill' ? [] : buildTerrainComponents(surface.contours, 'water')) {
     for (const triangle of tileTerrainComponent(component, TILE)) items.push({ kind: 'water', triangle })
   }
-  // Tile the projected component rather than indexing a potentially huge
-  // shadow triangle. The same projection and holes as the vector pass remain.
-  if (includeShadows && part !== 'water') {
-    for (const component of buildTerrainComponents(surface.contours, 'hill')) {
-      const projected = mapTerrainComponent(component, point => projectSunShadow(point, WORLD_ELEVATION.levelHeight))
-      for (const triangle of tileTerrainComponent(projected, TILE)) items.push({ kind: 'hill-shadow', triangle })
+  // Use the same continuous, hole-aware polygon fill as water for the hill
+  // silhouette. The canonical height mesh supplies only the interior lighting.
+  if (part !== 'water') {
+    const level = elevationLevelForHeight(WORLD_ELEVATION.levelHeight)
+    for (const component of buildTerrainComponents(contours, 'hill')) {
+      for (const triangle of tileTerrainComponent(component, TILE)) items.push({ kind: 'hill-mask', triangle, level })
+      if (includeShadows) {
+        const projected = mapTerrainComponent(component, point => projectSunShadow(point, WORLD_ELEVATION.levelHeight))
+        for (const triangle of tileTerrainComponent(projected, TILE)) items.push({ kind: 'hill-shadow', triangle })
+      }
     }
   }
-  // Reuse the canonical full-detail facets and their directional lighting.
-  // Full-detail plateau triangles are small and bounded, unlike overview runs.
+  // Reuse canonical road-aware slope facets as a translucent lighting pass.
   for (const primitive of part === 'water' || !surface.contours.some(contour => contour.kind === 'hill') ? [] : buildTerrainPresentation(surface, 'full', regionalCache)) {
     if (primitive.kind === 'hill-slope') {
       const level = elevationLevelForHeight(primitive.height)
       for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet, level })
-    } else if (primitive.kind === 'hill-plateau') {
-      const level = elevationLevelForHeight(primitive.height)
-      for (const triangle of primitive.triangles) items.push({ kind: 'plateau', triangle, level })
     }
   }
   return indexBitmapItems(items, item => 'segment' in item
@@ -403,12 +404,10 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   if (palette.waterDetail === 'oil-slicks' && tile) paintHarborOilSlicks(context, tile)
   context.restore()
 
-  // Each actual elevation gets its own material and directional shading.
-  // Paint low to high, with the plateau over the slope of the same level.
-  // Group only the faces in this bounded tile, not the whole terrain.
-  const faces = items.filter((item): item is ElevationFace => item.kind === 'slope' || item.kind === 'plateau')
-  // Soft contact shadow hugs the existing hill contour. The opaque hill
-  // material still covers only the exact canonical mesh triangles.
+  // The rounded outline owns the continuous material fill. Mesh facets are
+  // no longer opaque texture patches; this avoids the visible square mosaic.
+  const faces = items.filter((item): item is ElevationFace => item.kind === 'slope' || item.kind === 'hill-mask')
+  // Contact shadow follows the same decorative outline as the material.
   bankStroke(context, items, 12, '#15202a', 0.055, 'hill-bank')
   bankStroke(context, items, 8, '#15202a', 0.075, 'hill-bank')
   bankStroke(context, items, 4, '#15202a', 0.11, 'hill-bank')
@@ -416,35 +415,53 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
     const material = elevationMaterialForLevel(art.elevationMaterials, level)
     const shading = material.shading
     const slope = repeatPattern(context, material.slope)
+    context.save()
+    context.beginPath()
+    for (const item of levelFaces) {
+      if (item.kind === 'hill-mask') appendTriangle(context, item.triangle)
+    }
+    // Fill once, then clip every interior pass to the same hole-aware mask.
+    context.fillStyle = repeatPattern(context, material.plateau)
+    context.fill()
+    context.fillStyle = shading.plateauGlaze
+    context.fill()
+    context.clip()
+
+    // Road-adjacent grades can extend farther than natural slopes. Retain
+    // their visual cue, but do not let the sampling grid own opaque materials.
+    context.beginPath()
+    for (const item of levelFaces) {
+      if (item.kind === 'slope') appendTriangle(context, item.triangle)
+    }
+    context.fillStyle = slope
+    context.globalAlpha = 0.25
+    context.fill()
+    context.globalAlpha = 1
+
+    // Same overlapping, rounded bands as the shoreline painter, with the
+    // rock material growing progressively stronger toward the mountain foot.
+    const run = WORLD_ELEVATION.naturalSlopeRun
+    bankStroke(context, items, run * 2.5, slope, 0.15, 'hill-bank')
+    bankStroke(context, items, run * 2, slope, 0.26, 'hill-bank')
+    bankStroke(context, items, run * 1.5, slope, 0.40, 'hill-bank')
+    bankStroke(context, items, run, slope, 0.62, 'hill-bank')
+    bankStroke(context, items, run * 0.5, slope, 0.80, 'hill-bank')
+
+    // Preserve the road-aware directional shading, but soften its contrast
+    // so discretized gradient samples cannot form opaque square patches.
     for (let bucket = 0; bucket < 9; bucket++) {
+      if (bucket === 4) continue
       context.beginPath()
       for (const item of levelFaces) {
         if (item.kind === 'slope' && Math.max(0, Math.min(8, Math.round((item.shade + 1) * 4))) === bucket) {
           appendTriangle(context, item.triangle)
         }
       }
-      context.fillStyle = slope
-      context.fill()
       context.fillStyle = bucket < 4
-        ? `rgba(${shading.slopeShadow},${(4 - bucket) * shading.slopeShadowStrength})`
-        : `rgba(${shading.slopeLight},${(bucket - 4) * shading.slopeLightStrength})`
+        ? `rgba(${shading.slopeShadow},${(4 - bucket) * shading.slopeShadowStrength * 0.5})`
+        : `rgba(${shading.slopeLight},${(bucket - 4) * shading.slopeLightStrength * 0.5})`
       context.fill()
     }
-    context.beginPath()
-    for (const item of levelFaces) {
-      if (item.kind === 'plateau') appendTriangle(context, item.triangle)
-    }
-    context.fillStyle = repeatPattern(context, material.plateau)
-    context.fill()
-    context.fillStyle = shading.plateauGlaze
-    context.fill()
-
-    // Shade only the inside of the real elevated footprint, with no added
-    // solid geometry. Rounded strokes soften the stepped visual transitions.
-    context.save()
-    context.beginPath()
-    for (const face of levelFaces) appendTriangle(context, face.triangle)
-    context.clip()
     bankStroke(context, items, 18, `rgb(${shading.slopeShadow})`, 0.07, 'hill-bank')
     bankStroke(context, items, 12, `rgb(${shading.slopeShadow})`, 0.10, 'hill-bank')
     bankStroke(context, items, 6, `rgb(${shading.slopeShadow})`, 0.15, 'hill-bank')

@@ -386,3 +386,7 @@ quarter of the original elevation evaluations for a local edit on a
 2,700-cell synthetic hill at each detail level. This is a regression target,
 not a measured Android FPS claim. CI and physical-device profiling are
 required before release.
+
+### Rounded hill bitmap presentation
+
+Hill artwork reuses the shoreline corner bevel and continuous polygon mask, including holes. The visual contours are cached beside the canonical contours; hill height, road grade, water hazards and track data are unchanged. The bitmap painter fills a single world-anchored plateau material, then layers translucent road-aware slope cues, rounded rock bands and reduced directional shading. It no longer paints opaque textures per height-sample quad. The existing bitmap cache and tile limits remain in place. Extreme overview/vector fallback still uses the canonical hill mesh. Verify the editor and race on physical Android at driving zoom, including hill/water boundaries and large tracks; the change is a visual-only revert.
