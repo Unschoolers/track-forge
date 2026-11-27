@@ -1,3 +1,4 @@
+import type { SceneryTransform } from '@/domain/track/sceneryTransform'
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { TrackCreator } from '@/domain/track/trackCreator'
 
@@ -41,7 +42,7 @@ export interface TrackPoint extends Vector2 {
   readonly structure?: RoadStructure
 }
 
-export interface Tree extends Vector2 {}
+export interface Tree extends Vector2, SceneryTransform {}
 
 export interface TerrainCell {
   readonly column: number

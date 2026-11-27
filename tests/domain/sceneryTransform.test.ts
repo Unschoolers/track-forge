@@ -1,0 +1,31 @@
+import { describe, expect, it } from 'vitest'
+import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
+import { normalizeSceneryTransform, stepSceneryScale } from '@/domain/track/sceneryTransform'
+import { normalizeSceneryProps } from '@/domain/track/trackEnvironment'
+
+describe('authored scenery transforms', () => {
+  it('keeps legacy defaults, canonicalizes a full turn and rejects unsafe sizes', () => {
+    expect(normalizeSceneryTransform({})).toEqual({})
+    expect(normalizeSceneryTransform({ rotation: 360, scale: 1 })).toEqual({})
+    expect(normalizeSceneryTransform({ scale: Infinity })).toBeUndefined()
+    expect(normalizeSceneryTransform({ rotation: -1 })).toBeUndefined()
+    expect(stepSceneryScale(1, 1)).toBe(1.05)
+    expect(stepSceneryScale(2, 1)).toBe(2)
+  })
+
+  it('stores a prop transform during normalization', () => {
+    const prop = { kind: 'city-house', x: 12, y: 15, rotation: 135, scale: 1.15 }
+    expect(normalizeSceneryProps([prop])).toEqual([prop])
+  })
+
+  it('preserves tree transforms on move, undo, redo and reset', () => {
+    const original = createEditorState([], [{ x: 0, y: 0 }])
+    const changed = reduceEditor(original, { type: 'transform-scenery', target: { type: 'tree', index: 0 }, transform: { rotation: 135, scale: 1.15 } })
+    expect(changed.trees[0]).toEqual({ x: 0, y: 0, rotation: 135, scale: 1.15 })
+    const moved = reduceEditor(changed, { type: 'move-tree', index: 0, position: { x: 50, y: 50 } })
+    expect(moved.trees[0]).toEqual({ x: 50, y: 50, rotation: 135, scale: 1.15 })
+    expect(reduceEditor(moved, { type: 'undo' }).trees).toEqual(changed.trees)
+    expect(reduceEditor(reduceEditor(moved, { type: 'undo' }), { type: 'redo' }).trees).toEqual(moved.trees)
+    expect(reduceEditor(changed, { type: 'transform-scenery', target: { type: 'tree', index: 0 }, transform: {} }).trees).toEqual(original.trees)
+  })
+})

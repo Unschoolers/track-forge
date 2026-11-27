@@ -1,3 +1,4 @@
+import { normalizeSceneryTransform, type ScenerySelection, type SceneryTransform } from '@/domain/track/sceneryTransform'
 import { DEFAULT_TRACK_ENVIRONMENT_ID, MAX_SCENERY_PROPS, isSceneryPosition, sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { normalizeRouteKind, type RouteKind, type Track } from '@/domain/model'
@@ -103,6 +104,7 @@ export type EditorCommand =
       readonly point: TrackPoint
     }
   | { readonly type: 'set-environment'; readonly environmentId: TrackEnvironmentId }
+  | { readonly type: 'transform-scenery'; readonly target: ScenerySelection; readonly transform: SceneryTransform }
   | { readonly type: 'add-scenery-prop'; readonly prop: SceneryProp }
   | { readonly type: 'move-scenery-prop'; readonly index: number; readonly position: Vector2 }
   | { readonly type: 'erase-scenery-prop'; readonly index: number }
@@ -228,6 +230,9 @@ export function applyEditorCommand(
   state: EditorState,
   command: EditorCommand,
 ): EditorCommandResult {
+  if (command.type === 'transform-scenery' && !normalizeSceneryTransform(command.transform)) {
+    return { state, rejection: { code: 'invalid-scenery-position', message: 'Invalid scenery scale or rotation.' } }
+  }
   if (command.type === 'add-tree') {
     const rejection = treePlacementRejection(state.terrain, command.tree)
     if (rejection) return { state, rejection }
@@ -401,6 +406,20 @@ function reduceEditorUnchecked(
     }
     case 'set-environment':
       return state.environmentId === command.environmentId ? state : patchEditorState(state, { environmentId: command.environmentId })
+    case 'transform-scenery': {
+      const { target } = command
+      const transform = normalizeSceneryTransform(command.transform)
+      const item = target.type === 'tree' ? state.trees[target.index] : state.scenery[target.index]
+      if (!item || !transform || (item.rotation ?? 0) === (transform.rotation ?? 0) && (item.scale ?? 1) === (transform.scale ?? 1)) return state
+      if (target.type === 'tree') {
+        const trees = state.trees.map((tree, index) => index === target.index ? { x: tree.x, y: tree.y, ...transform } : tree)
+        return patchEditorState(state, { trees })
+      }
+      const prop = state.scenery[target.index]
+      if (!prop || !sceneryKindBelongsToEnvironment(prop.kind, state.environmentId)) return state
+      const scenery = state.scenery.map((entry, index) => index === target.index ? { kind: entry.kind, x: entry.x, y: entry.y, ...transform } : entry)
+      return patchEditorState(state, { scenery })
+    }
     case 'add-scenery-prop':
       return patchEditorState(state, { scenery: [...state.scenery, command.prop] })
     case 'move-scenery-prop': {
