@@ -21,7 +21,10 @@ import { buildRoadTextureStrip, ROAD_TEXTURE_VARIANTS, ROAD_TEXTURE_SIZE, ROAD_T
 import { paintOrganicGround, type OrganicGroundTheme } from './organicGroundDetails'
 import { createElevationMaterials, elevationMaterialForLevel, type ElevationMaterials } from './elevationMaterials'
 
+export const GROUND_ART_SIZE = 1024
+
 export interface EnvironmentBitmapArt {
+  readonly highResolutionGround?: HTMLCanvasElement
   readonly road: Readonly<Record<SurfaceId, HTMLCanvasElement>>
   readonly patches: readonly HTMLCanvasElement[]
   readonly organicGround?: { readonly theme: OrganicGroundTheme; readonly patch: HTMLCanvasElement }
@@ -71,6 +74,14 @@ function extract(image: HTMLImageElement, size: number, column: number, row: num
   return canvas
 }
 
+/** Preserve the old material scale for elevation and shoreline patterns. */
+function groundMaterial(source: HTMLCanvasElement): HTMLCanvasElement {
+  const { canvas, context } = createArtCanvas(GROUND_TILE_SIZE)
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(source, 0, 0, GROUND_TILE_SIZE, GROUND_TILE_SIZE)
+  return canvas
+}
+
 function tint(source: HTMLCanvasElement, color: string): HTMLCanvasElement {
   const { canvas, context } = createArtCanvas(source.width, source.height)
   context.drawImage(source, 0, 0)
@@ -114,7 +125,7 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
   ]).then(([materials, patches, meadowGround, desertGround, cityGround, kidsGround,
     meadowRoad, desertRoad, cityRoad, kidsRoad, meadowPolish, desertPolish, cityPolish, kidsPolish]) => {
     for (const [name, image] of [['Meadow', meadowGround], ['Desert', desertGround], ['Cityscape', cityGround], ['Kids’ Room', kidsGround]] as const) {
-      if (image.naturalWidth !== GROUND_TILE_SIZE || image.naturalHeight !== GROUND_TILE_SIZE) {
+      if (image.naturalWidth !== GROUND_ART_SIZE || image.naturalHeight !== GROUND_ART_SIZE) {
         throw new Error(`Unexpected ${name} ground artwork dimensions`)
       }
     }
@@ -137,9 +148,11 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     const cityRoads = roadAtlas(cityRoad)
     const kidsRoads = roadAtlas(kidsRoad)
     const build = (night: boolean): MeadowBitmapArt => {
-      const ground = extract(meadowGround, GROUND_TILE_SIZE, 0, 0, night)
+      const highResolutionGround = extract(meadowGround, GROUND_ART_SIZE, 0, 0, night)
+      const ground = groundMaterial(highResolutionGround)
       const detail = polish(meadowPolish, night)
       return {
+        highResolutionGround,
         road: meadowRoads[night ? 'night' : 'day'],
         elevationMaterials: createElevationMaterials(ground, {
           plateau: ground,
@@ -156,12 +169,14 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     }
     const buildDesert = (night: boolean): EnvironmentBitmapArt => {
       const detail = polish(desertPolish, night)
-      const ground = extract(desertGround, GROUND_TILE_SIZE, 0, 0, night)
+      const highResolutionGround = extract(desertGround, GROUND_ART_SIZE, 0, 0, night)
+      const ground = groundMaterial(highResolutionGround)
       return {
         elevationMaterials: createElevationMaterials(ground, {
           plateau: detail.elevation, slope: detail.elevation,
           shading: DESERT_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
+        highResolutionGround,
         road: desertRoads[night ? 'night' : 'day'],
         water: detail.water,
         bridge: detail.bridge,
@@ -173,12 +188,14 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     }
     const buildCity = (night: boolean): EnvironmentBitmapArt => {
       const detail = polish(cityPolish, night)
-      const cobble = extract(cityGround, GROUND_TILE_SIZE, 0, 0, night)
+      const highResolutionGround = extract(cityGround, GROUND_ART_SIZE, 0, 0, night)
+      const cobble = groundMaterial(highResolutionGround)
       return {
         elevationMaterials: createElevationMaterials(cobble, {
           plateau: cobble, slope: detail.elevation,
           shading: CITY_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
+        highResolutionGround,
         road: cityRoads[night ? 'night' : 'day'],
         water: detail.water,
         bridge: detail.bridge,
@@ -191,12 +208,14 @@ export function loadEnvironmentBitmapArt(): Promise<void> {
     const buildKids = (night: boolean): EnvironmentBitmapArt => {
       const detail = polish(kidsPolish, night)
       // The new source is already royal blue; preserve its original fiber detail.
-      const ground = extract(kidsGround, GROUND_TILE_SIZE, 0, 0, night)
+      const highResolutionGround = extract(kidsGround, GROUND_ART_SIZE, 0, 0, night)
+      const ground = groundMaterial(highResolutionGround)
       return {
         elevationMaterials: createElevationMaterials(ground, {
           plateau: detail.elevation, slope: detail.elevation,
           shading: KIDS_ROOM_TERRAIN_ART[night ? 'night' : 'day'].raised,
         }),
+        highResolutionGround,
         road: kidsRoads[night ? 'night' : 'day'],
         water: detail.water,
         bridge: detail.bridge,
@@ -230,10 +249,11 @@ export function getEnvironmentBitmapArt(environment: TrackEnvironmentId, night: 
  * transparent bitmap and procedural patch placements. Art stays inside the
  * central tile, leaving its old padding
  * transparent so adjacent world tiles cannot cover one another. */
-export function paintBitmapGround(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, variant: number, padding: number): void {
-  const ground = elevationMaterialForLevel(art.elevationMaterials, 0).plateau
-  // The generated swatch covers the full tile at one texel per world unit.
-  context.drawImage(ground, padding, padding, GROUND_TILE_SIZE, GROUND_TILE_SIZE)
+export function paintBitmapGround(context: CanvasRenderingContext2D, art: EnvironmentBitmapArt, variant: number, padding: number, overlayOnly = false): void {
+  if (!overlayOnly) {
+    const ground = elevationMaterialForLevel(art.elevationMaterials, 0).plateau
+    context.drawImage(ground, padding, padding, GROUND_TILE_SIZE, GROUND_TILE_SIZE)
+  }
   if (art.organicGround) {
     paintOrganicGround(context, art.organicGround.theme, variant, art.organicGround.patch, padding)
   }

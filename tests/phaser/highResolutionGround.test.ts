@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { GROUND_TILE_SIZE } from '@/presentation/environments/groundTexture'
-import { paintBitmapGround, type EnvironmentBitmapArt } from '@/presentation/environments/meadowBitmapArt'
+import { GROUND_ART_SIZE, paintBitmapGround, type EnvironmentBitmapArt } from '@/presentation/environments/meadowBitmapArt'
 import { createElevationMaterials } from '@/presentation/environments/elevationMaterials'
 import { MEADOW_TERRAIN_ART } from '@/presentation/environments/bitmapTerrainPalette'
 
@@ -21,5 +21,9 @@ describe('high resolution ground artwork', () => {
     const context = { drawImage } as unknown as CanvasRenderingContext2D
     paintBitmapGround(context, art, 0, 64)
     expect(drawImage).toHaveBeenCalledExactlyOnceWith(ground, 64, 64, 256, 256)
+    drawImage.mockClear()
+    paintBitmapGround(context, art, 0, 64, true)
+    expect(drawImage).not.toHaveBeenCalled()
+    expect(GROUND_ART_SIZE / GROUND_TILE_SIZE).toBe(4)
   })
 })

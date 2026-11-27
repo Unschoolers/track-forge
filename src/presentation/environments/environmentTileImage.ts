@@ -7,11 +7,11 @@ import { getEnvironmentBitmapArt, paintBitmapGround } from './meadowBitmapArt'
 export const GROUND_TILE_PADDING = GRASS_TILE_PADDING
 const images = new Map<string, HTMLCanvasElement>()
 
-export function getEnvironmentTileImage(environmentId: TrackEnvironmentId, variant: number, night: boolean): HTMLCanvasElement {
+export function getEnvironmentTileImage(environmentId: TrackEnvironmentId, variant: number, night: boolean, overlayOnly = false): HTMLCanvasElement {
   const boundedVariant = ((Math.trunc(variant) % GROUND_TILE_VARIANTS) + GROUND_TILE_VARIANTS) % GROUND_TILE_VARIANTS || 0
-  if (environmentId === 'grass') return getGrassTileImage(boundedVariant, night)
+  if (environmentId === 'grass') return getGrassTileImage(boundedVariant, night, overlayOnly)
   const bitmap = getEnvironmentBitmapArt(environmentId, night)
-  const key = `${environmentId}:${boundedVariant}:${night}:${bitmap ? 'bitmap' : 'vector'}`
+  const key = `${environmentId}:${boundedVariant}:${night}:${bitmap ? 'bitmap' : 'vector'}:${overlayOnly}`
   const cached = images.get(key)
   if (cached) return cached
   const canvas = document.createElement('canvas')
@@ -20,7 +20,7 @@ export function getEnvironmentTileImage(environmentId: TrackEnvironmentId, varia
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D is unavailable for ground tile rendering')
   if (bitmap) {
-    paintBitmapGround(context, bitmap, boundedVariant, GROUND_TILE_PADDING)
+    paintBitmapGround(context, bitmap, boundedVariant, GROUND_TILE_PADDING, overlayOnly)
     images.set(key, canvas)
     return canvas
   }

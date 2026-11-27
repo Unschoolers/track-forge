@@ -6,7 +6,7 @@ import { shorelineBands } from '@/presentation/environments/shorelineMaterials'
 import { createMeadowBitmapLayers, drawBitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
 import { buildBridgePresentation } from '@/phaser/rendering/bridgeRenderer'
 import { bridgePaintCommands, paintBridgeCanvas } from '@/presentation/environments/bridgeMaterials'
-import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
+import { getEnvironmentBitmapArt, getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
 import { drawVehicleArtworkOnCanvas, VEHICLE_VISUAL_SCALE } from '@/presentation/vehicleArtwork'
 import type { CarId, LightingMode, Track, Vector2 } from '@/domain/model'
@@ -29,9 +29,14 @@ interface RoutePosition extends Vector2 {
 }
 
 function drawGroundTexture(ctx: CanvasRenderingContext2D, viewport: GroundViewport, night: boolean, environmentId: TrackEnvironmentId): void {
-  for (const tile of visibleGroundTilesForViewport(viewport)) {
+  const tiles = visibleGroundTilesForViewport(viewport)
+  const base = getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
+  if (base) {
+    for (const tile of tiles) ctx.drawImage(base, tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, GROUND_TILE_SIZE, GROUND_TILE_SIZE)
+  }
+  for (const tile of tiles) {
     ctx.drawImage(
-      getEnvironmentTileImage(environmentId, tile.variant, night),
+      getEnvironmentTileImage(environmentId, tile.variant, night, Boolean(base)),
       tile.x * GROUND_TILE_SIZE - GRASS_TILE_PADDING,
       tile.y * GROUND_TILE_SIZE - GRASS_TILE_PADDING,
     )

@@ -7,9 +7,9 @@ export const GRASS_TILE_PADDING = 64
 const images = new Map<string, HTMLCanvasElement>()
 
 /** Bake transparent, antialiased tile art once for Canvas and Phaser. */
-export function getGrassTileImage(variant: number, night: boolean): HTMLCanvasElement {
+export function getGrassTileImage(variant: number, night: boolean, overlayOnly = false): HTMLCanvasElement {
   const art = getMeadowBitmapArt(night)
-  const key = `${variant}:${night}:${art ? "bitmap" : "vector"}`
+  const key = `${variant}:${night}:${art ? "bitmap" : "vector"}:${overlayOnly}`
   const cached = images.get(key)
   if (cached) return cached
   const canvas = document.createElement('canvas')
@@ -18,7 +18,7 @@ export function getGrassTileImage(variant: number, night: boolean): HTMLCanvasEl
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D is unavailable for grass tile rendering')
   if (art) {
-    paintBitmapGround(context, art, variant, GRASS_TILE_PADDING)
+    paintBitmapGround(context, art, variant, GRASS_TILE_PADDING, overlayOnly)
     images.set(key, canvas)
     return canvas
   }
