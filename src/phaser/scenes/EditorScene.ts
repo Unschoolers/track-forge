@@ -1,3 +1,4 @@
+import { TREE_SIZE, sceneryScale } from '@/domain/track/sceneryTransform'
 import Phaser from 'phaser'
 import { normalizeEditorSceneryChoice, type AppCommand, type AppSnapshot } from '@/application/appState'
 import type { Unsubscribe } from '@/application/eventBus'
@@ -667,6 +668,17 @@ export class EditorScene extends Phaser.Scene {
       snapshot.editorUi.selectedCrossing,
       this.editorCamera.zoom,
     )
+    const selected = snapshot.editorUi.selectedScenery
+    if (snapshot.editorUi.tool === 'tree' && selected) {
+      const item = selected.type === 'tree' ? snapshot.editor.trees[selected.index] : snapshot.editor.scenery[selected.index]
+      if (item) {
+        const prop = selected.type === 'prop' ? snapshot.editor.scenery[selected.index] : undefined
+        const radius = prop ? getTrackEnvironment(snapshot.editor.environmentId).scenery[prop.kind]?.radius ?? 0 : TREE_SIZE / 2
+        const zoom = this.editorCamera.zoom
+        this.overlayGraphics.lineStyle(2 / zoom, 0x80e5ff, 0.95)
+        this.overlayGraphics.strokeCircle(item.x, item.y, radius * sceneryScale(item) + 4 / zoom)
+      }
+    }
     this.lastOverlayZoom = this.editorCamera.zoom
     renderRecoveryCheckpoints(
       this.overlayGraphics, geometry.path,
@@ -689,6 +701,7 @@ export class EditorScene extends Phaser.Scene {
       start: snapshot.editor.start,
       night: snapshot.currentTrack?.lighting === 'night',
       grid: snapshot.editorUi.grid,
+      selectedScenery: snapshot.editorUi.selectedScenery,
       selectedPoint: snapshot.editorUi.selectedPoint,
       selectedCrossing: snapshot.editorUi.selectedCrossing,
       tool: snapshot.editorUi.tool,

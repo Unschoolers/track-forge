@@ -1,3 +1,4 @@
+import type { ScenerySelection } from '@/domain/track/sceneryTransform'
 import type { TerrainBrushRadius } from '@/domain/config'
 import type { EditorTool } from '@/domain/editor/editorGeometry'
 import type { TerrainBrushMode } from '@/domain/editor/terrainBrush'
@@ -17,6 +18,7 @@ export interface EditorRenderState {
   readonly night: boolean
   readonly grid: boolean
   readonly selectedPoint: number | null
+  readonly selectedScenery?: ScenerySelection | null | undefined
   readonly selectedCrossing: string | null
   readonly tool: EditorTool
   readonly terrainMode: TerrainBrushMode
@@ -84,6 +86,8 @@ export function editorSnapshotRenderChanges(
       cameraChanged ||
       geometryChanged ||
       previous.recoveryCheckpoints !== current.recoveryCheckpoints ||
+      previous.selectedScenery !== current.selectedScenery ||
+      (current.selectedScenery != null && (previous.scenery !== current.scenery || previous.trees !== current.trees)) ||
       previous.selectedPoint !== current.selectedPoint ||
       previous.selectedCrossing !== current.selectedCrossing,
     preview:

@@ -36,7 +36,7 @@ export function normalizeSceneryProps(value: unknown): readonly SceneryProp[] {
     const item = entry as Record<string, unknown>
     if (typeof item.kind !== 'string' || typeof item.x !== 'number' || typeof item.y !== 'number') continue
     if (!Object.values(SCENERY_KINDS_BY_ENVIRONMENT).some((kinds) => (kinds as readonly string[]).includes(item.kind as string))) continue
-    const transform = normalizeSceneryTransform(item)
+    const transform = normalizeSceneryTransform({ rotation: item.rotation, scale: item.scale })
     if (!transform) continue
     const prop = { kind: item.kind as SceneryPropKind, x: item.x, y: item.y, ...transform }
     if (isSceneryPosition(prop)) result.push(prop)

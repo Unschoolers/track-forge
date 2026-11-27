@@ -96,7 +96,7 @@ function decodeStart(value: unknown): TrackStart {
 function decodeTree(value: unknown): Tree | undefined {
   const item = object(value)
   if (!item || !finite(item.x) || !finite(item.y)) return undefined
-  const transform = normalizeSceneryTransform(item)
+  const transform = normalizeSceneryTransform({ rotation: item.rotation, scale: item.scale })
   return transform ? { x: item.x, y: item.y, ...transform } : undefined
 }
 

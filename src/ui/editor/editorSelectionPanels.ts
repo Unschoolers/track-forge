@@ -1,3 +1,4 @@
+import { MAX_SCENERY_SCALE, MIN_SCENERY_SCALE, sceneryScale, stepSceneryScale, type ScenerySelection, type SceneryTransform } from '@/domain/track/sceneryTransform'
 import type { AppSnapshot } from '@/application/appState'
 import type { EditorCommand } from '@/domain/editor/editorState'
 import { planPointInsertion } from '@/domain/editor/editorGeometry'
@@ -37,10 +38,53 @@ export function createEditorSelectionPanels(
     )
   }
 
+  const target = state.editorUi.selectedScenery
+  if (gestureFinished && state.editorUi.tool === 'tree' && target) {
+    const item = target.type === 'tree' ? state.editor.trees[target.index] : state.editor.scenery[target.index]
+    if (item) panels.push(createSceneryControl(target, item, actions.edit))
+  }
+
   if (state.editorUi.tool === 'start' && state.editor.routeKind === 'circuit') {
     panels.push(createStartControl(state, actions.edit))
   }
   return panels
+}
+
+function createSceneryControl(
+  target: ScenerySelection,
+  item: SceneryTransform,
+  edit: (command: EditorCommand) => void,
+): HTMLElement {
+  const panel = element('aside', 'point-control scenery-control')
+  panel.setAttribute('aria-label', 'Scenery transformation')
+  panel.append(element('strong', 'point-control-title', 'Scenery transformation'))
+  const update = (rotation: number, scale: number) => edit({
+    type: 'transform-scenery', target, transform: { rotation, scale },
+  })
+  const angle = item.rotation ?? 0
+  const scale = sceneryScale(item)
+  const rotationLabel = element('label', 'point-tension-label', `Rotation: ${angle}°`)
+  const rotation = document.createElement('input')
+  rotation.type = 'range'
+  rotation.min = '0'
+  rotation.max = '360'
+  rotation.step = '1'
+  rotation.value = String(angle)
+  rotation.dataset.action = 'scenery-rotation'
+  rotation.addEventListener('change', () => update(Number(rotation.value), scale))
+  rotationLabel.append(rotation)
+  const choices = element('div', 'point-control-choices')
+  const minus = button('−5%', 'scenery-scale-down', () => update(angle, stepSceneryScale(scale, -1)), 'point-choice')
+  minus.disabled = scale <= MIN_SCENERY_SCALE
+  minus.setAttribute('aria-label', 'Decrease scenery size by five percent')
+  const plus = button('+5%', 'scenery-scale-up', () => update(angle, stepSceneryScale(scale, 1)), 'point-choice')
+  plus.disabled = scale >= MAX_SCENERY_SCALE
+  plus.setAttribute('aria-label', 'Increase scenery size by five percent')
+  const size = element('span', 'point-control-title', `${Math.round(scale * 100)}%`)
+  size.setAttribute('aria-label', 'Current scenery scale')
+  choices.append(minus, size, plus)
+  panel.append(rotationLabel, choices, button('Reset', 'scenery-transform-reset', () => update(0, 1), 'point-insert'))
+  return panel
 }
 
 function createStartControl(
