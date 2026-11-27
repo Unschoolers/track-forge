@@ -1,4 +1,4 @@
-/* Scope to migrated menu screens. Never style race HUD or editor controls here. */
+/* Shared menu layout and material. Never apply optical effects to the live canvas. */
 .tf-menu {
   --tf-ink: #f4f6f8;
   --tf-muted: #c1cad4;
@@ -160,8 +160,6 @@
   box-shadow: inset 0 1px 1px #fff9, inset 0 -2px 2px #0003, 0 2px 7px #0003;
 }
 #app .race-setup-modal[data-menu-material] .setup-choice.active { background-color: rgb(227 237 247 / 72%); color: #15202b; }
-#app .options-modal .modal-card { background: rgb(16 24 33 / 44%); }
-#app .options-modal .setup-section { background: rgb(24 35 45 / 15%); }
 #app .options-modal .options-tab-list { background: rgb(38 50 62 / 25%); }
 
 #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)):where([data-graphics-quality='low'] *) { background: #202a36; border-color: #627382; box-shadow: none; backdrop-filter: none; }
@@ -171,8 +169,6 @@
 #app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)).active:where([data-graphics-quality='low'] *),
 #app .options-modal .options-tab-list .setup-choice.active:where([data-graphics-quality='low'] *) { background: #ff925c; box-shadow: none; }
 #app .race-setup-modal[data-menu-material] .setup-choice.active:where([data-graphics-quality='low'] *) { background: #e3edf7; }
-#app [data-graphics-quality='low'] .options-modal .modal-card { background: #101821; }
-#app [data-graphics-quality='low'] .options-modal .setup-section { background: #18232d; }
 #app [data-graphics-quality='low'] .options-modal .options-tab-list { background: #26323e; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)) { background: #202a36; border-color: #c1cad4; box-shadow: none; backdrop-filter: none; }
@@ -182,8 +178,6 @@
   #app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)).active,
   #app .options-modal .options-tab-list .setup-choice.active { background: #ff925c; box-shadow: none; }
   #app .race-setup-modal[data-menu-material] .setup-choice.active { background: #e3edf7; }
-  #app .options-modal .modal-card { background: #101821; }
-  #app .options-modal .setup-section { background: #18232d; }
   #app .options-modal .options-tab-list { background: #26323e; }
 }
 
@@ -291,6 +285,35 @@
   letter-spacing: 0;
 }
 #app .cup-modal .track-mini-button { border-radius: 50%; }
+/* All dialogs inherit the same painted defaults. Static optics enhance these
+   controls via the material capability; no per-dialog button skin. */
+#app .modal-overlay :is(.button, .setup-choice, .toggle-button, .modal-close, .track-icon-action, .editor-segmented-button):not(:where([data-menu-material='static'] *, .track-card *)) {
+  border: 1px solid var(--menu-control-border);
+  border-radius: var(--menu-control-rounding);
+  background: var(--menu-control-fill);
+  color: var(--menu-control-ink);
+  box-shadow: var(--menu-control-rim);
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+  clip-path: none;
+  backdrop-filter: none;
+}
+#app .modal-overlay :is(.modal-close, .track-icon-action):not(:where([data-menu-material='static'] *, .track-card *)) { border-radius: 50%; }
+#app .modal-overlay :is(.button-primary, .setup-choice.active, .toggle-button.active, .editor-segmented-button.active):not(:where([data-menu-material='static'] *, .track-card *)) {
+  background: var(--menu-control-selected-fill);
+  border-color: #ffc4a5;
+  color: #20130f;
+}
+#app .modal-overlay .button-danger:not(:where([data-menu-material='static'] *, .track-card *)) {
+  background: #302028;
+  border-color: #98606a;
+  color: #ffadb3;
+}
+#app .modal-overlay:not([data-menu-material='static']) {
+  backdrop-filter: none;
+}
+#app .editor-screen :is(.point-control, .crossing-control) { backdrop-filter: none; }
 #app .editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button,
   .point-choice, .crossing-choice):is(.active, .accent, [aria-pressed='true']) {
   background: var(--menu-control-selected-fill);
@@ -305,9 +328,6 @@
   border-radius: var(--menu-control-rounding);
   box-shadow: var(--menu-control-rim);
 }
-#app .editor-screen :is(.editor-toolbox-items, .editor-view-items, .editor-context-dock) {
-  padding: .4rem;
-}
 #app [data-menu-material='static'] :is(.button, .modal-close):not(:where(.track-card *, .cup-track-row *)) {
   font-family: var(--menu-control-font);
   font-weight: 650;
@@ -319,20 +339,20 @@
   font-weight: 650;
   letter-spacing: 0;
 }
-#app :is(.cup-modal, .nearby-static-modal)[data-menu-material] .modal-card {
+#app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card {
   border-color: #b4c8d54d;
   border-radius: 24px;
   background: rgb(16 24 33 / 44%);
   box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
 }
-#app .nearby-static-modal[data-menu-material] .setup-section {
+#app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section {
   border: 1px solid #dbeafe12;
   border-radius: 18px;
   background: rgb(24 35 45 / 15%);
 }
-#app :is(.cup-modal, .nearby-static-modal)[data-menu-material] .modal-card:where([data-graphics-quality='low'] *) { background: #101821; }
-#app .nearby-static-modal[data-menu-material] .setup-section:where([data-graphics-quality='low'] *) { background: #18232d; }
+#app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card:where([data-graphics-quality='low'] *) { background: #101821; }
+#app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section:where([data-graphics-quality='low'] *) { background: #18232d; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  #app :is(.cup-modal, .nearby-static-modal)[data-menu-material] .modal-card { background: #101821; border-color: #aab9c8; }
-  #app .nearby-static-modal[data-menu-material] .setup-section { background: #18232d; }
+  #app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card { background: #101821; border-color: #aab9c8; }
+  #app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section { background: #18232d; }
 }
