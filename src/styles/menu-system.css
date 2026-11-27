@@ -124,7 +124,7 @@
 #app :is(.home-screen:has(.home-navigation) .tf-menu-action,
   .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close,
   .track-library-modal .modal-footer > .button, .track-library-modal .modal-close,
-  .options-modal .modal-footer > .button, .options-modal .modal-close) {
+  .options-modal .modal-footer > .button, .options-modal .modal-close, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button) {
   background-color: rgb(15 28 41 / 20%);
   background-image:
     radial-gradient(ellipse at 18% -12%, #f1faff80, transparent 38%),
@@ -138,7 +138,7 @@
 #app :is(.home-screen:has(.home-navigation) .tf-menu-action--primary,
   .race-setup-modal .modal-footer > .button-primary,
   .track-library-modal .modal-footer > .button-primary,
-  .options-modal .modal-footer > .button-primary) {
+  .options-modal .modal-footer > .button-primary, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button-primary) {
   background-color: rgb(255 146 92 / 74%);
   background-image: radial-gradient(ellipse at 20% 0%, #fff5d7b3, transparent 45%),
     radial-gradient(ellipse at 90% 100%, #ffe4c94d, transparent 40%),
@@ -152,7 +152,7 @@
   #app :where(.home-screen:has(.home-navigation) .tf-menu-action,
     .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close,
   .track-library-modal .modal-footer > .button, .track-library-modal .modal-close,
-  .options-modal .modal-footer > .button, .options-modal .modal-close) { backdrop-filter: blur(2px); }
+  .options-modal .modal-footer > .button, .options-modal .modal-close, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button) { backdrop-filter: blur(2px); }
 }
 /* Selected controls in grouped settings catch the light without another
    backdrop filter; cars, statistics and the live flyover remain content. */
@@ -203,26 +203,26 @@
 #app [data-graphics-quality='low'] :is(.home-screen:has(.home-navigation) .tf-menu-action,
   .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close,
   .track-library-modal .modal-footer > .button, .track-library-modal .modal-close,
-  .options-modal .modal-footer > .button, .options-modal .modal-close) {
+  .options-modal .modal-footer > .button, .options-modal .modal-close, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button) {
   background: #202a36; border-color: #627382; box-shadow: none; backdrop-filter: none;
 }
 #app [data-graphics-quality='low'] :is(.home-screen:has(.home-navigation) .tf-menu-action--primary,
   .race-setup-modal .modal-footer > .button-primary,
   .track-library-modal .modal-footer > .button-primary,
-  .options-modal .modal-footer > .button-primary) { background: #ff925c; }
+  .options-modal .modal-footer > .button-primary, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button-primary) { background: #ff925c; }
 #app [data-graphics-quality='low'] :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active,
   .race-setup-modal .setup-choice.active) { background-image: none; box-shadow: none; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   #app :is(.home-screen:has(.home-navigation) .tf-menu-action,
     .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close,
   .track-library-modal .modal-footer > .button, .track-library-modal .modal-close,
-  .options-modal .modal-footer > .button, .options-modal .modal-close) {
+  .options-modal .modal-footer > .button, .options-modal .modal-close, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button) {
     background: #202a36; border-color: #c1cad4; box-shadow: none; backdrop-filter: none;
   }
   #app :is(.home-screen:has(.home-navigation) .tf-menu-action--primary,
     .race-setup-modal .modal-footer > .button-primary,
   .track-library-modal .modal-footer > .button-primary,
-  .options-modal .modal-footer > .button-primary) { background: #ff925c; }
+  .options-modal .modal-footer > .button-primary, .options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button-primary) { background: #ff925c; }
   #app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active,
     .race-setup-modal .setup-choice.active) { background-image: none; box-shadow: none; }
 }
@@ -241,7 +241,7 @@
   --lg-shadow-2: 0 4px 10px #0005;
   text-shadow: 0 1px 3px #000b;
 }
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass].modal-close { border-radius: 50%; }
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass]:is(.modal-close, .options-release-notes-button) { border-radius: 50%; }
 #app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary) {
   --lg-tint: rgb(255 146 92 / 76%);
   border-color: #ffe0c580;
