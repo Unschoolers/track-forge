@@ -120,6 +120,7 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
     section_id: sample.sectionId, speed: sample.speed,
     angle: sample.angle ?? null, yaw_rate: sample.yawRate ?? null,
     steering: sample.steering ?? null, slip: sample.slip ?? null,
+    surface: sample.surface ?? null, lap: sample.lap ?? null,
     braking: sample.braking ?? null, road_distance: sample.roadDistance ?? null,
     offroad_seconds: sample.offRoadSeconds ?? null,
     lane: sample.lane, target_lane: sample.targetLane,

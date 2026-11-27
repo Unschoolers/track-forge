@@ -55,6 +55,15 @@ installed APK's behavior has been reproduced.
 
 The simulator uses actual exported road controls and terrain cells, but the lane-check harness currently does **not** recreate authored scenery colliders or live opponent/player inputs; authored timing/recovery checkpoints are preserved. Do not claim a simulated time is directly comparable to a user's race without recording these differences. For production regressions keep a compact, versioned fixture such as `tests/domain/roundaboutDiagnostic.test.ts` and fixed seeds, and verify on other tracks.
 
+## Compare difficulty on the same course
+
+```bash
+node qa/race-analysis/cli.mjs difficulty desert-reverse --car red --json
+node qa/race-analysis/cli.mjs difficulty desert-reverse --car red --normal-bonus 0.1 --normal-reserve 0.2 --json
+```
+
+This runs the existing AI lab for Normal and Hard with the same track, car, start, grid, laps, seed and solo/traffic mode. Experimental Normal overrides are explicit, apply only to the offline trial and are printed in the report. `--mode traffic`, `--seed`, and `--bin-size` are available. Road sample indices are grouped into fixed-width sections (50 by default) across all laps, and intervals are attributed to the section at the beginning of the 10 Hz sample. Positive `secondsDelta` means Hard spent longer there. Sections show sampled mean speed, braking, off-road time, steering saturation, slip and lane offset; absolute values are game units. Equal `entries` helps confirm both runs passed through the section equally often. Sections with missing data or unequal entry counts require review. Recovery and missing-sample intervals are explicitly excluded and counted, so section deltas may not sum to the finish difference. Samples are estimates, not proof of causation. The AI is a rival in this harness and may use different recovery behavior than a human player.
+
 ## Investigation loop
 
 1. Check the track fingerprint and setup/version; label live traffic vs AI solo explicitly.

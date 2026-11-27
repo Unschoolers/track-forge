@@ -7,6 +7,7 @@ function usage() {
     '  npm run qa:race -- track <track.json> [--json]\n' +
     '  npm run qa:race -- stats <race.json> [--full] [--json]\n' +
     '  npm run qa:race -- compare <old-race.json> <new-race.json> [--json]\n' +
+    '  npm run qa:race -- difficulty <scenario> [--car red] [--mode solo|traffic] [--seed 1] [--normal-bonus 0.1] [--normal-reserve 0.2] [--json]\n' +
     '  npm run qa:race -- simulate <track.json> [--car red|green|blue|yellow|all]' +
     ' [--mode solo|traffic] [--difficulty hard|normal|easy]' +
     ' [--level 1|2|3] [--seed 1] [--laps 2] [--start 0.5] [--grid 2,1,0,3] [--seconds 110]\n' +
@@ -21,7 +22,26 @@ function flagValue(name) {
   return index < 0 ? undefined : args[index + 1]
 }
 
-if (command === 'simulate') {
+if (command === 'difficulty') {
+  try {
+    const { runDifficultyComparison } = await import('./difficulty-runner.mjs')
+    const result = await runDifficultyComparison(args)
+    if (flags.has('--json')) console.log(JSON.stringify(result, null, 2))
+    else {
+      console.log('DIFFICULTY_COMPARISON ' + JSON.stringify({ ...result, sections: undefined }))
+      console.table(result.sections.slice(0, 12).map(section => ({
+        from: section.pathIndexFrom, to: section.pathIndexTo, delta: section.secondsDelta,
+        normalSpeed: section.normal.meanSpeed, hardSpeed: section.hard.meanSpeed,
+        normalBrake: section.normal.brakingSeconds, hardBrake: section.hard.brakingSeconds,
+        normalOffRoad: section.normal.offRoadSeconds, hardOffRoad: section.hard.offRoadSeconds,
+        normalSteer: section.normal.steeringSaturatedSeconds, hardSteer: section.hard.steeringSaturatedSeconds,
+      })))
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  }
+} else if (command === 'simulate') {
   const file = args[0]
   if (!file || file.startsWith('--')) {
     usage()
