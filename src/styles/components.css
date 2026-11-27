@@ -225,6 +225,7 @@
   opacity: 0;
   transition: opacity 110ms ease;
 }
+.race-event-banner[hidden] { display: none; }
 .race-event-banner.visible { opacity: 1; }
 .race-event-banner[data-kind='loss'] { border-color: #ff7778c0; background: linear-gradient(120deg, #201924f5, #5c2632f2 60%, #201924f5); color: #ffdce0; }
 .race-event-banner[data-kind='lead'] { border-color: #fff5a4; box-shadow: 0 0 1.3rem #ffdb7870, 0 .4rem 1.2rem #000a; }

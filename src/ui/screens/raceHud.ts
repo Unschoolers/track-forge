@@ -389,9 +389,11 @@ export function createRaceHud(
         announce('FIGHT BACK', 'YOU GOT PASSED!', detail, 'loss', now, 1400)
       }
     }
-    const showBanner = racing && now < bannerUntil
+    const checkpointHasPriority = !checkpointWarning.hidden
+    const showBanner = racing && now < bannerUntil && !checkpointHasPriority
+    raceBanner.hidden = checkpointHasPriority
     raceBanner.classList.toggle('visible', showBanner)
-    if (!showBanner && raceBanner.textContent) raceBanner.replaceChildren()
+    if ((!racing || now >= bannerUntil) && raceBanner.textContent) raceBanner.replaceChildren()
     lastLap = telemetry.lap
     const ghostRace = snapshot.setup?.mode === 'ghost' && snapshot.ghostTime !== undefined
     const openRoute = telemetry.routeKind === 'point-to-point'
