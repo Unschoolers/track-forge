@@ -55,11 +55,11 @@ export class HapticsAdapter implements FeedbackPort {
     const now = this.now()
     const changed = event.surface !== this.surface
     this.surface = event.surface
-    if (event.surface !== 'grass' || event.speedRatio <= 0.1) {
+    if (event.surface !== 'grass' || event.speedRatio <= 0.1 || event.grounded === false) {
       this.nextGrassAt = 0
       if (this.activeKind === 'grass' && now < this.activeUntil) this.cancel()
       if (changed && event.surface !== 'street' && event.surface !== 'grass' &&
-        event.speedRatio > 0.1 && now >= this.activeUntil) this.pulse([6])
+        event.speedRatio > 0.1 && event.grounded !== false && now >= this.activeUntil) this.pulse([6])
       return
     }
     if (now < this.nextGrassAt || now < this.activeUntil) return
