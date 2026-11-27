@@ -21,6 +21,8 @@ export interface RoadSurfaceSample {
 
 export interface JumpLip {
   readonly runId: string
+  readonly startIndex: number
+  readonly length: number
   readonly beforeIndex: number
   readonly afterIndex: number
   readonly center: Vector2
@@ -104,7 +106,7 @@ export function buildRoadSurfaceProfile(
     const height = terrainSurface.heightAt(after) + WORLD_ELEVATION.levelHeight
     const grade = Math.atan2(height - terrainSurface.heightAt(before) - structure.at(run.endIndex).height, length)
     return [{
-      runId: run.id, beforeIndex: run.endIndex, afterIndex,
+      runId: run.id, startIndex: run.startIndex, length: run.length, beforeIndex: run.endIndex, afterIndex,
       center: { x: after.x, y: after.y },
       tangent: { x: (after.x - before.x) / length, y: (after.y - before.y) / length },
       height, grade,
