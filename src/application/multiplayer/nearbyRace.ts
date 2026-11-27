@@ -4,7 +4,7 @@ import { NearbyTrackShare } from './nearbyTrackShare'
 import { NearbyLobby } from './nearbyLobby'
 import { NearbyRosterDelivery } from './nearbyRosterDelivery'
 import type { GhostPose } from '@/application/race/ghostReplay'
-import { CAR_IDS, normalizeRouteKind, type CarId, type LightingMode, type Track } from '@/domain/model'
+import { CAR_IDS, normalizeRouteKind, type CarId, type CreatorGhostChallenge, type LightingMode, type Track } from '@/domain/model'
 import type { RaceState, RaceVehicle } from '@/domain/race/raceState'
 import { raceProgress } from '@/domain/race/ranking'
 import { decodeProgress, Packet, RemoteGhost } from './raceWire'
@@ -154,7 +154,7 @@ export class NearbyRace {
     private readonly transport: NearbyTransport,
     private readonly validateTrack: (track: Track) => boolean,
     private readonly now = () => performance.now(),
-    serializeSharedTrack: (track: Track) => Promise<string> = async () => {
+    serializeSharedTrack: (track: Track, challenge?: CreatorGhostChallenge) => Promise<string> = async () => {
       throw new Error('Track signing is unavailable on this device.')
     },
   ) {
@@ -267,7 +267,9 @@ export class NearbyRace {
     return true
   }
 
-  hostShare(track: Track): void {
+  hostShare(track: Track, challenge?: CreatorGhostChallenge): void {
+    if (this.phase !== 'idle') return
+    this.share.setChallenge(challenge)
     this.openHost({ track, laps: 1, lighting: track.lighting, car: this.localCar }, 'share')
   }
 
