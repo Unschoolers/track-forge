@@ -163,3 +163,29 @@
 }
 .editor-menu-select:focus-visible { outline: 2px solid var(--menu-ink); outline-offset: 2px; }
 
+
+/* Compact, non-modal scenery inspector: keep the glass background transparent
+   to canvas gestures, but reserve native input hit areas for the controls. */
+.editor-screen .scenery-control {
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  translate: none;
+  box-sizing: border-box;
+  width: min(22rem, calc(100% - 2rem));
+  min-width: 0;
+  gap: .2rem;
+  padding: .5rem .7rem;
+  pointer-events: none;
+}
+.editor-screen .scenery-control .point-tension-label {
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: .5rem;
+}
+.editor-screen .scenery-control input {
+  min-width: 0;
+  pointer-events: auto;
+}
+.editor-screen .scenery-control .point-insert {
+  pointer-events: auto;
+}

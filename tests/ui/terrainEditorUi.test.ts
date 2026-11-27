@@ -56,7 +56,7 @@ function setup(snapshot = terrainSnapshot()) {
 }
 
 describe('scenery transformation controls', () => {
-  it('dispatches bounded size steps, rotation and reset for the selected tree', () => {
+  it('dispatches season, bounded size, rotation and reset for the selected tree', () => {
     const base = terrainSnapshot()
     const target = { type: 'tree' as const, index: 0 }
     const { root, port, host } = setup({
@@ -64,7 +64,24 @@ describe('scenery transformation controls', () => {
       editor: createEditorState([], [{ x: 0, y: 0, rotation: 20, scale: 1.2 }]),
       editorUi: { ...base.editorUi, tool: 'tree', selectedScenery: target },
     })
-    root.querySelector<HTMLButtonElement>('[data-action="scenery-scale-up"]')?.click()
+    const season = root.querySelector<HTMLInputElement>('[data-action="tree-season"]')
+    const size = root.querySelector<HTMLInputElement>('[data-action="scenery-scale"]')
+    if (!season || !size) throw new Error('Missing scenery sliders')
+    expect([season.type, season.min, season.max, season.step, season.value]).toEqual(['range', '0', '3', '1', '1'])
+    expect([size.type, size.min, size.max, size.step, size.value]).toEqual(['range', '50', '150', '5', '120'])
+    vi.mocked(port.dispatch).mockClear()
+    season.value = '3'
+    season.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(season.getAttribute('aria-valuetext')).toBe('Winter')
+    expect(port.dispatch).not.toHaveBeenCalled()
+    season.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'set-tree-season', index: 0, season: 'winter' } })
+    vi.mocked(port.dispatch).mockClear()
+    size.value = '125'
+    size.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(root.textContent).toContain('Size: 125%')
+    expect(port.dispatch).not.toHaveBeenCalled()
+    size.dispatchEvent(new Event('change', { bubbles: true }))
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 20, scale: 1.25 } } })
     const slider = root.querySelector<HTMLInputElement>('[data-action="scenery-rotation"]')
     expect(slider).not.toBeNull()
