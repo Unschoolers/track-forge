@@ -8,66 +8,39 @@
   backdrop-filter: none;
 }
 #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)) {
-  background-color: rgb(15 28 41 / 20%);
-  background-image:
-    radial-gradient(ellipse at 18% -12%, #f1faff80, transparent 38%),
-    radial-gradient(ellipse at 88% 115%, #b6d8f24d, transparent 32%),
-    linear-gradient(175deg, #ffffff12, transparent 26%, transparent 74%, #07101b24);
-  border-color: #c6e3fa80;
-  border-radius: 18px;
+  background: var(--menu-static-action-fill);
+  border-color: var(--menu-static-action-border);
+  border-radius: var(--menu-control-rounding);
   clip-path: none;
-  box-shadow: inset 0 1px 1px #ffffffcc, inset 1px 0 2px #d3edff55,
-    inset 0 -2px 3px #070d18b0, inset -1px -1px 1px #b7d4ef60, 0 4px 10px #0005;
+  box-shadow: var(--menu-static-action-rim);
 }
 #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)):is(.modal-close, .options-release-notes-button) { border-radius: 50%; }
 #app [data-menu-material='static'] :is(.tf-menu-action--primary, .button-primary):not(:where(.track-card *, .cup-track-row *)) {
-  background-color: rgb(255 146 92 / 74%);
-  background-image: radial-gradient(ellipse at 20% 0%, #fff5d7b3, transparent 45%),
-    radial-gradient(ellipse at 90% 100%, #ffe4c94d, transparent 40%),
-    linear-gradient(175deg, #ffffff20, transparent 35%, transparent 80%, #b743171f);
-  border-color: #ffe0c58f;
+  background: var(--menu-static-primary-fill);
+  border-color: var(--menu-static-primary-border);
   color: #20110a;
-  box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #8c32175c, 0 4px 12px #0005;
+  box-shadow: var(--menu-static-primary-rim);
 }
 #app [data-menu-material='static'] .button-danger { background: #302028; border-color: #98606a; color: #ffadb3; }
 @supports (backdrop-filter: blur(2px)) {
-  #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)) { backdrop-filter: blur(2px); }
+  #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)) { backdrop-filter: var(--menu-static-action-filter); }
 }
 /* Settings choices share a light painted rim; only race setup has optical
    choices because it already owns independent action lenses. */
 #app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)) {
-  background: linear-gradient(165deg, #e9f6ff28, transparent 30%, transparent 75%, #b6d8f21a), rgb(15 28 41 / 20%);
+  background: var(--menu-static-choice-fill);
   border-color: #a9c8de55;
-  box-shadow: inset 0 1px 1px #ffffff55, inset 0 -1px 1px #b7d4ef36;
+  box-shadow: var(--menu-static-choice-rim);
 }
 #app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)).active,
 #app .options-modal .options-tab-list .setup-choice.active {
-  background: radial-gradient(ellipse at 15% 0%, #ffffff70, transparent 48%), rgb(255 146 92 / 74%);
+  background: var(--menu-static-selection-fill);
   color: #20130f;
   border-color: #ffd0ba66;
-  box-shadow: inset 0 1px 1px #fff9, inset 0 -2px 2px #0003, 0 2px 7px #0003;
+  box-shadow: var(--menu-static-selection-rim);
 }
-#app .race-setup-modal[data-menu-material] .setup-choice.active { background-color: rgb(227 237 247 / 72%); color: #15202b; }
-#app .options-modal .options-tab-list { background: rgb(38 50 62 / 25%); }
-
-#app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)):where([data-graphics-quality='low'] *) { background: #202a36; border-color: #627382; box-shadow: none; backdrop-filter: none; }
-#app [data-menu-material='static'] :is(.tf-menu-action--primary, .button-primary):not(:where(.track-card *, .cup-track-row *)):where([data-graphics-quality='low'] *) { background: #ff925c; }
-#app [data-menu-material='static'] .button-danger:where([data-graphics-quality='low'] *) { background: #302028; border-color: #98606a; }
-#app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)):where([data-graphics-quality='low'] *) { background: #22313e; box-shadow: none; }
-#app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)).active:where([data-graphics-quality='low'] *),
-#app .options-modal .options-tab-list .setup-choice.active:where([data-graphics-quality='low'] *) { background: #ff925c; box-shadow: none; }
-#app .race-setup-modal[data-menu-material] .setup-choice.active:where([data-graphics-quality='low'] *) { background: #e3edf7; }
-#app [data-graphics-quality='low'] .options-modal .options-tab-list { background: #26323e; }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)) { background: #202a36; border-color: #c1cad4; box-shadow: none; backdrop-filter: none; }
-  #app [data-menu-material='static'] :is(.tf-menu-action--primary, .button-primary):not(:where(.track-card *, .cup-track-row *)) { background: #ff925c; }
-  #app [data-menu-material='static'] .button-danger { background: #302028; border-color: #98606a; }
-  #app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)) { background: #22313e; box-shadow: none; }
-  #app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)).active,
-  #app .options-modal .options-tab-list .setup-choice.active { background: #ff925c; box-shadow: none; }
-  #app .race-setup-modal[data-menu-material] .setup-choice.active { background: #e3edf7; }
-  #app .options-modal .options-tab-list { background: #26323e; }
-}
+#app .race-setup-modal[data-menu-material] .setup-choice.active { background-color: var(--menu-static-race-selection); color: #15202b; }
+#app .options-modal .options-tab-list { background: var(--menu-static-tabs-fill); }
 
 /* One shared optical layer, with native labels and hit areas above it.
    The selector specificity deliberately matches the paint-only fallback rules. */
@@ -78,7 +51,7 @@
   backdrop-filter: none;
   border-color: #c6e3fa40;
   box-shadow: none;
-  border-radius: 18px;
+  border-radius: var(--menu-control-rounding);
   --lg-tint: rgb(15 28 41 / 20%);
   --lg-shadow-2: 0 4px 10px #0005;
   text-shadow: 0 1px 3px #000b;
@@ -130,3 +103,27 @@
   text-shadow: none;
 }
 #app .track-library-modal .track-library-toolbar[data-liquid-glass] .track-library-filter-button.active { text-shadow: none; }
+
+/* Static menu typography and panel surfaces. */
+#app [data-menu-material='static'] :is(.button, .modal-close):not(:where(.track-card *, .cup-track-row *)) {
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-align: center;
+}
+#app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)) {
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+#app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card {
+  border-color: var(--menu-static-card-border);
+  border-radius: 24px;
+  background: var(--menu-static-card-fill);
+  box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
+}
+#app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section {
+  border: 1px solid #dbeafe12;
+  border-radius: 18px;
+  background: var(--menu-static-section-fill);
+}
