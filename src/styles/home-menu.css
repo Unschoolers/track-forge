@@ -23,7 +23,7 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, #080b10 0%, #080b10d9 20%, #080b1066 55%, transparent 85%),
-    linear-gradient(0deg, #080b10e8, transparent 42%, #080b1030);
+    linear-gradient(0deg, #080b1080, transparent 42%, #080b1030);
   content: '';
 }
 .home-screen .tf-menu-header { align-self: start; max-width: 36rem; }
@@ -126,7 +126,7 @@
 }
 @media (max-width: 600px) {
   .home-artwork { background-image: url('../assets/title/city-harbor-portrait.webp'); background-position: center top; }
-  .home-artwork::after { background: linear-gradient(0deg, #080b10 0%, #080b10e0 23%, #080b1033 48%, #080b1044 68%, #080b10b0 100%); }
+  .home-artwork::after { background: linear-gradient(0deg, #080b1099 0%, #080b1066 23%, #080b1022 48%, #080b1044 68%, #080b10b0 100%); }
   .home-title { font-size: clamp(2.15rem, 9vw, 3.4rem); }
   .home-screen .tf-menu-actions { justify-self: center; }
 }

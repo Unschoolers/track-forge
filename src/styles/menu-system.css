@@ -121,11 +121,11 @@
 }
 #app :is(.home-screen:has(.home-navigation) .tf-menu-action,
   .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close) {
-  background-color: rgb(27 43 58 / 58%);
+  background-color: rgb(15 28 41 / 20%);
   background-image:
-    radial-gradient(ellipse at 18% 0%, #f1faff80, transparent 46%),
-    radial-gradient(ellipse at 88% 105%, #b6d8f23b, transparent 42%),
-    linear-gradient(175deg, #ffffff18, transparent 42%, #07101b30 65%, #ffffff13);
+    radial-gradient(ellipse at 18% -12%, #f1faff80, transparent 38%),
+    radial-gradient(ellipse at 88% 115%, #b6d8f24d, transparent 32%),
+    linear-gradient(175deg, #ffffff12, transparent 26%, transparent 74%, #07101b24);
   border-color: #c6e3fa80;
   box-shadow: inset 0 1px 1px #ffffffcc, inset 1px 0 2px #d3edff55,
     inset 0 -2px 3px #070d18b0, inset -1px -1px 1px #b7d4ef60,
@@ -133,18 +133,18 @@
 }
 #app :is(.home-screen:has(.home-navigation) .tf-menu-action--primary,
   .race-setup-modal .modal-footer > .button-primary) {
-  background-color: rgb(255 146 92 / 91%);
+  background-color: rgb(255 146 92 / 74%);
   background-image: radial-gradient(ellipse at 20% 0%, #fff5d7b3, transparent 45%),
     radial-gradient(ellipse at 90% 100%, #ffe4c94d, transparent 40%),
-    linear-gradient(175deg, #ffffff25, transparent 46%, #b7431729 80%);
+    linear-gradient(175deg, #ffffff20, transparent 35%, transparent 80%, #b743171f);
   border-color: #ffe0c58f;
   box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #8c32175c, 0 4px 12px #0005;
 }
 /* A browser supporting blur but not URL filters still gets a glass surface.
    The runtime's [data-edge-refraction] rule wins over this low-specificity fallback. */
-@supports (backdrop-filter: blur(5px)) {
+@supports (backdrop-filter: blur(2px)) {
   #app :where(.home-screen:has(.home-navigation) .tf-menu-action,
-    .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close) { backdrop-filter: blur(5px); }
+    .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close) { backdrop-filter: blur(2px); }
 }
 /* Selected controls in grouped settings catch the light without another
    backdrop filter; cars, statistics and the live flyover remain content. */
@@ -154,9 +154,44 @@
     linear-gradient(170deg, #ffffff1a, transparent 55%, #11192315);
   box-shadow: inset 0 1px 1px #fff9, inset 0 -2px 2px #0003, 0 2px 7px #0003;
 }
-/* Keep the selected-state contrast even when gradients are disabled. */
-#app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active) { background-color: #ff925c; }
-#app .race-setup-modal .setup-choice.active { background-color: #e3edf7; }
+/* Avoid stacking nearly opaque tints behind translucent buttons. The artwork
+   is static; leave the center of each control clear and put light on its rim. */
+#app .options-modal .modal-card { background: rgb(16 24 33 / 44%); }
+#app .options-modal .setup-section { background: rgb(24 35 45 / 15%); }
+#app .options-modal .options-tab-list { background: rgb(38 50 62 / 25%); }
+#app :is(.options-modal .options-tab-panel .setup-choice:not(.active),
+  .options-modal .toggle-button:not(.active), .race-setup-modal .setup-choice:not(.active)) {
+  background: linear-gradient(165deg, #e9f6ff28, transparent 30%, transparent 75%, #b6d8f21a), rgb(15 28 41 / 20%);
+  border-color: #a9c8de55;
+  box-shadow: inset 0 1px 1px #ffffff55, inset 0 -1px 1px #b7d4ef36;
+}
+#app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active) { background-color: rgb(255 146 92 / 74%); }
+#app .race-setup-modal .setup-choice.active { background-color: rgb(227 237 247 / 72%); }
+#app .options-modal .modal-footer .button-primary {
+  background-color: rgb(255 146 92 / 74%);
+  background-image: radial-gradient(ellipse at 20% -12%, #fff5d780, transparent 38%),
+    linear-gradient(175deg, #ffffff20, transparent 35%, transparent 80%, #b743171f);
+  box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #8c32175c, 0 4px 12px #0005;
+}
+/* All opaque fallbacks retain their original foreground contrast. */
+#app [data-graphics-quality='low'] .options-modal .modal-card { background: #101821; }
+#app [data-graphics-quality='low'] .options-modal .setup-section { background: #18232d; }
+#app [data-graphics-quality='low'] .options-modal .options-tab-list { background: #26323e; }
+#app [data-graphics-quality='low'] :is(.options-modal .options-tab-panel .setup-choice:not(.active),
+  .options-modal .toggle-button:not(.active), .race-setup-modal .setup-choice:not(.active)) { background: #22313e; box-shadow: none; }
+#app [data-graphics-quality='low'] :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active,
+  .options-modal .modal-footer .button-primary) { background: #ff925c; box-shadow: none; }
+#app [data-graphics-quality='low'] .race-setup-modal .setup-choice.active { background: #e3edf7; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  #app .options-modal .modal-card { background: #101821; }
+  #app .options-modal .setup-section { background: #18232d; }
+  #app .options-modal .options-tab-list { background: #26323e; }
+  #app :is(.options-modal .options-tab-panel .setup-choice:not(.active),
+    .options-modal .toggle-button:not(.active), .race-setup-modal .setup-choice:not(.active)) { background: #22313e; box-shadow: none; }
+  #app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active,
+    .options-modal .modal-footer .button-primary) { background: #ff925c; box-shadow: none; }
+  #app .race-setup-modal .setup-choice.active { background: #e3edf7; }
+}
 #app [data-graphics-quality='low'] :is(.home-screen:has(.home-navigation) .tf-menu-action,
   .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close) {
   background: #202a36; border-color: #627382; box-shadow: none; backdrop-filter: none;
