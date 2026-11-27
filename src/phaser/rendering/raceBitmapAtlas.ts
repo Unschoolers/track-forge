@@ -62,7 +62,7 @@ interface AtlasEntry {
 interface AtlasFrame {
   readonly tile: GroundTile
   readonly texture: string
-  readonly frame: number
+  readonly frame: string
 }
 
 /** Duplicate edge texels so linear sampling cannot bleed adjacent atlas frames. */
@@ -93,7 +93,7 @@ export function registerRaceAtlasFrames(
   })
   if (!sheet) throw new Error('Could not register race atlas sprite sheet')
   for (let frame = 0; frame < count; frame++) {
-    if (!sheet.has(frame)) throw new Error(`Missing race atlas frame ${frame}`)
+    if (!sheet.has(String(frame))) throw new Error(`Missing race atlas frame ${frame}`)
   }
 }
 
@@ -179,7 +179,7 @@ export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeomet
         const x = (i % page.columns) * plan.stride + GUTTER
         const y = Math.floor(i / page.columns) * plan.stride + GUTTER
         drawTile(context, entry.source.bake(entry.tile, plan.resolution), x, y, plan.resolution)
-        return { entry, frame: i }
+        return { entry, frame: String(i) }
       })
       const key = `${prefix}:${pageIndex}`
       const texture = scene.textures.addCanvas(key, canvas)
