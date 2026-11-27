@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
-import { planRaceAtlas, MAX_RACE_TILE_RESOLUTION, RACE_ATLAS_BUDGET, RACE_ATLAS_DEPTHS } from '@/phaser/rendering/raceBitmapAtlas'
+import { groupRaceAtlasFrames, planRaceAtlas, MAX_RACE_TILE_RESOLUTION, RACE_ATLAS_BUDGET, RACE_ATLAS_DEPTHS } from '@/phaser/rendering/raceBitmapAtlas'
 
 describe('race atlas memory budget', () => {
   it('keeps baked approach shadows, deck and walls on the correct sides of vehicles', () => {
@@ -36,4 +36,20 @@ describe('race atlas memory budget', () => {
   it('does not allocate any pages for empty layers', () => {
     expect(planRaceAtlas(0)).toMatchObject({ pages: [], bytes: 0 })
   })
+})
+
+
+it('groups visible tiles by texture page without losing tiles or disturbing order within a page', () => {
+  const frames = [
+    { texture: 'page-b', frame: '1' },
+    { texture: 'page-a', frame: '2' },
+    { texture: 'page-b', frame: '3' },
+    { texture: 'page-a', frame: '0' },
+  ]
+  expect(groupRaceAtlasFrames(frames)).toEqual([
+    { texture: 'page-a', frame: '2' },
+    { texture: 'page-a', frame: '0' },
+    { texture: 'page-b', frame: '1' },
+    { texture: 'page-b', frame: '3' },
+  ])
 })

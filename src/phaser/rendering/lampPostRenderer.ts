@@ -32,6 +32,12 @@ export interface LampLight {
   readonly bridge: boolean
 }
 
+// Single source for both the vector lights and the pre-baked race glow atlas.
+export const LAMP_LIGHT_PROFILE = {
+  road: { radius: 46, intensity: 0.12 },
+  bridge: { radius: 54, intensity: 0.14 },
+} as const
+
 const lampCaches: Record<TrackShadowMode, WeakMap<TrackGeometry, readonly LampPost[]>> = {
   terrain: new WeakMap(),
   'local-ground': new WeakMap(),
@@ -151,8 +157,7 @@ export function buildLampLights(
   const lights = posts.map((post) => ({
     center: post.roadAnchor,
     fixture: post.position,
-    radius: post.bridge ? 54 : 46,
-    intensity: post.bridge ? 0.14 : 0.12,
+    ...(post.bridge ? LAMP_LIGHT_PROFILE.bridge : LAMP_LIGHT_PROFILE.road),
     bridge: post.bridge,
   }))
   lightCache.set(posts, lights)

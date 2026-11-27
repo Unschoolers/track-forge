@@ -99,6 +99,12 @@ export function registerRaceAtlasFrames(
 
 export const RACE_ATLAS_DEPTHS = [ROAD_BITMAP_DEPTH, WORLD_RENDER_DEPTH.terrain + 0.2, BRIDGE_APPROACH_BITMAP_DEPTH, BRIDGE_DECK_BITMAP_DEPTH, WORLD_RENDER_DEPTH.structureWall] as const
 
+/** Same-depth atlas tiles occupy disjoint world cells. Group their texture
+ * pages without crossing layer/depth boundaries or changing tile coverage. */
+export function groupRaceAtlasFrames<T extends { readonly texture: string }>(frames: T[]): T[] {
+  return frames.sort((a, b) => a.texture < b.texture ? -1 : a.texture > b.texture ? 1 : 0)
+}
+
 class AtlasLayer {
   readonly frames = new Map<string, AtlasFrame>()
   private readonly images: Phaser.GameObjects.Image[] = []
@@ -117,7 +123,7 @@ class AtlasLayer {
       return frame ? [frame] : []
     }) : Array.from(this.frames.values()).filter(({ tile }) =>
       tile.x >= grid[0]! && tile.x <= grid[2]! && tile.y >= grid[1]! && tile.y <= grid[3]!)
-    frames.forEach(({ tile, texture, frame }, i) => {
+    groupRaceAtlasFrames(frames).forEach(({ tile, texture, frame }, i) => {
       let image = this.images[i]
       if (!image) {
         image = this.scene.add.image(0, 0, texture, frame).setOrigin(0).setDepth(this.depth)
