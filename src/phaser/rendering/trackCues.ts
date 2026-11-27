@@ -8,7 +8,7 @@ export interface RoadTransitionCue {
   readonly center: Vector2
   readonly tangent: Vector2
   readonly span: { readonly min: number; readonly max: number }
-  readonly kind: 'surface' | 'ramp-entry' | 'ramp-exit'
+  readonly kind: 'surface' | 'ramp-entry' | 'ramp-exit' | 'jump-lip'
   readonly color: number
   readonly markCount: 1 | 2 | 3
   readonly night: boolean
@@ -67,8 +67,9 @@ export function buildRoadTransitionCues(
     const surfaceChange = before.surface !== after.surface
     const rampStart = before.structure !== 'overpass' && after.structure === 'overpass'
     const rampEnd = before.structure === 'overpass' && after.structure !== 'overpass'
-    if (!surfaceChange && !rampStart && !rampEnd) continue
-    const kind = rampStart ? 'ramp-entry' : rampEnd ? 'ramp-exit' : 'surface'
+    const jumpLip = before.structure === 'jump' && after.structure === 'surface'
+    if (!surfaceChange && !rampStart && !rampEnd && !jumpLip) continue
+    const kind = jumpLip ? 'jump-lip' : rampStart ? 'ramp-entry' : rampEnd ? 'ramp-exit' : 'surface'
     const gate = roadGateGeometry(path, index + 1)
     if (!gate) continue
     const span = roadGateSpan(path, index + 1, ROAD_GEOMETRY.surfaceWidth / 2 - 3)
@@ -92,7 +93,7 @@ export function buildRoadTransitionCues(
         ? after.surface === 'ice' ? (night ? 0x8eeaff : 0x58c9ea)
           : after.surface === 'dirt' ? (night ? 0xffdc88 : 0xd39a4a)
             : (night ? 0xe4f1ff : 0xffffff)
-        : night ? 0xffd36b : 0xf0a82d,
+        : jumpLip ? 0xffcf55 : night ? 0xffd36b : 0xf0a82d,
       night,
     })
   }
@@ -125,7 +126,7 @@ export function paintRoadTransitionCue(
   }
   // Ramp marks stay on the low ground approach, beyond opaque deck geometry.
   // Their arrow points toward the raised section from either end.
-  const towardRamp = kind === 'ramp-entry' ? 1 : -1
+  const towardRamp = kind === 'ramp-entry' || kind === 'jump-lip' ? 1 : -1
   graphics.lineStyle(3, color, night ? 0.98 : 0.92)
   for (const along of [-5, 5]) {
     const left = pointAt(span.min, along)
