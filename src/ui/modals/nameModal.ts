@@ -17,6 +17,7 @@ export function createNameModal(
     renaming ? 'Rename track' : state.overlay.purpose === 'save-as' ? 'Save track as' : 'Name your new track',
     'Track names are required and must be unique.',
     actions.close,
+    'track-name-modal',
   )
   const form = element('form', 'name-form')
   const label = element('label', 'name-label', 'TRACK NAME')

@@ -11,6 +11,7 @@ export function createEditorExitModal(actions: {
     'Unsaved track changes',
     'You have changes that are not saved. What would you like to do?',
     actions.cancel,
+    'editor-exit-modal',
   )
   if (failure) {
     const error = element('p', 'editor-exit-error', failure)
