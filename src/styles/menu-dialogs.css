@@ -71,8 +71,9 @@
    The shared modal grid keeps the header and footer fixed while its body scrolls. */
 .options-modal .modal-card {
   width: min(42rem, 100%);
-  height: 100%;
   min-height: 0;
+  height: auto;
+  max-height: 100%;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   border-radius: 1.5rem;
   background: #101821b8;
@@ -86,28 +87,34 @@
     box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
   }
 }
-/* Every category remains visible; the content below the tabs is the only scroller. */
+/* All destinations stay visible together in a single navigation dock. */
 .options-modal .options-tab-list {
   display: grid;
   grid-template-columns: repeat(var(--options-tab-count), minmax(0, 1fr));
-  gap: .2rem;
+  gap: .25rem;
   min-width: 0;
-  margin: .2rem 1.4rem .5rem;
-  padding: .3rem;
+  margin: .2rem 1.4rem .35rem;
+  padding: .35rem;
   border: 1px solid #ffffff26;
-  border-radius: 1.25rem;
+  border-radius: 1.5rem;
   background: #26323ed6;
+  box-shadow: inset 0 1px #ffffff0a, 0 .4rem 1.4rem #0003;
 }
 .options-modal .options-tab-list .setup-choice {
-  display: flex;
+  display: grid;
+  align-content: center;
   align-items: center;
   justify-content: center;
-  gap: .35rem;
+  justify-items: center;
+  gap: .2rem;
   min-width: 0;
   min-height: 48px;
-  padding: .5rem .15rem;
+  padding: .35rem .15rem;
+  border-color: transparent;
+  border-radius: 1.15rem;
+  background: transparent;
   white-space: nowrap;
-  font: 600 .75rem/1.2 system-ui, sans-serif;
+  font: 650 .7rem/1.1 system-ui, sans-serif;
   letter-spacing: .01em;
   touch-action: manipulation;
 }
@@ -132,6 +139,14 @@
 }
 /* No placeholder frame when there is no download to show. */
 .options-modal .options-download-panel:empty { display: none; }
+.options-modal :is(.options-update-actions, .options-download-panel) .button {
+  border-radius: 999px;
+  clip-path: none;
+}
+.options-modal .options-update-actions .button {
+  min-height: 48px;
+  padding-inline: 1.1rem;
+}
 .options-modal .options-installed-build {
   color: var(--menu-ink);
   font-family: var(--menu-mono);
@@ -139,24 +154,24 @@
 }
 .options-modal .options-race-settings { margin-bottom: 0; }
 .options-modal .setup-section {
-  gap: .65rem;
-  border: 0;
-  border-radius: 1rem;
-  background: #1a2530;
+  gap: .55rem;
+  border: 1px solid #dbeafe12;
+  border-radius: 1.1rem;
+  background: #18232db8;
 }
-.options-modal .setup-choice, .options-modal .toggle-button {
-  border: 1px solid #465767;
-  border-radius: .8rem;
-  background: #1b2935;
+.options-modal .options-tab-panel .setup-choice, .options-modal .toggle-button {
+  border: 1px solid #7b91a51e;
+  border-radius: 999px;
+  background: #22313eb8;
   color: var(--menu-ink);
-  font: 800 .7rem/1.2 var(--menu-mono);
-  letter-spacing: .035em;
+  font: 700 .74rem/1.2 system-ui, sans-serif;
+  letter-spacing: .015em;
 }
 .options-modal :is(.setup-choice, .toggle-button).active {
-  border-color: #b6c5d4;
-  background: #425363;
-  color: #fff;
-  box-shadow: none;
+  border-color: #ffd0ba66;
+  background: linear-gradient(135deg, #ff9b70, #ff7648);
+  color: #20130f;
+  box-shadow: 0 3px 12px #ff784633, inset 0 1px #fff6;
 }
 .options-modal .modal-close { border-radius: 50%; }
 .options-modal .modal-footer .button { border-radius: 999px; clip-path: none; }
@@ -169,20 +184,19 @@
   .modal-overlay .modal-body { padding: 1rem; }
   .modal-overlay .modal-footer { padding: .8rem 1rem 1rem; }
   .options-modal .choice-row { flex-wrap: wrap; }
-  .options-modal .options-tab-list { gap: .2rem; margin-inline: .65rem; padding: .3rem; }
+  .options-modal .modal-card { width: 100%; }
+  .options-modal .options-tab-list { gap: .15rem; margin-inline: .7rem; padding: .25rem; }
   .options-modal .options-tab-list .setup-choice {
-    flex-direction: column;
-    gap: .2rem;
     min-width: 0;
-    min-height: 54px;
-    padding: .4rem .05rem;
-    font-size: .56rem;
+    min-height: 52px;
+    padding: .35rem .05rem;
+    font-size: .62rem;
     letter-spacing: 0;
   }
-  .options-modal .setup-choice { min-width: 5rem; }
+  .options-modal .options-tab-panel .setup-choice { min-width: 5rem; }
 }
 @media (max-width: 320px) {
-  /* Extremely narrow screens prefer two visible rows to clipping a tab. */
+  /* Two short rows keep every destination visible on the narrowest devices. */
   .options-modal .options-tab-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
@@ -265,6 +279,12 @@
   .options-modal { background: #05080d; }
   .options-modal .modal-card { background: #101821; backdrop-filter: none; }
   .options-modal.options-modal .options-tab-list { background: #26323e; backdrop-filter: none; }
+  .options-modal .setup-section { background: #18232d; border-color: #34414e; }
+  .options-modal .options-tab-panel .setup-choice:not(.active),
+  .options-modal .toggle-button:not(.active) { background: #22313e; }
 }
 [data-graphics-quality='low'] .options-modal .modal-card { background: #101821; backdrop-filter: none; }
 [data-graphics-quality='low'] .options-modal .options-tab-list { background: #26323e; backdrop-filter: none; }
+[data-graphics-quality='low'] .options-modal .setup-section { background: #18232d; }
+[data-graphics-quality='low'] .options-modal .options-tab-panel .setup-choice:not(.active),
+[data-graphics-quality='low'] .options-modal .toggle-button:not(.active) { background: #22313e; }
