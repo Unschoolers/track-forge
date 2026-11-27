@@ -334,6 +334,54 @@ test('short landscape keeps the flyover legible and race actions reachable', asy
   await expect(page.locator('[data-race-countdown]')).toBeVisible()
 })
 
+test('nearby entry uses the shared glass actions in its body and footer', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  await page.evaluate(async () => {
+    const { createNearbyRaceModal } = await import('/src/ui/modals/nearbyRaceModal.ts')
+    const { attachMenuGlass } = await import('/src/ui/menu/menuGlass.ts')
+    const noop = () => undefined
+    const root = document.querySelector('#ui-root')
+    const nearby = { snapshot: () => ({ phase: 'idle' }) }
+    let mode = 'android'
+    const connections = {
+      choices: [
+        { mode: 'android', label: 'ANDROID NEARBY', description: 'Bluetooth / Wi-Fi Direct' },
+        { mode: 'lan', label: 'LOCAL WI-FI', description: 'Same Wi-Fi' },
+      ],
+      current: () => mode,
+      choose: next => { mode = next; return true },
+      hostAddress: () => null,
+    }
+    const modal = createNearbyRaceModal(nearby, {
+      close: noop, chooseTrack: noop, configureCup: noop, scan: noop, scanTracks: noop,
+      saveTrack: noop, declineTrack: noop, connectByIp: noop, downloadDiagnostics: async () => true,
+    }, connections)
+    root.replaceChildren(modal)
+    attachMenuGlass(root, modal)
+  })
+  const dialog = page.getByRole('dialog', { name: 'Nearby Race' })
+  for (const action of ['nearby-choose-track', 'nearby-host-cup', 'nearby-scan', 'nearby-receive-track', 'nearby-back']) {
+    const control = dialog.locator(`[data-action="${action}"]`)
+    await expect(control).toHaveAttribute('data-liquid-glass', '')
+    await expect(control).toHaveCSS('border-top-left-radius', '18px')
+    await expect(control).toHaveCSS('clip-path', 'none')
+    await expect(control.locator('lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    expect((await control.boundingBox()).height).toBeGreaterThanOrEqual(44)
+  }
+  await expect(dialog).toHaveCSS('border-top-left-radius', '24px')
+  const android = dialog.locator('[data-action="nearby-mode-android"]')
+  const lan = dialog.locator('[data-action="nearby-mode-lan"]')
+  await expect(android).toHaveAttribute('aria-pressed', 'true')
+  await expect(android.locator('lg-panel')).toHaveCount(0)
+  await lan.click()
+  await expect(lan).toHaveAttribute('aria-pressed', 'true')
+  await expect(android).toHaveAttribute('aria-pressed', 'false')
+  await expect(dialog.locator('[data-action="nearby-download-diagnostics"] lg-panel')).toHaveCount(0)
+  await testInfo.attach('nearby-entry-glass', { body: await dialog.screenshot(), contentType: 'image/png' })
+})
+
 test('nearby lobby fits all four full car images inside their own cards on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/?qa')
