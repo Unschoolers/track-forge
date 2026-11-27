@@ -52,7 +52,7 @@ describe('Shared race preparation', () => {
     }
     expect(solo.querySelector('.race-preparation-picker')?.outerHTML).toEqual(multi.querySelector('.race-preparation-picker')?.outerHTML)
     expect(solo.querySelector('[data-action="setup-start"]')).not.toBeNull()
-    const footerButtons = [...solo.querySelectorAll('.modal-footer button')]
+    const footerButtons = [...solo.querySelectorAll<HTMLButtonElement>('.modal-footer button')]
     expect(footerButtons).toHaveLength(3)
     expect(footerButtons.map(button => button.textContent)).toEqual([
       'Back', 'Options', 'Start Race',
