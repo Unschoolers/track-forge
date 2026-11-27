@@ -51,12 +51,12 @@ describe('continuous geometry racing line', () => {
     const track = createStarterTrack(asTrackId('line'), 1)
     const path = buildRoadPath(track.points, track.terrain)
     const changed = { ...path, points: path.points.map((point, i) =>
-      i === 20 ? { ...point, structure: 'bridge' as const } : point) }
+      i === 20 ? { ...point, structure: 'overpass' as const } : point) }
     for (let i = 0; i < changed.points.length; i++) {
       const offset = racingLineOffset(changed, i)
-      expect(Math.hypot(offset.x, offset.y)).toBeLessThanOrEqual(ROAD_GEOMETRY.onRoadRadius * 0.55 + 1e-8)
+      expect(Math.hypot(offset?.x ?? 0, offset?.y ?? 0)).toBeLessThanOrEqual(ROAD_GEOMETRY.onRoadRadius * 0.55 + 1e-8)
       expect(racingLineOffset(changed, i)).toBe(offset)
     }
-    for (let i = 8; i <= 32; i++) expect(racingLineOffset(changed, i)).toEqual({ x: 0, y: 0 })
+    for (let i = 8; i <= 32; i++) expect(racingLineOffset(changed, i)).toBeUndefined()
   })
 })

@@ -9,7 +9,7 @@ interface LineNode {
   readonly limit: number
 }
 
-const cache = new WeakMap<RoadPath, readonly Vector2[]>()
+const cache = new WeakMap<RoadPath, readonly (Vector2 | undefined)[]>()
 const ZERO: Vector2 = { x: 0, y: 0 }
 
 /** Minimize squared second differences of a road-relative line at two
@@ -55,25 +55,29 @@ export function solveRacingLine(nodes: readonly LineNode[], closed: boolean): re
     for (let j = -3; j <= 3; j++) sum += offsets[at(i + j)] ?? 0
     return clamp(sum / 7, -node.limit, node.limit)
   })
-  const slopeLimit = 1.5
-  // Limit each point by the feasible interval of its neighbors, without
-  // allowing a safety-pinned zero to move. Two laps propagate across the seam.
-  for (const direction of [1, -1]) {
-    for (let j = 0; j < count * (closed ? 2 : 1); j++) {
-      const i = direction === 1 ? j % count : count - 1 - j % count
-      const previous = i - direction
-      if (!closed && (previous < 0 || previous >= count)) continue
-      const value = smoothed[i] ?? 0
-      const neighbor = smoothed[at(previous)] ?? 0
-      // Only shrink toward zero: never create an offset in a pinned corridor.
-      const magnitude = Math.min(Math.abs(value), Math.max(0, Math.sign(value) * neighbor + slopeLimit))
-      smoothed[i] = Math.sign(value) * magnitude
+  // Each sign gets half the lateral slope budget at a sign change.
+  const slopeLimit = 0.75
+  // Compute the lower Lipschitz envelope of each sign independently. This
+  // only shrinks offsets and respects pinned points; it is order-independent.
+  const envelope = (sign: number) => {
+    const values = smoothed.map(value => Math.max(0, sign * value))
+    for (const direction of [1, -1]) {
+      for (let j = 0; j < count * (closed ? 2 : 1); j++) {
+        const i = direction === 1 ? j % count : count - 1 - j % count
+        const previous = i - direction
+        if (!closed && (previous < 0 || previous >= count)) continue
+        values[i] = Math.min(values[i] ?? 0, (values[at(previous)] ?? 0) + slopeLimit)
+      }
     }
+    return values
   }
-  return smoothed
+  const positive = envelope(1)
+  const negative = envelope(-1)
+  return smoothed.map((_, i) => (positive[i] ?? 0) - (negative[i] ?? 0))
+
 }
 
-function compileLine(path: RoadPath): readonly Vector2[] {
+function compileLine(path: RoadPath): readonly (Vector2 | undefined)[] {
   const points = path.points
   const count = points.length
   const at = (i: number) => points[path.closed ? ((i % count) + count) % count : clamp(i, 0, count - 1)]
@@ -99,17 +103,18 @@ function compileLine(path: RoadPath): readonly Vector2[] {
   const offsets = solveRacingLine(nodes, path.closed)
   return nodes.map((node, i) => {
     const offset = offsets[i] ?? 0
-    return { x: node.normal.x * offset, y: node.normal.y * offset }
+    if (node.limit === 0) return undefined
+    return offset === 0 ? ZERO : { x: node.normal.x * offset, y: node.normal.y * offset }
   })
 }
 
 /** World-space offset at the future pursuit point, never a physics change.
  * Geometry is immutable and weakly cached; no per-tick whole-path scan. */
-export function racingLineOffset(path: RoadPath, index: number): Vector2 {
+export function racingLineOffset(path: RoadPath, index: number): Vector2 | undefined {
   let line = cache.get(path)
   if (!line) {
     line = compileLine(path)
     cache.set(path, line)
   }
-  return line[index] ?? ZERO
+  return line[index]
 }
