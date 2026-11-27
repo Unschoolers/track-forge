@@ -248,3 +248,91 @@
   text-shadow: none;
 }
 #app .track-library-modal .track-library-toolbar[data-liquid-glass] .track-library-filter-button.active { text-shadow: none; }
+
+/* Options is the visual reference for the common menu material. Painted
+   controls are used for repeated content actions and live editor chrome,
+   where copying the canvas into an optical layer would be expensive. */
+:root {
+  --menu-control-font: Inter, ui-sans-serif, system-ui, sans-serif;
+  --menu-control-ink: #edf2f8;
+  --menu-control-accent: #ff925c;
+  --menu-control-border: #a9c8de66;
+  --menu-control-fill: linear-gradient(165deg, #e9f6ff26, transparent 35%, transparent 72%, #b6d8f21a), #202a36;
+  --menu-control-selected-fill: radial-gradient(ellipse at 15% 0%, #ffffff70, transparent 48%), #ff925c;
+  --menu-control-rim: inset 0 1px 1px #ffffff60, inset 0 -1px 1px #b7d4ef36, 0 2px 6px #0003;
+  --menu-control-panel: linear-gradient(145deg, #e6f3ff16, transparent 48%), #101923ed;
+  --menu-control-rounding: 18px;
+}
+[data-graphics-quality='low'] {
+  --menu-control-fill: #202a36;
+  --menu-control-selected-fill: #ff925c;
+  --menu-control-rim: none;
+  --menu-control-panel: #101923;
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --menu-control-fill: #202a36;
+    --menu-control-selected-fill: #ff925c;
+    --menu-control-rim: none;
+    --menu-control-panel: #101923;
+    --menu-control-border: #c1cad4;
+  }
+}
+#app :is(.editor-screen, .cup-modal) :is(.tool-button, .icon-button, .surface-button,
+  .editor-segmented-button, .point-choice, .point-insert, .crossing-choice,
+  .diagnostic-repair, .editor-toolbox-summary, .editor-view-summary, .track-mini-button) {
+  border: 1px solid var(--menu-control-border);
+  border-radius: var(--menu-control-rounding);
+  background: var(--menu-control-fill);
+  color: var(--menu-control-ink);
+  box-shadow: var(--menu-control-rim);
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+#app .cup-modal .track-mini-button { border-radius: 50%; }
+#app .editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button,
+  .point-choice, .crossing-choice):is(.active, .accent, [aria-pressed='true']) {
+  background: var(--menu-control-selected-fill);
+  border-color: #ffc4a5;
+  color: #20130f;
+}
+#app .editor-screen .icon-button.danger { color: #ffadb3; }
+#app .editor-screen :is(.editor-context-dock, .point-control, .crossing-control,
+  .start-control, .diagnostic-panel, .editor-toolbox-items, .editor-view-items, .status-pill) {
+  background: var(--menu-control-panel);
+  border: 1px solid var(--menu-control-border);
+  border-radius: var(--menu-control-rounding);
+  box-shadow: var(--menu-control-rim);
+}
+#app .editor-screen :is(.editor-toolbox-items, .editor-view-items, .editor-context-dock) {
+  padding: .4rem;
+}
+#app [data-menu-material='static'] :is(.button, .modal-close):not(:where(.track-card *, .cup-track-row *)) {
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-align: center;
+}
+#app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)) {
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+#app :is(.cup-modal, .nearby-static-modal)[data-menu-material] .modal-card {
+  border-color: #b4c8d54d;
+  border-radius: 24px;
+  background: rgb(16 24 33 / 44%);
+  box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
+}
+#app .nearby-static-modal[data-menu-material] .setup-section {
+  border: 1px solid #dbeafe12;
+  border-radius: 18px;
+  background: rgb(24 35 45 / 15%);
+}
+#app :is(.cup-modal, .nearby-static-modal)[data-menu-material] .modal-card:where([data-graphics-quality='low'] *) { background: #101821; }
+#app .nearby-static-modal[data-menu-material] .setup-section:where([data-graphics-quality='low'] *) { background: #18232d; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  #app :is(.cup-modal, .nearby-static-modal)[data-menu-material] .modal-card { background: #101821; border-color: #aab9c8; }
+  #app .nearby-static-modal[data-menu-material] .setup-section { background: #18232d; }
+}
