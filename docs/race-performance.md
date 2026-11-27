@@ -77,6 +77,28 @@ coordinates stay independent of the backing resolution. No extra physics work.
 Compare identical tracks and frame timings at each quality level on Android.
 Higher settings increase fill rate and framebuffer memory; Low is the fallback.
 
+## Startup and race atlas preparation
+
+The title screen waits for shared artwork, Phaser readiness and the
+last-played circuit's selected lighting atlas (the first official circuit
+on a fresh installation). The percentage is weighted by startup phase,
+then counts completed atlas tiles and registered pages; it is not an ETA.
+The title action is hidden until completion. Errors retain the retry path.
+
+The race atlas uses one resumable preparation slot per texture manager.
+Startup and race setup's flyover yield between tiles/pages; starting a race
+early finishes the remaining work synchronously, without repainting completed
+tiles. Registered pages survive scene shutdown for a same-geometry and
+lighting restart. Geometry identity, environment or lighting changes retire
+the old slot; its pages are removed after the last scene releases them.
+The existing 128 MiB per-atlas page budget and resolution policy are unchanged.
+Do not eagerly bake every saved circuit or both lighting variants.
+
+Measure cold title readiness, first race start and same-circuit restart
+separately on Android, using the same track and graphics settings. Startup
+preparation shifts work earlier; reuse avoids repeated baking. Device
+measurements are required to quantify the improvement.
+
 ## Visual frame pacing and high-refresh motion
 
 Race physics stays fixed at 60 Hz for deterministic handling, collision,
