@@ -17,8 +17,9 @@ export function ensureGroundTexture(
   environmentId: TrackEnvironmentId,
   variant: number,
   night: boolean,
+  lowQuality = false,
 ): string {
-  const base = getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
+  const base = lowQuality ? undefined : getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
   if (base) {
     const baseKey = baseTextureKey(environmentId, night)
     if (!textures.exists(baseKey)) textures.addCanvas(baseKey, base)
@@ -38,15 +39,15 @@ export class GroundTextureRenderer {
 
   constructor(private readonly scene: Phaser.Scene) {}
 
-  render(view: GroundViewport, night: boolean, environmentId: TrackEnvironmentId = 'grass'): void {
+  render(view: GroundViewport, night: boolean, environmentId: TrackEnvironmentId = 'grass', lowQuality = false): void {
     const tiles = visibleGroundTilesForViewport(view)
-    const base = getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
+    const base = lowQuality ? undefined : getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
     const first = tiles[0]
     const last = tiles.at(-1)
     const key = first && last ? `${environmentId}:${night}:${Boolean(base)}:${first.x},${first.y}:${last.x},${last.y}` : `${environmentId}:${night}:fallback`
     if (this.key === key) return
     tiles.forEach((tile, index) => {
-      const textureKey = ensureGroundTexture(this.scene.textures, environmentId, tile.variant, night)
+      const textureKey = ensureGroundTexture(this.scene.textures, environmentId, tile.variant, night, lowQuality)
       if (base) {
         const baseKey = baseTextureKey(environmentId, night)
         let ground = this.baseImages[index]

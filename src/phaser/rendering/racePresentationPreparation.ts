@@ -12,6 +12,7 @@ interface GroundPreparation {
   readonly textures: GroundTextureManager
   readonly width: number
   readonly height: number
+  readonly lowQuality?: boolean
 }
 
 function* prepareRacePresentation(
@@ -34,7 +35,7 @@ function* prepareRacePresentation(
     })
     const variants = new Set(tiles.map(({ variant }) => variant))
     for (const variant of variants) {
-      ensureGroundTexture(textures, environmentId, variant, night)
+      ensureGroundTexture(textures, environmentId, variant, night, ground.lowQuality)
       yield
     }
   }

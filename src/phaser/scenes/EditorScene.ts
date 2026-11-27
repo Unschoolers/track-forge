@@ -564,6 +564,7 @@ export class EditorScene extends Phaser.Scene {
       },
       this.currentSnapshot.currentTrack?.lighting === 'night',
       this.currentSnapshot.editor.environmentId,
+      this.currentSnapshot.preferences?.graphicsQuality === 'low',
     )
   }
 
