@@ -27,6 +27,21 @@ Run its focused contract test with:
 node --test qa/perf/track-profile.test.mjs
 ```
 
+To isolate editor diagnostics and chrome construction, use the Node/jsdom
+component profiler with the same track and iteration counts for both runs:
+
+```sh
+node qa/perf/editor-chrome-profile.mjs path/to/track.trackforge.json --iterations 100 --warmup 20 --no-cache
+node qa/perf/editor-chrome-profile.mjs path/to/track.trackforge.json --iterations 100 --warmup 20
+```
+
+It reports unchanged and changing editor inputs separately. The uncached
+diagnostics timing is reported independently from the full chrome timing;
+the latter uses the host's single-entry diagnostics cache unless `--no-cache`
+is set. These measurements exclude browser layout, rendering, input and device
+frame pacing; use the browser editor-drag profiler and Android measurements
+to assess player-visible performance.
+
 Record City Harbor in both lighting modes and use daytime for Rally and Sandy
 Beach. Use the same saved track files before and after a change.
 

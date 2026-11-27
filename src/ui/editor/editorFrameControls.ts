@@ -2,6 +2,7 @@ import type { AppSnapshot } from '@/application/appState'
 import type { EditorCommand } from '@/domain/editor/editorState'
 import type { EditorCameraAction } from '@/domain/editor/editorGeometry'
 import { analyzeTrack } from '@/domain/track/trackDiagnostics'
+import type { TrackDiagnostic } from '@/domain/track/trackDiagnostics'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { validateTrack } from '@/domain/track/trackValidation'
 import { isSharedTrack } from '@/domain/track/trackAccess'
@@ -17,6 +18,85 @@ export interface EditorFrameActions {
   readonly camera: (action: EditorCameraAction) => void
   readonly toggleGrid: () => void
   readonly edit: (command: EditorCommand) => void
+}
+
+export interface EditorDiagnosticsMemo {
+  get(
+    state: Pick<AppSnapshot, 'currentTrack' | 'editor'>,
+    geometry: TrackGeometry,
+  ): readonly TrackDiagnostic[]
+  clear(): void
+}
+
+/** Keeps the latest analysis for one editor chrome lifetime. */
+export function createEditorDiagnosticsMemo(): EditorDiagnosticsMemo {
+  let previous: {
+    readonly track: AppSnapshot['currentTrack']
+    readonly points: AppSnapshot['editor']['points']
+    readonly trees: AppSnapshot['editor']['trees']
+    readonly terrain: AppSnapshot['editor']['terrain']
+    readonly start: AppSnapshot['editor']['start']
+    readonly routeKind: AppSnapshot['editor']['routeKind']
+    readonly geometry: TrackGeometry
+    readonly diagnostics: readonly TrackDiagnostic[]
+  } | undefined
+
+  const analyze = (
+    state: Pick<AppSnapshot, 'currentTrack' | 'editor'>,
+    geometry: TrackGeometry,
+  ): readonly TrackDiagnostic[] => {
+    const currentTrack = state.currentTrack
+    if (!currentTrack) return []
+    return analyzeTrack(editorDiagnosticTrack(state, currentTrack), geometry)
+  }
+
+  return {
+    clear() {
+      previous = undefined
+    },
+    get(state, geometry) {
+      const { currentTrack, editor } = state
+      if (!currentTrack) return []
+      if (
+        previous?.track === currentTrack &&
+        previous.points === editor.points &&
+        previous.trees === editor.trees &&
+        previous.terrain === editor.terrain &&
+        previous.start === editor.start &&
+        previous.routeKind === editor.routeKind &&
+        previous.geometry === geometry
+      ) {
+        return previous.diagnostics
+      }
+
+      const diagnostics = analyze(state, geometry)
+      previous = {
+        track: currentTrack,
+        points: editor.points,
+        trees: editor.trees,
+        terrain: editor.terrain,
+        start: editor.start,
+        routeKind: editor.routeKind,
+        geometry,
+        diagnostics,
+      }
+      return diagnostics
+    },
+  }
+}
+
+function editorDiagnosticTrack(
+  state: Pick<AppSnapshot, 'currentTrack' | 'editor'>,
+  currentTrack: NonNullable<AppSnapshot['currentTrack']>,
+) {
+  return {
+    ...currentTrack,
+    routeKind: state.editor.routeKind,
+    points: state.editor.points,
+    trees: state.editor.trees,
+    terrain: state.editor.terrain,
+    ...(state.editor.start ? { start: state.editor.start } : {}),
+  }
 }
 
 export function createEditorTopbar(
@@ -119,16 +199,11 @@ export function createEditorDiagnostics(
   state: Pick<AppSnapshot, 'currentTrack' | 'editor'>,
   actions: Pick<EditorFrameActions, 'edit'>,
   geometry: TrackGeometry,
+  memo?: EditorDiagnosticsMemo,
 ): HTMLElement | undefined {
   if (!state.currentTrack) return undefined
-  const diagnostics = analyzeTrack({
-    ...state.currentTrack,
-    routeKind: state.editor.routeKind,
-    points: state.editor.points,
-    trees: state.editor.trees,
-    terrain: state.editor.terrain,
-    ...(state.editor.start ? { start: state.editor.start } : {}),
-  }, geometry)
+  const diagnostics = memo?.get(state, geometry) ??
+    analyzeTrack(editorDiagnosticTrack(state, state.currentTrack), geometry)
   if (diagnostics.length === 0) return undefined
 
   const panel = element('aside', 'diagnostic-panel')

@@ -16,6 +16,7 @@ import {
   createEditorStatus,
   createEditorTopbar,
   createEditorTrackActions,
+  type EditorDiagnosticsMemo,
   type EditorFrameActions,
 } from '@/ui/editor/editorFrameControls'
 import { createEditorSelectionPanels } from '@/ui/editor/editorSelectionPanels'
@@ -37,6 +38,7 @@ export function createEditorChrome(
   state: AppSnapshot,
   actions: EditorChromeActions,
   geometry: TrackGeometry,
+  diagnosticsMemo?: EditorDiagnosticsMemo,
 ): HTMLElement {
   const screen = element('section', 'screen editor-screen')
   screen.dataset.screen = 'editor'
@@ -55,7 +57,7 @@ export function createEditorChrome(
   const dock = createEditorContextDock(state, actions)
   screen.dataset.editorDockLayout = dock.dataset.layout
   screen.append(dock, createEditorTrackActions(actions), ...createEditorSelectionPanels(state, actions, geometry))
-  const diagnostics = createEditorDiagnostics(state, actions, geometry)
+  const diagnostics = createEditorDiagnostics(state, actions, geometry, diagnosticsMemo)
   if (diagnostics) screen.append(diagnostics)
   return screen
 }

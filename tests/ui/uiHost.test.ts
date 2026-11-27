@@ -7,6 +7,7 @@ import * as trackExport from '@/infrastructure/export/trackExport'
 import type { Preferences } from '@/application/ports/storage'
 import type { UpdateProvider } from '@/application/updates/updateProvider'
 import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
+import * as trackDiagnostics from '@/domain/track/trackDiagnostics'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import {
@@ -138,6 +139,38 @@ describe('DomUiHost', () => {
     expect(geometry.mock.calls[0]?.[0]).toMatchObject({
       points: track.points,
     })
+  })
+
+  it('reuses diagnostics across chrome updates and recomputes when editor inputs change', () => {
+    const analyze = vi.spyOn(trackDiagnostics, 'analyzeTrack')
+    const initial = snapshot('editor')
+    const root = document.createElement('div')
+    let listener: ((value: AppSnapshot) => void) | undefined
+    const port: UiControllerPort = {
+      snapshot: () => initial,
+      dispatch: vi.fn<(command: AppCommand) => void>(),
+      subscribe: vi.fn((next) => {
+        listener = next
+        return () => { listener = undefined }
+      }),
+    }
+    const runtime = createUiRuntime()
+    const geometry = vi.spyOn(runtime.geometry, 'get')
+    const host = new DomUiHost(root, port, runtime)
+    host.mount()
+    const update = (value: AppSnapshot) => listener?.(value)
+    expect(analyze).toHaveBeenCalledOnce()
+    const firstGeometry = geometry.mock.results[0]?.value
+
+    update({ ...initial, editorUi: { ...initial.editorUi, grid: true } })
+    expect(geometry.mock.results.at(-1)?.value).toBe(firstGeometry)
+    expect(analyze).toHaveBeenCalledOnce()
+
+    update({ ...initial, editor: { ...initial.editor, trees: [...initial.editor.trees] } })
+    expect(geometry.mock.results.at(-1)?.value).toBe(firstGeometry)
+    expect(analyze).toHaveBeenCalledTimes(2)
+    host.destroy()
+    analyze.mockRestore()
   })
 
   it('keeps the editor DOM and diagnostics stable during point moves, then refreshes on release', () => {

@@ -67,12 +67,19 @@ try {
   const postTerrainEditGeometry = elapsed(() => new TrackGeometryService().get(editedTrack))
 
   const pointIndex = Math.floor(track.points.length / 2)
-  const point = track.points[pointIndex]
-  const pointEdit = point ? elapsed(() => applyEditorCommand(editorState, {
-    type: 'move-point', index: pointIndex, point: { x: point.x + 1 },
-  })) : null
-  if (pointEdit && (pointEdit.value.rejection || pointEdit.value.state.points[pointIndex]?.x === point.x)) {
-    throw new Error(`Point move did not apply: ${pointEdit.value.rejection ?? 'point unchanged'}`)
+  const pointMoveSearch = findValidPointMove(track, editorState, applyEditorCommand, pointIndex)
+  const pointMove = pointMoveSearch.move
+  if (!pointMove && track.points.length >= 2) {
+    throw new Error(`Point move did not apply: ${pointMoveSearch.reason}`)
+  }
+  const pointEdit = pointMove
+    ? elapsed(() => applyEditorCommand(editorState, pointMove.command))
+    : null
+  if (pointEdit && (pointEdit.value.rejection ||
+      (pointEdit.value.state.points[pointMove.index]?.x === pointMove.original.x &&
+       pointEdit.value.state.points[pointMove.index]?.y === pointMove.original.y))) {
+    const reason = pointEdit.value.rejection?.message ?? 'point unchanged'
+    throw new Error(`Point move did not apply: ${reason}`)
   }
   const postPointEditGeometry = pointEdit
     ? elapsed(() => new TrackGeometryService().get({ ...track, points: pointEdit.value.state.points }))
@@ -98,7 +105,7 @@ try {
       terrainCellsAfterPaint: terrainEdit.value.state.terrain.cells.length,
       geometryAfterTerrainPaint: postTerrainEditGeometry.ms,
       editorMoveOnePoint: ms(pointEdit),
-      pointCoordinateChanged: pointEdit !== null,
+      pointCoordinateChanged: pointEdit !== null && pointMove !== null,
       geometryAfterPointMove: ms(postPointEditGeometry),
     },
     terrainPresentation: {
@@ -113,4 +120,53 @@ try {
   }, null, 2))
 } finally {
   await server.close()
+}
+
+function findValidPointMove(track, editorState, applyCommand, preferredIndex) {
+  const count = track.points.length
+  if (count < 2) return { move: null, reason: 'the track has fewer than two points.' }
+  const isCircuit = track.routeKind === 'circuit'
+  const indices = [...new Set([
+    preferredIndex, 1, count - 2, 0, count - 1,
+    preferredIndex - 1, preferredIndex + 1,
+  ].filter(index => index >= 0 && index < count))]
+  const fractions = [0.0001, 0.001, 0.01, 0.1, 0.5, 1]
+  let lastRejection
+  let attempts = 0
+  const maximumAttempts = 128
+
+  for (const index of indices) {
+    const point = track.points[index]
+    if (!point) continue
+    const previous = index > 0 ? track.points[index - 1] : isCircuit ? track.points[count - 1] : undefined
+    const next = index + 1 < count ? track.points[index + 1] : isCircuit ? track.points[0] : undefined
+    const targets = [previous, next].filter(Boolean)
+    if (previous && next) targets.unshift({ x: (previous.x + next.x) / 2, y: (previous.y + next.y) / 2 })
+
+    for (const target of targets) {
+      if (!target) continue
+      for (const fraction of fractions) {
+        if (attempts >= maximumAttempts) break
+        const candidate = {
+          x: point.x + (target.x - point.x) * fraction,
+          y: point.y + (target.y - point.y) * fraction,
+        }
+        if (candidate.x === point.x && candidate.y === point.y) continue
+        const command = { type: 'move-point', index, point: candidate }
+        attempts += 1
+        const result = applyCommand(editorState, command)
+        const moved = result.state.points[index]
+        if (!result.rejection && moved && (moved.x !== point.x || moved.y !== point.y)) {
+          return { move: { command, index, original: point }, reason: '' }
+        }
+        if (result.rejection) lastRejection = result.rejection.message
+      }
+      if (attempts >= maximumAttempts) break
+    }
+    if (attempts >= maximumAttempts) break
+  }
+  return {
+    move: null,
+    reason: lastRejection ?? 'no candidate changed a point coordinate.',
+  }
 }
