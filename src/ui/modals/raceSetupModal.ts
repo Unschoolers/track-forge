@@ -1,10 +1,11 @@
 import type { LightingMode } from '@/domain/model'
 import { CAR_SPECS, DIFFICULTY_SPECS } from '@/domain/config'
-import type { GhostAvailability } from '@/application/race/ghostReplay'
+import type { GhostAvailability, GhostSetup } from '@/application/race/ghostReplay'
 import type { AppSnapshot } from '@/application/appState'
 import { populateRacePreparation } from '@/ui/components/racePreparationLayout'
 import { button, element } from '@/ui/dom'
 import { createModalFrame } from '@/ui/modals/modalFrame'
+import { appendGhostIndicator } from '@/ui/components/ghostIndicator'
 import { formatRaceTime } from '@/ui/format'
 import { BOOST_PRACTICE_AVAILABLE } from '@/application/race/boostPracticeConfig'
 
@@ -19,6 +20,7 @@ export function createRaceSetupModal(
   },
   availability: GhostAvailability | number | null = null,
   flyover?: HTMLElement,
+  availableSetups?: readonly GhostSetup[],
 ): HTMLElement {
   const ghost = typeof availability === 'number' ? { kind: 'exact' as const, time: availability } : availability ?? { kind: 'none' as const }
   const ghostTime = ghost.kind === 'exact' ? ghost.time : null
@@ -79,13 +81,35 @@ export function createRaceSetupModal(
   description.id = 'ghost-availability'
   mode.append(modeRow, description)
   const laps = state.preferences.raceLaps ?? 2
+  const savedSetups = availableSetups ?? (creatorChallenge
+    ? [{ car: creatorChallenge.car, laps: creatorChallenge.laps }]
+    : ghost.kind === 'exact' ? [{ car: state.preferences.car, laps: openRoute ? 1 : laps }]
+      : ghost.kind === 'different-setup' ? [ghost.setup] : [])
+  const lapSection = element('section', 'setup-section')
+  lapSection.append(element('h3', 'setup-label', 'Laps'))
+  const lapRow = element('div', 'choice-row')
+  lapRow.setAttribute('role', 'group')
+  lapRow.setAttribute('aria-label', 'Race laps')
+  for (const count of [1, 2, 3] as const) {
+    const choice = button(count === 1 ? '1 lap' : `${count} laps`, `laps-${count}`,
+      () => actions.preferences({ ...state.preferences, raceLaps: count }),
+      `setup-choice${count === laps ? ' active' : ''}`)
+    choice.dataset.raceLaps = String(count)
+    choice.setAttribute('aria-pressed', String(count === laps))
+    if (creatorChallenge?.laps === count || savedSetups.some(setup => setup.car === state.preferences.car && setup.laps === count)) {
+      appendGhostIndicator(choice, creatorChallenge ? 'Creator ghost available' : 'Saved ghost available for this car')
+    }
+    lapRow.append(choice)
+  }
+  lapSection.append(lapRow)
   const lightLabel = lighting === 'night' ? 'Night' : 'Day'
   populateRacePreparation(frame.body, {
     car: state.preferences.car,
     selectCar: car => actions.preferences({ ...state.preferences, car }),
     preview: flyover,
+    ghostSetups: savedSetups,
     metadata: `${DIFFICULTY_SPECS[state.preferences.difficulty].name} · ${openRoute ? 'Single run' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`} · ${lightLabel}`,
-    sections: [lightingSection, mode],
+    sections: [...(openRoute ? [] : [lapSection]), lightingSection, mode],
   })
   frame.footer.append(
     button('Back', 'setup-back', actions.close, 'button'),
