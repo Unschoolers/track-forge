@@ -85,8 +85,9 @@ display frame contributes at most 100 ms, so loading stalls cannot skip an
 entire cue or release the cars before the player can see the start. The
 running simulation retains its existing raw-delta and fixed-step policy.
 Nearby continues using its shared monotonic start time, not this local
-presentation clock. The initial audio cue is still emitted by RaceSession
-when the run is initialized.
+presentation clock. RaceSession emits the initial local audio cue only on
+the first positive countdown advance after that render gate, once per run.
+Loading, paused frames and zero-time advances do not emit the beep.
 
 ## Visual frame pacing and high-refresh motion
 
