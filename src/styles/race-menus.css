@@ -515,27 +515,25 @@
 .topper-glyph { display: inline-block; width: 1em; height: 1em; fill: currentColor; vertical-align: middle; }
 :is(.nearby-race-modal, .options-modal) .topper-options {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
   gap: .35rem;
 }
-:is(.nearby-race-modal, .options-modal) .topper-choice {
+:is(.nearby-race-modal, .options-modal) .topper-options.topper-colors {
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+}
+/* Topper choices inherit the common setup-choice material and selection state.
+   Only icon/swatch sizing and wrapping belong to the picker. */
+:is(.nearby-race-modal, .options-modal) .topper-options .setup-choice.topper-choice {
   min-width: 0;
-  min-height: 2.65rem;
-  padding: .25rem;
-  background: #1b2935;
-  border: 1px solid #465767;
-  color: var(--menu-ink);
-  font: 800 1.15rem/1.2 var(--menu-mono);
+  min-height: 44px;
+  padding: .4rem .2rem;
+  font-size: 1.15rem;
 }
-:is(.nearby-race-modal, .options-modal) .topper-choice[aria-pressed="true"] {
-  border-color: var(--menu-accent);
-  box-shadow: inset 0 -3px var(--menu-accent);
-}
-:is(.nearby-race-modal, .options-modal) .topper-color-choice {
-  color: var(--menu-muted);
-  font-size: .55rem;
-  text-transform: uppercase;
-  overflow: hidden;
+:is(.nearby-race-modal, .options-modal) .topper-options .setup-choice.topper-color-choice {
+  min-height: 48px;
+  font-size: .72rem;
+  text-transform: none;
+  overflow-wrap: anywhere;
 }
 :is(.nearby-race-modal, .options-modal) .topper-color-choice::before {
   content: '';
@@ -545,6 +543,7 @@
   margin: 0 auto .25rem;
   border-radius: 50%;
   background: var(--topper-choice-color);
+  border: 1px solid #0005;
 }
 .results-modal .scoreboard-row .topper-marker { flex: 0 0 1.5rem; }
 
