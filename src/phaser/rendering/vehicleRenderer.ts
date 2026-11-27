@@ -210,7 +210,10 @@ export function renderBoostFlames(
   const pitch = vehicle.grounded ? -vehicle.landingIntensity :
     Math.max(-1, Math.min(1, vehicle.verticalVelocity / 35))
   const lift = Math.min(0.11, liftHeight * 0.012)
-  const pulseScale = 0.9 + Math.min(1, Math.max(0, pulse)) * 0.18
+  // Small exhaust backfires: a brighter ignition burst, then gentle intermittent flicker.
+  const ignition = vehicle.driftBoost.remainingTicks >= 54
+  const flicker = Math.min(1, Math.max(0, pulse))
+  const pulseScale = ignition ? 1.1 : 0.45 + 0.45 * flicker
   graphics.save()
   graphics.translateCanvas(vehicle.x, vehicle.y)
   graphics.rotateCanvas(vehicle.angle)
@@ -223,14 +226,14 @@ export function renderBoostFlames(
   for (const exhaust of getVehicleGeometry(vehicle.car).taillights) {
     const x = exhaust.x - 1
     const y = exhaust.y
-    graphics.fillStyle(color, 0.9)
+    graphics.fillStyle(color, ignition ? 0.95 : 0.55 + 0.3 * flicker)
     graphics.beginPath()
     graphics.moveTo(x, y - 2.2)
     graphics.lineTo(x - 8 * pulseScale, y)
     graphics.lineTo(x, y + 2.2)
     graphics.closePath()
     graphics.fillPath()
-    graphics.fillStyle(0xffe9a0, 0.92)
+    graphics.fillStyle(0xffffff, ignition ? 0.85 : 0.5)
     graphics.beginPath()
     graphics.moveTo(x, y - 1)
     graphics.lineTo(x - 4.2 * pulseScale, y)

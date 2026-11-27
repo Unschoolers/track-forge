@@ -9,6 +9,7 @@ export type RaceParticleKind =
   | 'tire-smoke'
   | 'speed-line'
   | 'landing-dust'
+  | 'water'
 
 export interface RaceParticle extends Vector2 {
   readonly kind: RaceParticleKind
@@ -40,6 +41,9 @@ export interface RaceEffectEvent {
   readonly type: string
   readonly vehicleId?: string
   readonly strength?: number
+  readonly reason?: string
+  readonly x?: number
+  readonly y?: number
 }
 
 const MAX_PARTICLES = 180
@@ -62,12 +66,20 @@ function particle(
   life: number,
   size: number,
 ): RaceParticle {
+  const a = random.next()
+  const b = random.next()
+  const side = a < 0.5 ? -1 : 1
+  const cosine = Math.cos(vehicle.angle)
+  const sine = Math.sin(vehicle.angle)
+  const wind = kind === 'speed-line'
+  const lateral = side * (wind ? 15 + b * 10 : 7)
+  const spray = wind ? 0 : Math.min(22, 5 + vehicle.speed * 0.035 + vehicle.slip * 0.12) * side
   return {
     kind,
-    x: vehicle.x - Math.cos(vehicle.angle) * 12,
-    y: vehicle.y - Math.sin(vehicle.angle) * 12,
-    vx: -vehicle.vx * 0.1 + (random.next() - 0.5) * 24,
-    vy: -vehicle.vy * 0.1 + (random.next() - 0.5) * 24,
+    x: vehicle.x - cosine * (wind ? 2 : 10) - sine * lateral,
+    y: vehicle.y - sine * (wind ? 2 : 10) + cosine * lateral,
+    vx: -vehicle.vx * (wind ? 0.32 : 0.14) - sine * spray + (wind ? 0 : (a - 0.5) * 12),
+    vy: -vehicle.vy * (wind ? 0.32 : 0.14) + cosine * spray + (wind ? 0 : (b - 0.5) * 12),
     life,
     maxLife: life,
     size,
@@ -80,6 +92,7 @@ export function advanceRaceEffects(
   events: readonly RaceEffectEvent[],
   deltaSeconds: number,
   random: RandomSource,
+  tick = 0,
 ): RaceEffectsState {
   const dt = Math.max(0, deltaSeconds)
   const particles: RaceParticle[] = state.particles
@@ -99,6 +112,8 @@ export function advanceRaceEffects(
 
   for (const vehicle of vehicles) {
     const size = EFFECT_SIZE[vehicle.car]
+    const intensity = Math.min(1, vehicle.speed / 260 + vehicle.slip / 100)
+    const activeBoost = vehicle.driftBoost?.phase === 'active'
     if (
       vehicle.grounded &&
       vehicle.speed > 50 &&
@@ -112,7 +127,7 @@ export function advanceRaceEffects(
           vehicle,
           random,
           vehicle.currentSurface === 'grass' ? 0.48 : 0.62,
-          (vehicle.currentSurface === 'grass' ? 3 : 4) * size.dust,
+          (vehicle.currentSurface === 'grass' ? 2.2 : 3.5) * size.dust * (0.6 + 0.4 * intensity),
         ),
       )
     }
@@ -123,17 +138,24 @@ export function advanceRaceEffects(
       (vehicle.braking || vehicle.slip > 14) &&
       random.next() < 0.55
     ) {
-      particles.push(particle('ice', vehicle, random, 0.42, 3))
+      particles.push(particle('ice', vehicle, random, 0.42, 2 + intensity))
     }
     if (vehicle.grounded && vehicle.braking && vehicle.speed > 70) {
-      particles.push(particle('tire-smoke', vehicle, random, 0.38, 3.5 * size.smoke))
+      // Keep the legacy random draws even when a loose surface uses dust instead of smoke.
+      const smoke = particle('tire-smoke', vehicle, random, 0.38, 3.5 * size.smoke * intensity)
+      if (vehicle.currentSurface === 'street') particles.push(smoke)
+    } else if (vehicle.grounded && vehicle.currentSurface === 'street' && vehicle.speed > 70 && vehicle.slip > 24 && tick % 4 === 0) {
+      // Additional presentation-only emissions never consume the race random stream.
+      const visualRandom = { next: () => ((tick * 17 + vehicle.pathIndex * 13) % 19) / 19 }
+      particles.push(particle('tire-smoke', vehicle, visualRandom, 0.38, 3 * size.smoke * intensity))
     }
     if (
       vehicle.player &&
       vehicle.speed > 215 &&
       random.next() < 0.45
     ) {
-      particles.push(particle('speed-line', vehicle, random, 0.22, 1.2 * size.speed))
+      const windIntensity = Math.min(1, (vehicle.speed - 215) / 150 + (activeBoost ? 0.25 : 0))
+      particles.push(particle('speed-line', vehicle, random, 0.18 + 0.06 * windIntensity, (0.6 + 0.65 * windIntensity) * size.speed))
     }
     const skidThreshold =
       vehicle.currentSurface === 'ice'
@@ -168,6 +190,18 @@ export function advanceRaceEffects(
   }
 
   for (const event of events) {
+    if (event.reason === 'water' && (event.type === 'vehicle-recovered' || event.type === 'race-finished')) {
+      const vehicle = vehicles.find(v => event.vehicleId ? v.id === event.vehicleId : v.player)
+      const x = event.x ?? vehicle?.x
+      const y = event.y ?? vehicle?.y
+      if (x !== undefined && y !== undefined) {
+        for (let i = 0; i < 8; i++) {
+          const angle = i * Math.PI / 4
+          particles.push({ kind: 'water', x, y, vx: Math.cos(angle) * 32, vy: Math.sin(angle) * 32,
+            life: 0.28, maxLife: 0.28, size: 2.1 })
+        }
+      }
+    }
     if (event.type === 'vehicle-landed') {
       const vehicle = vehicles.find(({ id }) => id === event.vehicleId)
       if (!vehicle) continue

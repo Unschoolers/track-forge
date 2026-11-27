@@ -29,7 +29,7 @@ function vehicles() {
 }
 
 describe('race effects', () => {
-  it('emits surface dust, skids, and brake smoke', () => {
+  it('emits surface dust and skids instead of smoke on loose ground', () => {
     const next = advanceRaceEffects(
       createRaceEffectsState(),
       vehicles(),
@@ -39,9 +39,39 @@ describe('race effects', () => {
     )
 
     expect(new Set(next.particles.map(({ kind }) => kind))).toEqual(
-      new Set(['dirt', 'tire-smoke']),
+      new Set(['dirt']),
     )
     expect(next.skids.length).toBeGreaterThan(0)
+  })
+
+  it('emits smoke on asphalt and snow powder on sliding ice', () => {
+    const player = vehicles()[0]
+    if (!player) throw new Error('Missing player fixture')
+    for (const [currentSurface, kind] of [['street', 'tire-smoke'], ['ice', 'ice']] as const) {
+      const next = advanceRaceEffects(createRaceEffectsState(), [{ ...player, currentSurface }], [], 1 / 60, { next: () => 0 })
+      expect(next.particles.map(item => item.kind)).toEqual([kind])
+    }
+  })
+
+  it('places wind at the side and scales with speed without extra random draws', () => {
+    const player = vehicles()[0]
+    if (!player) throw new Error('Missing player fixture')
+    const sample = (speed: number) => {
+      let draws = 0
+      const result = advanceRaceEffects(createRaceEffectsState(), [{ ...player, x: 0, y: 0, angle: 0, vx: speed, vy: 0, speed, braking: false, slip: 0, currentSurface: 'street' }], [], 1 / 60, { next: () => { draws++; return 0 } })
+      expect(draws).toBe(3)
+      return result.particles.find(p => p.kind === 'speed-line')
+    }
+    const slow = sample(220), fast = sample(340)
+    expect(Math.abs(slow?.y ?? 0)).toBeGreaterThan(10)
+    expect(fast?.size).toBeGreaterThan(slow?.size ?? 0)
+    expect(fast?.vx).toBeLessThan(slow?.vx ?? 0)
+  })
+
+  it('splashes at water contact, not the recovered vehicle position', () => {
+    const next = advanceRaceEffects(createRaceEffectsState(), [], [{ type: 'vehicle-recovered', reason: 'water', x: 12, y: 34 }], 1 / 60, { next: () => 1 })
+    expect(next.particles).toHaveLength(8)
+    expect(next.particles.every(p => p.kind === 'water' && p.x === 12 && p.y === 34)).toBe(true)
   })
 
   it('expires descriptors and bounds retained arrays', () => {

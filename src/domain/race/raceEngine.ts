@@ -526,6 +526,7 @@ function advanceRace(
         events,
         dt,
         random,
+        state.tick,
       ),
     },
     events,

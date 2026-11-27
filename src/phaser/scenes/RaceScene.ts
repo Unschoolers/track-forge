@@ -92,6 +92,7 @@ export class RaceScene extends Phaser.Scene {
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
   private nativeParticles: NativeRaceParticles | undefined
+  private desertParticles = false
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
   private bridgeGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds; primitives: number }[] = []
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
@@ -143,6 +144,7 @@ export class RaceScene extends Phaser.Scene {
         })
     }
     const night = this.raceSession.snapshot().setup?.lighting === 'night'
+    this.desertParticles = normalizeTrackEnvironmentId(track.environmentId) === 'desert'
     const environment = getTrackEnvironment(track.environmentId)
     const palette = night ? environment.night : environment.day
     this.cameras.main.setBackgroundColor(palette.raceGround)
@@ -168,7 +170,7 @@ export class RaceScene extends Phaser.Scene {
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
     if (this.game.renderer && this.game.renderer.type === Phaser.WEBGL && typeof this.add.particles === 'function') {
-      this.nativeParticles = new NativeRaceParticles(this, WORLD_RENDER_DEPTH.effect + 0.01)
+      this.nativeParticles = new NativeRaceParticles(this, WORLD_RENDER_DEPTH.effect + 0.01, this.desertParticles, this.snapshot.preferences.graphicsQuality === 'low')
     }
     if (night) this.nightBeamRenderer = new NightBeamRenderer(this, Phaser.BlendModes.ADD)
     this.nightLightGraphics = this.add
@@ -367,7 +369,7 @@ export class RaceScene extends Phaser.Scene {
     this.vehicleSprites?.beginFrame()
     this.effectGraphics.clear()
     this.nativeParticles?.render(race.effects, race.tick)
-    renderRaceEffects(this.effectGraphics, race.effects, this.nativeParticles !== undefined)
+    renderRaceEffects(this.effectGraphics, race.effects, this.nativeParticles !== undefined, this.desertParticles)
     const restart = manualRecoverySignal(race)
     if (player && restart) {
       // Counter-rotate and scale to keep the local signal upright and legible.
@@ -418,7 +420,7 @@ export class RaceScene extends Phaser.Scene {
           graphics,
           player,
           TOPPER_COLORS[this.snapshot.preferences.playerIdentity?.color ?? 'cyan'],
-          (_time % 240) / 240,
+          0.5 + 0.5 * Math.sin(race.tick * 1.7),
           Math.max(0, player.z - supportHeight),
         )
       }
