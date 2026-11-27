@@ -1,7 +1,6 @@
 /* Editor and identity dialogs use the same calm graphite surface as the menu
    system. Their backdrop is the live editor canvas, so the card stays opaque. */
 :is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) {
-  --dialog-accent: #ff8d62;
   --dialog-ink: #f5f7fa;
   --dialog-muted: #b7c3ce;
   --dialog-line: rgb(214 228 240 / 16%);
@@ -9,8 +8,8 @@
 
 :is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .modal-card {
   border: 1px solid rgb(214 228 240 / 24%);
-  border-radius: 1.4rem;
-  background: linear-gradient(155deg, #202c38, #111923 74%);
+  border-radius: 24px;
+  background: #101923;
   box-shadow: 0 1.5rem 4rem #000b, inset 0 1px rgb(255 255 255 / 9%);
 }
 
@@ -47,39 +46,10 @@
   border-color: var(--dialog-line);
 }
 
-:is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .modal-close {
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 50%;
-  background: #ffffff0c;
-  color: var(--dialog-ink);
-}
 
-:is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .button {
-  min-height: 48px;
-  padding: .7rem 1rem;
-  border: 1px solid rgb(223 235 245 / 18%);
-  border-radius: 999px;
-  background: #ffffff0c;
-  color: var(--dialog-ink);
-  font: 650 .9rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0;
-  text-align: center;
-  touch-action: manipulation;
-  clip-path: none;
-}
+:is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .button { padding: .7rem 1rem; text-align: center; }
 
-:is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .button-primary {
-  border-color: #ffac89;
-  background: linear-gradient(135deg, #ffa37c, #ff7848);
-  color: #25150f;
-  box-shadow: 0 .35rem 1rem #ff78482e, inset 0 1px #fff8;
-}
 
-:is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .button-danger {
-  border-color: rgb(255 146 157 / 34%);
-  background: rgb(117 43 55 / 34%);
-  color: #ffd1d5;
-}
 
 :is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) :is(button, input, select):focus-visible {
   outline: 2px solid #fff;
@@ -106,10 +76,6 @@
 .editor-menu-modal .editor-menu-identity .track-icon-action {
   width: 48px;
   height: 48px;
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 50%;
-  background: #ffffff0c;
-  color: var(--dialog-ink);
 }
 .editor-menu-modal .editor-menu-secondary { gap: .55rem; }
 .editor-menu-modal .editor-menu-secondary .button { width: 100%; }
@@ -213,8 +179,6 @@
     background: #111923;
     box-shadow: 0 1rem 3rem #000c;
   }
-  :is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .modal-close,
-  :is(.editor-menu-modal, .track-name-modal, .player-name-modal, .editor-exit-modal) .button:not(.button-primary):not(.button-danger),
   .editor-menu-modal .editor-menu-select {
     border-color: #718191;
     background: #17232e;

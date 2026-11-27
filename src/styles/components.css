@@ -28,10 +28,10 @@
 .surface-dirt { border-bottom-color: #c18a55; }
 .surface-ice { border-bottom-color: #9ed9ee; }
 .surface-mixed { border-bottom-color: var(--color-accent); }
-.crossing-control { position: absolute; z-index: 8; left: 50%; bottom: var(--editor-selection-panels-bottom); display: grid; min-width: min(25rem, calc(100vw - 8rem)); gap: .55rem; padding: .75rem; translate: -50% 0; border: 1px solid var(--color-accent); border-radius: var(--radius-md); background: rgb(20 26 36 / 94%); box-shadow: 0 .9rem 2.3rem rgb(0 0 0 / 35%); backdrop-filter: blur(.75rem); }
+.crossing-control { position: absolute; z-index: 8; left: 50%; bottom: var(--editor-selection-panels-bottom); display: grid; min-width: min(25rem, calc(100vw - 8rem)); gap: .55rem; padding: .75rem; translate: -50% 0; border: 1px solid var(--color-accent); border-radius: var(--radius-md); background: rgb(20 26 36 / 94%); box-shadow: 0 .9rem 2.3rem rgb(0 0 0 / 35%); }
 .crossing-control-title { color: var(--color-muted); font-size: .7rem; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
 .crossing-control-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
-.point-control { position: absolute; z-index: 8; left: 50%; bottom: var(--editor-selection-panels-bottom); display: grid; min-width: min(22rem, calc(100vw - 8rem)); gap: .55rem; padding: .75rem; translate: -50% 0; border: 1px solid var(--color-accent); border-radius: var(--radius-md); background: rgb(20 26 36 / 94%); box-shadow: 0 .9rem 2.3rem rgb(0 0 0 / 35%); backdrop-filter: blur(.75rem); }
+.point-control { position: absolute; z-index: 8; left: 50%; bottom: var(--editor-selection-panels-bottom); display: grid; min-width: min(22rem, calc(100vw - 8rem)); gap: .55rem; padding: .75rem; translate: -50% 0; border: 1px solid var(--color-accent); border-radius: var(--radius-md); background: rgb(20 26 36 / 94%); box-shadow: 0 .9rem 2.3rem rgb(0 0 0 / 35%); }
 .point-control-title { color: var(--color-muted); font-size: .7rem; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
 .point-control-choices { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }
 .point-choice, .point-insert { min-block-size: 44px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-panel-raised); color: var(--color-text); }

@@ -1,5 +1,3 @@
-@import './menu-system.css';
-
 /* Home uses the shared shell's actual regions. Independent destinations are
    buttons, not segments in a single glass capsule. */
 .tf-menu.home-screen {

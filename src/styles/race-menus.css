@@ -7,8 +7,7 @@
 .track-library-modal .modal-close { border-radius: 50%; }
 .track-library-modal .modal-body { padding: .65rem 1.4rem 1rem; }
 .track-library-modal .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem 1.4rem max(1rem, env(safe-area-inset-bottom)); }
-.track-library-modal .modal-footer .button { min-width: 0; min-height: 48px; padding-inline: 1.1rem; border-radius: 999px; clip-path: none; font: 650 .88rem/1.15 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
-.track-library-modal .modal-footer .button-primary { color: #20110a; }
+.track-library-modal .modal-footer .button { min-width: 0; padding-inline: 1.1rem; }
 .track-library-modal .track-library-content { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .8rem; min-height: 0; }
 .track-library-modal .track-library-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .4rem; padding: .3rem; border: 1px solid #8393a580; border-radius: 1.2rem; background: linear-gradient(145deg, #e4f2ff14, transparent 36%, #080c1620), rgb(24 36 49 / 20%); box-shadow: inset 0 1px 1px #ffffff40, inset 0 -1px 1px #0006; }
 .track-library-modal .track-library-search { grid-column: 1 / -1; width: 100%; min-width: 0; min-height: 44px; padding: .6rem .85rem; border: 1px solid #71808c80; border-radius: .8rem; background: rgb(15 28 41 / 40%); color: #f4f6f8; font: inherit; user-select: text; }
@@ -330,8 +329,6 @@
   .results-modal .results-splits-detail-row { grid-template-columns: minmax(0, 1fr) 5.25rem 5.25rem; gap: .3rem; padding-inline: .4rem; font-size: .67rem; }
 }
 .results-modal .scoreboard { gap: .35rem; }
-.results-modal .scoreboard-row { border-color: #344554; border-radius: 0; background: #121d27; }
-.results-modal .scoreboard-row.player { border-color: var(--menu-accent); box-shadow: inset .2rem 0 var(--menu-accent); }
 .results-modal .scoreboard-row span { color: var(--menu-muted); font-variant-numeric: tabular-nums; }
 .results-modal .race-finish-medal { color: #ffc66d; font-family: var(--menu-mono); }
 .results-modal .ghost-save-status { color: #a6e4c7; font: 800 .7rem/1.4 var(--menu-mono); letter-spacing: .08em; }
@@ -353,7 +350,7 @@
   width: 3rem;
   height: .25rem;
   background: var(--menu-accent);
-  clip-path: polygon(0 0, 100% 0, calc(100% - .3rem) 100%, 0 100%);
+  border-radius: 1rem;
   content: '';
 }
 .results-modal .modal-header .modal-subtitle { font-family: var(--menu-mono); font-variant-numeric: tabular-nums; }
@@ -661,13 +658,7 @@
 }
 .race-setup-modal .modal-footer .button {
   min-width: 48px; min-height: 48px; padding: .5rem .85rem;
-  border-radius: 999px; font: 650 .88rem/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0; text-transform: none;
   white-space: normal; overflow-wrap: anywhere;
-}
-.race-setup-modal .modal-footer .button-primary {
-  clip-path: none; border-color: transparent;
-  background: #ff925c; color: #20110a; font-weight: 800;
 }
 .race-setup-modal :is(.setup-choice, .car-choice, .button):active:not(:disabled) { filter: brightness(.9); }
 @media (max-width: 520px) and (orientation: portrait) {
