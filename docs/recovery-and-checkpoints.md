@@ -23,7 +23,7 @@
 
 - A grounded AI has up to two seconds to drive back onto the road using its existing low-speed pursuit controller. A distance exceeding 100 world units from its followed road is an immediate lost-car reset. Natural re-entry clears the timer and does not emit a recovery event. Airborne time does not advance the timer. Gate eligibility is independent of the 100-unit recovery limit: all cars must physically cross each gate in order. A forced reset never grants a checkpoint.
 - A player accelerating below the existing low-speed threshold must accumulate two seconds of stuck time before an automatic reset; braking still prevents or decays that timer.
-- A player losing elevated bridge support automatically recovers after 250 ms (15 fixed physics ticks), including a fall into water. Regaining supported elevated road before expiry cancels the fall timer; normal ramp exits do not start it. Water contact outside a bridge fall, manual recovery, and missed-checkpoint rules retain their existing immediate/countdown behavior. Forced resets still emit recovery telemetry. The optimization goal is zero forced resets, not zero excursions onto grass.
+- A player losing elevated bridge support automatically recovers after 500 ms (30 fixed physics ticks), including a fall into water. Regaining supported elevated road before expiry cancels the fall timer; normal ramp exits do not start it. Water contact outside a bridge fall, manual recovery, and missed-checkpoint rules retain their existing immediate/countdown behavior. Forced resets still emit recovery telemetry. The optimization goal is zero forced resets, not zero excursions onto grass.
 
 ## Validation
 

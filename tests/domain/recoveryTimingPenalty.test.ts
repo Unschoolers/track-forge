@@ -85,17 +85,17 @@ describe('manual recovery hold and elevated-road auto respawn', () => {
     expect(rejoined.bridgeFallSeconds).toBeUndefined()
   })
 
-  it('expires a bridge fall on the fifteenth fixed physics tick, not before', () => {
+  it('expires a bridge fall on the thirtieth fixed physics tick, not before', () => {
     let seconds = 0
     expect(hasBridgeFallExpired(undefined)).toBe(false)
-    for (let tick = 1; tick <= 14; tick++) {
+    for (let tick = 1; tick <= 29; tick++) {
       seconds += 1 / 60
       expect(hasBridgeFallExpired(seconds)).toBe(false)
     }
     expect(hasBridgeFallExpired(seconds + 1 / 60)).toBe(true)
   })
 
-  it('automatically recovers a player falling off a bridge within 250 ms', () => {
+  it('automatically recovers a player falling off a bridge after 500 ms', () => {
     const initial = start()
     const index = path.points.findIndex((point) => point.x >= 0)
     const point = requireFixture(path.points[index])
@@ -129,7 +129,7 @@ describe('manual recovery hold and elevated-road auto respawn', () => {
     expect(startedAt).toBeDefined()
     expect(recoveredAt).toBeDefined()
     // The first observed fall tick has already accumulated 1/60 s.
-    expect((recoveredAt ?? 0) - (startedAt ?? 0) + 1 / 60).toBeCloseTo(0.25, 10)
+    expect((recoveredAt ?? 0) - (startedAt ?? 0) + 1 / 60).toBeCloseTo(0.5, 10)
   })
 
 })
