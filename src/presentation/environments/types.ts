@@ -19,7 +19,7 @@ import type { Vector2 } from '@/domain/model'
 import type { SceneryPropKind } from '@/domain/track/trackEnvironment'
 
 export type SceneryPrimitive =
-  | { readonly kind: 'ellipse'; readonly x: number; readonly y: number; readonly radiusX: number; readonly radiusY: number; readonly color: number; readonly alpha?: number }
+  | { readonly kind: 'ellipse'; readonly x: number; readonly y: number; readonly radiusX: number; readonly radiusY: number; readonly rotation?: number; readonly color: number; readonly alpha?: number }
   | { readonly kind: 'polygon'; readonly points: readonly Vector2[]; readonly color: number; readonly alpha?: number }
 
 export interface SceneryArtDefinition {

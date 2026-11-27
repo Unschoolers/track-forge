@@ -1,3 +1,5 @@
+import { isSceneryRotationPreviewOnly } from '@/application/editor/sceneryRotationPreview'
+import { TREE_SIZE, sceneryScale } from '@/domain/track/sceneryTransform'
 import Phaser from 'phaser'
 import { normalizeEditorSceneryChoice, type AppCommand, type AppSnapshot } from '@/application/appState'
 import type { Unsubscribe } from '@/application/eventBus'
@@ -106,6 +108,7 @@ export class EditorScene extends Phaser.Scene {
   private overlayRenderPending = false
   private lastOverlayZoom = 0
   private previewRenderPending = false
+  private sceneryRotationRenderPending = false
   private compiledTerrainPreviewRevision: number | undefined
   private terrainPreviewImpacts: readonly TerrainPreviewImpact[] = []
   private renderedTerrainDetail: TerrainPresentationDetail | undefined
@@ -216,6 +219,7 @@ export class EditorScene extends Phaser.Scene {
           type: 'select-editor-point',
           index,
         }),
+      onScenerySelected: (target) => this.controller.dispatch({ type: 'select-editor-scenery', target }),
       onRejected: (rejection) =>
         this.controller.dispatch({
           type: 'report-editor-rejection',
@@ -272,7 +276,7 @@ export class EditorScene extends Phaser.Scene {
       this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld && !this.currentRenderState?.roadDrag)
     }
     this.renderGroundPresentation()
-    this.renderSceneryPresentation()
+    this.renderSceneryPresentation(this.sceneryRotationRenderPending)
     if (!this.previewRenderPending) return
     this.previewRenderPending = false
     this.renderTerrainPreviewPresentation()
@@ -339,6 +343,13 @@ export class EditorScene extends Phaser.Scene {
     const oldSnapshot = this.currentSnapshot
     const previousPreview = this.editorInput?.sceneryPreview() ?? null
     this.currentSnapshot = snapshot
+    if (oldSnapshot?.sceneryRotationPreview !== snapshot.sceneryRotationPreview) {
+      this.sceneryRotationRenderPending ||= oldSnapshot?.sceneryRotationPreview?.target.type === 'tree' ||
+        snapshot.sceneryRotationPreview?.target.type === 'tree'
+    }
+    // Coalesce slider input to one scenery render per Phaser frame; do not
+    // invalidate the committed geometry or camera.
+    if (isSceneryRotationPreviewOnly(oldSnapshot, snapshot)) return
     const gestureContextChanged = oldSnapshot && (oldSnapshot.currentTrack?.id !== snapshot.currentTrack?.id || oldSnapshot.editorUi.tool !== snapshot.editorUi.tool || oldSnapshot.editorUi.sceneryChoice !== snapshot.editorUi.sceneryChoice || oldSnapshot.editor.environmentId !== snapshot.editor.environmentId)
     if (gestureContextChanged) {
       this.editorInput?.cancelActiveGesture()
@@ -507,10 +518,18 @@ export class EditorScene extends Phaser.Scene {
     if (!snapshot) return
     const camera = this.cameras.main
     const preview = this.editorInput?.sceneryPreview() ?? null
-    this.environmentSceneryRenderer?.render({ centerX: camera.scrollX + camera.width / 2, centerY: camera.scrollY + camera.height / 2, width: camera.width, height: camera.height, zoom: camera.zoom, rotation: 0 }, snapshot.editor.environmentId, snapshot.editor.scenery, snapshot.currentTrack?.lighting === 'night', preview?.type === 'prop' ? preview : undefined)
+    const rotation = snapshot.sceneryRotationPreview
+    const prop = rotation?.target.type === 'prop' ? snapshot.editor.scenery[rotation.target.index] : undefined
+    const propPreview = prop && rotation
+      ? { index: rotation.target.index, position: prop, rotation: rotation.rotation }
+      : preview?.type === 'prop' ? preview : undefined
+    this.environmentSceneryRenderer?.render({ centerX: camera.scrollX + camera.width / 2, centerY: camera.scrollY + camera.height / 2, width: camera.width, height: camera.height, zoom: camera.zoom, rotation: 0 }, snapshot.editor.environmentId, snapshot.editor.scenery, snapshot.currentTrack?.lighting === 'night', propPreview)
     if (!renderTreesLayer || !this.sceneryGraphics) return
+    this.sceneryRotationRenderPending = false
     this.sceneryGraphics.clear()
-    const trees = preview?.type === 'tree' ? snapshot.editor.trees.map((tree, index) => index === preview.index ? preview.position : tree) : snapshot.editor.trees
+    const trees = rotation?.target.type === 'tree'
+      ? snapshot.editor.trees.map((tree, index) => index === rotation.target.index ? { ...tree, rotation: rotation.rotation } : tree)
+      : preview?.type === 'tree' ? snapshot.editor.trees.map((tree, index) => index === preview.index ? { ...tree, ...preview.position } : tree) : snapshot.editor.trees
     renderTrees(this.sceneryGraphics, trees, snapshot.currentTrack?.lighting === 'night', this.trackGeometry().path.terrainSurface, snapshot.editor.environmentId)
   }
 
@@ -666,6 +685,17 @@ export class EditorScene extends Phaser.Scene {
       snapshot.editorUi.selectedCrossing,
       this.editorCamera.zoom,
     )
+    const selected = snapshot.editorUi.selectedScenery
+    if (snapshot.editorUi.tool === 'tree' && selected) {
+      const item = selected.type === 'tree' ? snapshot.editor.trees[selected.index] : snapshot.editor.scenery[selected.index]
+      if (item) {
+        const prop = selected.type === 'prop' ? snapshot.editor.scenery[selected.index] : undefined
+        const radius = prop ? getTrackEnvironment(snapshot.editor.environmentId).scenery[prop.kind]?.radius ?? 0 : TREE_SIZE / 2
+        const zoom = this.editorCamera.zoom
+        this.overlayGraphics.lineStyle(2 / zoom, 0x80e5ff, 0.95)
+        this.overlayGraphics.strokeCircle(item.x, item.y, radius * sceneryScale(item) + 4 / zoom)
+      }
+    }
     this.lastOverlayZoom = this.editorCamera.zoom
     renderRecoveryCheckpoints(
       this.overlayGraphics, geometry.path,
@@ -688,6 +718,7 @@ export class EditorScene extends Phaser.Scene {
       start: snapshot.editor.start,
       night: snapshot.currentTrack?.lighting === 'night',
       grid: snapshot.editorUi.grid,
+      selectedScenery: snapshot.editorUi.selectedScenery,
       selectedPoint: snapshot.editorUi.selectedPoint,
       selectedCrossing: snapshot.editorUi.selectedCrossing,
       tool: snapshot.editorUi.tool,
@@ -775,6 +806,7 @@ export class EditorScene extends Phaser.Scene {
     this.environmentSceneryRenderer?.destroy()
     this.environmentSceneryRenderer = undefined
     this.editorInput = undefined
+    this.sceneryRotationRenderPending = false
     this.currentSnapshot = undefined
     this.currentRenderState = undefined
     this.worldRenderPending = false

@@ -1,3 +1,4 @@
+import type { ScenerySelection } from '@/domain/track/sceneryTransform'
 import type { AppSnapshot, EditorSceneryChoice } from '@/application/appState'
 import type { TerrainBrushRadius } from '@/domain/config'
 import type {
@@ -24,6 +25,7 @@ import { createEditorToolPalette } from '@/ui/editor/editorToolPalette'
 import { element } from '@/ui/dom'
 
 export interface EditorChromeActions extends EditorFrameActions {
+  readonly previewSceneryRotation?: (target: ScenerySelection, rotation: number | null) => void
   readonly tool: (tool: EditorTool) => void
   readonly surface: (surface: EditorSurface) => void
   readonly structure: (structure: RoadStructure) => void

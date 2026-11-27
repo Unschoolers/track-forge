@@ -46,6 +46,14 @@ describe('generated scenery artwork', () => {
     expect(fallback.primitives.length).toBeGreaterThan(1)
   })
 
+  it('keeps a rotated bitmap visible when its corner crosses the viewport edge', () => {
+    const radius = getTrackEnvironment('cityscape').scenery['city-building']?.radius ?? 0
+    expect(radius).toBeGreaterThan(0)
+    const prop = { kind: 'city-building' as const, x: bounds.right + radius * 1.2, y: 0 }
+    expect(buildSceneryRenderPlan('cityscape', [prop], 'day', bounds, () => bitmap).sprites).toHaveLength(0)
+    expect(buildSceneryRenderPlan('cityscape', [{ ...prop, rotation: 45 }], 'day', bounds, () => bitmap).sprites).toHaveLength(1)
+  })
+
   it('reuses sprite objects and textures during drag and releases deleted props', () => {
     const registered = new Set<string>()
     const sprite = {
@@ -53,6 +61,7 @@ describe('generated scenery artwork', () => {
       setTexture: vi.fn().mockReturnThis(),
       setPosition: vi.fn().mockReturnThis(),
       setDisplaySize: vi.fn().mockReturnThis(),
+      setRotation: vi.fn().mockReturnThis(),
       destroy: vi.fn(),
     }
     const scene = {
@@ -65,13 +74,21 @@ describe('generated scenery artwork', () => {
     const graphics = {
       scene, depth: -15, clear: vi.fn(), fillStyle: vi.fn(), fillEllipse: vi.fn(),
       beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), fillPath: vi.fn(),
+      save: vi.fn(), restore: vi.fn(), translateCanvas: vi.fn(), rotateCanvas: vi.fn(),
     }
     const renderer = new SceneryRenderer(graphics as unknown as Phaser.GameObjects.Graphics, () => bitmap)
     const view = { centerX: 0, centerY: 0, width: 100, height: 100, zoom: 1, rotation: 0 }
-    const props = [{ kind: 'city-building' as const, x: 0, y: 0 }]
+    const props = [{ kind: 'city-building' as const, x: 0, y: 0, rotation: 90, scale: 1.25 }]
     renderer.render(view, 'cityscape', props, false)
     expect(scene.add.image).toHaveBeenCalledTimes(1)
+    expect(sprite.setRotation).toHaveBeenLastCalledWith(Math.PI / 2)
+    const radius = getTrackEnvironment('cityscape').scenery['city-building']?.radius ?? 0
+    expect(sprite.setDisplaySize).toHaveBeenLastCalledWith(radius * 2 * 1.25, radius * 2 * 1.25)
     expect(scene.textures.addCanvas).toHaveBeenCalledTimes(1)
+    renderer.render(view, 'cityscape', props, false, { index: 0, position: { x: 0, y: 0 }, rotation: 45 })
+    expect(sprite.setRotation).toHaveBeenLastCalledWith(Math.PI / 4)
+    renderer.render(view, 'cityscape', props, false)
+    expect(sprite.setRotation).toHaveBeenLastCalledWith(Math.PI / 2)
     renderer.render(view, 'cityscape', props, false, { index: 0, position: { x: 20, y: 30 } })
     expect(scene.add.image).toHaveBeenCalledTimes(1)
     expect(scene.textures.addCanvas).toHaveBeenCalledTimes(1)

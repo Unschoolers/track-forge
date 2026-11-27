@@ -1,3 +1,4 @@
+import { sceneryScale, sceneryRotation, scenerySquareHalfExtent } from '@/domain/track/sceneryTransform'
 import type { LightingMode } from '@/domain/model'
 import type { SceneryProp, SceneryPropKind, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { getTrackEnvironment } from './index'
@@ -9,15 +10,24 @@ function* visibleScenery(environmentId: TrackEnvironmentId, props: readonly Scen
   const scenery = getTrackEnvironment(environmentId).scenery
   for (const prop of props) {
     const art = scenery[prop.kind]
-    if (!art || prop.x + art.radius < bounds.left || prop.x - art.radius > bounds.right || prop.y + art.radius < bounds.top || prop.y - art.radius > bounds.bottom) continue
+    if (!art) continue
+    const radius = scenerySquareHalfExtent(art.radius, prop)
+    if (prop.x + radius < bounds.left || prop.x - radius > bounds.right || prop.y + radius < bounds.top || prop.y - radius > bounds.bottom) continue
     yield { prop, art }
   }
 }
 
 function translate(shape: SceneryPrimitive, prop: SceneryProp): SceneryPrimitive {
+  const scale = sceneryScale(prop)
+  const rotation = sceneryRotation(prop)
+  const c = Math.cos(rotation), s = Math.sin(rotation)
+  const transform = (point: { readonly x: number; readonly y: number }) => ({
+    x: prop.x + scale * (point.x * c - point.y * s),
+    y: prop.y + scale * (point.x * s + point.y * c),
+  })
   return shape.kind === 'ellipse'
-    ? { ...shape, x: shape.x + prop.x, y: shape.y + prop.y }
-    : { ...shape, points: shape.points.map(point => ({ x: point.x + prop.x, y: point.y + prop.y })) }
+    ? { ...shape, ...transform(shape), radiusX: shape.radiusX * scale, radiusY: shape.radiusY * scale, rotation: (shape.rotation ?? 0) + rotation }
+    : { ...shape, points: shape.points.map(transform) }
 }
 
 export function buildSceneryPresentation(environmentId: TrackEnvironmentId, props: readonly SceneryProp[], lighting: LightingMode, bounds: WorldBounds): readonly SceneryPrimitive[] {
@@ -34,6 +44,7 @@ export interface SceneryBitmapSprite {
   readonly x: number
   readonly y: number
   readonly size: number
+  readonly rotation: number
 }
 
 /** One presentation plan for editor, race and Canvas flyover. Keep the
@@ -58,7 +69,7 @@ export function buildSceneryRenderPlan(
     if (shadow?.kind === 'ellipse' && shadow.alpha !== undefined && shadow.alpha < 1) {
       primitives.push(translate(shadow, prop))
     }
-    sprites.push({ kind: prop.kind, image, x: prop.x, y: prop.y, size: art.radius * 2 })
+    sprites.push({ kind: prop.kind, image, x: prop.x, y: prop.y, size: art.radius * 2 * sceneryScale(prop), rotation: sceneryRotation(prop) })
   }
   return { primitives, sprites }
 }

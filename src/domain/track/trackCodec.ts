@@ -1,3 +1,4 @@
+import { normalizeSceneryTransform } from '@/domain/track/sceneryTransform'
 import { normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { normalizeTrackCreator } from '@/domain/track/trackCreator'
 import { normalizeRecoveryCheckpoints } from '@/domain/track/recoveryCheckpoints'
@@ -94,9 +95,9 @@ function decodeStart(value: unknown): TrackStart {
 
 function decodeTree(value: unknown): Tree | undefined {
   const item = object(value)
-  return item && finite(item.x) && finite(item.y)
-    ? { x: item.x, y: item.y }
-    : undefined
+  if (!item || !finite(item.x) || !finite(item.y)) return undefined
+  const transform = normalizeSceneryTransform({ rotation: item.rotation, scale: item.scale })
+  return transform ? { x: item.x, y: item.y, ...transform } : undefined
 }
 
 function decodeElevation(value: unknown): LegacyTrackElevation | undefined {

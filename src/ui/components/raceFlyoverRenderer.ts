@@ -1,3 +1,4 @@
+import { TREE_SIZE, sceneryScale, sceneryRotation } from '@/domain/track/sceneryTransform'
 import { ROAD_GEOMETRY } from '@/domain/config'
 import { roadColorsForEnvironment } from '@/presentation/environments/roadMaterials'
 import { environmentRoadStrokes } from '@/presentation/environments/environmentRoadStrokes'
@@ -266,7 +267,7 @@ export function createRaceFlyoverRenderer(
       ctx.globalAlpha = primitive.alpha ?? 1
       ctx.beginPath()
       if (primitive.kind === 'ellipse') {
-        ctx.ellipse(primitive.x, primitive.y, primitive.radiusX, primitive.radiusY, 0, 0, Math.PI * 2)
+        ctx.ellipse(primitive.x, primitive.y, primitive.radiusX, primitive.radiusY, primitive.rotation ?? 0, 0, Math.PI * 2)
       } else {
         for (const [index, point] of primitive.points.entries()) {
           if (index === 0) ctx.moveTo(point.x, point.y)
@@ -278,20 +279,30 @@ export function createRaceFlyoverRenderer(
     }
     ctx.globalAlpha = 1
     for (const sprite of scenery.sprites) {
-      ctx.drawImage(sprite.image, sprite.x - sprite.size / 2, sprite.y - sprite.size / 2, sprite.size, sprite.size)
+      ctx.save()
+      ctx.translate(sprite.x, sprite.y)
+      ctx.rotate(sprite.rotation)
+      ctx.drawImage(sprite.image, -sprite.size / 2, -sprite.size / 2, sprite.size, sprite.size)
+      ctx.restore()
     }
     for (const tree of trees) {
       if (!visible(tree.x, tree.y)) continue
+      const size = TREE_SIZE * sceneryScale(tree)
+      const factor = size / 34
       ctx.fillStyle = night ? 'rgba(0, 0, 0, .26)' : 'rgba(21, 54, 31, .24)'
-      ctx.beginPath(); ctx.ellipse(tree.x + 12, tree.y + 12, 23, 13, 0, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.ellipse(tree.x + 12 * factor, tree.y + 12 * factor, 23 * factor, 13 * factor, 0, 0, Math.PI * 2); ctx.fill()
+      ctx.save()
+      ctx.translate(tree.x, tree.y)
+      ctx.rotate(sceneryRotation(tree))
       if (treeBitmap) {
-        ctx.drawImage(treeBitmap, tree.x - 17, tree.y - 17, 34, 34)
-        continue
+        ctx.drawImage(treeBitmap, -size / 2, -size / 2, size, size)
+      } else {
+        ctx.fillStyle = night ? '#1b4738' : '#2c6b3c'
+        ctx.beginPath(); ctx.arc(0, 0, size / 2, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = night ? '#275642' : '#478c4c'
+        ctx.beginPath(); ctx.arc(-5 * factor, -5 * factor, 10 * factor, 0, Math.PI * 2); ctx.fill()
       }
-      ctx.fillStyle = night ? '#1b4738' : '#2c6b3c'
-      ctx.beginPath(); ctx.arc(tree.x, tree.y, 18, 0, Math.PI * 2); ctx.fill()
-      ctx.fillStyle = night ? '#275642' : '#478c4c'
-      ctx.beginPath(); ctx.arc(tree.x - 5, tree.y - 5, 10, 0, Math.PI * 2); ctx.fill()
+      ctx.restore()
     }
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'

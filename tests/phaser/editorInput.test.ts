@@ -88,6 +88,22 @@ describe('EditorInputController', () => {
     expect(reduceEditor(editor, { type: 'undo' }).scenery[0]).toEqual({ kind: 'desert-cactus', x: 100, y: 100 })
   })
 
+  it('selects a scaled tree by its visible canopy without placing another tree', () => {
+    let editor = createEditorState([], [{ x: 100, y: 100, scale: 1.5, rotation: 90 }])
+    const onScenerySelected = vi.fn()
+    const input = new EditorInputController({
+      camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street',
+      sceneryChoice: () => 'tree', editor: () => editor,
+      dispatch: command => { editor = reduceEditor(editor, command) }, onScenerySelected,
+    })
+    input.pointerDown({ id: 1, x: 140, y: 100 })
+    expect(onScenerySelected).not.toHaveBeenCalled()
+    input.pointerUp({ id: 1, x: 140, y: 100 })
+    expect(onScenerySelected).toHaveBeenCalledWith({ type: 'tree', index: 0 })
+    expect(editor.trees).toHaveLength(1)
+    expect(editor.history).toHaveLength(0)
+  })
+
   it('cancels a scenery move on pinch', () => {
     let editor = createEditorState([], [], undefined, undefined, { environmentId: 'desert', scenery: [{ kind: 'desert-cactus', x: 100, y: 100 }] })
     const input = new EditorInputController({ camera: { x: 0, y: 0, zoom: 1 }, tool: () => 'tree', surface: () => 'street', sceneryChoice: () => 'desert-cactus', editor: () => editor, dispatch: command => { editor = reduceEditor(editor, command) } })

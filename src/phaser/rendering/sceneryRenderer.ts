@@ -13,16 +13,16 @@ export class SceneryRenderer {
 
   constructor(private readonly graphics: Phaser.GameObjects.Graphics, private readonly resolveBitmap: SceneryBitmapResolver = getSceneryBitmap) {}
 
-  render(view: GroundViewport, environmentId: TrackEnvironmentId, props: readonly SceneryProp[], night: boolean, preview?: { index: number; position: Vector2 }): void {
+  render(view: GroundViewport, environmentId: TrackEnvironmentId, props: readonly SceneryProp[], night: boolean, preview?: { index: number; position: Vector2; rotation?: number }): void {
     const bounds = groundViewportBounds(view)
     const left = Math.floor(bounds.left / GROUND_TILE_SIZE) - 1
     const top = Math.floor(bounds.top / GROUND_TILE_SIZE) - 1
     const right = Math.ceil(bounds.right / GROUND_TILE_SIZE) + 1
     const bottom = Math.ceil(bounds.bottom / GROUND_TILE_SIZE) + 1
-    const key = `${environmentId}:${night}:${left}:${top}:${right}:${bottom}:${preview?.index}:${preview?.position.x}:${preview?.position.y}`
+    const key = `${environmentId}:${night}:${left}:${top}:${right}:${bottom}:${preview?.index}:${preview?.position.x}:${preview?.position.y}:${preview?.rotation}`
     if (this.key === key && this.props === props) return
     const shown = preview && props[preview.index]
-      ? props.map((prop, index) => index === preview.index ? { ...prop, ...preview.position } : prop)
+      ? props.map((prop, index) => index === preview.index ? { ...prop, ...preview.position, ...(preview.rotation !== undefined ? { rotation: preview.rotation } : {}) } : prop)
       : props
     const plan = buildSceneryRenderPlan(environmentId, shown, night ? 'night' : 'day', {
       left: left * GROUND_TILE_SIZE, top: top * GROUND_TILE_SIZE,
@@ -35,7 +35,15 @@ export class SceneryRenderer {
     for (const primitive of plan.primitives) {
       this.graphics.fillStyle(primitive.color, primitive.alpha ?? 1)
       if (primitive.kind === 'ellipse') {
-        this.graphics.fillEllipse(primitive.x, primitive.y, primitive.radiusX * 2, primitive.radiusY * 2)
+        if (primitive.rotation) {
+          this.graphics.save()
+          this.graphics.translateCanvas(primitive.x, primitive.y)
+          this.graphics.rotateCanvas(primitive.rotation)
+          this.graphics.fillEllipse(0, 0, primitive.radiusX * 2, primitive.radiusY * 2)
+          this.graphics.restore()
+        } else {
+          this.graphics.fillEllipse(primitive.x, primitive.y, primitive.radiusX * 2, primitive.radiusY * 2)
+        }
       } else {
         const first = primitive.points[0]
         if (!first) continue
@@ -61,7 +69,7 @@ export class SceneryRenderer {
         sprite = scene.add.image(prop.x, prop.y, texture).setDepth(this.graphics.depth + 0.01)
         this.sprites.push(sprite)
       }
-      sprite.setTexture(texture).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size)
+      sprite.setTexture(texture).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size).setRotation(prop.rotation)
     }
     for (const sprite of this.sprites.splice(plan.sprites.length)) sprite.destroy()
 

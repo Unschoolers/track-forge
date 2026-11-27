@@ -17,6 +17,7 @@ import type { UpdateInfo, UpdateProvider } from '@/application/updates/updatePro
 import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
 import { createEditorDiagnosticsMemo } from '@/ui/editor/editorFrameControls'
+import { isSceneryRotationPreviewOnly } from '@/application/editor/sceneryRotationPreview'
 import { deferEditorDragChrome } from '@/ui/editor/editorDragRendering'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
@@ -286,7 +287,7 @@ export class DomUiHost implements UiHost {
     this.root.dataset.graphicsQuality = state.preferences.graphicsQuality ?? 'medium'
     const previous = this.previousSnapshot
     this.previousSnapshot = state
-    if (deferEditorDragChrome(previous, state)) return
+    if (isSceneryRotationPreviewOnly(previous, state) || deferEditorDragChrome(previous, state)) return
     if (state.mode !== 'editor') this.editorDiagnosticsMemo.clear()
     this.screenCleanup?.()
     this.screenCleanup = undefined
@@ -384,6 +385,8 @@ export class DomUiHost implements UiHost {
                 this.controller.dispatch({
                   type: 'toggle-editor-grid',
                 }),
+              previewSceneryRotation: (target, rotation) =>
+                this.controller.dispatch({ type: 'preview-scenery-rotation', target, rotation }),
               edit: (command) =>
                 this.controller.dispatch({ type: 'editor', command }),
             }, geometry, this.editorDiagnosticsMemo)

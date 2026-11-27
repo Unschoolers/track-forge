@@ -55,6 +55,39 @@ function setup(snapshot = terrainSnapshot()) {
   return { root, port, host }
 }
 
+describe('scenery transformation controls', () => {
+  it('dispatches bounded size steps, rotation and reset for the selected tree', () => {
+    const base = terrainSnapshot()
+    const target = { type: 'tree' as const, index: 0 }
+    const { root, port, host } = setup({
+      ...base,
+      editor: createEditorState([], [{ x: 0, y: 0, rotation: 20, scale: 1.2 }]),
+      editorUi: { ...base.editorUi, tool: 'tree', selectedScenery: target },
+    })
+    root.querySelector<HTMLButtonElement>('[data-action="scenery-scale-up"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 20, scale: 1.25 } } })
+    const slider = root.querySelector<HTMLInputElement>('[data-action="scenery-rotation"]')
+    expect(slider).not.toBeNull()
+    if (!slider) throw new Error('Missing scenery rotation control')
+    vi.mocked(port.dispatch).mockClear()
+    slider.value = '45'
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
+    slider.value = '135'
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(port.dispatch).toHaveBeenNthCalledWith(1, { type: 'preview-scenery-rotation', target, rotation: 45 })
+    expect(port.dispatch).toHaveBeenNthCalledWith(2, { type: 'preview-scenery-rotation', target, rotation: 135 })
+    expect(root.textContent).toContain('Rotation: 135°')
+    expect(port.dispatch).toHaveBeenCalledTimes(2)
+    slider.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(port.dispatch).toHaveBeenCalledTimes(4)
+    expect(port.dispatch).toHaveBeenLastCalledWith({ type: 'preview-scenery-rotation', target, rotation: null })
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 135, scale: 1.2 } } })
+    root.querySelector<HTMLButtonElement>('[data-action="scenery-transform-reset"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 0, scale: 1 } } })
+    host.destroy()
+  })
+})
+
 describe('terrain editor chrome', () => {
   it('renders a two-row terrain dock with four verb brushes and three radii', () => {
     const { root, host } = setup()

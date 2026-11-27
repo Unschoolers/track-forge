@@ -1,3 +1,4 @@
+import { TREE_SIZE, sceneryScale, sceneryRotation, scenerySquareHalfExtent } from '@/domain/track/sceneryTransform'
 import type Phaser from 'phaser'
 import type { Tree } from '@/domain/model'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
@@ -20,6 +21,7 @@ export interface TreePrimitive {
   readonly color: number
   readonly alpha: number
   readonly baseHeight: number
+  readonly rotation?: number
 }
 
 export interface TreeViewBounds {
@@ -62,28 +64,31 @@ export function buildTreePresentation(
   const highlights: TreePrimitive[] = []
 
   for (const tree of trees) {
+    const size = TREE_SIZE * sceneryScale(tree)
+    const factor = size / 34
+    const rotation = sceneryRotation(tree)
     const baseHeight = terrainSurface?.heightAt(tree) ?? 0
     const shadow = terrainSurface
       ? projectSunShadowOntoTerrain(
           tree,
-          baseHeight + TREE_CANOPY_HEIGHT,
+          baseHeight + TREE_CANOPY_HEIGHT * factor,
           terrainSurface,
         ).point
-      : projectSunShadow(tree, TREE_CANOPY_HEIGHT)
-    // Bitmap canopies are rendered at 34px (radius 17); use that larger
-    // extent here so culling never clips their visible edge.
+      : projectSunShadow(tree, TREE_CANOPY_HEIGHT * factor)
+    // Include the scaled canopy and projected shadow in the culling bounds.
+    const extent = scenerySquareHalfExtent(TREE_SIZE / 2, tree)
     const canopyVisible = !viewBounds || intersectsEllipse(
       tree.x,
       tree.y,
-      17,
-      17,
+      extent,
+      extent,
       viewBounds,
     )
     const shadowVisible = !viewBounds || intersectsEllipse(
       shadow.x,
       shadow.y,
-      14,
-      7,
+      14 * factor,
+      7 * factor,
       viewBounds,
     )
     if (!canopyVisible && !shadowVisible) continue
@@ -91,8 +96,8 @@ export function buildTreePresentation(
       layer: 'shadow',
       x: shadow.x,
       y: shadow.y,
-      radiusX: 14,
-      radiusY: 7,
+      radiusX: 14 * factor,
+      radiusY: 7 * factor,
       color: colors.shadow,
       alpha: night ? 0.14 : 0.22,
       baseHeight,
@@ -101,18 +106,19 @@ export function buildTreePresentation(
       layer: 'canopy',
       x: tree.x,
       y: tree.y,
-      radiusX: 15,
-      radiusY: 15,
+      radiusX: size / 2,
+      radiusY: size / 2,
+      rotation,
       color: colors.canopy,
       alpha: 1,
       baseHeight,
     })
     highlights.push({
       layer: 'highlight',
-      x: tree.x - 4,
-      y: tree.y - 5,
-      radiusX: 10,
-      radiusY: 10,
+      x: tree.x + (-4 * Math.cos(rotation) + 5 * Math.sin(rotation)) * factor,
+      y: tree.y + (-4 * Math.sin(rotation) - 5 * Math.cos(rotation)) * factor,
+      radiusX: 10 * factor,
+      radiusY: 10 * factor,
       color: colors.highlight,
       alpha: 1,
       baseHeight,
@@ -150,7 +156,8 @@ export function renderStaticTreeCanopies(
     for (const tree of chunk) {
       layer.addMember({
         x: tree.x, y: tree.y, frame: '__BASE',
-        originX: 0.5, originY: 0.5, scaleX: 34 / width, scaleY: 34 / height,
+        originX: 0.5, originY: 0.5, scaleX: tree.radiusX * 2 / width, scaleY: tree.radiusY * 2 / height,
+        rotation: tree.rotation ?? 0,
       })
     }
   }
@@ -211,7 +218,7 @@ export function renderTrees(
         treeSprites.set(graphics, sprites)
       }
       sprite.setTexture(texture).setPosition(primitive.x, primitive.y)
-        .setDisplaySize(34, 34).setVisible(true)
+        .setDisplaySize(primitive.radiusX * 2, primitive.radiusY * 2).setRotation(primitive.rotation ?? 0).setVisible(true)
       shown++
       continue
     }

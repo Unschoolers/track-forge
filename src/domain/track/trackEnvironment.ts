@@ -1,3 +1,4 @@
+import { normalizeSceneryTransform, type SceneryTransform } from '@/domain/track/sceneryTransform'
 import type { Vector2 } from '@/domain/model'
 
 export type TrackEnvironmentId = 'grass' | 'cityscape' | 'desert' | 'kids-room'
@@ -11,7 +12,7 @@ export const SCENERY_KINDS_BY_ENVIRONMENT = {
 } as const satisfies Record<TrackEnvironmentId, readonly string[]>
 
 export type SceneryPropKind = (typeof SCENERY_KINDS_BY_ENVIRONMENT)[TrackEnvironmentId][number]
-export interface SceneryProp extends Vector2 { readonly kind: SceneryPropKind }
+export interface SceneryProp extends Vector2, SceneryTransform { readonly kind: SceneryPropKind }
 export const MAX_SCENERY_PROPS = 256
 
 export function normalizeTrackEnvironmentId(value: unknown): TrackEnvironmentId {
@@ -35,7 +36,9 @@ export function normalizeSceneryProps(value: unknown): readonly SceneryProp[] {
     const item = entry as Record<string, unknown>
     if (typeof item.kind !== 'string' || typeof item.x !== 'number' || typeof item.y !== 'number') continue
     if (!Object.values(SCENERY_KINDS_BY_ENVIRONMENT).some((kinds) => (kinds as readonly string[]).includes(item.kind as string))) continue
-    const prop = { kind: item.kind as SceneryPropKind, x: item.x, y: item.y }
+    const transform = normalizeSceneryTransform({ rotation: item.rotation, scale: item.scale })
+    if (!transform) continue
+    const prop = { kind: item.kind as SceneryPropKind, x: item.x, y: item.y, ...transform }
     if (isSceneryPosition(prop)) result.push(prop)
   }
   return result

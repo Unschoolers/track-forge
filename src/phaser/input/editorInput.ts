@@ -1,3 +1,4 @@
+import { TREE_SIZE, scenerySquareContains, type ScenerySelection } from '@/domain/track/sceneryTransform'
 import type { EditorCommand } from '@/domain/editor/editorState'
 import type { EditorState } from '@/domain/editor/editorState'
 import type { EditorSceneryChoice } from '@/application/appState'
@@ -157,6 +158,7 @@ export interface EditorInputDependencies {
   readonly viewport?: () => { readonly width: number; readonly height: number }
   readonly onCrossingSelected?: (key: string | null) => void
   readonly onPointSelected?: (index: number | null) => void
+  readonly onScenerySelected?: (target: ScenerySelection | null) => void
   readonly onRejected?: (rejection: EditorCommandRejection) => void
 }
 
@@ -472,13 +474,13 @@ export class EditorInputController {
     const art = getTrackEnvironment(editor.environmentId).scenery
     editor.trees.forEach((source, index) => {
       const distance = Math.hypot(world.x - source.x, world.y - source.y)
-      if (distance <= 15 + margin) candidates.push({ type: 'tree', index, source, distance })
+      if (scenerySquareContains(TREE_SIZE / 2, source, world.x - source.x, world.y - source.y, margin)) candidates.push({ type: 'tree', index, source, distance })
     })
     editor.scenery.forEach((source, index) => {
       if (!sceneryKindBelongsToEnvironment(source.kind, editor.environmentId)) return
       const radius = art[source.kind]?.radius ?? 0
       const distance = Math.hypot(world.x - source.x, world.y - source.y)
-      if (distance <= radius + margin) candidates.push({ type: 'prop', index, source, distance })
+      if (scenerySquareContains(radius, source, world.x - source.x, world.y - source.y, margin)) candidates.push({ type: 'prop', index, source, distance })
     })
     // Trees are drawn after themed props, and later items win an exact tie.
     candidates.sort((a, b) => a.distance - b.distance || (a.type === b.type ? b.index - a.index : a.type === 'tree' ? -1 : 1))
@@ -509,11 +511,16 @@ export class EditorInputController {
   private commitSceneryGesture(gesture: SceneryGesture): void {
     this.sceneryGesture = undefined
     if (gesture.choice === 'erase-scenery') {
+      this.dependencies.onScenerySelected?.(null)
       if (!gesture.dragging && gesture.type !== 'empty') this.dependencies.dispatch({ type: gesture.type === 'tree' ? 'erase-tree' : 'erase-scenery-prop', index: gesture.index })
       return
     }
-    if (gesture.type !== 'empty' && !gesture.dragging) return
+    if (gesture.type !== 'empty' && !gesture.dragging) {
+      this.dependencies.onScenerySelected?.({ type: gesture.type, index: gesture.index })
+      return
+    }
     if (gesture.type === 'empty' && gesture.dragging) return
+    if (gesture.type === 'empty') this.dependencies.onScenerySelected?.(null)
     const rejection = treePlacementRejection(this.dependencies.editor().terrain, gesture.position)
     if (rejection || !isSceneryPosition(gesture.position)) {
       this.dependencies.onRejected?.(rejection ?? INVALID_SCENERY_POSITION_REJECTION)

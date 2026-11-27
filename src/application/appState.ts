@@ -1,3 +1,4 @@
+import type { ScenerySelection } from '@/domain/track/sceneryTransform'
 import { sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
 import type { SceneryPropKind, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { TimeMedal } from '@/application/race/raceRecords'
@@ -61,6 +62,8 @@ export type AppOverlay =
   | { readonly type: 'cup-final' }
 
 export interface AppSnapshot {
+  /** Presentation only; never persisted or added to editor history. */
+  readonly sceneryRotationPreview?: { readonly target: ScenerySelection; readonly rotation: number } | null
   readonly raceLighting?: LightingMode
   readonly raceAgainTrackName?: string | undefined
   readonly cup?: CircuitCup | null
@@ -106,6 +109,7 @@ export interface EditorUiState {
   } | null
   readonly selectedCrossing: string | null
   readonly selectedPoint: number | null
+  readonly selectedScenery?: ScenerySelection | null
 }
 
 export type AppCommand =
@@ -160,6 +164,8 @@ export type AppCommand =
   | { readonly type: 'save-current-track' }
   | { readonly type: 'save-as-track'; readonly name: string }
   | { readonly type: 'resolve-editor-exit'; readonly choice: 'save' | 'save-as' | 'discard' | 'cancel' }
+  | { readonly type: 'select-editor-scenery'; readonly target: ScenerySelection | null }
+  | { readonly type: 'preview-scenery-rotation'; readonly target: ScenerySelection; readonly rotation: number | null }
   | { readonly type: 'set-editor-scenery'; readonly choice: EditorSceneryChoice }
   | { readonly type: 'set-editor-tool'; readonly tool: EditorTool }
   | {

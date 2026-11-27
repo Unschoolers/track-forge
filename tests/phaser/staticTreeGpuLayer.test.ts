@@ -9,14 +9,14 @@ describe('static race tree GPU batches', () => {
     const spriteGPULayer = vi.fn(() => layer)
     const scene = { add: { spriteGPULayer } } as unknown as Phaser.Scene
     const canopy: TreePrimitive = {
-      layer: 'canopy', x: 12, y: 32, radiusX: 15, radiusY: 15, color: 0xffffff, alpha: 1, baseHeight: 0,
+      layer: 'canopy', x: 12, y: 32, radiusX: 28, radiusY: 28, rotation: Math.PI / 2, color: 0xffffff, alpha: 1, baseHeight: 0,
     }
     renderStaticTreeCanopies(scene, 'tree', 68, 34, 5, Array.from({ length: 513 }, () => canopy))
     expect(spriteGPULayer.mock.calls).toEqual([['tree', 512], ['tree', 1]])
     expect(layer.setDepth).toHaveBeenCalledWith(5)
     expect(addMember).toHaveBeenCalledTimes(513)
     expect(addMember).toHaveBeenCalledWith({
-      x: 12, y: 32, frame: '__BASE', originX: 0.5, originY: 0.5, scaleX: 0.5, scaleY: 1,
+      x: 12, y: 32, frame: '__BASE', originX: 0.5, originY: 0.5, scaleX: 56 / 68, scaleY: 56 / 34, rotation: Math.PI / 2,
     })
   })
 })

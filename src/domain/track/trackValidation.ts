@@ -1,3 +1,4 @@
+import { normalizeSceneryTransform } from '@/domain/track/sceneryTransform'
 import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
 import {
   normalizeRouteKind,
@@ -38,7 +39,8 @@ export function validateTrack(
     !track.points.every(
       (point) => isFiniteVector(point) && isSurfaceId(point.surface),
     ) ||
-    !track.trees.every(isFiniteVector)
+    !track.trees.every(tree => isFiniteVector(tree) && normalizeSceneryTransform(tree) !== undefined) ||
+    !(track.scenery ?? []).every(prop => isFiniteVector(prop) && normalizeSceneryTransform(prop) !== undefined)
   ) {
     return {
       ready: false,
