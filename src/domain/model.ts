@@ -15,7 +15,7 @@ export type DifficultyId = (typeof DIFFICULTY_IDS)[number]
 export type LightingMode = (typeof LIGHTING_MODES)[number]
 export type TerrainKind = (typeof TERRAIN_KINDS)[number]
 export type TerrainBrushKind = TerrainKind | 'ground'
-export type RoadStructure = 'surface' | 'overpass'
+export type RoadStructure = 'surface' | 'overpass' | 'jump'
 export type CurveMode = 'smooth' | 'corner'
 export type RouteKind = 'circuit' | 'point-to-point'
 
