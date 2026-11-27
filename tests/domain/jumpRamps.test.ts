@@ -6,6 +6,7 @@ import { findJumpTakeoff } from '@/domain/race/jumpTakeoff'
 import { asTrackId, type TrackPoint, type Track } from '@/domain/model'
 import { createRace } from '@/domain/race/raceFactory'
 import { stepRace } from '@/domain/race/raceEngine'
+import type { RaceState } from '@/domain/race/raceState'
 import { jumpValidationMessage } from '@/domain/track/jumpValidation'
 import { decodeTrack } from '@/domain/track/trackCodec'
 import { createEditorState, applyEditorCommand } from '@/domain/editor/editorState'
@@ -72,7 +73,7 @@ describe('authored jump ramps', () => {
 it('preserves the jump brush through an editor command and local save decoding', () => {
   const track = jumpTrack()
   const original = createEditorState(track.points.map(point => ({ ...point, structure: 'surface' })))
-  const edited = applyEditorCommand(original, { type: 'paint-section-structure', index: 1, structure: 'jump' })
+  const { state: edited } = applyEditorCommand(original, { type: 'paint-section-structure', index: 1, structure: 'jump' })
   expect(edited.points[1]?.structure).toBe('jump')
   expect(decodeTrack({ ...track, points: edited.points }, 1)?.points[1]?.structure).toBe('jump')
 })
@@ -93,7 +94,7 @@ it('launches and lands through the real race tick without bridge-fall recovery',
   if (!original) throw new Error('Missing player')
   const x = lip.center.x - 3
   const support = path.roadSurface.at(lip.beforeIndex, { x, y: 0 })
-  let race = { ...base, phase: 'running' as const, vehicles: [{
+  let race: RaceState = { ...base, phase: 'running', vehicles: [{
     ...original, x, y: 0, z: support.height, pathIndex: lip.beforeIndex, angle: 0,
     speed: 180, vx: 180, vy: 0, grounded: true, structureRunId: support.structureRunId,
   }] }
