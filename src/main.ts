@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
 import { isPortableWindows } from '@/infrastructure/updates/windowsPortableUpdate'
 import { NearbyRace } from '@/application/multiplayer/nearbyRace'
@@ -121,7 +121,9 @@ const longTaskObserver = supportsLongTasks ? new PerformanceObserver(list => {
   for (const entry of list.getEntries()) frameDiagnostics.recordLongTask(entry.startTime, entry.duration)
 }) : undefined
 longTaskObserver?.observe({ entryTypes: ['longtask'] })
+const nativeExit = registerPlugin<{ exit(): Promise<void> }>('TrackForgeApp')
 const uiHost = new DomUiHost(uiRoot, controller, {
+  ...(Capacitor.getPlatform() === 'android' ? { exitApp: () => nativeExit.exit() } : {}),
   nearby,
   ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),
   raceSession,

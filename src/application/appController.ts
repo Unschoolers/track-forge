@@ -451,6 +451,11 @@ export class AppController {
         })
         break
       }
+      case 'open-app-exit':
+        if (this.state.mode === 'home' && this.state.overlay.type === 'none') {
+          this.update({ ...this.state, overlay: { type: 'app-exit' }, notice: null })
+        }
+        break
       case 'close-overlay':
         this.closeOverlay()
         break

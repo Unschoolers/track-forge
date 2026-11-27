@@ -188,15 +188,15 @@
 /* The compact dialog card is the optical source, not the live editor canvas.
    Keep the background opaque for readable content and let the same shared
    SVG lenses used by other menus refract this controlled, textured light. */
-#app :is(.editor-menu-modal, .track-share-modal)[data-menu-material='static']:has([data-liquid-glass]) .modal-card {
+#app :is(.editor-menu-modal, .track-share-modal, .app-exit-modal)[data-menu-material='static']:has([data-liquid-glass]) .modal-card {
   background: radial-gradient(ellipse at 15% 8%, #385264 0%, transparent 55%),
     radial-gradient(ellipse at 94% 88%, #334552 0%, transparent 54%),
     linear-gradient(150deg, #192631, #111923 52%, #17232e);
 }
-#app :is(.editor-menu-modal, .track-share-modal) [data-liquid-glass][data-liquid-glass] {
+#app :is(.editor-menu-modal, .track-share-modal, .app-exit-modal) [data-liquid-glass][data-liquid-glass] {
   --lg-tint: rgb(13 24 35 / 24%);
 }
-#app :is(.editor-menu-modal, .track-share-modal) [data-liquid-glass][data-liquid-glass].button-primary {
+#app :is(.editor-menu-modal, .track-share-modal, .app-exit-modal) [data-liquid-glass][data-liquid-glass].button-primary {
   --lg-tint: rgb(255 146 92 / 78%);
 }
 #app .editor-menu-modal [data-liquid-glass][data-liquid-glass].button-danger {
@@ -214,3 +214,15 @@
   background: #15212b;
   color: #f5f7fa;
 }
+
+.app-exit-modal .modal-card { width: min(27rem, 100%); }
+.app-exit-modal .modal-header { border: 0; }
+.app-exit-modal .modal-body:empty { display: none; }
+.app-exit-modal .modal-footer {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 0;
+  gap: .6rem;
+}
+.app-exit-modal .modal-body { color: #ffb5ba; }

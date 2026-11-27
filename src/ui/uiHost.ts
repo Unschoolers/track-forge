@@ -31,6 +31,7 @@ import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createModalFrame } from '@/ui/modals/modalFrame'
 import { button, element } from '@/ui/dom'
 import { createEditorExitModal } from '@/ui/modals/editorExitModal'
+import { createAppExitModal } from '@/ui/modals/appExitModal'
 import { createNameModal } from '@/ui/modals/nameModal'
 import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
 import { createOptionsModal } from '@/ui/modals/optionsModal'
@@ -58,6 +59,7 @@ export interface UiControllerPort {
 }
 
 export interface UiRuntime {
+  readonly exitApp?: () => Promise<void>
   readonly nearby?: NearbyRace | undefined
   readonly nearbyConnections?: NearbyConnectionModes
   readonly raceSession: RaceSessionPort
@@ -498,6 +500,8 @@ export class DomUiHost implements UiHost {
     switch (state.overlay.type) {
       case 'none':
         return undefined
+      case 'app-exit':
+        return createAppExitModal(close, this.runtime.exitApp)
       case 'track-share': {
         const { track, challenge } = state.overlay
         const nearby = this.runtime.nearby

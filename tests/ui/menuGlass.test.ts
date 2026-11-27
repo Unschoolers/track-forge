@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { attachMenuGlass } from '@/ui/menu/menuGlass'
+import { createAppExitModal } from '@/ui/modals/appExitModal'
 
 function setup(quality = 'medium') {
   const root = document.createElement('div')
@@ -20,6 +21,32 @@ afterEach(() => {
 })
 
 describe('LiquidGlass.dev menu adapter', () => {
+  it('uses real shared lenses for both app exit actions and only exits on confirmation', async () => {
+    const { root } = setup()
+    const stay = vi.fn()
+    const exit = vi.fn(async () => undefined)
+    const screen = createAppExitModal(stay, exit)
+    root.append(screen)
+    const cleanup = attachMenuGlass(root, screen, async () => undefined)
+    await vi.waitFor(() => expect(screen.querySelectorAll('button > lg-panel')).toHaveLength(2))
+    screen.querySelector<HTMLButtonElement>('[data-action="app-exit-stay"]')?.click()
+    expect(stay).toHaveBeenCalledOnce()
+    expect(exit).not.toHaveBeenCalled()
+    screen.querySelector<HTMLButtonElement>('[data-action="app-exit-confirm"]')?.click()
+    expect(exit).toHaveBeenCalledOnce()
+    cleanup()
+  })
+
+  it('reports native exit failure and permits retry', async () => {
+    const exit = vi.fn(async () => { throw new Error('Unavailable') })
+    const screen = createAppExitModal(vi.fn(), exit)
+    const confirm = screen.querySelector<HTMLButtonElement>('[data-action="app-exit-confirm"]')
+    if (!confirm) throw new Error('Missing exit action')
+    confirm.click()
+    await vi.waitFor(() => expect(screen.querySelector('[role="alert"]')?.textContent).toContain('Unavailable'))
+    expect(confirm.disabled).toBe(false)
+  })
+
   it('preserves the native button and removes the decorative lens on cleanup', async () => {
     const { root, screen, button, media } = setup()
     const click = vi.fn()
