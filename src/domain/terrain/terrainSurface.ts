@@ -23,6 +23,8 @@ export interface TerrainHeightSample {
 export interface TerrainSurface {
   readonly contours: readonly TerrainContour[]
   readonly authoredCellCount?: number
+  /** Rendering cache identity for the exact road-distance lookup neighborhood. */
+  roadInfluenceRegionAt?(position: Vector2): RoadInfluenceRegion
   heightSampleAt(position: Vector2): TerrainHeightSample
   heightAt(position: Vector2): number
   materialAt(position: Vector2): TerrainMaterial
@@ -40,8 +42,14 @@ interface RoadSegment {
   readonly end: Vector2
 }
 
+export interface RoadInfluenceRegion {
+  readonly key: string
+  readonly signature: string
+}
+
 interface RoadDistanceLookup {
   sampleAt(position: Vector2): DistanceSample
+  regionAt(position: Vector2): RoadInfluenceRegion
 }
 
 interface BoundaryDistanceLookup {
@@ -525,7 +533,36 @@ function compileRoadDistance(
       }
     }
   }
+  // Match sampleAt's bucket traversal and per-bucket segment order exactly.
+  // A tie in nearest distance must retain the same gradient. Compute these
+  // identities lazily for rendering only; the physics query stays unchanged.
+  const regions = new Map<string, RoadInfluenceRegion>()
+  const bucketSignatures = new Map<string, string>()
+  const signatureFor = (key: string): string => {
+    const cached = bucketSignatures.get(key)
+    if (cached !== undefined) return cached
+    const signature = (buckets.get(key) ?? []).map(({ start, end }) =>
+      `${start.x},${start.y}:${end.x},${end.y}`).join('|')
+    bucketSignatures.set(key, signature)
+    return signature
+  }
   return {
+    regionAt(position: Vector2): RoadInfluenceRegion {
+      const column = Math.floor(position.x / bucketSize)
+      const row = Math.floor(position.y / bucketSize)
+      const key = `${column}:${row}`
+      const cached = regions.get(key)
+      if (cached) return cached
+      const signatures: string[] = []
+      for (let x = column - bucketRadius; x <= column + bucketRadius; x++) {
+        for (let y = row - bucketRadius; y <= row + bucketRadius; y++) {
+          signatures.push(signatureFor(`${x}:${y}`))
+        }
+      }
+      const region = { key, signature: signatures.join(';') }
+      regions.set(key, region)
+      return region
+    },
     sampleAt(position: Vector2): DistanceSample {
       if (segments.length === 0) {
         return {
@@ -710,6 +747,10 @@ export function compileTerrainSurface(
   const surface: TerrainSurface = {
     contours: field.contours,
     authoredCellCount: terrain.cells.length,
+    roadInfluenceRegionAt(position) {
+      roadDistance ??= compileRoadDistance(centerPath, closed)
+      return roadDistance.regionAt(position)
+    },
     materialAt,
     heightSampleAt,
     heightAt(position: Vector2): number {
