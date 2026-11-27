@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NearbyRacePlugin.class);
         registerPlugin(LanRacePlugin.class);
         registerPlugin(TrackForgeUpdatesPlugin.class);
+        registerPlugin(TrackForgeAppPlugin.class);
         super.onCreate(savedInstanceState);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -57,7 +58,7 @@ public class MainActivity extends BridgeActivity {
     /**
      * Android Back navigates the in-game UI first. JavaScript synchronously
      * prevents the cancelable event when it handled Back; otherwise Android
-     * displays a native confirmation instead of unexpectedly closing the app.
+     * displays a native confirmation if the web UI cannot handle Back.
      */
     private void handleSystemBack() {
         if (backEvaluationPending || (exitDialog != null && exitDialog.isShowing())) return;

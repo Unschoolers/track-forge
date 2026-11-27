@@ -39,6 +39,7 @@ export type TrackShareReturn = TrackLibraryOverlay | { readonly type: 'editor-me
 
 export type AppOverlay =
   | { readonly type: 'none' }
+  | { readonly type: 'app-exit' }
   | TrackLibraryOverlay
   | {
       readonly type: 'track-name'
@@ -114,6 +115,7 @@ export interface EditorUiState {
 
 export type AppCommand =
   | { readonly type: 'go-home' }
+  | { readonly type: 'open-app-exit' }
   | { readonly type: 'open-editor' }
   | { readonly type: 'race-current-track' }
   | { readonly type: 'start-race' }

@@ -14,6 +14,7 @@ const menuSurfaces = [
   { screen: '.nearby-static-modal', backdrop: '.nearby-static-modal', groups: '' },
   { screen: '.editor-menu-modal', backdrop: '.editor-menu-modal .modal-card', groups: '.editor-menu-select-surface' },
   { screen: '.track-share-modal', backdrop: '.track-share-modal .modal-card', groups: '' },
+  { screen: '.app-exit-modal', backdrop: '.app-exit-modal .modal-card', groups: '' },
 ] as const
 
 /** One upstream lens per independent action or semantic group, never nested. */

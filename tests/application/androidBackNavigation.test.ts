@@ -35,10 +35,13 @@ describe('Android Back navigation', () => {
     expect(dispatch).toHaveBeenCalledWith(expected)
   })
 
-  it('allows native exit confirmation only when already on Home', () => {
+  it('opens the shared exit confirmation on Home and dismisses it on a second Back', () => {
     const dispatch = vi.fn()
-    expect(handleAndroidBack(state('home', { type: 'none' }), dispatch)).toBe(false)
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(handleAndroidBack(state('home', { type: 'none' }), dispatch)).toBe(true)
+    expect(dispatch).toHaveBeenCalledWith({ type: 'open-app-exit' })
+    dispatch.mockClear()
+    expect(handleAndroidBack(state('home', { type: 'app-exit' }), dispatch)).toBe(true)
+    expect(dispatch).toHaveBeenCalledWith({ type: 'close-overlay' })
   })
 
   it('does not dismiss a required first-launch name screen', () => {

@@ -2,7 +2,7 @@ import type { AppCommand, AppSnapshot } from '@/application/appState'
 
 /**
  * Convert the Android system Back button into the same commands used by
- * on-screen navigation. Only an unhandled Back can request app exit.
+ * on-screen navigation. Home opens the shared exit confirmation.
  */
 export function androidBackCommand(
   state: Pick<AppSnapshot, 'mode' | 'overlay' | 'preferences'>,
@@ -14,7 +14,7 @@ export function androidBackCommand(
 
   if (state.mode === 'race') return { type: 'pause-race' }
   if (state.mode === 'editor') return { type: 'go-home' }
-  return null
+  return { type: 'open-app-exit' }
 }
 
 export function handleAndroidBack(
