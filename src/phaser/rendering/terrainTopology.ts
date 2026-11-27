@@ -97,66 +97,81 @@ export function buildTerrainComponents(
   }))
 }
 
-export function triangulateTerrainComponent(
+interface ScanEdge {
+  readonly top: number
+  readonly bottom: number
+  readonly middle: number
+}
+
+/** Both Phaser's triangle batches and the bitmap tile painter must cover
+ * precisely the same polygon, including diagonal edges and island holes.
+ * The midpoint determines the edge ordering, not the shape of the fill. */
+function tessellateTerrainComponent(
   component: TerrainComponent,
+  tileSize: number,
 ): readonly TerrainTriangle[] {
   const rings = [component.outer, ...component.holes]
   const yLevels = [...new Set(rings.flatMap(
     (ring) => ring.map(({ y }) => y),
   ))].sort((left, right) => left - right)
   const triangles: TerrainTriangle[] = []
-  for (let index = 0; index < yLevels.length - 1; index += 1) {
-    const top = yLevels[index]
-    const bottom = yLevels[index + 1]
-    if (top === undefined || bottom === undefined || bottom <= top) continue
-    const sampleY = (top + bottom) / 2
-    const intersections: number[] = []
-    for (const ring of rings) {
-      for (let edgeIndex = 0; edgeIndex < ring.length; edgeIndex += 1) {
-        const start = ring[edgeIndex]
-        const end = ring[(edgeIndex + 1) % ring.length]
-        if (!start || !end || start.y === end.y) continue
-        if (
-          (start.y > sampleY) === (end.y > sampleY)
-        ) {
-          continue
+  for (let levelIndex = 0; levelIndex < yLevels.length - 1; levelIndex += 1) {
+    const levelTop = yLevels[levelIndex]
+    const levelBottom = yLevels[levelIndex + 1]
+    if (levelTop === undefined || levelBottom === undefined || levelBottom <= levelTop) continue
+    const rowCount = Math.ceil((levelBottom - levelTop) / tileSize) || 1
+    for (let row = 0; row < rowCount; row += 1) {
+      const top = levelTop + (Number.isFinite(tileSize) ? row * tileSize : 0)
+      const bottom = Math.min(levelBottom, top + tileSize)
+      const sampleY = (top + bottom) / 2
+      const intersections: ScanEdge[] = []
+      for (const ring of rings) {
+        for (let edgeIndex = 0; edgeIndex < ring.length; edgeIndex += 1) {
+          const start = ring[edgeIndex]
+          const end = ring[(edgeIndex + 1) % ring.length]
+          if (!start || !end || start.y === end.y ||
+              (start.y > sampleY) === (end.y > sampleY)) continue
+          const xAt = (y: number): number =>
+            start.x + ((y - start.y) * (end.x - start.x)) / (end.y - start.y)
+          intersections.push({ top: xAt(top), bottom: xAt(bottom), middle: xAt(sampleY) })
         }
-        intersections.push(
-          start.x +
-            ((sampleY - start.y) * (end.x - start.x)) /
-              (end.y - start.y),
-        )
       }
-    }
-    intersections.sort((left, right) => left - right)
-    for (
-      let intersectionIndex = 0;
-      intersectionIndex < intersections.length - 1;
-      intersectionIndex += 2
-    ) {
-      const left = intersections[intersectionIndex]
-      const right = intersections[intersectionIndex + 1]
-      if (left === undefined || right === undefined || right <= left) {
-        continue
+      intersections.sort((left, right) => left.middle - right.middle)
+      for (let index = 0; index < intersections.length - 1; index += 2) {
+        const left = intersections[index]
+        const right = intersections[index + 1]
+        if (!left || !right || right.middle <= left.middle) continue
+        const topWidth = right.top - left.top
+        const bottomWidth = right.bottom - left.bottom
+        const columnCount = Math.ceil(Math.max(topWidth, bottomWidth) / tileSize) || 1
+        for (let column = 0; column < columnCount; column += 1) {
+          // Preserve existing grid quad alignment and hill height sampling;
+          // angled sides instead interpolate each end of the trapezoid.
+          const xAt = (edge: number, width: number, i: number): number =>
+            topWidth === bottomWidth && Number.isFinite(tileSize)
+              ? edge + Math.min(width, i * tileSize)
+              : edge + width * i / columnCount
+          const topLeft = { x: xAt(left.top, topWidth, column), y: top }
+          const topRight = { x: xAt(left.top, topWidth, column + 1), y: top }
+          const bottomLeft = { x: xAt(left.bottom, bottomWidth, column), y: bottom }
+          const bottomRight = { x: xAt(left.bottom, bottomWidth, column + 1), y: bottom }
+          if (topRight.x > topLeft.x) triangles.push([topLeft, topRight, bottomRight])
+          if (bottomRight.x > bottomLeft.x) triangles.push([topLeft, bottomRight, bottomLeft])
+        }
       }
-      const topLeft = { x: left, y: top }
-      const topRight = { x: right, y: top }
-      const bottomRight = { x: right, y: bottom }
-      const bottomLeft = { x: left, y: bottom }
-      triangles.push(
-        [topLeft, topRight, bottomRight],
-        [topLeft, bottomRight, bottomLeft],
-      )
     }
   }
   return triangles
 }
 
-/**
- * Tessellates grid-derived terrain into bounded quads. Splitting scanline
- * intervals directly avoids recursively dividing the short axis of very wide
- * strips, so output remains linear in authored terrain area.
- */
+export function triangulateTerrainComponent(
+  component: TerrainComponent,
+): readonly TerrainTriangle[] {
+  return tessellateTerrainComponent(component, Number.POSITIVE_INFINITY)
+}
+
+/** Split into bounded tiles so a large lake does not become one huge
+ * bitmap-index primitive. Orthogonal hill quads remain unchanged. */
 export function tileTerrainComponent(
   component: TerrainComponent,
   tileSize: number,
@@ -164,69 +179,7 @@ export function tileTerrainComponent(
   if (!Number.isFinite(tileSize) || tileSize <= 0) {
     throw new Error('Terrain tile size must be positive')
   }
-  const rings = [component.outer, ...component.holes]
-  const yLevels = [...new Set(rings.flatMap(
-    (ring) => ring.map(({ y }) => y),
-  ))].sort((left, right) => left - right)
-  const triangles: TerrainTriangle[] = []
-
-  for (let levelIndex = 0; levelIndex < yLevels.length - 1; levelIndex += 1) {
-    const levelTop = yLevels[levelIndex]
-    const levelBottom = yLevels[levelIndex + 1]
-    if (
-      levelTop === undefined ||
-      levelBottom === undefined ||
-      levelBottom <= levelTop
-    ) {
-      continue
-    }
-    const rowCount = Math.ceil((levelBottom - levelTop) / tileSize)
-    for (let row = 0; row < rowCount; row += 1) {
-      const top = levelTop + row * tileSize
-      const bottom = Math.min(levelBottom, top + tileSize)
-      const sampleY = (top + bottom) / 2
-      const intersections: number[] = []
-      for (const ring of rings) {
-        for (let edgeIndex = 0; edgeIndex < ring.length; edgeIndex += 1) {
-          const start = ring[edgeIndex]
-          const end = ring[(edgeIndex + 1) % ring.length]
-          if (!start || !end || start.y === end.y) continue
-          if ((start.y > sampleY) === (end.y > sampleY)) continue
-          intersections.push(
-            start.x +
-              ((sampleY - start.y) * (end.x - start.x)) /
-                (end.y - start.y),
-          )
-        }
-      }
-      intersections.sort((left, right) => left - right)
-      for (
-        let intersectionIndex = 0;
-        intersectionIndex < intersections.length - 1;
-        intersectionIndex += 2
-      ) {
-        const left = intersections[intersectionIndex]
-        const right = intersections[intersectionIndex + 1]
-        if (left === undefined || right === undefined || right <= left) {
-          continue
-        }
-        const columnCount = Math.ceil((right - left) / tileSize)
-        for (let column = 0; column < columnCount; column += 1) {
-          const tileLeft = left + column * tileSize
-          const tileRight = Math.min(right, tileLeft + tileSize)
-          const topLeft = { x: tileLeft, y: top }
-          const topRight = { x: tileRight, y: top }
-          const bottomRight = { x: tileRight, y: bottom }
-          const bottomLeft = { x: tileLeft, y: bottom }
-          triangles.push(
-            [topLeft, topRight, bottomRight],
-            [topLeft, bottomRight, bottomLeft],
-          )
-        }
-      }
-    }
-  }
-  return triangles
+  return tessellateTerrainComponent(component, tileSize)
 }
 
 export function mapTerrainComponent(
