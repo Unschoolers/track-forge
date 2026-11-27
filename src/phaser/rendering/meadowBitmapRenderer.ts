@@ -237,6 +237,7 @@ export class BitmapTileRenderer {
     private readonly depth: number,
     private readonly layerOrder: number,
     private readonly tileLimit: number = BITMAP_TILE_LIMIT,
+    private readonly coherentWindow = false,
   ) {}
 
   render(view: GroundViewport, bounds?: WorldBounds): void {
@@ -252,13 +253,22 @@ export class BitmapTileRenderer {
     if (selection === this.selectionSignature) return
     this.selectionSignature = selection
     const currentTiles = this.tiles.visible(view, window)
-    const prefetchTiles = bounds ? this.tiles.visible(view, expanded(window)) : currentTiles
+    const prefetchTiles = bounds || this.coherentWindow ? this.tiles.visible(view, expanded(window)) : currentTiles
     const currentSignature = currentTiles.map(tileKey).join('|')
     const maxPrefetch = Math.max(0, Math.min(
       MAX_PREFETCH_TILES_PER_LAYER,
       this.tileLimit - currentTiles.length,
     ))
-    const prefetched = selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
+    const currentKeys = new Set(currentTiles.map(tileKey))
+    const distance = (tile: GroundTile): number => Math.hypot(
+      (tile.x + 0.5) * GROUND_TILE_SIZE - view.centerX,
+      (tile.y + 0.5) * GROUND_TILE_SIZE - view.centerY,
+    )
+    const prefetched = this.coherentWindow
+      ? prefetchTiles.filter(tile => !currentKeys.has(tileKey(tile)))
+        .sort((left, right) => distance(left) - distance(right) || left.y - right.y || left.x - right.x)
+        .slice(0, maxPrefetch)
+      : selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
     const candidates = [...currentTiles, ...prefetched]
     const wantedSignature = candidates.map(tileKey).join('|')
     // The editor calls render every frame. Stable tile windows do not need
@@ -276,9 +286,10 @@ export class BitmapTileRenderer {
     for (const [key, item] of this.images) {
       const visible = this.current.has(key)
       if (visible) this.visibleResident++
-      if (item.image.visible !== visible) item.image.setVisible(visible)
+      if (!this.coherentWindow && item.image.visible !== visible) item.image.setVisible(visible)
       if (this.wanted.has(key)) this.touch(key, item)
     }
+    if (this.coherentWindow) this.syncWindowVisibility()
 
     const requests: UploadRequest[] = []
     const addRequest = (tile: GroundTile, priority: number) => {
@@ -331,9 +342,12 @@ export class BitmapTileRenderer {
     if (!registered) throw new Error('Could not register Meadow bitmap tile')
     try {
       const image = this.scene.add.image(tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, texture)
-        .setOrigin(0).setDepth(this.depth).setVisible(this.current.has(key))
+        .setOrigin(0).setDepth(this.depth).setVisible(!this.coherentWindow && this.current.has(key))
       this.touch(key, { image, texture, lastUsed: ++this.clock })
       if (this.current.has(key)) this.visibleResident++
+      if (this.coherentWindow && this.current.has(key) && this.visibleResident === this.current.size) {
+        this.syncWindowVisibility()
+      }
     } catch (error) {
       this.scene.textures.remove(texture)
       throw error
@@ -351,6 +365,14 @@ export class BitmapTileRenderer {
     this.wantedSignature = ''
     for (const item of this.images.values()) this.remove(item)
     this.images.clear()
+  }
+
+  private syncWindowVisibility(): void {
+    const ready = this.current.size > 0 && this.visibleResident === this.current.size
+    for (const [key, item] of this.images) {
+      const visible = ready && this.current.has(key)
+      if (item.image.visible !== visible) item.image.setVisible(visible)
+    }
   }
 
   private ensureCapacity(): void {
@@ -466,11 +488,11 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: Trac
       if (gestureActive) return
       if (hasWater && !water) {
         const tiles = createEditorWaterBitmapTiles(geometry, night, environment, waterLimit)
-        if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit)
+        if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit, true)
       }
       if (hasHill && !hill) {
         const tiles = createEditorHillBitmapTiles(geometry, night, environment, hillLimit)
-        if (tiles) hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit)
+        if (tiles) hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit, true)
       }
       const layers = createEditorRoadBitmapLayers(geometry, night, environment, shadowMode)
       if (!layers) return
