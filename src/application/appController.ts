@@ -505,6 +505,7 @@ export class AppController {
       case 'resolve-editor-exit':
         this.editorExitFlow.resolve(command.choice)
         break
+      case 'select-editor-scenery':
       case 'set-editor-scenery':
       case 'set-editor-tool':
       case 'select-editor-crossing':
@@ -1096,12 +1097,17 @@ export class AppController {
     }
     const { editor, track } = result
     if (editor === this.state.editor) return
+    const selection = this.state.editorUi.selectedScenery
+    const preservesScenerySelection = command.type === 'transform-scenery' || command.type === 'move-tree' || command.type === 'move-scenery-prop'
+    const editorUi = selection && !preservesScenerySelection && (editor.trees !== this.state.editor.trees || editor.scenery !== this.state.editor.scenery)
+      ? { ...this.state.editorUi, selectedScenery: null } : this.state.editorUi
     if (!track) {
-      this.update({ ...this.state, editor })
+      this.update({ ...this.state, editor, editorUi })
       return
     }
     this.update({
       ...this.state,
+      editorUi,
       mode: 'editor',
       currentTrack: track,
       tracks: this.state.tracks.map((entry) => entry.id === track.id ? track : entry),
@@ -1119,6 +1125,10 @@ export class AppController {
     } else if ((leavingPreview && editorUi.tool === 'pan') ||
         (editorUi.tool === 'start' && state.editor.routeKind === 'point-to-point')) {
       editorUi = { ...editorUi, tool: 'draw' }
+    }
+    if (editorUi.selectedScenery && (state.mode !== 'editor' || editorUi.tool !== 'tree' || readOnly ||
+      state.currentTrack?.id !== this.state.currentTrack?.id || state.editor.environmentId !== this.state.editor.environmentId)) {
+      editorUi = { ...editorUi, selectedScenery: null }
     }
     if (editorUi.sceneryChoice !== undefined) {
       editorUi = {

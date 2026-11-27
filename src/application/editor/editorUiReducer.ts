@@ -7,6 +7,7 @@ import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 
 type EditorUiAction =
   | 'set-editor-scenery'
+  | 'select-editor-scenery'
   | 'set-editor-tool'
   | 'select-editor-crossing'
   | 'select-editor-point'
@@ -26,11 +27,14 @@ export function reduceEditorUi(
   environmentId: TrackEnvironmentId,
 ): EditorUiState {
   switch (command.type) {
+    case 'select-editor-scenery':
+      return state.tool === 'tree' ? { ...state, selectedScenery: command.target } : state
     case 'set-editor-scenery':
-      return { ...state, sceneryChoice: normalizeEditorSceneryChoice(command.choice, environmentId) }
+      return { ...state, sceneryChoice: normalizeEditorSceneryChoice(command.choice, environmentId), ...(state.selectedScenery ? { selectedScenery: null } : {}) }
     case 'set-editor-tool':
       return {
         ...state, tool: command.tool,
+        ...(command.tool !== 'tree' && state.selectedScenery ? { selectedScenery: null } : {}),
         selectedCrossing: command.tool === 'select' ? state.selectedCrossing : null,
         selectedPoint: command.tool === 'select' ? state.selectedPoint : null,
       }

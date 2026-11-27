@@ -216,6 +216,7 @@ export class EditorScene extends Phaser.Scene {
           type: 'select-editor-point',
           index,
         }),
+      onScenerySelected: (target) => this.controller.dispatch({ type: 'select-editor-scenery', target }),
       onRejected: (rejection) =>
         this.controller.dispatch({
           type: 'report-editor-rejection',
@@ -510,7 +511,7 @@ export class EditorScene extends Phaser.Scene {
     this.environmentSceneryRenderer?.render({ centerX: camera.scrollX + camera.width / 2, centerY: camera.scrollY + camera.height / 2, width: camera.width, height: camera.height, zoom: camera.zoom, rotation: 0 }, snapshot.editor.environmentId, snapshot.editor.scenery, snapshot.currentTrack?.lighting === 'night', preview?.type === 'prop' ? preview : undefined)
     if (!renderTreesLayer || !this.sceneryGraphics) return
     this.sceneryGraphics.clear()
-    const trees = preview?.type === 'tree' ? snapshot.editor.trees.map((tree, index) => index === preview.index ? preview.position : tree) : snapshot.editor.trees
+    const trees = preview?.type === 'tree' ? snapshot.editor.trees.map((tree, index) => index === preview.index ? { ...tree, ...preview.position } : tree) : snapshot.editor.trees
     renderTrees(this.sceneryGraphics, trees, snapshot.currentTrack?.lighting === 'night', this.trackGeometry().path.terrainSurface, snapshot.editor.environmentId)
   }
 
