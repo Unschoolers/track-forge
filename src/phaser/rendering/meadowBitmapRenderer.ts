@@ -235,6 +235,9 @@ export class BitmapTileRenderer {
     private readonly tiles: BitmapTiles,
     private readonly depth: number,
     private readonly layerOrder: number,
+    // Editor overlays must switch as a complete window, not expose a
+    // checkerboard of textured tiles and their vector underlay.
+    private readonly coherentWindow = false,
   ) {}
 
   render(view: GroundViewport, bounds?: WorldBounds): void {
@@ -274,9 +277,10 @@ export class BitmapTileRenderer {
     for (const [key, item] of this.images) {
       const visible = this.current.has(key)
       if (visible) this.visibleResident++
-      if (item.image.visible !== visible) item.image.setVisible(visible)
+      if (!this.coherentWindow && item.image.visible !== visible) item.image.setVisible(visible)
       if (this.wanted.has(key)) this.touch(key, item)
     }
+    if (this.coherentWindow) this.syncWindowVisibility()
 
     const requests: UploadRequest[] = []
     const addRequest = (tile: GroundTile, priority: number) => {
@@ -329,9 +333,12 @@ export class BitmapTileRenderer {
     if (!registered) throw new Error('Could not register Meadow bitmap tile')
     try {
       const image = this.scene.add.image(tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, texture)
-        .setOrigin(0).setDepth(this.depth).setVisible(this.current.has(key))
+        .setOrigin(0).setDepth(this.depth).setVisible(!this.coherentWindow && this.current.has(key))
       this.touch(key, { image, texture, lastUsed: ++this.clock })
       if (this.current.has(key)) this.visibleResident++
+      if (this.coherentWindow && this.current.has(key) && this.visibleResident === this.current.size) {
+        this.syncWindowVisibility()
+      }
     } catch (error) {
       this.scene.textures.remove(texture)
       throw error
@@ -349,6 +356,14 @@ export class BitmapTileRenderer {
     this.wantedSignature = ''
     for (const item of this.images.values()) this.remove(item)
     this.images.clear()
+  }
+
+  private syncWindowVisibility(): void {
+    const ready = this.current.size > 0 && this.visibleResident === this.current.size
+    for (const [key, item] of this.images) {
+      const visible = ready && this.current.has(key)
+      if (item.image.visible !== visible) item.image.setVisible(visible)
+    }
   }
 
   private ensureCapacity(): void {
@@ -403,7 +418,7 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackG
   const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
   const renderers = [
     new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
-    new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2, 1),
+    new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2, 1, true),
     ...(layers.bridgeApproach ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH, 2)] : []),
     ...(layers.bridgeDeck ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH, 3)] : []),
   ]
