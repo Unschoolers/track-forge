@@ -30,7 +30,7 @@ import {
   type EditorCamera,
   type PointerSample,
 } from '@/phaser/input/editorInput'
-import { applyEditorCameraAction, type EditorViewport } from '@/phaser/camera/editorCamera'
+import { applyEditorCameraAction, editorScreenToWorld, type EditorViewport } from '@/phaser/camera/editorCamera'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
 import {
   renderTerrain,
@@ -196,10 +196,7 @@ export class EditorScene extends Phaser.Scene {
       polygonContains: (point, polygon) => Phaser.Geom.Polygon.Contains(
         new Phaser.Geom.Polygon([...polygon]), point.x, point.y,
       ),
-      worldPoint: (pointer) => {
-        const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-        return { x: point.x, y: point.y }
-      },
+      worldPoint: pointer => editorScreenToWorld(pointer, this.editorCamera, this.viewport()),
       dispatch: (command) =>
         this.controller.dispatch({ type: 'editor', command }),
       viewport: () => this.viewport(),

@@ -156,3 +156,12 @@ export function applyEditorCameraAction(
   }
   return nearest
 }
+
+/** The editor camera is centered and unrotated. Use its current authoritative
+ * pose, not Phaser's matrix from the previous render, during pointer events. */
+export function editorScreenToWorld(point: Vector2, camera: EditorCamera, viewport: Pick<EditorViewport, 'width' | 'height'>): Vector2 {
+  return {
+    x: camera.x + (point.x - viewport.width / 2) / camera.zoom,
+    y: camera.y + (point.y - viewport.height / 2) / camera.zoom,
+  }
+}
