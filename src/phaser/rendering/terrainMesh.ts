@@ -269,7 +269,8 @@ export class RegionalTerrainMeshCache {
       this.clear()
       this.contours = surface.contours
     }
-    return this.geometry ??= buildStaticTerrainGeometry(surface)
+    this.geometry ??= buildStaticTerrainGeometry(surface)
+    return this.geometry
   }
 
   trianglesFor(component: TerrainComponent, detail: TerrainPresentationDetail): readonly TerrainTriangle[] {
