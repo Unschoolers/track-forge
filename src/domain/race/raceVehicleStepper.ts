@@ -102,6 +102,7 @@ export function advanceVehicle(
     },
     deltaSeconds,
   )
-  return { ...moved, ...vertical, jumpLaunched: !!jumpTakeoff && !vertical.grounded && vertical.verticalVelocity > 0 }
+  const jumpLaunched = !!jumpTakeoff && !vertical.grounded && vertical.verticalVelocity > 0
+  return { ...moved, ...vertical, jumpLaunched, jumpFlight: !vertical.grounded && (jumpLaunched || vehicle.jumpFlight === true) }
 }
 
