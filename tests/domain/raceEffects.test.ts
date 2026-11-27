@@ -41,7 +41,7 @@ describe('race effects', () => {
     expect(new Set(next.particles.map(({ kind }) => kind))).toEqual(
       new Set(['dirt']),
     )
-    expect(next.skids.length).toBeGreaterThan(0)
+    expect(next.skids).toHaveLength(2)
   })
 
   it('emits smoke on asphalt and snow powder on sliding ice', () => {
@@ -74,6 +74,22 @@ describe('race effects', () => {
     expect(next.particles.every(p => p.kind === 'water' && p.x === 12 && p.y === 34)).toBe(true)
   })
 
+  it('tracks the left and right rear tires independently through a turn', () => {
+    const player = vehicles()[0]
+    if (!player) throw new Error('Missing player fixture')
+    const car = { ...player, x: 0, y: 0, angle: 0, vx: 100, vy: 0, currentSurface: 'street' as const }
+    const first = advanceRaceEffects(createRaceEffectsState(), [car], [], 1 / 60, { next: () => 0 })
+    expect(first.skids.map(mark => mark.end)).toEqual([{ x: -10, y: -7 }, { x: -10, y: 7 }])
+    const second = advanceRaceEffects(first, [{ ...car, x: 2, angle: 0.1 }], [], 1 / 60, { next: () => 0 })
+    const pair = second.skids.slice(-2)
+    expect(pair.map(mark => mark.start)).toEqual(first.skids.map(mark => mark.end))
+    const [left, right] = pair
+    if (!left || !right) throw new Error('Missing rear tire pair')
+    expect(Math.hypot(left.end.x - right.end.x, left.end.y - right.end.y)).toBeCloseTo(14)
+    const recovered = advanceRaceEffects(second, [{ ...car, x: 1000 }], [{ type: 'vehicle-recovered', vehicleId: car.id }], 1 / 60, { next: () => 0 })
+    expect(recovered.skids).toHaveLength(second.skids.length)
+  })
+
   it('expires descriptors and bounds retained arrays', () => {
     let effects = createRaceEffectsState()
     for (let index = 0; index < 300; index += 1) {
@@ -86,7 +102,7 @@ describe('race effects', () => {
       )
     }
     expect(effects.particles.length).toBeLessThanOrEqual(180)
-    expect(effects.skids.length).toBeLessThanOrEqual(120)
+    expect(effects.skids.length).toBeLessThanOrEqual(240)
 
     const expired = advanceRaceEffects(
       effects,

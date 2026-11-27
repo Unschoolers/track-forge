@@ -50,7 +50,7 @@ function particleTexture(scene: Phaser.Scene, shape: ParticleShape): string {
     gradient.addColorStop(0.65, '#ffffff')
     gradient.addColorStop(1, 'rgba(255,255,255,0)')
     ctx.fillStyle = gradient
-    ctx.fillRect(0, 5, 64, 6)
+    ctx.fillRect(0, 4, 64, 8)
   } else {
     ctx.fillStyle = '#ffffff'
     ctx.beginPath()
@@ -72,7 +72,9 @@ export class NativeRaceParticles {
   constructor(scene: Phaser.Scene, depth: number, private readonly desert = false, private readonly low = false) {
     for (const shape of SHAPES) {
       const emitter = scene.add.particles(0, 0, particleTexture(scene, shape), {
-        emitting: false, maxParticles: low ? Math.floor(BUDGETS[shape] / 2) : BUDGETS[shape], speed: 0,
+        // Phaser's hard maxParticles counts dead pooled entries and blocks reuse at the cap.
+        // Limit live particles instead; emitParticle reuses dead entries before allocating.
+        emitting: false, maxAliveParticles: low ? Math.floor(BUDGETS[shape] / 2) : BUDGETS[shape], speed: 0,
         scale: {
           onEmit: particle => {
             if (particle) this.appearance.set(particle, this.pending)
@@ -108,7 +110,7 @@ export class NativeRaceParticles {
       const emitter = this.emitters.get(style.shape)
       if (!emitter) throw new Error('Missing particle emitter: ' + style.shape)
       this.pending = {
-        scale: style.size / 8,
+        scale: style.size / 8 * (style.shape === 'wind' ? 1.6 : 1),
         alpha: item.life / item.maxLife * style.opacity,
         age: 1 - item.life / item.maxLife,
         growth: style.growth,

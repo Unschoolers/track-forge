@@ -19,7 +19,7 @@ const speedLine: RaceParticle = {
 describe('race speed-line rendering', () => {
   it('draws a fading streak whose tail trails the particle velocity', () => {
     const graphics = renderParticle(speedLine)
-    expect(graphics.lineStyle).toHaveBeenCalledWith(expect.any(Number), 0xe8f3ff, 0.28)
+    expect(graphics.lineStyle).toHaveBeenCalledWith(expect.any(Number), 0xe8f3ff, 0.36)
     expect(graphics.fillCircle).not.toHaveBeenCalled()
     expect(graphics.lineBetween).toHaveBeenCalledOnce()
     const [headX, headY, tailX, tailY] = graphics.lineBetween.mock.calls[0] as [number, number, number, number]

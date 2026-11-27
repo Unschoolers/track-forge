@@ -33,7 +33,7 @@ export interface SkidMark {
 export interface RaceEffectsState {
   readonly particles: readonly RaceParticle[]
   readonly skids: readonly SkidMark[]
-  readonly previousTires: Readonly<Record<string, Vector2>>
+  readonly previousTires: Readonly<Record<string, readonly [Vector2, Vector2]>>
   readonly nextEmissionId?: number
 }
 
@@ -47,7 +47,8 @@ export interface RaceEffectEvent {
 }
 
 const MAX_PARTICLES = 180
-const MAX_SKIDS = 120
+// Keep the previous history budget per tire, now with two rear contact tracks.
+const MAX_SKIDS = 240
 const EFFECT_SIZE = {
   blue: { dust: 0.92, smoke: 0.8, speed: 1, skid: 0.9, landing: 0.95 },
   red: { dust: 0.96, smoke: 1, speed: 1.3, skid: 1, landing: 0.9 },
@@ -57,6 +58,12 @@ const EFFECT_SIZE = {
 
 export function createRaceEffectsState(): RaceEffectsState {
   return { particles: [], skids: [], previousTires: {} }
+}
+
+function rearTirePoint(vehicle: RaceVehicle, side: number): Vector2 {
+  const cosine = Math.cos(vehicle.angle)
+  const sine = Math.sin(vehicle.angle)
+  return { x: vehicle.x - cosine * 10 - sine * side * 7, y: vehicle.y - sine * 10 + cosine * side * 7 }
 }
 
 function particle(
@@ -72,12 +79,13 @@ function particle(
   const cosine = Math.cos(vehicle.angle)
   const sine = Math.sin(vehicle.angle)
   const wind = kind === 'speed-line'
-  const lateral = side * (wind ? 15 + b * 10 : 7)
+  const lateral = side * (15 + b * 10)
+  const contact = rearTirePoint(vehicle, side)
   const spray = wind ? 0 : Math.min(22, 5 + vehicle.speed * 0.035 + vehicle.slip * 0.12) * side
   return {
     kind,
-    x: vehicle.x - cosine * (wind ? 2 : 10) - sine * lateral,
-    y: vehicle.y - sine * (wind ? 2 : 10) + cosine * lateral,
+    x: wind ? vehicle.x - cosine * 2 - sine * lateral : contact.x,
+    y: wind ? vehicle.y - sine * 2 + cosine * lateral : contact.y,
     vx: -vehicle.vx * (wind ? 0.32 : 0.14) - sine * spray + (wind ? 0 : (a - 0.5) * 12),
     vy: -vehicle.vy * (wind ? 0.32 : 0.14) + cosine * spray + (wind ? 0 : (b - 0.5) * 12),
     life,
@@ -106,9 +114,7 @@ export function advanceRaceEffects(
   const skids: SkidMark[] = state.skids
     .map((item) => ({ ...item, life: item.life - dt }))
     .filter(({ life }) => life > 0)
-  const previousTires: Record<string, Vector2> = {
-    ...state.previousTires,
-  }
+  const previousTires: Record<string, readonly [Vector2, Vector2]> = {}
 
   for (const vehicle of vehicles) {
     const size = EFFECT_SIZE[vehicle.car]
@@ -163,30 +169,28 @@ export function advanceRaceEffects(
         : vehicle.currentSurface === 'dirt'
           ? 30
           : 42
-    const tire = {
-      x: vehicle.x - Math.cos(vehicle.angle) * 10,
-      y: vehicle.y - Math.sin(vehicle.angle) * 10,
-    }
-    const previous = previousTires[vehicle.id] ?? {
-      x: tire.x - vehicle.vx * dt,
-      y: tire.y - vehicle.vy * dt,
-    }
+    const tires = [rearTirePoint(vehicle, -1), rearTirePoint(vehicle, 1)] as const
+    const previous = state.previousTires[vehicle.id]
+    const recovered = events.some(event => event.type === 'vehicle-recovered' && event.vehicleId === vehicle.id)
     if (
-      previous &&
+      !recovered &&
       vehicle.grounded &&
       vehicle.speed > 58 &&
       vehicle.currentSurface !== 'grass' &&
       (vehicle.braking || vehicle.slip > skidThreshold)
     ) {
-      skids.push({
-        start: previous,
-        end: tire,
-        life: 2.2,
-        maxLife: 2.2,
-        width: (vehicle.currentSurface === 'ice' ? 1 : 1.8) * size.skid,
-      })
+      for (const index of [0, 1] as const) {
+        const tire = tires[index]
+        const from = previous?.[index] ?? { x: tire.x - vehicle.vx * dt, y: tire.y - vehicle.vy * dt }
+        // Manual recovery or a discontinuous pose must not leave a long line across the map.
+        if (Math.hypot(tire.x - from.x, tire.y - from.y) > vehicle.speed * dt + 12) continue
+        skids.push({
+          start: from, end: tire, life: 2.2, maxLife: 2.2,
+          width: (vehicle.currentSurface === 'ice' ? 1 : 1.8) * size.skid,
+        })
+      }
     }
-    previousTires[vehicle.id] = tire
+    if (vehicle.grounded) previousTires[vehicle.id] = tires
   }
 
   for (const event of events) {
