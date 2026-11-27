@@ -1,3 +1,4 @@
+import type { RegionalTerrainMeshCache } from '@/phaser/rendering/terrainMesh'
 import type Phaser from 'phaser'
 import type { TerrainMap } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
@@ -465,7 +466,7 @@ export interface EditorMeadowBitmapRenderer extends MeadowBitmapRenderer {
 }
 
 /** Scene-lifetime owner. Water is independent of road geometry; hills are not. */
-export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): EditorMeadowBitmapRenderer {
+export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver, regionalCache?: RegionalTerrainMeshCache): EditorMeadowBitmapRenderer {
   const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
   let water: BitmapTileRenderer | undefined
   let hill: BitmapTileRenderer | undefined
@@ -534,7 +535,9 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: Trac
         if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit, true)
       }
       if (hasHill && (!hill || previousHillInfluence !== hillInfluence)) {
-        const tiles = createEditorHillBitmapTiles(geometry, night, environment, hillLimit)
+        const tiles = regionalCache
+          ? createEditorHillBitmapTiles(geometry, night, environment, hillLimit, regionalCache)
+          : createEditorHillBitmapTiles(geometry, night, environment, hillLimit)
         if (tiles) {
           if (hill) hill.replaceTiles(tiles)
           else hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit, true)
