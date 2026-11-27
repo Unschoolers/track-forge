@@ -54,7 +54,7 @@ export class NativeRaceParticles {
       emitting: false, maxParticles: 180, speed: 0,
       scale: {
         onEmit: particle => {
-          this.appearance.set(particle, this.pending)
+          if (particle) this.appearance.set(particle, this.pending)
           return this.pending.scale * (1 + 0.8 * this.pending.age)
         },
         onUpdate: (particle, _key, t, value) => {

@@ -167,7 +167,7 @@ export class RaceScene extends Phaser.Scene {
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
-    if (this.game.renderer?.type === Phaser.WEBGL) {
+    if (this.game.renderer && this.game.renderer.type === Phaser.WEBGL && typeof this.add.particles === 'function') {
       this.nativeParticles = new NativeRaceParticles(this, WORLD_RENDER_DEPTH.effect + 0.01)
     }
     if (night) this.nightBeamRenderer = new NightBeamRenderer(this, Phaser.BlendModes.ADD)
