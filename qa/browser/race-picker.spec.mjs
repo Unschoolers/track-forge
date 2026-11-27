@@ -10,7 +10,9 @@ async function openPicker(page) {
 }
 
 test('track cards stay in two columns with reachable controls on narrow and landscape phones', async ({ page }) => {
-  const longName = 'A Very Long Circuit Name That Must Stay Inside Its Card'
+  // Track decoding caps saved names at 32 characters; use that full supported length.
+  const longName = 'A Long Track Title at Max Length'
+  expect(longName).toHaveLength(32)
   await seedOwnedTrack(page, 'cityscape', longName)
 
   const picker = await openPicker(page)
