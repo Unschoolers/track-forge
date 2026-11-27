@@ -724,3 +724,22 @@
   .race-setup-modal .modal-card,
   .race-setup-modal :is(.car-choice, .setup-choice, .button) { border-color: #aab9c8; }
 }
+
+/* Small replay status glyph; never a separate optical control. */
+.race-setup-modal :is(.car-choice, .setup-choice):has(.setup-ghost-indicator) {
+  position: relative;
+}
+.race-setup-modal .setup-ghost-indicator {
+  position: absolute;
+  inset-block-start: .2rem;
+  inset-inline-end: .25rem;
+  inline-size: .85rem;
+  block-size: .85rem;
+  color: currentColor;
+  pointer-events: none;
+}
+.race-setup-modal .setup-ghost-indicator svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
