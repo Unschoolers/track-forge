@@ -1,22 +1,26 @@
 # High-resolution base ground textures
 
-All four base-ground materials now use separate generated 256 × 256 WebP
-swatches rather than the 48–96px ground cells in the original material
-atlases. The source art is regenerated at higher resolution, not upscaled.
-Opposite edge bands are blended offline to reduce wrapping seams. The
-four compressed assets total 132,302 bytes.
+Meadow, Desert, Cityscape and Kids' Room now use the four generated
+1024 × 1024 WebP base swatches. Each source was resized from its native
+1254 × 1254 art, and opposite edge bands were feathered before encoding.
+The four compressed assets total 1,660,788 bytes.
 
-The bitmap painter maps the full source to one existing 256-world-unit
-tile instead of stamping four identical 128-unit subtiles. This preserves
-native baked resolution, doubles the repeat distance and keeps existing
-padding and the eight cached tile variants. Meadow decorative patches
-remain intact. Day/night is still derived once at startup using the same
-lighting treatment, including the new already-blue carpet. Cityscape's
-raised cobblestone plateau reuses its new ground swatch; the Kids' Room
-bank uses the existing tint operation on the new carpet.
+World tiles are still 256 × 256 units. A shared full-resolution base
+is drawn below the existing transparent decorative variants, giving four
+texels per world unit without baking eight copies of each HD texture.
+The editor, race and Canvas flyover share this layout; race preparation
+registers the base alongside the existing decorative variant cache.
+The existing visible tile budget and overview fallback are unchanged.
+The base uses a second pooled sprite per visible tile in Phaser.
 
-Road, water and dedicated elevation swatches, prop assets, physics,
-track formats and GPU tile limits are unchanged. The separate organic
-ground overlay work remains compatible with this painter. The goal is a
-sharper base surface; it does not yet upgrade every other material.
-Physical Android appearance and frame pacing remain release checks.
+Day and night artwork is still decoded and prepared at startup. Each
+1024² RGBA base occupies 4 MiB before GPU overhead; eight day/night
+bases together are 32 MiB in CPU canvases, plus GPU copies as used.
+The existing 256px material swatch is derived from the HD image to
+preserve the world repeat scale on elevated ground and shoreline.
+The existing procedural/bitmap decorations and fallback are retained.
+
+This slice changes base ground only, not road resolution, props,
+terrain physics, track formats or graphics-quality policy.
+Physical Android frame pacing, startup memory and visual seam checks
+are required before merging. Adaptive density is a follow-up if needed.
