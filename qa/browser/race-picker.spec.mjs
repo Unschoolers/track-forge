@@ -19,6 +19,11 @@ test('track cards stay in two columns with reachable controls on narrow and land
   for (const viewport of [{ width: 320, height: 740 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport)
     await expect(picker.locator('.track-library-search')).toBeHidden()
+    await expect(picker.locator('.track-card-favorite').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(picker.locator('.track-menu-trigger').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(picker.locator('.track-card').first()).toHaveCSS('background-color', 'rgba(15, 28, 41, 0.3)')
+    await expect(picker.locator('.modal-footer [data-action="library-back"]')).toHaveCSS('background-color', 'rgba(15, 28, 41, 0.2)')
+    await expect(picker.locator('.modal-footer [data-action="library-back"]')).toHaveCSS('clip-path', 'none')
     const searchToggle = picker.getByRole('button', { name: 'Search circuits' })
     await expect(searchToggle).toHaveAttribute('aria-expanded', 'false')
     expect((await picker.locator('.track-library-toolbar').boundingBox()).height).toBeLessThanOrEqual(64)

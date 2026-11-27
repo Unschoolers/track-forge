@@ -88,7 +88,7 @@ export function createTrackLibraryModal(
   search.id = 'track-library-search'
   search.dataset.action = 'library-search-input'
   search.hidden = !(initialViewState?.searchOpen || search.value)
-  const searchToggle = iconAction('Search circuits', 'search', 'library-search-toggle', () => setSearchOpen(search.hidden), 'track-library-search-toggle')
+  const searchToggle = iconAction('Search circuits', 'search', 'library-search-toggle', () => setSearchOpen(search.hidden === true), 'track-library-search-toggle')
   searchToggle.setAttribute('aria-controls', search.id)
   const updateSearchToggle = () => {
     const label = search.hidden ? 'Search circuits' : 'Close search'
@@ -259,7 +259,7 @@ export function createTrackLibraryModal(
   } else {
     frame.footer.append(
       button('IMPORT', 'import-track-file', () => fileInput.click(), 'button'),
-      button('BACK', 'library-back', actions.close, 'button button-primary'),
+      button('BACK', 'library-back', actions.close, 'button'),
     )
   }
   return frame.overlay
