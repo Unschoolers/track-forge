@@ -284,9 +284,9 @@ export class DomUiHost implements UiHost {
     if (!button) return
     this.runtime.feedback.handle({
       type: 'ui',
-      emphasis: button.classList.contains('button-danger')
+      emphasis: button.dataset.menuActionIntent === 'danger' || button.classList.contains('button-danger')
         ? 'danger'
-        : button.classList.contains('button-primary')
+        : button.dataset.menuActionIntent === 'primary' || button.classList.contains('button-primary') || button.classList.contains('tf-menu-action--primary')
           ? 'confirm'
           : 'normal',
     })

@@ -18,6 +18,12 @@ export function button(
   const node = element('button', className, label)
   node.type = 'button'
   node.dataset.action = action
+  const classes = className.split(/\s+/)
+  node.dataset.menuActionIntent = classes.includes('button-danger')
+    ? 'danger'
+    : classes.includes('button-primary') || classes.includes('tf-menu-action--primary')
+      ? 'primary'
+      : 'secondary'
   node.addEventListener('click', onClick)
   return node
 }

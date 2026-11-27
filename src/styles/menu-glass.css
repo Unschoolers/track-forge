@@ -15,13 +15,13 @@
   box-shadow: var(--menu-static-action-rim);
 }
 #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close, .track-icon-action):not(:where(.track-card *, .cup-track-row *)):is(.modal-close, .options-release-notes-button, .track-icon-action) { border-radius: 50%; }
-#app [data-menu-material='static'] :is(.tf-menu-action--primary, .button-primary):not(:where(.track-card *, .cup-track-row *)) {
+#app [data-menu-material='static'] :is([data-menu-action-intent='primary'], .tf-menu-action--primary, .button-primary):not(:where(.track-card *, .cup-track-row *)) {
   background: var(--menu-static-primary-fill);
   border-color: var(--menu-static-primary-border);
   color: #20110a;
   box-shadow: var(--menu-static-primary-rim);
 }
-#app [data-menu-material='static'] .button-danger { background: #302028; border-color: #98606a; color: #ffadb3; }
+#app [data-menu-material='static'] :is([data-menu-action-intent='danger'], .button-danger) { background: #302028; border-color: #98606a; color: #ffadb3; }
 @supports (backdrop-filter: blur(2px)) {
   #app [data-menu-material='static'] :is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *)) { backdrop-filter: var(--menu-static-action-filter); }
 }
@@ -57,12 +57,12 @@
   text-shadow: 0 1px 3px #000b;
 }
 #app [data-menu-material='static'] [data-liquid-glass][data-liquid-glass]:is(.modal-close, .options-release-notes-button, .track-icon-action) { border-radius: 50%; }
-#app [data-menu-material='static'] [data-liquid-glass][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary) {
+#app [data-menu-material='static'] [data-liquid-glass][data-liquid-glass]:is([data-menu-action-intent='primary'], .tf-menu-action--primary, .button-primary) {
   --lg-tint: rgb(255 146 92 / 76%);
   border-color: #ffe0c580;
   text-shadow: none;
 }
-#app [data-menu-material='static'] [data-liquid-glass][data-liquid-glass].button-danger {
+#app [data-menu-material='static'] [data-liquid-glass][data-liquid-glass]:is([data-menu-action-intent='danger'], .button-danger) {
   --lg-tint: rgb(93 34 49 / 78%);
   border-color: #98606a;
   color: #ffadb3;
