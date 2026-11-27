@@ -1,7 +1,7 @@
 /** A user-created, race-ready track. Built-in tracks are not shareable. */
 export const OWNED_TRACK_NAME = 'QA Shared Circuit'
 
-export async function seedOwnedTrack(page, environmentId = 'cityscape') {
+export async function seedOwnedTrack(page, environmentId = 'cityscape', name = OWNED_TRACK_NAME) {
   await page.addInitScript(({ name, environmentId }) => {
     const points = Array.from({ length: 17 }, (_, index) => {
       const radians = index / 16 * Math.PI * 2
@@ -21,5 +21,5 @@ export async function seedOwnedTrack(page, environmentId = 'cityscape') {
       points, recoveryCheckpoints: [0.25, 0.55, 0.8], trees: [], scenery: [], terrain: { cellSize: 32, cells: [] },
     }]))
     localStorage.setItem('trackforge-library-v1-migrated', '1')
-  }, { name: OWNED_TRACK_NAME, environmentId })
+  }, { name, environmentId })
 }
