@@ -16,21 +16,15 @@ export function createFinishCelebration(medal: RaceMedal, newRecord = false, com
   const podium = element('section', 'results-celebration')
   podium.dataset.medal = medal
   podium.dataset.resultCelebration = medal === 'GOLD' ? 'victory' : 'podium'
-  const sparkles = element('div', 'results-celebration-sparks')
-  sparkles.setAttribute('aria-hidden', 'true')
-  if (medal === 'GOLD') {
-    for (let i = 0; i < 8; i += 1) sparkles.append(element('i'))
-  }
   const placement = medal === 'GOLD' ? '1ST PLACE' : medal === 'SILVER' ? '2ND PLACE' : '3RD PLACE'
   if (compact) {
     const crest = element('span', 'results-celebration-crest', '✦')
     crest.setAttribute('aria-hidden', 'true')
     podium.classList.add('results-celebration-compact')
-    podium.append(sparkles, crest, element('strong', 'results-celebration-place', placement), element('span', 'results-celebration-kicker', `${medal} MEDAL`))
+    podium.append(crest, element('strong', 'results-celebration-place', placement), element('span', 'results-celebration-kicker', `${medal} MEDAL`))
   } else {
     const accolade = medal === 'GOLD' ? 'CHAMPION' : medal === 'SILVER' ? 'BRILLIANT DRIVE' : 'ON THE PODIUM'
     podium.append(
-      sparkles,
       element('span', 'results-celebration-kicker', accolade),
       element('strong', 'results-celebration-place', placement),
       element('span', 'results-celebration-detail', medal === 'GOLD' ? 'YOU WON THE RACE' : 'YOU EARNED YOUR MEDAL'),

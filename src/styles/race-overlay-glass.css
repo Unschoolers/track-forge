@@ -143,10 +143,6 @@
 		0 0.5rem 1.5rem #0003;
 }
 
-.results-modal .results-celebration-sparks {
-	display: none;
-}
-
 .results-modal .results-celebration-place {
 	font-size: clamp(2.2rem, 10vw, 3.5rem);
 }
@@ -222,12 +218,6 @@
 	.results-modal .results-primary-actions .button {
 		padding-inline: 0.2rem;
 		font-size: 0.66rem;
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.results-modal .results-celebration-sparks {
-		display: none;
 	}
 }
 
