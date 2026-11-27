@@ -140,6 +140,12 @@
   border-color: #ffe0c58f;
   box-shadow: inset 0 1px 2px #fff8, inset 0 -2px 3px #8c32175c, 0 4px 12px #0005;
 }
+/* A browser supporting blur but not URL filters still gets a glass surface.
+   The runtime's [data-edge-refraction] rule wins over this low-specificity fallback. */
+@supports (backdrop-filter: blur(5px)) {
+  #app :where(.home-screen:has(.home-navigation) .tf-menu-action,
+    .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close) { backdrop-filter: blur(5px); }
+}
 /* Selected controls in grouped settings catch the light without another
    backdrop filter; cars, statistics and the live flyover remain content. */
 #app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active,
@@ -148,6 +154,9 @@
     linear-gradient(170deg, #ffffff1a, transparent 55%, #11192315);
   box-shadow: inset 0 1px 1px #fff9, inset 0 -2px 2px #0003, 0 2px 7px #0003;
 }
+/* Keep the selected-state contrast even when gradients are disabled. */
+#app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active) { background-color: #ff925c; }
+#app .race-setup-modal .setup-choice.active { background-color: #e3edf7; }
 #app [data-graphics-quality='low'] :is(.home-screen:has(.home-navigation) .tf-menu-action,
   .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close) {
   background: #202a36; border-color: #627382; box-shadow: none; backdrop-filter: none;

@@ -100,6 +100,13 @@ describe('static edge refraction', () => {
     const rerenderCleanup = attachEdgeRefraction(root, 'div')
     expect(getContext).toHaveBeenCalledTimes(2)
     rerenderCleanup()
+    // Same bounds, different rounded geometry must not reuse the previous map.
+    first.style.borderTopLeftRadius = '0px'
+    const squareCleanup = attachEdgeRefraction(root, 'div')
+    expect(getContext).toHaveBeenCalledTimes(3)
+    expect(maps).toHaveLength(3)
+    expect(maps[2]?.data[(1 * 180 + 1) * 4 + 1]).not.toBe(normalMap.data[(1 * 180 + 1) * 4 + 1])
+    squareCleanup()
   })
 
   it('does not attach maps for low quality, reduced transparency, or unsupported URL filters', () => {
