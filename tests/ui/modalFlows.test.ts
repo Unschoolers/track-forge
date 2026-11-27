@@ -469,7 +469,8 @@ describe('modal application flows', () => {
     expect(night?.dataset.car).toBe('red')
     const nightToggle = root.querySelector<HTMLButtonElement>('[data-action="lighting-toggle"]')
     expect(nightToggle?.getAttribute('aria-pressed')).toBe('true')
-    expect(nightToggle?.dataset.lightingTransition).toBe('true')
+    expect(nightToggle).toBe(toggle)
+    expect(night).toBe(preview)
     nightToggle?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'set-race-lighting', lighting: 'day' })
     update({ ...initial, overlay: { type: 'options', returnTo: 'race-setup' } })
@@ -520,12 +521,25 @@ describe('modal application flows', () => {
     const { root, port, update } = setup(state({ type: 'race-setup' }))
 
     expect(root.querySelector('[data-car="green"]')).not.toBeNull()
-    expect(root.querySelector('[data-action="mode-normal"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="mode-cycle"]')).not.toBeNull()
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
-    expect(root.querySelector('[data-action="laps-3"]')).not.toBeNull()
-    root.querySelector<HTMLButtonElement>('[data-action="laps-3"]')?.click()
+    expect(root.querySelector('[data-action="laps-cycle"]')).not.toBeNull()
+    const laps = root.querySelector<HTMLButtonElement>('[data-action="laps-cycle"]')
+    const modal = root.querySelector('.race-setup-modal')
+    const canvas = root.querySelector('.race-flyover')
+    laps?.focus()
+    laps?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
       type: 'set-preferences', preferences: { ...preferences, raceLaps: 3 },
+    })
+    update({ ...state({ type: 'race-setup' }), preferences: { ...preferences, raceLaps: 3 } })
+    expect(root.querySelector('.race-setup-modal')).toBe(modal)
+    expect(root.querySelector('[data-action="laps-cycle"]')).toBe(laps)
+    expect(root.querySelector('.race-flyover')).toBe(canvas)
+    expect(document.activeElement).toBe(laps)
+    laps?.click()
+    expect(port.dispatch).toHaveBeenLastCalledWith({
+      type: 'set-preferences', preferences: { ...preferences, raceLaps: 1 },
     })
     root.querySelector<HTMLButtonElement>('[data-action="setup-options"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-options', returnTo: 'race-setup' })
@@ -534,7 +548,7 @@ describe('modal application flows', () => {
     expect(root.textContent).toContain('AI DIFFICULTY')
     expect(root.querySelector('[data-action="lighting-toggle"]')).toBeNull()
     expect(root.querySelector('[data-action="difficulty-hard"]')).not.toBeNull()
-    expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
+    expect(root.querySelector('[data-action="laps-cycle"]')).toBeNull()
     root.querySelector<HTMLButtonElement>('[data-action="difficulty-hard"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
       type: 'set-preferences', preferences: { ...preferences, difficulty: 'hard' },
@@ -612,7 +626,7 @@ describe('modal application flows', () => {
     expect(root.querySelector('input[type="range"][aria-label="Sound Effects"]')).not.toBeNull()
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
     expect(root.querySelector('[data-action="options-tab-race"]')).toBeNull()
-    expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
+    expect(root.querySelector('[data-action="laps-cycle"]')).toBeNull()
     expect(root.querySelector('[data-action="pedalMode-manual"]')).not.toBeNull()
     expect(root.querySelector('[data-action="lighting-toggle"]')).toBeNull()
   })

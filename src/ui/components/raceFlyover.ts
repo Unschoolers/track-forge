@@ -27,7 +27,7 @@ export function createRaceFlyover(
   canvas.setAttribute('aria-label', `${lighting === 'night' ? 'Nighttime' : 'Daytime'} flyover of ${track.name}`)
   canvas.dataset.car = car
   canvas.dataset.lighting = lighting
-  const paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost)
+  let paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost)
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
   let speed: PlaybackSpeed = playback.speed ?? (motion?.matches ? 0 : DEFAULT_SPEED)
   let visible = true
@@ -101,6 +101,14 @@ export function createRaceFlyover(
   setSpeed(speed)
   return {
     element: panel,
+    setPresentation(car: CarId, lighting: LightingMode, ghost: boolean): void {
+      paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost)
+      canvas.dataset.car = car
+      canvas.dataset.lighting = lighting
+      canvas.setAttribute('aria-label', (lighting === 'night' ? 'Nighttime' : 'Daytime') + ' flyover of ' + track.name)
+      // Keep existing pixels visible until the next frame is ready.
+      refresh()
+    },
     destroy(): void {
       if (frame !== undefined) window.cancelAnimationFrame(frame)
       resize?.disconnect()
@@ -131,11 +139,16 @@ export class RaceFlyoverLifecycle {
     }
   }
 
-  get(track: Track, geometry: TrackGeometry, car: CarId, lighting: LightingMode, ghost: boolean): HTMLElement {
+  get(track: Track, geometry: TrackGeometry, car: CarId, lighting: LightingMode, ghost: boolean, retainCanvas = false): HTMLElement {
     this.used = true
     const current = this.current
     if (current && current.track === track && current.geometry === geometry &&
         current.car === car && current.lighting === lighting && current.ghost === ghost) {
+      return current.view.element
+    }
+    if (retainCanvas && current && current.track === track && current.geometry === geometry) {
+      current.view.setPresentation(car, lighting, ghost)
+      this.current = { ...current, car, lighting, ghost }
       return current.view.element
     }
     this.release()

@@ -28,6 +28,9 @@ describe('LiquidGlass.dev menu adapter', () => {
     const cleanup = attachMenuGlass(root, screen, load)
     await vi.waitFor(() => expect(button.querySelector('lg-panel')).not.toBeNull())
     expect(button.querySelector('lg-panel')?.getAttribute('aria-hidden')).toBe('true')
+    expect(button.querySelector('lg-panel')?.getAttribute('refraction')).toBe('26')
+    expect(button.querySelector('lg-panel')?.getAttribute('curvature')).toBe('2')
+    expect(button.querySelector('lg-panel')?.getAttribute('chroma')).toBe('0')
     expect(button.dataset.liquidGlass).toBe('')
     button.click()
     expect(click).toHaveBeenCalledOnce()
@@ -142,7 +145,7 @@ describe('LiquidGlass.dev menu adapter', () => {
     cleanup()
   })
 
-  it.each(['pause-modal', 'results-modal', 'nearby-race-modal', 'editor-menu-modal', 'editor-exit-modal', 'track-name-modal', 'player-name-modal'])('never adds lenses to live %s overlays', (className) => {
+  it.each(['pause-modal', 'results-modal', 'nearby-race-modal', 'editor-exit-modal', 'track-name-modal', 'player-name-modal'])('never adds lenses to live %s overlays', (className) => {
     const { root } = setup()
     const screen = document.createElement('div')
     screen.className = className
@@ -150,6 +153,27 @@ describe('LiquidGlass.dev menu adapter', () => {
     const load = vi.fn(async () => undefined)
     attachMenuGlass(root, screen, load)()
     expect(load).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['editor-menu-modal', '<button class="track-icon-action">Rename</button><button class="track-icon-action">Share</button><button class="button button-primary">Save track</button><button class="button">Save as</button><button class="button">Race track</button><span class="editor-menu-select-surface"><select><option>Grass</option></select></span><span class="editor-menu-select-surface"><select><option>Circuit</option></select></span><button class="button button-danger">Return home</button>', 9],
+    ['track-share-modal', '<button class="button button-primary">Nearby</button><button class="button">Export</button><button class="button">Cancel</button>', 4],
+  ] as const)('mounts real card-backed lenses throughout %s', async (className, controls, count) => {
+    const { root } = setup('high')
+    const screen = document.createElement('div')
+    screen.className = className
+    screen.innerHTML = '<section class="modal-card"><button class="modal-close">Close</button>' + controls + '</section>'
+    root.append(screen)
+    const cleanup = attachMenuGlass(root, screen, async () => undefined)
+    await vi.waitFor(() => expect(screen.querySelectorAll('lg-panel')).toHaveLength(count))
+    for (const panel of screen.querySelectorAll('lg-panel')) {
+      expect(panel.getAttribute('backdrop')).toBe('.' + className + ' .modal-card')
+      expect(panel.getAttribute('chroma')).toBe('0.08')
+    }
+    expect(screen.querySelector('select lg-panel, lg-panel lg-panel')).toBeNull()
+    expect(screen.querySelector('.track-icon-action lg-panel')?.getAttribute('radius')).toBe(className === 'editor-menu-modal' ? 'capsule' : undefined)
+    cleanup()
+    expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
   })
 
   it('does not load optics on low quality or reduced transparency', () => {

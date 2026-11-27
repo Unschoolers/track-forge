@@ -1,3 +1,4 @@
+import { selectRaceMode } from './race-choice.mjs'
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
@@ -57,7 +58,7 @@ for (const scenario of scenarios) {
       await picker.getByRole('button', { name: `Race ${trackName}`, exact: true }).click()
       const setup = page.getByRole('dialog', { name: 'Race setup' })
       await selectRaceLighting(page, scenario.lighting)
-      await setup.getByRole('button', { name: /^(NORMAL RACE|RACE AI)$/ }).click()
+      await selectRaceMode(page, 'normal')
       if (scenario.filename) {
         await expect(setup.getByRole('button', { name: /^(Double flyover speed|Pause flyover)$/ })).toBeVisible()
         await page.waitForTimeout(5_000)

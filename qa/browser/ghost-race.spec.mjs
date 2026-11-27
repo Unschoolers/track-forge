@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
 import { selectRaceLighting } from './race-lighting.mjs'
+import { selectRaceLaps, selectRaceMode } from './race-choice.mjs'
 import { seedOwnedTrack, OWNED_TRACK_NAME } from './owned-track.mjs'
 
 async function setupRace(page) {
@@ -10,15 +11,21 @@ async function setupRace(page) {
   await page.getByRole('button', { name: `Race ${OWNED_TRACK_NAME}`, exact: true }).click()
 }
 
-test('Ghost Race stays visible and greyed out without a matching saved replay', async ({ page }) => {
+test('Race mode skips Ghost Race without a matching saved replay', async ({ page }) => {
   await seedOwnedTrack(page)
   await page.goto('/?qa')
   await enterTrackForge(page)
   await setupRace(page)
-  const ghost = page.getByRole('button', { name: 'Ghost Race', exact: true })
-  await expect(ghost).toBeVisible()
-  await expect(ghost).toBeDisabled()
-  await expect(ghost).toHaveCSS('opacity', '0.45')
+  const mode = page.locator('[data-action="mode-cycle"]')
+  await expect(mode).toBeVisible()
+  await expect(mode).not.toHaveAttribute('data-available-modes', /\bghost\b/)
+  await expect(mode).toHaveAttribute('data-race-mode', 'normal')
+  await expect(page.getByText('Finish a race on this layout to save a ghost.')).toBeVisible()
+  await mode.click()
+  await expect(mode).toHaveAttribute('data-race-mode', 'boost-practice')
+  await expect(page.getByText(/Solo, unranked Arcade run/)).toBeVisible()
+  await mode.click()
+  await expect(mode).toHaveAttribute('data-race-mode', 'normal')
   await expect(page.getByText('Finish a race on this layout to save a ghost.')).toBeVisible()
 })
 
@@ -41,11 +48,11 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await page.reload()
   await enterTrackForge(page)
   await setupRace(page)
-  const ghost = page.getByRole('button', { name: 'Ghost Race', exact: true })
-  await expect(ghost).toBeEnabled()
+  const mode = page.locator('[data-action="mode-cycle"]')
+  await expect(mode).toHaveAttribute('data-available-modes', /\bghost\b/)
   await selectRaceLighting(page, 'night')
-  await expect(ghost).toBeEnabled()
-  await ghost.click()
+  await expect(mode).toHaveAttribute('data-available-modes', /\bghost\b/)
+  await selectRaceMode(page, 'ghost')
   await expect(page.getByRole('button', { name: 'Start Ghost Race', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Start Ghost Race', exact: true }).click()
   await expect(page.getByText('GHOST TARGET', { exact: true })).toBeVisible()
@@ -55,18 +62,18 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await page.locator('[data-action="pause"]').click()
   await page.getByRole('button', { name: 'QUIT TO HOME', exact: true }).click()
   await setupRace(page)
-  // Recompute availability when selecting a different car, without hiding the button.
+  // Recompute availability when selecting a different car.
   await page.locator('[data-car="red"]').click()
-  await expect(ghost).toBeVisible()
-  await expect(ghost).toBeDisabled()
+  await expect(mode).toBeVisible()
+  await expect(mode).not.toHaveAttribute('data-available-modes', /\bghost\b/)
   await expect(page.getByText('Saved ghost: Blue · 2 laps.')).toBeVisible()
   await page.locator('[data-car="blue"]').click()
-  await expect(ghost).toBeEnabled()
-  await page.locator('[data-action="laps-1"]').click()
-  await expect(ghost).toBeDisabled()
-  await page.locator('[data-action="laps-2"]').click()
-  await expect(ghost).toBeEnabled()
-  await page.getByRole('button', { name: 'Normal Race', exact: true }).click()
+  await expect(mode).toHaveAttribute('data-available-modes', /\bghost\b/)
+  await selectRaceLaps(page, 1)
+  await expect(mode).not.toHaveAttribute('data-available-modes', /\bghost\b/)
+  await selectRaceLaps(page, 2)
+  await expect(mode).toHaveAttribute('data-available-modes', /\bghost\b/)
+  await selectRaceMode(page, 'normal')
   await page.getByRole('button', { name: 'Start Race', exact: true }).click()
   await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.vehicleCount)).toBe(4)
   await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.ghostVisible)).toBe(false)
@@ -89,7 +96,7 @@ test('shares a saved creator ghost and opens the imported challenge with its lap
   await page.reload()
   await enterTrackForge(page)
   await setupRace(page)
-  await page.locator('[data-action="laps-1"]').click()
+  await selectRaceLaps(page, 1)
   await page.getByRole('dialog', { name: 'Race setup' }).getByRole('button', { name: 'Back', exact: true }).click()
   const garage = page.getByRole('dialog', { name: 'Choose a track' })
   await expect(garage).toBeVisible()
@@ -113,11 +120,11 @@ test('shares a saved creator ghost and opens the imported challenge with its lap
   await page.getByRole('button', { name: 'Race', exact: true }).click()
   await garage.getByRole('button', { name: `Race ${OWNED_TRACK_NAME} (2)`, exact: true }).click()
   const setup = page.getByRole('dialog', { name: 'Race setup' })
-  await setup.locator('[data-action="laps-2"]').click()
-  await expect(setup.locator('[data-action="laps-2"]')).toHaveAttribute('aria-pressed', 'true')
+  await selectRaceLaps(page, 2)
+  await expect(setup.locator('[data-action="laps-cycle"]')).toHaveAttribute('data-race-laps', '2')
   await setup.locator('[data-car="red"]').click()
   await expect(setup.getByText(/Creator (challenge|target):.*Blue.*1 lap/)).toBeVisible()
-  await setup.getByRole('button', { name: 'Ghost Race', exact: true }).click()
+  await selectRaceMode(page, 'ghost')
   await setup.getByRole('button', { name: 'Start Ghost Race', exact: true }).click()
   await expect(page.getByText('GHOST TARGET', { exact: true })).toBeVisible()
   await expect.poll(() => page.evaluate(() => window.__trackForgeQa.snapshot().race?.setup))

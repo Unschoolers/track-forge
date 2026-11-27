@@ -90,6 +90,23 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
     await assertClearEditorControls(page, 'terrain')
 
     await editor.getByRole('button', { name: 'Editor menu' }).click()
+    if (width === 390) {
+      const menu = page.locator('.editor-menu-modal')
+      for (const action of ['menu-save', 'menu-rename', 'menu-share', 'menu-save-as', 'menu-race', 'editor-home', 'close-dialog']) {
+        const lens = menu.locator('[data-action="' + action + '"] > lg-panel .lg-surface__glass')
+        await expect(lens).toHaveCSS('filter', /url\(/)
+        await expect(lens).not.toHaveCSS('display', 'none')
+      }
+      await expect(menu.locator('.editor-menu-select-surface > lg-panel .lg-surface__glass').first()).toHaveCSS('filter', /url\(/)
+      await menu.locator('[data-action="menu-share"]').click()
+      const share = page.locator('.track-share-modal')
+      await expect(share).toBeVisible()
+      for (const action of ['share-nearby', 'share-export', 'share-cancel', 'close-dialog']) {
+        await expect(share.locator('[data-action="' + action + '"] > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+      }
+      await share.locator('[data-action="share-cancel"]').click()
+      await expect(menu).toBeVisible()
+    }
     await page.getByRole('combobox', { name: 'Environment' }).selectOption('cityscape')
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await editor.locator('summary.editor-toolbox-summary').click()

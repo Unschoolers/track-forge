@@ -197,13 +197,13 @@
   position: relative;
   isolation: isolate;
 }
-#app .race-setup-modal .lighting-toggle .lighting-sky { display: none; }
+#app .race-setup-modal .lighting-toggle :is(.lighting-sky, .lighting-reflection) { display: none; }
 #app .race-setup-modal[data-menu-material] .lighting-toggle[data-lighting-art] {
   background: #111b2a;
-  border-color: #c6e3fa66;
+  border-color: transparent;
   color: #fff;
-  box-shadow: none;
-  text-shadow: 0 1px 4px #000, 0 0 7px #000;
+  box-shadow: 0 0 18px var(--glass-ambient, transparent);
+  text-shadow: 0 1px 2px #0009;
 }
 #app .race-setup-modal .lighting-toggle[data-lighting-art] .lighting-sky {
   display: block;
@@ -213,6 +213,15 @@
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
+  background: #111b2a;
+}
+#app .race-setup-modal .lighting-toggle[data-lighting-art] .lighting-reflection {
+  display: block;
+  z-index: -1;
+  /* Keep the text readable over the bright sun without frosting the artwork. */
+  background: radial-gradient(ellipse at center, rgb(8 15 25 / 36%), transparent 62%),
+    radial-gradient(ellipse at var(--glass-light-x) var(--glass-light-y),
+      var(--glass-light-color), transparent 65%);
 }
 .lighting-frame {
   position: absolute;
@@ -224,3 +233,23 @@
   position: relative;
   pointer-events: none;
 }
+
+/* One tactile, full-width choice per setting; its native hit box and lens stay mounted. */
+#app .race-setup-modal .setup-cycle {
+  width: 100%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding-inline: 2rem;
+}
+#app .race-setup-modal .setup-cycle-arrow {
+  position: absolute;
+  right: .8rem;
+  font-size: 1rem;
+  opacity: .75;
+  pointer-events: none;
+}
+#app .race-setup-modal .setup-cycle:disabled { opacity: 1; }
+#app .race-setup-modal .setup-cycle:disabled .setup-cycle-arrow { visibility: hidden; }
+#app .race-setup-modal .setup-cycle .setup-ghost-indicator { right: auto; left: .35rem; }
+.race-setup-modal .setup-lap-hint { margin: 0; }

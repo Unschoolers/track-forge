@@ -1,3 +1,4 @@
+import { selectRaceMode } from './race-choice.mjs'
 import { expect, test } from '@playwright/test'
 import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
@@ -55,8 +56,8 @@ test('persists an open route and displays its ordered finish splits', async ({ p
     await details.locator('[data-action="close-race-splits"]').click()
   }
 
-  await expect(setup.getByRole('button', { name: 'Ghost Race', exact: true })).toBeDisabled()
-  await setup.getByRole('button', { name: 'Time Trial', exact: true }).click()
+  await expect(setup.locator('[data-action="mode-cycle"]')).not.toHaveAttribute('data-available-modes', /\bghost\b/)
+  await selectRaceMode(page, 'time-trial')
   await setup.getByRole('button', { name: 'Start Time Trial', exact: true }).click()
   await expect.poll(race).toMatchObject({ setup: { mode: 'time-trial', laps: 1 }, vehicleCount: 1 })
   await expect(page.locator('[data-race-lap]')).toHaveText(/%$/)

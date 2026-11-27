@@ -1,3 +1,4 @@
+import { selectRaceMode } from './race-choice.mjs'
 import { expect, test } from '@playwright/test'
 import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
@@ -42,7 +43,7 @@ test('places a checkpoint while arcade ignores physical scenery collisions', asy
 
   await page.getByRole('button', { name: 'Race', exact: true }).click()
   await page.getByRole('button', { name: 'Race Checkpoint QA' }).click()
-  await page.getByRole('button', { name: 'Time Trial', exact: true }).click()
+  await selectRaceMode(page, 'time-trial')
   await page.getByRole('button', { name: 'Start Time Trial' }).click()
   await expect.poll(async () => (await qa()).race?.player?.y).toBe(-24)
   await page.evaluate(() => window.__trackForgeQa.advanceRace(4.7))

@@ -184,3 +184,33 @@
     background: #17232e;
   }
 }
+
+/* The compact dialog card is the optical source, not the live editor canvas.
+   Keep the background opaque for readable content and let the same shared
+   SVG lenses used by other menus refract this controlled, textured light. */
+#app :is(.editor-menu-modal, .track-share-modal)[data-menu-material='static']:has([data-liquid-glass]) .modal-card {
+  background: radial-gradient(ellipse at 15% 8%, #385264 0%, transparent 55%),
+    radial-gradient(ellipse at 94% 88%, #334552 0%, transparent 54%),
+    linear-gradient(150deg, #192631, #111923 52%, #17232e);
+}
+#app :is(.editor-menu-modal, .track-share-modal) [data-liquid-glass][data-liquid-glass] {
+  --lg-tint: rgb(13 24 35 / 24%);
+}
+#app :is(.editor-menu-modal, .track-share-modal) [data-liquid-glass][data-liquid-glass].button-primary {
+  --lg-tint: rgb(255 146 92 / 78%);
+}
+#app .editor-menu-modal [data-liquid-glass][data-liquid-glass].button-danger {
+  --lg-tint: rgb(93 34 49 / 78%);
+}
+.editor-menu-select-surface { display: grid; min-width: 0; }
+.editor-menu-select-surface > select { width: 100%; }
+#app .editor-menu-select-surface[data-liquid-glass] > select {
+  position: relative;
+  border-color: transparent;
+  border-radius: inherit;
+  background: transparent;
+}
+#app .editor-menu-select-surface[data-liquid-glass] > select option {
+  background: #15212b;
+  color: #f5f7fa;
+}

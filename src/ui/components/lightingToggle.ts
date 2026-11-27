@@ -1,5 +1,6 @@
 import type { LightingMode } from '@/domain/model'
 import { button, element } from '@/ui/dom'
+import { clearGlassIllumination, glassOptics, paintGlassIllumination } from '@/ui/menu/glassMaterial'
 import type { GlassController, GlassOptions } from '@/vendor/liquidglass/liquid-glass.js'
 import sunrise from '@/assets/lighting/sunrise.webp?url'
 import sunset from '@/assets/lighting/sunset.webp?url'
@@ -11,15 +12,26 @@ const labelFor = (lighting: LightingMode): string => lighting === 'day' ? 'Day' 
 const sheetFor = (lighting: LightingMode): string => lighting === 'day' ? sunrise : sunset
 
 export function createLightingToggle(lighting: LightingMode, select: (lighting: LightingMode) => void): HTMLButtonElement {
-  const toggle = button('', 'lighting-toggle', () => select(opposite(lighting)), 'setup-choice lighting-toggle')
+  const toggle = button('', 'lighting-toggle', () => select(opposite(toggle.dataset.lightingMode === 'night' ? 'night' : 'day')), 'setup-choice lighting-toggle')
   toggle.dataset.lightingMode = lighting
   toggle.setAttribute('aria-label', 'Night lighting (Day / Night)')
   toggle.setAttribute('aria-pressed', String(lighting === 'night'))
   const sky = element('span', 'lighting-sky')
   sky.setAttribute('aria-hidden', 'true')
   sky.append(element('span', 'lighting-frame'), element('span', 'lighting-frame'))
-  toggle.append(sky, element('span', 'lighting-label', labelFor(lighting)))
+  const reflection = element('span', 'lighting-reflection')
+  reflection.setAttribute('aria-hidden', 'true')
+  toggle.append(sky, reflection, element('span', 'lighting-label', labelFor(lighting)))
   return toggle
+}
+
+export function updateLightingToggle(toggle: HTMLButtonElement, lighting: LightingMode): void {
+  if (toggle.dataset.lightingMode === lighting) return
+  toggle.dataset.lightingMode = lighting
+  toggle.setAttribute('aria-pressed', String(lighting === 'night'))
+  const label = toggle.querySelector('.lighting-label')
+  if (!toggle.hasAttribute('data-lighting-art') && label) label.textContent = labelFor(lighting)
+  toggle.dispatchEvent(new Event('lighting-art-change'))
 }
 
 // Both directions share canonical endpoints, so a completed transition and a
@@ -35,9 +47,9 @@ function paintFrame(layer: HTMLElement, lighting: LightingMode, index: number): 
 }
 
 function opticsFor(lighting: LightingMode, horizon = false): GlassOptions {
-  if (horizon) return { lightAngle: 90, specular: 0.95, specularWidth: 2.5 }
+  if (horizon) return { lightAngle: 90, specular: 0.85, specularWidth: 1.8 }
   return lighting === 'day'
-    ? { lightAngle: -40, specular: 0.75, specularWidth: 1.8 }
+    ? { lightAngle: -40, specular: 0.72, specularWidth: 1.5 }
     : { lightAngle: 120, specular: 0.45, specularWidth: 1.5 }
 }
 
@@ -55,9 +67,9 @@ export function attachLightingArtwork(
   const label = toggle.querySelector<HTMLElement>('.lighting-label')
   if (!sky || !base || !next || !label) return () => undefined
 
-  const lighting = toggle.dataset.lightingMode === 'night' ? 'night' : 'day'
+  let lighting: LightingMode = toggle.dataset.lightingMode === 'night' ? 'night' : 'day'
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-  const animate = toggle.dataset.lightingTransition === 'true' && !motion?.matches
+  let animate = toggle.dataset.lightingTransition === 'true' && !motion?.matches
   delete toggle.dataset.lightingTransition
   let disposed = false
   let request: number | undefined
@@ -73,6 +85,7 @@ export function attachLightingArtwork(
     paintFrame(next, lighting, progress === 1 ? 0 : Math.min(lastFrame, index + 1))
     next.style.opacity = String(position - index)
     label.textContent = labelFor(progress < 0.5 ? opposite(lighting) : lighting)
+    paintGlassIllumination(toggle, lighting === 'day' ? progress : 1 - progress)
   }
   const applyOptics = (progress: number) => {
     const phase = progress < 0.3 ? 0 : progress < 0.7 ? 1 : 2
@@ -90,13 +103,27 @@ export function attachLightingArtwork(
     if (progress < 1) request = requestAnimationFrame(tick)
   }
 
+  const onChange = () => {
+    lighting = toggle.dataset.lightingMode === 'night' ? 'night' : 'day'
+    if (request !== undefined) cancelAnimationFrame(request)
+    request = undefined
+    started = undefined
+    stage = -1
+    animate = !motion?.matches
+    paint(animate ? 0 : 1)
+    if (glass) {
+      applyOptics(animate ? 0 : 1)
+      if (animate) request = requestAnimationFrame(tick)
+    }
+  }
+  toggle.addEventListener('lighting-art-change', onChange)
   paint(animate ? 0 : 1)
   toggle.dataset.lightingArt = ''
   void load().then(module => {
     if (disposed) return
     glass = module.createGlass(sky, {
-      fit: true, clip: true, radius: 18, refraction: 18, bezel: 0.75,
-      curvature: 3, chroma: highQuality ? 0.1 : 0, blur: 0, mapScale: 1,
+      fit: true, clip: true, radius: 18, mapScale: 1,
+      ...glassOptics('artwork', highQuality),
       ...opticsFor(animate ? opposite(lighting) : lighting),
     })
     // Only three optical maps per interaction; the sprite crossfade is separate.
@@ -104,16 +131,20 @@ export function attachLightingArtwork(
     if (animate) request = requestAnimationFrame(tick)
   }).catch((error: unknown) => {
     if (disposed) return
+    toggle.removeEventListener('lighting-art-change', onChange)
     paint(1)
+    clearGlassIllumination(toggle)
     delete toggle.dataset.lightingArt
     console.error('LiquidGlass.dev lighting material failed to initialize', error)
   })
 
   return () => {
     disposed = true
+    toggle.removeEventListener('lighting-art-change', onChange)
     if (request !== undefined) cancelAnimationFrame(request)
     glass?.destroy()
     paint(1)
+    clearGlassIllumination(toggle)
     delete toggle.dataset.lightingArt
   }
 }

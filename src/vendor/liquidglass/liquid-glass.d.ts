@@ -9,6 +9,7 @@ export interface GlassOptions {
   refraction?: number
   bezel?: number
   curvature?: number
+  ior?: number
   chroma?: number
   blur?: number
   specular?: number
