@@ -376,7 +376,7 @@ describe('Nearby Arcade', () => {
     }
   })
 
-  it('lets the host override lighting for a Cup session without changing saved tracks', async () => {
+  it('lets the host configure lighting and laps for a Cup session without changing saved tracks', async () => {
     const network = new NearbyNetwork()
     const host = new NearbyRace(network.endpoint('host'), () => true)
     const guest = new NearbyRace(network.endpoint('guest'), () => true)
@@ -388,9 +388,13 @@ describe('Nearby Arcade', () => {
     const next = { ...track, name: 'Next round', lighting: 'day' as const }
     try {
       expect(host.setLighting('night')).toBe(false)
+      expect(host.setLaps(3)).toBe(false)
       host.hostCup([first, next], 'blue', 2)
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
       expect(host.snapshot().lighting).toBe('day')
+      expect(host.snapshot().configurableLaps).toBe(2)
+      expect(host.setLaps(3)).toBe(true)
+      expect(host.snapshot().configurableLaps).toBe(3)
       expect(host.setLighting('night')).toBe(true)
       expect(host.snapshot().lighting).toBe('night')
       expect(first.lighting).toBe('day')
@@ -399,10 +403,14 @@ describe('Nearby Arcade', () => {
       guest.connect('host')
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('waiting'), { interval: 5 })
       expect(guest.setLighting('day')).toBe(false)
+      expect(guest.setLaps(1)).toBe(false)
       await readyEveryone(host, [guest])
       await vi.waitFor(() => expect(hostStarts).toHaveLength(1), { interval: 5 })
       expect(hostStarts[0]?.lighting).toBe('night')
       expect(guestStarts[0]?.lighting).toBe('night')
+      expect(hostStarts[0]?.laps).toBe(3)
+      expect(guestStarts[0]?.laps).toBe(3)
+      expect(host.setLaps(1)).toBe(false)
       host.sceneReady()
       guest.sceneReady()
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('racing'), { interval: 5 })
@@ -413,6 +421,8 @@ describe('Nearby Arcade', () => {
       await vi.waitFor(() => expect(guestStarts).toHaveLength(2), { interval: 5 })
       expect(hostStarts[1]?.lighting).toBe('night')
       expect(guestStarts[1]?.lighting).toBe('night')
+      expect(hostStarts[1]?.laps).toBe(3)
+      expect(guestStarts[1]?.laps).toBe(3)
       expect(next.lighting).toBe('day')
     } finally {
       host.destroy()
