@@ -50,6 +50,13 @@ export function createEditorChrome(
     createEditorHistoryActions(state, actions, readOnly),
     createEditorStatus(state, geometry),
   )
+  const drawers = [...screen.querySelectorAll<HTMLDetailsElement>('.editor-toolbox-drawer, .editor-view-drawer')]
+  for (const drawer of drawers) {
+    drawer.querySelector('summary')?.addEventListener('click', () => {
+      if (drawer.open) return
+      for (const other of drawers) if (other !== drawer) other.open = false
+    })
+  }
   if (readOnly) {
     screen.append(createEditorTrackActions(actions, true))
     return screen
