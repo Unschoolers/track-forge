@@ -8,7 +8,7 @@ import {
 import { createAiDriverState } from '@/domain/race/ai/aiState'
 import { createRace } from '@/domain/race/raceFactory'
 import { validNearbyGridPositions } from '@/domain/race/startGrid'
-import { stepRace } from '@/domain/race/raceEngine'
+import { stepRace, type RaceStepResult } from '@/domain/race/raceEngine'
 import type { RaceState } from '@/domain/race/raceState'
 import type { RoadPath } from '@/domain/track/pathBuilder'
 import { authoredCheckpointsForPath } from './scenarios'
@@ -23,6 +23,8 @@ import {
 } from './monitor'
 
 export interface LaneRunOptions {
+	/** Optional offline observer of authoritative 60 Hz ticks; never modifies race state. */
+	readonly observeStep?: (previous: RaceState, result: RaceStepResult) => void
 	readonly path: RoadPath
 	readonly trackName: string
 	readonly seed: number
@@ -181,6 +183,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 			1 / 60,
 			random,
 		)
+		options.observeStep?.(race, result)
 		monitor.observe(race, result, 1 / 60)
 		race = result.state
 		steps++
