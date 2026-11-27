@@ -541,7 +541,9 @@ function compileRoadDistance(
   const signatureFor = (key: string): string => {
     const cached = bucketSignatures.get(key)
     if (cached !== undefined) return cached
-    const signature = (buckets.get(key) ?? []).map(({ start, end }) =>
+    const contents = buckets.get(key)
+    if (!contents) return ''
+    const signature = contents.map(({ start, end }) =>
       `${start.x},${start.y}:${end.x},${end.y}`).join('|')
     bucketSignatures.set(key, signature)
     return signature
