@@ -4,6 +4,7 @@ import { WORLD_ELEVATION } from '@/domain/config'
 import { buildTerrainComponents, tileTerrainComponent } from '@/phaser/rendering/terrainTopology'
 import {
   compileTerrainPresentation,
+  RegionalTerrainMeshCache,
 } from '@/phaser/rendering/terrainMesh'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
 import { renderRoadRibbon } from '@/phaser/rendering/roadRibbonRenderer'
@@ -20,6 +21,44 @@ function landscape(width: number, height: number) {
 }
 
 describe('large track rendering budgets', () => {
+  it.each(['full', 'overview'] as const)('reuses unaffected hill samples and static tessellation after a nearby road edit (%s)', (detail) => {
+    const terrain = landscape(45, 60)
+    const west = -20 * 32
+    const north = -90 * 32
+    const beforePath = [{ x: west + 8, y: north + 8 }, { x: west + 100, y: north + 8 }]
+    const afterPath = [{ x: west + 8, y: north + 24 }, { x: west + 100, y: north + 24 }]
+    const cache = new RegionalTerrainMeshCache()
+    const first = compileTerrainSurface(terrain, beforePath)
+    const next = compileTerrainSurface(terrain, afterPath)
+    const firstSamples = vi.fn(first.heightSampleAt)
+    const nextSamples = vi.fn(next.heightSampleAt)
+    const before = compileTerrainPresentation({ ...first, heightSampleAt: firstSamples }, detail, cache)
+    const edited = compileTerrainPresentation({ ...next, heightSampleAt: nextSamples }, detail, cache)
+    const uncached = compileTerrainPresentation({ ...next }, detail)
+    expect(edited).toEqual(uncached)
+    expect(edited).not.toEqual(before)
+    expect(nextSamples.mock.calls.length).toBeGreaterThan(0)
+    expect(nextSamples.mock.calls.length).toBeLessThan(firstSamples.mock.calls.length / 4)
+    const shadows = (mesh: typeof edited) => mesh.primitives
+      .filter(primitive => primitive.kind === 'hill-shadow')
+      .flatMap(primitive => primitive.triangles)
+    expect(shadows(edited)[0]).toBe(shadows(before)[0])
+
+    const undoSamples = vi.fn(first.heightSampleAt)
+    const undone = compileTerrainPresentation({ ...first, heightSampleAt: undoSamples }, detail, cache)
+    expect(undone).toEqual(before)
+    expect(undoSamples.mock.calls.length).toBeLessThan(firstSamples.mock.calls.length / 4)
+
+    // Authoring terrain is a different dependency: even identical road
+    // segments must not reuse the prior terrain's boundary height samples.
+    const modified = compileTerrainSurface({ ...terrain, cells: terrain.cells.slice(1) }, afterPath)
+    const modifiedSamples = vi.fn(modified.heightSampleAt)
+    const rebuilt = compileTerrainPresentation({ ...modified, heightSampleAt: modifiedSamples }, detail, cache)
+    expect(rebuilt).toEqual(compileTerrainPresentation({ ...modified }, detail))
+    expect(modifiedSamples.mock.calls.length).toBeGreaterThan(firstSamples.mock.calls.length * 0.95)
+    cache.clear()
+  })
+
   it('prefers overview for Papou-scale terrain even during a race', () => {
     expect(terrainDetailForView(2_741, 1)).toBe('overview')
     expect(terrainDetailForView(0, 0.1)).toBe('overview')
