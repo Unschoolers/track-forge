@@ -224,16 +224,17 @@ export class BitmapTileRenderer {
   private readonly current = new Set<string>()
   private readonly wanted = new Set<string>()
   private selectionSignature = ''
-  private currentSignature = ''
-  private wantedSignature = ''
+  private currentSignature: string | undefined
+  private wantedSignature: string | undefined
   private clock = 0
   private destroyed = false
+  private suspended = false
   private visibleResident = 0
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly scheduler: BitmapTileUploadScheduler,
-    private readonly tiles: BitmapTiles,
+    private tiles: BitmapTiles,
     private readonly depth: number,
     private readonly layerOrder: number,
     private readonly tileLimit: number = BITMAP_TILE_LIMIT,
@@ -241,7 +242,7 @@ export class BitmapTileRenderer {
   ) {}
 
   render(view: GroundViewport, bounds?: WorldBounds): void {
-    if (this.destroyed) return
+    if (this.destroyed || this.suspended) return
     const window = bounds ?? groundViewportBounds(view)
     const grid = [window.left, window.top, window.right, window.bottom]
       .map(edge => Math.floor(edge / GROUND_TILE_SIZE)).join(':')
@@ -317,6 +318,42 @@ export class BitmapTileRenderer {
     this.scheduler.replace(this, requests)
   }
 
+  setSuspended(suspended: boolean): void {
+    if (this.destroyed || this.suspended === suspended) return
+    this.suspended = suspended
+    this.scheduler.cancel(this)
+    this.selectionSignature = ''
+    this.currentSignature = undefined
+    this.wantedSignature = undefined
+    if (suspended) {
+      for (const item of this.images.values()) {
+        if (item.image.visible) item.image.setVisible(false)
+      }
+    }
+  }
+
+  /** Reconcile only after a committed geometry change. Retain GPU textures
+   * whose exact painter inputs are unchanged; never reuse an unknown key.
+   * Cancel old prepared work before switching sources. */
+  replaceTiles(tiles: BitmapTiles): void {
+    if (this.destroyed || this.tiles === tiles) return
+    this.scheduler.cancel(this)
+    for (const [key, item] of this.images) {
+      const previous = this.tiles.tileContentKey?.(key)
+      const next = tiles.tileContentKey?.(key)
+      if (previous !== undefined && previous === next) continue
+      this.remove(item)
+      this.images.delete(key)
+    }
+    this.tiles = tiles
+    this.selectionSignature = ''
+    this.currentSignature = undefined
+    this.wantedSignature = undefined
+    this.visibleResident = 0
+    this.current.clear()
+    this.wanted.clear()
+  }
+
   /** Counts only; do not enumerate tiles or inspect GPU state in the hot path. */
   writeCoverage(target: number[]): void {
     const offset = this.layerOrder * 3
@@ -326,7 +363,7 @@ export class BitmapTileRenderer {
   }
 
   wants(key: string): boolean {
-    return !this.destroyed && this.wanted.has(key) && !this.images.has(key)
+    return !this.destroyed && !this.suspended && this.wanted.has(key) && !this.images.has(key)
   }
 
   prepare(tile: GroundTile): HTMLCanvasElement {
@@ -479,21 +516,35 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: Trac
         waterLimit = hasHill ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
         hillLimit = hasWater ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
       }
-      if (changed || previousHillInfluence !== hillInfluence) {
+      if (changed) {
         hill?.destroy()
         hill = undefined
-        previousHillInfluence = hillInfluence
+        previousHillInfluence = undefined
       }
       destroyRoadLayers()
-      if (gestureActive) return
+      // Preserve the committed hill bitmap during an unrelated live gesture.
+      // If slope influence changes, hide that pass until commit so stale hill
+      // shading cannot cover the updated vector geometry.
+      if (gestureActive) {
+        if (hill && previousHillInfluence !== hillInfluence) hill.setSuspended(true)
+        return
+      }
       if (hasWater && !water) {
         const tiles = createEditorWaterBitmapTiles(geometry, night, environment, waterLimit)
         if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit, true)
       }
-      if (hasHill && !hill) {
+      if (hasHill && (!hill || previousHillInfluence !== hillInfluence)) {
         const tiles = createEditorHillBitmapTiles(geometry, night, environment, hillLimit)
-        if (tiles) hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit, true)
+        if (tiles) {
+          if (hill) hill.replaceTiles(tiles)
+          else hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit, true)
+          previousHillInfluence = hillInfluence
+        } else {
+          hill?.destroy()
+          hill = undefined
+        }
       }
+      hill?.setSuspended(false)
       const layers = createEditorRoadBitmapLayers(geometry, night, environment, shadowMode)
       if (!layers) return
       roadLayers = [
