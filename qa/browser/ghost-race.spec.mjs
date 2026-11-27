@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
+import { selectRaceLighting } from './race-lighting.mjs'
 import { seedOwnedTrack, OWNED_TRACK_NAME } from './owned-track.mjs'
 
 async function setupRace(page) {
@@ -42,7 +43,7 @@ test('saved replay unlocks solo Ghost Race and Normal Race keeps AI without the 
   await setupRace(page)
   const ghost = page.getByRole('button', { name: 'Ghost Race', exact: true })
   await expect(ghost).toBeEnabled()
-  await page.getByRole('button', { name: 'Night', exact: true }).click()
+  await selectRaceLighting(page, 'night')
   await expect(ghost).toBeEnabled()
   await ghost.click()
   await expect(page.getByRole('button', { name: 'Start Ghost Race', exact: true })).toBeVisible()

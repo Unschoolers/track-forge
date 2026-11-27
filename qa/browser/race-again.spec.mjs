@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { selectRaceLighting } from './race-lighting.mjs'
 
 test('Race Again restores the original night race setup after reload', async ({ page }) => {
   await page.goto('/?qa')
@@ -8,7 +9,7 @@ test('Race Again restores the original night race setup after reload', async ({ 
   await page.getByRole('button', { name: 'Race Harbor Grid', exact: true }).click()
   const setup = page.getByRole('dialog', { name: 'Race setup' })
   await setup.locator('[data-car="red"]').click()
-  await setup.getByRole('button', { name: 'Night', exact: true }).click()
+  await selectRaceLighting(page, 'night')
   await setup.getByRole('button', { name: 'Start Race', exact: true }).click()
   const original = await page.evaluate(() => window.__trackForgeQa.snapshot().race.setup)
   expect(original).toMatchObject({ car: 'red', lighting: 'night' })

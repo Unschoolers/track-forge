@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { enterTrackForge } from '../enter-game.mjs'
+import { selectRaceLighting } from './race-lighting.mjs'
 
 const trackDirectory = process.env.TRACKFORGE_RACE_PERF_TRACKS
 const customTrack = process.env.TRACKFORGE_RACE_PERF_TRACK
@@ -55,7 +56,7 @@ for (const scenario of scenarios) {
       await openPicker()
       await picker.getByRole('button', { name: `Race ${trackName}`, exact: true }).click()
       const setup = page.getByRole('dialog', { name: 'Race setup' })
-      await setup.getByRole('button', { name: scenario.lighting.toUpperCase(), exact: true }).click()
+      await selectRaceLighting(page, scenario.lighting)
       await setup.getByRole('button', { name: /^(NORMAL RACE|RACE AI)$/ }).click()
       if (scenario.filename) {
         await expect(setup.getByRole('button', { name: /^(Double flyover speed|Pause flyover)$/ })).toBeVisible()

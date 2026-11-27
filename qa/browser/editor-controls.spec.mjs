@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readSavedTracks } from './saved-tracks.mjs'
 import { enterTrackForge } from '../enter-game.mjs'
+import { selectRaceLighting } from './race-lighting.mjs'
 import { EDITOR_FIXTURE_NAME, seedEditorFixture } from './editor-fixture.mjs'
 import { contact, releaseTouches, touch } from './touch.mjs'
 
@@ -171,7 +172,7 @@ test('creates and races a themed track on mobile', async ({ page, context }) => 
     await expect(track.locator('svg.track-preview')).not.toHaveAttribute('style', /background-color/)
     await expect(track.locator('..').locator('.track-environment-dot')).toHaveAttribute('data-environment', 'cityscape')
     await track.click()
-    await page.getByRole('button', { name: 'Night', exact: true }).click()
+    await selectRaceLighting(page, 'night')
     await expect(page.locator('.race-flyover')).toHaveAttribute('data-lighting', 'night')
     await page.getByRole('button', { name: 'Start Race', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Brake', exact: true })).toBeVisible()
