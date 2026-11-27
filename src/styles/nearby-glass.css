@@ -33,7 +33,6 @@
 }
 .nearby-static-modal .choice-row { flex-wrap: wrap; }
 .nearby-static-modal .setup-choice { min-width: min(7rem, 100%); overflow-wrap: anywhere; }
-.nearby-static-modal .menu-buttons > .button { text-align: center; }
 .nearby-static-modal .setup-label { font-family: system-ui, sans-serif; letter-spacing: .02em; text-transform: none; }
 [data-graphics-quality='low'] .nearby-static-modal .modal-card { background: #101821; }
 [data-graphics-quality='low'] .nearby-static-modal .setup-section { background: #18232d; }
