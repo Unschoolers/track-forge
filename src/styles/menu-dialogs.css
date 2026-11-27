@@ -141,13 +141,29 @@
 }
 /* No placeholder frame when there is no download to show. */
 .options-modal .options-download-panel:empty { display: none; }
-.options-modal :is(.options-update-actions, .options-download-panel) .button {
-  border-radius: 999px;
+.options-modal :is(.options-update-actions, .options-download-panel, .name-form, .release-notes-scroll) .button {
+  border-radius: 18px;
   clip-path: none;
-}
-.options-modal .options-update-actions .button {
   min-height: 48px;
-  padding-inline: 1.1rem;
+  font: 650 .88rem/1.15 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+.options-modal .options-download-panel progress {
+  display: block;
+  width: 100%;
+  height: .5rem;
+  accent-color: var(--menu-accent);
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.options-modal .options-download-panel progress::-webkit-progress-bar {
+  background: #ffffff24;
+  border-radius: 999px;
+}
+.options-modal .options-download-panel progress::-webkit-progress-value {
+  background: var(--menu-accent);
+  border-radius: 999px;
 }
 .options-modal .options-installed-build {
   color: var(--menu-ink);
@@ -215,11 +231,12 @@
   place-items: center;
   width: 48px;
   min-width: 48px;
-  height: 44px;
+  height: 48px;
   padding: .5rem;
-  color: var(--menu-accent);
-  border-color: var(--menu-accent);
+  color: var(--menu-ink);
+  border-radius: 50%;
 }
+.options-modal .options-update-actions .options-release-notes-button { border-radius: 50%; }
 .options-modal .options-release-notes-button[hidden] { display: none; }
 .options-modal .options-release-notes-button svg { width: 1.45rem; height: 1.45rem; }
 .options-modal.release-notes-active { padding: 0; }
