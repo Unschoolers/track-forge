@@ -428,3 +428,5 @@ matched device captures establish whether the new artwork affects gameplay.
 ## Race particles
 
 Native WebGL emitters own wind, soft puffs and occasional tire debris with a combined 180-particle pool (90 on Low); Low also samples half of the visual descriptors. Canvas keeps a lightweight Graphics fallback. Surface styling is presentation-only: desert uses sand-colored dust, ice uses soft powder, and wind is player-only. Existing race RNG draws are preserved; additional drift smoke and water splashes do not consume race randomness. Tire marks and vehicle physics are unchanged. Check Rally and Sandy Beach on Android for visibility and frame pacing before increasing density.
+
+Phaser 4.2.1's hard `maxParticles` includes dead pooled particles, so it prevents subsequent emissions once the pool fills. Use `maxAliveParticles` for the same live budget and allow Phaser to reuse expired entries. Rear skid marks track both tire contacts independently, retaining a bounded 240 segments (the former 120-segment budget per tire). Recovery discontinuities must not create connecting marks across the map.
