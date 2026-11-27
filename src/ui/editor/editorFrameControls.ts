@@ -161,7 +161,9 @@ export function createEditorStatus(
         points: state.editor.points,
         trees: state.editor.trees,
         terrain: state.editor.terrain,
-      }, geometry.path.totalLength)
+        ...(state.editor.start ? { start: state.editor.start } : {}),
+        recoveryCheckpoints: state.editor.recoveryCheckpoints,
+      }, geometry.path.totalLength, geometry.path)
     : undefined
   const status = element(
     'div',

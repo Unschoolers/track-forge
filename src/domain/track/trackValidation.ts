@@ -8,6 +8,8 @@ import {
   type Track,
   type Vector2,
 } from '@/domain/model'
+import { jumpValidationMessage } from '@/domain/track/jumpValidation'
+import type { RoadPath } from '@/domain/track/pathBuilder'
 import { EDITOR_LIMITS } from '@/domain/editor/editorGeometry'
 import { MAX_ROAD_CONTROL_LENGTH, roadControlLength } from '@/domain/track/roadLength'
 
@@ -18,6 +20,7 @@ export type TrackValidationCode =
   | 'too-short'
   | 'road-too-long'
   | 'missing-checkpoints'
+  | 'invalid-jump'
   | 'invalid-data'
 
 export interface TrackValidationResult {
@@ -33,6 +36,7 @@ function isFiniteVector(value: Vector2): boolean {
 export function validateTrack(
   track: Track,
   totalLength: number,
+  path?: RoadPath,
 ): TrackValidationResult {
   if (
     track.name.trim().length === 0 ||
@@ -88,6 +92,9 @@ export function validateTrack(
       message: 'Track is too short',
     }
   }
+
+  const jumpError = jumpValidationMessage(track, path)
+  if (jumpError) return { ready: false, code: 'invalid-jump', message: jumpError }
 
   if (!track.recoveryCheckpoints?.some(ratio => Number.isFinite(ratio) && ratio > 0 && ratio < 1)) {
     return { ready: false, code: 'missing-checkpoints', message: 'Incomplete track · Add a checkpoint in the editor' }

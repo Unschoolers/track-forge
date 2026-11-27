@@ -5,6 +5,7 @@ import { manualRecoveryTicksRemaining, type DriverInput, type RaceState, type Ra
 import { gradeForTravel, getVehicleStepContext, type VehicleStepContext } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { stepVehicleVerticalDynamics } from '@/domain/race/vehicleVerticalDynamics'
+import { findJumpTakeoff } from '@/domain/race/jumpTakeoff'
 import { advanceDriftBoost } from '@/domain/race/driftBoost'
 
 export const PLAYER_ROUTE_WINDOW = 12
@@ -84,6 +85,10 @@ export function advanceVehicle(
     moved.vx * nextContext.tangent.x +
       moved.vy * nextContext.tangent.y,
   )
+  const jumpTakeoff = !race.reversed && previousContext.onRoad && nextContext.onRoad &&
+    previousContext.structureRunId !== nextContext.structureRunId
+    ? findJumpTakeoff(race.path, vehicle, moved, previousContext.structureRunId)
+    : undefined
   const vertical = stepVehicleVerticalDynamics(
     vehicle,
     {
@@ -93,9 +98,10 @@ export function advanceVehicle(
       longitudinalSpeed,
       previousOverRoad: previousContext.onRoad,
       overRoad: nextContext.onRoad,
+      ...(jumpTakeoff ? { jumpTakeoff } : {}),
     },
     deltaSeconds,
   )
-  return { ...moved, ...vertical }
+  return { ...moved, ...vertical, jumpLaunched: !!jumpTakeoff && !vertical.grounded && vertical.verticalVelocity > 0 }
 }
 

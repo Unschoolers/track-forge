@@ -16,6 +16,7 @@ export interface RoadStructurePath {
 
 interface RoadStructureRun {
   readonly id: string
+  readonly kind: 'overpass' | 'jump'
   readonly startIndex: number
   readonly endIndex: number
   readonly startDistance: number
@@ -47,11 +48,12 @@ function smootherstep(value: number): number {
 
 function structureRanges(
   path: RoadStructurePath,
+  kind: 'overpass' | 'jump',
 ): readonly IndexRange[] {
   const ranges: IndexRange[] = []
   let start = -1
   for (let index = 0; index < path.points.length; index += 1) {
-    const overpass = path.points[index]?.structure === 'overpass'
+    const overpass = path.points[index]?.structure === kind
     if (overpass && start < 0) start = index
     if (!overpass && start >= 0) {
       ranges.push({ start, end: index - 1 })
@@ -73,9 +75,10 @@ function distanceAfterRun(
 
 function deriveRuns(
   path: RoadStructurePath,
+  kind: 'overpass' | 'jump',
 ): readonly RoadStructureRun[] {
   if (path.points.length === 0 || path.totalLength <= 0) return []
-  const ranges = [...structureRanges(path)]
+  const ranges = [...structureRanges(path, kind)]
   if (
     path.closed &&
     ranges.length > 1 &&
@@ -113,7 +116,8 @@ function deriveRuns(
       }
     }
     return {
-      id: `bridge:${sectionIds.join('|')}`,
+      id: `${kind === 'jump' ? 'jump' : 'bridge'}:${sectionIds.join('|')}`,
+      kind,
       startIndex: range.start,
       endIndex: range.end,
       startDistance,
@@ -163,7 +167,7 @@ function distanceIntoRun(
 export function buildRoadStructureProfile(
   path: RoadStructurePath,
 ): RoadStructureProfile {
-  const runs = deriveRuns(path)
+  const runs = [...deriveRuns(path, 'overpass'), ...deriveRuns(path, 'jump')]
   const sample = (
     pathIndex: number,
     segmentRatio = 0,
@@ -174,6 +178,7 @@ export function buildRoadStructureProfile(
     if (!run || run.length <= 0) return { height: 0, runId: null }
     const along = distanceIntoRun(path, run, index, segmentRatio)
     const ratio =
+      run.kind === 'jump' ? along / run.length :
       run.rampLength <= 0
         ? 1
         : along < run.rampLength

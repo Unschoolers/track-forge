@@ -70,6 +70,8 @@ export interface RaceVehicle {
   readonly manualRecoveryUntilTick?: number
   /** Seconds since a player fell off elevated road support; clears after recovery. */
   readonly bridgeFallSeconds?: number | undefined
+  /** True only on the tick an authored jump launches the car. */
+  readonly jumpLaunched?: boolean
   readonly currentSurface: SurfaceId | 'grass'
   readonly surfaceGrip?: number
   readonly onCurb: boolean

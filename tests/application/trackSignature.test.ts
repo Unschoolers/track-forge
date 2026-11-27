@@ -116,3 +116,16 @@ it('signs Send Back replies over the canonical creator file and keeps reply chai
   expect(typeof second.original).toBe('string')
   expect(second.original).not.toContain('trackforge-track-reply')
 })
+
+it('uses a distinct signed version for jump tracks and rejects a legacy version downgrade', async () => {
+  const jumpTrack: Track = { ...track, points: track.points.map((point, index) =>
+    index === 2 ? { ...point, structure: 'jump' } : point) }
+  const file = await serializeSignedTrack(jumpTrack, createTrackSigningKey)
+  const raw = JSON.parse(file) as { track: Track; format: string; formatVersion: number }
+  expect(raw.formatVersion).toBe(4)
+  const parsed = await parseSharedTrackImport(file)
+  expect(parsed.ok && parsed.track.points[2]?.structure).toBe('jump')
+  await expect(parseSharedTrackImport(JSON.stringify({ ...raw, formatVersion: 2 }))).resolves.toMatchObject({ ok: false })
+  await expect(parseSharedTrackImport(JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: 1, track: jumpTrack }))).resolves.toMatchObject({ ok: false })
+  await expect(parseSharedTrackImport(JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: 3, track: jumpTrack }))).resolves.toMatchObject({ ok: true })
+})
