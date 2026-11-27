@@ -90,6 +90,8 @@ function createRenderingScenario() {
     nightLightGraphics,
     nightBeamRenderer: beamRenderer,
     effectGraphics: new RecordingGraphics(),
+    lowerRaceEffects: new RecordingGraphics(),
+    upperRaceEffects: new RecordingGraphics(),
     snapshot: {},
     controller: { snapshot: () => ({ preferences: { lighting } }) },
     raceSession: { advance() {}, snapshot: () => ({ state, setup: { lighting } }) },
