@@ -1,5 +1,6 @@
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { prepareRaceAtlas, type RaceAtlasTextureManager } from '@/phaser/rendering/raceBitmapAtlas'
 import { RACE_CAMERA_TUNING } from '@/phaser/camera/raceCamera'
 import { prepareBridgePresentation } from '@/phaser/rendering/bridgeRenderer'
 import { ensureGroundTexture, type GroundTextureManager } from '@/phaser/rendering/environmentRenderer'
@@ -13,6 +14,7 @@ interface GroundPreparation {
   readonly width: number
   readonly height: number
   readonly lowQuality?: boolean
+  readonly atlasTextures?: RaceAtlasTextureManager
 }
 
 function* prepareRacePresentation(
@@ -42,6 +44,12 @@ function* prepareRacePresentation(
   yield* prepareBridgePresentation(geometry)
   const lamps = yield* prepareLampPosts(geometry)
   if (night) buildLampLights(lamps)
+  if (ground?.atlasTextures) {
+    for (const progress of prepareRaceAtlas(ground.atlasTextures, geometry, night, environmentId)) {
+      void progress
+      yield
+    }
+  }
 }
 
 // The timer runs after the browser has had a chance to paint the flyover.
