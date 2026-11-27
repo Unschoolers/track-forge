@@ -123,7 +123,7 @@ const longTaskObserver = supportsLongTasks ? new PerformanceObserver(list => {
 }) : undefined
 longTaskObserver?.observe({ entryTypes: ['longtask'] })
 const nativeExit = registerPlugin<{ exit(): Promise<void> }>('TrackForgeApp')
-const uiHost = new DomUiHost(uiRoot, controller, {
+const uiHost: DomUiHost = new DomUiHost(uiRoot, controller, {
   ...(Capacitor.getPlatform() === 'android' ? { exitApp: () => nativeExit.exit() } : {}),
   nearby,
   ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),
