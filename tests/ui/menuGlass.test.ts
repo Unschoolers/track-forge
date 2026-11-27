@@ -103,11 +103,12 @@ describe('LiquidGlass.dev menu adapter', () => {
     const { root } = setup()
     const screen = document.createElement('div')
     screen.className = 'nearby-static-modal'
-    screen.innerHTML = '<details><summary>Diagnostics</summary><button class="button">Download</button></details>'
+    screen.innerHTML = '<button class="button">Back</button><details><summary>Diagnostics</summary><button class="button">Download</button></details>'
     root.append(screen)
     const cleanup = attachMenuGlass(root, screen, async () => undefined)
     const details = screen.querySelector('details')!
-    expect(screen.querySelector('lg-panel')).toBeNull()
+    await vi.waitFor(() => expect(screen.querySelector(':scope > button > lg-panel')).not.toBeNull())
+    expect(details.querySelector('lg-panel')).toBeNull()
     details.open = true
     await vi.waitFor(() => expect(details.querySelector('lg-panel')).not.toBeNull())
     details.open = false
