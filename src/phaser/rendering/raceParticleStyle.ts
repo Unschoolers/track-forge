@@ -16,6 +16,7 @@ export function raceParticleStyle(item: RaceParticle, desert = false) {
     case 'ice': return { shape: 'puff' as const, color: 0xebfaff, opacity: 0.68, size: item.size, angle, growth: 0.7 }
     case 'water': return { shape: 'puff' as const, color: 0xc5eaf2, opacity: 0.7, size: item.size, angle, growth: 0.15 }
     case 'tire-smoke': return { shape: 'puff' as const, color: 0xb9c0c8, opacity: 0.62, size: item.size, angle, growth: 0.8 }
+    case 'jump-launch': return { shape: 'puff' as const, color: 0xd9e2ea, opacity: 0.55, size: item.size, angle, growth: 0.6 }
     case 'landing-dust': return { shape: 'puff' as const, color: 0xa6afb9, opacity: 0.45, size: item.size, angle, growth: 0.8 }
   }
 }
