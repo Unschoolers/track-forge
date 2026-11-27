@@ -13,6 +13,12 @@ export interface VehicleVerticalEnvironment {
   readonly longitudinalSpeed: number
   readonly previousOverRoad: boolean
   readonly overRoad: boolean
+  /** Present only when grounded motion crosses the authored takeoff lip
+   * in its launch direction. A lateral bridge departure is not a takeoff. */
+  readonly jumpTakeoff?: {
+    readonly height: number
+    readonly grade: number
+  }
 }
 
 export interface VehicleVerticalResult extends VehicleVerticalState {
@@ -95,6 +101,26 @@ export function stepVehicleVerticalDynamics(
       suspensionCompression: 0,
       landingIntensity,
       contactLoad: 0,
+    }
+  }
+
+  const takeoff = environment.jumpTakeoff
+  if (takeoff && dt > 0 && environment.previousOverRoad &&
+      Number.isFinite(takeoff.height) && Number.isFinite(takeoff.grade) &&
+      takeoff.height > surfaceHeight + SUPPORT_HEIGHT_EPSILON &&
+      takeoff.height >= z - SUPPORT_HEIGHT_EPSILON &&
+      takeoff.grade > 0 && environment.longitudinalSpeed > 0) {
+    const grade = clamp(takeoff.grade, 0, VERTICAL_DYNAMICS.maximumGrade)
+    const speed = Math.max(0, finiteOr(environment.longitudinalSpeed))
+    if (speed > 0) {
+      return {
+        z: takeoff.height,
+        verticalVelocity: speed * Math.sin(grade),
+        grounded: false,
+        suspensionCompression: 0,
+        landingIntensity,
+        contactLoad: 0,
+      }
     }
   }
 
