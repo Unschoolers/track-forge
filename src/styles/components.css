@@ -49,6 +49,39 @@
 .hud-card { display: grid; width: fit-content; min-width: 0; padding: .4rem .55rem; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: rgb(20 26 36 / 82%); font-variant-numeric: tabular-nums; }
 .race-hud .hud-card:first-child { justify-self: start; }
 .race-hud > .icon-button { justify-self: center; }
+.race-hud-left { display: grid; justify-items: start; gap: .35rem; min-width: 0; pointer-events: none; }
+.race-minimap {
+  width: clamp(76px, 25vw, 108px);
+  aspect-ratio: 1;
+  padding: .35rem;
+  border: 1px solid #b8c7d030;
+  border-radius: .7rem;
+  background: #0b131ad9;
+  pointer-events: none;
+}
+.race-minimap[hidden] { display: none; }
+.race-minimap svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.race-minimap [data-kind='route'] { fill: none; stroke: #d7e4ebad; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.race-minimap circle { fill: #d7e4eb; stroke: #0b131a; stroke-width: 1.1; }
+.race-minimap [data-kind='player'] { fill: #ffad75; stroke: #fff5e9; stroke-width: 1.2; }
+.race-minimap [data-map-heading] { stroke: #ffad75; stroke-width: 2.5; stroke-linecap: round; }
+.race-minimap [data-kind='nearby'] { fill: #8fd7e8; }
+.race-minimap [data-kind='ghost'] { fill: #a5b0ba; stroke: #e8f0f4; stroke-width: .8; }
+.race-turn-cue {
+  min-width: 2.15rem;
+  padding: .2rem .45rem;
+  border-radius: .55rem;
+  background: #0b131ad9;
+  color: #e4edf3;
+  font: 700 1.1rem/1 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+.race-turn-cue[hidden] { display: none; }
+@media (max-height: 430px) {
+  .race-minimap { width: 72px; padding: .25rem; }
+  .race-turn-cue { font-size: .9rem; padding: .1rem .35rem; }
+}
 .align-right { justify-self: end; text-align: right; }
 .hud-value { font-size: clamp(1rem, 4vw, 1.35rem); line-height: 1.2; }
 .race-controls { --steer-button-size: 64px; --pedal-size: 6.875rem; }

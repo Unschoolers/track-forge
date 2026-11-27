@@ -149,6 +149,29 @@ test('arcade race advances and produces machine-readable driving metrics', async
   page.on('pageerror', error => browserErrors.push(error.message))
   await launch(page)
   await enterRace(page)
+  const minimap = page.locator('.race-minimap')
+  for (const [width, height] of [[360, 780], [780, 360]]) {
+    await page.setViewportSize({ width, height })
+    await expect(minimap).toBeVisible()
+    const mapBounds = await minimap.boundingBox()
+    const brakeBounds = await page.getByRole('button', { name: 'Brake', exact: true }).boundingBox()
+    expect(mapBounds).not.toBeNull()
+    expect(brakeBounds).not.toBeNull()
+    expect(mapBounds.x).toBeGreaterThanOrEqual(0)
+    expect(mapBounds.y).toBeGreaterThanOrEqual(0)
+    expect(mapBounds.x + mapBounds.width).toBeLessThanOrEqual(width)
+    expect(mapBounds.y + mapBounds.height).toBeLessThanOrEqual(height)
+    const overlap = mapBounds.x < brakeBounds.x + brakeBounds.width &&
+      mapBounds.x + mapBounds.width > brakeBounds.x && mapBounds.y < brakeBounds.y + brakeBounds.height &&
+      mapBounds.y + mapBounds.height > brakeBounds.y
+    expect(overlap).toBe(false)
+    const passesTouches = await minimap.evaluate(el => {
+      const rect = el.getBoundingClientRect()
+      return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.matches('#game-container canvas')
+    })
+    expect(passesTouches).toBe(true)
+    await testInfo.attach(`minimap-${width}x${height}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
   await expect.poll(async () => (await telemetry(page)).race.elapsed).toBeGreaterThan(0.5)
   const state = await telemetry(page)
   expect(state.race.elapsed).toBeGreaterThan(0.5)

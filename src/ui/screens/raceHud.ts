@@ -11,6 +11,9 @@ import { button, element } from '@/ui/dom'
 import { formatRaceTime } from '@/ui/format'
 import { bindRacePointer, STEERING_RANGE_PX } from '@/phaser/input/racePointer'
 import { driftCue } from '@/ui/screens/driftCue'
+import { createRaceMinimap } from '@/ui/components/raceMinimap'
+import { upcomingRaceTurnCue } from '@/ui/components/raceTurnCue'
+import type { RoadPath } from '@/domain/track/pathBuilder'
 
 // Keep race-position celebrations stable without delaying the live position HUD.
 const POSITION_CHANGE_HOLD_MS = 600
@@ -34,6 +37,12 @@ export function createRaceHud(
   positionValue.dataset.racePosition = ''
   const positionLabel = element('span', 'label', 'POSITION')
   position.append(positionValue, positionLabel)
+  const minimap = createRaceMinimap()
+  const turnCue = element('div', 'race-turn-cue')
+  turnCue.setAttribute('role', 'img')
+  turnCue.hidden = true
+  const leftHud = element('div', 'race-hud-left')
+  leftHud.append(position, minimap.element, turnCue)
 
   const lap = element('div', 'hud-card race-timing align-right')
   const lapValue = element('strong', 'hud-value', '1/3')
@@ -50,7 +59,7 @@ export function createRaceHud(
   pause.setAttribute('aria-label', raceSession.snapshot().setup?.mode === 'nearby' ? 'Race menu' : 'Pause race')
   position.append(gap)
   lap.append(lapValue, timeValue, lapTimes, splitTime)
-  hud.append(position, pause, lap)
+  hud.append(leftHud, pause, lap)
 
 
   const raceBanner = element('div', 'race-event-banner')
@@ -270,6 +279,9 @@ export function createRaceHud(
   let bannerUntil = 0
   let previousPaused: boolean | undefined
   let previousPhase: RaceSessionSnapshot['telemetry']['phase'] | undefined
+  let cuePath: RoadPath | undefined
+  let cueIndex = -1
+  let cueReversed = false
   const announce = (
     label: string,
     title: string,
@@ -332,6 +344,20 @@ export function createRaceHud(
       if (checkpointAnnouncement.textContent) checkpointAnnouncement.textContent = ''
     }
     const player = snapshot.state?.vehicles.find((car) => car.player)
+    minimap.update(snapshot, snapshot.setup?.mode === 'nearby' ? raceSession.nearbyGhosts?.() ?? [] : [])
+    const path = snapshot.state?.path
+    const index = player?.pathIndex ?? -1
+    const reversed = snapshot.state?.reversed ?? false
+    if (path !== cuePath || index !== cueIndex || reversed !== cueReversed) {
+      cuePath = path
+      cueIndex = index
+      cueReversed = reversed
+      const cue = path && player ? upcomingRaceTurnCue(path, index, reversed) : null
+      turnCue.hidden = !cue
+      turnCue.textContent = cue?.direction === 'left' ? '↰' : cue?.direction === 'right' ? '↱' : ''
+      if (cue) turnCue.setAttribute('aria-label', `Turn ${cue.direction} ahead`)
+      else turnCue.removeAttribute('aria-label')
+    }
     const boostSnapshot = (player as { readonly driftBoost?: { readonly charge: number; readonly phase: string } } | undefined)?.driftBoost
     const boostCharge = Math.max(0, Math.min(1, boostSnapshot?.charge ?? 0))
     boost.disabled = !boostPractice || paused || phase !== 'running' || boostSnapshot?.phase !== 'ready'
