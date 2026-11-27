@@ -22,6 +22,7 @@ import {
   buildLampLights,
 } from '@/phaser/rendering/lampPostRenderer'
 import { buildTreePresentation } from '@/phaser/rendering/treeRenderer'
+import { GRASS_SCENERY } from '@/presentation/environments/grass'
 import {
   EMPTY_TERRAIN,
   paintTerrain,
@@ -83,12 +84,21 @@ describe('track presentation geometry', () => {
     expect(day[1]).toMatchObject({
       x: 80,
       y: 80,
-      radiusX: 28,
-      radiusY: 28,
+      radiusX: GRASS_SCENERY['grass-shrub'].radius * 2,
+      radiusY: GRASS_SCENERY['grass-shrub'].radius * 2,
       baseHeight: WORLD_ELEVATION.levelHeight,
     })
     expect(night[1]?.color).not.toBe(day[1]?.color)
     expect(buildTreePresentation([], false, terrainSurface)).toEqual([])
+  })
+
+  it('applies authored size multipliers to the larger default canopy', () => {
+    const shrubDiameter = GRASS_SCENERY['grass-shrub'].radius * 2
+    for (const scale of [0.5, 1, 1.5]) {
+      const canopy = buildTreePresentation([{ x: 0, y: 0, scale }], false).find(item => item.layer === 'canopy')
+      expect(canopy?.radiusX).toBe(shrubDiameter * scale)
+      expect(canopy?.radiusY).toBe(shrubDiameter * scale)
+    }
   })
 
   it('culls trees only when both their canopy and projected shadow miss the view', () => {
@@ -96,7 +106,7 @@ describe('track presentation geometry', () => {
     const primitives = buildTreePresentation(
       [
         { x: 50, y: 50 },
-        // The canopy is outside, but its southeast shadow reaches the view.
+        // A tree centered outside the viewport still overlaps it.
         { x: -20, y: 50 },
         { x: 200, y: 200 },
       ],
@@ -108,9 +118,9 @@ describe('track presentation geometry', () => {
     expect(primitives).toHaveLength(6)
     expect(primitives.filter(({ layer }) => layer === 'canopy')).toHaveLength(2)
     expect(primitives.filter(({ layer }) => layer === 'shadow')).toHaveLength(2)
-    // The 56-unit canopy reaches the viewport even at its outer edge.
+    // The enlarged canopy reaches the viewport even at its outer edge.
     expect(buildTreePresentation(
-      [{ x: 128, y: 50 }],
+      [{ x: bounds.right + GRASS_SCENERY['grass-shrub'].radius * 2, y: 50 }],
       false,
       undefined,
       bounds,
