@@ -67,14 +67,14 @@ export function buildRoadTransitionCues(
     const surfaceChange = before.surface !== after.surface
     const rampStart = before.structure !== 'overpass' && after.structure === 'overpass'
     const rampEnd = before.structure === 'overpass' && after.structure !== 'overpass'
-    const jumpLip = before.structure === 'jump' && after.structure === 'surface'
+    const jumpLip = path.roadSurface.jumpLips.find(lip => lip.beforeIndex === index)
     if (!surfaceChange && !rampStart && !rampEnd && !jumpLip) continue
     const kind = jumpLip ? 'jump-lip' : rampStart ? 'ramp-entry' : rampEnd ? 'ramp-exit' : 'surface'
-    const gate = roadGateGeometry(path, index + 1)
+    const gate = jumpLip ?? roadGateGeometry(path, index + 1)
     if (!gate) continue
-    const span = roadGateSpan(path, index + 1, ROAD_GEOMETRY.surfaceWidth / 2 - 3)
+    const span = jumpLip ? { min: -ROAD_GEOMETRY.surfaceWidth / 2 + 3, max: ROAD_GEOMETRY.surfaceWidth / 2 - 3 } : roadGateSpan(path, index + 1, ROAD_GEOMETRY.surfaceWidth / 2 - 3)
     const approachDirection = rampStart ? -1 : rampEnd ? 1 : 0
-    const approach = rampStart || rampEnd
+    const approach = jumpLip ? 12 : rampStart || rampEnd
       ? 14 * approachDirection
       : 0
     const center = {
