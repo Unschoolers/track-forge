@@ -79,10 +79,16 @@ test('reports an artwork failure while the game bundle is still loading', async 
     await heldBundle
     await route.continue()
   })
-  await page.route(/\/assets\/scenery-[^/]+\.webp$/, route => route.abort())
+  let blockedAtlas = false
+  await page.route(/\/assets\/shared-[^/]+\.webp$/, route => {
+    blockedAtlas = true
+    return route.abort()
+  })
   try {
     await page.goto('/', { waitUntil: 'commit' })
     await expect(page.getByRole('button', { name: /^try again$/i })).toBeVisible()
+    expect(blockedAtlas).toBe(true)
+    await expect(page.getByRole('status')).toHaveText('Track Forge couldn’t load.')
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)))
     await expect.poll(() => errors).toEqual([])
   } finally {
