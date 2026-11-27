@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BRIDGE_FALL_RESPAWN_SECONDS, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
+import { hasBridgeFallExpired, trackBridgeFall } from '@/domain/race/bridgeFallRecovery'
 import { createRace } from '@/domain/race/raceFactory'
 import { recoverRacePlayer, stepRace, stepRaceTick } from '@/domain/race/raceEngine'
 import { recoverRaceVehicle } from '@/domain/race/raceRecovery'
@@ -85,7 +85,17 @@ describe('manual recovery hold and elevated-road auto respawn', () => {
     expect(rejoined.bridgeFallSeconds).toBeUndefined()
   })
 
-  it('automatically recovers a player stranded below a bridge after two seconds', () => {
+  it('expires a bridge fall on the fifteenth fixed physics tick, not before', () => {
+    let seconds = 0
+    expect(hasBridgeFallExpired(undefined)).toBe(false)
+    for (let tick = 1; tick <= 14; tick++) {
+      seconds += 1 / 60
+      expect(hasBridgeFallExpired(seconds)).toBe(false)
+    }
+    expect(hasBridgeFallExpired(seconds + 1 / 60)).toBe(true)
+  })
+
+  it('automatically recovers a player falling off a bridge within 250 ms', () => {
     const initial = start()
     const index = path.points.findIndex((point) => point.x >= 0)
     const point = requireFixture(path.points[index])
@@ -103,7 +113,7 @@ describe('manual recovery hold and elevated-road auto respawn', () => {
     }
     let startedAt: number | undefined
     let recoveredAt: number | undefined
-    for (let frame = 0; frame < 155; frame++) {
+    for (let frame = 0; frame < 60; frame++) {
       const tick = stepRace(race, { steering: 0, throttle: 0, braking: false }, 1 / 60, { next: () => 0.5 })
       race = tick.state
       const car = requireFixture(race.vehicles[0])
@@ -118,8 +128,8 @@ describe('manual recovery hold and elevated-road auto respawn', () => {
     }
     expect(startedAt).toBeDefined()
     expect(recoveredAt).toBeDefined()
-    expect((recoveredAt ?? 0) - (startedAt ?? 0)).toBeGreaterThanOrEqual(BRIDGE_FALL_RESPAWN_SECONDS - 0.05)
-    expect((recoveredAt ?? 0) - (startedAt ?? 0)).toBeLessThanOrEqual(BRIDGE_FALL_RESPAWN_SECONDS + 0.05)
+    // The first observed fall tick has already accumulated 1/60 s.
+    expect((recoveredAt ?? 0) - (startedAt ?? 0) + 1 / 60).toBeCloseTo(0.25, 10)
   })
 
 })
