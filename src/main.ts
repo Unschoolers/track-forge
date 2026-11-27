@@ -217,7 +217,7 @@ export async function prepareStartupRace(report: (progress: number) => void): Pr
     OFFICIAL_COURSES.find(({ track }) => track.id === lastRace.trackId)?.track)
   const track = lastTrack ?? OFFICIAL_COURSES[0]?.track
   if (!track) { report(1); return }
-  await sceneHost.prepareStartupRace(track, lastTrack && lastRace ? lastRace.setup.lighting : track.lighting, report)
+  await sceneHost.prepareStartupRace(track, (lastTrack && lastRace ? lastRace.setup.lighting : track.lighting) ?? track.lighting, report)
 }
 
 // Render the controls before a scene uses their bounds to fit the camera.
