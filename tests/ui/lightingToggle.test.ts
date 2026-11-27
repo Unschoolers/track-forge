@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { attachLightingArtwork, createLightingToggle } from '@/ui/components/lightingToggle'
+import { attachLightingArtwork, createLightingToggle, updateLightingToggle } from '@/ui/components/lightingToggle'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -53,6 +53,23 @@ describe('race lighting toggle', () => {
     expect(toggle.dataset.lightingArt).toBeUndefined()
     expect(toggle.style.getPropertyValue('--glass-light-x')).toBe('')
     expect(toggle.style.getPropertyValue('--glass-ambient')).toBe('')
+  })
+
+  it('updates an already mounted lighting lens without recreating it', async () => {
+    const toggle = createLightingToggle('day', vi.fn())
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const update = vi.fn()
+    const destroy = vi.fn()
+    const createGlass = vi.fn(() => ({ update, destroy }))
+    const cleanup = attachLightingArtwork(toggle, true, async () => ({ createGlass }))
+    await Promise.resolve()
+    updateLightingToggle(toggle, 'night')
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(toggle.textContent).toBe('Night')
+    expect(createGlass).toHaveBeenCalledOnce()
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ lightAngle: 120 }))
+    expect(destroy).not.toHaveBeenCalled()
+    cleanup()
   })
 
   it('skips motion and ignores a late library load after disposal', async () => {

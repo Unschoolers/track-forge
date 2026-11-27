@@ -295,6 +295,29 @@ test('race setup actions stay visible and reachable at narrow portrait and lands
     await expect(setup).toHaveCSS('background-color', 'rgba(17, 25, 35, 0.72)')
     await expect(setup.locator('[data-action="setup-start"] > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
     await expect(setup.locator('[data-action="lighting-toggle"] .lighting-sky')).toHaveCSS('filter', /url\(/)
+    const lap = setup.locator('[data-action="laps-cycle"]')
+    const mode = setup.locator('[data-action="mode-cycle"]')
+    await expect(lap.locator('lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    await expect(mode.locator('lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    // Retain the actual nodes and active lenses, not only their visual styles.
+    const before = await setup.evaluateHandle(dialog => ({
+      dialog, canvas: dialog.querySelector('canvas'), start: dialog.querySelector('[data-action="setup-start"] > lg-panel'),
+      lap: dialog.querySelector('[data-action="laps-cycle"] > lg-panel'), mode: dialog.querySelector('[data-action="mode-cycle"] > lg-panel'),
+      lighting: dialog.querySelector('.lighting-sky'),
+    }))
+    await lap.click()
+    await mode.click()
+    await setup.locator('[data-action="lighting-toggle"]').click()
+    expect(await setup.evaluate((dialog, nodes) => dialog === nodes.dialog && dialog.querySelector('canvas') === nodes.canvas &&
+      dialog.querySelector('[data-action="setup-start"] > lg-panel') === nodes.start &&
+      dialog.querySelector('[data-action="laps-cycle"] > lg-panel') === nodes.lap &&
+      dialog.querySelector('[data-action="mode-cycle"] > lg-panel') === nodes.mode &&
+      dialog.querySelector('.lighting-sky') === nodes.lighting, before)).toBe(true)
+    await before.dispose()
+    await mode.click()
+    await lap.click()
+    await lap.click()
+    await setup.locator('[data-action="lighting-toggle"]').click()
     await expect(setup.locator('.race-flyover-panel lg-panel')).toHaveCount(0)
     await testInfo.attach(`race-setup-${viewport.width}x${viewport.height}`, { body: await setup.screenshot(), contentType: 'image/png' })
     await actions[0].focus()
