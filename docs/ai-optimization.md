@@ -280,3 +280,9 @@ With the latest settings the six-course Hard solo benchmark completes all
 48 runs. Fast asphalt finishes Red 28.45 s, Blue 28.93 s, Green 28.95 s,
 Yellow 30.85 s. Red remains 26.60% slower than Green overall on the six
 equally weighted scenarios. The two tested seeds yield identical outcomes.
+
+### Continuous racing line (P1 experiment)
+
+A geometry-only curvature solver computes bounded lateral offsets once per immutable compiled road, using multi-scale second differences and a center/slope penalty. Hard can blend the existing pursuit target into that line; the old target is preserved when the blend is zero, traffic occupies the approach, or the chassis is unstable. The first experiment restricts the line to ordinary paved road away from crossings, support and surface transitions. No track identity, replay inputs, physics, brake or checkpoint rules enter the solver. Open endpoints are pinned. The default profile is unchanged until the lab validates a candidate.
+
+`npm run qa:optimize -- --focus driving --racing-line --workers 2 --trials 5 --seeds 1,4331 --out qa/results/racing-line` isolates the line blend for all four cars on the standard calibration and holdout tracks, including reverse routes and traffic. The existing recovery, finish, and timing gates apply. Promote only measured per-car gains, validate combined profiles and required CI, then extend surface coverage or braking prediction as a separate slice. No speed improvement is assumed before the experiment.

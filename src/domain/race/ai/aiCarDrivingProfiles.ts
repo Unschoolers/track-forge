@@ -17,6 +17,8 @@ export interface CarDrivingProfile {
   readonly hardLookAheadSamples: number
   /** Hard-only tactical line choice; never changes tire forces or the road. */
   readonly hardApexCutScale?: number
+  /** Experimental blend into the continuous geometry racing line; default off. */
+  readonly hardRacingLineBlend?: number
   /** Fraction of pursuit shortening applied near the outer road edge. */
   readonly hardEdgeAvoidanceScale?: number
   /** Extra planned corner speed on a controlled Hard racing line, never physics. */
