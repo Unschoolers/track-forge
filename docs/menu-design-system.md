@@ -18,6 +18,8 @@ Menu glass uses LiquidGlass.dev's upstream SVG refraction of aligned copies of s
 
 ## Shared control defaults
 
+Disable the native WebView tap highlight on interactive controls. Press feedback uses the existing glass contact reflection and elastic response without changing the authored tint; keyboard focus outlines and persistent selection colors remain intact.
+
 menu-glass.css owns optical material and its static-art fallback; menu-controls.css owns painted controls; menu-dialogs.css owns base dialog layout, field geometry and minimum touch sizes. Options, Track Library, Race Setup, Results and the player topper picker have focused stylesheets. An unclassified new
 dialog must already look like Track Forge, not the retired angular theme.
 Use the existing button and setup-choice classes; selectable buttons expose

@@ -82,16 +82,7 @@
 #app [data-menu-material='static'] [data-liquid-glass-kind='action'][data-liquid-glass]:active:not(:disabled) {
   transform: none;
   filter: none;
-  --lg-tint: rgb(15 28 41 / 38%);
-}
-#app [data-menu-material='static'] [data-liquid-glass-kind='action'][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary):active:not(:disabled) {
-  --lg-tint: rgb(255 146 92 / 88%);
-}
-#app [data-menu-material='static'] [data-liquid-glass-kind='action'][data-liquid-glass].button-danger:active:not(:disabled) {
-  --lg-tint: rgb(93 34 49 / 92%);
-}
-#app .race-setup-modal [data-liquid-glass-kind='action'][data-liquid-glass].setup-choice.active:active:not(:disabled) {
-  --lg-tint: rgb(227 237 247 / 86%);
+  /* Keep the authored tint; contact reflection and elastic glass provide press feedback. */
 }
 #app :is(.track-library-modal, .options-modal) [data-liquid-glass-kind='group'][data-liquid-glass] {
   --lg-tint: rgb(15 28 41 / 24%);
