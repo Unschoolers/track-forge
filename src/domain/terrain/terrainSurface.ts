@@ -351,6 +351,9 @@ function waterAt(
   position: Vector2,
   cellSize: number,
 ): boolean {
+  if (field.waterCorners.size === 0) {
+    return field.lookup.get(terrainCellKey(cellAt(position, cellSize))) === 'water'
+  }
   const vertex = {
     x: Math.round(position.x / cellSize) * cellSize,
     y: Math.round(position.y / cellSize) * cellSize,
