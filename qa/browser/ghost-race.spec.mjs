@@ -101,6 +101,7 @@ test('shares a saved creator ghost and opens the imported challenge with its lap
   await garage.locator('.track-card-overflow summary').click()
   const download = page.waitForEvent('download')
   await garage.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()
+  await page.getByRole('button', { name: 'EXPORT', exact: true }).click()
   const challengeContent = await readFile(await (await download).path(), 'utf8')
   const challenge = JSON.parse(challengeContent)
   expect(challenge.formatVersion).toBe(2)
