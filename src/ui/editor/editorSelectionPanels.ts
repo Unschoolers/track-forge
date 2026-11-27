@@ -6,10 +6,11 @@ import { planPointInsertion } from '@/domain/editor/editorGeometry'
 import type { TrackCrossing } from '@/domain/track/crossings'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { button, element } from '@/ui/dom'
+import { editorIconButton } from '@/ui/editor/editorIcons'
 
 export function createEditorSelectionPanels(
   state: AppSnapshot,
-  actions: { readonly edit: (command: EditorCommand) => void; readonly previewSceneryRotation?: (target: ScenerySelection, rotation: number | null) => void },
+  actions: { readonly edit: (command: EditorCommand) => void; readonly dismissScenery: () => void; readonly previewSceneryRotation?: (target: ScenerySelection, rotation: number | null) => void },
   geometry: TrackGeometry,
 ): readonly HTMLElement[] {
   const panels: HTMLElement[] = []
@@ -42,7 +43,7 @@ export function createEditorSelectionPanels(
   const target = state.editorUi.selectedScenery
   if (gestureFinished && state.editorUi.tool === 'tree' && target) {
     const item = target.type === 'tree' ? state.editor.trees[target.index] : state.editor.scenery[target.index]
-    if (item) panels.push(createSceneryControl(target, item, actions.edit, actions.previewSceneryRotation))
+    if (item) panels.push(createSceneryControl(target, item, actions.edit, actions.dismissScenery, actions.previewSceneryRotation))
   }
 
   if (state.editorUi.tool === 'start' && state.editor.routeKind === 'circuit') {
@@ -55,11 +56,17 @@ function createSceneryControl(
   target: ScenerySelection,
   item: SceneryTransform & { readonly season?: TreeSeason },
   edit: (command: EditorCommand) => void,
+  dismiss: () => void,
   preview?: (target: ScenerySelection, rotation: number | null) => void,
 ): HTMLElement {
   const panel = element('aside', 'point-control scenery-control')
   panel.setAttribute('aria-label', 'Scenery transformation')
-  panel.append(element('strong', 'point-control-title', 'Scenery transformation'))
+  const header = element('div', 'scenery-control-header')
+  header.append(
+    element('strong', 'point-control-title', 'Scenery transformation'),
+    editorIconButton('close', 'close-scenery-control', 'Close scenery transformation', dismiss, 'icon-button scenery-control-close'),
+  )
+  panel.append(header)
   if (target.type === 'tree') {
     const seasonLabel = element('label', 'point-tension-label scenery-season-label')
     const seasonText = element('span', '')

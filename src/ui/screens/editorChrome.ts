@@ -25,6 +25,7 @@ import { createEditorToolPalette } from '@/ui/editor/editorToolPalette'
 import { element } from '@/ui/dom'
 
 export interface EditorChromeActions extends EditorFrameActions {
+  readonly dismissScenery: () => void
   readonly previewSceneryRotation?: (target: ScenerySelection, rotation: number | null) => void
   readonly tool: (tool: EditorTool) => void
   readonly surface: (surface: EditorSurface) => void

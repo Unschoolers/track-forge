@@ -189,3 +189,15 @@
 .editor-screen .scenery-control .point-insert {
   pointer-events: auto;
 }
+
+.editor-screen .scenery-control-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: .35rem;
+}
+.editor-screen .scenery-control-close {
+  width: 44px;
+  height: 44px;
+  pointer-events: auto;
+}
