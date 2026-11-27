@@ -91,7 +91,7 @@ export interface RaceDiagnosticsReport {
   readonly playerControls: readonly DiagnosticControlSample[]
   readonly track: Track
   readonly setup: RaceSetup & { readonly handling: 'arcade' }
-  readonly result: DiagnosticResult
+  readonly result: DiagnosticResult | null
   readonly frames: readonly DiagnosticFrame[]
   readonly events: readonly DiagnosticEvent[]
   readonly droppedEvents: number
@@ -135,8 +135,8 @@ export class RaceDiagnosticsRecording {
     this.capture(state, undefined, true)
   }
 
-  /** The report stays available through the results modal, including rivals' final five seconds. */
-  report(track: Track, setup: RaceSetup, result: RaceResult): RaceDiagnosticsReport {
+  /** Snapshot the recording without ending it; null denotes an unfinished race. */
+  report(track: Track, setup: RaceSetup, result: RaceResult | null): RaceDiagnosticsReport {
     return {
       format: 'trackforge-race-replay',
       formatVersion: 1,
@@ -146,7 +146,7 @@ export class RaceDiagnosticsRecording {
       playerControls: [...this.playerControls],
       track,
       setup: { ...setup, handling: 'arcade' },
-      result: {
+      result: result ? {
         ...result,
         playerWrecked: false,
         standings: result.standings.map(standing => ({ ...standing, wrecked: false })),
@@ -154,7 +154,7 @@ export class RaceDiagnosticsRecording {
           ...score,
           ...(category ? { category: { ...category, handling: 'arcade' } } : {}),
         })),
-      },
+      } : null,
       frames: [...this.frames],
       events: [...this.events],
       droppedEvents: this.droppedEvents,

@@ -216,11 +216,11 @@ export class DomUiHost implements UiHost {
     this.noticeTimers.add(timer)
   }
 
-  private async downloadNearbyDiagnostics(nearby: NearbyRace, fromResults = false): Promise<boolean> {
+  private async downloadNearbyDiagnostics(nearby: NearbyRace, includeRacePerformance = false): Promise<boolean> {
     const capturedAt = new Date().toISOString()
     // Capture the local frame report and JS network counters before any async work.
     // The results overlay can remain visible while the next round is being prepared.
-    const performance = fromResults && nearby.snapshot().phase === 'racing' &&
+    const performance = includeRacePerformance && nearby.snapshot().phase === 'racing' &&
       this.runtime.raceSession.snapshot().setup?.mode === 'nearby'
       ? this.runtime.frameDiagnostics?.() ?? null : null
     const network = await nearby.diagnostics()
@@ -718,11 +718,13 @@ export class DomUiHost implements UiHost {
           initialTab: this.previousOverlayType !== 'options' ? state.overlay.tab : undefined,
           availableUpdate: this.availableUpdate,
         })
-      case 'pause':
+      case 'pause': {
+        const nearby = this.runtime.nearby
         if (this.runtime.raceSession.snapshot().setup?.mode === 'nearby') {
           return createNearbyRaceMenu(
             () => this.controller.dispatch({ type: 'resume-race' }),
             () => this.controller.dispatch({ type: 'leave-nearby' }),
+            nearby ? () => this.downloadNearbyDiagnostics(nearby, true) : undefined,
           )
         }
         return createPauseModal({
@@ -736,7 +738,9 @@ export class DomUiHost implements UiHost {
               returnTo: 'race',
             }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
+          exportRace: this.runtime.raceSession.diagnosticsReport ? () => { void this.exportRaceDiagnostics() } : undefined,
         })
+      }
       case 'editor-exit':
         return createEditorExitModal({
           save: () => this.controller.dispatch({ type: 'resolve-editor-exit', choice: 'save' }),

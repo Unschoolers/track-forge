@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createNearbyRaceMenu } from '@/ui/modals/nearbyRaceModal'
 import { createResultsModal } from '@/ui/modals/resultsModal'
 import type { RaceResult } from '@/application/race/raceSession'
 import { asTrackId } from '@/domain/model'
@@ -90,4 +91,14 @@ describe('hidden race diagnostics entry', () => {
     target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
     expect(modal.querySelector<HTMLElement>('.race-diagnostics-panel')?.hidden).toBe(false)
   })
+})
+
+it('offers Nearby diagnostics from the live race menu without leaving the race', async () => {
+  const resume = vi.fn(), leave = vi.fn(), save = vi.fn(async () => true)
+  const modal = createNearbyRaceMenu(resume, leave, save)
+  modal.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')?.click()
+  await vi.waitFor(() => expect(modal.textContent).toContain('Diagnostic report saved.'))
+  expect(save).toHaveBeenCalledOnce()
+  expect(resume).not.toHaveBeenCalled()
+  expect(leave).not.toHaveBeenCalled()
 })

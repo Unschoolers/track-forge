@@ -6,6 +6,7 @@ export function createPauseModal(actions: {
   readonly restart: () => void
   readonly options: () => void
   readonly home: () => void
+  readonly exportRace?: (() => void) | undefined
 }): HTMLElement {
   const frame = createModalFrame(
     'Race paused',
@@ -23,6 +24,7 @@ export function createPauseModal(actions: {
     ),
     button('RESTART RACE', 'restart-race', actions.restart, 'button'),
     button('OPTIONS', 'race-options', actions.options, 'button'),
+    ...(actions.exportRace ? [button('EXPORT DIAGNOSTICS', 'export-race-diagnostics', actions.exportRace, 'button')] : []),
     button(
       'QUIT TO HOME',
       'quit-race',
