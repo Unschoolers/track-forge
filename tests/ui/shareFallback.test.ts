@@ -16,7 +16,7 @@ vi.mock('@/infrastructure/export/trackExport', () => ({
 const track = createStarterTrack(asTrackId('personal-share'), 1)
 const state: AppSnapshot = {
   mode: 'home', paused: false,
-  overlay: { type: 'track-library', purpose: 'edit' },
+  overlay: { type: 'track-share', track, returnTo: { type: 'track-library', purpose: 'edit' } },
   tracks: [track], currentTrack: track,
   editor: createEditorState(track.points, track.trees),
   editorUi: {
@@ -41,7 +41,7 @@ describe('track share fallback', () => {
     const host = new DomUiHost(root, controller, createUiRuntime())
     host.mount()
     try {
-      const share = root.querySelector<HTMLButtonElement>('[data-action="share-personal-share"]')
+      const share = root.querySelector<HTMLButtonElement>('[data-action="share-export"]')
       if (!share) throw new Error('Personal track share action missing')
       share.click()
       await vi.waitFor(() => {
