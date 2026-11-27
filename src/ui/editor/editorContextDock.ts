@@ -105,6 +105,7 @@ export function createEditorContextDock(
         createSegmentedButtons('Road structure', [
           structureChoice('surface', state.editorUi.structure, actions.structure),
           structureChoice('overpass', state.editorUi.structure, actions.structure),
+          structureChoice('jump', state.editorUi.structure, actions.structure),
         ]),
       ),
     )
