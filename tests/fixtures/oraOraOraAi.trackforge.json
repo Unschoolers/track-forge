@@ -1,0 +1,2656 @@
+{
+  "id": "ora-ora-replay-fixture",
+  "name": "Ora Ora Ora",
+  "version": 8,
+  "points": [
+    {
+      "x": -93.54999072771658,
+      "y": 348.26425003796044,
+      "surface": "street",
+      "id": "point-0",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -152.55200068227634,
+      "y": 334.0974505798601,
+      "surface": "street",
+      "id": "point-1",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -286.1665841618444,
+      "y": 170.8340737789911,
+      "surface": "street",
+      "id": "point-2",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -305.9926700693836,
+      "y": 17.868059001381056,
+      "surface": "street",
+      "id": "point-3",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -325.8187559769229,
+      "y": -135.09795577622899,
+      "surface": "street",
+      "id": "point-4",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -299.2175064171484,
+      "y": -198.4070984522683,
+      "surface": "street",
+      "id": "point-5",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -114.94606581192119,
+      "y": -258.53405328794435,
+      "surface": "street",
+      "id": "point-6",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -28.136054648716737,
+      "y": -349.49421999213536,
+      "surface": "street",
+      "id": "point-7",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 7.311377861483145,
+      "y": -465.7475294511512,
+      "surface": "street",
+      "id": "point-8",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 0.030241159299354337,
+      "y": -593.7532879962617,
+      "surface": "street",
+      "id": "point-9",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 38.59202327750978,
+      "y": -642.1930025130637,
+      "surface": "street",
+      "id": "point-10",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 271.376528494546,
+      "y": -777.688431052588,
+      "surface": "street",
+      "id": "point-11",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 490.9428079802457,
+      "y": -769.9744922689538,
+      "surface": "street",
+      "id": "point-12",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 710.5090874659454,
+      "y": -762.2605534853194,
+      "surface": "street",
+      "id": "point-13",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 771.2267176898961,
+      "y": -700.9548870573229,
+      "surface": "street",
+      "id": "point-14",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 775.8771690345446,
+      "y": -380.3374454384,
+      "surface": "street",
+      "id": "point-15",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 778.2815598331994,
+      "y": -290.53380760142284,
+      "surface": "street",
+      "id": "point-16",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "jump"
+    },
+    {
+      "x": 776.5293349752533,
+      "y": -117.5048909984665,
+      "surface": "street",
+      "id": "point-17",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 760.0062538167058,
+      "y": 343.78043615803847,
+      "surface": "street",
+      "id": "point-18",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 596.033773100911,
+      "y": 410.71832398722484,
+      "surface": "street",
+      "id": "point-19",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 333.4360800020271,
+      "y": 400.65940205502454,
+      "surface": "street",
+      "id": "point-20",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": 166.39650276148166,
+      "y": 340.10265796096917,
+      "surface": "street",
+      "id": "point-21",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    },
+    {
+      "x": -93.54999072771658,
+      "y": 348.26425003796044,
+      "surface": "street",
+      "id": "point-22",
+      "curve": "smooth",
+      "tension": 0.5,
+      "structure": "surface"
+    }
+  ],
+  "routeKind": "circuit",
+  "recoveryCheckpoints": [
+    0.5629596184077807,
+    0.9765990639625585
+  ],
+  "autoCheckpoints": true,
+  "trees": [
+    {
+      "x": 693.2923332343305,
+      "y": -259.0178441448494,
+      "rotation": 220,
+      "scale": 1.35,
+      "season": "autumn"
+    },
+    {
+      "x": 839.1008352803465,
+      "y": -377.64823948151496
+    },
+    {
+      "x": 854.5531053185822,
+      "y": -468.7960276340914
+    }
+  ],
+  "terrain": {
+    "cellSize": 32,
+    "cells": [
+      {
+        "column": 18,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -21,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -20,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -19,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -18,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -17,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -16,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -15,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -14,
+        "kind": "hill"
+      },
+      {
+        "column": 10,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -13,
+        "kind": "hill"
+      },
+      {
+        "column": 10,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -12,
+        "kind": "hill"
+      },
+      {
+        "column": 10,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -11,
+        "kind": "hill"
+      },
+      {
+        "column": 10,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -10,
+        "kind": "hill"
+      },
+      {
+        "column": 10,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -9,
+        "kind": "hill"
+      },
+      {
+        "column": 11,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -8,
+        "kind": "hill"
+      },
+      {
+        "column": 12,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 13,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -7,
+        "kind": "hill"
+      },
+      {
+        "column": 14,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -6,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -5,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -4,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 36,
+        "row": -3,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 19,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 20,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 29,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -2,
+        "kind": "hill"
+      },
+      {
+        "column": 15,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 18,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 21,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 22,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 28,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 34,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 35,
+        "row": -1,
+        "kind": "hill"
+      },
+      {
+        "column": 16,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 23,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 24,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 25,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 26,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 27,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 30,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 31,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 32,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 33,
+        "row": 0,
+        "kind": "hill"
+      },
+      {
+        "column": 17,
+        "row": 1,
+        "kind": "hill"
+      }
+    ]
+  },
+  "start": {
+    "ratio": 0,
+    "reversed": false
+  },
+  "environmentId": "grass",
+  "scenery": [
+    {
+      "kind": "grass-wildflowers",
+      "x": 865.0094373546715,
+      "y": -300.57627121675944,
+      "rotation": 240,
+      "scale": 1.5
+    },
+    {
+      "kind": "grass-log",
+      "x": 770.7980818342658,
+      "y": 39.26914064694404,
+      "rotation": 223,
+      "scale": 1.5
+    }
+  ],
+  "lighting": "day",
+  "createdAt": 1,
+  "updatedAt": 1
+}

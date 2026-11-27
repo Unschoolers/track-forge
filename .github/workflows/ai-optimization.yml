@@ -128,3 +128,38 @@ jobs:
           path: qa/results/passing/
           if-no-files-found: warn
           retention-days: 14
+
+  ora-ora-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tune all four cars against replay and existing holdouts
+        run: npm run qa:optimize -- --focus driving --workers 2 --trials 40 --seeds 1,4331 --scenarios ora-ora-replay,pine-hairpins,desert-reverse,figure-eight-replay,kids-room,meadow-loop,emile --out qa/results/ora-ora
+      - name: Diagnose sector pace and applied braking at 60 Hz
+        run: |
+          node --test qa/optimization/sectorTelemetry.test.mjs
+          node qa/optimization/sector-diagnosis.mjs qa/results/ora-ora
+      - name: Print four-car replay comparison
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs'
+          const report = JSON.parse(readFileSync('qa/results/ora-ora/summary.json', 'utf8'))
+          const ghostSeconds = 1598 / 60
+          for (const car of report.cars) {
+            const baseline = report.baselineMatrix.find(row => row.car === car && row.scenarioId === 'ora-ora-replay' && row.mode === 'solo' && row.seed === report.seeds[0])
+            const eligible = report.candidates.filter(row => row.car === car && row.validation?.eligible).sort((a, b) => b.validation.gainPercent - a.validation.gainPercent)
+            console.log('ORA_ORA_CAR ' + JSON.stringify({ car, ghostSeconds, baseline, eligible }))
+          }
+          JS
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: ora-ora-optimization-${{ github.sha }}
+          path: qa/results/ora-ora/
+          if-no-files-found: error

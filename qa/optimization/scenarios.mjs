@@ -63,11 +63,18 @@ export const JUMP_STUDY_SCENARIOS = [
   jumpLayout('jump-gravel', 'dirt', 160, 'validation'),
 ]
 
+// Opt-in: preserve the original default matrix and matched physics studies.
+export const REPLAY_STUDY_SCENARIOS = [{
+  id: 'ora-ora-replay', file: 'tests/fixtures/oraOraOraAi.trackforge.json',
+  reverse: false, startRatio: 0, laps: 2, seconds: 80,
+  gridPositions: [0, 1, 2, 3], group: 'calibration',
+}]
+
 export function selectScenarios(ids, available = STUDY_SCENARIOS) {
   const requested = ids?.length ? ids : available.map(x => x.id)
   const selected = requested.map(id => {
     const found = available.find(x => x.id === id) ??
-      (available === STUDY_SCENARIOS ? JUMP_STUDY_SCENARIOS.find(x => x.id === id) : undefined)
+      (available === STUDY_SCENARIOS ? [...JUMP_STUDY_SCENARIOS, ...REPLAY_STUDY_SCENARIOS].find(x => x.id === id) : undefined)
     if (!found) throw new Error(`Unknown scenario: ${id}`)
     return found
   })

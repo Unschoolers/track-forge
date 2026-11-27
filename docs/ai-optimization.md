@@ -280,3 +280,18 @@ With the latest settings the six-course Hard solo benchmark completes all
 48 runs. Fast asphalt finishes Red 28.45 s, Blue 28.93 s, Green 28.95 s,
 Yellow 30.85 s. Red remains 26.60% slower than Green overall on the six
 equally weighted scenarios. The two tested seeds yield identical outcomes.
+
+
+## Ora Ora Ora ghost challenge (2026-11-27)
+
+Opt-in replay fixture: `tests/fixtures/oraOraOraAi.trackforge.json`. The exported Red/Arcade/Normal ghost race finished two laps in 28.467 s; its stored best is 26.633 s (1598 ticks), not the captured input trace. The fixture preserves the full authored road geometry, jump, checkpoint ratios and all 478 hill cells; personal creator metadata is omitted. Hard solo trials provide the initial AI comparison, not an identical Normal ghost-mode replay. Grid and race-mode differences must be disclosed. The target is informational, not an acceptance threshold for other chassis.
+
+```sh
+npm run qa:optimize -- --focus driving --workers 2 --trials 40 --seeds 1,4331 --scenarios ora-ora-replay,pine-hairpins,desert-reverse,figure-eight-replay,kids-room,meadow-loop,emile --out qa/results/ora-ora
+```
+
+The study screens all four existing car-specific policies; the ordinary-track and traffic acceptance rules remain unchanged. Only validated candidates may be considered for production. Compare the Ora Ora solo times in the JSONL records, and verify the combined profiles and difficulty/recovery gates before promotion. No measured improvement is claimed by this fixture alone.
+
+### Replay sector diagnosis
+
+Run `node qa/optimization/sector-diagnosis.mjs qa/results/ora-ora` after installing dependencies. The existing lane checker observes real 60 Hz solo ticks for each car on Hard and Normal, seeds 1 and 4331, and writes gate-by-gate elapsed time, average and peak speed, applied braking duration, grass contact, travelled distance and 20 Hz line/velocity samples. The six reference gates are from the exported 28.467s Red Normal ghost race, not the separate 26.633s record; the latter has no input trace in this export. Red Normal is the closest configuration, but AI and player control semantics are not identical. Recovery counts and finish status accompany each result. This is diagnosis, not a speed acceptance gate, and does not alter production steering, physics or difficulty. Brake duration is effective vehicle braking, not a direct AI pedal request; trace comparisons alone do not establish causality. Boost and assisted brake-tap drift are practice-only and were absent from the ghost run.
