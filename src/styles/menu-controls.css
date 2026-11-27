@@ -1,19 +1,7 @@
 /* Painted menu controls and live editor surfaces. No canvas sampling. */
 #app :is(.editor-screen, .cup-modal) :is(.tool-button, .icon-button, .surface-button,
   .editor-segmented-button, .point-choice, .point-insert, .crossing-choice,
-  .diagnostic-repair, .editor-toolbox-summary, .editor-view-summary, .track-mini-button) {
-  border: 1px solid var(--menu-control-border);
-  border-radius: var(--menu-control-rounding);
-  background: var(--menu-control-fill);
-  color: var(--menu-control-ink);
-  box-shadow: var(--menu-control-rim);
-  font-family: var(--menu-control-font);
-  font-weight: 650;
-  letter-spacing: 0;
-}
-#app .cup-modal .track-mini-button { border-radius: 50%; }
-/* All dialogs inherit the same painted defaults. Static optics enhance these
-   controls via the material capability; no per-dialog button skin. */
+  .diagnostic-repair, .editor-toolbox-summary, .editor-view-summary, .track-mini-button),
 #app .modal-overlay :is(.button, .setup-choice, .toggle-button, .modal-close, .track-icon-action, .editor-segmented-button):not(:where([data-menu-material='static'] *, .track-card *)) {
   border: 1px solid var(--menu-control-border);
   border-radius: var(--menu-control-rounding);
@@ -26,6 +14,9 @@
   clip-path: none;
   backdrop-filter: none;
 }
+#app .cup-modal .track-mini-button { border-radius: 50%; }
+/* All dialogs inherit the same painted defaults. Static optics enhance these
+   controls via the material capability; no per-dialog button skin. */
 #app .modal-overlay :is(.modal-close, .track-icon-action):not(:where([data-menu-material='static'] *, .track-card *)) { border-radius: 50%; }
 #app .modal-overlay :is(.button-primary, .setup-choice.active, .toggle-button.active, .editor-segmented-button.active):not(:where([data-menu-material='static'] *, .track-card *)) {
   background: var(--menu-control-selected-fill);
@@ -54,32 +45,4 @@
   border: 1px solid var(--menu-control-border);
   border-radius: var(--menu-control-rounding);
   box-shadow: var(--menu-control-rim);
-}
-#app [data-menu-material='static'] :is(.button, .modal-close):not(:where(.track-card *, .cup-track-row *)) {
-  font-family: var(--menu-control-font);
-  font-weight: 650;
-  letter-spacing: 0;
-  text-align: center;
-}
-#app [data-menu-material='static'] :is(.setup-choice, .toggle-button):not(:where(.options-tab-list *)) {
-  font-family: var(--menu-control-font);
-  font-weight: 650;
-  letter-spacing: 0;
-}
-#app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card {
-  border-color: #b4c8d54d;
-  border-radius: 24px;
-  background: rgb(16 24 33 / 44%);
-  box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
-}
-#app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section {
-  border: 1px solid #dbeafe12;
-  border-radius: 18px;
-  background: rgb(24 35 45 / 15%);
-}
-#app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card:where([data-graphics-quality='low'] *) { background: #101821; }
-#app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section:where([data-graphics-quality='low'] *) { background: #18232d; }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  #app :is(.options-modal, .cup-modal, .nearby-static-modal)[data-menu-material] .modal-card { background: #101821; border-color: #aab9c8; }
-  #app :is(.options-modal, .nearby-static-modal)[data-menu-material] .setup-section { background: #18232d; }
 }
