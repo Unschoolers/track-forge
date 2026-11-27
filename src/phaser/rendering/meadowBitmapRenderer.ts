@@ -1,7 +1,8 @@
 import type Phaser from 'phaser'
+import type { TerrainMap } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { BITMAP_TILE_LIMIT, createMeadowBitmapLayers, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { BITMAP_TILE_LIMIT, createEditorHillBitmapTiles, createEditorRoadBitmapLayers, createEditorWaterBitmapTiles, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
 import { GROUND_TILE_SIZE, groundViewportBounds, type GroundTile, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { WORLD_RENDER_DEPTH } from './renderLayers'
 import type { TrackShadowMode } from './lighting'
@@ -223,22 +224,25 @@ export class BitmapTileRenderer {
   private readonly current = new Set<string>()
   private readonly wanted = new Set<string>()
   private selectionSignature = ''
-  private currentSignature = ''
-  private wantedSignature = ''
+  private currentSignature: string | undefined
+  private wantedSignature: string | undefined
   private clock = 0
   private destroyed = false
+  private suspended = false
   private visibleResident = 0
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly scheduler: BitmapTileUploadScheduler,
-    private readonly tiles: BitmapTiles,
+    private tiles: BitmapTiles,
     private readonly depth: number,
     private readonly layerOrder: number,
+    private readonly tileLimit: number = BITMAP_TILE_LIMIT,
+    private readonly coherentWindow = false,
   ) {}
 
   render(view: GroundViewport, bounds?: WorldBounds): void {
-    if (this.destroyed) return
+    if (this.destroyed || this.suspended) return
     const window = bounds ?? groundViewportBounds(view)
     const grid = [window.left, window.top, window.right, window.bottom]
       .map(edge => Math.floor(edge / GROUND_TILE_SIZE)).join(':')
@@ -250,13 +254,22 @@ export class BitmapTileRenderer {
     if (selection === this.selectionSignature) return
     this.selectionSignature = selection
     const currentTiles = this.tiles.visible(view, window)
-    const prefetchTiles = bounds ? this.tiles.visible(view, expanded(window)) : currentTiles
+    const prefetchTiles = bounds || this.coherentWindow ? this.tiles.visible(view, expanded(window)) : currentTiles
     const currentSignature = currentTiles.map(tileKey).join('|')
     const maxPrefetch = Math.max(0, Math.min(
       MAX_PREFETCH_TILES_PER_LAYER,
-      BITMAP_TILE_LIMIT - currentTiles.length,
+      this.tileLimit - currentTiles.length,
     ))
-    const prefetched = selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
+    const currentKeys = new Set(currentTiles.map(tileKey))
+    const distance = (tile: GroundTile): number => Math.hypot(
+      (tile.x + 0.5) * GROUND_TILE_SIZE - view.centerX,
+      (tile.y + 0.5) * GROUND_TILE_SIZE - view.centerY,
+    )
+    const prefetched = this.coherentWindow
+      ? prefetchTiles.filter(tile => !currentKeys.has(tileKey(tile)))
+        .sort((left, right) => distance(left) - distance(right) || left.y - right.y || left.x - right.x)
+        .slice(0, maxPrefetch)
+      : selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
     const candidates = [...currentTiles, ...prefetched]
     const wantedSignature = candidates.map(tileKey).join('|')
     // The editor calls render every frame. Stable tile windows do not need
@@ -274,9 +287,10 @@ export class BitmapTileRenderer {
     for (const [key, item] of this.images) {
       const visible = this.current.has(key)
       if (visible) this.visibleResident++
-      if (item.image.visible !== visible) item.image.setVisible(visible)
+      if (!this.coherentWindow && item.image.visible !== visible) item.image.setVisible(visible)
       if (this.wanted.has(key)) this.touch(key, item)
     }
+    if (this.coherentWindow) this.syncWindowVisibility()
 
     const requests: UploadRequest[] = []
     const addRequest = (tile: GroundTile, priority: number) => {
@@ -304,6 +318,42 @@ export class BitmapTileRenderer {
     this.scheduler.replace(this, requests)
   }
 
+  setSuspended(suspended: boolean): void {
+    if (this.destroyed || this.suspended === suspended) return
+    this.suspended = suspended
+    this.scheduler.cancel(this)
+    this.selectionSignature = ''
+    this.currentSignature = undefined
+    this.wantedSignature = undefined
+    if (suspended) {
+      for (const item of this.images.values()) {
+        if (item.image.visible) item.image.setVisible(false)
+      }
+    }
+  }
+
+  /** Reconcile only after a committed geometry change. Retain GPU textures
+   * whose exact painter inputs are unchanged; never reuse an unknown key.
+   * Cancel old prepared work before switching sources. */
+  replaceTiles(tiles: BitmapTiles): void {
+    if (this.destroyed || this.tiles === tiles) return
+    this.scheduler.cancel(this)
+    for (const [key, item] of this.images) {
+      const previous = this.tiles.tileContentKey?.(key)
+      const next = tiles.tileContentKey?.(key)
+      if (previous !== undefined && previous === next) continue
+      this.remove(item)
+      this.images.delete(key)
+    }
+    this.tiles = tiles
+    this.selectionSignature = ''
+    this.currentSignature = undefined
+    this.wantedSignature = undefined
+    this.visibleResident = 0
+    this.current.clear()
+    this.wanted.clear()
+  }
+
   /** Counts only; do not enumerate tiles or inspect GPU state in the hot path. */
   writeCoverage(target: number[]): void {
     const offset = this.layerOrder * 3
@@ -313,7 +363,7 @@ export class BitmapTileRenderer {
   }
 
   wants(key: string): boolean {
-    return !this.destroyed && this.wanted.has(key) && !this.images.has(key)
+    return !this.destroyed && !this.suspended && this.wanted.has(key) && !this.images.has(key)
   }
 
   prepare(tile: GroundTile): HTMLCanvasElement {
@@ -323,15 +373,18 @@ export class BitmapTileRenderer {
   upload(tile: GroundTile, key: string, canvas: HTMLCanvasElement): void {
     if (!this.wants(key)) return
     this.ensureCapacity()
-    if (this.images.size >= BITMAP_TILE_LIMIT) return
+    if (this.images.size >= this.tileLimit) return
     const texture = `meadow-layer-${this.order}:${key}`
     const registered = this.scene.textures.addCanvas(texture, canvas)
     if (!registered) throw new Error('Could not register Meadow bitmap tile')
     try {
       const image = this.scene.add.image(tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, texture)
-        .setOrigin(0).setDepth(this.depth).setVisible(this.current.has(key))
+        .setOrigin(0).setDepth(this.depth).setVisible(!this.coherentWindow && this.current.has(key))
       this.touch(key, { image, texture, lastUsed: ++this.clock })
       if (this.current.has(key)) this.visibleResident++
+      if (this.coherentWindow && this.current.has(key) && this.visibleResident === this.current.size) {
+        this.syncWindowVisibility()
+      }
     } catch (error) {
       this.scene.textures.remove(texture)
       throw error
@@ -351,10 +404,18 @@ export class BitmapTileRenderer {
     this.images.clear()
   }
 
+  private syncWindowVisibility(): void {
+    const ready = this.current.size > 0 && this.visibleResident === this.current.size
+    for (const [key, item] of this.images) {
+      const visible = ready && this.current.has(key)
+      if (item.image.visible !== visible) item.image.setVisible(visible)
+    }
+  }
+
   private ensureCapacity(): void {
     // Retain offscreen textures within the existing hard cap. Evict only
     // when an actual upload requires space, not merely because a tile left view.
-    if (this.images.size < BITMAP_TILE_LIMIT) return
+    if (this.images.size < this.tileLimit) return
     // Evict stale tiles before any requested tile. Current tiles are never
     // sacrificed for speculation.
     if (!this.evictOldest(key => !this.wanted.has(key))) {
@@ -397,33 +458,109 @@ export interface MeadowBitmapRenderer {
   destroy(): void
 }
 
-export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): MeadowBitmapRenderer | undefined {
-  const layers = createMeadowBitmapLayers(geometry, night, environment, shadowMode)
-  if (!layers) return undefined
+/** Only the editable scene owns mutable geometry and material lifetimes. */
+export interface EditorMeadowBitmapRenderer extends MeadowBitmapRenderer {
+  update(geometry: TrackGeometry, terrain: TerrainMap, hillInfluence: string, gestureActive: boolean, night: boolean, environment: TrackEnvironmentId): void
+  hasRoadLayers(): boolean
+}
+
+/** Scene-lifetime owner. Water is independent of road geometry; hills are not. */
+export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): EditorMeadowBitmapRenderer {
   const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
-  const renderers = [
-    new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
-    new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2, 1),
-    ...(layers.bridgeApproach ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH, 2)] : []),
-    ...(layers.bridgeDeck ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH, 3)] : []),
-  ]
+  let water: BitmapTileRenderer | undefined
+  let hill: BitmapTileRenderer | undefined
+  let previousHillInfluence: string | undefined
+  let roadLayers: BitmapTileRenderer[] = []
+  let previousTerrain: TerrainMap | undefined
+  let previousEnvironment: TrackEnvironmentId | undefined
+  let previousNight: boolean | undefined
+  let waterLimit = BITMAP_TILE_LIMIT as number
+  let hillLimit = BITMAP_TILE_LIMIT as number
+  let hasWater = false
+  let hasHill = false
   let destroyed = false
+
+  const destroyRoadLayers = () => {
+    for (const renderer of roadLayers) renderer.destroy()
+    roadLayers = []
+  }
   const destroy = () => {
     if (destroyed) return
     destroyed = true
     scene.events.off('shutdown', destroy)
+    water?.destroy()
+    water = undefined
+    hill?.destroy()
+    hill = undefined
+    destroyRoadLayers()
     scheduler.destroy()
-    for (const renderer of renderers) renderer.destroy()
   }
   scene.events.once('shutdown', destroy)
+  const renderers = (): readonly BitmapTileRenderer[] => [
+    ...(water ? [water] : []), ...(hill ? [hill] : []), ...roadLayers,
+  ]
   return {
+    update(geometry, terrain, hillInfluence, gestureActive, night, environment) {
+      if (destroyed) return
+      const changed = previousTerrain !== terrain || previousNight !== night || previousEnvironment !== environment
+      if (changed) {
+        water?.destroy()
+        water = undefined
+        previousTerrain = terrain
+        previousNight = night
+        previousEnvironment = environment
+        hasWater = terrain.cells.some(cell => cell.kind === 'water')
+        hasHill = terrain.cells.some(cell => cell.kind === 'hill')
+        // Keep the original combined terrain cap even when the map contains
+        // both materials. Each source and GPU cache enforces its allocation.
+        waterLimit = hasHill ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
+        hillLimit = hasWater ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
+      }
+      if (changed) {
+        hill?.destroy()
+        hill = undefined
+        previousHillInfluence = undefined
+      }
+      destroyRoadLayers()
+      // Preserve the committed hill bitmap during an unrelated live gesture.
+      // If slope influence changes, hide that pass until commit so stale hill
+      // shading cannot cover the updated vector geometry.
+      if (gestureActive) {
+        if (hill && previousHillInfluence !== hillInfluence) hill.setSuspended(true)
+        return
+      }
+      if (hasWater && !water) {
+        const tiles = createEditorWaterBitmapTiles(geometry, night, environment, waterLimit)
+        if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit, true)
+      }
+      if (hasHill && (!hill || previousHillInfluence !== hillInfluence)) {
+        const tiles = createEditorHillBitmapTiles(geometry, night, environment, hillLimit)
+        if (tiles) {
+          if (hill) hill.replaceTiles(tiles)
+          else hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit, true)
+          previousHillInfluence = hillInfluence
+        } else {
+          hill?.destroy()
+          hill = undefined
+        }
+      }
+      hill?.setSuspended(false)
+      const layers = createEditorRoadBitmapLayers(geometry, night, environment, shadowMode)
+      if (!layers) return
+      roadLayers = [
+        new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
+        ...(layers.bridgeApproach ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH, 2)] : []),
+        ...(layers.bridgeDeck ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH, 3)] : []),
+      ]
+    },
+    hasRoadLayers: () => roadLayers.length > 0,
     render(view, bounds) {
-      for (const renderer of renderers) renderer.render(view, bounds)
+      for (const renderer of renderers()) renderer.render(view, bounds)
     },
     warmVisible: () => scheduler.warmVisible(),
     coverage: () => {
-      const counts = Array<number>(12).fill(0)
-      for (const renderer of renderers) renderer.writeCoverage(counts)
+      const counts = Array<number>(15).fill(0)
+      for (const renderer of renderers()) renderer.writeCoverage(counts)
       return counts
     },
     destroy,

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type Phaser from 'phaser'
-import { BitmapTileRenderer, BitmapTileUploadScheduler, selectAheadTiles, type UploadRequest, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
+import { BitmapTileRenderer, BitmapTileUploadScheduler, createMeadowBitmapRenderer, selectAheadTiles, type UploadRequest, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
+
+import * as bitmapLayers from '@/presentation/environments/meadowBitmapTiles'
+import { buildTrackGeometry, type TrackGeometry } from '@/domain/track/trackGeometry'
+import * as bitmapArt from '@/presentation/environments/meadowBitmapArt'
+import { GROUND_TILE_SIZE } from '@/presentation/environments/groundTexture'
+import type { TerrainMap } from '@/domain/model'
 
 const view = {
   centerX: 128,
@@ -157,6 +163,59 @@ describe('BitmapTileUploadScheduler', () => {
 })
 
 describe('BitmapTileRenderer', () => {
+  it('reveals the entire editor terrain window only after all required tiles are resident', () => {
+    const { scheduler, scene, frame } = schedulerFixture()
+    const images: { visible: boolean }[] = []
+    Object.assign(scene, {
+      textures: { addCanvas: () => ({}), remove: () => undefined },
+      add: {
+        image: () => {
+          const image = {
+            visible: true,
+            setOrigin: () => image,
+            setDepth: () => image,
+            setVisible: (visible: boolean) => { image.visible = visible; return image },
+            destroy: () => undefined,
+          }
+          images.push(image)
+          return image
+        },
+      },
+    })
+    let tileOffset = 0
+    const renderer = new BitmapTileRenderer(scene, scheduler, {
+      visible: () => Array.from({ length: 2 }, (_, x) => ({
+        x: x + tileOffset, y: 0, variant: 0,
+      })),
+      image: () => ({} as HTMLCanvasElement),
+    }, 0, 1, 48, true)
+    renderer.render(view)
+    frame()
+    frame()
+    expect(images).toHaveLength(1)
+    expect(images.every(image => !image.visible)).toBe(true)
+    frame()
+    frame()
+    expect(images).toHaveLength(2)
+    expect(images.every(image => image.visible)).toBe(true)
+
+    tileOffset = 1
+    renderer.render({ ...view, centerX: view.centerX + 4096 })
+    expect(images.every(image => !image.visible)).toBe(true)
+    frame()
+    frame()
+    expect(images).toHaveLength(3)
+    expect(images.filter(image => image.visible)).toHaveLength(2)
+    tileOffset = 0
+    renderer.render(view)
+    expect(images.filter(image => image.visible)).toHaveLength(2)
+    expect(images).toHaveLength(3)
+    renderer.destroy()
+    scheduler.destroy()
+  })
+
+
+
   it('retains offscreen textures within capacity and reuses them on return', () => {
     const { scheduler, scene, frame } = schedulerFixture()
     const registered = new Set<string>()
@@ -252,5 +311,173 @@ describe('BitmapTileRenderer', () => {
     expect([...registered].every(key => Number(key.split(':')[1]) >= 24)).toBe(true)
     renderer.destroy()
     scheduler.destroy()
+  })
+})
+
+describe('editor water cache lifecycle', () => {
+  it.each(['grass', 'desert', 'cityscape', 'kids-room'] as const)('retains unchanged terrain across road edits in %s', (environment) => {
+    const { scene, scheduler } = schedulerFixture()
+    scheduler.destroy()
+    const uploaded = vi.fn(() => ({}))
+    const removed = vi.fn()
+    Object.assign(scene, {
+      events: { once: vi.fn(), off: vi.fn() },
+      textures: { addCanvas: uploaded, remove: removed },
+      add: {
+        image: () => {
+          const image = {
+            visible: true,
+            setOrigin: () => image,
+            setDepth: () => image,
+            setVisible: (visible: boolean) => { image.visible = visible; return image },
+            destroy: vi.fn(),
+          }
+          return image
+        },
+      },
+    })
+    const source = (visible: boolean) => ({
+      visible: () => visible ? [{ x: 0, y: 0, variant: 0 }] : [],
+      image: vi.fn(() => ({} as HTMLCanvasElement)),
+      all: () => [],
+      bake: () => ({} as HTMLCanvasElement),
+    })
+    const water = source(true)
+    const empty = source(false)
+    const createWater = vi.spyOn(bitmapLayers, 'createEditorWaterBitmapTiles').mockReturnValue(water)
+    const createRoad = vi.spyOn(bitmapLayers, 'createEditorRoadBitmapLayers').mockReturnValue({
+      road: empty, bridgeApproach: undefined, bridgeDeck: undefined,
+    })
+    const renderer = createMeadowBitmapRenderer(scene)
+    const terrain: TerrainMap = { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] }
+    const geometry = () => ({} as TrackGeometry)
+    try {
+      renderer.update(geometry(), terrain, '', false, false, environment)
+      renderer.render(view)
+      renderer.warmVisible()
+      expect(uploaded).toHaveBeenCalledTimes(1)
+      expect(water.image).toHaveBeenCalledTimes(1)
+
+      renderer.update(geometry(), terrain, '', true, false, environment)
+      expect(renderer.hasRoadLayers()).toBe(false)
+      renderer.render(view)
+      renderer.warmVisible()
+      renderer.update(geometry(), terrain, '', false, false, environment)
+      renderer.render(view)
+      renderer.warmVisible()
+      expect(createWater).toHaveBeenCalledTimes(1)
+      expect(uploaded).toHaveBeenCalledTimes(1)
+      expect(removed).not.toHaveBeenCalled()
+      expect(renderer.hasRoadLayers()).toBe(true)
+
+      renderer.update(geometry(), { ...terrain, cells: [] }, '', false, false, environment)
+      expect(removed).toHaveBeenCalledTimes(1)
+      expect(renderer.coverage()[5]).toBe(0)
+
+      const hillSource = (changed: boolean) => ({
+        ...source(true),
+        visible: () => [{ x: 0, y: 0, variant: 0 }, { x: 1, y: 0, variant: 0 }],
+        tileContentKey: (key: string) => key === '0:0' && changed ? 'new slope' : 'same slope',
+      })
+      const firstHill = hillSource(false)
+      const nextHill = hillSource(true)
+      const createHill = vi.spyOn(bitmapLayers, 'createEditorHillBitmapTiles')
+        .mockReturnValueOnce(firstHill).mockReturnValue(nextHill)
+      try {
+        const mixed: TerrainMap = { cellSize: 32, cells: [
+          { column: 0, row: 0, kind: 'water' },
+          { column: 1, row: 0, kind: 'hill' },
+        ] }
+        renderer.update(geometry(), mixed, 'near', false, false, environment)
+        renderer.render(view)
+        renderer.warmVisible()
+        const before = uploaded.mock.calls.length
+        const removals = removed.mock.calls.length
+        renderer.update(geometry(), mixed, 'near', true, false, environment)
+        renderer.update(geometry(), mixed, 'near', false, false, environment)
+        renderer.render(view)
+        renderer.warmVisible()
+        expect(createHill).toHaveBeenCalledTimes(1)
+        expect(uploaded).toHaveBeenCalledTimes(before)
+        expect(removed).toHaveBeenCalledTimes(removals)
+
+        renderer.update(geometry(), mixed, 'changed-nearby-road', true, false, environment)
+        renderer.render(view)
+        renderer.warmVisible()
+        expect(createHill).toHaveBeenCalledTimes(1)
+        expect(removed).toHaveBeenCalledTimes(removals)
+        renderer.update(geometry(), mixed, 'changed-nearby-road', false, false, environment)
+        renderer.render(view)
+        renderer.warmVisible()
+        expect(createHill).toHaveBeenCalledTimes(2)
+        expect(uploaded).toHaveBeenCalledTimes(before + 1)
+        expect(removed).toHaveBeenCalledTimes(removals + 1)
+        expect(nextHill.image).toHaveBeenCalledTimes(1)
+        expect(createWater).toHaveBeenLastCalledWith(expect.anything(), false, environment, 24)
+        expect(createHill).toHaveBeenLastCalledWith(expect.anything(), false, environment, 24)
+      } finally {
+        createHill.mockRestore()
+      }
+    } finally {
+      renderer.destroy()
+      createWater.mockRestore()
+      createRoad.mockRestore()
+    }
+  })
+})
+
+
+describe('regional terrain cache identity with real geometry', () => {
+  it('changes hill painter inputs only near a road edit and leaves water unchanged', () => {
+    // No GPU or canvas is needed to compare the actual ordered geometry fed
+    // into each tile painter. Keep two separated hills on the same terrain.
+    const cells = Array.from({ length: 64 }, (_, index) => ({
+      column: 2 + index % 8, row: 2 + Math.floor(index / 8), kind: 'hill' as const,
+    }))
+    const distantColumn = Math.ceil(6 * GROUND_TILE_SIZE / 32)
+    const terrain: TerrainMap = {
+      cellSize: 32,
+      cells: [
+        ...cells,
+        ...cells.map(cell => ({ ...cell, column: cell.column + distantColumn })),
+        { column: 14, row: 14, kind: 'water' },
+      ],
+    }
+    const geometry = (y: number) => buildTrackGeometry({
+      routeKind: 'point-to-point', terrain,
+      points: [
+        { x: -400, y, surface: 'street' },
+        { x: 600, y, surface: 'street' },
+      ],
+    })
+    const art = vi.spyOn(bitmapArt, 'getEnvironmentBitmapArt')
+      .mockReturnValue({} as bitmapArt.EnvironmentBitmapArt)
+    try {
+      const before = geometry(144)
+      const after = geometry(-400)
+      const oldHill = bitmapLayers.createEditorHillBitmapTiles(before, false, 'grass', 24)
+      const newHill = bitmapLayers.createEditorHillBitmapTiles(after, false, 'grass', 24)
+      const oldWater = bitmapLayers.createEditorWaterBitmapTiles(before, false, 'grass', 24)
+      const newWater = bitmapLayers.createEditorWaterBitmapTiles(after, false, 'grass', 24)
+      if (!oldHill || !newHill || !oldWater || !newWater) throw new Error('Missing terrain tile source')
+      const keys = (source: bitmapLayers.BakeableBitmapTiles) =>
+        source.all().map(tile => `${tile.x}:${tile.y}`).sort()
+      const local = keys(oldHill).filter(key => Number(key.split(':')[0]) < 3)
+      const distant = keys(oldHill).filter(key => Number(key.split(':')[0]) >= 3)
+      expect(local.length).toBeGreaterThan(0)
+      expect(distant.length).toBeGreaterThan(0)
+      expect(local.some(key => oldHill.tileContentKey?.(key) !== newHill.tileContentKey?.(key))).toBe(true)
+      for (const key of distant) {
+        expect(oldHill.tileContentKey?.(key)).toBeDefined()
+        expect(newHill.tileContentKey?.(key)).toBe(oldHill.tileContentKey?.(key))
+      }
+      expect(keys(newWater)).toEqual(keys(oldWater))
+      expect(keys(oldWater).length).toBeGreaterThan(0)
+      for (const key of keys(oldWater)) {
+        expect(newWater.tileContentKey?.(key)).toBe(oldWater.tileContentKey?.(key))
+      }
+    } finally {
+      art.mockRestore()
+    }
   })
 })

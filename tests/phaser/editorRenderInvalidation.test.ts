@@ -4,6 +4,7 @@ import {
   editorSnapshotRenderChanges,
   editorTreeRenderRequired,
   editorTerrainRenderRequired,
+  hillRoadInfluenceKey,
   treePreviewRenderRequired,
   terrainPreviewCompileRequired,
   type EditorRenderState,
@@ -32,6 +33,32 @@ function state(
 }
 
 describe('editor render invalidation', () => {
+  it('retains hill artwork when remote segments change but invalidates nearby additions, removals and movement', () => {
+    const terrain = { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'hill' as const }] }
+    const near = [{ x: -20, y: 0 }, { x: 20, y: 0 }]
+    const far = [{ x: 1000, y: 1000 }, { x: 1100, y: 1000 }]
+    const key = (points: readonly {x: number; y: number}[], closed = false) =>
+      hillRoadInfluenceKey(terrain, { points, closed })
+    expect(key(far)).toBe('')
+    expect(key([{ x: 1000, y: 1100 }, far[1]!])).toBe('')
+    const original = key([...near, ...far])
+    expect(original).not.toBe('')
+    expect(key([...near, far[0]!, { x: 1200, y: 1100 }])).toBe(original)
+    expect(key([{ x: -20, y: 5 }, near[1]!, ...far])).not.toBe(original)
+    expect(key(far)).not.toBe(original)
+    expect(key([...near, ...far], true)).not.toBe(original)
+    expect(hillRoadInfluenceKey({ ...terrain, cells: [{ column: 0, row: 0, kind: 'water' }] }, { points: near, closed: false })).toBe('')
+  })
+
+  it('does not invalidate water-only vector terrain for road edits', () => {
+    const rendered = state()
+    const edited = { ...rendered, points: [] }
+    expect(editorTerrainRenderRequired(rendered, edited, false, false)).toBe(false)
+    expect(editorTerrainRenderRequired(rendered, { ...edited, terrain: {} }, false, false)).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, { ...edited, night: true }, false, false)).toBe(true)
+    expect(editorTerrainRenderRequired(rendered, edited, false, true)).toBe(true)
+  })
+
   it('does not redraw immutable world data for gesture-only snapshots', () => {
     const current = state()
 
