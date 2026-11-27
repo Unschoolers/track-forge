@@ -1,7 +1,12 @@
 import type { RaceVehicle } from '@/domain/race/raceState'
 import { SUPPORT_HEIGHT_EPSILON } from '@/domain/race/vehicleVerticalDynamics'
 
-export const BRIDGE_FALL_RESPAWN_SECONDS = 2
+export const BRIDGE_FALL_RESPAWN_SECONDS = 0.25
+
+export function hasBridgeFallExpired(seconds: number | undefined): boolean {
+  // Fixed-step accumulation can land just below the exact deadline.
+  return seconds !== undefined && seconds >= BRIDGE_FALL_RESPAWN_SECONDS - 1e-9
+}
 
 /** Track a fall from elevated road support without mistaking normal ramp exits for a fall. */
 export function trackBridgeFall(
