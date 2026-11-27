@@ -16,6 +16,7 @@ import type { AudioVolumeSetting } from '@/application/audioVolume'
 import type { UpdateInfo, UpdateProvider } from '@/application/updates/updateProvider'
 import type { UiHost } from '@/app/createApplication'
 import { createEditorChrome } from '@/ui/screens/editorChrome'
+import { createEditorDiagnosticsMemo } from '@/ui/editor/editorFrameControls'
 import { deferEditorDragChrome } from '@/ui/editor/editorDragRendering'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
@@ -74,6 +75,7 @@ export class DomUiHost implements UiHost {
   private mounted = false
   private previousSnapshot: AppSnapshot | undefined
   private readonly dialogs = new DialogController()
+  private readonly editorDiagnosticsMemo = createEditorDiagnosticsMemo()
   private readonly environment: UiEnvironment
   private availableUpdate: UpdateInfo | null = null
   private updateCheckPending = false
@@ -125,6 +127,7 @@ export class DomUiHost implements UiHost {
     this.lastUpdateCheckAt = Number.NEGATIVE_INFINITY
     this.previousOverlayType = 'none'
     this.previousSnapshot = undefined
+    this.editorDiagnosticsMemo.clear()
     this.noticeGeneration++
     for (const timer of this.noticeTimers) clearTimeout(timer)
     this.noticeTimers.clear()
@@ -280,6 +283,7 @@ export class DomUiHost implements UiHost {
     const previous = this.previousSnapshot
     this.previousSnapshot = state
     if (deferEditorDragChrome(previous, state)) return
+    if (state.mode !== 'editor') this.editorDiagnosticsMemo.clear()
     this.screenCleanup?.()
     this.screenCleanup = undefined
     this.overlayCleanup?.()
@@ -378,7 +382,7 @@ export class DomUiHost implements UiHost {
                 }),
               edit: (command) =>
                 this.controller.dispatch({ type: 'editor', command }),
-            }, geometry)
+            }, geometry, this.editorDiagnosticsMemo)
     } else {
       const raceHud = createRaceHud(
         state,
