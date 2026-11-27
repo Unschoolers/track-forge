@@ -1,7 +1,7 @@
 import type Phaser from 'phaser'
 import type { WorldBounds } from '@/presentation/environments/groundTexture'
 import type { VehicleLightTransform } from '@/phaser/rendering/vehicleRenderer'
-import { buildLampLights, type LampLight, type LampPost } from '@/phaser/rendering/lampPostRenderer'
+import { buildLampLights, LAMP_LIGHT_PROFILE, type LampLight, type LampPost } from '@/phaser/rendering/lampPostRenderer'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { chunkSpatialItems } from '@/phaser/rendering/raceTerrainChunks'
 import { getNightHeadlightBeam, NIGHT_HEADLIGHT } from '@/presentation/nightLighting'
@@ -97,10 +97,10 @@ function renderLampGlow(graphics: Phaser.GameObjects.Graphics, lamp: LampLight):
 const LAMP_ATLAS_KEY = 'trackforge-night-lamp-glow-v1'
 const HALO_DENSITY = 2
 const HALO_FRAMES = [
-  { name: 'road', x: 0, y: 0, size: 96, radius: 46, intensity: 0.12, rings: ROAD_GLOW },
-  { name: 'bridge-road', x: 96, y: 0, size: 112, radius: 54, intensity: 0.14, rings: ROAD_GLOW },
-  { name: 'fixture', x: 0, y: 112, size: 16, radius: 1, intensity: 0.12, rings: FIXTURE_GLOW },
-  { name: 'bridge-fixture', x: 16, y: 112, size: 16, radius: 1, intensity: 0.14, rings: FIXTURE_GLOW },
+  { name: 'road', x: 0, y: 0, size: 96, ...LAMP_LIGHT_PROFILE.road, rings: ROAD_GLOW },
+  { name: 'bridge-road', x: 96, y: 0, size: 112, ...LAMP_LIGHT_PROFILE.bridge, rings: ROAD_GLOW },
+  { name: 'fixture', x: 0, y: 112, size: 16, radius: 1, intensity: LAMP_LIGHT_PROFILE.road.intensity, rings: FIXTURE_GLOW },
+  { name: 'bridge-fixture', x: 16, y: 112, size: 16, radius: 1, intensity: LAMP_LIGHT_PROFILE.bridge.intensity, rings: FIXTURE_GLOW },
 ] as const
 
 /** Add the concentric rings once in premultiplied canvas space. On the opaque
