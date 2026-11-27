@@ -1,11 +1,14 @@
-/** Only these static-art menus own optical surfaces. No HUD, editor or canvas targets. */
+/** Static artwork is a screen capability, not a per-button allowlist.
+ * All standard actions share one policy; content cards and live canvases are
+ * deliberately excluded. Choices in settings remain paint-only. */
+const standardActions = 'button:is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *))'
 const menuSurfaces = [
-  { screen: '.home-screen', backdrop: '.home-artwork', actions: 'button.tf-menu-action', groups: '' },
-  { screen: '.track-library-modal', backdrop: '.track-library-modal', actions: '.modal-footer > .button, .modal-close', groups: '.track-library-toolbar' },
-  { screen: '.race-setup-modal', backdrop: '.race-setup-modal', actions: '.modal-footer > .button, .modal-close, .race-preparation-sections .setup-choice', groups: '' },
-  { screen: '.options-modal', backdrop: '.options-modal', actions: '.modal-footer > .button, .modal-close, .options-update-actions .button, .options-download-panel .button, .name-form .button, .release-notes-scroll .button', groups: '.options-tab-list' },
-  { screen: '.cup-modal', backdrop: '.cup-modal', actions: '.modal-footer > .button, .modal-close', groups: '' },
-  { screen: '.nearby-static-modal', backdrop: '.nearby-static-modal', actions: '.modal-footer > .button, .modal-close', groups: '' },
+  { screen: '.home-screen', backdrop: '.home-artwork', groups: '' },
+  { screen: '.track-library-modal', backdrop: '.track-library-modal', groups: '.track-library-toolbar' },
+  { screen: '.race-setup-modal', backdrop: '.race-setup-modal', groups: '' },
+  { screen: '.options-modal', backdrop: '.options-modal', groups: '.options-tab-list' },
+  { screen: '.cup-modal', backdrop: '.cup-modal', groups: '' },
+  { screen: '.nearby-static-modal', backdrop: '.nearby-static-modal', groups: '' },
 ] as const
 
 /** One upstream lens per independent action or semantic group, never nested. */
@@ -15,7 +18,14 @@ export function attachMenuGlass(
   load: () => Promise<unknown> = () => import('../../vendor/liquidglass/components.js'),
 ): () => void {
   const config = screen && menuSurfaces.find(item => screen.matches(item.screen))
-  if (!screen || !config || root.dataset.graphicsQuality === 'low' ||
+  if (!screen || !config) return () => undefined
+  // Paint and optical material share this capability marker, even on Low or
+  // when a browser cannot render SVG lenses.
+  screen.dataset.menuMaterial = 'static'
+  const actionsSelector = screen.matches('.race-setup-modal')
+    ? standardActions + ', .race-preparation-sections .setup-choice'
+    : standardActions
+  if (root.dataset.graphicsQuality === 'low' ||
       typeof ResizeObserver === 'undefined' || !window.CSS?.supports?.('filter', 'url(#liquidglass)')) return () => undefined
 
   const preference = window.matchMedia('(prefers-reduced-transparency: reduce), (prefers-contrast: more)')
@@ -23,7 +33,7 @@ export function attachMenuGlass(
   let disposed = false
   let loading = false
   let loaded = false
-  const dynamic = screen.matches('.options-modal')
+  const dynamic = screen.matches('.options-modal, .nearby-static-modal')
 
   const clear = () => {
     for (const [surface, panel] of panels) {
@@ -36,9 +46,9 @@ export function attachMenuGlass(
 
   const sync = () => {
     if (disposed || !loaded || preference.matches || !root.contains(screen)) return
-    const visible = (surface: HTMLElement) => !dynamic || !surface.closest('[hidden]')
+    const visible = (surface: HTMLElement) => !surface.closest('[hidden], details:not([open])')
     const groups = config.groups ? [...screen.querySelectorAll<HTMLElement>(config.groups)].filter(visible) : []
-    const actions = [...screen.querySelectorAll<HTMLElement>(config.actions)]
+    const actions = [...screen.querySelectorAll<HTMLElement>(actionsSelector)]
       .filter(action => visible(action) && !groups.some(group => group.contains(action)))
     const surfaces = new Set([...groups, ...actions])
     for (const [surface, panel] of panels) {
@@ -84,7 +94,7 @@ export function attachMenuGlass(
 
   // Update controls and the release reader are replaced asynchronously. Observe
   // only structural/visibility changes involving actual controls, not lens internals.
-  const selector = [config.actions, config.groups].filter(Boolean).join(', ')
+  const selector = [actionsSelector, config.groups].filter(Boolean).join(', ')
   const containsControl = (node: Node) => node instanceof Element &&
     (node.matches(selector) || node.querySelector(selector) !== null)
   const observer = dynamic ? new MutationObserver(records => {
@@ -94,7 +104,7 @@ export function attachMenuGlass(
         [...record.removedNodes].some(node => node instanceof Element &&
           [...panels.keys()].some(surface => node === surface || node.contains(surface))))) sync()
   }) : undefined
-  observer?.observe(screen, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
+  observer?.observe(screen, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'open'] })
 
   const onPreference = () => { if (preference.matches) clear(); else mount() }
   preference.addEventListener('change', onPreference)
