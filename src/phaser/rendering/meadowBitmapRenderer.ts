@@ -253,13 +253,24 @@ export class BitmapTileRenderer {
     if (selection === this.selectionSignature) return
     this.selectionSignature = selection
     const currentTiles = this.tiles.visible(view, window)
-    const prefetchTiles = bounds ? this.tiles.visible(view, expanded(window)) : currentTiles
+    const prefetchTiles = bounds || this.coherentWindow ? this.tiles.visible(view, expanded(window)) : currentTiles
     const currentSignature = currentTiles.map(tileKey).join('|')
     const maxPrefetch = Math.max(0, Math.min(
       MAX_PREFETCH_TILES_PER_LAYER,
       BITMAP_TILE_LIMIT - currentTiles.length,
     ))
-    const prefetched = selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
+    // The editor pans in any direction; prefetch the nearest surrounding
+    // tiles instead of assuming the race camera's forward direction.
+    const currentKeys = new Set(currentTiles.map(tileKey))
+    const distance = (tile: GroundTile): number => Math.hypot(
+      (tile.x + 0.5) * GROUND_TILE_SIZE - view.centerX,
+      (tile.y + 0.5) * GROUND_TILE_SIZE - view.centerY,
+    )
+    const prefetched = this.coherentWindow
+      ? prefetchTiles.filter(tile => !currentKeys.has(tileKey(tile)))
+        .sort((left, right) => distance(left) - distance(right) || left.y - right.y || left.x - right.x)
+        .slice(0, maxPrefetch)
+      : selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
     const candidates = [...currentTiles, ...prefetched]
     const wantedSignature = candidates.map(tileKey).join('|')
     // The editor calls render every frame. Stable tile windows do not need
