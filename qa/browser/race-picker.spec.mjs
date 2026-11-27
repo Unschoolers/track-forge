@@ -193,6 +193,7 @@ test('race setup actions stay visible and reachable at narrow portrait and lands
       expect(bounds.y).toBe(carBounds[0].y)
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
     }
+    await expect(setup).toHaveCSS('background-color', 'rgba(17, 25, 35, 0.72)')
     await testInfo.attach(`race-setup-${viewport.width}x${viewport.height}`, { body: await setup.screenshot(), contentType: 'image/png' })
     await actions[0].focus()
     await expect(actions[0]).toBeFocused()
