@@ -105,12 +105,13 @@ export function editorTerrainRenderRequired(
   rendered: EditorRenderState | undefined,
   current: EditorRenderState,
   detailChanged: boolean,
+  roadDependent = true,
 ): boolean {
   if (!rendered || rendered.terrain !== current.terrain ||
     rendered.environmentId !== current.environmentId || rendered.night !== current.night ||
-    rendered.routeKind !== current.routeKind) return true
+    (roadDependent && rendered.routeKind !== current.routeKind)) return true
   if (current.roadDrag) return false
-  return detailChanged || rendered.points !== current.points
+  return detailChanged || (roadDependent && rendered.points !== current.points)
 }
 
 export function editorPointerRenderChanges(
