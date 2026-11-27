@@ -105,7 +105,7 @@ test('mobile editor controls have vector icons, visible save and no overlapping 
         await expect(share.locator('[data-action="' + action + '"] > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
       }
       await share.locator('[data-action="share-cancel"]').click()
-      await editor.getByRole('button', { name: 'Editor menu' }).click()
+      await expect(menu).toBeVisible()
     }
     await page.getByRole('combobox', { name: 'Environment' }).selectOption('cityscape')
     await page.getByRole('button', { name: 'Close', exact: true }).click()
