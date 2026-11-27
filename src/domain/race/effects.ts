@@ -253,18 +253,18 @@ export function advanceRaceEffects(
         for (const axle of [-1, 1]) {
           const count = event.jump ? 3 : 1
           for (let i = 0; i < count; i++) {
-          const life = 0.18 + strength * 0.14 + i * 0.08
-          particles.push({
-            kind,
-            ...(raised ? { raised: true as const } : {}),
-            x: vehicle.x + axle * cosine * 10 - side * sine * 7,
-            y: vehicle.y + axle * sine * 10 + side * cosine * 7,
-            vx: -vehicle.vx * 0.04 - side * sine * (28 + i * 16) * strength,
-            vy: -vehicle.vy * 0.04 + side * cosine * (28 + i * 16) * strength,
-            life,
-            maxLife: life,
-            size: (1.6 + strength * 2.4 + i * 0.55) * EFFECT_SIZE[vehicle.car].landing,
-          })
+            const life = 0.18 + strength * 0.14 + i * 0.08
+            particles.push({
+              kind,
+              ...(raised ? { raised: true as const } : {}),
+              x: vehicle.x + axle * cosine * 10 - side * sine * 7,
+              y: vehicle.y + axle * sine * 10 + side * cosine * 7,
+              vx: -vehicle.vx * 0.04 - side * sine * (28 + i * 16) * strength,
+              vy: -vehicle.vy * 0.04 + side * cosine * (28 + i * 16) * strength,
+              life,
+              maxLife: life,
+              size: (1.6 + strength * 2.4 + i * 0.55) * EFFECT_SIZE[vehicle.car].landing,
+            })
           }
         }
       }
