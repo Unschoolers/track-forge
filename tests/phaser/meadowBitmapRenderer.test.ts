@@ -313,7 +313,7 @@ describe('BitmapTileRenderer', () => {
 })
 
 describe('editor water cache lifecycle', () => {
-  it('keeps uploaded water across road edits and drawing gestures, but invalidates terrain edits', () => {
+  it.each(['grass', 'desert', 'cityscape', 'kids-room'] as const)('retains unchanged terrain across road edits in %s', (environment) => {
     const { scene, scheduler } = schedulerFixture()
     scheduler.destroy()
     const uploaded = vi.fn(() => ({}))
@@ -350,17 +350,17 @@ describe('editor water cache lifecycle', () => {
     const terrain: TerrainMap = { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] }
     const geometry = () => ({} as TrackGeometry)
     try {
-      renderer.update(geometry(), terrain, '', false, false, 'grass')
+      renderer.update(geometry(), terrain, '', false, false, environment)
       renderer.render(view)
       renderer.warmVisible()
       expect(uploaded).toHaveBeenCalledTimes(1)
       expect(water.image).toHaveBeenCalledTimes(1)
 
-      renderer.update(geometry(), terrain, '', true, false, 'grass')
+      renderer.update(geometry(), terrain, '', true, false, environment)
       expect(renderer.hasRoadLayers()).toBe(false)
       renderer.render(view)
       renderer.warmVisible()
-      renderer.update(geometry(), terrain, '', false, false, 'grass')
+      renderer.update(geometry(), terrain, '', false, false, environment)
       renderer.render(view)
       renderer.warmVisible()
       expect(createWater).toHaveBeenCalledTimes(1)
@@ -368,35 +368,51 @@ describe('editor water cache lifecycle', () => {
       expect(removed).not.toHaveBeenCalled()
       expect(renderer.hasRoadLayers()).toBe(true)
 
-      renderer.update(geometry(), { ...terrain, cells: [] }, '', false, false, 'grass')
+      renderer.update(geometry(), { ...terrain, cells: [] }, '', false, false, environment)
       expect(removed).toHaveBeenCalledTimes(1)
       expect(renderer.coverage()[5]).toBe(0)
 
-      const createHill = vi.spyOn(bitmapLayers, 'createEditorHillBitmapTiles').mockReturnValue(water)
+      const hillSource = (changed: boolean) => ({
+        ...source(true),
+        visible: () => [{ x: 0, y: 0, variant: 0 }, { x: 1, y: 0, variant: 0 }],
+        tileContentKey: (key: string) => key === '0:0' && changed ? 'new slope' : 'same slope',
+      })
+      const firstHill = hillSource(false)
+      const nextHill = hillSource(true)
+      const createHill = vi.spyOn(bitmapLayers, 'createEditorHillBitmapTiles')
+        .mockReturnValueOnce(firstHill).mockReturnValue(nextHill)
       try {
         const mixed: TerrainMap = { cellSize: 32, cells: [
           { column: 0, row: 0, kind: 'water' },
           { column: 1, row: 0, kind: 'hill' },
         ] }
-        renderer.update(geometry(), mixed, 'near', false, false, 'grass')
+        renderer.update(geometry(), mixed, 'near', false, false, environment)
         renderer.render(view)
         renderer.warmVisible()
         const before = uploaded.mock.calls.length
         const removals = removed.mock.calls.length
-        renderer.update(geometry(), mixed, 'near', true, false, 'grass')
-        renderer.update(geometry(), mixed, 'near', false, false, 'grass')
+        renderer.update(geometry(), mixed, 'near', true, false, environment)
+        renderer.update(geometry(), mixed, 'near', false, false, environment)
         renderer.render(view)
         renderer.warmVisible()
         expect(createHill).toHaveBeenCalledTimes(1)
         expect(uploaded).toHaveBeenCalledTimes(before)
         expect(removed).toHaveBeenCalledTimes(removals)
 
-        renderer.update(geometry(), mixed, 'changed-nearby-road', false, false, 'grass')
+        renderer.update(geometry(), mixed, 'changed-nearby-road', true, false, environment)
+        renderer.render(view)
+        renderer.warmVisible()
+        expect(createHill).toHaveBeenCalledTimes(1)
+        expect(removed).toHaveBeenCalledTimes(removals)
+        renderer.update(geometry(), mixed, 'changed-nearby-road', false, false, environment)
         renderer.render(view)
         renderer.warmVisible()
         expect(createHill).toHaveBeenCalledTimes(2)
         expect(uploaded).toHaveBeenCalledTimes(before + 1)
         expect(removed).toHaveBeenCalledTimes(removals + 1)
+        expect(nextHill.image).toHaveBeenCalledTimes(1)
+        expect(createWater).toHaveBeenLastCalledWith(expect.anything(), false, environment, 24)
+        expect(createHill).toHaveBeenLastCalledWith(expect.anything(), false, environment, 24)
       } finally {
         createHill.mockRestore()
       }
