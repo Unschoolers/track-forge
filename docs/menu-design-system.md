@@ -117,3 +117,4 @@ Editor menu, unsaved changes, track naming/renaming and player-name onboarding u
 ## Race setup length and ghost discovery
 
 Circuit race length is selected in Race Setup (1, 2 or 3 laps), not Options. Point-to-point routes stay single-run. The existing saved lap preference and ghost storage format are unchanged. Car indicators identify cars with a replay at any supported length; lap indicators identify lengths with a replay for the selected car. Creator challenges keep their existing cross-car and target-lap behavior. Indicators are informational, not separate actions, and reuse the same accessible choice controls.
+Nearby hosts choose circuit laps before preparing a race or cup; the existing prepare message carries the chosen length. Point-to-point rounds still use a single run.
