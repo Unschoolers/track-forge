@@ -2,7 +2,7 @@ import type Phaser from 'phaser'
 import type { TerrainMap } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { BITMAP_TILE_LIMIT, createEditorRoadBitmapLayers, createEditorWaterBitmapTiles, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { BITMAP_TILE_LIMIT, createEditorHillBitmapTiles, createEditorRoadBitmapLayers, createEditorWaterBitmapTiles, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
 import { GROUND_TILE_SIZE, groundViewportBounds, type GroundTile, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { WORLD_RENDER_DEPTH } from './renderLayers'
 import type { TrackShadowMode } from './lighting'
@@ -393,7 +393,7 @@ export class BitmapTileRenderer {
 }
 
 export interface MeadowBitmapRenderer {
-  update(geometry: TrackGeometry, terrain: TerrainMap, gestureActive: boolean, night: boolean, environment: TrackEnvironmentId): void
+  update(geometry: TrackGeometry, terrain: TerrainMap, hillInfluence: string, gestureActive: boolean, night: boolean, environment: TrackEnvironmentId): void
   hasRoadLayers(): boolean
   render(view: GroundViewport, bounds?: WorldBounds): void
   warmVisible(): void
@@ -405,6 +405,8 @@ export interface MeadowBitmapRenderer {
 export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): MeadowBitmapRenderer {
   const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
   let water: BitmapTileRenderer | undefined
+  let hill: BitmapTileRenderer | undefined
+  let previousHillInfluence: string | undefined
   let roadLayers: BitmapTileRenderer[] = []
   let previousTerrain: TerrainMap | undefined
   let previousEnvironment: TrackEnvironmentId | undefined
@@ -425,13 +427,17 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: Trac
     scene.events.off('shutdown', destroy)
     water?.destroy()
     water = undefined
+    hill?.destroy()
+    hill = undefined
     destroyRoadLayers()
     scheduler.destroy()
   }
   scene.events.once('shutdown', destroy)
-  const renderers = (): readonly BitmapTileRenderer[] => water ? [water, ...roadLayers] : roadLayers
+  const renderers = (): readonly BitmapTileRenderer[] => [
+    ...(water ? [water] : []), ...(hill ? [hill] : []), ...roadLayers,
+  ]
   return {
-    update(geometry, terrain, gestureActive, night, environment) {
+    update(geometry, terrain, hillInfluence, gestureActive, night, environment) {
       if (destroyed) return
       const changed = previousTerrain !== terrain || previousNight !== night || previousEnvironment !== environment
       if (changed) {
@@ -447,17 +453,25 @@ export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: Trac
         waterLimit = hasHill ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
         hillLimit = hasWater ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
       }
+      if (changed || previousHillInfluence !== hillInfluence) {
+        hill?.destroy()
+        hill = undefined
+        previousHillInfluence = hillInfluence
+      }
       destroyRoadLayers()
       if (gestureActive) return
       if (hasWater && !water) {
         const tiles = createEditorWaterBitmapTiles(geometry, night, environment, waterLimit)
         if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit)
       }
-      const layers = createEditorRoadBitmapLayers(geometry, night, environment, shadowMode, hillLimit)
+      if (hasHill && !hill) {
+        const tiles = createEditorHillBitmapTiles(geometry, night, environment, hillLimit)
+        if (tiles) hill = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit)
+      }
+      const layers = createEditorRoadBitmapLayers(geometry, night, environment, shadowMode)
       if (!layers) return
       roadLayers = [
         new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
-        ...(hasHill ? [new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit)] : []),
         ...(layers.bridgeApproach ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH, 2)] : []),
         ...(layers.bridgeDeck ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH, 3)] : []),
       ]
