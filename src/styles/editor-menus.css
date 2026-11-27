@@ -5,41 +5,25 @@
   --editor-menu-muted: #b5c3d0;
   --editor-menu-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
-.editor-screen :is(.editor-context-dock, .point-control, .crossing-control, .start-control, .diagnostic-panel) {
-  border-color: #53616c;
-  border-radius: 0;
-  background: rgb(12 19 27 / 96%);
-  color: var(--editor-menu-ink);
-  box-shadow: 0 .9rem 2.3rem #0009;
-}
-.editor-screen :is(.point-control, .crossing-control, .start-control) {
-  border-top: 2px solid var(--editor-menu-accent);
-}
-.editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button, .point-choice, .point-insert, .crossing-choice, .diagnostic-repair),
 .modal-overlay .editor-segmented-button {
-  border-color: #53616c;
-  border-radius: 12px;
-  background: #202a36;
-  color: #edf2f8;
-}
-.editor-screen :is(.editor-segmented-button, .point-choice, .point-insert, .crossing-choice, .diagnostic-repair),
-.modal-overlay .editor-segmented-button {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  border: 1px solid var(--menu-control-border);
+  border-radius: var(--menu-control-rounding);
+  background: var(--menu-control-fill);
+  color: var(--menu-control-ink);
+  box-shadow: var(--menu-control-rim);
+  font-family: var(--menu-control-font);
   font-weight: 650;
-  letter-spacing: 0;
 }
-.editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button, .point-choice, .crossing-choice).active,
 .modal-overlay .editor-segmented-button.active {
   border-color: #ffc4a5;
-  background: #ff925c;
+  background: var(--menu-control-selected-fill);
   color: #20130f;
-  box-shadow: none;
 }
 .editor-screen :is(.point-control-title, .crossing-control-title, .point-tension-label, .editor-context-dock .label) {
   color: var(--editor-menu-muted);
-  font-family: var(--editor-menu-mono);
-  font-weight: 800;
-  letter-spacing: .08em;
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
 }
 .editor-screen :is(.start-control-help, .diagnostic-message) { color: var(--editor-menu-muted); }
 /* The canvas remains pointer-transparent except where an editor panel needs input. */
@@ -52,11 +36,8 @@
   touch-action: none;
 }
 .editor-screen .status-pill {
-  border: 1px solid #53616c;
-  border-radius: 0;
-  background: rgb(12 19 27 / 96%);
   color: var(--editor-menu-ink);
-  font-family: var(--editor-menu-mono);
+  font-family: var(--menu-control-font);
 }
 .editor-screen .topbar-title { color: var(--editor-menu-ink); text-shadow: 0 1px 4px #000, 0 1px 8px #000; }
 .editor-screen :is(button, input):focus-visible,
@@ -73,14 +54,7 @@
   gap: .4rem;
   min-height: 44px;
   padding: .35rem .55rem;
-  border: 1px solid #53616c;
-  border-radius: 12px;
-  background: #202a36;
-  color: #edf2f8;
-  font-family: var(--editor-menu-mono);
-  font-size: .72rem;
-  font-weight: 800;
-  letter-spacing: .04em;
+  font-size: .8rem;
   list-style: none;
   cursor: pointer;
   touch-action: manipulation;
@@ -107,9 +81,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .35rem;
   padding: .45rem;
-  border: 1px solid #53616c;
-  background: rgb(12 19 27 / 98%);
-  box-shadow: 0 .9rem 2rem #000a;
+  max-width: calc(100vw - 1rem);
 }
 .editor-screen .editor-toolbox-items { top: calc(100% + .25rem); left: 0; width: min(17rem, calc(100vw - 1rem)); }
 .editor-screen .editor-toolbox-items .tool-button {
@@ -121,7 +93,7 @@
   height: auto;
   min-height: 44px;
   padding: .4rem;
-  font-size: .7rem;
+  font-size: .8rem;
 }
 .editor-screen .editor-control-label { white-space: normal; line-height: 1.15; text-align: left; }
 .editor-screen .history-actions { z-index: 11; grid-template-columns: repeat(2, minmax(44px, 1fr)); width: 7rem; }
@@ -135,8 +107,7 @@
   justify-content: center;
   width: 100%;
   height: 3.25rem;
-  font-family: var(--editor-menu-mono);
-  font-size: .62rem;
+  font-size: .72rem;
   line-height: 1.1;
 }
 .editor-screen .editor-action-label { white-space: nowrap; }
