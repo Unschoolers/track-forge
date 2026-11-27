@@ -38,7 +38,7 @@ import {
   renderTerrainPreview,
 } from '@/phaser/rendering/terrainRenderer'
 import { terrainDetailForView } from '@/phaser/rendering/terrainDetail'
-import type { TerrainPresentationDetail } from '@/phaser/rendering/terrainMesh'
+import { RegionalTerrainMeshCache, type TerrainPresentationDetail } from '@/phaser/rendering/terrainMesh'
 import {
   buildLampPosts,
   renderLampPosts,
@@ -89,6 +89,7 @@ export class EditorScene extends Phaser.Scene {
   private trackGraphics?: Phaser.GameObjects.Graphics
   private roadMarkingGraphics?: Phaser.GameObjects.Graphics
   private meadowBitmapRenderer: EditorMeadowBitmapRenderer | undefined
+  private readonly regionalTerrainMesh = new RegionalTerrainMeshCache()
   private structureUnderlayGraphics?: Phaser.GameObjects.Graphics
   private structureDeckGraphics?: Phaser.GameObjects.Graphics
   private structureWallGraphics?: Phaser.GameObjects.Graphics
@@ -447,7 +448,7 @@ export class EditorScene extends Phaser.Scene {
     this.roadMarkingGraphics.clear()
     // Keep the scene's water textures while road edits use the vector preview.
     // Only a terrain or appearance change can invalidate the water layer.
-    this.meadowBitmapRenderer ??= createMeadowBitmapRenderer(this, 'local-ground')
+    this.meadowBitmapRenderer ??= createMeadowBitmapRenderer(this, 'local-ground', undefined, this.regionalTerrainMesh)
     const hillInfluence = hillRoadInfluenceKey(snapshot.editor.terrain, geometry.path)
     this.meadowBitmapRenderer.update(geometry, snapshot.editor.terrain, hillInfluence, Boolean(snapshot.editor.gestureStart), night, snapshot.editor.environmentId)
     this.structureUnderlayGraphics.clear()
@@ -513,7 +514,7 @@ export class EditorScene extends Phaser.Scene {
     const environment = getTrackEnvironment(snapshot.editor.environmentId)
     const detail = this.terrainDetail(geometry)
     this.terrainGraphics.clear()
-    renderTerrain(this.terrainGraphics, geometry.path.terrainSurface, night, detail, night ? environment.night : environment.day)
+    renderTerrain(this.terrainGraphics, geometry.path.terrainSurface, night, detail, night ? environment.night : environment.day, this.regionalTerrainMesh)
     this.renderedHillInfluence = hillInfluence ?? hillRoadInfluenceKey(snapshot.editor.terrain, geometry.path)
     this.renderedTerrainDetail = detail
     this.renderedTerrainState = this.currentRenderState
@@ -832,6 +833,7 @@ export class EditorScene extends Phaser.Scene {
     this.bitmapMarkingRaster = undefined
     this.meadowBitmapRenderer?.destroy()
     this.meadowBitmapRenderer = undefined
+    this.regionalTerrainMesh.clear()
     this.rasterizeWorld = false
   }
 }

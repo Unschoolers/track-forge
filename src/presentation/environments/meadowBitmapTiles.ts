@@ -6,7 +6,7 @@ import { GROUND_TILE_SIZE, groundViewportBounds, visibleGroundTiles, type Ground
 import { buildRoadRibbonQuads, type RoadRibbonQuad } from './roadRibbonQuads'
 import { createArtCanvas, getEnvironmentBitmapArt, type EnvironmentBitmapArt } from './meadowBitmapArt'
 import { buildTerrainComponents, mapTerrainComponent, tileTerrainComponent, type TerrainTriangle } from '@/phaser/rendering/terrainTopology'
-import { buildTerrainPresentation } from '@/phaser/rendering/terrainMesh'
+import { buildTerrainPresentation, type RegionalTerrainMeshCache } from '@/phaser/rendering/terrainMesh'
 import { paintHarborOilSlicks } from './harborOilSlicks'
 import { roadTextureRepeat } from './roadTextureVariants'
 import { buildBridgePresentation, bridgeRenderPasses, type BridgePrimitive } from '@/phaser/rendering/bridgeRenderer'
@@ -295,7 +295,7 @@ export function splitBankSegment(start: Vector2, end: Vector2): readonly BankSeg
   return Array.from({ length: count }, (_, i) => ({ start: at(i / count), end: at((i + 1) / count) }))
 }
 
-function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, part: 'all' | 'water' | 'hill' = 'all'): Map<string, TerrainBitmapItem[]> {
+function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, part: 'all' | 'water' | 'hill' = 'all', regionalCache?: RegionalTerrainMeshCache): Map<string, TerrainBitmapItem[]> {
   const surface = geometry.path.terrainSurface
   const items: TerrainBitmapItem[] = []
   for (const contour of surface.contours) {
@@ -322,7 +322,7 @@ function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, par
   }
   // Reuse the canonical full-detail facets and their directional lighting.
   // Full-detail plateau triangles are small and bounded, unlike overview runs.
-  for (const primitive of part === 'water' || !surface.contours.some(contour => contour.kind === 'hill') ? [] : buildTerrainPresentation(surface, 'full')) {
+  for (const primitive of part === 'water' || !surface.contours.some(contour => contour.kind === 'hill') ? [] : buildTerrainPresentation(surface, 'full', regionalCache)) {
     if (primitive.kind === 'hill-slope') {
       const level = elevationLevelForHeight(primitive.height)
       for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet, level })
@@ -452,8 +452,8 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   }
 }
 
-function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme, part: 'all' | 'water' | 'hill' = 'all', limit: number = BITMAP_TILE_LIMIT): BakeableBitmapTiles {
-  return new CachedBitmapTiles(terrainBitmapIndex(geometry, Boolean(theme), part), (context, items, tile) => paintTerrainBitmap(context, items, art, tile, theme?.night), limit)
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme, part: 'all' | 'water' | 'hill' = 'all', limit: number = BITMAP_TILE_LIMIT, regionalCache?: RegionalTerrainMeshCache): BakeableBitmapTiles {
+  return new CachedBitmapTiles(terrainBitmapIndex(geometry, Boolean(theme), part, regionalCache), (context, items, tile) => paintTerrainBitmap(context, items, art, tile, theme?.night), limit)
 }
 
 // Water does not depend on road grade. Editor road changes only rebuild the
@@ -463,9 +463,9 @@ export function createEditorWaterBitmapTiles(geometry: TrackGeometry, night: boo
   return art ? terrainTiles(geometry, art, undefined, 'water', limit) : undefined
 }
 
-export function createEditorHillBitmapTiles(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, limit: number): BakeableBitmapTiles | undefined {
+export function createEditorHillBitmapTiles(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, limit: number, regionalCache?: RegionalTerrainMeshCache): BakeableBitmapTiles | undefined {
   const art = getEnvironmentBitmapArt(environment, night)
-  return art ? terrainTiles(geometry, art, undefined, 'hill', limit) : undefined
+  return art ? terrainTiles(geometry, art, undefined, 'hill', limit, regionalCache) : undefined
 }
 
 export function createEditorRoadBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode): Omit<EnvironmentBitmapLayers, 'terrain'> | undefined {

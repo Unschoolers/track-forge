@@ -9,6 +9,7 @@ import type { TerrainCellPreview } from '@/phaser/input/editorInput'
 import {
   buildTerrainPresentation,
   type TerrainPresentationDetail,
+  type RegionalTerrainMeshCache,
 } from '@/phaser/rendering/terrainMesh'
 import type {
   TerrainPreviewBounds,
@@ -65,8 +66,9 @@ export function renderTerrain(
   night: boolean,
   detail: TerrainPresentationDetail = 'full',
   palette: EnvironmentPalette = night ? GRASS_ENVIRONMENT.night : GRASS_ENVIRONMENT.day,
+  regionalCache?: RegionalTerrainMeshCache,
 ): void {
-  renderTerrainPrimitives(graphics, buildTerrainPresentation(surface, detail), night, palette)
+  renderTerrainPrimitives(graphics, buildTerrainPresentation(surface, detail, regionalCache), night, palette)
 }
 
 export function renderTerrainPrimitives(
