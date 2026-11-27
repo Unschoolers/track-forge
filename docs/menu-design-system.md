@@ -8,7 +8,7 @@ Inspired by [Adopting Liquid Glass](https://developer.apple.com/documentation/te
 - Motion communicates interaction, not ornament. No idle animated glass or device-motion effects.
 
 ## Architecture and boundaries
-Application state, commands, persistence and navigation remain authoritative in appState/appController. Screen composition belongs to ui/screens and ui/modals. Shared DOM primitives in ui/menu use ui/dom and stable data-action attributes. styles/menu-system.css owns the shared scoped tokens, layout and material rules. Retain DialogController's focus/scroll restoration and existing modal semantics when migrating dialogs; the shell is not a new router or modal manager. No new framework, library, global state or gameplay dependency.
+Application state, commands, persistence and navigation remain authoritative in appState/appController. Screen composition belongs to ui/screens and ui/modals. Shared DOM primitives in ui/menu use ui/dom and stable data-action attributes. styles/app.css defines the production cascade. styles/tokens.css owns reusable design tokens; styles/menu-system.css loads the shared shell, glass and painted controls. Each screen stylesheet owns its layout and content. Retain DialogController's focus/scroll restoration and existing modal semantics when migrating dialogs; the shell is not a new router or modal manager. No new framework, library, global state or gameplay dependency.
 
 The layout is a full-bleed media layer, semantic header, scrollable main content and action dock. Grid reserves real space for actions and safe areas. Wide viewports reflow instead of scaling up phone controls. Avoid absolute content placement and nested scroll areas. Each screen owns content composition; no giant configurable screen component.
 
@@ -18,7 +18,7 @@ Menu glass uses LiquidGlass.dev's upstream SVG refraction of aligned copies of s
 
 ## Shared control defaults
 
-menu-system.css owns shared painted and optical control material; menu-dialogs.css owns base dialog layout, field geometry and minimum touch sizes. An unclassified new
+menu-glass.css owns optical material and its static-art fallback; menu-controls.css owns painted controls; menu-dialogs.css owns base dialog layout, field geometry and minimum touch sizes. Options, Track Library, Race Setup, Results and the player topper picker have focused stylesheets. An unclassified new
 dialog must already look like Track Forge, not the retired angular theme.
 Use the existing button and setup-choice classes; selectable buttons expose
 aria-pressed and the matching active class. Specialized pickers (including
@@ -42,7 +42,7 @@ their optical paint, geometry or low-quality fallback.
 Options defines the visual reference: soft rounded geometry, sans-serif
 labels, orange selection, a subtle illuminated rim and readable graphite.
 Repeated content actions and live editor chrome share the painted material
-tokens in menu-system.css; do not mount a lens per cup row or over a live
+tokens in tokens.css; do not mount a lens per cup row or over a live
 editor canvas. Tools and View disclosures are mutually exclusive. Keep their
 layout and editing commands separate from shared paint.
 
