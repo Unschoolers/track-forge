@@ -23,6 +23,8 @@ const keyFor = (tile: Pick<GroundTile, 'x' | 'y'>) => `${tile.x}:${tile.y}`
 export interface BitmapTiles {
   visible(view: GroundViewport, bounds?: WorldBounds): readonly GroundTile[]
   image(tile: GroundTile): HTMLCanvasElement
+  /** Exact painter input identity, available for static terrain tile reconciliation. */
+  tileContentKey?(key: string): string | undefined
 }
 
 export interface BakeableBitmapTiles extends BitmapTiles {
@@ -63,6 +65,11 @@ class CachedBitmapTiles<T> implements BakeableBitmapTiles {
   constructor(private readonly index: ReadonlyMap<string, readonly T[]>,
     private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[], tile: GroundTile) => void,
     private readonly limit: number = BITMAP_TILE_LIMIT) {}
+
+  tileContentKey(key: string): string | undefined {
+    const items = this.index.get(key)
+    return items ? JSON.stringify(items) : undefined
+  }
 
   all(): readonly GroundTile[] {
     return Array.from(this.index.keys(), key => {
