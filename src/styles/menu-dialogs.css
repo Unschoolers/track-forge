@@ -6,7 +6,10 @@
   --menu-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   background: rgb(5 8 13 / 84%);
 }
-.options-modal { background: rgb(5 8 13 / 50%); }
+.options-modal {
+  isolation: isolate;
+  background: linear-gradient(145deg, #070d16b8, #080d16c9), url('../assets/title/city-harbor.webp') center / cover no-repeat;
+}
 .modal-overlay .modal-card {
   border: 1px solid #3c4c5b;
   border-radius: 0;
@@ -72,17 +75,15 @@
   min-height: 0;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   border-radius: 1.5rem;
-  background: #101821;
+  background: #101821b8;
   box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff18;
 }
-/* Keep the current screen visible around and faintly through Options. The dark
-   base color preserves a solid fallback when backdrop filters are unavailable. */
+/* Keep static menu artwork visible through the tinted Options card. */
 @supports (backdrop-filter: blur(8px)) {
   .options-modal .modal-card {
     border-color: #b4c8d54d;
-    background: linear-gradient(145deg, #e6f3ff20, transparent 42%), #101821c9;
+    background: linear-gradient(145deg, #e6f3ff20, transparent 42%), #101821ad;
     box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
-    backdrop-filter: blur(18px) saturate(120%);
   }
 }
 /* Every category remains visible; the content below the tabs is the only scroller. */
@@ -95,7 +96,7 @@
   padding: .3rem;
   border: 1px solid #ffffff26;
   border-radius: 1.25rem;
-  background: #26323ef2;
+  background: #26323ed6;
 }
 .options-modal .options-tab-list .setup-choice {
   display: flex;
@@ -259,7 +260,7 @@
 .options-modal .release-notes-list li + li { margin-top: .6rem; }
 .options-modal .release-notes-warning { color: #ffcc9f; line-height: 1.4; }
 
-/* The Options card is the sole glass surface; keep its tab controls solid. */
+/* Reduced-transparency preferences restore opaque settings surfaces. */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .options-modal { background: #05080d; }
   .options-modal .modal-card { background: #101821; backdrop-filter: none; }
