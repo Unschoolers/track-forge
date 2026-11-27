@@ -42,8 +42,6 @@ export function createCupModal(state: AppSnapshot, actions: CupMenuActions): HTM
     list.append(row)
   })
   const lineupHeading = element('h3', 'cup-lineup-heading', 'Track lineup')
-  lineupHeading.id = 'cup-lineup-heading'
-  list.setAttribute('aria-labelledby', lineupHeading.id)
   const lineupCount = element('span', 'cup-lineup-count', `${lineup.length} of ${MAX_CUP_ROUNDS} rounds`)
   lineupHeading.append(lineupCount)
   frame.body.append(lineupHeading, list)
