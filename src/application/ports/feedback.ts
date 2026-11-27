@@ -30,6 +30,7 @@ export type FeedbackEvent =
       readonly type: 'surface'
       readonly surface: SurfaceId | 'grass'
       readonly speedRatio: number
+      readonly grounded?: boolean
     }
   | { readonly type: 'tire-slip'; readonly strength: number; readonly speedRatio?: number; readonly surface?: SurfaceId | 'grass' }
   | { readonly type: 'landing'; readonly strength: number }
