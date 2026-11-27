@@ -229,7 +229,7 @@
 
 /* One shared optical layer, with native labels and hit areas above it.
    The selector specificity deliberately matches the paint-only fallback rules. */
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal) [data-liquid-glass][data-liquid-glass] {
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass] {
   position: relative;
   isolation: isolate;
   background: transparent;
@@ -241,8 +241,8 @@
   --lg-shadow-2: 0 4px 10px #0005;
   text-shadow: 0 1px 3px #000b;
 }
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal) [data-liquid-glass][data-liquid-glass].modal-close { border-radius: 50%; }
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal) [data-liquid-glass][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary) {
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass].modal-close { border-radius: 50%; }
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary) {
   --lg-tint: rgb(255 146 92 / 76%);
   border-color: #ffe0c580;
   text-shadow: none;
@@ -252,19 +252,19 @@
   text-shadow: none;
   border-color: #e3edf7;
 }
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal) [data-liquid-glass][data-liquid-glass] > lg-panel {
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass][data-liquid-glass] > lg-panel {
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
   border-radius: inherit;
 }
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal) [data-liquid-glass-kind='action'][data-liquid-glass]:active:not(:disabled) {
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass-kind='action'][data-liquid-glass]:active:not(:disabled) {
   transform: none;
   filter: none;
   --lg-tint: rgb(15 28 41 / 38%);
 }
-#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal) [data-liquid-glass-kind='action'][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary):active:not(:disabled) {
+#app :is(.home-screen, .track-library-modal, .race-setup-modal, .options-modal, .cup-modal, .nearby-static-modal) [data-liquid-glass-kind='action'][data-liquid-glass]:is(.tf-menu-action--primary, .button-primary):active:not(:disabled) {
   --lg-tint: rgb(255 146 92 / 88%);
 }
 #app .race-setup-modal [data-liquid-glass-kind='action'][data-liquid-glass].setup-choice.active:active:not(:disabled) {

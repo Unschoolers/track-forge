@@ -4,6 +4,8 @@ const menuSurfaces = [
   { screen: '.track-library-modal', backdrop: '.track-library-modal', actions: '.modal-footer > .button, .modal-close', groups: '.track-library-toolbar' },
   { screen: '.race-setup-modal', backdrop: '.race-setup-modal', actions: '.modal-footer > .button, .modal-close, .race-preparation-sections .setup-choice', groups: '' },
   { screen: '.options-modal', backdrop: '.options-modal', actions: '.modal-footer > .button, .modal-close', groups: '.options-tab-list' },
+  { screen: '.cup-modal', backdrop: '.cup-modal', actions: '.modal-footer > .button, .modal-close', groups: '' },
+  { screen: '.nearby-static-modal', backdrop: '.nearby-static-modal', actions: '.modal-footer > .button, .modal-close', groups: '' },
 ] as const
 
 /** One upstream lens per independent action or semantic group, never nested. */

@@ -41,17 +41,26 @@ export function createCupModal(state: AppSnapshot, actions: CupMenuActions): HTM
     row.append(name, controls)
     list.append(row)
   })
-  frame.body.append(element('h3', 'results-heading', `TRACK LINEUP · ${lineup.length}/${MAX_CUP_ROUNDS}`), list)
-  const curated = button('LOAD CURATED CUP', 'cup-load-curated', actions.loadCurated, 'button')
+  const lineupHeading = element('h3', 'cup-lineup-heading', 'Track lineup')
+  lineupHeading.id = 'cup-lineup-heading'
+  list.setAttribute('aria-labelledby', lineupHeading.id)
+  const lineupCount = element('span', 'cup-lineup-count', `${lineup.length} of ${MAX_CUP_ROUNDS} rounds`)
+  lineupHeading.append(lineupCount)
+  frame.body.append(lineupHeading, list)
+  const curated = button('LOAD CURATED CUP', 'cup-load-curated', actions.loadCurated, 'button cup-secondary-action')
   curated.setAttribute('aria-pressed', String(lineup.length === CURATED_CUP_TRACK_IDS.length &&
     lineup.every((id, index) => id === CURATED_CUP_TRACK_IDS[index])))
-  frame.body.append(curated, element('p', 'modal-subtitle',
-    'Three stages: Kids Room tight turns · City Harbor speed and braking · Rally point-to-point finale.'))
-  const add = button('+ ADD TRACK', 'cup-add-track', actions.addTrack, 'button')
+  frame.body.append(curated, element('p', 'cup-format-note',
+    'Three stages: Kids Room tight turns, City Harbor speed and braking, then a Rally point-to-point finale.'))
+  const add = button('Add track', 'cup-add-track', actions.addTrack, 'button cup-secondary-action')
   add.disabled = lineup.length >= MAX_CUP_ROUNDS
   frame.body.append(add)
-  if (checkpoint) frame.body.append(element('p', 'modal-subtitle',
-    `Unfinished cup · Race ${Math.min(checkpoint.index + 1, cupRoundCount(checkpoint))} of ${cupRoundCount(checkpoint)}. Its original lineup is preserved.`))
+  if (checkpoint) {
+    const progress = element('p', 'cup-checkpoint-note',
+      `Unfinished cup · Race ${Math.min(checkpoint.index + 1, cupRoundCount(checkpoint))} of ${cupRoundCount(checkpoint)}. Its original lineup is preserved.`)
+    progress.setAttribute('role', 'status')
+    frame.body.append(progress)
+  }
   const raceReady = lineup.length > 0 && lineup.every(id => tracks.some(track => track.id === id))
   const hosting = state.overlay.type === 'cup' && state.overlay.returnTo === 'nearby' && !!actions.hostNearby
   const start = button('START NEW CUP', 'start-cup', actions.start, hosting ? 'button' : 'button button-primary')

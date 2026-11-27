@@ -11,6 +11,7 @@ export function createPauseModal(actions: {
     'Race paused',
     'Controls stay hidden until you resume.',
     undefined,
+    'pause-modal',
   )
   frame.body.classList.add('menu-buttons')
   frame.body.append(

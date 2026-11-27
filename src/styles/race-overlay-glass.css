@@ -1,0 +1,302 @@
+/*
+ * Pause and results overlays sit on top of the live race canvas. Their depth is
+ * painted into opaque surfaces; backdrop filters and canvas sampling are not
+ * used here.
+ */
+:is(.pause-modal, .results-modal) {
+	--overlay-highlight: #ffffff24;
+	--overlay-line: #a9bdcc55;
+	--overlay-surface: #101821f5;
+	--overlay-raised: #1a2632;
+	--overlay-accent: #ff925c;
+	background: #05090dd9;
+}
+
+:is(.pause-modal, .results-modal) .modal-card {
+	isolation: isolate;
+	border: 1px solid var(--overlay-line);
+	border-radius: 1.35rem;
+	background:
+		linear-gradient(150deg, #ffffff0c, transparent 40%), var(--overlay-surface);
+	box-shadow:
+		0 1.5rem 5rem #000b,
+		inset 0 1px var(--overlay-highlight);
+}
+
+:is(.pause-modal, .results-modal) .modal-header {
+	border-color: #ffffff18;
+}
+
+:is(.pause-modal, .results-modal) .modal-title {
+	letter-spacing: -0.035em;
+}
+
+/* Pause is a compact interruption with one unmistakable return-to-race action. */
+.pause-modal .modal-card {
+	width: min(29rem, 100%);
+	grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.pause-modal .modal-header {
+	padding: 1.35rem 1.4rem 0.45rem;
+	border-bottom: 0;
+}
+
+.pause-modal .modal-title {
+	font-size: clamp(1.7rem, 6vw, 2.35rem);
+}
+
+.pause-modal .modal-subtitle {
+	max-width: 28ch;
+	margin-top: 0.45rem;
+	line-height: 1.45;
+}
+
+.pause-modal .modal-body {
+	display: grid;
+	align-content: start;
+	padding: 0.85rem 1.4rem 1.4rem;
+}
+
+.pause-modal .menu-buttons {
+	gap: 0.55rem;
+}
+
+.pause-modal .menu-buttons > .button {
+	min-height: 50px;
+	padding-inline: 1rem;
+	border: 1px solid #9caebe32;
+	border-radius: 0.85rem;
+	background:
+		linear-gradient(135deg, #ffffff0b, transparent 60%), var(--overlay-raised);
+	box-shadow: inset 0 1px #ffffff0d;
+	color: #edf2f8;
+	font:
+		700 0.9rem / 1.2 system-ui,
+		sans-serif;
+	letter-spacing: 0.015em;
+	text-align: center;
+	text-transform: none;
+}
+
+.pause-modal .menu-buttons > .button-primary {
+	border-color: #ffc6a2;
+	background: linear-gradient(135deg, #ffb17e, var(--overlay-accent));
+	box-shadow:
+		inset 0 1px #fff8,
+		0 0.3rem 1rem #ff784633;
+	color: #20120d;
+	font-weight: 800;
+}
+
+.pause-modal .menu-buttons > .button-danger {
+	margin-top: 0.25rem;
+	border-color: #a05b6470;
+	background: #321e25;
+	color: #ffc4c5;
+}
+
+/* Results lead with the finish, then keep optional detail and history secondary. */
+.results-modal .modal-card {
+	width: min(47rem, 100%);
+	border-radius: 1.5rem;
+}
+
+.results-modal .modal-header {
+	padding: 1.1rem 1.4rem 0.8rem;
+}
+
+.results-modal .modal-header::after {
+	right: 1.4rem;
+	width: 2.5rem;
+	height: 0.2rem;
+	border-radius: 1rem;
+	clip-path: none;
+}
+
+.results-modal[data-outcome="finished"] .modal-header::after {
+	background: linear-gradient(90deg, #f5c86c, var(--overlay-accent));
+}
+
+.results-modal .modal-title {
+	font-size: clamp(1.45rem, 5vw, 2.15rem);
+	line-height: 1.05;
+}
+
+.results-modal .modal-header .modal-subtitle {
+	margin-top: 0.35rem;
+	color: #becbd6;
+	font: 600 0.78rem / 1.35 var(--menu-mono);
+	letter-spacing: 0.025em;
+}
+
+.results-modal .modal-body {
+	gap: 0.45rem;
+	padding: 0.85rem 1.4rem 1rem;
+}
+
+.results-modal .results-finish-time {
+	gap: 0.35rem;
+	padding: 0.85rem 1rem;
+	border: 1px solid #ffffff1c;
+	border-inline-start: 3px solid var(--overlay-accent);
+	border-radius: 0.9rem;
+	background: linear-gradient(110deg, #ff925c18, transparent 65%), #17222d;
+	box-shadow: inset 0 1px #ffffff0c;
+}
+
+.results-modal .results-finish-time span {
+	font-size: 0.65rem;
+	letter-spacing: 0.14em;
+}
+
+.results-modal .results-finish-time strong {
+	font-size: clamp(1.7rem, 7vw, 2.5rem);
+	letter-spacing: -0.045em;
+}
+
+.results-modal .results-celebration {
+	gap: 0.35rem;
+	margin: 0.15rem 0 0.35rem;
+	padding: 1rem 0.8rem 1.1rem;
+	border: 1px solid color-mix(in srgb, var(--podium-color), transparent 45%);
+	border-radius: 1rem;
+	background:
+		radial-gradient(
+			ellipse at 50% 0,
+			color-mix(in srgb, var(--podium-color), transparent 84%),
+			transparent 72%
+		),
+		#141f29;
+	box-shadow:
+		inset 0 1px #ffffff12,
+		0 0.5rem 1.5rem #0003;
+}
+
+.results-modal .results-celebration-sparks {
+	display: none;
+}
+
+.results-modal .results-celebration-place {
+	font-size: clamp(2.2rem, 10vw, 3.5rem);
+}
+
+.results-modal .results-heading {
+	margin: 0.6rem 0 0.25rem;
+	color: #c7d2db;
+	font:
+		750 0.68rem / 1.3 system-ui,
+		sans-serif;
+	letter-spacing: 0.12em;
+}
+
+.results-modal .scoreboard-row {
+	min-height: 44px;
+	border: 1px solid #ffffff12;
+	border-radius: 0.65rem;
+	background: #17222d;
+}
+
+.results-modal .scoreboard-row.player {
+	border-color: #ff925c7a;
+	background: linear-gradient(90deg, #ff925c1c, transparent 60%), #17222d;
+	box-shadow: inset 3px 0 var(--overlay-accent);
+}
+
+.results-modal .results-details-bar {
+	padding-top: 0.35rem;
+	border-top: 1px solid #ffffff14;
+}
+
+.results-modal .results-history {
+	border-color: #ffffff1a;
+}
+
+.results-modal .results-footer {
+	padding: 0.65rem 1.1rem max(0.65rem, env(safe-area-inset-bottom));
+	border-color: #ffffff18;
+	background: #0b121ad9;
+}
+
+.results-modal .results-primary-actions .button {
+	min-height: 48px;
+	border-radius: 0.75rem;
+	font:
+		750 0.72rem / 1.15 system-ui,
+		sans-serif;
+	letter-spacing: 0.015em;
+	text-transform: none;
+}
+
+.results-modal .results-primary-actions .button-primary {
+	border-color: #ffc6a2;
+	background: linear-gradient(135deg, #ffb17e, var(--overlay-accent));
+	box-shadow:
+		inset 0 1px #fff8,
+		0 0.25rem 0.8rem #ff78462b;
+	color: #20120d;
+}
+
+.results-modal .results-secondary {
+	gap: clamp(0.35rem, 3vw, 1.2rem);
+}
+
+.results-modal .results-secondary .button {
+	min-height: 44px;
+	border-radius: 0.65rem;
+	font:
+		650 0.74rem / 1.2 system-ui,
+		sans-serif;
+	letter-spacing: 0.01em;
+	text-transform: none;
+}
+
+.results-modal .results-secondary .button:hover {
+	background: #ffffff0c;
+}
+
+@media (max-width: 420px) {
+	.pause-modal .modal-card,
+	.results-modal .modal-card {
+		border-radius: 1.1rem;
+	}
+
+	.pause-modal .modal-header {
+		padding: 1rem 1rem 0.35rem;
+	}
+	.pause-modal .modal-body {
+		padding: 0.75rem 1rem 1rem;
+	}
+	.results-modal .modal-header {
+		padding: 0.85rem 1rem 0.7rem;
+	}
+	.results-modal .modal-body {
+		padding: 0.7rem 1rem 0.85rem;
+	}
+	.results-modal .results-footer {
+		padding-inline: 0.7rem;
+	}
+	.results-modal .results-primary-actions .button {
+		padding-inline: 0.2rem;
+		font-size: 0.66rem;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.results-modal .results-celebration-sparks {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+	:is(.pause-modal, .results-modal) {
+		background: #05090d;
+	}
+	:is(.pause-modal, .results-modal) .modal-card {
+		background: #101821;
+		border-color: #c1cad4;
+	}
+	.results-modal .results-footer {
+		background: #0b121a;
+	}
+}

@@ -66,6 +66,27 @@ describe('LiquidGlass.dev menu adapter', () => {
     expect(load).not.toHaveBeenCalled()
   })
 
+  it.each(['cup-modal', 'nearby-static-modal'])('uses static artwork for %s actions', async (className) => {
+    const { root } = setup()
+    const screen = document.createElement('div')
+    screen.className = className
+    screen.innerHTML = '<footer class="modal-footer"><button class="button">Back</button></footer>'
+    root.append(screen)
+    const cleanup = attachMenuGlass(root, screen, async () => undefined)
+    await vi.waitFor(() => expect(screen.querySelector('lg-panel')?.getAttribute('backdrop')).toBe(`.${className}`))
+    cleanup()
+  })
+
+  it.each(['pause-modal', 'results-modal', 'nearby-race-modal'])('never adds lenses to live %s overlays', (className) => {
+    const { root } = setup()
+    const screen = document.createElement('div')
+    screen.className = className
+    root.append(screen)
+    const load = vi.fn(async () => undefined)
+    attachMenuGlass(root, screen, load)()
+    expect(load).not.toHaveBeenCalled()
+  })
+
   it('does not load optics on low quality or reduced transparency', () => {
     const low = setup('low')
     const load = vi.fn(async () => undefined)

@@ -44,7 +44,9 @@ export function createNearbyRaceModal(
   const cup = snapshot.cup
   const frame = createModalFrame(phase === 'lobby' ? 'Race Lobby' : cup ? 'Nearby Cup' : 'Nearby Race',
     phase === 'lobby' ? [track ?? 'Next race', room].filter(Boolean).join(' · ') : room ?? (cup ? `Cup · ${cup.total} tracks · Up to ${MAX_PLAYERS} players` : `Arcade · Up to ${MAX_PLAYERS} players`),
-    actions.close, phase === 'lobby' ? 'nearby-race-modal nearby-lobby-modal race-preparation-modal' : 'nearby-race-modal')
+    actions.close, phase === 'lobby'
+      ? 'nearby-race-modal nearby-static-modal nearby-lobby-modal race-preparation-modal'
+      : 'nearby-race-modal nearby-static-modal')
   frame.body.classList.add('menu-buttons')
   if (error) {
     const message = element('p', 'modal-subtitle', error)
