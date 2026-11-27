@@ -77,7 +77,7 @@ describe('LiquidGlass.dev menu adapter', () => {
     cleanup()
   })
 
-  it.each(['pause-modal', 'results-modal', 'nearby-race-modal'])('never adds lenses to live %s overlays', (className) => {
+  it.each(['pause-modal', 'results-modal', 'nearby-race-modal', 'editor-menu-modal', 'editor-exit-modal', 'track-name-modal', 'player-name-modal'])('never adds lenses to live %s overlays', (className) => {
     const { root } = setup()
     const screen = document.createElement('div')
     screen.className = className
