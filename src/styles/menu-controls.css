@@ -1,0 +1,48 @@
+/* Painted menu controls and live editor surfaces. No canvas sampling. */
+#app :is(.editor-screen, .cup-modal) :is(.tool-button, .icon-button, .surface-button,
+  .editor-segmented-button, .point-choice, .point-insert, .crossing-choice,
+  .diagnostic-repair, .editor-toolbox-summary, .editor-view-summary, .track-mini-button),
+#app .modal-overlay :is(.button, .setup-choice, .toggle-button, .modal-close, .track-icon-action, .editor-segmented-button):not(:where([data-menu-material='static'] *, .track-card *)) {
+  border: 1px solid var(--menu-control-border);
+  border-radius: var(--menu-control-rounding);
+  background: var(--menu-control-fill);
+  color: var(--menu-control-ink);
+  box-shadow: var(--menu-control-rim);
+  font-family: var(--menu-control-font);
+  font-weight: 650;
+  letter-spacing: 0;
+  clip-path: none;
+  backdrop-filter: none;
+}
+#app .cup-modal .track-mini-button { border-radius: 50%; }
+/* All dialogs inherit the same painted defaults. Static optics enhance these
+   controls via the material capability; no per-dialog button skin. */
+#app .modal-overlay :is(.modal-close, .track-icon-action):not(:where([data-menu-material='static'] *, .track-card *)) { border-radius: 50%; }
+#app .modal-overlay :is(.button-primary, .setup-choice.active, .toggle-button.active, .editor-segmented-button.active):not(:where([data-menu-material='static'] *, .track-card *)) {
+  background: var(--menu-control-selected-fill);
+  border-color: #ffc4a5;
+  color: #20130f;
+}
+#app .modal-overlay .button-danger:not(:where([data-menu-material='static'] *, .track-card *)) {
+  background: #302028;
+  border-color: #98606a;
+  color: #ffadb3;
+}
+#app .modal-overlay:not([data-menu-material='static']) {
+  backdrop-filter: none;
+}
+#app .editor-screen :is(.point-control, .crossing-control) { backdrop-filter: none; }
+#app .editor-screen :is(.tool-button, .icon-button, .surface-button, .editor-segmented-button,
+  .point-choice, .crossing-choice):is(.active, .accent, [aria-pressed='true']) {
+  background: var(--menu-control-selected-fill);
+  border-color: #ffc4a5;
+  color: #20130f;
+}
+#app .editor-screen .icon-button.danger { color: #ffadb3; }
+#app .editor-screen :is(.editor-context-dock, .point-control, .crossing-control,
+  .start-control, .diagnostic-panel, .editor-toolbox-items, .editor-view-items, .status-pill) {
+  background: var(--menu-control-panel);
+  border: 1px solid var(--menu-control-border);
+  border-radius: var(--menu-control-rounding);
+  box-shadow: var(--menu-control-rim);
+}
