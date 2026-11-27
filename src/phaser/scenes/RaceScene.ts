@@ -612,7 +612,9 @@ export class RaceScene extends Phaser.Scene {
   }
 
   private dispose(): void {
-    this.game.events.off(Phaser.Core.Events.POST_RENDER, this.onLocalCountdownRender)
+    if (this.localCountdownFrame === 'submitted') {
+      this.game.events.off(Phaser.Core.Events.POST_RENDER, this.onLocalCountdownRender)
+    }
     this.localCountdownFrame = 'waiting'
     this.nativeParticles?.destroy()
     this.nativeParticles = undefined
