@@ -30,6 +30,7 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
   await enterTrackForge(page)
   await page.evaluate(async () => {
     const { EditorScene } = await import('/src/phaser/scenes/EditorScene.ts')
+    const { EditorTerrainPresentation } = await import('/src/phaser/rendering/editorTerrainPresentation.ts')
     const { TrackGeometryCache } = await import('/src/domain/track/trackGeometryCache.ts')
     const work = { previews: 0, redraws: 0, terrainRedraws: 0, builds: 0, writes: 0 }
     window.roadEditWork = work
@@ -44,8 +45,9 @@ test('bounds editing work on a course with Sandy Beach-sized terrain and scenery
       preview.apply(this, args)
       if (this.lastRoadPreview && previous !== this.lastRoadPreview) work.previews++
     }
-    const terrain = EditorScene.prototype.renderTerrainPresentation
-    EditorScene.prototype.renderTerrainPresentation = function (...args) {
+    const terrain = EditorTerrainPresentation.prototype.renderTerrain
+    if (typeof terrain !== 'function') throw new Error('Missing terrain redraw instrumentation target')
+    EditorTerrainPresentation.prototype.renderTerrain = function (...args) {
       work.terrainRedraws++
       return terrain.apply(this, args)
     }
