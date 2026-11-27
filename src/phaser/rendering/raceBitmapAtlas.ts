@@ -141,59 +141,139 @@ class AtlasLayer {
   }
 }
 
-/** Race geometry is immutable. Bake all sparse material tiles into shared
- * pages before driving starts. Only sprite selection changes during driving.
- * The editor keeps its dynamic, bounded streaming renderer. */
-export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean,
-  environment: TrackEnvironmentId): MeadowBitmapRenderer | undefined {
-  const sources = createRaceBitmapLayers(geometry, night, environment)
-  if (!sources) return undefined
+export type RaceAtlasTextureManager = Pick<Phaser.Textures.TextureManager, 'addCanvas' | 'addSpriteSheet' | 'remove'>
+
+interface PreparedFrame extends AtlasFrame {
+  readonly layer: number
+}
+
+interface AtlasJob {
+  readonly geometry: TrackGeometry
+  readonly night: boolean
+  readonly environment: TrackEnvironmentId
+  readonly textures: RaceAtlasTextureManager
+  readonly keys: string[]
+  readonly frames: PreparedFrame[]
+  work: Generator<number, boolean, void>
+  progress: number
+  ready: boolean
+  available: boolean
+  users: number
+  retired: boolean
+}
+
+// One retained atlas per Phaser texture manager. A replaced atlas is released
+// immediately unless a still-live scene is using it.
+const atlasJobs = new WeakMap<RaceAtlasTextureManager, AtlasJob>()
+
+function releaseAtlas(job: AtlasJob): void {
+  if (!job.retired || job.users > 0) return
+  for (const key of job.keys.splice(0)) job.textures.remove(key)
+  job.frames.length = 0
+  job.work.return(false)
+}
+
+function* bakeAtlas(job: AtlasJob): Generator<number, boolean, void> {
+  const sources = createRaceBitmapLayers(job.geometry, job.night, job.environment)
+  if (!sources) return false
   const entries: AtlasEntry[] = []
-  const layers = RACE_ATLAS_DEPTHS.map(depth => new AtlasLayer(scene, depth))
   const ordered = [sources.road, sources.terrain, sources.bridgeApproach, sources.bridgeDeck, sources.bridgeWalls]
   ordered.forEach((source, layer) => {
     if (source) for (const tile of source.all()) entries.push({ tile, source, layer })
   })
   const plan = planRaceAtlas(entries.length)
+  const total = entries.length + plan.pages.length
   const prefix = `race-atlas-${++nextAtlas}`
-  const textures: string[] = []
+  let offset = 0
+  let completed = 0
+  for (const [pageIndex, page] of plan.pages.entries()) {
+    const canvas = document.createElement('canvas')
+    canvas.width = page.width
+    canvas.height = page.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not create race atlas canvas')
+    context.imageSmoothingQuality = 'high'
+    const pageEntries = entries.slice(offset, offset + page.count)
+    for (const [i, entry] of pageEntries.entries()) {
+      const x = (i % page.columns) * plan.stride + GUTTER
+      const y = Math.floor(i / page.columns) * plan.stride + GUTTER
+      drawTile(context, entry.source.bake(entry.tile, plan.resolution), x, y, plan.resolution)
+      yield ++completed / total
+    }
+    const key = `${prefix}:${pageIndex}`
+    const texture = job.textures.addCanvas(key, canvas)
+    if (!texture) throw new Error('Could not register race atlas')
+    job.keys.push(key)
+    registerRaceAtlasFrames(job.textures, texture, plan.resolution, page.count)
+    for (const [i, entry] of pageEntries.entries()) {
+      job.frames.push({ layer: entry.layer, tile: entry.tile, texture: key, frame: String(i) })
+    }
+    offset += page.count
+    yield ++completed / total
+  }
+  return true
+}
+
+function atlasJob(textures: RaceAtlasTextureManager, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId): AtlasJob {
+  const current = atlasJobs.get(textures)
+  if (current && current.geometry === geometry && current.night === night && current.environment === environment) return current
+  if (current) {
+    current.retired = true
+    releaseAtlas(current)
+  }
+  const job: AtlasJob = {
+    textures, geometry, night, environment, keys: [], frames: [], progress: 0,
+    ready: false, available: false, users: 0, retired: false,
+    work: (function* () { return false })(),
+  }
+  job.work = bakeAtlas(job)
+  atlasJobs.set(textures, job)
+  return job
+}
+
+/** Advance the same resumable bake from startup, flyover or synchronous race
+ * creation. Cancelling the scheduler does not discard completed pages. */
+export function* prepareRaceAtlas(textures: RaceAtlasTextureManager, geometry: TrackGeometry, night: boolean,
+  environment: TrackEnvironmentId): Generator<number, void, void> {
+  const job = atlasJob(textures, geometry, night, environment)
+  try {
+    while (!job.ready && !job.retired) {
+      const next = job.work.next()
+      if (next.done) {
+        job.ready = true
+        job.available = next.value
+        job.progress = 1
+      } else {
+        job.progress = next.value
+        yield job.progress
+      }
+    }
+  } catch (error) {
+    if (atlasJobs.get(textures) === job) atlasJobs.delete(textures)
+    job.retired = true
+    releaseAtlas(job)
+    throw error
+  }
+}
+
+/** Race geometry is immutable. The scene owns only its image pools;
+ * the bounded preparation slot owns registered texture pages. */
+export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean,
+  environment: TrackEnvironmentId): MeadowBitmapRenderer | undefined {
+  const job = atlasJob(scene.textures, geometry, night, environment)
+  for (const _progress of prepareRaceAtlas(scene.textures, geometry, night, environment)) { /* finish pending work */ }
+  if (!job.available) return undefined
+  job.users++
+  const layers = RACE_ATLAS_DEPTHS.map(depth => new AtlasLayer(scene, depth))
+  for (const frame of job.frames) layers[frame.layer]!.frames.set(tileKey(frame.tile), frame)
   let destroyed = false
   const destroy = () => {
     if (destroyed) return
     destroyed = true
     scene.events.off('shutdown', destroy)
     for (const layer of layers) layer.destroy()
-    for (const texture of textures) scene.textures.remove(texture)
-  }
-  try {
-    let offset = 0
-    for (const [pageIndex, page] of plan.pages.entries()) {
-      const canvas = document.createElement('canvas')
-      canvas.width = page.width
-      canvas.height = page.height
-      const context = canvas.getContext('2d')
-      if (!context) throw new Error('Could not create race atlas canvas')
-      context.imageSmoothingQuality = 'high'
-      const pageEntries = entries.slice(offset, offset + page.count)
-      const slots = pageEntries.map((entry, i) => {
-        const x = (i % page.columns) * plan.stride + GUTTER
-        const y = Math.floor(i / page.columns) * plan.stride + GUTTER
-        drawTile(context, entry.source.bake(entry.tile, plan.resolution), x, y, plan.resolution)
-        return { entry, frame: String(i) }
-      })
-      const key = `${prefix}:${pageIndex}`
-      const texture = scene.textures.addCanvas(key, canvas)
-      if (!texture) throw new Error('Could not register race atlas')
-      textures.push(key)
-      registerRaceAtlasFrames(scene.textures, texture, plan.resolution, page.count)
-      for (const { entry, frame } of slots) {
-        layers[entry.layer]!.frames.set(tileKey(entry.tile), { tile: entry.tile, texture: key, frame })
-      }
-      offset += page.count
-    }
-  } catch (error) {
-    destroy()
-    throw error
+    job.users--
+    releaseAtlas(job)
   }
   scene.events.once('shutdown', destroy)
   return {
