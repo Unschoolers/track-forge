@@ -357,3 +357,32 @@ prefetch candidates within their respective budgets. This incorporates
 the coherent-window fix from PR #457. Rapid movement or dirty tile uploads
 may temporarily show the vector underlay; no synchronous upload burst is
 introduced. Component regressions exercise all four environment IDs.
+
+### Regional editor hill mesh compilation
+
+The editor owns one regional terrain mesh cache shared by the vector
+underlay and bitmap hill painter. Immutable contour identity retains
+water tessellation, shoreline rings, water ripples, hill shadows and
+full/overview hill quad geometry. Terrain edits discard these dependencies.
+
+For road-only edits, the authoritative road-distance index exposes a
+rendering identity for each spatial bucket neighborhood: exact ordered
+segment endpoints, in the same traversal order as the existing nearest-road
+query. Elevation samples at quad centers remain valid while that identity
+is unchanged. Changed neighborhoods resample lazily; both full and overview
+detail use the same bounded cache for the current terrain. No physics query
+or road slope formula is modified. Scene shutdown clears the cache.
+
+The final presentation batches and bitmap index are still assembled globally
+to retain canonical ordering, coverage, plateau merging and budget checks.
+This phase avoids repeated tessellation and unrelated elevation evaluations,
+not all CPU work. The regional GPU tile reconciliation from the previous
+phase remains in effect.
+
+The same path serves Meadow, Desert, Cityscape and Kids' Room. Tests compare
+incremental and cold compilation output, verify undo and terrain-edit
+invalidation, preserve static triangle identity, and require fewer than one
+quarter of the original elevation evaluations for a local edit on a
+2,700-cell synthetic hill at each detail level. This is a regression target,
+not a measured Android FPS claim. CI and physical-device profiling are
+required before release.
