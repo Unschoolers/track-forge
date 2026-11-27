@@ -456,13 +456,17 @@ export function createEditorWaterBitmapTiles(geometry: TrackGeometry, night: boo
   return art ? terrainTiles(geometry, art, undefined, 'water', limit) : undefined
 }
 
-export function createEditorRoadBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode, hillLimit: number): EnvironmentBitmapLayers | undefined {
+export function createEditorHillBitmapTiles(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, limit: number): BakeableBitmapTiles | undefined {
+  const art = getEnvironmentBitmapArt(environment, night)
+  return art ? terrainTiles(geometry, art, undefined, 'hill', limit) : undefined
+}
+
+export function createEditorRoadBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode): Omit<EnvironmentBitmapLayers, 'terrain'> | undefined {
   const art = getEnvironmentBitmapArt(environment, night)
   if (!art) return undefined
   const bridge = buildBridgePresentation(geometry, shadowMode)
   return {
     road: roadTiles(geometry, art),
-    terrain: terrainTiles(geometry, art, undefined, 'hill', hillLimit),
     bridgeApproach: bridgeTiles(bridge, geometry, art, environment, night, true),
     bridgeDeck: bridgeTiles(bridge, geometry, art, environment, night, false),
   }
