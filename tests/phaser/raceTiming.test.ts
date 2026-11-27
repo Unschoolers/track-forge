@@ -28,10 +28,8 @@ it('waits for the first submitted race frame and preserves visible local countdo
   const controller = { snapshot: () => ({ preferences: { pedalMode: 'auto' } }) }
   const controls = { consumeBoostRequest: () => false, snapshot: () => ({}) }
   const loop = { rawDelta: 4000 }
-  const scene = Object.assign(
-    new RaceScene(controller as never, { advance, snapshot } as never, controls as never, {} as never),
-    { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, snapshot: {}, game: { loop, events: { once } } },
-  )
+  const scene = new RaceScene(controller as never, { advance, snapshot } as never, controls as never, {} as never)
+  Object.assign(scene, { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, snapshot: {}, game: { loop, events: { once } } })
   const update = (mode: string, phase: string, rawDelta: number) => {
     loop.rawDelta = rawDelta
     // The scene exits after advancing, so this test needs no renderer.
