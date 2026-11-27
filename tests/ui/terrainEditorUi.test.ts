@@ -69,8 +69,18 @@ describe('scenery transformation controls', () => {
     const slider = root.querySelector<HTMLInputElement>('[data-action="scenery-rotation"]')
     expect(slider).not.toBeNull()
     if (!slider) throw new Error('Missing scenery rotation control')
+    vi.mocked(port.dispatch).mockClear()
+    slider.value = '45'
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
     slider.value = '135'
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(port.dispatch).toHaveBeenNthCalledWith(1, { type: 'preview-scenery-rotation', target, rotation: 45 })
+    expect(port.dispatch).toHaveBeenNthCalledWith(2, { type: 'preview-scenery-rotation', target, rotation: 135 })
+    expect(root.textContent).toContain('Rotation: 135°')
+    expect(port.dispatch).toHaveBeenCalledTimes(2)
     slider.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(port.dispatch).toHaveBeenCalledTimes(4)
+    expect(port.dispatch).toHaveBeenLastCalledWith({ type: 'preview-scenery-rotation', target, rotation: null })
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 135, scale: 1.2 } } })
     root.querySelector<HTMLButtonElement>('[data-action="scenery-transform-reset"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 0, scale: 1 } } })

@@ -96,6 +96,34 @@ function setup(track = createStarterTrack(asTrackId('starter'), 1), realRace = f
 }
 
 describe('AppController', () => {
+  it('keeps scenery rotation previews out of the draft and history until a single commit', () => {
+    const track = { ...createStarterTrack(asTrackId('rotation-preview'), 1), trees: [{ x: 4, y: 5 }] }
+    const { controller, trackStore } = setup(track)
+    controller.dispatch({ type: 'open-editor' })
+    controller.dispatch({ type: 'set-editor-tool', tool: 'tree' })
+    const target = { type: 'tree' as const, index: 0 }
+    controller.dispatch({ type: 'select-editor-scenery', target })
+    const before = controller.snapshot()
+    controller.dispatch({ type: 'preview-scenery-rotation', target, rotation: 45 })
+    controller.dispatch({ type: 'preview-scenery-rotation', target, rotation: 90 })
+    expect(controller.snapshot().sceneryRotationPreview).toEqual({ target, rotation: 90 })
+    expect(controller.snapshot().editor).toBe(before.editor)
+    expect(controller.snapshot().currentTrack).toBe(before.currentTrack)
+    expect(trackStore.save).not.toHaveBeenCalled()
+    controller.dispatch({ type: 'preview-scenery-rotation', target, rotation: null })
+    expect(controller.snapshot().sceneryRotationPreview).toBeNull()
+    controller.dispatch({ type: 'preview-scenery-rotation', target, rotation: 135 })
+    controller.dispatch({ type: 'editor', command: { type: 'transform-scenery', target, transform: { rotation: 135 } } })
+    expect(controller.snapshot().sceneryRotationPreview).toBeNull()
+    expect(controller.snapshot().editor.trees[0]?.rotation).toBe(135)
+    expect(controller.snapshot().editor.history).toHaveLength(before.editor.history.length + 1)
+    controller.dispatch({ type: 'editor', command: { type: 'undo' } })
+    expect(controller.snapshot().editor.trees).toEqual(before.editor.trees)
+    controller.dispatch({ type: 'preview-scenery-rotation', target, rotation: 45 })
+    expect(controller.snapshot().sceneryRotationPreview).toBeNull()
+    controller.destroy()
+  })
+
   it('rejects a modified signed file before saving and retains the verified original', async () => {
     const { controller, trackStore } = setup()
     try {

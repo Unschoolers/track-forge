@@ -32,3 +32,18 @@ export function stepSceneryScale(scale: number, direction: -1 | 1): number {
 }
 
 export type ScenerySelection = { readonly type: 'tree' | 'prop'; readonly index: number }
+
+/** Half extent of the rotated square bitmap along either world axis. */
+export function scenerySquareHalfExtent(radius: number, item: SceneryTransform): number {
+  const angle = sceneryRotation(item)
+  return radius * sceneryScale(item) * (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)))
+}
+
+/** Inverse rotation gives the same square footprint used by the artwork.
+ * Margin is measured in world units (the caller converts its touch padding). */
+export function scenerySquareContains(radius: number, item: SceneryTransform, dx: number, dy: number, margin = 0): boolean {
+  const angle = sceneryRotation(item)
+  const c = Math.cos(angle), s = Math.sin(angle)
+  const half = radius * sceneryScale(item) + margin
+  return Math.abs(dx * c + dy * s) <= half && Math.abs(-dx * s + dy * c) <= half
+}

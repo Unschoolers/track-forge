@@ -1,4 +1,4 @@
-import { sceneryScale, sceneryRotation } from '@/domain/track/sceneryTransform'
+import { sceneryScale, sceneryRotation, scenerySquareHalfExtent } from '@/domain/track/sceneryTransform'
 import type { LightingMode } from '@/domain/model'
 import type { SceneryProp, SceneryPropKind, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { getTrackEnvironment } from './index'
@@ -11,7 +11,7 @@ function* visibleScenery(environmentId: TrackEnvironmentId, props: readonly Scen
   for (const prop of props) {
     const art = scenery[prop.kind]
     if (!art) continue
-    const radius = art.radius * sceneryScale(prop)
+    const radius = scenerySquareHalfExtent(art.radius, prop)
     if (prop.x + radius < bounds.left || prop.x - radius > bounds.right || prop.y + radius < bounds.top || prop.y - radius > bounds.bottom) continue
     yield { prop, art }
   }

@@ -1,4 +1,4 @@
-import { TREE_SIZE, sceneryScale, sceneryRotation } from '@/domain/track/sceneryTransform'
+import { TREE_SIZE, sceneryScale, sceneryRotation, scenerySquareHalfExtent } from '@/domain/track/sceneryTransform'
 import type Phaser from 'phaser'
 import type { Tree } from '@/domain/model'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
@@ -76,11 +76,12 @@ export function buildTreePresentation(
         ).point
       : projectSunShadow(tree, TREE_CANOPY_HEIGHT * factor)
     // Include the scaled canopy and projected shadow in the culling bounds.
+    const extent = scenerySquareHalfExtent(TREE_SIZE / 2, tree)
     const canopyVisible = !viewBounds || intersectsEllipse(
       tree.x,
       tree.y,
-      size / 2,
-      size / 2,
+      extent,
+      extent,
       viewBounds,
     )
     const shadowVisible = !viewBounds || intersectsEllipse(

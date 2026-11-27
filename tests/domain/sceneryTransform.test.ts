@@ -3,7 +3,7 @@ import { createStarterTrack } from '@/domain/track/starterTrack'
 import { decodeTrack } from '@/domain/track/trackCodec'
 import { describe, expect, it } from 'vitest'
 import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
-import { normalizeSceneryTransform, stepSceneryScale } from '@/domain/track/sceneryTransform'
+import { normalizeSceneryTransform, stepSceneryScale, scenerySquareContains, scenerySquareHalfExtent } from '@/domain/track/sceneryTransform'
 import { normalizeSceneryProps } from '@/domain/track/trackEnvironment'
 
 describe('authored scenery transforms', () => {
@@ -19,6 +19,15 @@ describe('authored scenery transforms', () => {
     expect(normalizeSceneryTransform({ scale: 1.51 })).toBeUndefined()
     expect(normalizeSceneryTransform({ scale: 0.5 })).toEqual({ scale: 0.5 })
     expect(normalizeSceneryTransform({ scale: 1.5 })).toEqual({ scale: 1.5 })
+  })
+
+  it('uses scaled, rotated square bounds and inverse rotation for hit testing', () => {
+    const item = { rotation: 45, scale: 1.5 }
+    expect(scenerySquareHalfExtent(10, item)).toBeCloseTo(15 * Math.SQRT2)
+    expect(scenerySquareContains(10, item, 20, 0)).toBe(true)
+    expect(scenerySquareContains(10, item, 15, 15)).toBe(false)
+    expect(scenerySquareContains(10, item, 22, 0, 1)).toBe(true)
+    expect(scenerySquareHalfExtent(10, { rotation: 90 })).toBeCloseTo(10)
   })
 
   it('stores a prop transform during normalization', () => {

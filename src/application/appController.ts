@@ -1,3 +1,4 @@
+import { normalizeSceneryTransform } from '@/domain/track/sceneryTransform'
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import { CupFlow } from '@/application/race/cupFlow'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
@@ -505,6 +506,18 @@ export class AppController {
       case 'resolve-editor-exit':
         this.editorExitFlow.resolve(command.choice)
         break
+      case 'preview-scenery-rotation': {
+        const { target, rotation } = command
+        const { selectedScenery, tool } = this.state.editorUi
+        if (this.state.mode !== 'editor' || this.state.overlay.type !== 'none' || tool !== 'tree' ||
+          isSharedTrack(this.state.currentTrack) || selectedScenery?.type !== target.type || selectedScenery.index !== target.index) break
+        const item = target.type === 'tree' ? this.state.editor.trees[target.index] : this.state.editor.scenery[target.index]
+        if (!item || (rotation !== null && !normalizeSceneryTransform({ rotation }))) break
+        if ((this.state.sceneryRotationPreview?.rotation ?? null) === rotation) break
+        this.state = { ...this.state, sceneryRotationPreview: rotation === null ? null : { target, rotation } }
+        this.events.publish({ type: 'state-changed', snapshot: this.state })
+        break
+      }
       case 'select-editor-scenery':
       case 'set-editor-scenery':
       case 'set-editor-tool':
@@ -1117,6 +1130,8 @@ export class AppController {
   }
 
   private update(state: AppSnapshot): void {
+    // Every ordinary state transition ends the temporary slider preview.
+    if (state.sceneryRotationPreview) state = { ...state, sceneryRotationPreview: null }
     let editorUi = state.editorUi
     const readOnly = state.mode === 'editor' && isSharedTrack(state.currentTrack)
     const leavingPreview = this.state.mode === 'editor' && isSharedTrack(this.state.currentTrack) && !readOnly

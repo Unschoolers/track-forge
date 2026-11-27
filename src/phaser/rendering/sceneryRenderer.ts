@@ -13,16 +13,16 @@ export class SceneryRenderer {
 
   constructor(private readonly graphics: Phaser.GameObjects.Graphics, private readonly resolveBitmap: SceneryBitmapResolver = getSceneryBitmap) {}
 
-  render(view: GroundViewport, environmentId: TrackEnvironmentId, props: readonly SceneryProp[], night: boolean, preview?: { index: number; position: Vector2 }): void {
+  render(view: GroundViewport, environmentId: TrackEnvironmentId, props: readonly SceneryProp[], night: boolean, preview?: { index: number; position: Vector2; rotation?: number }): void {
     const bounds = groundViewportBounds(view)
     const left = Math.floor(bounds.left / GROUND_TILE_SIZE) - 1
     const top = Math.floor(bounds.top / GROUND_TILE_SIZE) - 1
     const right = Math.ceil(bounds.right / GROUND_TILE_SIZE) + 1
     const bottom = Math.ceil(bounds.bottom / GROUND_TILE_SIZE) + 1
-    const key = `${environmentId}:${night}:${left}:${top}:${right}:${bottom}:${preview?.index}:${preview?.position.x}:${preview?.position.y}`
+    const key = `${environmentId}:${night}:${left}:${top}:${right}:${bottom}:${preview?.index}:${preview?.position.x}:${preview?.position.y}:${preview?.rotation}`
     if (this.key === key && this.props === props) return
     const shown = preview && props[preview.index]
-      ? props.map((prop, index) => index === preview.index ? { ...prop, ...preview.position } : prop)
+      ? props.map((prop, index) => index === preview.index ? { ...prop, ...preview.position, ...(preview.rotation !== undefined ? { rotation: preview.rotation } : {}) } : prop)
       : props
     const plan = buildSceneryRenderPlan(environmentId, shown, night ? 'night' : 'day', {
       left: left * GROUND_TILE_SIZE, top: top * GROUND_TILE_SIZE,
