@@ -113,3 +113,7 @@ Options reconciles newly inserted or hidden action controls while open; download
 
 ## Remaining compact dialogs
 Editor menu, unsaved changes, track naming/renaming and player-name onboarding use the shared 18px action geometry and opaque painted material. These dialogs can appear over an editor or other unknown backdrop; they do not opt into SVG refraction. Android's system Back exit confirmation is a native dialog, not a DOM modal: its rounded panel, warm primary and graphite secondary native ripple drawables match the menu palette without adding a WebView bridge or live backdrop capture. Preserve native Back/Stay/Exit behavior and accessible scalable text. The native dialog remains opaque independently of graphics quality.
+
+## Race setup length and ghost discovery
+
+Circuit race length is selected in Race Setup (1, 2 or 3 laps), not Options. Point-to-point routes stay single-run. The existing saved lap preference and ghost storage format are unchanged. Car indicators identify cars with a replay at any supported length; lap indicators identify lengths with a replay for the selected car. Creator challenges keep their existing cross-car and target-lap behavior. Indicators are informational, not separate actions, and reuse the same accessible choice controls.
