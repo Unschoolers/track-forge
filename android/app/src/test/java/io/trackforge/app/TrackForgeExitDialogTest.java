@@ -34,6 +34,10 @@ public class TrackForgeExitDialogTest {
         assertEquals(WindowManager.LayoutParams.WRAP_CONTENT, dialog.getWindow().getAttributes().height);
 
         Button stay = dialog.findViewById(R.id.exit_dialog_stay);
+        Button exit = dialog.findViewById(R.id.exit_dialog_confirm);
+        int minimumTouchHeight = Math.round(48 * activity.getResources().getDisplayMetrics().density);
+        assertTrue(stay.getMinHeight() >= minimumTouchHeight);
+        assertTrue(exit.getMinHeight() >= minimumTouchHeight);
         stay.performClick();
 
         assertFalse(dialog.isShowing());
