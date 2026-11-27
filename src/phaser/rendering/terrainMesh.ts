@@ -1,7 +1,7 @@
 import { TERRAIN_LIMITS, WORLD_ELEVATION } from '@/domain/config'
 import { clamp } from '@/domain/geometry/math'
 import type { Vector2 } from '@/domain/model'
-import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
+import type { RoadInfluenceRegion, TerrainHeightSample, TerrainSurface } from '@/domain/terrain/terrainSurface'
 import {
   projectSunShadow,
   WORLD_LIGHTING,
@@ -206,20 +206,110 @@ function waterTexture(
   return lines
 }
 
+function hillTriangles(component: TerrainComponent, detail: TerrainPresentationDetail): readonly TerrainTriangle[] {
+  return tileTerrainComponent(component, detail === 'overview'
+    ? WORLD_ELEVATION.cellSize
+    : WORLD_ELEVATION.cellSize / 2)
+}
+
+interface StaticTerrainGeometry {
+  readonly waterTriangles: readonly TerrainTriangle[]
+  readonly waterTextureLines: readonly TerrainTextureLine[]
+  readonly shorelineRings: readonly (readonly Vector2[])[]
+  readonly shadowTriangles: readonly TerrainTriangle[]
+  readonly hills: readonly TerrainComponent[]
+}
+
+function buildStaticTerrainGeometry(surface: TerrainSurface): StaticTerrainGeometry {
+  const waterTriangles: TerrainTriangle[] = []
+  const waterTextureLines: TerrainTextureLine[] = []
+  const shorelineRings: (readonly Vector2[])[] = []
+  for (const component of buildTerrainComponents(surface.contours, 'water')) {
+    for (const triangle of triangulateTerrainComponent(component)) waterTriangles.push(triangle)
+    for (const line of waterTexture(component)) waterTextureLines.push(line)
+    shorelineRings.push(component.outer, ...component.holes)
+  }
+  const shadowTriangles: TerrainTriangle[] = []
+  const hills = buildTerrainComponents(surface.contours, 'hill')
+  for (const component of hills) {
+    const projected = mapTerrainComponent(component, point =>
+      projectSunShadow(point, WORLD_ELEVATION.levelHeight))
+    for (const triangle of triangulateTerrainComponent(projected)) shadowTriangles.push(triangle)
+  }
+  return { waterTriangles, waterTextureLines, shorelineRings, shadowTriangles, hills }
+}
+
+interface CachedHeightRegion {
+  influence: RoadInfluenceRegion
+  readonly samples: Map<string, TerrainHeightSample>
+}
+
+/** One editor's current terrain only. Retain static topology and at most the
+ * full/overview quad centers, not every historical path or edit. Reuse samples
+ * only when the canonical road lookup sees identical ordered candidates. */
+export class RegionalTerrainMeshCache {
+  private contours: TerrainSurface['contours'] | undefined
+  private geometry: StaticTerrainGeometry | undefined
+  private readonly triangles = {
+    full: new Map<TerrainComponent, readonly TerrainTriangle[]>(),
+    overview: new Map<TerrainComponent, readonly TerrainTriangle[]>(),
+  }
+  private readonly regions = new Map<string, CachedHeightRegion>()
+
+  clear(): void {
+    this.contours = undefined
+    this.geometry = undefined
+    this.triangles.full.clear()
+    this.triangles.overview.clear()
+    this.regions.clear()
+  }
+
+  staticGeometryFor(surface: TerrainSurface): StaticTerrainGeometry {
+    if (this.contours !== surface.contours) {
+      this.clear()
+      this.contours = surface.contours
+    }
+    return this.geometry ??= buildStaticTerrainGeometry(surface)
+  }
+
+  trianglesFor(component: TerrainComponent, detail: TerrainPresentationDetail): readonly TerrainTriangle[] {
+    const cache = this.triangles[detail]
+    const cached = cache.get(component)
+    if (cached) return cached
+    const triangles = hillTriangles(component, detail)
+    cache.set(component, triangles)
+    return triangles
+  }
+
+  sampleAt(surface: TerrainSurface, position: Vector2): TerrainHeightSample {
+    const influence = surface.roadInfluenceRegionAt?.(position)
+    if (!influence) return surface.heightSampleAt(position)
+    let region = this.regions.get(influence.key)
+    if (!region || region.influence.signature !== influence.signature) {
+      region = { influence, samples: new Map() }
+      this.regions.set(influence.key, region)
+    } else {
+      region.influence = influence
+    }
+    const key = `${position.x}:${position.y}`
+    const cached = region.samples.get(key)
+    if (cached) return cached
+    const sample = surface.heightSampleAt(position)
+    region.samples.set(key, sample)
+    return sample
+  }
+}
+
 function terrainHeightMesh(
   component: TerrainComponent,
   surface: TerrainSurface,
   detail: TerrainPresentationDetail,
+  regionalCache?: RegionalTerrainMeshCache,
 ): {
   readonly slopes: readonly HillSlopeFacet[]
   readonly plateau: readonly TerrainTriangle[]
 } {
-  const triangles = tileTerrainComponent(
-    component,
-    detail === 'overview'
-      ? WORLD_ELEVATION.cellSize
-      : WORLD_ELEVATION.cellSize / 2,
-  )
+  const triangles = regionalCache?.trianglesFor(component, detail) ?? hillTriangles(component, detail)
   const slopes: HillSlopeFacet[] = []
   const plateau: TerrainTriangle[] = []
   // Interior plateau tiles share an identical material. In overview mode,
@@ -247,7 +337,7 @@ function terrainHeightMesh(
       x: (first[0].x + first[2].x) / 2,
       y: (first[0].y + first[2].y) / 2,
     }
-    const sample = surface.heightSampleAt(center)
+    const sample = regionalCache?.sampleAt(surface, center) ?? surface.heightSampleAt(center)
     if (sample.height >= WORLD_ELEVATION.levelHeight - 0.001) {
       if (detail === 'overview') {
         const top = first[0].y
@@ -320,35 +410,16 @@ function weightedChunks<T>(
 function buildUncachedPresentation(
   surface: TerrainSurface,
   detail: TerrainPresentationDetail,
+  regionalCache?: RegionalTerrainMeshCache,
 ): TerrainPresentation {
-  const waterTriangles: TerrainTriangle[] = []
-  const waterTextureLines: TerrainTextureLine[] = []
-  const shorelineRings: (readonly Vector2[])[] = []
-  for (const component of buildTerrainComponents(surface.contours, 'water')) {
-    for (const triangle of triangulateTerrainComponent(component)) {
-      waterTriangles.push(triangle)
-    }
-    for (const line of waterTexture(component)) {
-      waterTextureLines.push(line)
-    }
-    shorelineRings.push(component.outer, ...component.holes)
-  }
-
-  const shadowTriangles: TerrainTriangle[] = []
+  const { waterTriangles, waterTextureLines, shorelineRings, shadowTriangles, hills } =
+    regionalCache?.staticGeometryFor(surface) ?? buildStaticTerrainGeometry(surface)
   const slopeFacets: HillSlopeFacet[] = []
   const plateauTriangles: TerrainTriangle[] = []
-  for (const component of buildTerrainComponents(surface.contours, 'hill')) {
-    const projected = mapTerrainComponent(component, (point) =>
-      projectSunShadow(point, WORLD_ELEVATION.levelHeight),
-    )
-    for (const triangle of triangulateTerrainComponent(projected)) {
-      shadowTriangles.push(triangle)
-    }
-    const mesh = terrainHeightMesh(component, surface, detail)
+  for (const component of hills) {
+    const mesh = terrainHeightMesh(component, surface, detail, regionalCache)
     for (const facet of mesh.slopes) slopeFacets.push(facet)
-    for (const triangle of mesh.plateau) {
-      plateauTriangles.push(triangle)
-    }
+    for (const triangle of mesh.plateau) plateauTriangles.push(triangle)
   }
 
   const primitives: TerrainPrimitive[] = []
@@ -483,11 +554,12 @@ function buildUncachedPresentation(
 export function compileTerrainPresentation(
   surface: TerrainSurface,
   detail: TerrainPresentationDetail = 'full',
+  regionalCache?: RegionalTerrainMeshCache,
 ): TerrainPresentation {
   const cache = terrainPresentationCaches[detail]
   const cached = cache.get(surface)
   if (cached) return cached
-  const presentation = buildUncachedPresentation(surface, detail)
+  const presentation = buildUncachedPresentation(surface, detail, regionalCache)
   cache.set(
     surface,
     presentation,
@@ -499,6 +571,7 @@ export function compileTerrainPresentation(
 export function buildTerrainPresentation(
   surface: TerrainSurface,
   detail: TerrainPresentationDetail = 'full',
+  regionalCache?: RegionalTerrainMeshCache,
 ): readonly TerrainPrimitive[] {
-  return compileTerrainPresentation(surface, detail).primitives
+  return compileTerrainPresentation(surface, detail, regionalCache).primitives
 }
