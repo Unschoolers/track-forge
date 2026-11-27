@@ -9,6 +9,64 @@ async function openPicker(page) {
   return page.getByRole('dialog', { name: 'Choose a track' })
 }
 
+test('track cards stay in two columns with reachable controls on narrow and landscape phones', async ({ page }) => {
+  // Track decoding caps saved names at 32 characters; use that full supported length.
+  const longName = 'A Long Track Title at Max Length'
+  expect(longName).toHaveLength(32)
+  await seedOwnedTrack(page, 'cityscape', longName)
+
+  const picker = await openPicker(page)
+  for (const viewport of [{ width: 320, height: 740 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport)
+    const cards = picker.locator('.track-card')
+    await expect(cards.first()).toBeVisible()
+    const bounds = await cards.evaluateAll(nodes => nodes.map(node => {
+      const rect = node.getBoundingClientRect()
+      const favorite = node.querySelector('.track-card-favorite')?.getBoundingClientRect()
+      const overflow = node.querySelector('.track-menu-trigger')?.getBoundingClientRect()
+      const preview = node.querySelector('.track-preview').getBoundingClientRect()
+      const name = node.querySelector('.track-card-name').getBoundingClientRect()
+      const creator = node.querySelector('.track-card-creator').getBoundingClientRect()
+      return {
+        card: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+        favorite: favorite && { left: favorite.left, right: favorite.right, top: favorite.top, bottom: favorite.bottom, width: favorite.width, height: favorite.height },
+        overflow: overflow && { left: overflow.left, right: overflow.right, top: overflow.top, bottom: overflow.bottom, width: overflow.width, height: overflow.height },
+        preview: { left: preview.left, right: preview.right, top: preview.top, bottom: preview.bottom, width: preview.width },
+        name: { left: name.left, right: name.right, top: name.top, bottom: name.bottom },
+        creator: { left: creator.left, right: creator.right, top: creator.top, bottom: creator.bottom },
+      }
+    }))
+    expect(bounds.length).toBeGreaterThanOrEqual(2)
+    expect(Math.abs(bounds[0].card.top - bounds[1].card.top)).toBeLessThan(2)
+    expect(bounds[0].card.right).toBeLessThanOrEqual(bounds[1].card.left)
+    for (const item of bounds) {
+      expect(item.preview.width).toBeGreaterThan(0)
+      for (const text of [item.name, item.creator]) {
+        expect(text.left).toBeGreaterThanOrEqual(item.card.left)
+        expect(text.right).toBeLessThanOrEqual(item.card.right)
+        expect(text.bottom).toBeLessThanOrEqual(item.card.bottom)
+      }
+      if (viewport.width <= 700) {
+        expect(item.preview.top).toBeGreaterThanOrEqual(item.favorite?.bottom ?? item.card.top)
+        expect(item.name.top).toBeGreaterThanOrEqual(item.preview.bottom)
+        expect(item.creator.top).toBeGreaterThanOrEqual(item.preview.bottom)
+      } else {
+        expect(item.preview.right).toBeLessThanOrEqual(item.name.left)
+      }
+      for (const control of [item.favorite, item.overflow].filter(Boolean)) {
+        expect(control.width).toBeGreaterThanOrEqual(44)
+        expect(control.height).toBeGreaterThanOrEqual(44)
+        expect(control.left).toBeGreaterThanOrEqual(item.card.left)
+        expect(control.right).toBeLessThanOrEqual(item.card.right)
+        expect(control.top).toBeGreaterThanOrEqual(item.card.top)
+        expect(control.bottom).toBeLessThanOrEqual(item.card.bottom)
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
+  await expect(picker.getByRole('button', { name: `Race ${longName}` })).toBeVisible()
+})
+
 test('previews every track and shares a saved track without selecting it', async ({ page }) => {
   await seedOwnedTrack(page)
   await page.addInitScript(() => {
