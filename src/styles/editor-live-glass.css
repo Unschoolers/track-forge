@@ -38,6 +38,9 @@
 }
 #app .editor-screen :is([data-editor-glass], [data-editor-glass='group'] button):hover {
   filter: none;
+}
+/* Only buttons have a hover lift. Never reset a centered panel's layout translate. */
+#app .editor-screen :is(button[data-editor-glass], [data-editor-glass='group'] button):hover {
   translate: none;
 }
 #app .editor-screen :is([data-editor-glass='action'], [data-editor-glass='group'] button):active:not(:disabled) {

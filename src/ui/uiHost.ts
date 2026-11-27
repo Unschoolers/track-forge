@@ -404,6 +404,8 @@ export class DomUiHost implements UiHost {
                 this.controller.dispatch({
                   type: 'toggle-editor-grid',
                 }),
+              dismissScenery: () =>
+                this.controller.dispatch({ type: 'select-editor-scenery', target: null }),
               previewSceneryRotation: (target, rotation) =>
                 this.controller.dispatch({ type: 'preview-scenery-rotation', target, rotation }),
               edit: (command) =>

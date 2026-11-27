@@ -5,6 +5,7 @@ import { button } from '@/ui/dom'
 const paths = {
   home: 'm3 10 9-7 9 7 M5 9v12h14V9 M9 21v-7h6v7',
   menu: 'M4 6h16 M4 12h16 M4 18h16',
+  close: 'M6 6l12 12 M18 6 6 18',
   undo: 'M9 14 4 9l5-5 M4 9h10a6 6 0 0 1 0 12h-2',
   redo: 'm15 14 5-5-5-5 M20 9H10a6 6 0 0 0 0 12h2',
   'zoom-in': 'M12 8v8 M8 12h8 M21 21l-4.3-4.3 M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0',

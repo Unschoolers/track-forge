@@ -1,15 +1,16 @@
-import { TREE_SEASONS, isTreeSeason, type TreeSeason } from '@/domain/track/treeSeason'
-import { MAX_SCENERY_SCALE, MIN_SCENERY_SCALE, sceneryScale, stepSceneryScale, type ScenerySelection, type SceneryTransform } from '@/domain/track/sceneryTransform'
+import { TREE_SEASONS, type TreeSeason } from '@/domain/track/treeSeason'
+import { MAX_SCENERY_SCALE, MIN_SCENERY_SCALE, sceneryScale, SCENERY_SCALE_STEP, type ScenerySelection, type SceneryTransform } from '@/domain/track/sceneryTransform'
 import type { AppSnapshot } from '@/application/appState'
 import type { EditorCommand } from '@/domain/editor/editorState'
 import { planPointInsertion } from '@/domain/editor/editorGeometry'
 import type { TrackCrossing } from '@/domain/track/crossings'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { button, element } from '@/ui/dom'
+import { editorIconButton } from '@/ui/editor/editorIcons'
 
 export function createEditorSelectionPanels(
   state: AppSnapshot,
-  actions: { readonly edit: (command: EditorCommand) => void; readonly previewSceneryRotation?: (target: ScenerySelection, rotation: number | null) => void },
+  actions: { readonly edit: (command: EditorCommand) => void; readonly dismissScenery: () => void; readonly previewSceneryRotation?: (target: ScenerySelection, rotation: number | null) => void },
   geometry: TrackGeometry,
 ): readonly HTMLElement[] {
   const panels: HTMLElement[] = []
@@ -42,7 +43,7 @@ export function createEditorSelectionPanels(
   const target = state.editorUi.selectedScenery
   if (gestureFinished && state.editorUi.tool === 'tree' && target) {
     const item = target.type === 'tree' ? state.editor.trees[target.index] : state.editor.scenery[target.index]
-    if (item) panels.push(createSceneryControl(target, item, actions.edit, actions.previewSceneryRotation))
+    if (item) panels.push(createSceneryControl(target, item, actions.edit, actions.dismissScenery, actions.previewSceneryRotation))
   }
 
   if (state.editorUi.tool === 'start' && state.editor.routeKind === 'circuit') {
@@ -55,29 +56,43 @@ function createSceneryControl(
   target: ScenerySelection,
   item: SceneryTransform & { readonly season?: TreeSeason },
   edit: (command: EditorCommand) => void,
+  dismiss: () => void,
   preview?: (target: ScenerySelection, rotation: number | null) => void,
 ): HTMLElement {
   const panel = element('aside', 'point-control scenery-control')
   panel.setAttribute('aria-label', 'Scenery transformation')
-  panel.append(element('strong', 'point-control-title', 'Scenery transformation'))
+  const header = element('div', 'scenery-control-header')
+  header.append(
+    element('strong', 'point-control-title', 'Scenery transformation'),
+    editorIconButton('close', 'close-scenery-control', 'Close scenery transformation', dismiss, 'icon-button scenery-control-close'),
+  )
+  panel.append(header)
   if (target.type === 'tree') {
-    const label = element('label', 'point-tension-label scenery-season-label', 'Season')
-    const season = document.createElement('select')
-    season.className = 'point-choice scenery-season-select'
+    const seasonLabel = element('label', 'point-tension-label scenery-season-label')
+    const seasonText = element('span', '')
+    const season = document.createElement('input')
+    season.type = 'range'
+    season.min = '0'
+    season.max = String(TREE_SEASONS.length - 1)
+    season.step = '1'
+    season.value = String(TREE_SEASONS.indexOf(item.season ?? 'summer'))
     season.dataset.action = 'tree-season'
     season.setAttribute('aria-label', 'Tree season')
-    for (const value of TREE_SEASONS) {
-      const option = document.createElement('option')
-      option.value = value
-      option.textContent = value.charAt(0).toUpperCase() + value.slice(1)
-      season.append(option)
+    const showSeason = () => {
+      const value = TREE_SEASONS[Number(season.value)]
+      if (!value) return
+      const name = value.charAt(0).toUpperCase() + value.slice(1)
+      seasonText.textContent = `Season: ${name}`
+      season.setAttribute('aria-valuetext', name)
     }
-    season.value = item.season ?? 'summer'
+    showSeason()
+    season.addEventListener('input', showSeason)
     season.addEventListener('change', () => {
-      if (isTreeSeason(season.value)) edit({ type: 'set-tree-season', index: target.index, season: season.value })
+      const value = TREE_SEASONS[Number(season.value)]
+      if (value) edit({ type: 'set-tree-season', index: target.index, season: value })
     })
-    label.append(season)
-    panel.append(label)
+    seasonLabel.append(seasonText, season)
+    panel.append(seasonLabel)
   }
   const update = (rotation: number, scale: number) => edit({
     type: 'transform-scenery', target, transform: { rotation, scale },
@@ -114,17 +129,24 @@ function createSceneryControl(
     rotationText.textContent = `Rotation: ${value}°`
   })
   rotationLabel.append(rotation)
-  const choices = element('div', 'point-control-choices')
-  const minus = button('−5%', 'scenery-scale-down', () => update(angle, stepSceneryScale(scale, -1)), 'point-choice')
-  minus.disabled = scale <= MIN_SCENERY_SCALE
-  minus.setAttribute('aria-label', 'Decrease scenery size by five percent')
-  const plus = button('+5%', 'scenery-scale-up', () => update(angle, stepSceneryScale(scale, 1)), 'point-choice')
-  plus.disabled = scale >= MAX_SCENERY_SCALE
-  plus.setAttribute('aria-label', 'Increase scenery size by five percent')
-  const size = element('span', 'point-control-title', `${Math.round(scale * 100)}%`)
-  size.setAttribute('aria-label', 'Current scenery scale')
-  choices.append(minus, size, plus)
-  panel.append(rotationLabel, choices, button('Reset', 'scenery-transform-reset', () => update(0, 1), 'point-insert'))
+  const sizeLabel = element('label', 'point-tension-label scenery-size-label')
+  const sizeText = element('span', '', `Size: ${Math.round(scale * 100)}%`)
+  const size = document.createElement('input')
+  size.type = 'range'
+  size.min = String(Math.round(MIN_SCENERY_SCALE * 100))
+  size.max = String(Math.round(MAX_SCENERY_SCALE * 100))
+  size.step = String(Math.round(SCENERY_SCALE_STEP * 100))
+  size.value = String(Math.round(scale * 100))
+  size.dataset.action = 'scenery-scale'
+  size.setAttribute('aria-label', 'Scenery size')
+  size.setAttribute('aria-valuetext', `${size.value}%`)
+  size.addEventListener('input', () => {
+    sizeText.textContent = `Size: ${size.value}%`
+    size.setAttribute('aria-valuetext', `${size.value}%`)
+  })
+  size.addEventListener('change', () => update(angle, Number(size.value) / 100))
+  sizeLabel.append(sizeText, size)
+  panel.append(rotationLabel, sizeLabel, button('Reset', 'scenery-transform-reset', () => update(0, 1), 'point-insert'))
   return panel
 }
 
