@@ -144,14 +144,43 @@
 #app [data-lighting-art] > :is(.lighting-sky, .lighting-reflection) {
   transition: transform 280ms cubic-bezier(.2, 1.55, .45, 1);
 }
-#app [data-liquid-glass-kind='action']:active:not(:disabled) > lg-panel,
-#app [data-lighting-art]:active:not(:disabled) > :is(.lighting-sky, .lighting-reflection) {
-  transform: scale(.98, .94);
+#app [data-liquid-glass-kind='action'][data-glass-pressed]:not(:disabled) > lg-panel,
+#app [data-lighting-art][data-glass-pressed]:not(:disabled) > :is(.lighting-sky, .lighting-reflection) {
+  transform: scale(1.035, .91);
   transition: transform 90ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   #app [data-liquid-glass] > lg-panel,
   #app [data-lighting-art] > :is(.lighting-sky, .lighting-reflection) {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Touch is independent of optical capability. The highlight tracks the contact
+   point and releases with the same elastic response on every native button. */
+#app button[data-glass-touch-position] { position: relative; }
+#app button > .tf-glass-touch {
+  position: absolute;
+  inset: 0;
+  display: block;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(ellipse at var(--glass-touch-x, 50%) var(--glass-touch-y, 50%),
+    rgb(255 255 255 / 38%), rgb(255 255 255 / 9%) 48%, transparent 82%);
+  box-shadow: inset 0 1px 2px rgb(255 255 255 / 35%), inset 0 -2px 5px rgb(0 0 0 / 14%);
+  transform: scale(1.04, .98);
+  transition: opacity 240ms ease-out, transform 320ms cubic-bezier(.2, 1.55, .45, 1);
+}
+#app button[data-glass-pressed]:not(:disabled):not([aria-disabled='true']) > .tf-glass-touch {
+  opacity: 1;
+  transform: scale(1, .92);
+  transition: opacity 65ms ease-out, transform 90ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  #app button > .tf-glass-touch {
     transform: none !important;
     transition: none !important;
   }

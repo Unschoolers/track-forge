@@ -24,6 +24,7 @@ import { createRaceHud } from '@/ui/screens/raceHud'
 import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
 import { attachMenuGlass } from '@/ui/menu/menuGlass'
+import { attachGlassTouch } from '@/ui/menu/glassTouch'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createModalFrame } from '@/ui/modals/modalFrame'
@@ -73,6 +74,7 @@ export class DomUiHost implements UiHost {
   private screenCleanup: (() => void) | undefined
   private overlayCleanup: (() => void) | undefined
   private materialCleanup: (() => void) | undefined
+  private touchCleanup: (() => void) | undefined
   private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
   private readonly flyover = new RaceFlyoverLifecycle()
   private mounted = false
@@ -103,6 +105,7 @@ export class DomUiHost implements UiHost {
 
   mount(): void {
     if (this.unsubscribe) return
+    this.touchCleanup = attachGlassTouch(this.root)
     this.root.addEventListener('pointerdown', this.onIntent)
     this.root.addEventListener('click', this.onClickFeedback)
     this.mounted = true
@@ -121,6 +124,8 @@ export class DomUiHost implements UiHost {
     this.overlayCleanup = undefined
     this.materialCleanup?.()
     this.materialCleanup = undefined
+    this.touchCleanup?.()
+    this.touchCleanup = undefined
     this.cancelRacePreparation()
     this.flyover.destroy()
     this.dialogs.destroy()
