@@ -185,6 +185,9 @@ export class NearbyRace {
       readyPending: this.phase === 'lobby' && this.role === 'guest' && this.lobby.readyPending(this.slot),
       lobbyPlayers: this.phase === 'lobby' ? this.lobbyPlayers() : [],
       laps: this.course?.laps ?? null,
+      configurableLaps: this.phase === 'hosting' && this.role === 'host' && this.purpose === 'race' && this.course
+        ? this.cupTotal > 0 ? this.cupLaps : this.course.track.routeKind === 'point-to-point' ? null : this.course.laps
+        : null,
       canStart: this.purpose === 'race' && this.phase === 'hosting' &&
         this.guests.size > 0 && this.pendingPairs.size === 0,
       canRematch: this.canRematch(),
@@ -254,6 +257,17 @@ export class NearbyRace {
     const first = tracks[0]!
     this.openHost({ track: first, car, lighting: first.lighting,
       laps: first.routeKind === 'point-to-point' ? 1 : laps }, 'race')
+  }
+
+  /** Host chooses circuit length before offering the round to peers. */
+  setLaps(laps: 1 | 2 | 3): boolean {
+    if (this.role !== 'host' || this.purpose !== 'race' || !this.course || this.phase !== 'hosting' ||
+        (laps !== 1 && laps !== 2 && laps !== 3) ||
+        (this.cupTotal === 0 && this.course.track.routeKind === 'point-to-point')) return false
+    if (this.cupTotal > 0) this.cupLaps = laps
+    this.course = { ...this.course, laps: this.course.track.routeKind === 'point-to-point' ? 1 : laps }
+    this.changed()
+    return true
   }
 
   /** Host-only session lighting; never modifies saved track data. */
