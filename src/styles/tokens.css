@@ -15,3 +15,31 @@
   --shadow-deep: 0 1.4rem 4rem rgb(0 0 0 / 45%);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Shared menu material tokens. Quality changes the values, not screen layout. */
+:root {
+  --menu-control-font: Inter, ui-sans-serif, system-ui, sans-serif;
+  --menu-control-ink: #edf2f8;
+  --menu-control-accent: #ff925c;
+  --menu-control-border: #a9c8de66;
+  --menu-control-fill: linear-gradient(165deg, #e9f6ff26, transparent 35%, transparent 72%, #b6d8f21a), #202a36;
+  --menu-control-selected-fill: radial-gradient(ellipse at 15% 0%, #ffffff70, transparent 48%), #ff925c;
+  --menu-control-rim: inset 0 1px 1px #ffffff60, inset 0 -1px 1px #b7d4ef36, 0 2px 6px #0003;
+  --menu-control-panel: linear-gradient(145deg, #e6f3ff16, transparent 48%), #101923ed;
+  --menu-control-rounding: 18px;
+}
+[data-graphics-quality='low'] {
+  --menu-control-fill: #202a36;
+  --menu-control-selected-fill: #ff925c;
+  --menu-control-rim: none;
+  --menu-control-panel: #101923;
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --menu-control-fill: #202a36;
+    --menu-control-selected-fill: #ff925c;
+    --menu-control-rim: none;
+    --menu-control-panel: #101923;
+    --menu-control-border: #c1cad4;
+  }
+}
