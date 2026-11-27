@@ -178,8 +178,10 @@ export function renderTrees(
   environment: TrackEnvironmentId = 'grass',
   viewBounds?: TreeViewBounds,
   staticGpuBatch = false,
+  canopyGraphics = graphics,
 ): void {
   graphics.clear()
+  if (canopyGraphics !== graphics) canopyGraphics.clear()
   const atlas = trees.length ? getSceneryAtlas('tree', night) : undefined
   const bitmap = !atlas && environment === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined
   const primitives = buildTreePresentation(trees, night, terrainSurface, viewBounds)
@@ -203,7 +205,7 @@ export function renderTrees(
     }
     renderStaticTreeCanopies(scene, texture, atlas ? SCENERY_SPRITE_SIZE : bitmap?.width ?? SCENERY_SPRITE_SIZE,
       atlas ? SCENERY_SPRITE_SIZE : bitmap?.height ?? SCENERY_SPRITE_SIZE,
-      graphics.depth + 0.01, primitives.filter(item => item.layer === 'canopy'), frameFor)
+      canopyGraphics.depth + 0.01, primitives.filter(item => item.layer === 'canopy'), frameFor)
     return
   }
   const sprites = treeSprites.get(graphics) ?? []
@@ -216,7 +218,7 @@ export function renderTrees(
       const frame = frameFor(primitive)
       let sprite = sprites[shown]
       if (!sprite) {
-        sprite = scene.add.image(primitive.x, primitive.y, texture, frame).setDepth(graphics.depth + 0.01)
+        sprite = scene.add.image(primitive.x, primitive.y, texture, frame).setDepth(canopyGraphics.depth + 0.01)
         sprites.push(sprite)
         treeSprites.set(graphics, sprites)
       }
@@ -225,8 +227,9 @@ export function renderTrees(
       shown++
       continue
     }
-    graphics.fillStyle(primitive.color, primitive.alpha)
-    graphics.fillEllipse(
+    const target = primitive.layer === 'shadow' ? graphics : canopyGraphics
+    target.fillStyle(primitive.color, primitive.alpha)
+    target.fillEllipse(
       primitive.x,
       primitive.y,
       primitive.radiusX * 2,

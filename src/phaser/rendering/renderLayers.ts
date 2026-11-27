@@ -14,6 +14,7 @@ export const WORLD_RENDER_DEPTH = {
   structureUnderlay: 2,
   vehicleShadow: 4,
   lowerVehicle: 5,
+  tallScenery: 8,
   structureDeck: 10,
   structureWall: 12,
   upperVehicle: 15,

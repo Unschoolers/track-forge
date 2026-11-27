@@ -31,6 +31,10 @@ Race diagnostics record canvas backing dimensions, CSS dimensions and device
 pixel ratio to distinguish source detail from display upscaling. High-DPI
 canvas changes require separate camera, input and physical GPU validation.
 
+## Race prop occlusion
+
+Tree canopies and Cityscape house/building bodies use the tall-scenery depth above ground-level cars. Their contact/projected shadows, rocks, shrubs and other props retain the original ground layers. The existing bridge deck and elevated vehicle layers remain above this layer; this is a coarse presentation ordering, not new collision or per-prop height physics. Editor and flyover ordering are unchanged. Static tree GPU batches and cached scenery windows remain in use.
+
 ## Performance and compatibility
 
 - Do not allocate material textures or strokes during physics steps or editor pointer movement.

@@ -54,22 +54,26 @@ export function buildSceneryRenderPlan(
   environmentId: TrackEnvironmentId, props: readonly SceneryProp[],
   lighting: LightingMode, bounds: WorldBounds,
   resolveBitmap: SceneryBitmapResolver = getSceneryBitmap,
-): { readonly primitives: readonly SceneryPrimitive[]; readonly sprites: readonly SceneryBitmapSprite[] } {
+  isForeground?: (kind: SceneryPropKind) => boolean,
+): { readonly primitives: readonly SceneryPrimitive[]; readonly foregroundPrimitives: readonly SceneryPrimitive[]; readonly sprites: readonly SceneryBitmapSprite[] } {
   const primitives: SceneryPrimitive[] = []
+  const foregroundPrimitives: SceneryPrimitive[] = []
   const sprites: SceneryBitmapSprite[] = []
   for (const { prop, art } of visibleScenery(environmentId, props, bounds)) {
     const image = resolveBitmap(prop.kind, lighting === 'night')
     const shapes = art[lighting]
-    if (!image) {
-      for (const shape of shapes) primitives.push(translate(shape, prop))
-      continue
-    }
     // Existing art definitions place the soft contact shadow first.
     const shadow = shapes[0]
-    if (shadow?.kind === 'ellipse' && shadow.alpha !== undefined && shadow.alpha < 1) {
-      primitives.push(translate(shadow, prop))
+    const hasShadow = shadow?.kind === 'ellipse' && shadow.alpha !== undefined && shadow.alpha < 1
+    if (!image) {
+      for (const [index, shape] of shapes.entries()) {
+        const target = isForeground?.(prop.kind) && !(index === 0 && hasShadow) ? foregroundPrimitives : primitives
+        target.push(translate(shape, prop))
+      }
+      continue
     }
+    if (hasShadow) primitives.push(translate(shadow, prop))
     sprites.push({ kind: prop.kind, image, x: prop.x, y: prop.y, size: art.radius * 2 * sceneryScale(prop), rotation: sceneryRotation(prop) })
   }
-  return { primitives, sprites }
+  return { primitives, foregroundPrimitives, sprites }
 }

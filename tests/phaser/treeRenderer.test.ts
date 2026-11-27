@@ -40,3 +40,14 @@ describe('tree renderer viewport refresh', () => {
     expect(commands.every(([x]) => x !== undefined && x > 450)).toBe(true)
   })
 })
+
+it('renders race tree shadows below cars and vector canopy above cars without changing editor rendering', () => {
+  const graphics = () => ({ depth: 1, scene: {}, clear: vi.fn(), fillStyle: vi.fn(), fillEllipse: vi.fn() })
+  const shadows = graphics()
+  const canopies = graphics()
+  renderTrees(shadows as never, [{ x: 50, y: 50 }], false, undefined, 'desert', undefined, false, canopies as never)
+  expect(shadows.fillEllipse).toHaveBeenCalledTimes(1)
+  expect(canopies.fillEllipse).toHaveBeenCalledTimes(2)
+  renderTrees(shadows as never, [{ x: 50, y: 50 }], true, undefined, 'desert')
+  expect(shadows.fillEllipse).toHaveBeenCalledTimes(4)
+})
