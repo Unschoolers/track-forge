@@ -19,6 +19,7 @@ import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChalleng
 
 export const TRACK_EXPORT_FORMAT = 'trackforge-track'
 export const TRACK_EXPORT_FORMAT_VERSION = 1
+export const JUMP_TRACK_EXPORT_FORMAT_VERSION = 3
 export const MAX_TRACK_EXPORT_CHARS = 2_000_000
 
 interface LegacyTrackElevation {
@@ -31,6 +32,16 @@ function object(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null
     ? (value as Record<string, unknown>)
     : undefined
+}
+
+/** New file versions ensure older clients reject jumps rather than flattening them. */
+export function trackHasJumpRamps(value: unknown): boolean {
+  const points = object(value)?.points
+  return Array.isArray(points) && points.some(point => object(point)?.structure === 'jump')
+}
+
+export function trackExportFormatVersion(track: unknown): number {
+  return trackHasJumpRamps(track) ? JUMP_TRACK_EXPORT_FORMAT_VERSION : TRACK_EXPORT_FORMAT_VERSION
 }
 
 function finite(value: unknown): value is number {
