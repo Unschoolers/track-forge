@@ -20,7 +20,14 @@ The existing 256px material swatch is derived from the HD image to
 preserve the world repeat scale on elevated ground and shoreline.
 The existing procedural/bitmap decorations and fallback are retained.
 
+Low graphics quality uses the derived 256px base composited with the
+existing decorative variants in the original padded tile cache. It does
+not register or draw the HD base; Medium and High use the 1024px pass.
+The same choice is used in the editor, race, prewarm and flyover.
+HD CPU canvases remain eagerly prepared at startup; GPU textures from
+previous HD sessions may remain cached until the game is destroyed.
+
 This slice changes base ground only, not road resolution, props,
-terrain physics, track formats or graphics-quality policy.
+terrain physics or track formats.
 Physical Android frame pacing, startup memory and visual seam checks
-are required before merging. Adaptive density is a follow-up if needed.
+are required before merging. Lazy loading and cache eviction are follow-ups if needed.

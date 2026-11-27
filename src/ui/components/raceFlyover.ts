@@ -20,6 +20,7 @@ export function createRaceFlyover(
   lighting: LightingMode,
   ghost: boolean,
   playback: RaceFlyoverPlayback,
+  lowQuality = false,
 ) {
   const panel = element('div', 'race-flyover-panel')
   const canvas = element('canvas', 'race-flyover')
@@ -27,7 +28,7 @@ export function createRaceFlyover(
   canvas.setAttribute('aria-label', `${lighting === 'night' ? 'Nighttime' : 'Daytime'} flyover of ${track.name}`)
   canvas.dataset.car = car
   canvas.dataset.lighting = lighting
-  let paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost)
+  let paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost, lowQuality)
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
   let speed: PlaybackSpeed = playback.speed ?? (motion?.matches ? 0 : DEFAULT_SPEED)
   let visible = true
@@ -101,8 +102,9 @@ export function createRaceFlyover(
   setSpeed(speed)
   return {
     element: panel,
-    setPresentation(car: CarId, lighting: LightingMode, ghost: boolean): void {
-      paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost)
+    setPresentation(car: CarId, lighting: LightingMode, ghost: boolean, nextLowQuality = lowQuality): void {
+      lowQuality = nextLowQuality
+      paint = createRaceFlyoverRenderer(geometry, track, car, lighting, ghost, lowQuality)
       canvas.dataset.car = car
       canvas.dataset.lighting = lighting
       canvas.setAttribute('aria-label', (lighting === 'night' ? 'Nighttime' : 'Daytime') + ' flyover of ' + track.name)
@@ -125,7 +127,7 @@ export class RaceFlyoverLifecycle {
   private key: string | undefined
   private playback: RaceFlyoverPlayback = { elapsedSeconds: 0 }
   private current: {
-    track: Track; geometry: TrackGeometry; car: CarId; lighting: LightingMode; ghost: boolean
+    track: Track; geometry: TrackGeometry; car: CarId; lighting: LightingMode; ghost: boolean; lowQuality: boolean
     view: ReturnType<typeof createRaceFlyover>
   } | undefined
   private used = false
@@ -139,21 +141,21 @@ export class RaceFlyoverLifecycle {
     }
   }
 
-  get(track: Track, geometry: TrackGeometry, car: CarId, lighting: LightingMode, ghost: boolean, retainCanvas = false): HTMLElement {
+  get(track: Track, geometry: TrackGeometry, car: CarId, lighting: LightingMode, ghost: boolean, retainCanvas = false, lowQuality = false): HTMLElement {
     this.used = true
     const current = this.current
     if (current && current.track === track && current.geometry === geometry &&
-        current.car === car && current.lighting === lighting && current.ghost === ghost) {
+        current.car === car && current.lighting === lighting && current.ghost === ghost && current.lowQuality === lowQuality) {
       return current.view.element
     }
     if (retainCanvas && current && current.track === track && current.geometry === geometry) {
-      current.view.setPresentation(car, lighting, ghost)
-      this.current = { ...current, car, lighting, ghost }
+      current.view.setPresentation(car, lighting, ghost, lowQuality)
+      this.current = { ...current, car, lighting, ghost, lowQuality }
       return current.view.element
     }
     this.release()
-    const view = createRaceFlyover(track, geometry, car, lighting, ghost, this.playback)
-    this.current = { track, geometry, car, lighting, ghost, view }
+    const view = createRaceFlyover(track, geometry, car, lighting, ghost, this.playback, lowQuality)
+    this.current = { track, geometry, car, lighting, ghost, lowQuality, view }
     return view.element
   }
 

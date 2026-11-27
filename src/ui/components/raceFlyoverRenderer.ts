@@ -28,9 +28,9 @@ interface RoutePosition extends Vector2 {
   readonly angle: number
 }
 
-function drawGroundTexture(ctx: CanvasRenderingContext2D, viewport: GroundViewport, night: boolean, environmentId: TrackEnvironmentId): void {
+function drawGroundTexture(ctx: CanvasRenderingContext2D, viewport: GroundViewport, night: boolean, environmentId: TrackEnvironmentId, lowQuality: boolean): void {
   const tiles = visibleGroundTilesForViewport(viewport)
-  const base = getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
+  const base = lowQuality ? undefined : getEnvironmentBitmapArt(environmentId, night)?.highResolutionGround
   if (base) {
     for (const tile of tiles) ctx.drawImage(base, tile.x * GROUND_TILE_SIZE, tile.y * GROUND_TILE_SIZE, GROUND_TILE_SIZE, GROUND_TILE_SIZE)
   }
@@ -50,6 +50,7 @@ export function createRaceFlyoverRenderer(
   car: CarId,
   lighting: LightingMode,
   ghost: boolean,
+  lowQuality = false,
 ): (ctx: CanvasRenderingContext2D, width: number, height: number, elapsedSeconds: number) => void {
   const path = geometry.path
   const points = path.points
@@ -211,7 +212,7 @@ export function createRaceFlyoverRenderer(
       rotation,
       minimumZoom: baseScale * (1 - 0.035),
     }
-    drawGroundTexture(ctx, worldView, night, environmentId)
+    drawGroundTexture(ctx, worldView, night, environmentId, lowQuality)
 
     const cellSize = track.terrain.cellSize
     for (let i = 0; i < runs.length; i += terrainStride) {

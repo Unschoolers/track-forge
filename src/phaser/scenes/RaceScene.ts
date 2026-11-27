@@ -512,7 +512,7 @@ export class RaceScene extends Phaser.Scene {
         minimumZoom: RACE_CAMERA_TUNING.minimumZoom,
       }
     const environmentId = normalizeTrackEnvironmentId(track.environmentId)
-    this.groundRenderer?.render(view, night, environmentId)
+    this.groundRenderer?.render(view, night, environmentId, this.snapshot?.preferences?.graphicsQuality === 'low')
     const viewport = groundViewportBounds(view)
     // Chunk visibility only needs updating when the viewport exits a padded
     // coverage window; all geometry entering the camera is already visible.

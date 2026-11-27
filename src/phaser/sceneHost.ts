@@ -137,7 +137,7 @@ export class PhaserSceneHost implements SceneHost {
       geometry,
       normalizeTrackEnvironmentId(track.environmentId),
       lighting === 'night',
-      game?.isRunning ? { textures: game.textures, width: game.scale.width, height: game.scale.height } : undefined,
+      game?.isRunning ? { textures: game.textures, width: game.scale.width, height: game.scale.height, lowQuality: this.controller.snapshot().preferences?.graphicsQuality === 'low' } : undefined,
     )
   }
 

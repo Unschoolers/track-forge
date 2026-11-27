@@ -529,7 +529,7 @@ export class DomUiHost implements UiHost {
         const track = lobby.lobbyTrack
         const geometry = track && this.runtime.geometry.get(track)
         const flyover = track && geometry && geometry.path.points.length > 1
-          ? this.flyover.get(track, geometry, lobby.localCar, lobby.lighting ?? track.lighting, false)
+          ? this.flyover.get(track, geometry, lobby.localCar, lobby.lighting ?? track.lighting, false, false, state.preferences.graphicsQuality === 'low')
           : undefined
         return createNearbyRaceModal(nearby, {
           close,
@@ -670,6 +670,7 @@ export class DomUiHost implements UiHost {
               lighting,
               preferences.raceMode === 'ghost' && ghostTime !== null && Number.isFinite(ghostTime) && ghostTime > 0,
               true,
+              preferences.graphicsQuality === 'low',
             )
           : undefined
         if (currentTrack && geometry && flyover && !this.racePreparation) {
