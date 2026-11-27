@@ -335,11 +335,25 @@ Road surface and bridge metadata do not influence that hill field.
 
 Road and bridge presentation keep their existing committed-geometry rebuild
 and vector gesture preview. The vector terrain underlay shares the same
-hill-influence invalidation rule. Editing near hills can still rebuild the
-entire hill pass; finer per-region invalidation is a separate optimization.
+hill-influence invalidation rule. Editing near hills recomputes the canonical hill mesh and tile index at
+commit, but compares the exact ordered painter inputs of each resident tile.
+Only changed or removed tiles lose their GPU textures; unchanged tiles are
+reused. Pending old-source work is canceled. During a slope-changing live
+gesture, retain the committed cache but show vector terrain until commit or
+cancellation. This is regional GPU invalidation, not regional mesh compilation.
 The original 48-tile combined terrain cache budget remains: mixed terrain
 allocates 24 tiles to water and 24 to hills, which may cause earlier vector
 fallback at wide zooms. Race and flyover bitmap composition are unchanged.
 
 No save or physics changes. Component tests cover cache retention, real
 terrain changes and hill influence; Android profiling remains required.
+
+
+The cache lifecycle and tile reconciliation apply to Meadow, Desert,
+Cityscape and Kids' Room through the shared environment art lookup. Water
+and hill layers each reveal their complete visible window only once all
+required textures are resident, with up to eight nearest surrounding
+prefetch candidates within their respective budgets. This incorporates
+the coherent-window fix from PR #457. Rapid movement or dirty tile uploads
+may temporarily show the vector underlay; no synchronous upload burst is
+introduced. Component regressions exercise all four environment IDs.
