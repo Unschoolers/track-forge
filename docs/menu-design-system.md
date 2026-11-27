@@ -30,6 +30,23 @@ defaults; live editor tools use the same palette with opaque rounded controls.
 Do not introduce square action styles, clipped corners or a new optical layer
 for a settings choice.
 
+Static artwork capability is declared once in menuGlass.ts. All ordinary
+button, tf-menu-action and modal-close actions on those screens automatically
+use the shared paint and optical layer, independent of whether they appear
+in the body, footer or a form. CSS uses the data-menu-material capability
+rather than repeating a screen/action allowlist. Content cards and cup rows
+stay unfiltered, grouped settings choices stay paint-only, and closed
+diagnostics do not mount lenses. Race setup retains its existing optical
+mode/lighting choices. Screen CSS may arrange controls but must not duplicate
+their optical paint, geometry or low-quality fallback.
+
+Options defines the visual reference: soft rounded geometry, sans-serif
+labels, orange selection, a subtle illuminated rim and readable graphite.
+Repeated content actions and live editor chrome share the painted material
+tokens in menu-system.css; do not mount a lens per cup row or over a live
+editor canvas. Tools and View disclosures are mutually exclusive. Keep their
+layout and editing commands separate from shared paint.
+
 ## Adoption review gates
 
 The Apple adoption guide is the design reference, not a native SDK dependency.
@@ -105,7 +122,7 @@ The reference lab is a developer-only route: run npm run dev and open /qa/menu-d
 
 ## LiquidGlass.dev migration (phases 1–2)
 
-The shared `attachMenuGlass` adapter mounts upstream `lg-panel` only on explicitly approved static-art menus. Home, race setup actions/choices, library footer/close and Options footer/close, profile save, update actions and release-note retry use independent lenses; library toolbar and Options categories use one lens per group. Native buttons, tabs, inputs, commands and focus behavior remain authoritative. No lenses inside track cards, car cards, flyovers, live gameplay or editor. The source is the screen artwork with its scrim in the same CSS background. The library is vendored unchanged from gentpan/liquidglass commit `d5db099ef00828496aa2733e4f35542c05a0b1f8`, with attribution in src/vendor/liquidglass. Lazy-load only on medium/high quality; remove panels on navigation and accessibility preference changes. The former custom edgeRefraction engine has no remaining consumers and is removed. CSS paint-only fallbacks remain available when optics are unavailable. Phase 2 implementation proceeds on the user's request after phase 1 mobile/build verification; production merge still requires CI and Android device visual/frame-pacing review.
+The shared `attachMenuGlass` adapter mounts upstream `lg-panel` only on explicitly approved static-art menus. Standard body/footer/form actions on Home, race setup, library, Options, Cup and Nearby use independent lenses; race setup choices retain independent lenses; library toolbar and Options categories use one lens per group. Native buttons, tabs, inputs, commands and focus behavior remain authoritative. No lenses inside track cards, car cards, flyovers, live gameplay or editor. The source is the screen artwork with its scrim in the same CSS background. The library is vendored unchanged from gentpan/liquidglass commit `d5db099ef00828496aa2733e4f35542c05a0b1f8`, with attribution in src/vendor/liquidglass. Lazy-load only on medium/high quality; remove panels on navigation and accessibility preference changes. The former custom edgeRefraction engine has no remaining consumers and is removed. CSS paint-only fallbacks remain available when optics are unavailable. Phase 2 implementation proceeds on the user's request after phase 1 mobile/build verification; production merge still requires CI and Android device visual/frame-pacing review.
 
 Cup and Nearby navigation use the same static harbor artwork for their action lenses; the live flyover is never sampled. Pause and results use painted opaque surfaces without backdrop filters over the race canvas. Physical Android visual and frame-pacing verification remains required before merging optical changes.
 

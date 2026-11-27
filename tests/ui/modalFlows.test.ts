@@ -237,6 +237,24 @@ describe('modal application flows', () => {
     expect(port.dispatch).not.toHaveBeenCalledWith({ type: 'select-track-for-race', id: incomplete.id })
   })
 
+  it('never overlaps the editor Tools and View drawers', () => {
+    const { root, host } = setup({ ...state(), mode: 'editor' })
+    const tools = root.querySelector<HTMLDetailsElement>('.editor-toolbox-drawer')
+    const view = root.querySelector<HTMLDetailsElement>('.editor-view-drawer')
+    if (!tools || !view) throw new Error('Missing editor drawers')
+    tools.querySelector('summary')?.click()
+    expect(tools.open).toBe(true)
+    view.querySelector('summary')?.click()
+    expect(view.open).toBe(true)
+    expect(tools.open).toBe(false)
+    tools.querySelector('summary')?.click()
+    expect(tools.open).toBe(true)
+    expect(view.open).toBe(false)
+    tools.querySelector('summary')?.click()
+    expect(tools.open).toBe(false)
+    host.destroy()
+  })
+
   it('keeps track management in one compact editor menu and the map title read-only', () => {
     const { root, port, host } = setup({ ...state({ type: 'editor-menu' }), mode: 'editor' })
     const menu = root.querySelector('[role="dialog"][aria-label="Editor menu"]')

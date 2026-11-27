@@ -53,6 +53,9 @@ it('keeps the entry menu free of car and topper details', () => {
     downloadDiagnostics: vi.fn(async () => true),
   }
   const modal = createNearbyRaceModal(nearby, actions)
+  for (const action of ['nearby-choose-track', 'nearby-host-cup', 'nearby-scan', 'nearby-receive-track', 'nearby-back']) {
+    expect(modal.querySelector(`button.button[data-action="${action}"]`)).not.toBeNull()
+  }
   expect(modal.textContent).not.toContain('Your topper')
   expect(modal.textContent).not.toContain('Options → Profile')
   expect(modal.querySelector('.car-picker')).toBeNull()

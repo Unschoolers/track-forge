@@ -11,6 +11,7 @@
 }
 
 .nearby-static-modal .modal-card {
+  border-radius: 24px;
   background: linear-gradient(145deg, rgb(24 34 45 / 94%), rgb(11 17 26 / 94%) 72%);
 }
 
@@ -30,6 +31,11 @@
 .nearby-static-modal .setup-section {
   background: rgb(24 35 45 / 60%);
 }
+.nearby-static-modal .choice-row { flex-wrap: wrap; }
+.nearby-static-modal .setup-choice { min-width: min(7rem, 100%); overflow-wrap: anywhere; }
+.nearby-static-modal .setup-label { font-family: system-ui, sans-serif; letter-spacing: .02em; text-transform: none; }
+[data-graphics-quality='low'] .nearby-static-modal .modal-card { background: #101821; }
+[data-graphics-quality='low'] .nearby-static-modal .setup-section { background: #18232d; }
 
 @media (max-width: 600px) {
   .nearby-static-modal .modal-card {

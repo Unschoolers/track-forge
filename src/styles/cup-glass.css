@@ -62,7 +62,7 @@
 
 #app .cup-lineup-count {
   color: var(--cup-muted);
-  font: 650 .74rem/1.3 var(--menu-mono);
+  font: 650 .8rem/1.3 var(--menu-control-font);
   font-variant-numeric: tabular-nums;
 }
 
@@ -93,10 +93,6 @@
 #app .cup-track-actions .track-mini-button {
   min-width: 44px;
   min-height: 44px;
-  border-color: #a9c8de55;
-  border-radius: 50%;
-  background: #152231a6;
-  color: var(--cup-ink);
   font-size: 1.05rem;
 }
 
@@ -121,16 +117,7 @@
   color: var(--cup-ink);
 }
 
-#app .cup-modal .cup-secondary-action {
-  min-height: 44px;
-  border-color: #a9c8de55;
-  border-radius: 999px;
-  background: #152231a6;
-  color: var(--cup-ink);
-  font: 650 .84rem/1.2 system-ui, sans-serif;
-  letter-spacing: 0;
-  clip-path: none;
-}
+#app .cup-modal .cup-secondary-action { min-height: 48px; }
 
 #app .cup-modal .modal-footer {
   flex-wrap: wrap;
@@ -139,49 +126,7 @@
   border-color: #dbeafe20;
 }
 
-#app .cup-modal .modal-footer .button {
-  flex: 1 1 42%;
-  min-height: 48px;
-  border-color: #a9c8de66;
-  border-radius: 999px;
-  background-color: rgb(15 28 41 / 30%);
-  background-image: linear-gradient(170deg, #ffffff1c, transparent 42%, #07101b30);
-  color: var(--cup-ink);
-  font: 650 .85rem/1.2 system-ui, sans-serif;
-  letter-spacing: 0;
-  clip-path: none;
-}
-
-#app .cup-modal .modal-footer .button-primary {
-  border-color: #ffe0c58f;
-  background-color: rgb(255 146 92 / 84%);
-  background-image: radial-gradient(ellipse at 20% 0%, #fff5d7a8, transparent 45%),
-    linear-gradient(175deg, #ffffff20, transparent 35%, transparent 80%, #b743171f);
-  color: #20110a;
-}
-
-#app .cup-modal .modal-close {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border: 1px solid #c6e3fa80;
-  border-radius: 50%;
-  background-color: rgb(15 28 41 / 30%);
-  color: var(--cup-ink);
-}
-
-/* The lens replaces the painted fallback when the optical layer is mounted. */
-#app .cup-modal .modal-footer .button[data-liquid-glass][data-liquid-glass],
-#app .cup-modal .modal-close[data-liquid-glass][data-liquid-glass] {
-  background: transparent;
-  backdrop-filter: none;
-}
-
-/* Paint fallback remains readable when URL filters are unavailable. */
-@supports (backdrop-filter: blur(2px)) {
-  #app .cup-modal .modal-footer > .button,
-  #app .cup-modal .modal-close { backdrop-filter: blur(2px); }
-}
+#app .cup-modal .modal-footer .button { flex: 1 1 42%; }
 
 #app [data-graphics-quality='low'] .cup-modal .modal-card,
 #app [data-graphics-quality='low'] .cup-modal .cup-track-row,
@@ -189,40 +134,10 @@
   background: #101821;
 }
 
-#app [data-graphics-quality='low'] .cup-modal .modal-footer > .button,
-#app [data-graphics-quality='low'] .cup-modal .modal-close,
-#app [data-graphics-quality='low'] .cup-modal .cup-secondary-action,
-#app [data-graphics-quality='low'] .cup-track-actions .track-mini-button {
-  background: #202a36;
-  border-color: #627382;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-
-#app [data-graphics-quality='low'] .cup-modal .modal-footer > .button-primary {
-  background: #ff925c;
-  border-color: #ffb08c;
-}
-
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   #app .cup-modal .modal-card,
   #app .cup-modal .cup-track-row,
   #app .cup-modal .cup-checkpoint-note { background: #101821; }
-
-  #app .cup-modal .modal-footer > .button,
-  #app .cup-modal .modal-close,
-  #app .cup-modal .cup-secondary-action,
-  #app .cup-track-actions .track-mini-button {
-    background: #202a36;
-    border-color: #c1cad4;
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-
-  #app .cup-modal .modal-footer > .button-primary {
-    background: #ff925c;
-    border-color: #ffb08c;
-  }
 }
 
 @media (max-width: 400px), (max-height: 420px) {

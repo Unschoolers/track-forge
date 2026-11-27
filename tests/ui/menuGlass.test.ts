@@ -84,6 +84,43 @@ describe('LiquidGlass.dev menu adapter', () => {
     expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
   })
 
+  it.each(['nearby-static-modal', 'cup-modal', 'options-modal', 'track-library-modal', 'race-setup-modal'])(
+    'automatically styles body and footer actions on %s without decorating content cards', async className => {
+      const { root } = setup()
+      const screen = document.createElement('div')
+      screen.className = className
+      screen.innerHTML = '<div class="modal-body"><button class="button button-primary">Host</button><button class="button">Join</button><article class="track-card"><button class="button">Card</button></article><button class="setup-choice">Connection</button></div><footer class="modal-footer"><button class="button">Back</button></footer>'
+      root.append(screen)
+      const cleanup = attachMenuGlass(root, screen, async () => undefined)
+      expect(screen.dataset.menuMaterial).toBe('static')
+      await vi.waitFor(() => expect(screen.querySelectorAll('lg-panel')).toHaveLength(3))
+      expect(screen.querySelector('.track-card lg-panel, .setup-choice lg-panel')).toBeNull()
+      cleanup()
+    },
+  )
+
+  it('keeps closed diagnostics unmounted until opened and preserves Low paint capability', async () => {
+    const { root } = setup()
+    const screen = document.createElement('div')
+    screen.className = 'nearby-static-modal'
+    screen.innerHTML = '<button class="button">Back</button><details><summary>Diagnostics</summary><button class="button">Download</button></details>'
+    root.append(screen)
+    const cleanup = attachMenuGlass(root, screen, async () => undefined)
+    const details = screen.querySelector('details')!
+    await vi.waitFor(() => expect(screen.querySelector(':scope > button > lg-panel')).not.toBeNull())
+    expect(details.querySelector('lg-panel')).toBeNull()
+    details.open = true
+    await vi.waitFor(() => expect(details.querySelector('lg-panel')).not.toBeNull())
+    details.open = false
+    await vi.waitFor(() => expect(details.querySelector('lg-panel')).toBeNull())
+    cleanup()
+    root.dataset.graphicsQuality = 'low'
+    const load = vi.fn(async () => undefined)
+    attachMenuGlass(root, screen, load)()
+    expect(screen.dataset.menuMaterial).toBe('static')
+    expect(load).not.toHaveBeenCalled()
+  })
+
   it('does not load optics on an unsupported or live screen', () => {
     const { root } = setup()
     const screen = document.createElement('div')
