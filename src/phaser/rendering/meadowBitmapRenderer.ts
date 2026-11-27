@@ -393,16 +393,20 @@ export class BitmapTileRenderer {
 }
 
 export interface MeadowBitmapRenderer {
-  update(geometry: TrackGeometry, terrain: TerrainMap, hillInfluence: string, gestureActive: boolean, night: boolean, environment: TrackEnvironmentId): void
-  hasRoadLayers(): boolean
   render(view: GroundViewport, bounds?: WorldBounds): void
   warmVisible(): void
   coverage(): readonly number[]
   destroy(): void
 }
 
+/** Only the editable scene owns mutable geometry and material lifetimes. */
+export interface EditorMeadowBitmapRenderer extends MeadowBitmapRenderer {
+  update(geometry: TrackGeometry, terrain: TerrainMap, hillInfluence: string, gestureActive: boolean, night: boolean, environment: TrackEnvironmentId): void
+  hasRoadLayers(): boolean
+}
+
 /** Scene-lifetime owner. Water is independent of road geometry; hills are not. */
-export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): MeadowBitmapRenderer {
+export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): EditorMeadowBitmapRenderer {
   const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
   let water: BitmapTileRenderer | undefined
   let hill: BitmapTileRenderer | undefined
