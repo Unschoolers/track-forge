@@ -1,4 +1,5 @@
 import { art, ellipse, polygon } from './artPrimitives'
+import { GRASS_SHRUB_RADIUS } from '@/domain/track/sceneryTransform'
 import { GROUND_TILE_SIZE, createGroundTileRandom } from '@/presentation/environments/groundTexture'
 import type { EnvironmentPalette } from '@/presentation/environments/types'
 import { meadowGroundPatches } from './meadowGroundPatches'
@@ -29,7 +30,7 @@ export const GRASS_ENVIRONMENT = {
 
 /** Placeable grassland scenery uses the same saving, undo and collision pipeline as other themes. */
 export const GRASS_SCENERY = {
-  'grass-shrub': art('Shrub', 31, (night) => [
+  'grass-shrub': art('Shrub', GRASS_SHRUB_RADIUS, (night) => [
     ellipse(5, 9, 27, 18, 0x182c1e, 0.24),
     ellipse(-10, 0, 17, 16, night ? 0x2b5740 : 0x397c45),
     ellipse(10, 2, 18, 17, night ? 0x245136 : 0x42894c),

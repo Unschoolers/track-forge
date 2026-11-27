@@ -4,7 +4,9 @@ export interface SceneryTransform {
   readonly scale?: number
 }
 
-export const TREE_SIZE = 56
+export const GRASS_SHRUB_RADIUS = 31
+/** Default canopy width is twice the default shrub width. */
+export const TREE_SIZE = GRASS_SHRUB_RADIUS * 4
 export const MIN_SCENERY_SCALE = 0.5
 export const MAX_SCENERY_SCALE = 1.5
 export const SCENERY_SCALE_STEP = 0.05
