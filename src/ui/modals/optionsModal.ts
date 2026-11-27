@@ -293,7 +293,6 @@ export function createOptionsModal(
     const panel = element('section', 'setup-section options-download-panel')
     const progress = document.createElement('progress')
     progress.setAttribute('aria-label', 'APK download progress')
-    progress.style.width = '100%'
     progress.max = 100
     const progressText = element('p', 'modal-subtitle', '')
     const install = button('INSTALL UPDATE', 'install-update', () => {
@@ -338,7 +337,12 @@ export function createOptionsModal(
         progressText.textContent = `${(downloaded / 1048576).toFixed(1)} MB downloaded`
       }
       status.textContent = `Update ${state.version}: ${state.state}`
-      panel.replaceChildren(progress, progressText, ...(state.state === 'complete' ? [install] : []), cancel)
+      const controls = [progress, progressText, ...(state.state === 'complete' ? [install] : []), cancel]
+      // Polling changes values, not the identity of the optical controls.
+      if (panel.children.length !== controls.length ||
+          controls.some((control, index) => panel.children[index] !== control)) {
+        panel.replaceChildren(...controls)
+      }
       if (state.state === 'complete') {
         stop()
         progress.value = 100
