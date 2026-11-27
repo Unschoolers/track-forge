@@ -65,7 +65,7 @@ export class SceneryRenderer {
       const native = this.resolveBitmap === resolveAtlas ? registerSceneryFrame(scene, prop.kind, night) : undefined
       const texture = native?.key ?? `trackforge-scenery-${prop.kind}-${night ? 'night' : 'day'}`
       if (!native && !scene.textures.exists(texture)) {
-        const created = prop.image instanceof HTMLImageElement
+        const created = 'naturalWidth' in prop.image
           ? scene.textures.addImage(texture, prop.image)
           : scene.textures.addCanvas(texture, prop.image)
         if (!created) throw new Error(`Could not register scenery artwork for ${prop.kind}`)

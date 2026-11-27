@@ -15,7 +15,7 @@ import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { normalizeTrackEnvironmentId, type TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { buildSceneryRenderPlan } from '@/presentation/environments/sceneryPresentation'
-import { getSceneryBitmap } from '@/presentation/environments/sceneryBitmapArt'
+import { getSceneryBitmap, treeSpriteKind } from '@/presentation/environments/sceneryBitmapArt'
 import { GRASS_TILE_PADDING } from '@/presentation/environments/grassTileImage'
 import { getEnvironmentTileImage } from '@/presentation/environments/environmentTileImage'
 import {
@@ -58,7 +58,7 @@ export function createRaceFlyoverRenderer(
     points: 'polygon' in primitive ? primitive.polygon : [primitive.start, primitive.end],
     commands: bridgePaintCommands(primitive, environmentId, night, false, path.closed ? path.totalLength : undefined),
   }))
-  const treeBitmap = getSceneryBitmap('tree', night) ?? (environmentId === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined)
+  const treeFallback = environmentId === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined
   const props = track.scenery ?? []
   let sceneryWindow = ''
   let scenery = buildSceneryRenderPlan(environmentId, [], lighting, { left: 0, top: 0, right: 0, bottom: 0 })
@@ -294,6 +294,7 @@ export function createRaceFlyoverRenderer(
       ctx.save()
       ctx.translate(tree.x, tree.y)
       ctx.rotate(sceneryRotation(tree))
+      const treeBitmap = getSceneryBitmap(treeSpriteKind(tree.season), night) ?? treeFallback
       if (treeBitmap) {
         ctx.drawImage(treeBitmap, -size / 2, -size / 2, size, size)
       } else {

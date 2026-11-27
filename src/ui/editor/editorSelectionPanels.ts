@@ -69,7 +69,7 @@ function createSceneryControl(
     for (const value of TREE_SEASONS) {
       const option = document.createElement('option')
       option.value = value
-      option.textContent = value[0]?.toUpperCase() + value.slice(1)
+      option.textContent = value.charAt(0).toUpperCase() + value.slice(1)
       season.append(option)
     }
     season.value = item.season ?? 'summer'

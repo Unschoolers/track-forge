@@ -11,9 +11,9 @@ export interface SceneryFrame {
 export function registerSceneryAtlas(scene: Phaser.Scene, atlas: SceneryAtlasSource, night: boolean): string {
   const key = `trackforge-scenery-atlas-${atlas.id}-${night ? 'night' : 'day'}`
   if (scene.textures.exists(key)) return key
-  const texture = atlas.source instanceof HTMLCanvasElement
-    ? scene.textures.addCanvas(key, atlas.source)
-    : scene.textures.addImage(key, atlas.source)
+  const texture = 'naturalWidth' in atlas.source
+    ? scene.textures.addImage(key, atlas.source)
+    : scene.textures.addCanvas(key, atlas.source)
   if (!texture) throw new Error(`Could not register scenery atlas ${atlas.id}`)
   const size = SCENERY_SPRITE_SIZE
   try {
