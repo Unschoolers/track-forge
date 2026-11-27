@@ -39,7 +39,8 @@ export type RaceEvent =
       readonly vehicleId: string
       readonly speed: number
     }
-  | { readonly type: 'vehicle-landed'; readonly vehicleId: string; readonly strength: number }
+  | { readonly type: 'vehicle-jumped'; readonly vehicleId: string; readonly speed: number; readonly x: number; readonly y: number }
+  | { readonly type: 'vehicle-landed'; readonly vehicleId: string; readonly strength: number; readonly jump?: true }
   | {
       readonly type: 'vehicle-finished'
       readonly vehicleId: string
@@ -465,9 +466,14 @@ function advanceRace(
       vehicles[index] = { ...vehicle, nextSector: previous.nextSector, lap: previous.lap, finishedAt: previous.finishedAt }
       continue
     }
+    if (recovered && vehicle.jumpFlight) vehicles[index] = { ...vehicle, jumpFlight: false, jumpLaunched: false }
     if (!recovered) {
-      if (!previous.grounded && vehicle.grounded && vehicle.landingIntensity > 0.1) {
-        events.push({ type: 'vehicle-landed', vehicleId: vehicle.id, strength: vehicle.landingIntensity })
+      if (previous.finishedAt === null && previous.grounded && vehicle.jumpLaunched && !vehicle.grounded) {
+        events.push({ type: 'vehicle-jumped', vehicleId: vehicle.id, speed: vehicle.speed, x: previous.x, y: previous.y })
+      }
+      if (!previous.grounded && vehicle.grounded && (vehicle.landingIntensity > 0.1 || previous.jumpFlight)) {
+        events.push({ type: 'vehicle-landed', vehicleId: vehicle.id, strength: vehicle.landingIntensity,
+          ...(previous.jumpFlight ? { jump: true as const } : {}) })
       }
       const endGate = vehicle.lap > previous.lap ? finishGateNumber(state) : vehicle.nextSector - 1
       for (let gate = previous.nextSector; gate <= endGate; gate++) {
