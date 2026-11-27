@@ -18,6 +18,7 @@ export function trackBridgeFall(
   dt: number,
 ): RaceVehicle {
   if (!current.player) return current
+  if (current.jumpLaunched) return { ...current, bridgeFallSeconds: undefined }
   // Reaching supported elevated road cancels an unfinished fall timer.
   if (onRoad && current.grounded && structureRunId !== null) {
     return previous.bridgeFallSeconds === undefined
