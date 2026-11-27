@@ -62,9 +62,9 @@ function decodePoint(
   const curve = item.curve === 'corner' ? 'corner' : 'smooth'
   const rawTension = finite(item.tension) ? item.tension : 0.5
   const hasStructure =
-    item.structure === 'surface' || item.structure === 'overpass'
+    item.structure === 'surface' || item.structure === 'overpass' || item.structure === 'jump'
   const structure: RoadStructure =
-    item.structure === 'surface' || item.structure === 'overpass'
+    item.structure === 'surface' || item.structure === 'overpass' || item.structure === 'jump'
       ? item.structure
       : item.elevation === 'overhead'
         ? 'overpass'
