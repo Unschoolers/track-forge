@@ -133,6 +133,29 @@ function intersectsEllipse(
     y + radiusY >= bounds.top && y - radiusY <= bounds.bottom
 }
 
+const MAX_GPU_TREE_BATCH = 512
+
+/** Immutable race canopies: one native GPU batch per bounded chunk. */
+export function renderStaticTreeCanopies(
+  scene: Phaser.Scene,
+  texture: string,
+  width: number,
+  height: number,
+  depth: number,
+  canopies: readonly TreePrimitive[],
+): void {
+  for (let start = 0; start < canopies.length; start += MAX_GPU_TREE_BATCH) {
+    const chunk = canopies.slice(start, start + MAX_GPU_TREE_BATCH)
+    const layer = scene.add.spriteGPULayer(texture, chunk.length).setDepth(depth)
+    for (const tree of chunk) {
+      layer.addMember({
+        x: tree.x, y: tree.y, frame: '__BASE',
+        originX: 0.5, originY: 0.5, scaleX: 34 / width, scaleY: 34 / height,
+      })
+    }
+  }
+}
+
 const treeSprites = new WeakMap<Phaser.GameObjects.Graphics, Phaser.GameObjects.Image[]>()
 
 export function renderTrees(
@@ -142,10 +165,27 @@ export function renderTrees(
   terrainSurface?: TerrainSurface,
   environment: TrackEnvironmentId = 'grass',
   viewBounds?: TreeViewBounds,
+  staticGpuBatch = false,
 ): void {
   graphics.clear()
   const generated = getSceneryBitmap('tree', night)
   const bitmap = generated ?? (environment === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined)
+  if (bitmap && staticGpuBatch) {
+    const scene = graphics.scene
+    const texture = `trackforge-${generated ? 'scenery' : 'meadow'}-tree-${night ? 'night' : 'day'}`
+    if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, bitmap)) {
+      throw new Error('Could not register tree artwork')
+    }
+    const primitives = buildTreePresentation(trees, night, terrainSurface, viewBounds)
+    for (const shadow of primitives) {
+      if (shadow.layer !== 'shadow') continue
+      graphics.fillStyle(shadow.color, shadow.alpha)
+      graphics.fillEllipse(shadow.x, shadow.y, shadow.radiusX * 2, shadow.radiusY * 2)
+    }
+    renderStaticTreeCanopies(scene, texture, bitmap.width, bitmap.height,
+      graphics.depth + 0.01, primitives.filter(item => item.layer === 'canopy'))
+    return
+  }
   const sprites = treeSprites.get(graphics) ?? []
   for (const sprite of sprites) sprite.setVisible(false)
   let shown = 0

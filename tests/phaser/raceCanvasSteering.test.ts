@@ -126,7 +126,9 @@ describe('race canvas steering', () => {
     const presentation = scene as unknown as { renderGroundPresentation(night: boolean, rotation?: number): void }
     try {
       expect(renderTrees).toHaveBeenCalledTimes(1)
-      expect(vi.mocked(renderTrees).mock.calls[0]).toHaveLength(5)
+      // Static race trees must not be clipped to the initial camera window.
+      // The non-WebGL test scene uses the normal image path.
+      expect(renderTrees).toHaveBeenCalledWith(expect.anything(), [], false, expect.anything(), 'grass', undefined, false)
       for (let i = 1; i <= 10; i++) {
         camera.scrollX = i * 1_000
         camera.scrollY = i * 500
