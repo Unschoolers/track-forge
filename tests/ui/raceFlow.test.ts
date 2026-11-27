@@ -204,6 +204,18 @@ function recoverySession() {
 }
 
 describe('race UI flow', () => {
+  it('shows the minimap and player on the race HUD once the race is ready', () => {
+    const { root, updateRace } = setup()
+    const map = requiredElement(root, '.race-minimap')
+    expect(map.hidden).toBe(true)
+    const session = recoverySession().session
+    updateRace(session.snapshot())
+    expect(map.hidden).toBe(false)
+    expect(map.querySelector('svg')).not.toBeNull()
+    expect(map.querySelector('[data-map-player]')).not.toBeNull()
+    session.destroy()
+  })
+
   it('shows the missed gate countdown and recovers immediately', () => {
     const controls = new RaceInputController()
     const step: RaceStep = (state) => {
