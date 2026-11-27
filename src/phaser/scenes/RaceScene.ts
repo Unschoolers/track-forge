@@ -6,6 +6,8 @@ import type { AppSnapshot } from '@/application/appState'
 import {
   NightBeamRenderer,
   createNightLampGraphics,
+  createNightLampSprites,
+  type NightLampBatch,
   renderNightLights,
 } from '@/phaser/rendering/nightRenderer'
 import {
@@ -95,7 +97,7 @@ export class RaceScene extends Phaser.Scene {
   private upperRaceEffects?: Phaser.GameObjects.Graphics
   private nativeParticles: NativeRaceParticles | undefined
   private desertParticles = false
-  private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
+  private lampGraphics: NightLampBatch[] = []
   private bridgeGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds; primitives: number }[] = []
   private staticGraphicsVisibilityBounds: WorldBounds | undefined
   private nightBeamRenderer: NightBeamRenderer | undefined
@@ -259,7 +261,10 @@ export class RaceScene extends Phaser.Scene {
       this.lampGraphics.push({ graphics, bounds: batch.bounds })
     }
     if (night) {
-      this.lampGraphics.push(...createNightLampGraphics(this, lamps, Phaser.BlendModes.ADD))
+      const glowBatches = this.game.renderer?.type === Phaser.WEBGL
+        ? createNightLampSprites(this, lamps, Phaser.BlendModes.ADD)
+        : createNightLampGraphics(this, lamps, Phaser.BlendModes.ADD)
+      this.lampGraphics.push(...glowBatches)
     }
     this.checkpointGraphics = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lamp)
     const initialRace = this.raceSession.snapshot().state

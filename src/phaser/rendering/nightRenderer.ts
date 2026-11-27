@@ -72,17 +72,112 @@ export function lampIntersectsViewport(
     lamp.center.y - lamp.radius <= bounds.bottom
 }
 
+// Shared exposure and geometry for the vector fallback and baked additive art.
+const ROAD_GLOW = [
+  { radius: 1, color: 0xffd88a, alpha: 0.14 },
+  { radius: 0.68, color: 0xffdf98, alpha: 0.3 },
+  { radius: 0.38, color: 0xffe7ae, alpha: 0.52 },
+] as const
+const FIXTURE_GLOW = [
+  { radius: 6, color: 0xffe4a3, alpha: 1.35 },
+  { radius: 2.8, color: 0xfff0bf, alpha: 1.9 },
+] as const
+
 function renderLampGlow(graphics: Phaser.GameObjects.Graphics, lamp: LampLight): void {
-  graphics.fillStyle(0xffd88a, lamp.intensity * 0.14)
-  graphics.fillCircle(lamp.center.x, lamp.center.y, lamp.radius)
-  graphics.fillStyle(0xffdf98, lamp.intensity * 0.3)
-  graphics.fillCircle(lamp.center.x, lamp.center.y, lamp.radius * 0.68)
-  graphics.fillStyle(0xffe7ae, lamp.intensity * 0.52)
-  graphics.fillCircle(lamp.center.x, lamp.center.y, lamp.radius * 0.38)
-  graphics.fillStyle(0xffe4a3, lamp.intensity * 1.35)
-  graphics.fillCircle(lamp.fixture.x, lamp.fixture.y, 6)
-  graphics.fillStyle(0xfff0bf, lamp.intensity * 1.9)
-  graphics.fillCircle(lamp.fixture.x, lamp.fixture.y, 2.8)
+  for (const ring of ROAD_GLOW) {
+    graphics.fillStyle(ring.color, lamp.intensity * ring.alpha)
+    graphics.fillCircle(lamp.center.x, lamp.center.y, lamp.radius * ring.radius)
+  }
+  for (const ring of FIXTURE_GLOW) {
+    graphics.fillStyle(ring.color, lamp.intensity * ring.alpha)
+    graphics.fillCircle(lamp.fixture.x, lamp.fixture.y, ring.radius)
+  }
+}
+
+const LAMP_ATLAS_KEY = 'trackforge-night-lamp-glow-v1'
+const HALO_DENSITY = 2
+const HALO_FRAMES = [
+  { name: 'road', x: 0, y: 0, size: 96, radius: 46, intensity: 0.12, rings: ROAD_GLOW },
+  { name: 'bridge-road', x: 96, y: 0, size: 112, radius: 54, intensity: 0.14, rings: ROAD_GLOW },
+  { name: 'fixture', x: 0, y: 112, size: 16, radius: 1, intensity: 0.12, rings: FIXTURE_GLOW },
+  { name: 'bridge-fixture', x: 16, y: 112, size: 16, radius: 1, intensity: 0.14, rings: FIXTURE_GLOW },
+] as const
+
+/** Add the concentric rings once in premultiplied canvas space. On the opaque
+ * race background, Phaser ADD then sums the baked contribution just as it
+ * summed the separate circles. Transparent gutters keep filtering isolated. */
+function registerLampAtlas(scene: Phaser.Scene): string {
+  if (scene.textures.exists(LAMP_ATLAS_KEY)) return LAMP_ATLAS_KEY
+  const canvas = document.createElement('canvas')
+  canvas.width = 208 * HALO_DENSITY
+  canvas.height = 128 * HALO_DENSITY
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Could not create night lamp atlas canvas')
+  context.scale(HALO_DENSITY, HALO_DENSITY)
+  context.globalCompositeOperation = 'lighter'
+  for (const frame of HALO_FRAMES) {
+    for (const ring of frame.rings) {
+      context.globalAlpha = frame.intensity * ring.alpha
+      context.fillStyle = '#' + ring.color.toString(16).padStart(6, '0')
+      context.beginPath()
+      context.arc(frame.x + frame.size / 2, frame.y + frame.size / 2,
+        frame.radius * ring.radius, 0, Math.PI * 2)
+      context.fill()
+    }
+  }
+  const texture = scene.textures.addCanvas(LAMP_ATLAS_KEY, canvas)
+  if (!texture) throw new Error('Could not register night lamp atlas')
+  try {
+    for (const frame of HALO_FRAMES) {
+      if (!texture.add(frame.name, 0, frame.x * HALO_DENSITY, frame.y * HALO_DENSITY,
+        frame.size * HALO_DENSITY, frame.size * HALO_DENSITY)) {
+        throw new Error('Could not register night lamp frame ' + frame.name)
+      }
+    }
+  } catch (error) {
+    scene.textures.remove(LAMP_ATLAS_KEY)
+    throw error
+  }
+  return LAMP_ATLAS_KEY
+}
+
+export interface NightLampBatch {
+  readonly graphics: { readonly visible: boolean; setVisible(visible: boolean): unknown }
+  readonly bounds: WorldBounds
+}
+
+/** WebGL path: two tightly fitted additive quads replace five vector circles.
+ * Both use a single shared atlas; culling can hide a lamp independently, without
+ * recreating artwork or inserting container/render-target boundaries. */
+export function createNightLampSprites(
+  scene: Phaser.Scene,
+  lamps: readonly LampPost[],
+  blendMode: number,
+): NightLampBatch[] {
+  if (!lamps.length) return []
+  const texture = registerLampAtlas(scene)
+  return buildLampLights(lamps).map(lamp => {
+    const prefix = lamp.bridge ? 'bridge-' : ''
+    const roadSize = lamp.bridge ? 112 : 96
+    const image = (x: number, y: number, frame: string, size: number) =>
+      scene.add.image(x, y, texture, prefix + frame)
+        .setOrigin(0.5).setDisplaySize(size, size)
+        .setDepth(WORLD_RENDER_DEPTH.nightLight - 0.01).setBlendMode(blendMode)
+    const road = image(lamp.center.x, lamp.center.y, 'road', roadSize)
+    const fixture = image(lamp.fixture.x, lamp.fixture.y, 'fixture', 16)
+    return {
+      graphics: {
+        get visible() { return road.visible },
+        setVisible(visible: boolean) { road.setVisible(visible); fixture.setVisible(visible) },
+      },
+      bounds: {
+        left: Math.min(lamp.center.x - roadSize / 2, lamp.fixture.x - 8),
+        top: Math.min(lamp.center.y - roadSize / 2, lamp.fixture.y - 8),
+        right: Math.max(lamp.center.x + roadSize / 2, lamp.fixture.x + 8),
+        bottom: Math.max(lamp.center.y + roadSize / 2, lamp.fixture.y + 8),
+      },
+    }
+  })
 }
 
 /** Build immutable additive lamp commands at scene creation, not on every frame.
