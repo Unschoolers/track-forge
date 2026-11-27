@@ -40,6 +40,13 @@ diagnostics do not mount lenses. Race setup retains its existing optical
 mode/lighting choices. Screen CSS may arrange controls but must not duplicate
 their optical paint, geometry or low-quality fallback.
 
+Options defines the visual reference: soft rounded geometry, sans-serif
+labels, orange selection, a subtle illuminated rim and readable graphite.
+Repeated content actions and live editor chrome share the painted material
+tokens in menu-system.css; do not mount a lens per cup row or over a live
+editor canvas. Tools and View disclosures are mutually exclusive. Keep their
+layout and editing commands separate from shared paint.
+
 ## Adoption review gates
 
 The Apple adoption guide is the design reference, not a native SDK dependency.
