@@ -36,6 +36,7 @@ describe('home screen', () => {
     expect(raceAgainAction?.querySelector('.home-race-again-track')?.textContent).toBe('City Sprint')
     const navigation = screen.querySelector('nav[aria-label="Main menu"]')
     expect(navigation?.querySelectorAll(':scope > button')).toHaveLength(5)
+    expect(navigation?.querySelector('[data-action="nearby"]')?.textContent).toBe('Multiplayer')
     expect(navigation?.closest('[data-material]')).toBeNull()
     expect(screen.querySelectorAll('.tf-menu-dock')).toHaveLength(1)
     expect(screen.textContent).toContain(track.name)
