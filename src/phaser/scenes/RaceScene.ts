@@ -108,6 +108,7 @@ export class RaceScene extends Phaser.Scene {
   private localCountdownFrame: 'waiting' | 'submitted' | 'presented' = 'waiting'
   private readonly onLocalCountdownRender = (): void => {
     this.localCountdownFrame = 'presented'
+    this.onRacePresented?.(this.raceSession.snapshot().runId)
   }
 
   constructor(
@@ -118,6 +119,7 @@ export class RaceScene extends Phaser.Scene {
     private readonly racePerformance?: RacePerformance,
     private readonly frameDiagnostics?: RaceFrameDiagnostics,
     private readonly renderPixelRatio: () => number = () => 1,
+    private readonly onRacePresented?: (runId: number | undefined) => void,
   ) {
     super({ key: 'RaceScene' })
   }

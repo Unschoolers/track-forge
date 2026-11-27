@@ -132,6 +132,7 @@ const uiHost = new DomUiHost(uiRoot, controller, {
   feedback,
   frameDiagnostics: () => ({
     timings: frameDiagnostics.report(raceSession.snapshot().runId),
+    launch: uiHost.raceLaunchTiming(),
     device: {
       userAgent: navigator.userAgent,
       pixelRatio: window.devicePixelRatio,
@@ -163,6 +164,7 @@ const sceneHost = new PhaserSceneHost(
   geometry,
   racePerformance,
   frameDiagnostics,
+  (runId) => uiHost.racePresented(runId),
 )
 const application = createApplication({ sceneHost, uiHost })
 

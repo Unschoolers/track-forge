@@ -21,6 +21,7 @@ import { isSceneryRotationPreviewOnly } from '@/application/editor/sceneryRotati
 import { deferEditorDragChrome } from '@/ui/editor/editorDragRendering'
 import { createHomeScreen } from '@/ui/screens/homeScreen'
 import { createRaceHud } from '@/ui/screens/raceHud'
+import { RaceLaunchIndicator } from '@/ui/components/raceLaunchIndicator'
 import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
 import { attachMenuGlass } from '@/ui/menu/menuGlass'
@@ -80,6 +81,7 @@ export class DomUiHost implements UiHost {
   private touchCleanup: (() => void) | undefined
   private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
   private readonly flyover = new RaceFlyoverLifecycle()
+  private readonly raceLaunch: RaceLaunchIndicator
   private mounted = false
   private previousSnapshot: AppSnapshot | undefined
   private readonly dialogs = new DialogController()
@@ -100,6 +102,7 @@ export class DomUiHost implements UiHost {
     private readonly runtime: UiRuntime,
     environment: Partial<UiEnvironment> = {},
   ) {
+    this.raceLaunch = new RaceLaunchIndicator(root)
     this.environment = {
       confirm: (message) => window.confirm(message),
       ...environment,
@@ -130,6 +133,7 @@ export class DomUiHost implements UiHost {
     this.touchCleanup?.()
     this.touchCleanup = undefined
     this.cancelRacePreparation()
+    this.raceLaunch.cancel()
     this.flyover.destroy()
     this.dialogs.destroy()
     this.updateCheckGeneration++
@@ -286,12 +290,43 @@ export class DomUiHost implements UiHost {
     })
   }
 
+  /** Called after Phaser submits the new local run's first frame. */
+  racePresented(runId: number | undefined): void {
+    this.raceLaunch.presented(runId)
+  }
+
+  raceLaunchTiming() {
+    return this.raceLaunch.timing(this.runtime.raceSession.snapshot().runId)
+  }
+
+  private launchLocalRace(type: 'start-race' | 'race-again' | 'restart-race' | 'race-best-ghost' | 'start-cup' | 'resume-cup' | 'next-cup-race'): void {
+    const before = this.controller.snapshot()
+    const previousRun = this.runtime.raceSession.snapshot().runId
+    this.raceLaunch.begin(() => {
+      const current = this.controller.snapshot()
+      // Back/navigation during the paint yield must not launch a stale race.
+      if (current.mode !== before.mode || current.overlay.type !== before.overlay.type ||
+          current.currentTrack !== before.currentTrack) return undefined
+      try {
+        this.controller.dispatch({ type })
+        const run = this.runtime.raceSession.snapshot()
+        return this.controller.snapshot().mode === 'race' && run.runId !== previousRun
+          ? run.runId : undefined
+      } catch (error) {
+        console.error('Track Forge race launch failed:', error)
+        this.showRaceExportNotice('Could not start the race. Please try again.')
+        return undefined
+      }
+    })
+  }
+
   private cancelRacePreparation(): void {
     this.racePreparation?.cancel()
     this.racePreparation = undefined
   }
 
   private render(state: AppSnapshot): void {
+    if (state.mode !== 'race' && this.raceLaunch.awaitingPresentation) this.raceLaunch.cancel()
     this.root.dataset.graphicsQuality = state.preferences.graphicsQuality ?? 'medium'
     const previous = this.previousSnapshot
     this.previousSnapshot = state
@@ -339,7 +374,7 @@ export class DomUiHost implements UiHost {
             edit: () => openLibrary('edit'),
             race: () => openLibrary('race'),
             nearby: this.runtime.nearby ? () => this.controller.dispatch({ type: 'open-nearby' }) : undefined,
-            raceAgain: () => this.controller.dispatch({ type: 'race-again' }),
+            raceAgain: () => this.launchLocalRace('race-again'),
             cup: () => this.controller.dispatch({ type: 'open-cup' }),
             options: () =>
               this.controller.dispatch({
@@ -480,6 +515,7 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
+    this.raceLaunch.cover()
     this.materialCleanup = !overlay && state.mode === 'editor'
       ? attachEditorGlass(this.root, screen)
       : attachMenuGlass(this.root, overlay ?? (state.mode === 'home' ? screen : undefined))
@@ -556,8 +592,8 @@ export class DomUiHost implements UiHost {
           loadCurated: () => this.controller.dispatch({ type: 'cup-load-curated' }),
           removeTrack: (index) => this.controller.dispatch({ type: 'cup-remove-track', index }),
           moveTrack: (index, direction) => this.controller.dispatch({ type: 'cup-move-track', index, direction }),
-          start: () => this.controller.dispatch({ type: 'start-cup' }),
-          resume: () => this.controller.dispatch({ type: 'resume-cup' }),
+          start: () => this.launchLocalRace('start-cup'),
+          resume: () => this.launchLocalRace('resume-cup'),
           ...(this.runtime.nearby ? { hostNearby: () => this.controller.dispatch({ type: 'host-nearby-cup' }) } : {}),
         })
       case 'cup-final':
@@ -577,13 +613,13 @@ export class DomUiHost implements UiHost {
           return results.element
         }
         const modal = createResultsModal(result, {
-          retry: () => this.controller.dispatch({ type: 'restart-race' }),
+          retry: () => this.launchLocalRace('restart-race'),
           exportRace: this.runtime.raceSession.diagnosticsReport ? () => { void this.exportRaceDiagnostics() } : undefined,
           diagnosticsOpened: () => this.runtime.feedback.handle({ type: 'ui', emphasis: 'confirm' }),
           raceBestGhost: (() => {
             const { track, setup } = this.runtime.raceSession.snapshot()
             return track && setup && this.runtime.raceSession.ghostTime?.(track, setup) != null
-              ? () => this.controller.dispatch({ type: 'race-best-ghost' }) : undefined
+              ? () => this.launchLocalRace('race-best-ghost') : undefined
           })(),
           shareChallengeResult: (() => {
             const { track, setup } = this.runtime.raceSession.snapshot()
@@ -595,7 +631,7 @@ export class DomUiHost implements UiHost {
           changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           edit: () => this.controller.dispatch({ type: 'open-editor' }),
           home: () => this.controller.dispatch({ type: 'go-home' }),
-        }, state.cup ? { cup: state.cup, next: () => this.controller.dispatch({ type: 'next-cup-race' }) } : undefined, state.newTimeMedal, state.preferences.displayName)
+        }, state.cup ? { cup: state.cup, next: () => this.launchLocalRace('next-cup-race') } : undefined, state.newTimeMedal, state.preferences.displayName)
         const standings = modal.querySelector<HTMLElement>('[data-results-standings]')
         if (standings && result.rivalsFinishing) {
           let previous = result
@@ -693,7 +729,7 @@ export class DomUiHost implements UiHost {
               preferences,
             }),
           start: () =>
-            this.controller.dispatch({ type: 'start-race' }),
+            this.launchLocalRace('start-race'),
         }, availability, flyover, currentTrack ? this.runtime.raceSession.ghostSetups?.(currentTrack) : undefined, existingRaceSetup)
       }
       case 'options':
@@ -729,7 +765,7 @@ export class DomUiHost implements UiHost {
           resume: () =>
             this.controller.dispatch({ type: 'resume-race' }),
           restart: () =>
-            this.controller.dispatch({ type: 'restart-race' }),
+            this.launchLocalRace('restart-race'),
           options: () =>
             this.controller.dispatch({
               type: 'open-options',

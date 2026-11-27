@@ -887,7 +887,16 @@ describe('race UI flow', () => {
     )
     root.querySelector<HTMLButtonElement>('[data-action="change-track"]')?.click()
     expect(controller.dispatch).toHaveBeenCalledWith({ type: 'open-track-library', purpose: 'race' })
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback)
+      return frames.length
+    })
     root.querySelector<HTMLButtonElement>('[data-action="retry-race"]')?.click()
+    expect(root.querySelector('.race-launch-overlay')?.textContent).toContain('Loading race')
+    expect(controller.dispatch).not.toHaveBeenCalledWith({ type: 'restart-race' })
+    frames.shift()?.(0)
+    frames.shift()?.(16)
     root.querySelector<HTMLButtonElement>('[data-action="edit-race-track"]')
       ?.click()
 

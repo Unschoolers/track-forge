@@ -36,6 +36,7 @@ export class PhaserSceneHost implements SceneHost {
     private readonly geometry: TrackGeometryService,
     private readonly racePerformance?: RacePerformance,
     private readonly frameDiagnostics?: RaceFrameDiagnostics,
+    private readonly onRacePresented?: (runId: number | undefined) => void,
   ) {}
 
   start(mode: AppMode): void {
@@ -61,6 +62,7 @@ export class PhaserSceneHost implements SceneHost {
             this.racePerformance,
             this.frameDiagnostics,
             () => this.racePixelRatio,
+            this.onRacePresented,
           ),
         ],
         input: { activePointers: 3 },
