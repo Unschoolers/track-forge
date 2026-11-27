@@ -32,6 +32,7 @@ vi.mock('@/phaser/rendering/sceneryRenderer', () => ({ SceneryRenderer: class { 
 import { RaceInputController } from '@/phaser/input/raceInput'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
 import { renderTrees } from '@/phaser/rendering/treeRenderer'
+import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
 import { RaceSession, type RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceStep } from '@/domain/race/raceEngine'
 import { asTrackId } from '@/domain/model'
@@ -54,7 +55,7 @@ function createScene(controls: RaceInputController, session: Pick<RaceSessionPor
   document.body.append(canvas)
   const controller = { snapshot: () => ({ currentTrack: { trees: [] }, preferences: { lighting: 'day', steeringSensitivity } }), dispatch: vi.fn() }
   const geometry = { get: () => ({ path: { terrainSurface: {} } }) }
-  const graphics = { setDepth() { return this }, setBlendMode() { return this } }
+  const createGraphics = () => ({ depth: 0, setDepth(depth: number) { this.depth = depth; return this }, setBlendMode() { return this } })
   const camera = {
     width: 320 * pixelRatio,
     height: 180 * pixelRatio,
@@ -69,7 +70,7 @@ function createScene(controls: RaceInputController, session: Pick<RaceSessionPor
   const scene = new RaceScene(controller as never, session as never, controls, geometry as never, undefined, undefined, () => pixelRatio)
   Object.assign(scene, {
     game: { canvas },
-    add: { graphics: () => graphics },
+    add: { graphics: createGraphics },
     cameras: { main: camera },
     events: { once: (_event: string, callback: () => void, context: unknown) => { shutdown = callback.bind(context) } },
     input: { on: vi.fn(), off: vi.fn() },
@@ -128,7 +129,13 @@ describe('race canvas steering', () => {
       expect(renderTrees).toHaveBeenCalledTimes(1)
       // Static race trees must not be clipped to the initial camera window.
       // The non-WebGL test scene uses the normal image path.
-      expect(renderTrees).toHaveBeenCalledWith(expect.anything(), [], false, expect.anything(), 'grass', undefined, false)
+      expect(renderTrees).toHaveBeenCalledWith(
+        expect.objectContaining({ depth: WORLD_RENDER_DEPTH.scenery }), [], false,
+        expect.anything(), 'grass', undefined, false,
+        expect.objectContaining({ depth: WORLD_RENDER_DEPTH.tallScenery }),
+      )
+      const call = vi.mocked(renderTrees).mock.calls[0]
+      expect(call?.[0]).not.toBe(call?.[7])
       for (let i = 1; i <= 10; i++) {
         camera.scrollX = i * 1_000
         camera.scrollY = i * 500

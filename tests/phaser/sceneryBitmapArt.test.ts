@@ -128,3 +128,40 @@ describe('generated scenery artwork', () => {
     expect(sprite.destroy).toHaveBeenCalledTimes(2)
   })
 })
+
+it('routes only building bodies above ground vehicles, keeping contact shadows and small props below', () => {
+  const props: readonly SceneryProp[] = [
+    { kind: 'city-building', x: 0, y: 0 },
+    { kind: 'city-house', x: 0, y: 0 },
+    { kind: 'city-trash-bin', x: 0, y: 0 },
+  ]
+  const isBuilding = (kind: SceneryProp['kind']) => kind === 'city-building' || kind === 'city-house'
+  const split = buildSceneryRenderPlan('cityscape', props, 'day', bounds, () => undefined, isBuilding)
+  const original = buildSceneryRenderPlan('cityscape', props, 'day', bounds, () => undefined)
+  expect(split.foregroundPrimitives.length).toBeGreaterThan(0)
+  expect(split.primitives.filter(shape => shape.kind === 'ellipse')).toHaveLength(3)
+  expect(split.primitives.length + split.foregroundPrimitives.length).toBe(original.primitives.length)
+  expect(original.foregroundPrimitives).toEqual([])
+  const bitmapPlan = buildSceneryRenderPlan('cityscape', props, 'night', bounds, () => bitmap, isBuilding)
+  expect(bitmapPlan.primitives).toHaveLength(3)
+  expect(bitmapPlan.foregroundPrimitives).toEqual([])
+  const sprites = props.map(() => ({
+    depth: 0, setDepth: vi.fn().mockReturnThis(), setTexture: vi.fn().mockReturnThis(),
+    setPosition: vi.fn().mockReturnThis(), setDisplaySize: vi.fn().mockReturnThis(),
+    setRotation: vi.fn().mockReturnThis(), destroy: vi.fn(),
+  }))
+  const image = vi.fn()
+  for (const sprite of sprites) image.mockReturnValueOnce(sprite)
+  const scene = { add: { image }, textures: { exists: () => true } }
+  const graphics = (depth: number) => ({
+    scene, depth, clear: vi.fn(), fillStyle: vi.fn(), fillEllipse: vi.fn(),
+    save: vi.fn(), restore: vi.fn(), translateCanvas: vi.fn(), rotateCanvas: vi.fn(),
+  })
+  const renderer = new SceneryRenderer(graphics(1) as unknown as Phaser.GameObjects.Graphics,
+    () => bitmap, graphics(8) as unknown as Phaser.GameObjects.Graphics)
+  renderer.render({ centerX: 0, centerY: 0, width: 100, height: 100, zoom: 1, rotation: 0 }, 'cityscape', props, false)
+  expect(sprites[0]?.setDepth).toHaveBeenCalledWith(8.01)
+  expect(sprites[1]?.setDepth).toHaveBeenCalledWith(8.01)
+  expect(sprites[2]?.setDepth).toHaveBeenCalledWith(1.01)
+  renderer.destroy()
+})

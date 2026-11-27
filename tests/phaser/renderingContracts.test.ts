@@ -37,6 +37,9 @@ describe('race rendering contracts', () => {
       WORLD_RENDER_DEPTH.environmentScenery,
       WORLD_RENDER_DEPTH.scenery,
       WORLD_RENDER_DEPTH.structureUnderlay,
+      WORLD_RENDER_DEPTH.vehicleShadow,
+      WORLD_RENDER_DEPTH.lowerVehicle,
+      WORLD_RENDER_DEPTH.tallScenery,
       WORLD_RENDER_DEPTH.structureDeck,
       WORLD_RENDER_DEPTH.structureWall,
       WORLD_RENDER_DEPTH.upperVehicle,
@@ -53,7 +56,7 @@ describe('race rendering contracts', () => {
     }
     expect(WORLD_RENDER_DEPTH.scenery + 0.01).toBeLessThan(WORLD_RENDER_DEPTH.structureUnderlay)
     expect(WORLD_RENDER_DEPTH.scenery + 0.01).toBeLessThan(WORLD_RENDER_DEPTH.vehicleShadow)
-    expect(WORLD_RENDER_DEPTH.lowerVehicle)
+    expect(WORLD_RENDER_DEPTH.tallScenery + 0.01)
       .toBeLessThan(WORLD_RENDER_DEPTH.structureDeck)
   })
 

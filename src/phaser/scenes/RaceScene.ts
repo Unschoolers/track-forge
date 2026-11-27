@@ -160,10 +160,15 @@ export class RaceScene extends Phaser.Scene {
     this.cameras.main.setZoom(this.renderPixelRatio())
     this.groundRenderer = new GroundTextureRenderer(this)
     this.renderGroundPresentation(night)
-    this.environmentSceneryRenderer = new SceneryRenderer(this.add.graphics().setDepth(WORLD_RENDER_DEPTH.environmentScenery))
+    this.environmentSceneryRenderer = new SceneryRenderer(
+      this.add.graphics().setDepth(WORLD_RENDER_DEPTH.environmentScenery),
+      undefined,
+      this.add.graphics().setDepth(WORLD_RENDER_DEPTH.tallScenery),
+    )
     const sceneryGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.scenery)
+    const treeCanopies = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.tallScenery)
     this.shadowGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.vehicleShadow)
@@ -216,6 +221,7 @@ export class RaceScene extends Phaser.Scene {
       normalizeTrackEnvironmentId(track.environmentId),
       undefined,
       this.game.renderer !== undefined && this.game.renderer.type === Phaser.WEBGL && typeof this.add.spriteGPULayer === 'function',
+      treeCanopies,
     )
     if (bitmap && this.raceCamera) {
       const camera = this.cameras.main
