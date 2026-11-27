@@ -43,12 +43,16 @@ describe('continuous mountain material field', () => {
     const pixel = (x: number, y: number) => x + y < 100 ? [255, 0, 220, 255] : [0, 0, 0, 255]
     const left = smoothHillField(raster(size, size, (x, y) => pixel(x - pad, y - pad)), size, size)
     const right = smoothHillField(raster(size, size, (x, y) => pixel(x + tile - pad, y - pad)), size, size)
+    const bottom = smoothHillField(raster(size, size, (x, y) => pixel(x - pad, y + tile - pad)), size, size)
     // Compare the overlapping world samples on both sides of the tile seam.
     for (let y = pad; y < pad + tile; y++) {
       for (let dx = -1; dx <= 1; dx++) {
         const a = (y * size + pad + tile + dx) * 4
         const b = (y * size + pad + dx) * 4
         expect(left.slice(a, a + 4)).toEqual(right.slice(b, b + 4))
+        const c = ((pad + tile + dx) * size + y) * 4
+        const d = ((pad + dx) * size + y) * 4
+        expect(left.slice(c, c + 4)).toEqual(bottom.slice(d, d + 4))
       }
     }
   })

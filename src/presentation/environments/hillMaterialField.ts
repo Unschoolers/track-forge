@@ -3,7 +3,9 @@
  * Padding covers both blur passes, so neighboring tiles agree at their edges. */
 export const HILL_FIELD_STEP = 4
 const BLUR_RADIUS = 3
-export const HILL_FIELD_PADDING = HILL_FIELD_STEP * (BLUR_RADIUS * 2 + 1)
+// Two extra samples cover the interpolation neighbors on both sides of a
+// tile seam after both blur passes in each axis.
+export const HILL_FIELD_PADDING = HILL_FIELD_STEP * (BLUR_RADIUS * 2 + 2)
 
 export function smoothHillField(input: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||

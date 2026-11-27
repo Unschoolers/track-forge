@@ -334,7 +334,7 @@ export function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = fal
     }
   }
   return indexBitmapItems(items, item => 'segment' in item
-    ? [item.segment.start, item.segment.end] : item.triangle, WATER_SHALLOW_RADIUS + 2)
+    ? [item.segment.start, item.segment.end] : item.triangle, Math.max(WATER_SHALLOW_RADIUS, HILL_FIELD_PADDING) + 2)
 }
 
 function appendTriangle(context: CanvasRenderingContext2D, [a, b, c]: TerrainTriangle): void {
