@@ -1111,7 +1111,7 @@ export class AppController {
     const { editor, track } = result
     if (editor === this.state.editor) return
     const selection = this.state.editorUi.selectedScenery
-    const preservesScenerySelection = command.type === 'transform-scenery' || command.type === 'move-tree' || command.type === 'move-scenery-prop'
+    const preservesScenerySelection = command.type === 'set-tree-season' || command.type === 'transform-scenery' || command.type === 'move-tree' || command.type === 'move-scenery-prop'
     const editorUi = selection && !preservesScenerySelection && (editor.trees !== this.state.editor.trees || editor.scenery !== this.state.editor.scenery)
       ? { ...this.state.editorUi, selectedScenery: null } : this.state.editorUi
     if (!track) {

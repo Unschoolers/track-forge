@@ -1,3 +1,4 @@
+import { isTreeSeason } from '@/domain/track/treeSeason'
 import { normalizeSceneryTransform } from '@/domain/track/sceneryTransform'
 import { TRACK_CLOSE_DISTANCE } from '@/domain/config'
 import {
@@ -39,7 +40,7 @@ export function validateTrack(
     !track.points.every(
       (point) => isFiniteVector(point) && isSurfaceId(point.surface),
     ) ||
-    !track.trees.every(tree => isFiniteVector(tree) && normalizeSceneryTransform(tree) !== undefined) ||
+    !track.trees.every(tree => isFiniteVector(tree) && normalizeSceneryTransform(tree) !== undefined && (tree.season === undefined || isTreeSeason(tree.season))) ||
     !(track.scenery ?? []).every(prop => isFiniteVector(prop) && normalizeSceneryTransform(prop) !== undefined)
   ) {
     return {

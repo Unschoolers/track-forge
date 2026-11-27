@@ -1,3 +1,4 @@
+import { isTreeSeason, type TreeSeason } from '@/domain/track/treeSeason'
 import { normalizeSceneryTransform, type ScenerySelection, type SceneryTransform } from '@/domain/track/sceneryTransform'
 import { DEFAULT_TRACK_ENVIRONMENT_ID, MAX_SCENERY_PROPS, isSceneryPosition, sceneryKindBelongsToEnvironment } from '@/domain/track/trackEnvironment'
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
@@ -110,6 +111,7 @@ export type EditorCommand =
   | { readonly type: 'erase-scenery-prop'; readonly index: number }
   | { readonly type: 'move-tree'; readonly index: number; readonly position: Vector2 }
   | { readonly type: 'add-tree'; readonly tree: Tree }
+  | { readonly type: 'set-tree-season'; readonly index: number; readonly season: TreeSeason }
   | { readonly type: 'erase-tree'; readonly index: number }
   | {
       readonly type: 'set-crossing-sections'
@@ -235,6 +237,10 @@ export function applyEditorCommand(
     : command.type === 'add-scenery-prop' ? command.prop : undefined
   if (authoredTransform && !normalizeSceneryTransform(authoredTransform)) {
     return { state, rejection: { code: 'invalid-scenery-position', message: 'Invalid scenery scale or rotation.' } }
+  }
+  if ((command.type === 'set-tree-season' && !isTreeSeason(command.season)) ||
+      (command.type === 'add-tree' && command.tree.season !== undefined && !isTreeSeason(command.tree.season))) {
+    return { state, rejection: { code: 'invalid-scenery-position', message: 'Invalid tree season.' } }
   }
   if (command.type === 'add-tree') {
     const rejection = treePlacementRejection(state.terrain, command.tree)
@@ -415,7 +421,7 @@ function reduceEditorUnchecked(
       const item = target.type === 'tree' ? state.trees[target.index] : state.scenery[target.index]
       if (!item || !transform || (item.rotation ?? 0) === (transform.rotation ?? 0) && (item.scale ?? 1) === (transform.scale ?? 1)) return state
       if (target.type === 'tree') {
-        const trees = state.trees.map((tree, index) => index === target.index ? { x: tree.x, y: tree.y, ...transform } : tree)
+        const trees = state.trees.map((tree, index) => index === target.index ? { x: tree.x, y: tree.y, ...transform, ...(tree.season ? { season: tree.season } : {}) } : tree)
         return patchEditorState(state, { trees })
       }
       const prop = state.scenery[target.index]
@@ -443,6 +449,13 @@ function reduceEditorUnchecked(
       const trees = [...state.trees]
       trees[command.index] = { ...tree, ...command.position }
       return patchEditorState(state, { trees })
+    }
+    case 'set-tree-season': {
+      const tree = state.trees[command.index]
+      if (!tree || !isTreeSeason(command.season) || (tree.season ?? 'summer') === command.season) return state
+      const rest = { x: tree.x, y: tree.y, ...normalizeSceneryTransform(tree) }
+      return patchEditorState(state, { trees: state.trees.map((entry, index) =>
+        index === command.index ? { ...rest, ...(command.season !== 'summer' ? { season: command.season } : {}) } : entry) })
     }
     case 'add-tree':
       return patchEditorState(state, {
