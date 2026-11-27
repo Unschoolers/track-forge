@@ -30,7 +30,9 @@ describe('home screen', () => {
 
     expect(screen.classList.contains('tf-menu')).toBe(true)
     expect(screen.querySelector('[aria-label="Race"] [data-action="race"]')?.classList.contains('tf-menu-action--primary')).toBe(true)
-    expect(screen.querySelector('[aria-label="Race"] [data-action="race-again"]')?.textContent).toContain('City Sprint')
+    const raceAgainAction = screen.querySelector('[aria-label="Race"] [data-action="race-again"]')
+    expect(raceAgainAction?.textContent).toBe('Race again · City Sprint')
+    expect(raceAgainAction?.querySelector('.home-race-again-label')?.textContent).toBe('Race again · City Sprint')
     expect(screen.querySelector('[aria-label="Main menu"]')?.querySelectorAll('button')).toHaveLength(5)
     expect(screen.textContent).toContain(track.name)
 
