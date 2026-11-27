@@ -79,6 +79,24 @@ function drawTile(context: CanvasRenderingContext2D, source: HTMLCanvasElement, 
   context.drawImage(source, w - 1, h - 1, 1, 1, x + size, y + size, 1, 1)
 }
 
+/** The atlas pages are uniform grids; let Phaser parse the sprite sheet
+ * rather than registering every frame manually. Gutters remain outside frames. */
+export function registerRaceAtlasFrames(
+  textures: Pick<Phaser.Textures.TextureManager, 'addSpriteSheet'>,
+  texture: Phaser.Textures.Texture,
+  resolution: number,
+  count: number,
+): void {
+  const sheet = textures.addSpriteSheet('', texture, {
+    frameWidth: resolution, frameHeight: resolution,
+    margin: GUTTER, spacing: 2 * GUTTER, endFrame: count - 1,
+  })
+  if (!sheet) throw new Error('Could not register race atlas sprite sheet')
+  for (let frame = 0; frame < count; frame++) {
+    if (!sheet.has(String(frame))) throw new Error(`Missing race atlas frame ${frame}`)
+  }
+}
+
 export const RACE_ATLAS_DEPTHS = [ROAD_BITMAP_DEPTH, WORLD_RENDER_DEPTH.terrain + 0.2, BRIDGE_APPROACH_BITMAP_DEPTH, BRIDGE_DECK_BITMAP_DEPTH, WORLD_RENDER_DEPTH.structureWall] as const
 
 class AtlasLayer {
@@ -161,14 +179,14 @@ export function createRaceBitmapAtlas(scene: Phaser.Scene, geometry: TrackGeomet
         const x = (i % page.columns) * plan.stride + GUTTER
         const y = Math.floor(i / page.columns) * plan.stride + GUTTER
         drawTile(context, entry.source.bake(entry.tile, plan.resolution), x, y, plan.resolution)
-        return { entry, x, y, frame: String(i) }
+        return { entry, frame: String(i) }
       })
       const key = `${prefix}:${pageIndex}`
       const texture = scene.textures.addCanvas(key, canvas)
       if (!texture) throw new Error('Could not register race atlas')
       textures.push(key)
-      for (const { entry, x, y, frame } of slots) {
-        if (!texture.add(frame, 0, x, y, plan.resolution, plan.resolution)) throw new Error('Could not register race atlas frame')
+      registerRaceAtlasFrames(scene.textures, texture, plan.resolution, page.count)
+      for (const { entry, frame } of slots) {
         layers[entry.layer]!.frames.set(tileKey(entry.tile), { tile: entry.tile, texture: key, frame })
       }
       offset += page.count
