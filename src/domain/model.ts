@@ -1,3 +1,4 @@
+import type { TreeSeason } from '@/domain/track/treeSeason'
 import type { SceneryTransform } from '@/domain/track/sceneryTransform'
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import type { TrackCreator } from '@/domain/track/trackCreator'
@@ -42,7 +43,10 @@ export interface TrackPoint extends Vector2 {
   readonly structure?: RoadStructure
 }
 
-export interface Tree extends Vector2, SceneryTransform {}
+export interface Tree extends Vector2, SceneryTransform {
+  /** Missing season preserves the original summer tree on legacy tracks. */
+  readonly season?: TreeSeason
+}
 
 export interface TerrainCell {
   readonly column: number

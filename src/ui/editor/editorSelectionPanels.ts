@@ -1,3 +1,4 @@
+import { TREE_SEASONS, isTreeSeason, type TreeSeason } from '@/domain/track/treeSeason'
 import { MAX_SCENERY_SCALE, MIN_SCENERY_SCALE, sceneryScale, stepSceneryScale, type ScenerySelection, type SceneryTransform } from '@/domain/track/sceneryTransform'
 import type { AppSnapshot } from '@/application/appState'
 import type { EditorCommand } from '@/domain/editor/editorState'
@@ -52,13 +53,32 @@ export function createEditorSelectionPanels(
 
 function createSceneryControl(
   target: ScenerySelection,
-  item: SceneryTransform,
+  item: SceneryTransform & { readonly season?: TreeSeason },
   edit: (command: EditorCommand) => void,
   preview?: (target: ScenerySelection, rotation: number | null) => void,
 ): HTMLElement {
   const panel = element('aside', 'point-control scenery-control')
   panel.setAttribute('aria-label', 'Scenery transformation')
   panel.append(element('strong', 'point-control-title', 'Scenery transformation'))
+  if (target.type === 'tree') {
+    const label = element('label', 'point-tension-label scenery-season-label', 'Season')
+    const season = document.createElement('select')
+    season.className = 'point-choice scenery-season-select'
+    season.dataset.action = 'tree-season'
+    season.setAttribute('aria-label', 'Tree season')
+    for (const value of TREE_SEASONS) {
+      const option = document.createElement('option')
+      option.value = value
+      option.textContent = value.charAt(0).toUpperCase() + value.slice(1)
+      season.append(option)
+    }
+    season.value = item.season ?? 'summer'
+    season.addEventListener('change', () => {
+      if (isTreeSeason(season.value)) edit({ type: 'set-tree-season', index: target.index, season: season.value })
+    })
+    label.append(season)
+    panel.append(label)
+  }
   const update = (rotation: number, scale: number) => edit({
     type: 'transform-scenery', target, transform: { rotation, scale },
   })

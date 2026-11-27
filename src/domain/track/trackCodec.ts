@@ -1,3 +1,4 @@
+import { isTreeSeason } from '@/domain/track/treeSeason'
 import { normalizeSceneryTransform } from '@/domain/track/sceneryTransform'
 import { normalizeSceneryProps, normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { normalizeTrackCreator } from '@/domain/track/trackCreator'
@@ -97,7 +98,8 @@ function decodeTree(value: unknown): Tree | undefined {
   const item = object(value)
   if (!item || !finite(item.x) || !finite(item.y)) return undefined
   const transform = normalizeSceneryTransform({ rotation: item.rotation, scale: item.scale })
-  return transform ? { x: item.x, y: item.y, ...transform } : undefined
+  if (!transform || (item.season !== undefined && !isTreeSeason(item.season))) return undefined
+  return { x: item.x, y: item.y, ...transform, ...(item.season !== undefined && item.season !== 'summer' ? { season: item.season } : {}) }
 }
 
 function decodeElevation(value: unknown): LegacyTrackElevation | undefined {

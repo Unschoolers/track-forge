@@ -1,9 +1,10 @@
+import { registerSceneryAtlas } from '@/phaser/rendering/sceneryAtlasTexture'
 import { describe, expect, it, vi } from 'vitest'
 import type Phaser from 'phaser'
 import { SCENERY_KINDS_BY_ENVIRONMENT, type SceneryProp } from '@/domain/track/trackEnvironment'
 import { getTrackEnvironment } from '@/presentation/environments'
 import { buildSceneryRenderPlan } from '@/presentation/environments/sceneryPresentation'
-import { SCENERY_SPRITE_INDEX, type ScenerySpriteKind } from '@/presentation/environments/sceneryBitmapArt'
+import { SCENERY_ATLASES, SCENERY_SPRITE_SIZE, treeSpriteKind, type ScenerySpriteKind } from '@/presentation/environments/sceneryBitmapArt'
 import { SceneryRenderer } from '@/phaser/rendering/sceneryRenderer'
 
 const bitmap = {} as HTMLCanvasElement
@@ -13,9 +14,32 @@ describe('generated scenery artwork', () => {
   it('maps every existing prop and tree to a unique atlas cell', () => {
     const kinds = Object.values(SCENERY_KINDS_BY_ENVIRONMENT).flat()
     expect(kinds).toHaveLength(18)
-    const indices = [...kinds, 'tree' as const].map(kind => SCENERY_SPRITE_INDEX[kind])
-    expect(new Set(indices).size).toBe(19)
-    expect([...indices].sort((a, b) => a - b)).toEqual(Array.from({ length: 19 }, (_, i) => i))
+    const frames = SCENERY_ATLASES.flatMap(atlas => [...atlas.kinds])
+    expect(SCENERY_SPRITE_SIZE).toBe(256)
+    expect(SCENERY_ATLASES).toHaveLength(5)
+    expect(frames).toHaveLength(22)
+    expect(new Set(frames).size).toBe(22)
+    expect(frames).toEqual(expect.arrayContaining([...kinds, 'tree', 'tree-spring', 'tree-autumn', 'tree-winter']))
+    expect(treeSpriteKind(undefined)).toBe('tree')
+    expect(treeSpriteKind('summer')).toBe('tree')
+    expect(treeSpriteKind('winter')).toBe('tree-winter')
+  })
+
+  it('registers named Phaser frames once per atlas and lighting', () => {
+    const registered = new Set<string>()
+    const add = vi.fn(() => ({}))
+    const addCanvas = vi.fn((key: string) => { registered.add(key); return { add } })
+    const scene = { textures: { exists: (key: string) => registered.has(key), addCanvas } } as unknown as Phaser.Scene
+    const atlas = { id: 'shared', columns: 2, source: bitmap, kinds: ['tree-spring', 'tree', 'tree-autumn', 'tree-winter'] as const }
+    const key = registerSceneryAtlas(scene, atlas, false)
+    expect(key).toBe('trackforge-scenery-atlas-shared-day')
+    expect(add).toHaveBeenCalledWith('tree', 0, 256, 0, 256, 256)
+    expect(add).toHaveBeenCalledWith('tree-winter', 0, 256, 256, 256, 256)
+    expect(registerSceneryAtlas(scene, atlas, false)).toBe(key)
+    expect(addCanvas).toHaveBeenCalledTimes(1)
+    expect(add).toHaveBeenCalledTimes(4)
+    expect(registerSceneryAtlas(scene, atlas, true)).not.toBe(key)
+    expect(addCanvas).toHaveBeenCalledTimes(2)
   })
 
   it('preserves every prop radius, position, lighting and environment filter', () => {

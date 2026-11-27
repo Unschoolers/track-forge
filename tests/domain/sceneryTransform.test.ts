@@ -47,6 +47,19 @@ describe('authored scenery transforms', () => {
     expect(decodeTrack({ ...track, trees: [{ x: 0, y: 0, scale: 500 }] }, 1)).toBeUndefined()
   })
 
+  it('keeps seasons through track serialization, transforms and undo', () => {
+    const track = { ...createStarterTrack(asTrackId('season'), 1), trees: [{ x: 0, y: 0, season: 'autumn' as const }] }
+    expect(decodeTrack(JSON.parse(JSON.stringify(track)), 1)?.trees).toEqual(track.trees)
+    expect(decodeTrack({ ...track, trees: [{ x: 0, y: 0, season: 'invalid' }] }, 1)).toBeUndefined()
+    const original = createEditorState([], track.trees)
+    const winter = reduceEditor(original, { type: 'set-tree-season', index: 0, season: 'winter' })
+    expect(winter.trees[0]?.season).toBe('winter')
+    const scaled = reduceEditor(winter, { type: 'transform-scenery', target: { type: 'tree', index: 0 }, transform: { scale: 1.25 } })
+    expect(scaled.trees[0]).toEqual({ x: 0, y: 0, season: 'winter', scale: 1.25 })
+    expect(reduceEditor(winter, { type: 'undo' }).trees).toEqual(original.trees)
+    expect(reduceEditor(winter, { type: 'set-tree-season', index: 0, season: 'summer' }).trees).toEqual([{ x: 0, y: 0 }])
+  })
+
   it('preserves tree transforms on move, undo, redo and reset', () => {
     const original = createEditorState([], [{ x: 0, y: 0 }])
     const changed = reduceEditor(original, { type: 'transform-scenery', target: { type: 'tree', index: 0 }, transform: { rotation: 135, scale: 1.15 } })

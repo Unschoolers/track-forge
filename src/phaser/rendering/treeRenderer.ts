@@ -3,7 +3,9 @@ import type Phaser from 'phaser'
 import type { Tree } from '@/domain/model'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { getMeadowBitmapArt } from '@/presentation/environments/meadowBitmapArt'
-import { getSceneryBitmap } from '@/presentation/environments/sceneryBitmapArt'
+import { getSceneryAtlas, SCENERY_SPRITE_SIZE, treeSpriteKind } from '@/presentation/environments/sceneryBitmapArt'
+import { registerSceneryAtlas } from './sceneryAtlasTexture'
+import type { TreeSeason } from '@/domain/track/treeSeason'
 import type { TerrainSurface } from '@/domain/terrain/terrainSurface'
 import {
   projectSunShadow,
@@ -22,6 +24,7 @@ export interface TreePrimitive {
   readonly alpha: number
   readonly baseHeight: number
   readonly rotation?: number
+  readonly season?: TreeSeason
 }
 
 export interface TreeViewBounds {
@@ -109,6 +112,7 @@ export function buildTreePresentation(
       radiusX: size / 2,
       radiusY: size / 2,
       rotation,
+      ...(tree.season ? { season: tree.season } : {}),
       color: colors.canopy,
       alpha: 1,
       baseHeight,
@@ -149,13 +153,14 @@ export function renderStaticTreeCanopies(
   height: number,
   depth: number,
   canopies: readonly TreePrimitive[],
+  frameFor: (tree: TreePrimitive) => string = () => '__BASE',
 ): void {
   for (let start = 0; start < canopies.length; start += MAX_GPU_TREE_BATCH) {
     const chunk = canopies.slice(start, start + MAX_GPU_TREE_BATCH)
     const layer = scene.add.spriteGPULayer(texture, chunk.length).setDepth(depth)
     for (const tree of chunk) {
       layer.addMember({
-        x: tree.x, y: tree.y, frame: '__BASE',
+        x: tree.x, y: tree.y, frame: frameFor(tree),
         originX: 0.5, originY: 0.5, scaleX: tree.radiusX * 2 / width, scaleY: tree.radiusY * 2 / height,
         rotation: tree.rotation ?? 0,
       })
@@ -175,49 +180,47 @@ export function renderTrees(
   staticGpuBatch = false,
 ): void {
   graphics.clear()
-  const generated = getSceneryBitmap('tree', night)
-  const bitmap = generated ?? (environment === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined)
-  if (bitmap && staticGpuBatch) {
-    const scene = graphics.scene
-    const texture = `trackforge-${generated ? 'scenery' : 'meadow'}-tree-${night ? 'night' : 'day'}`
-    if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, bitmap)) {
+  const atlas = trees.length ? getSceneryAtlas('tree', night) : undefined
+  const bitmap = !atlas && environment === 'grass' ? getMeadowBitmapArt(night)?.tree : undefined
+  const primitives = buildTreePresentation(trees, night, terrainSurface, viewBounds)
+  const hasCanopies = primitives.some(item => item.layer === 'canopy')
+  let texture: string | undefined
+  if (hasCanopies && atlas) {
+    texture = registerSceneryAtlas(graphics.scene, atlas, night)
+  } else if (hasCanopies && bitmap) {
+    texture = `trackforge-meadow-tree-${night ? 'night' : 'day'}`
+    if (!graphics.scene.textures.exists(texture) && !graphics.scene.textures.addCanvas(texture, bitmap)) {
       throw new Error('Could not register tree artwork')
     }
-    const primitives = buildTreePresentation(trees, night, terrainSurface, viewBounds)
+  }
+  const frameFor = (item: TreePrimitive) => atlas ? treeSpriteKind(item.season) : '__BASE'
+  if (texture && staticGpuBatch) {
+    const scene = graphics.scene
     for (const shadow of primitives) {
       if (shadow.layer !== 'shadow') continue
       graphics.fillStyle(shadow.color, shadow.alpha)
       graphics.fillEllipse(shadow.x, shadow.y, shadow.radiusX * 2, shadow.radiusY * 2)
     }
-    renderStaticTreeCanopies(scene, texture, bitmap.width, bitmap.height,
-      graphics.depth + 0.01, primitives.filter(item => item.layer === 'canopy'))
+    renderStaticTreeCanopies(scene, texture, atlas ? SCENERY_SPRITE_SIZE : bitmap?.width ?? SCENERY_SPRITE_SIZE,
+      atlas ? SCENERY_SPRITE_SIZE : bitmap?.height ?? SCENERY_SPRITE_SIZE,
+      graphics.depth + 0.01, primitives.filter(item => item.layer === 'canopy'), frameFor)
     return
   }
   const sprites = treeSprites.get(graphics) ?? []
   for (const sprite of sprites) sprite.setVisible(false)
   let shown = 0
-  for (
-    const primitive of buildTreePresentation(
-      trees,
-      night,
-      terrainSurface,
-      viewBounds,
-    )
-  ) {
-    if (bitmap && primitive.layer !== 'shadow') {
+  for (const primitive of primitives) {
+    if (texture && primitive.layer !== 'shadow') {
       if (primitive.layer === 'highlight') continue
-      const texture = `trackforge-${generated ? 'scenery' : 'meadow'}-tree-${night ? 'night' : 'day'}`
       const scene = graphics.scene
-      if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, bitmap)) {
-        throw new Error('Could not register tree artwork')
-      }
+      const frame = frameFor(primitive)
       let sprite = sprites[shown]
       if (!sprite) {
-        sprite = scene.add.image(primitive.x, primitive.y, texture).setDepth(graphics.depth + 0.01)
+        sprite = scene.add.image(primitive.x, primitive.y, texture, frame).setDepth(graphics.depth + 0.01)
         sprites.push(sprite)
         treeSprites.set(graphics, sprites)
       }
-      sprite.setTexture(texture).setPosition(primitive.x, primitive.y)
+      sprite.setTexture(texture, frame).setPosition(primitive.x, primitive.y)
         .setDisplaySize(primitive.radiusX * 2, primitive.radiusY * 2).setRotation(primitive.rotation ?? 0).setVisible(true)
       shown++
       continue
