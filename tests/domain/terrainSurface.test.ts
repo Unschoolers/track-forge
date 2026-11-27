@@ -62,6 +62,34 @@ describe('compiled terrain surface', () => {
     expect(surface.heightAt({ x: 25 * 32, y: 25 * 32 })).toBe(0)
   })
 
+  it('reuses water corner bevels for decorative hills without changing height or grade', () => {
+    const cells = [{ column: 0, row: 0 }, { column: 1, row: 0 }, { column: 0, row: 1 }]
+    const hill = compile(paintTerrain(EMPTY_TERRAIN, cells, 'hill'))
+    const water = compile(paintTerrain(EMPTY_TERRAIN, cells, 'water'))
+    expect(hill.visualContours?.[0]?.points).toEqual(water.contours[0]?.points)
+    expect(hill.visualContours?.[0]?.points.length).toBeGreaterThan(hill.contours[0]?.points.length ?? 0)
+    expect(hill.heightAt({ x: 2, y: 2 })).toBeGreaterThan(0)
+    expect(hill.heightAt({ x: 34, y: 34 })).toBe(0)
+    expect(hill.gradeAt({ x: 2, y: 2 }, 'natural')).toBeGreaterThan(0)
+    expect(hill.gradeAt({ x: 34, y: 34 }, 'natural')).toBe(0)
+  })
+
+  it('preserves visual hill holes, isolated cells and water junctions', () => {
+    const hills = paintTerrain(EMPTY_TERRAIN, [
+      ...rectangle(0, 2, 0, 2).filter(cell => cell.column !== 1 || cell.row !== 1),
+      { column: 6, row: 6 },
+    ], 'hill')
+    const surface = compile(paintTerrain(hills, [{ column: 1, row: 1 }], 'water'))
+    const canonical = surface.contours.filter(contour => contour.kind === 'hill')
+    const visual = surface.visualContours?.filter(contour => contour.kind === 'hill') ?? []
+    expect(visual).toHaveLength(canonical.length)
+    expect(visual.filter(contour => signedArea(contour.points) < 0))
+      .toEqual(canonical.filter(contour => signedArea(contour.points) < 0))
+    expect(visual.find(contour => contour.points.some(point => point.x === 192 && point.y === 192)))
+      .toEqual(canonical.find(contour => contour.points.some(point => point.x === 192 && point.y === 192)))
+    expect(surface.materialAt({ x: 48, y: 48 })).toBe('water')
+  })
+
   it('samples natural boundary slopes and a merged hill plateau', () => {
     const terrain = paintTerrain(
       EMPTY_TERRAIN,
