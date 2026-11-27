@@ -5,8 +5,8 @@ export interface SceneryTransform {
 }
 
 export const TREE_SIZE = 56
-export const MIN_SCENERY_SCALE = 0.25
-export const MAX_SCENERY_SCALE = 2
+export const MIN_SCENERY_SCALE = 0.5
+export const MAX_SCENERY_SCALE = 1.5
 export const SCENERY_SCALE_STEP = 0.05
 
 export function normalizeSceneryTransform(item: { readonly rotation?: unknown; readonly scale?: unknown }): SceneryTransform | undefined {

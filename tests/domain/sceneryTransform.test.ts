@@ -13,7 +13,12 @@ describe('authored scenery transforms', () => {
     expect(normalizeSceneryTransform({ scale: Infinity })).toBeUndefined()
     expect(normalizeSceneryTransform({ rotation: -1 })).toBeUndefined()
     expect(stepSceneryScale(1, 1)).toBe(1.05)
-    expect(stepSceneryScale(2, 1)).toBe(2)
+    expect(stepSceneryScale(1.5, 1)).toBe(1.5)
+    expect(stepSceneryScale(0.5, -1)).toBe(0.5)
+    expect(normalizeSceneryTransform({ scale: 0.49 })).toBeUndefined()
+    expect(normalizeSceneryTransform({ scale: 1.51 })).toBeUndefined()
+    expect(normalizeSceneryTransform({ scale: 0.5 })).toEqual({ scale: 0.5 })
+    expect(normalizeSceneryTransform({ scale: 1.5 })).toEqual({ scale: 1.5 })
   })
 
   it('stores a prop transform during normalization', () => {
