@@ -24,6 +24,7 @@ import { createRaceHud } from '@/ui/screens/raceHud'
 import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
 import { attachMenuGlass } from '@/ui/menu/menuGlass'
+import { attachEditorGlass } from '@/ui/menu/editorGlass'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createModalFrame } from '@/ui/modals/modalFrame'
@@ -457,7 +458,9 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
-    this.materialCleanup = attachMenuGlass(this.root, overlay ?? (state.mode === 'home' ? screen : undefined))
+    this.materialCleanup = !overlay && state.mode === 'editor'
+      ? attachEditorGlass(this.root, screen)
+      : attachMenuGlass(this.root, overlay ?? (state.mode === 'home' ? screen : undefined))
     const scroll = libraryScroll ?? lobbyScroll
     if (scroll !== undefined) {
       const body = overlay?.querySelector<HTMLElement>('.modal-body')

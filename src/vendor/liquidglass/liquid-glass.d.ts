@@ -1,5 +1,8 @@
-/** Narrow typing for the vendored LiquidGlass.dev content-lens API. */
+/** Narrow typing for the vendored LiquidGlass.dev optical API. */
+export const engine: 'blink' | 'webkit' | 'gecko' | 'unknown'
 export interface GlassOptions {
+  mode?: 'content' | 'backdrop'
+  fallback?: string
   fit?: boolean
   clip?: boolean
   radius?: number

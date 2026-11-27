@@ -27,6 +27,11 @@
   --menu-control-rim: inset 0 1px 1px #ffffff60, inset 0 -1px 1px #b7d4ef36, 0 2px 6px #0003;
   --menu-control-panel: linear-gradient(145deg, #e6f3ff16, transparent 48%), #101923ed;
   --menu-control-rounding: 18px;
+  /* Live lenses use a contrast scrim rather than an opaque painted face. */
+  --menu-live-glass-fill: rgb(12 23 35 / 52%);
+  --menu-live-glass-group-fill: rgb(12 23 35 / 60%);
+  --menu-live-glass-border: rgb(220 239 255 / 32%);
+  --menu-live-glass-selection: rgb(255 146 92 / 82%);
   --menu-static-action-fill: radial-gradient(ellipse at 18% -12%, #f1faff80, transparent 38%),
     radial-gradient(ellipse at 88% 115%, #b6d8f24d, transparent 32%),
     linear-gradient(175deg, #ffffff12, transparent 26%, transparent 74%, #07101b24), rgb(15 28 41 / 20%);
