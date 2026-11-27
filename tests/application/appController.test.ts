@@ -255,6 +255,60 @@ describe('AppController', () => {
     }
   })
 
+  it('starts a Nearby rematch on the newly selected track', async () => {
+    const network = new NearbyNetwork()
+    let clock = 100
+    const now = () => clock
+    const track = createStarterTrack(asTrackId('rematch-start'), 1)
+    const host = new NearbyRace(network.endpoint('host'), () => true, now)
+    const guest = new NearbyRace(network.endpoint('guest'), () => true, now)
+    const h = setup(track, true, undefined, host, now)
+    const g = setup(track, true, undefined, guest, now)
+    const input = { steering: 0, throttle: 1, braking: false }
+    try {
+      h.controller.dispatch({ type: 'open-nearby' })
+      g.controller.dispatch({ type: 'open-nearby' })
+      host.host({ track, car: 'blue', laps: 1, lighting: 'day' })
+      await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
+      guest.scan('red')
+      await vi.waitFor(() => expect(guest.snapshot().rooms).toHaveLength(1), { interval: 5 })
+      guest.connect('host')
+      await vi.waitFor(() => expect(host.snapshot().canStart).toBe(true), { interval: 5 })
+      host.start()
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('lobby'), { interval: 5 })
+      host.setLobbyReady(true)
+      guest.setLobbyReady(true)
+      await vi.waitFor(() => expect(h.controller.snapshot().overlay.type).toBe('none'), { interval: 5 })
+      h.controller.dispatch({ type: 'nearby-scene-ready' })
+      g.controller.dispatch({ type: 'nearby-scene-ready' })
+      await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })
+
+      clock += 5000
+      for (const device of [h, g]) {
+        device.raceSession.advance(0.05, input)
+        device.raceSession.advance(0.05, input)
+        expect(device.controller.snapshot().overlay.type).toBe('results')
+      }
+      await vi.waitFor(() => expect(host.snapshot().canRematch).toBe(true), { interval: 5 })
+
+      const alternateTrack = { ...createStarterTrack(asTrackId('rematch-track'), 2), name: 'Rematch Circuit' }
+      h.trackStore.tracks.set(alternateTrack.id, alternateTrack)
+      h.controller.dispatch({ type: 'nearby-select-next-track' })
+      expect(h.controller.snapshot().overlay).toMatchObject({ type: 'track-library', purpose: 'nearby' })
+      h.controller.dispatch({ type: 'select-track-for-race', id: alternateTrack.id })
+      await vi.waitFor(() => {
+        expect(h.controller.snapshot().overlay.type).toBe('nearby')
+        expect(g.controller.snapshot().overlay.type).toBe('nearby')
+        expect(guest.snapshot().phase).toBe('lobby')
+      }, { interval: 5 })
+      expect(host.snapshot().lobbyTrack?.name).toBe(alternateTrack.name)
+      expect(guest.snapshot().lobbyTrack?.name).toBe(alternateTrack.name)
+    } finally {
+      h.controller.destroy()
+      g.controller.destroy()
+    }
+  })
+
   it('does not apply unsaved preferences to UI state when durable storage rejects the commit', () => {
     const { controller, preferencesStore } = setup()
     vi.mocked(preferencesStore.save).mockReturnValueOnce(false)
@@ -410,8 +464,11 @@ describe('AppController', () => {
     try {
       controller.dispatch({ type: 'open-nearby' })
       controller.dispatch({ type: 'open-track-library', purpose: 'nearby-host' })
+      const nearbySnapshot = vi.spyOn(nearby, 'snapshot')
+      nearbySnapshot.mockClear()
       controller.dispatch({ type: 'select-track-for-race', id: incomplete.id })
       expect(controller.snapshot().overlay).toEqual({ type: 'track-library', purpose: 'nearby-host' })
+      expect(nearbySnapshot).not.toHaveBeenCalled()
       expect(advertise).not.toHaveBeenCalled()
       expect(raceSession.start).not.toHaveBeenCalled()
     } finally {
@@ -995,6 +1052,30 @@ describe('AppController', () => {
     controller.dispatch({ type: 'save-current-track' })
     expect(trackStore.find(asTrackId('created'))?.trees).toContainEqual({ x: 4, y: 5 })
     expect(trackStore.find(original.id)).toEqual(original)
+  })
+
+  it('allows racing an imported shared track without saving or modifying the original', () => {
+    const original: Track = {
+      ...createStarterTrack(asTrackId('shared-race'), 1),
+      origin: 'imported',
+      creator: { id: 'remote-creator', name: 'Other Racer' },
+      signedSource: 'original signed export',
+    }
+    const { controller, trackStore, raceSession } = setup(original)
+    try {
+      controller.dispatch({ type: 'open-track-library', purpose: 'race' })
+      controller.dispatch({ type: 'select-track-for-race', id: original.id })
+
+      expect(controller.snapshot()).toMatchObject({
+        overlay: { type: 'race-setup' },
+        currentTrack: { id: original.id, origin: 'imported' },
+      })
+      expect(trackStore.find(original.id)).toEqual(original)
+      expect(trackStore.save).not.toHaveBeenCalled()
+      expect(raceSession.start).not.toHaveBeenCalled()
+    } finally {
+      controller.destroy()
+    }
   })
 
   it('Save As resumes a pending race using the new track without overwriting the source', () => {
