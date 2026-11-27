@@ -27,6 +27,26 @@ export interface TrackLibraryViewState {
   readonly searchQuery: string
   readonly searchOpen?: boolean
   readonly filter: 'all' | 'favorites'
+  readonly scrollTop?: number
+}
+
+/** Capture the library's user-facing view without making its markup host policy. */
+export function captureTrackLibraryViewState(modal: HTMLElement): TrackLibraryViewState {
+  const search = modal.querySelector<HTMLInputElement>('.track-library-search')
+  return {
+    searchQuery: search?.value ?? '',
+    searchOpen: search ? !search.hidden : false,
+    filter: modal.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed') === 'true'
+      ? 'favorites'
+      : 'all',
+    scrollTop: modal.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0,
+  }
+}
+
+/** Restore after attachment and dialog focus management establish browser layout. */
+export function restoreTrackLibraryViewState(modal: HTMLElement, state: TrackLibraryViewState): void {
+  const body = modal.querySelector<HTMLElement>('.modal-body')
+  if (body) body.scrollTop = state.scrollTop ?? 0
 }
 
 // Built-in tracks are immutable; reuse identity collections on each library redraw.

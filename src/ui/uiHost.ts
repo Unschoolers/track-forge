@@ -1,6 +1,6 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
 import type { NearbyConnectionModes } from '@/infrastructure/multiplayer/selectNearbyConnection'
-import { createNearbyLeaveConfirmation, createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults } from '@/ui/modals/nearbyRaceModal'
+import { captureNearbyLobbyViewState, createNearbyLeaveConfirmation, createNearbyRaceMenu, createNearbyRaceModal, createNearbyRaceResults, restoreNearbyLobbyDiagnostics, restoreNearbyLobbyScroll, type NearbyLobbyViewState } from '@/ui/modals/nearbyRaceModal'
 import { exportTrack, saveJsonFile, shareTrack } from '@/infrastructure/export/trackExport'
 import { raceDiagnosticsFilename } from '@/infrastructure/export/raceExportName'
 import { formatRaceTime } from '@/ui/format'
@@ -37,7 +37,7 @@ import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
 import { createOptionsModal } from '@/ui/modals/optionsModal'
 import { createPauseModal } from '@/ui/modals/pauseModal'
 import { createRaceSetupModal } from '@/ui/modals/raceSetupModal'
-import { createTrackLibraryModal, type TrackLibraryViewState } from '@/ui/modals/trackLibraryModal'
+import { captureTrackLibraryViewState, createTrackLibraryModal, restoreTrackLibraryViewState, type TrackLibraryViewState } from '@/ui/modals/trackLibraryModal'
 import { isSeededTrack } from '@/domain/track/trackCreator'
 import { isSharedTrack } from '@/domain/track/trackAccess'
 import { createToast } from '@/ui/toast'
@@ -95,6 +95,7 @@ export class DomUiHost implements UiHost {
   private updateCheckGeneration = 0
   private previousOverlayType: AppSnapshot['overlay']['type'] = 'none'
   private trackLibraryViewState: TrackLibraryViewState | undefined
+  private nearbyLobbyViewState: NearbyLobbyViewState | undefined
   private readonly noticeTimers = new Set<ReturnType<typeof setTimeout>>()
   private noticeGeneration = 0
 
@@ -144,6 +145,8 @@ export class DomUiHost implements UiHost {
     this.lastUpdateCheckAt = Number.NEGATIVE_INFINITY
     this.previousOverlayType = 'none'
     this.previousSnapshot = undefined
+    this.trackLibraryViewState = undefined
+    this.nearbyLobbyViewState = undefined
     this.editorDiagnosticsMemo.clear()
     this.noticeGeneration++
     for (const timer of this.noticeTimers) clearTimeout(timer)
@@ -436,10 +439,6 @@ export class DomUiHost implements UiHost {
       screen = raceHud.element
       this.screenCleanup = () => raceHud.destroy()
     }
-    // Rebuilding a sorted library after starring a card must not jump back to the top.
-    const libraryScroll = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
-      ? this.root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop
-      : undefined
     // Preserve the current view while visiting race setup, not on a fresh visit.
     const returningThroughSetup = state.mode === 'home' && (
       state.overlay.type === 'race-setup' ||
@@ -453,21 +452,17 @@ export class DomUiHost implements UiHost {
       (state.overlay.type === 'track-library' || returningThroughSetup || returningThroughShare)
       ? this.root.querySelector<HTMLElement>('.track-library-modal')
       : null
-    const librarySearch = currentLibrary?.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
     if (currentLibrary) {
-      this.trackLibraryViewState = {
-        searchQuery: librarySearch?.value ?? '',
-        searchOpen: librarySearch ? !librarySearch.hidden : false,
-        filter: currentLibrary.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed') === 'true'
-          ? 'favorites'
-          : 'all',
-      }
+      this.trackLibraryViewState = captureTrackLibraryViewState(currentLibrary)
     } else if (!returningThroughSetup && !returningThroughShare) this.trackLibraryViewState = undefined
-    // Keep the local player's scroll and diagnostic export across roster updates.
+    // Keep lobby scroll and diagnostics disclosure/export control across roster updates.
     const previousLobby = lobbyTrack && this.previousOverlayType === 'nearby'
       ? this.root.querySelector<HTMLElement>('.nearby-lobby-modal') : null
-    const lobbyScroll = previousLobby?.querySelector<HTMLElement>('.modal-body')?.scrollTop
-    const diagnostics = previousLobby?.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')
+    if (previousLobby) this.nearbyLobbyViewState = captureNearbyLobbyViewState(previousLobby)
+    else if (state.overlay.type !== 'nearby' ||
+      (state.overlay.type === 'nearby' && !lobbyTrack && !state.overlay.confirmLeave)) {
+      this.nearbyLobbyViewState = undefined
+    }
     const overlay = this.renderOverlay(state)
     // Lighting changes rebuild this modal. Carry only this interaction into
     // the new button, not into a different track or a fresh visit.
@@ -478,8 +473,8 @@ export class DomUiHost implements UiHost {
       const lightingToggle = overlay?.querySelector<HTMLButtonElement>('.lighting-toggle')
       if (lightingToggle) lightingToggle.dataset.lightingTransition = 'true'
     }
-    if (diagnostics && overlay?.classList.contains('nearby-lobby-modal')) {
-      overlay.querySelector('.nearby-lobby-diagnostics')?.replaceWith(diagnostics)
+    if (overlay?.classList.contains('nearby-lobby-modal') && this.nearbyLobbyViewState) {
+      restoreNearbyLobbyDiagnostics(overlay, this.nearbyLobbyViewState)
     }
     this.flyover.end()
     const nodes: Node[] = [screen]
@@ -497,14 +492,17 @@ export class DomUiHost implements UiHost {
     this.materialCleanup = !overlay && state.mode === 'editor'
       ? attachEditorGlass(this.root, screen)
       : attachMenuGlass(this.root, overlay ?? (state.mode === 'home' ? screen : undefined))
-    const scroll = libraryScroll ?? lobbyScroll
-    if (scroll !== undefined) {
-      const body = overlay?.querySelector<HTMLElement>('.modal-body')
-      if (body) body.scrollTop = scroll
-    }
     this.dialogs.afterRender(this.root, state.overlay, () =>
       this.controller.dispatch({ type: 'close-overlay' }),
     )
+    // Apply modal-owned scroll after attachment and dialog focus management.
+    if (state.overlay.type === 'track-library' && this.trackLibraryViewState) {
+      const library = this.root.querySelector<HTMLElement>('.track-library-modal')
+      if (library) restoreTrackLibraryViewState(library, this.trackLibraryViewState)
+    }
+    if (overlay?.classList.contains('nearby-lobby-modal') && this.nearbyLobbyViewState) {
+      restoreNearbyLobbyScroll(overlay, this.nearbyLobbyViewState)
+    }
     this.previousOverlayType = state.overlay.type
     if (state.mode === 'home' && state.overlay.type === 'none') this.checkForUpdates()
   }

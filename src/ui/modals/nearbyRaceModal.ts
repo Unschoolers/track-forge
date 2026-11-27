@@ -199,6 +199,31 @@ export function createNearbyRaceModal(
   return frame.overlay
 }
 
+/** Carry lobby-only transient interaction state across roster-driven redraws. */
+export interface NearbyLobbyViewState {
+  readonly scrollTop: number
+  readonly diagnostics: HTMLDetailsElement | null
+}
+
+export function captureNearbyLobbyViewState(modal: HTMLElement): NearbyLobbyViewState {
+  return {
+    scrollTop: modal.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0,
+    diagnostics: modal.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics'),
+  }
+}
+
+/** Move the existing subtree before replacement to preserve an active export. */
+export function restoreNearbyLobbyDiagnostics(modal: HTMLElement, state: NearbyLobbyViewState): void {
+  const diagnostics = modal.querySelector('.nearby-lobby-diagnostics')
+  if (diagnostics && state.diagnostics) diagnostics.replaceWith(state.diagnostics)
+}
+
+/** Scroll restoration requires an attached modal and a computed browser scroll range. */
+export function restoreNearbyLobbyScroll(modal: HTMLElement, state: NearbyLobbyViewState): void {
+  const body = modal.querySelector<HTMLElement>('.modal-body')
+  if (body) body.scrollTop = state.scrollTop
+}
+
 export function createNearbyRaceResults(
   nearby: NearbyRace,
   result: RaceResult,

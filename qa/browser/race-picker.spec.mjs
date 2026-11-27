@@ -146,6 +146,25 @@ test('track library stays fullscreen with empty, filtered and populated results'
   }
 })
 
+test('track library restores real scroll after sorted rerender and resets on a fresh visit', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 460 })
+  await seedOwnedTrack(page)
+  const picker = await openPicker(page)
+  const body = picker.locator('.modal-body')
+  await expect.poll(() => body.evaluate(node => node.scrollHeight - node.clientHeight)).toBeGreaterThan(0)
+  await body.evaluate(node => { node.scrollTop = node.scrollHeight })
+  const before = await body.evaluate(node => node.scrollTop)
+  expect(before).toBeGreaterThan(0)
+
+  await picker.locator('.track-card').last().locator('.track-card-favorite').click()
+  await expect.poll(() => body.evaluate(node => node.scrollTop)).toBe(before)
+
+  await picker.getByRole('button', { name: 'BACK', exact: true }).click()
+  await page.getByRole('button', { name: 'Race', exact: true }).click()
+  const freshPicker = page.getByRole('dialog', { name: 'Choose a track' })
+  await expect(freshPicker.locator('.modal-body')).toHaveJSProperty('scrollTop', 0)
+})
+
 test('track cards stay in two columns with reachable controls on narrow and landscape phones', async ({ page }) => {
   // Track decoding caps saved names at 32 characters; use that full supported length.
   const longName = 'A Long Track Title at Max Length'
