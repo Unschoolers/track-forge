@@ -78,11 +78,34 @@ describe('drift boost exhaust rendering', () => {
     expect(calls).toContainEqual({ name: 'translateCanvas', args: [20, 10] })
     expect(calls).toContainEqual({ name: 'rotateCanvas', args: [Math.PI / 2] })
     expect(calls).toContainEqual({ name: 'scaleCanvas', args: [VEHICLE_VISUAL_SCALE * 1.11, VEHICLE_VISUAL_SCALE * 1.11] })
-    expect(calls.filter(({ name }) => name === 'fillStyle').map(({ args }) => args))
-      .toContainEqual([TOPPER_COLORS.violet, 0.9])
+    const colors = calls.filter(({ name }) => name === 'fillStyle').map(({ args }) => args)
+    expect(colors).toEqual([
+      [TOPPER_COLORS.violet, 0.55 + 0.3 * 0.5], [0xffffff, 0.5],
+      [TOPPER_COLORS.violet, 0.55 + 0.3 * 0.5], [0xffffff, 0.5],
+    ])
     expect(calls.filter(({ name }) => name === 'lineTo').every(({ args }) =>
       typeof args[0] === 'number' && args[0] >= -30 && args[0] <= -18,
     )).toBe(true)
+  })
+
+  it('produces a brighter and longer initial backfire, then flickers in the topper color', () => {
+    const sample = (remainingTicks: number, pulse: number) => {
+      const { graphics, calls } = recordingGraphics()
+      renderBoostFlames(graphics, {
+        ...vehicle, driftBoost: { ...vehicle.driftBoost, remainingTicks },
+      }, TOPPER_COLORS.pink, pulse)
+      const colors = calls.filter(({ name }) => name === 'fillStyle').map(({ args }) => args)
+      const outerTip = calls.find(({ name }) => name === 'lineTo')?.args[0]
+      return { colors, outerTip }
+    }
+    const ignition = sample(60, 0)
+    const quiet = sample(30, 0)
+    const flicker = sample(30, 1)
+    expect(ignition.colors).toContainEqual([TOPPER_COLORS.pink, 0.95])
+    expect(quiet.colors).toContainEqual([TOPPER_COLORS.pink, 0.55])
+    expect(flicker.colors).toContainEqual([TOPPER_COLORS.pink, 0.55 + 0.3])
+    expect(ignition.outerTip).toBeLessThan(Number(flicker.outerTip))
+    expect(flicker.outerTip).toBeLessThan(Number(quiet.outerTip))
   })
 
   it('uses each vehicle artwork taillight pair as its exhaust anchor', () => {
