@@ -428,7 +428,9 @@ export class DomUiHost implements UiHost {
     this.root.replaceChildren(...nodes)
     this.materialCleanup = attachEdgeRefraction(
       this.root,
-      '.home-screen .tf-menu-dock, .track-library-modal .track-library-toolbar, .options-modal .options-tab-list, .race-setup-modal .modal-footer',
+      overlay
+        ? '.track-library-modal .track-library-toolbar, .options-modal .options-tab-list, .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close'
+        : '.home-screen:not(:has(.home-navigation)) .tf-menu-dock, .home-screen:has(.home-navigation) .tf-menu-action',
     )
     const scroll = libraryScroll ?? lobbyScroll
     if (scroll !== undefined) {

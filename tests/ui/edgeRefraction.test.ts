@@ -77,6 +77,10 @@ describe('static edge refraction', () => {
     expect(filters[0]?.querySelector('feImage')?.getAttribute('width')).toBe('180')
     expect(filters[0]?.querySelector('feImage')?.getAttribute('height')).toBe('80')
     expect(filters[0]?.getAttribute('primitiveUnits')).toBe('userSpaceOnUse')
+    expect(filters[0]?.querySelector('feDisplacementMap')?.getAttribute('scale')).toBe('24')
+    // The visible rim approaches the full displacement range while the center stays neutral.
+    expect(normalMap.data[(40 * normalMap.width + 1) * 4]).toBeLessThan(32)
+    expect(normalMap.data[(40 * normalMap.width + 178) * 4]).toBeGreaterThan(224)
 
     const observer = TestResizeObserver.instances[0]
     if (!observer) throw new Error('Resize observer was not attached')
