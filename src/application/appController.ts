@@ -386,7 +386,9 @@ export class AppController {
         }
         break
       case 'pause-race':
-        if (this.state.mode === 'race' && this.state.overlay.type !== 'results') {
+        if (this.state.mode === 'race' && this.state.overlay.type !== 'results' &&
+            !(this.state.overlay.type === 'track-share' && this.state.overlay.returnTo.type === 'results') &&
+            !(this.state.overlay.type === 'nearby' && this.state.overlay.shareReturnTo?.type === 'results')) {
           if (this.beforeNearbyTrack === undefined) this.dependencies.raceSession.setPaused(true)
           this.update({
             ...this.state,
