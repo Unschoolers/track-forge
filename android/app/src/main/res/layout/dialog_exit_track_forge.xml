@@ -5,11 +5,6 @@
     android:orientation="vertical"
     android:background="@drawable/trackforge_dialog_surface">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:background="#FF7846" />
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -44,31 +39,33 @@
             <Button
                 android:id="@+id/exit_dialog_stay"
                 android:layout_width="0dp"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="10dp"
                 android:background="@drawable/trackforge_dialog_button_secondary"
                 android:backgroundTint="@null"
-                android:fontFamily="monospace"
+                android:fontFamily="sans-serif-medium"
                 android:text="@string/exit_track_forge_stay"
                 android:textAllCaps="false"
                 android:textColor="#EDF2F8"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="normal" />
 
             <Button
                 android:id="@+id/exit_dialog_confirm"
                 android:layout_width="0dp"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
                 android:layout_weight="1"
                 android:background="@drawable/trackforge_dialog_button_primary"
                 android:backgroundTint="@null"
-                android:fontFamily="monospace"
+                android:fontFamily="sans-serif-medium"
                 android:text="@string/exit_track_forge_exit"
                 android:textAllCaps="false"
                 android:textColor="#101017"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="normal" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
