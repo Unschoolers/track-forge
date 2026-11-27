@@ -81,6 +81,71 @@ test('Options keeps its full available height and fixed chrome across categories
   }
 })
 
+test('track library stays fullscreen with empty, filtered and populated results', async ({ page }) => {
+  await seedOwnedTrack(page)
+  const picker = await openPicker(page)
+  const all = picker.getByRole('button', { name: 'All circuits', exact: true })
+  const favorites = picker.getByRole('button', { name: 'Favorites', exact: true })
+  const cards = picker.locator('.track-card')
+  const measure = () => picker.evaluate(card => {
+    const overlay = card.parentElement
+    const style = getComputedStyle(overlay)
+    const outer = overlay.getBoundingClientRect()
+    const bounds = card.getBoundingClientRect()
+    const rect = selector => {
+      const { x, y, width, height } = card.querySelector(selector).getBoundingClientRect()
+      return { x, y, width, height }
+    }
+    return {
+      x: bounds.x, y: bounds.y, right: bounds.right, bottom: bounds.bottom,
+      availableLeft: outer.left + parseFloat(style.paddingLeft),
+      availableTop: outer.top + parseFloat(style.paddingTop),
+      availableRight: outer.right - parseFloat(style.paddingRight),
+      availableBottom: outer.bottom - parseFloat(style.paddingBottom),
+      header: rect('.modal-header'), footer: rect('.modal-footer'),
+    }
+  })
+  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport)
+    await all.click()
+    const baseline = await measure()
+    expect(baseline.x).toBeCloseTo(baseline.availableLeft, 0)
+    expect(baseline.y).toBeCloseTo(baseline.availableTop, 0)
+    expect(baseline.right).toBeCloseTo(baseline.availableRight, 0)
+    expect(baseline.bottom).toBeCloseTo(baseline.availableBottom, 0)
+    await expect(cards.first()).toBeVisible()
+    const total = await cards.count()
+    expect(total).toBeGreaterThan(1)
+    await expect(picker.locator('.track-library-toolbar > lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+    const toolbar = await picker.locator('.track-library-toolbar').boundingBox()
+    await favorites.click()
+    await expect(cards).toHaveCount(0)
+    await expect(picker.locator('.empty-state')).toBeVisible()
+    expect(await measure()).toEqual(baseline)
+    expect(await picker.locator('.track-library-toolbar').boundingBox()).toEqual(toolbar)
+    await all.click()
+    const add = picker.getByRole('button', { name: 'Add ' + OWNED_TRACK_NAME + ' to favorites', exact: true })
+    await add.click()
+    await favorites.click()
+    await expect(cards).toHaveCount(1)
+    expect(await measure()).toEqual(baseline)
+    await expect(picker.locator('[data-action="library-back"]')).toBeInViewport()
+    await expect(picker.locator('[data-action="import-track-file"]')).toBeInViewport()
+    await picker.getByRole('button', { name: 'Search circuits' }).click()
+    const search = picker.getByRole('searchbox', { name: 'Search tracks' })
+    await search.fill('No such track 42')
+    await expect(cards).toHaveCount(0)
+    expect(await measure()).toEqual(baseline)
+    await picker.getByRole('button', { name: 'Close search' }).click()
+    await expect(cards).toHaveCount(1)
+    await picker.getByRole('button', { name: 'Remove ' + OWNED_TRACK_NAME + ' from favorites', exact: true }).click()
+    await expect(cards).toHaveCount(0)
+    await all.click()
+    await expect(cards).toHaveCount(total)
+    expect(await measure()).toEqual(baseline)
+  }
+})
+
 test('track cards stay in two columns with reachable controls on narrow and landscape phones', async ({ page }) => {
   // Track decoding caps saved names at 32 characters; use that full supported length.
   const longName = 'A Long Track Title at Max Length'

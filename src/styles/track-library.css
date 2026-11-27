@@ -1,12 +1,27 @@
 /* The route is the hero; filters and actions sit in a distinct functional layer. */
 .track-library-modal { isolation: isolate; background: linear-gradient(145deg, #070d1655, #080d1680), #080d14 url('../assets/title/city-harbor.webp') center / cover no-repeat; backdrop-filter: none; }
-.track-library-modal .modal-card { width: min(68rem, 100%); border-radius: 1.25rem; border-color: #71808c66; background: rgb(17 24 32 / 44%); box-shadow: 0 1.5rem 5rem #0008; }
+/* The library is a full-screen destination, not a content-sized dialog.
+   Keep the viewport-sized grid even for one favorite or an empty search. */
+.track-library-modal {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.track-library-modal .modal-card {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgb(17 24 32 / 44%);
+  box-shadow: none;
+}
 .track-library-modal .modal-header { padding: 1.1rem 1.4rem .7rem; }
 .track-library-modal .modal-title { font-size: clamp(1.55rem, 4.6vw, 2.35rem); letter-spacing: -.045em; }
 .track-library-modal .modal-subtitle { font-size: .9rem; }
 .track-library-modal .modal-close { border-radius: 50%; }
-.track-library-modal .modal-body { padding: .65rem 1.4rem 1rem; }
-.track-library-modal .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem 1.4rem max(1rem, env(safe-area-inset-bottom)); }
+.track-library-modal .modal-body { min-height: 0; padding: .65rem 1.4rem 1rem; overscroll-behavior-y: contain; }
+.track-library-modal .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem 1.4rem 1rem; }
 .track-library-modal .modal-footer .button { min-width: 0; padding-inline: 1.1rem; }
 .track-library-modal .track-library-content { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .8rem; min-height: 0; }
 .track-library-modal .track-library-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .4rem; padding: .3rem; border: 1px solid #8393a580; border-radius: 1.2rem; background: linear-gradient(145deg, #e4f2ff14, transparent 36%, #080c1620), rgb(24 36 49 / 20%); box-shadow: inset 0 1px 1px #ffffff40, inset 0 -1px 1px #0006; }
@@ -197,7 +212,7 @@
   .track-library-modal .track-card-copy { padding: .25rem .35rem; }
   .track-library-modal .modal-header { padding: .9rem 1rem .55rem; }
   .track-library-modal .modal-body { padding: .55rem 1rem .8rem; }
-  .track-library-modal .modal-footer { padding: .65rem 1rem max(.8rem, env(safe-area-inset-bottom)); }
+  .track-library-modal .modal-footer { padding: .65rem 1rem .8rem; }
 }
 @media (max-width: 380px) {
   .track-library-modal .track-card-select { padding: 3.15rem .3rem .3rem; }
