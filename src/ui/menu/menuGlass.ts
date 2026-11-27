@@ -2,8 +2,8 @@ import { attachLightingArtwork } from '@/ui/components/lightingToggle'
 import { glassOptics } from '@/ui/menu/glassMaterial'
 
 /** Static artwork is a screen capability, not a per-button allowlist.
- * All standard actions share one policy; content cards and live canvases are
- * deliberately excluded. Choices in settings remain paint-only. */
+ * All standard actions share one policy; the track library also opts its
+ * visible selectable tiles in. Other content cards and live canvases stay excluded. */
 const standardActions = 'button.tf-menu-action, button.button, button.modal-close'
 const menuSurfaces = [
   { screen: '.home-screen', backdrop: '.home-artwork', groups: '' },
@@ -41,7 +41,23 @@ export function attachMenuGlass(
   let loading = false
   let loaded = false
   let lightingCleanup: (() => void) | undefined
-  const dynamic = screen.matches('.options-modal, .nearby-static-modal')
+  const library = screen.matches('.track-library-modal')
+  const dynamic = library || screen.matches('.options-modal, .nearby-static-modal')
+  const observedCards = new Set<HTMLElement>()
+  const visibleCards = new Set<HTMLElement>()
+  // Limit expensive displacement maps on long scrollable libraries, including
+  // desktop and partially visible rows. The remaining tiles retain their paint.
+  const cardObserver = library && typeof IntersectionObserver !== 'undefined'
+    ? new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          const card = entry.target as HTMLElement
+          if (!observedCards.has(card)) continue
+          if (entry.isIntersecting) visibleCards.add(card)
+          else visibleCards.delete(card)
+        }
+        sync()
+      })
+    : undefined
 
   const clear = () => {
     lightingCleanup?.()
@@ -65,7 +81,21 @@ export function attachMenuGlass(
     const actions = [...screen.querySelectorAll<HTMLElement>(actionsSelector)]
       .filter(action => visible(action) && !action.closest('.track-card, .cup-track-row') &&
         !groups.some(group => group.contains(action)))
-    const surfaces = new Set([...groups, ...actions])
+    const cards = cardObserver ? [...screen.querySelectorAll<HTMLElement>('.track-card')].filter(visible) : []
+    const cardSet = new Set(cards)
+    for (const card of observedCards) {
+      if (cardSet.has(card)) continue
+      cardObserver?.unobserve(card)
+      observedCards.delete(card)
+      visibleCards.delete(card)
+    }
+    for (const card of cards) {
+      if (observedCards.has(card)) continue
+      observedCards.add(card)
+      cardObserver?.observe(card)
+    }
+    const opticalCards = cards.filter(card => visibleCards.has(card)).slice(0, 8)
+    const surfaces = new Set([...groups, ...actions, ...opticalCards])
     for (const [surface, panel] of panels) {
       if (surfaces.has(surface)) continue
       panel.remove()
@@ -76,6 +106,7 @@ export function attachMenuGlass(
     for (const surface of surfaces) {
       if (panels.has(surface)) continue
       const group = groups.includes(surface)
+      const card = cardSet.has(surface)
       const panel = document.createElement('lg-panel')
       panel.setAttribute('aria-hidden', 'true')
       panel.setAttribute('backdrop', config.backdrop)
@@ -85,7 +116,7 @@ export function attachMenuGlass(
         panel.setAttribute(name === 'specularWidth' ? 'specular-width' : name, String(value))
       }
       surface.dataset.liquidGlass = ''
-      surface.dataset.liquidGlassKind = group ? 'group' : 'action'
+      surface.dataset.liquidGlassKind = card ? 'card' : group ? 'group' : 'action'
       panels.set(surface, panel)
       surface.prepend(panel)
     }
@@ -106,7 +137,7 @@ export function attachMenuGlass(
 
   // Updates, release notes and disclosed diagnostics can change in place. Observe
   // only structural/visibility changes involving actual controls, not lens internals.
-  const selector = [actionsSelector, config.groups].filter(Boolean).join(', ')
+  const selector = [actionsSelector, config.groups, library ? '.track-card' : ''].filter(Boolean).join(', ')
   const containsControl = (node: Node) => node instanceof Element &&
     (node.matches(selector) || node.querySelector(selector) !== null)
   const observer = dynamic ? new MutationObserver(records => {
@@ -124,6 +155,9 @@ export function attachMenuGlass(
   return () => {
     disposed = true
     observer?.disconnect()
+    cardObserver?.disconnect()
+    observedCards.clear()
+    visibleCards.clear()
     preference.removeEventListener('change', onPreference)
     clear()
   }
