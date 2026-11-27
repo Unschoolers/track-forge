@@ -31,9 +31,13 @@ describe('home screen', () => {
     expect(screen.classList.contains('tf-menu')).toBe(true)
     expect(screen.querySelector('[aria-label="Race"] [data-action="race"]')?.classList.contains('tf-menu-action--primary')).toBe(true)
     const raceAgainAction = screen.querySelector('[aria-label="Race"] [data-action="race-again"]')
-    expect(raceAgainAction?.textContent).toBe('Race again · City Sprint')
-    expect(raceAgainAction?.querySelector('.home-race-again-label')?.textContent).toBe('Race again · City Sprint')
-    expect(screen.querySelector('[aria-label="Main menu"]')?.querySelectorAll('button')).toHaveLength(5)
+    expect(raceAgainAction?.getAttribute('aria-label')).toBe('Race again · City Sprint')
+    expect(raceAgainAction?.querySelector('.home-race-again-label')?.textContent).toBe('Race again')
+    expect(raceAgainAction?.querySelector('.home-race-again-track')?.textContent).toBe('City Sprint')
+    const navigation = screen.querySelector('nav[aria-label="Main menu"]')
+    expect(navigation?.querySelectorAll(':scope > button')).toHaveLength(5)
+    expect(navigation?.closest('[data-material]')).toBeNull()
+    expect(screen.querySelectorAll('.tf-menu-dock')).toHaveLength(1)
     expect(screen.textContent).toContain(track.name)
 
     for (const [action, callback] of Object.entries({ race, 'race-again': raceAgain, editor: edit, nearby, 'arcade-cup': cup, options, 'open-updates': updates })) {

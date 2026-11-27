@@ -1,15 +1,19 @@
 @import './menu-system.css';
 
-.home-screen {
+/* Home uses the shared shell's actual regions. Independent destinations are
+   buttons, not segments in a single glass capsule. */
+.tf-menu.home-screen {
   --home-accent: #ff925c;
   --home-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: grid;
+  grid-template-rows: auto minmax(min-content, 1fr) auto;
   overflow: auto;
-  padding: max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-top)) max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-right))
-    max(clamp(.75rem, 2vw, 1.5rem), env(safe-area-inset-bottom)) max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-left));
+  pointer-events: auto;
+  gap: .85rem;
+  padding: max(clamp(1rem, 3vw, 3rem), env(safe-area-inset-top)) max(clamp(.9rem, 3vw, 3rem), env(safe-area-inset-right))
+    max(clamp(.9rem, 2vw, 1.5rem), env(safe-area-inset-bottom)) max(clamp(.9rem, 3vw, 3rem), env(safe-area-inset-left));
   background: #080b10;
 }
-.home-screen .tf-menu-media { z-index: -1; }
 .home-artwork {
   position: absolute;
   inset: 0;
@@ -18,16 +22,16 @@
 .home-artwork::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, #080b10 0%, #080b10e8 14%, #080b10a8 37%, #080b1020 75%),
-    linear-gradient(0deg, #080b10d9, transparent 42%, #080b1030);
+  background: linear-gradient(90deg, #080b10 0%, #080b10d9 20%, #080b1066 55%, transparent 85%),
+    linear-gradient(0deg, #080b10e8, transparent 42%, #080b1030);
   content: '';
 }
-.home-menu-header { align-self: end; max-width: 34rem; }
+.home-screen .tf-menu-header { align-self: start; max-width: 36rem; }
 .home-eyebrow {
-  margin: 0 0 .55rem;
+  margin: 0 0 .5rem;
   color: #d5dce3;
   font: 650 .72rem/1.4 var(--home-mono);
-  letter-spacing: .14em;
+  letter-spacing: .12em;
 }
 .home-title {
   display: flex;
@@ -39,92 +43,107 @@
   text-shadow: 0 3px 28px #0008;
 }
 .home-brand-accent { color: var(--home-accent); }
-.home-menu-content {
-  display: flex;
-  align-items: center;
-  overflow: visible;
-  padding-block: clamp(1rem, 4vh, 3rem);
-}
+.home-screen .tf-menu-content { display: grid; align-content: start; overflow: visible; }
 .home-track {
   width: min(33rem, 100%);
-  padding: .1rem 0 .15rem 1rem;
+  padding: .1rem 0 .15rem .85rem;
   border-left: 2px solid var(--home-accent);
   text-shadow: 0 2px 14px #000, 0 1px 3px #000;
 }
 .home-track-label {
   color: #ffd6c3;
-  font: 700 .68rem/1.35 var(--home-mono);
-  letter-spacing: .13em;
-  text-shadow: 0 1px 5px #000;
+  font: 700 .72rem/1.35 system-ui, sans-serif;
+  letter-spacing: .08em;
 }
 .home-track-name {
   margin: .3rem 0 .2rem;
-  font-size: clamp(1.35rem, 2.8vw, 2.15rem);
+  font-size: clamp(1.25rem, 2.8vw, 2.15rem);
   font-weight: 750;
-  line-height: 1.05;
-  letter-spacing: -.035em;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+  letter-spacing: -.025em;
 }
 .home-track-credit, .home-track-best, .home-track-progress {
-  margin: .35rem 0 0;
-  color: #f0f3f7;
-  font: 550 .75rem/1.45 var(--home-mono);
+  margin: .25rem 0 0;
+  color: #e5ebf0;
+  font: 500 .82rem/1.35 system-ui, sans-serif;
+  overflow-wrap: anywhere;
 }
-.home-menu-actions { align-self: end; gap: .65rem; }
-.home-menu-actions .tf-menu-dock { justify-content: center; }
-.home-primary-dock { min-width: min(26rem, 100%); }
-.home-primary-dock .tf-menu-action { flex: 1; }
-.home-primary-dock .tf-menu-action--primary { min-width: min(12rem, 48vw); font-size: 1.05rem; }
-.home-primary-dock [data-action='race-again'] { min-width: 0; }
-.home-race-again-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-navigation-dock { gap: 2px; background: #182431ed; }
-.home-navigation-dock .tf-menu-action { min-height: 44px; padding-inline: clamp(.55rem, 2vw, 1rem); font-size: .82rem; }
-.home-navigation-dock [data-action='open-updates'] { color: #ffd1b6; }
-/* The still image behind the home docks is the visible glass backdrop. The dark
-   tint keeps controls legible; this is a CSS frost effect, not refraction. */
-@supports (backdrop-filter: blur(8px)) {
-  .home-screen[data-backdrop='static'] .home-primary-dock,
-  .home-screen[data-backdrop='static'] .home-navigation-dock {
-    border-color: #c4d4e477;
-    background: linear-gradient(135deg, #eaf5ff30 0%, #d6e8f00a 36%, transparent 62%), #152332a8;
-    box-shadow: inset 0 1px 1px #ffffff50, inset 0 -1px 1px #0009, 0 10px 34px #0008;
-    backdrop-filter: blur(18px) saturate(125%);
-  }
-  .home-screen[data-backdrop='static'] .home-navigation-dock { background-color: #1523329c; }
+.home-track-best { font-variant-numeric: tabular-nums; }
+.home-screen .tf-menu-actions {
+  align-self: end;
+  justify-items: stretch;
+  width: min(100%, 32rem);
+  gap: .65rem;
 }
-/* The host exposes the saved Options setting on the menu root. */
-[data-graphics-quality='low'] .home-screen[data-backdrop='static'] .tf-menu-dock[data-material] { background: #202a36; backdrop-filter: none; }
-@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .home-screen[data-backdrop='static'] .tf-menu-dock { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
+.home-primary-dock {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  width: 100%;
+  gap: .35rem;
+  border-radius: 1.5rem;
+  padding: .35rem;
 }
-@media (min-width: 900px) and (min-height: 600px) {
-  .home-screen { grid-template-rows: auto minmax(0, 1fr) auto; }
-  .home-menu-header { align-self: center; margin-top: 4vh; }
-  .home-menu-content { align-items: end; padding-bottom: clamp(1rem, 7vh, 5rem); }
-  .home-menu-actions { justify-items: start; }
-  .home-navigation-dock { margin-left: 1rem; }
+.home-primary-dock .tf-menu-action {
+  min-width: 0;
+  min-height: 56px;
+  padding: .55rem .65rem;
+  border-radius: 1.15rem;
+  overflow-wrap: anywhere;
+}
+.home-primary-dock .tf-menu-action--primary { font-size: 1.12rem; font-weight: 800; }
+.home-primary-dock [data-action='race-again'] {
+  display: grid;
+  gap: .15rem;
+  border-color: #ffffff30;
+  background: #10192355;
+}
+.home-race-again-label { font-size: .9rem; }
+.home-race-again-track { font-size: .74rem; font-weight: 500; color: var(--tf-muted); }
+.home-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+}
+.home-navigation .tf-menu-action {
+  min-width: 0;
+  min-height: 52px;
+  padding: .65rem .5rem;
+  border: 1px solid #8295a66b;
+  border-radius: 1rem;
+  background: #182431eb;
+  box-shadow: inset 0 1px #ffffff14;
+  font-size: .91rem;
+  overflow-wrap: anywhere;
+}
+.home-navigation [data-action='open-updates'] { grid-column: 1 / -1; color: #ffd1b6; }
+@media (hover: hover) {
+  .home-navigation .tf-menu-action:hover { background: #2b3b4b; }
+}
+@media (min-width: 760px) and (min-height: 521px) {
+  .home-screen .tf-menu-header { margin-top: 3vh; }
+  .home-screen .tf-menu-content { align-content: center; }
 }
 @media (max-width: 600px) {
   .home-artwork { background-image: url('../assets/title/city-harbor-portrait.webp'); background-position: center top; }
-  .home-artwork::after { background: linear-gradient(0deg, #080b10 4%, #080b10f2 31%, #080b1099 70%, #080b1033); }
-  .home-menu-header { align-self: start; }
-  .home-title { max-width: 10ch; font-size: clamp(2.25rem, 10vw, 3.25rem); }
-  .home-menu-content { align-items: end; padding-bottom: .35rem; }
-  .home-track { padding: .1rem 0 .15rem .8rem; }
-  .home-track-credit, .home-track-best, .home-track-progress { font-size: .72rem; }
-  .home-menu-actions .tf-menu-dock { width: 100%; }
-  .home-primary-dock { min-width: 0; }
-  .home-primary-dock .tf-menu-action { flex: 1 1 0; min-width: 0; padding-inline: .6rem; font-size: .8rem; }
-  .home-primary-dock .tf-menu-action--primary { min-width: 6rem; font-size: .95rem; }
-  .home-primary-dock [data-action='race-again'] { justify-content: flex-start; }
-  .home-navigation-dock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-artwork::after { background: linear-gradient(0deg, #080b10 0%, #080b10e0 23%, #080b1033 48%, #080b1044 68%, #080b10b0 100%); }
+  .home-title { font-size: clamp(2.15rem, 9vw, 3.4rem); }
+  .home-screen .tf-menu-actions { justify-self: center; }
 }
 @media (max-height: 520px) and (orientation: landscape) {
-  .home-screen { grid-template-columns: minmax(12rem, .9fr) minmax(14rem, 1.1fr); grid-template-rows: minmax(0, 1fr) auto; column-gap: 2rem; }
-  .home-menu-header { grid-column: 1; align-self: end; }
-  .home-menu-content { grid-column: 1; grid-row: 2; padding: .5rem 0 0; }
-  .home-menu-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-  .home-menu-actions .tf-menu-dock { width: 100%; }
-  .home-navigation-dock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tf-menu.home-screen {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(min-content, 1fr);
+    column-gap: clamp(.8rem, 3vw, 2rem);
+  }
+  .home-screen .tf-menu-header { grid-column: 1; align-self: end; }
+  .home-screen .tf-menu-content { grid-column: 1; grid-row: 2; }
+  .home-screen .tf-menu-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; justify-self: end; }
+  .home-title { font-size: clamp(1.9rem, 7vw, 3.2rem); }
   .home-artwork { background-position: 60% center; }
 }
-@media (prefers-reduced-motion: reduce) { .home-screen .tf-menu-action { transition: none; } }
+[data-graphics-quality='low'] .home-navigation .tf-menu-action { background: #202a36; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .home-navigation .tf-menu-action { background: #202a36; border-color: #c1cad4; }
+  .home-primary-dock [data-action='race-again'] { background: #202a36; }
+}
