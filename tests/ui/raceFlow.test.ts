@@ -382,6 +382,48 @@ describe('race UI flow', () => {
     expect(banner.querySelector('.race-event-title')?.textContent).toBe('FINAL LAP!')
   })
 
+  it('temporarily hides race celebrations while a missed-checkpoint reset warning is visible', () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const { root, updateRace } = setup()
+    const banner = requiredElement(root, '.race-event-banner')
+    const warning = requiredElement(root, '[data-checkpoint-warning]')
+    const reset = warning.querySelector<HTMLButtonElement>('button[data-action="reset-checkpoint"]')
+    if (!reset) throw new Error('Missing checkpoint reset button')
+
+    updateRace(raceSnapshot({ position: 1 }))
+    now = 600
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(banner.classList.contains('visible')).toBe(true)
+    const eventTitle = banner.querySelector('.race-event-title')?.textContent
+
+    const fixtureSession = recoverySession().session
+    const state = fixtureSession.snapshot().state
+    fixtureSession.destroy()
+    if (!state) throw new Error('Missing race state for checkpoint-warning fixture')
+    updateRace({
+      ...raceSnapshot({ position: 1 }),
+      state: {
+        ...state,
+        phase: 'running',
+        paused: false,
+        missedCheckpoint: { gate: 1, remainingSeconds: 1.8, position: { x: 25, y: 20 } },
+      },
+    })
+
+    expect(warning.hidden).toBe(false)
+    expect(reset.disabled).toBe(false)
+    expect(banner.hidden).toBe(true)
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe(eventTitle)
+
+    now = 800
+    updateRace(raceSnapshot({ position: 1 }))
+    expect(warning.hidden).toBe(true)
+    expect(banner.hidden).toBe(false)
+    expect(banner.classList.contains('visible')).toBe(true)
+    expect(banner.querySelector('.race-event-title')?.textContent).toBe(eventTitle)
+  })
+
   it('confirms overtakes after 600 ms without interrupting an active banner', () => {
     let now = 0
     vi.spyOn(performance, 'now').mockImplementation(() => now)
