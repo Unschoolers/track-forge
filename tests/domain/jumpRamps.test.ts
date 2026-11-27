@@ -100,16 +100,34 @@ it('launches and lands through the real race tick without bridge-fall recovery',
   }] }
   let launched = false
   let landed = false
+  let takeoffEvents = 0
   for (let frame = 0; frame < 180; frame++) {
     const step = stepRace(race, { steering: 0, throttle: 0.5, braking: false }, 1 / 60, { next: () => 0.5 })
     const car = step.state.vehicles[0]
     if (!car) throw new Error('Missing player after tick')
     expect(car.bridgeFallSeconds).toBeUndefined()
     expect(step.events.some(event => event.type === 'vehicle-recovered')).toBe(false)
-    if (!car.grounded) launched = true
-    if (launched && car.grounded) { landed = true; break }
+    for (const event of step.events) {
+      if (event.type === 'vehicle-jumped') {
+        takeoffEvents++
+        expect(car.jumpFlight).toBe(true)
+        expect(step.state.effects.particles.some(p => p.kind === 'jump-launch' && p.raised)).toBe(true)
+      }
+    }
+    if (!car.grounded) {
+      launched = true
+      expect(car.jumpFlight).toBe(true)
+    }
+    if (launched && car.grounded) {
+      landed = true
+      expect(car.jumpFlight).toBe(false)
+      expect(step.events).toContainEqual(expect.objectContaining({ type: 'vehicle-landed', jump: true }))
+      expect(step.state.effects.particles.filter(p => p.kind === 'landing-dust').length).toBeGreaterThanOrEqual(12)
+      break
+    }
     race = { ...step.state, phase: 'running', vehicles: [car] }
   }
+  expect(takeoffEvents).toBe(1)
   expect(launched).toBe(true)
   expect(landed).toBe(true)
 })
