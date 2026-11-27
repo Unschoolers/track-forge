@@ -298,3 +298,27 @@ only the player's next authoritative timing
 gate is emphasized; other recovery markers remain subdued. The active marker
 updates when the gate changes, not on every draw frame. No implicit gate,
 physics or track data is introduced.
+
+### Organic shoreline geometry (first slice)
+
+The authored terrain grid remains the save and editor representation. The
+compiled terrain surface now bevels eligible water/grass corners by up to
+45% of a cell. Single-cell rings, diagonal contacts and junctions touching
+hills retain their original boundaries. The same corner cuts are used by
+material lookup and the contour consumed by the vector, bitmap and flyover
+renderers; there is no separate visual-only water hazard.
+
+The shared terrain tessellator now fills angled scanline trapezoids rather
+than midpoint rectangles. It still emits the original bounded quads for
+orthogonal hills and retains bitmap spatial indexing, cache and LOD limits.
+No new textures, per-frame mesh generation, save fields or dependencies
+are introduced. Existing saved tracks may have slightly different water
+hazard boundaries at grass corners; existing record validity and Android
+frame pacing must be assessed before release.
+
+Hills and their elevation sampling are unchanged in this slice. Native
+Phaser Earcut, curved (rather than beveled) shoreline segments and hill
+smoothing remain follow-ups: the shared bitmap painter needs bounded
+triangles, and importing the full Phaser runtime into headless geometry
+tests would break the separation of responsibilities. Revert this slice
+to restore the original terrain geometry without a save migration.

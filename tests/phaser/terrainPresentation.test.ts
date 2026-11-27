@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildTerrainComponents, pointInTerrainComponent } from '@/phaser/rendering/terrainTopology'
+import { buildTerrainComponents, pointInTerrainComponent, tileTerrainComponent, triangulateTerrainComponent } from '@/phaser/rendering/terrainTopology'
 import type { TerrainCell, Vector2 } from '@/domain/model'
 import {
   EMPTY_TERRAIN,
@@ -86,6 +86,71 @@ function terrainRectangle(
 }
 
 describe('terrain presentation topology', () => {
+  it('matches the rounded water hazard with both vector and bitmap geometry', () => {
+    // Three cells form an L with one concave corner and five convex corners.
+    const terrain = paintTerrain(EMPTY_TERRAIN, [
+      { column: 0, row: 0 }, { column: 1, row: 0 }, { column: 0, row: 1 },
+    ], 'water')
+    const surface = compileTerrainSurface(terrain, [])
+    const component = buildTerrainComponents(surface.contours, 'water')[0]
+    if (!component) throw new Error('Missing water component')
+    const vector = trianglesFor(buildTerrainPresentation(surface), new Set(['water']))
+    const bitmap = tileTerrainComponent(component, 16)
+
+    for (const [point, water] of [
+      [{ x: 2, y: 2 }, false],
+      [{ x: 16, y: 16 }, true],
+      [{ x: 34, y: 34 }, true],
+      [{ x: 50, y: 50 }, false],
+    ] as const) {
+      expect(surface.materialAt(point)).toBe(water ? 'water' : 'grass')
+      expect(pointInTerrainComponent(point, component)).toBe(water)
+      expect(covered(point, vector)).toBe(water)
+      expect(covered(point, bitmap)).toBe(water)
+    }
+    // The complete diagonal polygon must be covered, not midpoint rectangles.
+    const polygonArea = (ring: readonly Vector2[]): number =>
+      Math.abs(ring.reduce((sum, a, index) => {
+        const b = ring[(index + 1) % ring.length]
+        return b ? sum + a.x * b.y - b.x * a.y : sum
+      }, 0) / 2)
+    for (const triangles of [vector, bitmap]) {
+      expect(triangles.reduce((sum, triangle) => sum + Math.abs(triangleArea(triangle)), 0))
+        .toBeCloseTo(polygonArea(component.outer), 6)
+    }
+  })
+
+  it('preserves hill junctions and isolated water hazards', () => {
+    const water = paintTerrain(EMPTY_TERRAIN, [
+      { column: 0, row: 0 }, { column: 1, row: 0 }, { column: 4, row: 4 },
+    ], 'water')
+    const terrain = paintTerrain(water, [{ column: -1, row: -1 }], 'hill')
+    const surface = compileTerrainSurface(terrain, [])
+    expect(surface.materialAt({ x: 2, y: 2 })).toBe('water')
+    expect(surface.materialAt({ x: 130, y: 130 })).toBe('water')
+    expect(surface.materialAt({ x: -2, y: -2 })).toBe('grass')
+    expect(surface.heightAt({ x: -2, y: -2 })).toBeGreaterThan(0)
+  })
+
+  it('triangulates diagonal outer and hole edges without filling the hole', () => {
+    const component = {
+      kind: 'water' as const,
+      outer: [{ x: 0, y: 30 }, { x: 30, y: 0 }, { x: 60, y: 30 }, { x: 30, y: 60 }],
+      holes: [[{ x: 30, y: 20 }, { x: 20, y: 30 }, { x: 30, y: 40 }, { x: 40, y: 30 }]],
+    }
+    for (const triangles of [
+      triangulateTerrainComponent(component),
+      tileTerrainComponent(component, 16),
+    ]) {
+      expect(covered({ x: 30, y: 30 }, triangles)).toBe(false)
+      expect(covered({ x: 30, y: 10 }, triangles)).toBe(true)
+      expect(covered({ x: 2, y: 2 }, triangles)).toBe(false)
+      expect(triangles.reduce((sum, triangle) => sum + Math.abs(triangleArea(triangle)), 0))
+        .toBeCloseTo(1600, 6)
+      expect(triangles.every(triangle => Math.abs(triangleArea(triangle)) > 0)).toBe(true)
+    }
+  })
+
   it('keeps a donut hill hole empty across slope and plateau meshes', () => {
     const ring = rectangle(0, 8, 0, 8).filter(
       ({ column, row }) =>

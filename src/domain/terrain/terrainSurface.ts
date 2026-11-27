@@ -53,9 +53,17 @@ interface DistanceSample {
   readonly gradient: Vector2
 }
 
+interface WaterCorner {
+  readonly vertex: Vector2
+  readonly directionX: number
+  readonly directionY: number
+  readonly water: boolean
+}
+
 interface CompiledTerrainField {
   readonly lookup: ReadonlyMap<string, TerrainKind>
   readonly hillDistance: BoundaryDistanceLookup
+  readonly waterCorners: ReadonlyMap<string, WaterCorner>
   readonly contours: readonly TerrainContour[]
 }
 
@@ -271,6 +279,94 @@ function traceContours(
     }
   }
   return contours
+}
+
+// Bevel stair-step corners in the shared surface, never just in the renderer.
+const WATER_CORNER_RATIO = 0.45
+
+function roundWaterContours(
+  contours: readonly TerrainContour[],
+  lookup: ReadonlyMap<string, TerrainKind>,
+  cellSize: number,
+): { contours: readonly TerrainContour[]; corners: ReadonlyMap<string, WaterCorner> } {
+  const corners = new Map<string, WaterCorner>()
+  const radius = cellSize * WATER_CORNER_RATIO
+  const rounded = contours.map((contour) => {
+    const ring = contour.points
+    // Preserve single-cell features and keep the established geometry budget.
+    if (ring.length === 4 && ring.every((point) => {
+      const first = ring[0]
+      return first !== undefined &&
+        Math.abs(point.x - first.x) <= cellSize &&
+        Math.abs(point.y - first.y) <= cellSize
+    })) return contour
+
+    const points: Vector2[] = []
+    for (let index = 0; index < ring.length; index += 1) {
+      const vertex = ring[index]
+      const before = ring[(index + ring.length - 1) % ring.length]
+      const after = ring[(index + 1) % ring.length]
+      if (!vertex || !before || !after) continue
+      const column = vertex.x / cellSize
+      const row = vertex.y / cellSize
+      const neighbors = [
+        lookup.get(terrainCellKey({ column: column - 1, row: row - 1 })),
+        lookup.get(terrainCellKey({ column, row: row - 1 })),
+        lookup.get(terrainCellKey({ column: column - 1, row })),
+        lookup.get(terrainCellKey({ column, row })),
+      ]
+      const waterCount = neighbors.filter((kind) => kind === 'water').length
+      // Leave diagonal contacts and hill/water junctions untouched.
+      if (neighbors.includes('hill') || (waterCount !== 1 && waterCount !== 3)) {
+        points.push(vertex)
+        continue
+      }
+      const toward = (point: Vector2): Vector2 => ({
+        x: Math.sign(point.x - vertex.x),
+        y: Math.sign(point.y - vertex.y),
+      })
+      const incoming = toward(before)
+      const outgoing = toward(after)
+      const directionX = incoming.x + outgoing.x
+      const directionY = incoming.y + outgoing.y
+      if (Math.abs(directionX) !== 1 || Math.abs(directionY) !== 1) {
+        points.push(vertex)
+        continue
+      }
+      points.push(
+        { x: vertex.x + incoming.x * radius, y: vertex.y + incoming.y * radius },
+        { x: vertex.x + outgoing.x * radius, y: vertex.y + outgoing.y * radius },
+      )
+      corners.set(pointKey(vertex), {
+        vertex, directionX, directionY, water: waterCount === 3,
+      })
+    }
+    return { ...contour, points }
+  })
+  return { contours: rounded, corners }
+}
+
+function waterAt(
+  field: CompiledTerrainField,
+  position: Vector2,
+  cellSize: number,
+): boolean {
+  if (field.waterCorners.size === 0) {
+    return field.lookup.get(terrainCellKey(cellAt(position, cellSize))) === 'water'
+  }
+  const vertex = {
+    x: Math.round(position.x / cellSize) * cellSize,
+    y: Math.round(position.y / cellSize) * cellSize,
+  }
+  const corner = field.waterCorners.get(pointKey(vertex))
+  if (corner) {
+    const x = (position.x - corner.vertex.x) * corner.directionX
+    const y = (position.y - corner.vertex.y) * corner.directionY
+    if (x >= 0 && y >= 0 && x + y < cellSize * WATER_CORNER_RATIO) {
+      return corner.water
+    }
+  }
+  return field.lookup.get(terrainCellKey(cellAt(position, cellSize))) === 'water'
 }
 
 function smoothstep(value: number): number {
@@ -507,11 +603,16 @@ function compileTerrainField(terrain: TerrainMap): CompiledTerrainField {
     hillMask,
     terrain.cellSize,
   )
+  const water = roundWaterContours(
+    traceContours('water', boundaryEdges(terrain, waterMask)),
+    lookup,
+    terrain.cellSize,
+  )
   const contours = [
-    ...traceContours('water', boundaryEdges(terrain, waterMask)),
+    ...water.contours,
     ...traceContours('hill', hillEdges),
   ]
-  const field = { lookup, hillDistance, contours }
+  const field = { lookup, hillDistance, waterCorners: water.corners, contours }
   terrainFields.set(terrain, new WeakRef(field))
   return field
 }
@@ -533,7 +634,7 @@ export function compileTerrainSurface(
   const field = compileTerrainField(terrain)
   let roadDistance: RoadDistanceLookup | undefined
   const kindAt = (position: Vector2) => field.lookup.get(terrainCellKey(cellAt(position, terrain.cellSize)))
-  const materialAt = (position: Vector2): TerrainMaterial => kindAt(position) === 'water' ? 'water' : 'grass'
+  const materialAt = (position: Vector2): TerrainMaterial => waterAt(field, position, terrain.cellSize) ? 'water' : 'grass'
   const heightSampleAt = (position: Vector2): TerrainHeightSample => {
     if (kindAt(position) !== 'hill') {
       return {
