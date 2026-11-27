@@ -37,7 +37,7 @@ function paintCycle(control: HTMLButtonElement, label: string, title: string, ne
     const hadValue = Boolean(value.textContent)
     value.textContent = label
     if (hadValue && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      value.getAnimations?.().forEach(animation => animation.cancel())
+      for (const animation of value.getAnimations?.() ?? []) animation.cancel()
       value.animate?.([{ opacity: .45, transform: 'translateY(3px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 180, easing: 'ease-out' })
     }
   }

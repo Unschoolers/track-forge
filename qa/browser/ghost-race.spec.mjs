@@ -19,8 +19,13 @@ test('Race mode skips Ghost Race without a matching saved replay', async ({ page
   const mode = page.locator('[data-action="mode-cycle"]')
   await expect(mode).toBeVisible()
   await expect(mode).not.toHaveAttribute('data-available-modes', /\bghost\b/)
+  await expect(mode).toHaveAttribute('data-race-mode', 'normal')
+  await expect(page.getByText('Finish a race on this layout to save a ghost.')).toBeVisible()
   await mode.click()
   await expect(mode).toHaveAttribute('data-race-mode', 'boost-practice')
+  await expect(page.getByText(/Solo, unranked Arcade run/)).toBeVisible()
+  await mode.click()
+  await expect(mode).toHaveAttribute('data-race-mode', 'normal')
   await expect(page.getByText('Finish a race on this layout to save a ghost.')).toBeVisible()
 })
 
