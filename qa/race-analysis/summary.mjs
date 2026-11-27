@@ -1,3 +1,4 @@
+import { diagnoseTimeline } from './diagnostics.mjs'
 import { createHash } from 'node:crypto'
 
 function assert(valid, reason) {
@@ -172,7 +173,7 @@ export function summarizeRace(exported, options = {}) {
   const locations = []
   let frameIndex = 0
   for (const item of [...exported.events].sort((a, b) => a.t - b.t)) {
-    if (!finite(item.t) || item.t > end) continue
+    if (!finite(item.t) || item.t > end + 0.0005) continue
     const event = item.event
     if (!event || typeof event.type !== 'string') continue
     while (frameIndex + 1 < frames.length && frames[frameIndex + 1].t <= item.t) frameIndex++
@@ -201,6 +202,30 @@ export function summarizeRace(exported, options = {}) {
       })
     }
   }
+  const controls = Array.isArray(exported.playerControls) ? exported.playerControls : []
+  const diagnostics = new Map()
+  for (const s of statsById.values()) {
+    let controlIndex = 0
+    const samples = frames.filter(frame => frame.t <= end).map(frame => {
+      const v = frame.vehicles.find(vehicle => vehicle.id === s.id)
+      while (controlIndex + 1 < controls.length && controls[controlIndex + 1][0] <= frame.tick) controlIndex++
+      const control = s.player && controls[controlIndex]?.[0] <= frame.tick ? controls[controlIndex] : null
+      return {
+        time: frame.t, speed: v.speed, angle: finite(v.angle) ? v.angle : null,
+        yawRate: finite(v.yawRate) ? v.yawRate : null, slip: finite(v.slip) ? v.slip : null,
+        steering: control?.[1] ?? v.ai?.steer ?? (s.player ? frame.input?.steering : null) ?? null,
+        throttle: control?.[2] ?? (s.player ? frame.input?.throttle : null) ?? null, braking: v.braking ?? null,
+        brakePressure: v.brakePressure ?? null, surface: v.currentSurface ?? null,
+        pathIndex: v.pathIndex ?? null, lap: v.lap ?? null, grounded: v.grounded ?? null,
+        x: v.x ?? null, y: v.y ?? null, cut: v.cut === true,
+      }
+    })
+    const events = exported.events.filter(item => item.t <= end + 0.0005 && item.event?.vehicleId === s.id)
+      .map(item => ({ time: item.t, ...item.event }))
+    const gates = s.gates.length ? s.gates : s.player && Array.isArray(exported.result?.splits)
+      ? exported.result.splits.filter(gate => gate.time <= end) : []
+    diagnostics.set(s.id, diagnoseTimeline({ samples, events, gates }, options.level ?? 1))
+  }
   const standings = new Map((exported.result?.standings ?? []).map((v) => [v.id, v]))
   const vehicles = [...statsById.values()].map((s) => {
     const stand = standings.get(s.id)
@@ -215,7 +240,7 @@ export function summarizeRace(exported, options = {}) {
       steeringReversals: s.steeringReversals,
       surfaces: Object.fromEntries(Object.entries(s.surfaces).map(([name, p]) =>
         [name, { seconds: round(p.seconds), meanSpeed: round(p.speedIntegral / p.seconds) }])),
-      events: s.events, recoveries: s.recoveries, gates: s.gates,
+      events: s.events, recoveries: s.recoveries, gates: s.gates, diagnostics: diagnostics.get(s.id),
       completedLaps: stand?.lap ?? null, finishTime: stand?.finishTime ?? null,
     }
   })

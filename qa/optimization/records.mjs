@@ -88,16 +88,40 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
       ...passingMetrics(run.samples, vehicle.vehicleId),
     }
   })
-  const events = run.issues.map(issue => ({
-    ...base,
-    vehicle_id: issue.vehicleId, event_time: issue.time, code: issue.code,
-    severity: issue.severity, path_index: issue.pathIndex,
-    section_id: issue.sectionId, detail: issue.detail,
-  }))
+  const events = run.issues.map(issue => {
+    const trace = issue.code === 'recovery'
+      ? run.samples.filter(sample => sample.vehicleId === issue.vehicleId && sample.time < issue.time)
+      : []
+    const before = trace.at(-1)
+    const previous = trace.at(-2)
+    const elapsed = before && previous ? before.time - previous.time : 0
+    const crossedRecovery = before && previous && run.issues.some(other =>
+      other.code === 'recovery' && other.vehicleId === issue.vehicleId &&
+      other.time > previous.time && other.time <= before.time)
+    return {
+      ...base,
+      vehicle_id: issue.vehicleId, event_time: issue.time, code: issue.code,
+      severity: issue.severity, path_index: issue.pathIndex,
+      section_id: issue.sectionId, detail: issue.detail,
+      ...(issue.code === 'recovery' ? {
+        recovery_reason: issue.detail.match(/^Automatic (.+) recovery$/)?.[1] ?? 'unknown',
+        before_time: before?.time ?? null, before_speed: before?.speed ?? null,
+        before_acceleration: elapsed > 0 && !crossedRecovery ? (before.speed - previous.speed) / elapsed : null,
+        before_angle: before?.angle ?? null, before_yaw_rate: before?.yawRate ?? null,
+        before_steering: before?.steering ?? null, before_braking: before?.braking ?? null,
+        before_road_distance: before?.roadDistance ?? null,
+        before_offroad_seconds: before?.offRoadSeconds ?? null,
+      } : {}),
+    }
+  })
   const samples = telemetry ? run.samples.map(sample => ({
     ...base, vehicle_id: sample.vehicleId, car_type: sample.car,
     time: sample.time, path_index: sample.pathIndex,
     section_id: sample.sectionId, speed: sample.speed,
+    angle: sample.angle ?? null, yaw_rate: sample.yawRate ?? null,
+    steering: sample.steering ?? null, slip: sample.slip ?? null,
+    braking: sample.braking ?? null, road_distance: sample.roadDistance ?? null,
+    offroad_seconds: sample.offRoadSeconds ?? null,
     lane: sample.lane, target_lane: sample.targetLane,
     on_road: sample.onRoad, grounded: sample.grounded,
     ai_phase: sample.phase,

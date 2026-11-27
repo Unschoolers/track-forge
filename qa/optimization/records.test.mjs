@@ -58,3 +58,15 @@ test('passing diagnostics quantify actual two-car activity separately from lap t
   assert.equal(row.pass_attempts, 2)
   assert.equal(row.passing_seconds, 0.3)
 })
+
+test('recovery events retain their cause and preceding driving context without full telemetry', () => {
+  const sample = { ...run.samples[0], angle: 0.4, yawRate: 0.6, steering: 0.8, roadDistance: 94, offRoadSeconds: 0.4 }
+  const result = projectTrial({ ...run, samples: [sample], issues: [{
+    ...run.issues[0], code: 'recovery', detail: 'Automatic off-road recovery',
+  }] }, meta)
+  assert.equal(result.events[0].recovery_reason, 'off-road')
+  assert.equal(result.events[0].before_speed, 80)
+  assert.equal(result.events[0].before_steering, 0.8)
+  assert.equal(result.events[0].before_road_distance, 94)
+  assert.deepEqual(result.samples, [])
+})

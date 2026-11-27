@@ -207,3 +207,10 @@ test('unfinished captures use the observation end and never invent finish times'
   assert.equal(startup.observationEnd, 0)
   assert.ok(startup.vehicles.every(v => v.observedSeconds === 0))
 })
+
+test('includes a finish gate whose exported event timestamp was rounded up', () => {
+  const input = replay()
+  input.result.playerTime = 1.4996
+  input.events.push({ t: 1.5, event: { type: 'gate-crossed', vehicleId: 'player', lap: 1, gate: 5, time: 1.4996 } })
+  assert.equal(summarizeRace(input, { level: 1 }).vehicles[0].diagnostics.sectors.at(-1).gate, 5)
+})
