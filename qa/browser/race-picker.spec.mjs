@@ -176,6 +176,7 @@ test('previews every track and shares a saved track without selecting it', async
   await expect(share).toHaveText('SHARE')
   await expect(share.locator('svg path')).toHaveCount(1)
   await share.tap()
+  await page.locator('[data-action="share-export"]').tap()
   await expect.poll(() => page.evaluate(() => window.sharedTrack)).toMatchObject({
     file: 'QA-Shared-Circuit.trackforge.json',
     track: OWNED_TRACK_NAME,
