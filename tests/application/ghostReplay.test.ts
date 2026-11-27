@@ -65,6 +65,9 @@ describe('personal-best ghost replay', () => {
       [ghostRaceKey(track, red)]: run('red', 1),
       [ghostRaceKey(track, setup)]: { car: 'blue', time: 1, frames: [] },
     }))
+    expect(store.availableSetups(track)).toEqual(expect.arrayContaining([{ car: 'red', laps: 1 }, { car: 'green', laps: 1 }]))
+    expect(store.availableSetups(track)).toHaveLength(2)
+    expect(store.availableSetups({ ...track, updatedAt: track.updatedAt + 2 })).toEqual([])
     expect(store.availability(track, setup)).toEqual({ kind: 'different-setup', setup: { car: 'red', laps: 1 } })
     expect(store.availability({ ...track, updatedAt: track.updatedAt + 2 }, setup)).toEqual({ kind: 'none' })
     expect(store.record(track, setup, 1, frames)).toBe(true)

@@ -508,21 +508,25 @@ describe('modal application flows', () => {
     })
   })
 
-  it('moves race settings to options while keeping car and race mode in setup', () => {
+  it('keeps laps, car and race mode in setup while leaving AI difficulty in Options', () => {
     const { root, port, update } = setup(state({ type: 'race-setup' }))
 
     expect(root.querySelector('[data-car="green"]')).not.toBeNull()
     expect(root.querySelector('[data-action="mode-normal"]')).not.toBeNull()
     expect(root.querySelector('[data-action="difficulty-hard"]')).toBeNull()
+    expect(root.querySelector('[data-action="laps-3"]')).not.toBeNull()
+    root.querySelector<HTMLButtonElement>('[data-action="laps-3"]')?.click()
+    expect(port.dispatch).toHaveBeenCalledWith({
+      type: 'set-preferences', preferences: { ...preferences, raceLaps: 3 },
+    })
     root.querySelector<HTMLButtonElement>('[data-action="setup-options"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-options', returnTo: 'race-setup' })
 
     update(state({ type: 'options', returnTo: 'race-setup' }))
     expect(root.textContent).toContain('AI DIFFICULTY')
     expect(root.querySelector('[data-action="lighting-night"]')).toBeNull()
-    for (const action of ['difficulty-hard', 'laps-3']) {
-      expect(root.querySelector(`[data-action="${action}"]`)).not.toBeNull()
-    }
+    expect(root.querySelector('[data-action="difficulty-hard"]')).not.toBeNull()
+    expect(root.querySelector('[data-action="laps-3"]')).toBeNull()
     root.querySelector<HTMLButtonElement>('[data-action="difficulty-hard"]')?.click()
     expect(port.dispatch).toHaveBeenCalledWith({
       type: 'set-preferences', preferences: { ...preferences, difficulty: 'hard' },

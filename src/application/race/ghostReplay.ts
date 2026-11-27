@@ -33,6 +33,7 @@ export interface GhostPose extends GhostFrame {
   readonly identity?: PlayerIdentity
 }
 export interface GhostStore {
+  availableSetups?(track: Track): readonly GhostSetup[]
   availability?(track: Track, setup: GhostSetup): GhostAvailability
   load(track: Track, setup: GhostSetup): GhostRun | null
   record(track: Track, setup: GhostSetup, time: number, frames: readonly GhostFrame[], splits?: readonly number[]): boolean

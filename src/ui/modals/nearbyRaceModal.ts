@@ -114,6 +114,22 @@ export function createNearbyRaceModal(
         }
         lightingSection.append(choices)
         frame.body.append(lightingSection)
+        if (snapshot.configurableLaps != null) {
+          const section = element('section', 'setup-section')
+          section.append(element('h3', 'setup-label', cup ? 'Cup laps' : 'Laps'))
+          const row = element('div', 'choice-row')
+          row.setAttribute('role', 'group')
+          row.setAttribute('aria-label', cup ? 'Cup laps' : 'Race laps')
+          for (const laps of [1, 2, 3] as const) {
+            const selected = snapshot.configurableLaps === laps
+            const choice = button(laps === 1 ? '1 lap' : `${laps} laps`, `nearby-laps-${laps}`,
+              () => nearby.setLaps(laps), `setup-choice${selected ? ' active' : ''}`)
+            choice.setAttribute('aria-pressed', String(selected))
+            row.append(choice)
+          }
+          section.append(row)
+          frame.body.append(section)
+        }
         const start = button('PREPARE RACE', 'nearby-start', () => nearby.start(), 'button button-primary')
         start.disabled = !canStart
         if (!canStart) frame.body.append(element('p', 'modal-subtitle',

@@ -1,5 +1,5 @@
 import type { NearbyRace } from '@/application/multiplayer/nearbyRace'
-import { normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
+import { CAR_IDS, normalizeRouteKind, type LightingMode, type RouteKind } from '@/domain/model'
 import { EventBus, type Unsubscribe } from '@/application/eventBus'
 import type { RandomSource } from '@/application/ports/random'
 import type {
@@ -37,6 +37,7 @@ import {
   type GhostAvailability,
   type GhostPose,
   type GhostRun,
+  type GhostSetup,
   type GhostStore,
 } from '@/application/race/ghostReplay'
 import { LapTiming } from '@/application/race/lapTiming'
@@ -130,6 +131,7 @@ export interface RaceSessionSnapshot {
 }
 
 export interface RaceSessionPort {
+  ghostSetups?(track: Track): readonly GhostSetup[]
   ghostAvailability?(track: Track, setup: RaceSetup): GhostAvailability
   ghostTime?(track: Track, setup: RaceSetup): number | null
   creatorGhostChallenge?(track: Track, setup: RaceSetup, completedRun?: boolean): CreatorGhostChallenge | null
@@ -286,6 +288,20 @@ export class RaceSession implements RaceSessionPort {
     const countdown = Math.max(0, (startsAt - this.monotonicNow()) / 1000)
     this.publish(this.buildSnapshot(track, setup, { ...state, countdown }, null))
     this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(countdown) })
+  }
+
+  /** Available replay combinations for the race preparation selectors. */
+  ghostSetups(track: Track): readonly GhostSetup[] {
+    if (track.creatorChallenge) {
+      const { car, laps } = track.creatorChallenge
+      return [{ car, laps }]
+    }
+    const store = this.dependencies.ghostStore
+    if (!store) return []
+    if (store.availableSetups) return store.availableSetups(track)
+    const laps = track.routeKind === 'point-to-point' ? [1] : [1, 2, 3]
+    return CAR_IDS.flatMap(car => laps.flatMap(laps =>
+      store.load(track, { car, laps }) ? [{ car, laps }] : []))
   }
 
   ghostAvailability(track: Track, setup: RaceSetup): GhostAvailability {
