@@ -197,7 +197,7 @@ export class RaceScene extends Phaser.Scene {
       geometry.path.terrainSurface,
       normalizeTrackEnvironmentId(track.environmentId),
       undefined,
-      this.game.renderer?.type === Phaser.WEBGL && typeof this.add.spriteGPULayer === 'function',
+      this.game.renderer !== undefined && this.game.renderer.type === Phaser.WEBGL && typeof this.add.spriteGPULayer === 'function',
     )
     if (bitmap && this.raceCamera) {
       const camera = this.cameras.main
