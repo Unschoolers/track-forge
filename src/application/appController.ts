@@ -4,6 +4,7 @@ import { CupFlow } from '@/application/race/cupFlow'
 import { normalizeEditorSceneryChoice } from '@/application/appState'
 import { courseIdentity, timeMedal, promotedTimeMedal } from '@/application/race/raceRecords'
 import { collectTrackScores } from '@/application/race/trackScoreCollection'
+import { decideTrackSelection } from '@/application/race/trackSelectionPolicy'
 import { OFFICIAL_COURSES } from '@/domain/track/officialCircuits'
 import { DEFAULT_CUP_TRACK_IDS, recordCupResult, retryCupRace } from '@/application/race/circuitCup'
 import type {
@@ -738,7 +739,15 @@ export class AppController {
       track,
       this.dependencies.geometry.get(track).path.totalLength,
     )
-    if (!validation.ready) {
+    const overlay = this.state.overlay
+    const decision = decideTrackSelection({
+      ready: validation.ready,
+      trackLibraryPurpose: overlay.type === 'track-library' ? overlay.purpose : undefined,
+      cupLineupLength: this.state.cupProgress?.lineup?.length ?? DEFAULT_CUP_TRACK_IDS.length,
+      nearbyHostAvailable: validation.ready && overlay.type === 'track-library' && overlay.purpose === 'nearby-host' &&
+        this.dependencies.nearby?.snapshot().phase === 'idle',
+    })
+    if (decision.type === 'invalid') {
       this.update({
         ...this.state,
         ...this.librarySnapshot(),
@@ -747,11 +756,13 @@ export class AppController {
       })
       return
     }
-    if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'cup') {
-      const returnTo = this.state.overlay.cupReturnTo
+    if (decision.type === 'cup') {
+      const returnTo = overlay.type === 'track-library' && overlay.purpose === 'cup'
+        ? overlay.cupReturnTo
+        : undefined
       const cupOverlay = { type: 'cup' as const, ...(returnTo ? { returnTo } : {}) }
       const lineup = this.state.cupProgress?.lineup ?? DEFAULT_CUP_TRACK_IDS
-      if (lineup.length >= 12) {
+      if (decision.lineupFull) {
         this.update({ ...this.state, overlay: cupOverlay, notice: 'Cup is limited to 12 races.' })
       } else {
         this.cupFlow.setCupLineup([...lineup, track.id])
@@ -759,16 +770,16 @@ export class AppController {
       }
       return
     }
-    if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'nearby') {
+    if (decision.type === 'nearby-rematch') {
       if (this.dependencies.nearby?.selectNextTrack(track)) {
         this.update({ ...this.state, overlay: { type: 'results' }, notice: null })
         this.dependencies.nearby.start()
       }
       return
     }
-    if (this.state.overlay.type === 'track-library' && this.state.overlay.purpose === 'nearby-host') {
+    if (decision.type === 'nearby-host') {
       const nearby = this.dependencies.nearby
-      if (!nearby || nearby.snapshot().phase !== 'idle') {
+      if (!nearby || !decision.available) {
         this.update({ ...this.state, notice: 'Nearby hosting is unavailable. Try again.' })
         return
       }

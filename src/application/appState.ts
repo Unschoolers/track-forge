@@ -23,9 +23,11 @@ import type {
   EditorTool,
 } from '@/domain/editor/editorGeometry'
 
+export type TrackLibraryPurpose = 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
+
 type TrackLibraryOverlay = {
   readonly type: 'track-library'
-  readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
+  readonly purpose: TrackLibraryPurpose
   readonly cupReturnTo?: 'nearby'
 }
 
@@ -148,7 +150,7 @@ export type AppCommand =
   | { readonly type: 'select-track'; readonly id: TrackId }
   | {
       readonly type: 'open-track-library'
-      readonly purpose: 'edit' | 'race' | 'nearby' | 'nearby-host' | 'cup'
+      readonly purpose: TrackLibraryPurpose
     }
   | { readonly type: 'close-overlay' }
   | { readonly type: 'open-player-name' }
