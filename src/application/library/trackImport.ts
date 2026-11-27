@@ -6,10 +6,11 @@ import { CrossingWorkLimitError } from '@/domain/track/crossings'
 import { roadPointsForPreview } from '@/domain/track/roadLength'
 import { isRecoveryCheckpointRatio, MAX_RECOVERY_CHECKPOINTS } from '@/domain/track/recoveryCheckpoints'
 import { MAX_SCENERY_PROPS, normalizeSceneryProps } from '@/domain/track/trackEnvironment'
-import { decodeTrack, MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { decodeTrack, MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, trackExportFormatVersion } from '@/domain/track/trackCodec'
 import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChallenge'
 import {
   SIGNED_TRACK_FORMAT_VERSION,
+  SIGNED_JUMP_TRACK_FORMAT_VERSION,
   SIGNED_TRACK_REPLY_FORMAT,
   SIGNED_TRACK_REPLY_FORMAT_VERSION,
   verifySignedTrackReply,
@@ -103,7 +104,7 @@ export async function parseSharedTrackImport(content: string): Promise<TrackImpo
       signedChallengeSource: content,
     }
   }
-  if (envelope.formatVersion !== SIGNED_TRACK_FORMAT_VERSION) return decodeTrackExport(envelope)
+  if (envelope.formatVersion !== SIGNED_TRACK_FORMAT_VERSION && envelope.formatVersion !== SIGNED_JUMP_TRACK_FORMAT_VERSION) return decodeTrackExport(envelope)
   if (!globalThis.crypto?.subtle) return { ok: false, message: 'Track signature verification is unavailable on this device.' }
   if (!await verifyTrackSignature(envelope)) {
     return { ok: false, message: 'Invalid track signature. The original file is required.' }
@@ -114,7 +115,7 @@ export async function parseSharedTrackImport(content: string): Promise<TrackImpo
 
 export function decodeTrackExport(parsed: unknown): TrackImportResult {
   const envelope = object(parsed)
-  if (envelope?.format !== TRACK_EXPORT_FORMAT || envelope.formatVersion !== TRACK_EXPORT_FORMAT_VERSION ||
+  if (envelope?.format !== TRACK_EXPORT_FORMAT || envelope.formatVersion !== trackExportFormatVersion(envelope.track) ||
       Object.hasOwn(envelope, 'signature')) {
     return { ok: false, message: 'Not a supported Track Forge export.' }
   }
