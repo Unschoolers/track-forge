@@ -322,3 +322,19 @@ smoothing remain follow-ups: the shared bitmap painter needs bounded
 triangles, and importing the full Phaser runtime into headless geometry
 tests would break the separation of responsibilities. Revert this slice
 to restore the original terrain geometry without a save migration.
+
+### Coherent editor terrain texture windows
+
+The editor terrain bitmap overlay is revealed as a complete visible window.
+Pending tiles remain hidden while the shared upload scheduler prepares and
+uploads them; the existing vector terrain remains visible underneath. Once
+all requested tiles are resident, reveal the current window in one update.
+Keep resident offscreen tiles and prefetch up to eight nearby terrain tiles
+in any direction within the existing 48-texture layer cap. No synchronous
+upload burst or race-renderer change is introduced.
+
+This addresses mixed vector/bitmap water patches during tile streaming.
+A rapid pan to uncached terrain can still temporarily switch the entire
+terrain window to vector presentation; extreme zoom retains the existing
+overview behavior. Device frame-time and visual measurements are required
+before claiming a performance improvement.
