@@ -37,10 +37,37 @@ export const STUDY_SCENARIOS = [
   },
 ]
 
+// Opt-in only: the matched legacy-physics comparison must never feed new
+// jump geometry to an older engine that cannot represent it.
+const jumpLayout = (id, surface, rampLength, group) => ({
+  id, group, reverse: false, startRatio: 0, laps: 2, seconds: 85,
+  track: {
+    id, name: id, version: 8,
+    points: [
+      [-500, -300], [-250, -300], [-100, -300], [-100 + rampLength, -300],
+      [400, -300], [520, -180], [520, 180], [400, 300],
+      [0, 300], [-400, 300], [-520, 180], [-520, -180], [-500, -300],
+    ].map(([x, y], index) => ({
+      x, y, surface, id: id + '-' + index,
+      ...(index === 2 ? { structure: 'jump' } : {}),
+    })),
+    trees: [], terrain: { cellSize: 32, cells: [] },
+    start: { ratio: 0, reversed: false },
+    recoveryCheckpoints: [0.25, 0.5, 0.75],
+    lighting: 'day', createdAt: 1, updatedAt: 1,
+  },
+})
+
+export const JUMP_STUDY_SCENARIOS = [
+  jumpLayout('jump-straight', 'street', 110, 'calibration'),
+  jumpLayout('jump-gravel', 'dirt', 160, 'validation'),
+]
+
 export function selectScenarios(ids, available = STUDY_SCENARIOS) {
   const requested = ids?.length ? ids : available.map(x => x.id)
   const selected = requested.map(id => {
-    const found = available.find(x => x.id === id)
+    const found = available.find(x => x.id === id) ??
+      (available === STUDY_SCENARIOS ? JUMP_STUDY_SCENARIOS.find(x => x.id === id) : undefined)
     if (!found) throw new Error(`Unknown scenario: ${id}`)
     return found
   })
