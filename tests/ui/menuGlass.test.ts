@@ -59,6 +59,44 @@ describe('LiquidGlass.dev menu adapter', () => {
     expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
   })
 
+  it('lenses only visible track tiles, caps the pool and cleans up filtered tiles', async () => {
+    const { root } = setup()
+    const screen = document.createElement('div')
+    screen.className = 'track-library-modal'
+    screen.innerHTML = '<div class="track-list">' + Array.from({ length: 12 }, () =>
+      '<article class="track-card"><button class="track-card-select">Race</button><button class="track-card-favorite">Star</button></article>').join('') + '</div>'
+    root.append(screen)
+    let notify: (entries: { target: Element; isIntersecting: boolean }[]) => void = () => { throw new Error('Observer not initialized') }
+    const observe = vi.fn(), unobserve = vi.fn(), disconnect = vi.fn()
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback: typeof notify) { notify = callback }
+      observe = observe
+      unobserve = unobserve
+      disconnect = disconnect
+    })
+    const cleanup = attachMenuGlass(root, screen, async () => undefined)
+    const cards = [...screen.querySelectorAll<HTMLElement>('.track-card')]
+    await vi.waitFor(() => expect(observe).toHaveBeenCalledTimes(12))
+    expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
+    notify(cards.map(target => ({ target, isIntersecting: true })))
+    expect(screen.querySelectorAll('.track-card > lg-panel')).toHaveLength(8)
+    expect(screen.querySelector('.track-card button lg-panel')).toBeNull()
+    expect(cards[0]?.dataset.liquidGlassKind).toBe('card')
+    const first = cards[0]
+    if (!first) throw new Error('Missing card fixture')
+    notify([{ target: first, isIntersecting: false }])
+    expect(first.querySelector('lg-panel')).toBeNull()
+    expect(screen.querySelectorAll('.track-card > lg-panel')).toHaveLength(8)
+    const removed = cards[1]
+    if (!removed) throw new Error('Missing card fixture')
+    removed.remove()
+    await vi.waitFor(() => expect(unobserve).toHaveBeenCalledWith(removed))
+    expect(removed.querySelector('lg-panel')).toBeNull()
+    cleanup()
+    expect(disconnect).toHaveBeenCalledOnce()
+    expect(screen.querySelectorAll('lg-panel')).toHaveLength(0)
+  })
+
   it('reconciles asynchronous Options actions without remounting existing lenses', async () => {
     const { root } = setup()
     const screen = document.createElement('div')
