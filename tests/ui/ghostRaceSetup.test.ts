@@ -83,6 +83,26 @@ describe('Ghost Race setup', () => {
     expect(open.querySelector('[data-action="mode-boost-practice"]')).not.toBeNull()
   })
 
+  it('chooses laps directly and indicates saved car/lap combinations', () => {
+    const callbacks = actions()
+    const setups = [{ car: 'blue' as const, laps: 3 }, { car: 'red' as const, laps: 1 }]
+    const modal = createRaceSetupModal(state, callbacks, null, undefined, setups)
+    expect(modal.querySelector('[data-action="laps-2"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(modal.querySelector('[data-action="laps-3"] .setup-ghost-indicator')).not.toBeNull()
+    expect(modal.querySelector('[data-action="laps-1"] .setup-ghost-indicator')).toBeNull()
+    expect(modal.querySelector('[data-car="red"] .setup-ghost-indicator')).not.toBeNull()
+    expect(modal.querySelector('[data-car="yellow"] .setup-ghost-indicator')).toBeNull()
+    modal.querySelector<HTMLButtonElement>('[data-action="laps-3"]')?.click()
+    expect(callbacks.preferences).toHaveBeenCalledWith({ ...state.preferences, raceLaps: 3 })
+    const changed = createRaceSetupModal({ ...state, preferences: { ...state.preferences, car: 'red', raceLaps: 1 } },
+      callbacks, { kind: 'exact', time: 60 }, undefined, setups)
+    expect(changed.querySelector('[data-action="laps-1"] .setup-ghost-indicator')).not.toBeNull()
+    expect(changed.querySelector('[data-action="laps-3"] .setup-ghost-indicator')).toBeNull()
+    expect(changed.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')?.disabled).toBe(false)
+    const open = createRaceSetupModal({ ...state, currentTrack: { ...track, routeKind: 'point-to-point' } }, callbacks)
+    expect(open.querySelector('[data-action="laps-1"]')).toBeNull()
+  })
+
   it('always shows a disabled Ghost Race button when no replay is available', () => {
     const modal = createRaceSetupModal(state, actions(), null)
     const ghost = modal.querySelector<HTMLButtonElement>('[data-action="mode-ghost"]')
