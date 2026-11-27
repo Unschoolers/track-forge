@@ -1,3 +1,4 @@
+import { editorScreenToWorld } from '@/phaser/camera/editorCamera'
 import { describe, expect, it } from 'vitest'
 import {
   applyEditorCameraAction,
@@ -123,4 +124,19 @@ describe('editor camera', () => {
     }
   })
 
+})
+
+describe('editor pointer conversion before the next render', () => {
+  it('uses the current center and zoom, including immediate consecutive changes', () => {
+    const camera = { x: 100, y: -200, zoom: 1 }
+    const viewport = { width: 400, height: 800 }
+    const pointer = { x: 300, y: 500 }
+    expect(editorScreenToWorld(pointer, camera, viewport)).toEqual({ x: 200, y: -100 })
+    camera.zoom = 2
+    camera.x = 150
+    camera.y = -100
+    expect(editorScreenToWorld(pointer, camera, viewport)).toEqual({ x: 200, y: -50 })
+    expect(editorScreenToWorld({ x: 200, y: 400 }, camera, viewport)).toEqual({ x: 150, y: -100 })
+    expect(editorScreenToWorld(pointer, camera, { width: 800, height: 400 })).toEqual({ x: 100, y: 50 })
+  })
 })
