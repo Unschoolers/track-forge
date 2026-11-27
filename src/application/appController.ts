@@ -165,7 +165,7 @@ export class AppController {
     })
     this.unsubscribeNearby = dependencies.nearby?.subscribe(() => {
       const status = dependencies.nearby?.snapshot()
-      if (this.state.overlay.type === 'nearby' && this.state.mode === 'race' &&
+      if (this.state.overlay.type === 'nearby' && !this.state.overlay.shareReturnTo && this.state.mode === 'race' &&
           status?.phase === 'idle' && status.error) {
         this.update({ ...this.state, mode: 'home', paused: false, overlay: { type: 'none' }, notice: status.error })
         return
@@ -191,7 +191,8 @@ export class AppController {
     })
     this.unsubscribeRace = dependencies.raceSession.subscribe((snapshot) => {
       if (!snapshot.result || this.state.mode !== 'race' || this.state.overlay.type === 'nearby') return
-      if (this.state.overlay.type === 'results') {
+      if (this.state.overlay.type === 'results' ||
+          (this.state.overlay.type === 'track-share' && this.state.overlay.returnTo.type === 'results')) {
         const { cup } = this.state
         const { standings } = snapshot.result
         if (cup?.rounds[cup.index]?.some((driver, index) => driver.id !== standings[index]?.id)) {
@@ -315,17 +316,31 @@ export class AppController {
           this.dependencies.nearby?.scan(this.state.preferences.car, 'share')
         }
         break
+      case 'open-track-share': {
+        const returnTo = this.state.overlay
+        if (returnTo.type !== 'track-library' && returnTo.type !== 'editor-menu' && returnTo.type !== 'results') break
+        if (isSeededTrack(command.track)) {
+          this.update({ ...this.state, notice: 'Built-in tracks cannot be shared.' })
+          break
+        }
+        this.update({ ...this.state, overlay: { type: 'track-share', track: command.track, challenge: command.challenge, returnTo }, notice: null })
+        break
+      }
       case 'send-nearby-track': {
         const nearby = this.dependencies.nearby
-        if (!nearby) break
-        if (nearby.snapshot().phase !== 'idle') break
-        const track = this.state.tracks.find(entry => entry.id === command.track.id) ?? command.track
+        if (!nearby || nearby.snapshot().phase !== 'idle') {
+          this.update({ ...this.state, notice: 'Nearby sharing is unavailable right now.' })
+          break
+        }
+        const overlay = this.state.overlay
+        if (overlay.type !== 'track-share' || overlay.track !== command.track) break
+        const track = overlay.track
         if (isSeededTrack(track)) {
           this.update({ ...this.state, notice: 'Built-in tracks cannot be shared.' })
           break
         }
-        nearby.hostShare(track)
-        this.update({ ...this.state, overlay: { type: 'nearby' }, notice: null })
+        nearby.hostShare(track, overlay.challenge)
+        this.update({ ...this.state, overlay: { type: 'nearby', shareReturnTo: overlay.returnTo }, notice: null })
         break
       }
       case 'save-nearby-track': {
@@ -371,7 +386,9 @@ export class AppController {
         }
         break
       case 'pause-race':
-        if (this.state.mode === 'race' && this.state.overlay.type !== 'results') {
+        if (this.state.mode === 'race' && this.state.overlay.type !== 'results' &&
+            !(this.state.overlay.type === 'track-share' && this.state.overlay.returnTo.type === 'results') &&
+            !(this.state.overlay.type === 'nearby' && this.state.overlay.shareReturnTo?.type === 'results')) {
           if (this.beforeNearbyTrack === undefined) this.dependencies.raceSession.setPaused(true)
           this.update({
             ...this.state,
@@ -861,6 +878,15 @@ export class AppController {
     const overlay = this.state.overlay
     if (overlay.type === 'editor-exit') {
       this.editorExitFlow.resolve('cancel')
+      return
+    }
+    if (overlay.type === 'track-share') {
+      this.update({ ...this.state, overlay: overlay.returnTo, notice: null })
+      return
+    }
+    if (overlay.type === 'nearby' && overlay.shareReturnTo) {
+      this.update({ ...this.state, overlay: overlay.shareReturnTo, notice: null })
+      if (this.state.mode === 'race') this.dependencies.nearby?.close()
       return
     }
     if (overlay.type === 'nearby') {

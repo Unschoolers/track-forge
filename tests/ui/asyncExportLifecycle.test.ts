@@ -19,7 +19,7 @@ const track = createStarterTrack(asTrackId('async-export'), 10)
 const state: AppSnapshot = {
   mode: 'editor',
   paused: false,
-  overlay: { type: 'editor-menu' },
+  overlay: { type: 'track-share', track, returnTo: { type: 'editor-menu' } },
   tracks: [track],
   currentTrack: track,
   editor: createEditorState(track.points, track.trees),
@@ -51,7 +51,7 @@ describe('async UI export teardown', () => {
     vi.mocked(exportTrack).mockClear()
     vi.mocked(shareTrack).mockResolvedValueOnce(true)
     const { root, host } = setup()
-    root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="share-export"]')?.click()
     await Promise.resolve()
     expect(shareTrack).toHaveBeenCalledWith(track, expect.any(String), undefined)
     expect(exportTrack).not.toHaveBeenCalled()
@@ -63,7 +63,7 @@ describe('async UI export teardown', () => {
       new Promise(resolve => { finish = resolve }))
     vi.mocked(shareTrack).mockResolvedValueOnce(false)
     const { root, host } = setup()
-    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="share-export"]')
     if (!exportButton) throw new Error('Editor export button missing')
     exportButton.click()
     expect(shareTrack).toHaveBeenCalledWith(track, expect.any(String), undefined)
@@ -83,7 +83,7 @@ describe('async UI export teardown', () => {
       new Promise(resolve => { finish = resolve }))
     vi.mocked(shareTrack).mockResolvedValueOnce(false)
     const { root, host } = setup()
-    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-action="share-export"]')
     if (!exportButton) throw new Error('Editor export button missing')
     exportButton.click()
     await vi.waitFor(() => expect(finish).toBeDefined())
@@ -101,7 +101,7 @@ describe('async UI export teardown', () => {
     vi.mocked(exportTrack).mockResolvedValueOnce(true)
     vi.mocked(shareTrack).mockResolvedValueOnce(false)
     const { root, host } = setup()
-    root.querySelector<HTMLButtonElement>('[data-action="menu-share"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="share-export"]')?.click()
     await vi.waitFor(() => expect(root.textContent).toContain('Track file saved.'))
     host.destroy()
   })

@@ -25,6 +25,8 @@ import { DialogController } from '@/ui/dialogController'
 import { attachMenuGlass } from '@/ui/menu/menuGlass'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
+import { createModalFrame } from '@/ui/modals/modalFrame'
+import { button, element } from '@/ui/dom'
 import { createEditorExitModal } from '@/ui/modals/editorExitModal'
 import { createNameModal } from '@/ui/modals/nameModal'
 import { createPlayerNameModal } from '@/ui/modals/playerNameModal'
@@ -227,8 +229,7 @@ export class DomUiHost implements UiHost {
     return saveJsonFile({ filename: `trackforge-nearby-${timestamp}.json`, content: JSON.stringify(report, null, 2) })
   }
 
-  private async shareTrackChallenge(track: Track, challengeOverride?: CreatorGhostChallenge | null): Promise<void> {
-    const generation = this.noticeGeneration
+  private openTrackShare(track: Track, challengeOverride?: CreatorGhostChallenge): void {
     if (isSeededTrack(track)) {
       this.showRaceExportNotice('Built-in tracks are already available to every player.')
       return
@@ -239,9 +240,12 @@ export class DomUiHost implements UiHost {
       difficulty: current.preferences.difficulty,
       laps: track.routeKind === 'point-to-point' ? 1 : current.preferences.raceLaps ?? 2,
     }
-    const creatorChallenge = challengeOverride === undefined
-      ? this.runtime.raceSession.creatorGhostChallenge?.(track, setup) ?? undefined
-      : challengeOverride ?? undefined
+    const challenge = challengeOverride ?? this.runtime.raceSession.creatorGhostChallenge?.(track, setup) ?? undefined
+    this.controller.dispatch({ type: 'open-track-share', track, challenge })
+  }
+
+  private async shareTrackChallenge(track: Track, creatorChallenge?: CreatorGhostChallenge): Promise<void> {
+    const generation = this.noticeGeneration
     const best = this.controller.snapshot().scoresByTrack[track.id]?.[0]
     const challenge = creatorChallenge
       ? `Race "${track.name}" in Track Forge: ${creatorChallenge.laps} ${creatorChallenge.laps === 1 ? 'lap' : 'laps'}, Ghost Race against my ${CAR_SPECS[creatorChallenge.car].name} ghost (${formatRaceTime(creatorChallenge.time)}). Import the attached track file to play.`
@@ -408,8 +412,11 @@ export class DomUiHost implements UiHost {
       (state.overlay.type === 'options' && state.overlay.returnTo === 'race-setup') ||
       (state.overlay.type === 'track-library' && state.overlay.purpose === 'race' && this.previousOverlayType === 'race-setup')
     )
+    const returningThroughShare = (state.overlay.type === 'track-share' && state.overlay.returnTo.type === 'track-library') ||
+      (state.overlay.type === 'nearby' && state.overlay.shareReturnTo?.type === 'track-library') ||
+      (state.overlay.type === 'track-library' && (this.previousOverlayType === 'track-share' || this.previousOverlayType === 'nearby'))
     const currentLibrary = this.previousOverlayType === 'track-library' &&
-      (state.overlay.type === 'track-library' || returningThroughSetup)
+      (state.overlay.type === 'track-library' || returningThroughSetup || returningThroughShare)
       ? this.root.querySelector<HTMLElement>('.track-library-modal')
       : null
     const librarySearch = currentLibrary?.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
@@ -421,7 +428,7 @@ export class DomUiHost implements UiHost {
           ? 'favorites'
           : 'all',
       }
-    } else if (!returningThroughSetup) this.trackLibraryViewState = undefined
+    } else if (!returningThroughSetup && !returningThroughShare) this.trackLibraryViewState = undefined
     // Keep the local player's scroll and diagnostic export across roster updates.
     const previousLobby = lobbyTrack && this.previousOverlayType === 'nearby'
       ? this.root.querySelector<HTMLElement>('.nearby-lobby-modal') : null
@@ -456,6 +463,28 @@ export class DomUiHost implements UiHost {
     switch (state.overlay.type) {
       case 'none':
         return undefined
+      case 'track-share': {
+        const { track, challenge } = state.overlay
+        const nearby = this.runtime.nearby
+        const frame = createModalFrame('Share track', track.name, close, 'track-share-modal')
+        const ghost = challenge ?? track.creatorChallenge
+        frame.body.classList.add('menu-buttons')
+        frame.body.append(element('p', 'modal-subtitle', ghost
+          ? `Ghost included · ${CAR_SPECS[ghost.car].name} · ${formatRaceTime(ghost.time)} · ${ghost.laps} ${ghost.laps === 1 ? 'lap' : 'laps'}`
+          : 'No saved ghost for this track and race setup.'))
+        frame.body.append(element('p', 'modal-subtitle', 'Both options include a signed, read-only track file.'))
+        const send = button('NEARBY', 'share-nearby', () =>
+          this.controller.dispatch({ type: 'send-nearby-track', track, challenge }), 'button button-primary')
+        send.disabled = !nearby || nearby.snapshot().phase !== 'idle'
+        frame.body.append(send)
+        if (send.disabled) frame.body.append(element('p', 'modal-subtitle', 'Nearby is unavailable right now.'))
+        frame.body.append(button('EXPORT', 'share-export', () => {
+          close()
+          void this.shareTrackChallenge(track, challenge)
+        }, 'button'))
+        frame.footer.append(button('CANCEL', 'share-cancel', close, 'button'))
+        return frame.overlay
+      }
       case 'nearby': {
         const nearby = this.runtime.nearby
         if (!nearby) return undefined
@@ -522,7 +551,7 @@ export class DomUiHost implements UiHost {
             if (track?.origin !== 'imported' || !track.creatorChallenge ||
                 isSeededTrack(track) || setup?.mode !== 'ghost') return undefined
             const challenge = this.runtime.raceSession.creatorGhostChallenge?.(track, setup, true)
-            return challenge ? () => { void this.shareTrackChallenge(track, challenge) } : undefined
+            return challenge ? () => this.openTrackShare(track, challenge) : undefined
           })(),
           changeTrack: () => this.controller.dispatch({ type: 'open-track-library', purpose: 'race' }),
           edit: () => this.controller.dispatch({ type: 'open-editor' }),
@@ -558,10 +587,7 @@ export class DomUiHost implements UiHost {
               type: 'select-track-for-race',
               id,
             }),
-          share: (track) => { void this.shareTrackChallenge(track) },
-          ...(this.runtime.nearby && (state.overlay.purpose === 'edit' || state.overlay.purpose === 'race')
-            ? { sendNearby: (track: Track) => this.controller.dispatch({ type: 'send-nearby-track', track }) }
-            : {}),
+          share: (track) => this.openTrackShare(track),
           importFile: (content) => this.controller.dispatch({ type: 'import-track', content }),
           delete: (track) => {
             if (this.environment.confirm(`Delete "${track.name}"?`)) {
@@ -689,7 +715,7 @@ export class DomUiHost implements UiHost {
             }),
           share: () => {
             const track = this.controller.snapshot().currentTrack
-            if (track) void this.shareTrackChallenge(track)
+            if (track) this.openTrackShare(track)
           },
           save: () =>
             this.controller.dispatch({ type: 'save-current-track' }),

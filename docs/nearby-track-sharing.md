@@ -2,7 +2,7 @@
 
 ## Track sharing (Android Nearby Connections)
 
-From Track Library choose **NEARBY** on a saved track. This advertises `Track ####`, distinct from the existing `Room ####` race rooms. On a second device open Nearby and choose **RECEIVE TRACK**, select the advertised sender and approve the incoming track.
+From Track Library or the Editor menu choose **SHARE → NEARBY**. Choose **EXPORT** instead to open the system file share flow (with a download fallback). Both use the same signed file serializer and include the selected saved ghost when available. Sending back a completed ghost challenge offers the same choices. This advertises `Track ####`, distinct from the existing `Room ####` race rooms. On a second device open Nearby and choose **RECEIVE TRACK**, select the advertised sender and approve the incoming track.
 
 - This uses the **existing** Nearby transport, compressed track chunker and strict shared-track importer. No Internet service, new Android permissions or second transfer protocol is necessary.
 - Guest devices initiate a share-ready handshake before the sender begins streaming. The sender compresses the track only once and can serve up to three connected guests.

@@ -32,8 +32,9 @@ Open the URL printed by Vite, normally <http://localhost:5173>.
 - Tap a circuit preview to open Race Setup, then choose a car and race mode.
   The flyover uses the selected car and lighting. Open **Options** for race
   length, lighting, difficulty, and driving style.
-- Use the track's share icon to send its importable file. On browsers without
-  file sharing it downloads a copy.
+- Use the track's share icon and choose Nearby or Export. Both carry a signed,
+  importable track file and the same available ghost. On browsers without file
+  sharing, Export downloads a copy.
 - A share can include your saved recovery-free ghost for the selected car and
   lap count. Import it from the Race picker to see the target time, car and lap
   rule in Race Setup. The creator replay stays separate from your private best.

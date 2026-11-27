@@ -838,7 +838,11 @@ describe('Nearby track sharing and rematches', () => {
     const recipient = new NearbyRace(network.endpoint('friend'), () => false)
     const racer = new NearbyRace(network.endpoint('racer'), () => true)
     try {
-      host.hostShare(track)
+      const challenge = { car: 'blue' as const, laps: 1 as const, time: 31.5, frames: [
+        { t: 0, x: 0, y: 0, angle: 0, z: 0, structureRunId: null },
+        { t: 31.5, x: 1, y: 1, angle: 0, z: 0, structureRunId: null },
+      ] }
+      host.hostShare(track, challenge)
       await vi.waitFor(() => expect(host.snapshot().phase).toBe('hosting'), { interval: 5 })
       recipient.scan('blue', 'share')
       racer.scan('red')
@@ -848,6 +852,7 @@ describe('Nearby track sharing and rematches', () => {
       await vi.waitFor(() => expect(recipient.snapshot().phase).toBe('share-review'), { interval: 5 })
       expect(recipient.pendingSharedTrack()?.points).toEqual(track.points)
       expect(recipient.pendingSharedTrack()?.signedSource).toBeTypeOf('string')
+      expect(recipient.pendingSharedTrack()?.creatorChallenge).toEqual(challenge)
       expect(recipient.snapshot().incomingTrack).toBe(track.name)
       expect(host.snapshot().sharedCount).toBe(0)
       recipient.respondToShare(true)

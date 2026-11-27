@@ -14,6 +14,7 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   await page.locator('.track-card-overflow summary').click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()
+  await page.getByRole('button', { name: 'EXPORT', exact: true }).click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toMatch(/\.trackforge\.json$/)
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'))
@@ -29,6 +30,7 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   await page.locator('[data-action="editor-menu"]').click()
   const editorDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'SHARE', exact: true }).click()
+  await page.getByRole('button', { name: 'EXPORT', exact: true }).click()
   const current = JSON.parse(await readFile(await (await editorDownload).path(), 'utf8'))
   expect(current.track).toEqual(exported.track)
   expect(current.signature.publicKey).toBe(exported.signature.publicKey)
@@ -52,6 +54,7 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   await expect(page.getByRole('combobox', { name: 'Environment' })).toHaveCount(0)
   const themedDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'SHARE', exact: true }).click()
+  await page.getByRole('button', { name: 'EXPORT', exact: true }).click()
   const roundTrip = JSON.parse(await readFile(await (await themedDownload).path(), 'utf8'))
   expect(roundTrip.signature.publicKey).toBe(exported.signature.publicKey)
   expect(roundTrip.track.id).not.toBe(themed.track.id)
