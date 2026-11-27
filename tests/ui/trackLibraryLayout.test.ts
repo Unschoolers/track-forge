@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const css = readFileSync(new URL('../../src/styles/race-menus.css', import.meta.url), 'utf8')
+const css = readFileSync(new URL('../../src/styles/track-library.css', import.meta.url), 'utf8')
 
 describe('track library layout styles', () => {
   it('keeps two compact cards per row on narrow screens with readable previews and touch controls', () => {
