@@ -141,6 +141,10 @@ jobs:
       - run: npm ci
       - name: Tune all four cars against replay and existing holdouts
         run: npm run qa:optimize -- --focus driving --workers 2 --trials 40 --seeds 1,4331 --scenarios ora-ora-replay,pine-hairpins,desert-reverse,figure-eight-replay,kids-room,meadow-loop,emile --out qa/results/ora-ora
+      - name: Diagnose sector pace and applied braking at 60 Hz
+        run: |
+          node --test qa/optimization/sectorTelemetry.test.mjs
+          node qa/optimization/sector-diagnosis.mjs qa/results/ora-ora
       - name: Print four-car replay comparison
         run: |
           node --input-type=module <<'JS'

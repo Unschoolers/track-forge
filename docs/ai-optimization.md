@@ -291,3 +291,7 @@ npm run qa:optimize -- --focus driving --workers 2 --trials 40 --seeds 1,4331 --
 ```
 
 The study screens all four existing car-specific policies; the ordinary-track and traffic acceptance rules remain unchanged. Only validated candidates may be considered for production. Compare the Ora Ora solo times in the JSONL records, and verify the combined profiles and difficulty/recovery gates before promotion. No measured improvement is claimed by this fixture alone.
+
+### Replay sector diagnosis
+
+Run `node qa/optimization/sector-diagnosis.mjs qa/results/ora-ora` after installing dependencies. The existing lane checker observes real 60 Hz solo ticks for each car on Hard and Normal, seeds 1 and 4331, and writes gate-by-gate elapsed time, average and peak speed, applied braking duration, grass contact, travelled distance and 20 Hz line/velocity samples. The six reference gates are from the exported 28.467s Red Normal ghost race, not the separate 26.633s record; the latter has no input trace in this export. Red Normal is the closest configuration, but AI and player control semantics are not identical. Recovery counts and finish status accompany each result. This is diagnosis, not a speed acceptance gate, and does not alter production steering, physics or difficulty. Brake duration is effective vehicle braking, not a direct AI pedal request; trace comparisons alone do not establish causality. Boost and assisted brake-tap drift are practice-only and were absent from the ghost run.
