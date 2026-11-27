@@ -13,6 +13,7 @@ import {
   type UiControllerPort,
 } from '@/ui/uiHost'
 import { createUiRuntime } from './uiRuntime'
+import { clampDetachedScrollTopForTest } from './domScrollBehavior'
 
 const ready = createStarterTrack(asTrackId('ready'), 1)
 const incomplete = {
@@ -399,45 +400,90 @@ describe('modal application flows', () => {
   })
 
   it('restores active search on return from race setup and resets it on a new visit', () => {
+    const restoreScrollBehavior = clampDetachedScrollTopForTest()
     const initial = state({ type: 'track-library', purpose: 'race' })
     const { root, update, host } = setup(initial)
-    root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')?.click()
-    const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
-    if (!search) throw new Error('Missing track search')
-    search.value = 'Starter'
-    search.dispatchEvent(new Event('input'))
-    update(state({ type: 'race-setup' }))
-    update(initial)
-    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Starter')
-    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(false)
-    update(state())
-    update(initial)
-    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('')
-    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(true)
-    host.destroy()
+    document.body.append(root)
+    try {
+      root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')?.click()
+      const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
+      if (!search) throw new Error('Missing track search')
+      search.value = 'Starter'
+      search.dispatchEvent(new Event('input'))
+      const body = root.querySelector<HTMLElement>('.track-library-modal .modal-body')
+      if (!body) throw new Error('Missing track library body')
+      body.scrollTop = 125
+      update(state({ type: 'race-setup' }))
+      update(initial)
+      expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Starter')
+      expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(false)
+      expect(root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop).toBe(125)
+      update(state())
+      update(initial)
+      expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('')
+      expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(true)
+      expect(root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop).toBe(0)
+    } finally {
+      host.destroy()
+      root.remove()
+      restoreScrollBehavior()
+    }
+  })
+
+  it('restores library scroll after returning from track sharing', () => {
+    const restoreScrollBehavior = clampDetachedScrollTopForTest()
+    const initial = state({ type: 'track-library', purpose: 'edit' })
+    const { root, update, host } = setup(initial)
+    document.body.append(root)
+    try {
+      const body = root.querySelector<HTMLElement>('.track-library-modal .modal-body')
+      if (!body) throw new Error('Missing track library body')
+      body.scrollTop = 90
+      update(state({
+        type: 'track-share', track: ready,
+        returnTo: { type: 'track-library', purpose: 'edit' },
+      }))
+      update(initial)
+      expect(root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop).toBe(90)
+    } finally {
+      host.destroy()
+      root.remove()
+      restoreScrollBehavior()
+    }
   })
 
   it('keeps the search query and favorites filter when a favorite update rerenders the library', () => {
+    const restoreScrollBehavior = clampDetachedScrollTopForTest()
     const initial = {
       ...state({ type: 'track-library', purpose: 'edit' }),
       tracks: [{ ...ready, creator: { id: 'creator-alex', name: 'Alex' } }, incomplete],
     }
     const { root, update, host } = setup(initial)
-    root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.click()
-    root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')?.click()
-    const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
-    if (!search) throw new Error('Missing track search')
-    search.value = 'Alex'
-    search.dispatchEvent(new Event('input'))
+    document.body.append(root)
+    try {
+      root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.click()
+      root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')?.click()
+      const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
+      if (!search) throw new Error('Missing track search')
+      search.value = 'Alex'
+      search.dispatchEvent(new Event('input'))
+      const body = root.querySelector<HTMLElement>('.track-library-modal .modal-body')
+      if (!body) throw new Error('Missing track library body')
+      body.scrollTop = 115
 
-    update({ ...initial, preferences: { ...preferences, favoriteTrackIds: [ready.id] } })
+      update({ ...initial, preferences: { ...preferences, favoriteTrackIds: [ready.id] } })
 
-    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Alex')
-    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(false)
-    expect(root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed')).toBe('true')
-    expect(root.querySelectorAll('.track-card')).toHaveLength(1)
-    expect(root.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
-    host.destroy()
+      expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Alex')
+      expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(false)
+      expect(root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed')).toBe('true')
+      expect(root.querySelectorAll('.track-card')).toHaveLength(1)
+      expect(root.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
+      expect(root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop).toBe(115)
+    } finally {
+      host.destroy()
+      root.remove()
+      restoreScrollBehavior()
+    }
   })
 
   it('keeps imported shared tracks marked read-only and offers View as the main action', () => {

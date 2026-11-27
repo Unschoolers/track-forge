@@ -16,6 +16,7 @@ import {
   type UiRuntime,
 } from '@/ui/uiHost'
 import { createUiRuntime } from './uiRuntime'
+import { clampDetachedScrollTopForTest } from './domScrollBehavior'
 
 const track = createStarterTrack(asTrackId('starter'), 1)
 const preferences: Preferences = {
@@ -392,7 +393,8 @@ describe('DomUiHost', () => {
     expect(port.subscribe).toHaveBeenCalledOnce()
   })
 
-  it('previews the proposed multiplayer track rather than the previously selected solo track', () => {
+  it('preserves lobby scroll, diagnostics disclosure and a pending export across roster refreshes', async () => {
+    const restoreScrollBehavior = clampDetachedScrollTopForTest()
     const proposed = createStarterTrack(asTrackId('nearby-proposed'), 2)
     const lobby = {
       phase: 'lobby', purpose: 'race', role: 'guest', track: proposed.name,
@@ -401,11 +403,15 @@ describe('DomUiHost', () => {
       lobbyPlayers: [{ slot: 0, car: 'green', name: 'Host', accepted: false, choice: 0 },
         { slot: 1, car: 'red', name: 'Guest', accepted: false, choice: 0 }],
     }
+    let finishDiagnostics!: (report: Record<string, unknown>) => void
     const nearby = {
       snapshot: () => lobby, localSlot: () => 1,
       selectLobbyCar: vi.fn(), setLobbyReady: vi.fn(),
+      diagnostics: vi.fn(() => new Promise<Record<string, unknown>>(resolve => { finishDiagnostics = resolve })),
     } as unknown as NearbyRace
+    const save = vi.spyOn(trackExport, 'saveJsonFile').mockResolvedValue(true)
     const { root, update, host, geometry } = setup('home', undefined, undefined, nearby)
+    document.body.append(root)
     try {
       const overlay = { ...snapshot('home'), overlay: { type: 'nearby' as const } }
       update(overlay)
@@ -414,14 +420,24 @@ describe('DomUiHost', () => {
       expect(preview?.dataset.car).toBe('red')
       expect(preview?.dataset.lighting).toBe('night')
       expect(preview?.getAttribute('aria-label')).toContain(proposed.name)
-      const diagnostics = root.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')!
-      const body = root.querySelector<HTMLElement>('.nearby-lobby-modal .modal-body')!
+      const diagnostics = root.querySelector<HTMLDetailsElement>('.nearby-lobby-diagnostics')
+      const body = root.querySelector<HTMLElement>('.nearby-lobby-modal .modal-body')
+      if (!diagnostics || !body) throw new Error('Missing lobby diagnostics or body')
       diagnostics.open = true
       body.scrollTop = 80
+      const download = root.querySelector<HTMLButtonElement>('[data-action="nearby-download-diagnostics"]')
+      if (!download) throw new Error('Missing nearby diagnostics download action')
+      download.click()
+      expect(download.disabled).toBe(true)
       update(overlay)
       expect(root.querySelector('.nearby-lobby-diagnostics')).toBe(diagnostics)
       expect(diagnostics.open).toBe(true)
       expect(root.querySelector('.nearby-lobby-modal .modal-body')?.scrollTop).toBe(80)
+      expect(root.querySelector('[data-action="nearby-download-diagnostics"]')).toBe(download)
+      expect(download.disabled).toBe(true)
+      finishDiagnostics({ version: 2 })
+      await vi.waitFor(() => expect(download.disabled).toBe(false))
+      expect(download.parentElement?.textContent).toContain('Diagnostic report saved.')
       lobby.lobbyPlayers[0]!.accepted = true
       update(overlay)
       expect(root.querySelector('.race-flyover')).toBe(preview)
@@ -441,7 +457,12 @@ describe('DomUiHost', () => {
       expect(root.querySelector<HTMLCanvasElement>('.race-flyover')?.dataset.lighting).toBe('day')
       update(snapshot('home'))
       expect(root.querySelector('.race-flyover')).toBeNull()
-    } finally { host.destroy() }
+    } finally {
+      host.destroy()
+      root.remove()
+      restoreScrollBehavior()
+      save.mockRestore()
+    }
   })
 
   it('reuses setup preparation across car changes and cancels it when rendering inputs change', () => {
