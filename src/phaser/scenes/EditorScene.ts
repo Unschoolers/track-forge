@@ -259,19 +259,19 @@ export class EditorScene extends Phaser.Scene {
     this.renderRoadDragPreview()
     const { width, height } = this.viewport()
     this.terrainRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
-    if (this.meadowBitmapRenderer) {
+    if (this.meadowBitmapRenderer?.hasRoadLayers()) {
       this.roadRaster?.render(this.editorCamera, width, height, false)
       this.bitmapRoadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
       this.bitmapMarkingRaster?.render(this.editorCamera, width, height, this.rasterizeWorld)
-      this.meadowBitmapRenderer.render({
-        centerX: this.editorCamera.x, centerY: this.editorCamera.y,
-        width, height, zoom: this.editorCamera.zoom, rotation: 0,
-      })
     } else {
       this.bitmapRoadRaster?.render(this.editorCamera, width, height, false)
       this.bitmapMarkingRaster?.render(this.editorCamera, width, height, false)
       this.roadRaster?.render(this.editorCamera, width, height, this.rasterizeWorld && !this.currentRenderState?.roadDrag)
     }
+    this.meadowBitmapRenderer?.render({
+      centerX: this.editorCamera.x, centerY: this.editorCamera.y,
+      width, height, zoom: this.editorCamera.zoom, rotation: 0,
+    })
     this.renderGroundPresentation()
     this.renderSceneryPresentation(this.sceneryRotationRenderPending)
     if (!this.previewRenderPending) return
@@ -438,10 +438,10 @@ export class EditorScene extends Phaser.Scene {
       geometry.path.points.length >= 2_200
     this.trackGraphics.clear()
     this.roadMarkingGraphics.clear()
-    this.meadowBitmapRenderer?.destroy()
-    // The inexpensive vector geometry remains visible during a live gesture;
-    // bake the new bitmap window only when the geometry is committed.
-    this.meadowBitmapRenderer = snapshot.editor.gestureStart ? undefined : createMeadowBitmapRenderer(this, geometry, night, snapshot.editor.environmentId, 'local-ground')
+    // Keep the scene's water textures while road edits use the vector preview.
+    // Only a terrain or appearance change can invalidate the water layer.
+    this.meadowBitmapRenderer ??= createMeadowBitmapRenderer(this, 'local-ground')
+    this.meadowBitmapRenderer.update(geometry, snapshot.editor.terrain, Boolean(snapshot.editor.gestureStart), night, snapshot.editor.environmentId)
     this.structureUnderlayGraphics.clear()
     this.structureDeckGraphics.clear()
     this.structureWallGraphics.clear()
