@@ -322,3 +322,24 @@ smoothing remain follow-ups: the shared bitmap painter needs bounded
 triangles, and importing the full Phaser runtime into headless geometry
 tests would break the separation of responsibilities. Revert this slice
 to restore the original terrain geometry without a save migration.
+
+### Editor terrain cache ownership
+
+Water and hills now have independent scene-lifetime bitmap owners. Road edits
+and live road gestures preserve unchanged water canvases, GPU textures and
+pending uploads. Hill art is invalidated only when authored terrain or
+appearance changes, or the sequence of road segments potentially influencing
+hill slope blending changes. A conservative spatial corridor test includes
+added, moved and removed segments and the closing edge of a circuit.
+Road surface and bridge metadata do not influence that hill field.
+
+Road and bridge presentation keep their existing committed-geometry rebuild
+and vector gesture preview. The vector terrain underlay shares the same
+hill-influence invalidation rule. Editing near hills can still rebuild the
+entire hill pass; finer per-region invalidation is a separate optimization.
+The original 48-tile combined terrain cache budget remains: mixed terrain
+allocates 24 tiles to water and 24 to hills, which may cause earlier vector
+fallback at wide zooms. Race and flyover bitmap composition are unchanged.
+
+No save or physics changes. Component tests cover cache retention, real
+terrain changes and hill influence; Android profiling remains required.
