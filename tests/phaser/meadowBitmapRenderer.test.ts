@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type Phaser from 'phaser'
-import { BitmapTileRenderer, BitmapTileUploadScheduler, selectAheadTiles, type UploadRequest, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
+import { BitmapTileRenderer, BitmapTileUploadScheduler, createMeadowBitmapRenderer, selectAheadTiles, type UploadRequest, type BitmapWorkObserver } from '@/phaser/rendering/meadowBitmapRenderer'
+
+import * as bitmapLayers from '@/presentation/environments/meadowBitmapTiles'
+import type { TrackGeometry } from '@/domain/track/trackGeometry'
+import type { TerrainMap } from '@/domain/model'
 
 const view = {
   centerX: 128,
@@ -252,5 +256,72 @@ describe('BitmapTileRenderer', () => {
     expect([...registered].every(key => Number(key.split(':')[1]) >= 24)).toBe(true)
     renderer.destroy()
     scheduler.destroy()
+  })
+})
+
+describe('editor water cache lifecycle', () => {
+  it('keeps uploaded water across road edits and drawing gestures, but invalidates terrain edits', () => {
+    const { scene, scheduler } = schedulerFixture()
+    scheduler.destroy()
+    const uploaded = vi.fn(() => ({}))
+    const removed = vi.fn()
+    Object.assign(scene, {
+      events: { once: vi.fn(), off: vi.fn() },
+      textures: { addCanvas: uploaded, remove: removed },
+      add: {
+        image: () => {
+          const image = {
+            visible: true,
+            setOrigin: () => image,
+            setDepth: () => image,
+            setVisible: (visible: boolean) => { image.visible = visible; return image },
+            destroy: vi.fn(),
+          }
+          return image
+        },
+      },
+    })
+    const source = (visible: boolean) => ({
+      visible: () => visible ? [{ x: 0, y: 0, variant: 0 }] : [],
+      image: vi.fn(() => ({} as HTMLCanvasElement)),
+      all: () => [],
+      bake: () => ({} as HTMLCanvasElement),
+    })
+    const water = source(true)
+    const empty = source(false)
+    const createWater = vi.spyOn(bitmapLayers, 'createEditorWaterBitmapTiles').mockReturnValue(water)
+    const createRoad = vi.spyOn(bitmapLayers, 'createEditorRoadBitmapLayers').mockReturnValue({
+      road: empty, terrain: empty, bridgeApproach: undefined, bridgeDeck: undefined,
+    })
+    const renderer = createMeadowBitmapRenderer(scene)
+    const terrain: TerrainMap = { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] }
+    const geometry = () => ({} as TrackGeometry)
+    try {
+      renderer.update(geometry(), terrain, false, false, 'grass')
+      renderer.render(view)
+      renderer.warmVisible()
+      expect(uploaded).toHaveBeenCalledTimes(1)
+      expect(water.image).toHaveBeenCalledTimes(1)
+
+      renderer.update(geometry(), terrain, true, false, 'grass')
+      expect(renderer.hasRoadLayers()).toBe(false)
+      renderer.render(view)
+      renderer.warmVisible()
+      renderer.update(geometry(), terrain, false, false, 'grass')
+      renderer.render(view)
+      renderer.warmVisible()
+      expect(createWater).toHaveBeenCalledTimes(1)
+      expect(uploaded).toHaveBeenCalledTimes(1)
+      expect(removed).not.toHaveBeenCalled()
+      expect(renderer.hasRoadLayers()).toBe(true)
+
+      renderer.update(geometry(), { ...terrain, cells: [] }, false, false, 'grass')
+      expect(removed).toHaveBeenCalledTimes(1)
+      expect(renderer.coverage()[5]).toBe(0)
+    } finally {
+      renderer.destroy()
+      createWater.mockRestore()
+      createRoad.mockRestore()
+    }
   })
 })
