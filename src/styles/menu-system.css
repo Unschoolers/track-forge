@@ -218,3 +218,37 @@
   #app :is(.options-modal .setup-choice.active, .options-modal .toggle-button.active,
     .race-setup-modal .setup-choice.active) { background-image: none; box-shadow: none; }
 }
+
+/* Phase 1: use the upstream glass component as decoration behind the existing
+   native action. No nested interactive element or duplicate optical filter. */
+#app .home-screen .tf-menu-action[data-liquid-glass] {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  backdrop-filter: none;
+  border-color: #c6e3fa40;
+  box-shadow: none;
+  border-radius: 18px;
+  --lg-tint: rgb(15 28 41 / 24%);
+  --lg-shadow-2: 0 4px 10px #0005;
+  text-shadow: 0 1px 3px #000b;
+}
+#app .home-screen .tf-menu-action[data-liquid-glass].tf-menu-action--primary {
+  --lg-tint: rgb(255 146 92 / 76%);
+  border-color: #ffe0c580;
+  text-shadow: none;
+}
+#app .home-screen .tf-menu-action[data-liquid-glass] > lg-panel {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+}
+#app .home-screen .tf-menu-action[data-liquid-glass]:active:not(:disabled) {
+  transform: none;
+  --lg-tint: rgb(15 28 41 / 38%);
+}
+#app .home-screen .tf-menu-action[data-liquid-glass].tf-menu-action--primary:active:not(:disabled) {
+  --lg-tint: rgb(255 146 92 / 88%);
+}

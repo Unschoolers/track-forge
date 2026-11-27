@@ -9,6 +9,24 @@ async function openPicker(page) {
   return page.getByRole('dialog', { name: 'Choose a track' })
 }
 
+test('home uses the bundled LiquidGlass.dev optical component and keeps native actions', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  const actions = page.locator('.home-screen button.tf-menu-action')
+  const race = page.getByRole('button', { name: 'Race', exact: true })
+  await expect(race).toHaveAttribute('data-liquid-glass', '')
+  await expect(race.locator('lg-panel .lg-surface__glass')).toHaveCSS('filter', /url\(/)
+  expect(await actions.count()).toBeGreaterThanOrEqual(4)
+  await expect(page.locator('.home-screen button.tf-menu-action > lg-panel')).toHaveCount(await actions.count())
+  await expect(race.locator('lg-panel')).toHaveAttribute('aria-hidden', 'true')
+  await expect(race.locator('lg-panel')).toHaveCSS('pointer-events', 'none')
+  await testInfo.attach('liquidglass-home-portrait', { body: await page.screenshot(), contentType: 'image/png' })
+  await race.click()
+  await expect(page.getByRole('dialog', { name: 'Choose a track' })).toBeVisible()
+  await expect(page.locator('.home-screen lg-panel')).toHaveCount(0)
+})
+
 test('track cards stay in two columns with reachable controls on narrow and landscape phones', async ({ page }) => {
   // Track decoding caps saved names at 32 characters; use that full supported length.
   const longName = 'A Long Track Title at Max Length'

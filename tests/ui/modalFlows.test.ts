@@ -7,6 +7,7 @@ import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
+import * as trackExport from '@/infrastructure/export/trackExport'
 import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
 import {
   DomUiHost,
@@ -177,8 +178,8 @@ describe('modal application flows', () => {
     })
   })
 
-  it('keeps race readiness accessible without cluttering saved cards with times', () => {
-    const { root, port } = setup(
+  it('keeps race readiness accessible without cluttering saved cards with times', async () => {
+    const { root, port, host } = setup(
       state({ type: 'track-library', purpose: 'race' }),
     )
 
@@ -198,9 +199,16 @@ describe('modal application flows', () => {
     const overflow = share?.closest<HTMLDetailsElement>('details.track-card-overflow')
     expect(overflow).not.toBeNull()
     if (!overflow) throw new Error('Saved track share action must be in its overflow menu')
-    overflow.open = true
-    share?.click()
-    expect(overflow.open).toBe(false)
+    const shareTrack = vi.spyOn(trackExport, 'shareTrack').mockResolvedValueOnce(true)
+    try {
+      overflow.open = true
+      share?.click()
+      expect(overflow.open).toBe(false)
+      await Promise.resolve()
+      expect(shareTrack).toHaveBeenCalledWith(ready, expect.any(String), undefined)
+    } finally {
+      shareTrack.mockRestore()
+    }
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
     expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
@@ -218,6 +226,7 @@ describe('modal application flows', () => {
       type: 'select-track-for-race',
       id: ready.id,
     })
+    host.destroy()
   })
 
   it('offers EDIT in the race picker even for an incomplete personal track', () => {

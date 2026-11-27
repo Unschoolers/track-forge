@@ -17,14 +17,13 @@
 .home-artwork {
   position: absolute;
   inset: 0;
-  background: #080b10 url('../assets/title/city-harbor.webp') 60% 56% / cover no-repeat;
-}
-.home-artwork::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, #080b10 0%, #080b10d9 20%, #080b1066 55%, transparent 85%),
-    linear-gradient(0deg, #080b1080, transparent 42%, #080b1030);
-  content: '';
+  /* LiquidGlass.dev copies this exact background, including its scrim. */
+  background-color: #080b10;
+  background-image: linear-gradient(90deg, #080b10 0%, #080b10d9 20%, #080b1066 55%, transparent 85%),
+    linear-gradient(0deg, #080b1080, transparent 42%, #080b1030), url('../assets/title/city-harbor.webp');
+  background-size: 100% 100%, 100% 100%, cover;
+  background-position: center, center, 60% 56%;
+  background-repeat: no-repeat;
 }
 .home-screen .tf-menu-header { align-self: start; max-width: 36rem; }
 .home-eyebrow {
@@ -125,8 +124,11 @@
   .home-screen .tf-menu-content { align-content: center; }
 }
 @media (max-width: 600px) {
-  .home-artwork { background-image: url('../assets/title/city-harbor-portrait.webp'); background-position: center top; }
-  .home-artwork::after { background: linear-gradient(0deg, #080b1099 0%, #080b1066 23%, #080b1022 48%, #080b1044 68%, #080b10b0 100%); }
+  .home-artwork {
+    background-image: linear-gradient(0deg, #080b1099 0%, #080b1066 23%, #080b1022 48%, #080b1044 68%, #080b10b0 100%), url('../assets/title/city-harbor-portrait.webp');
+    background-size: 100% 100%, cover;
+    background-position: center, center top;
+  }
   .home-title { font-size: clamp(2.15rem, 9vw, 3.4rem); }
   .home-screen .tf-menu-actions { justify-self: center; }
 }
@@ -140,7 +142,7 @@
   .home-screen .tf-menu-content { grid-column: 1; grid-row: 2; }
   .home-screen .tf-menu-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; justify-self: end; }
   .home-title { font-size: clamp(1.9rem, 7vw, 3.2rem); }
-  .home-artwork { background-position: 60% center; }
+  .home-artwork { background-position: center, center, 60% center; }
 }
 [data-graphics-quality='low'] .home-navigation .tf-menu-action { background: #202a36; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
