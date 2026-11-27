@@ -33,6 +33,87 @@ function environment(
 }
 
 describe('vehicle vertical dynamics', () => {
+  it('launches from an authored lip even when the landing road remains underneath', () => {
+    const launch = (speed: number) => stepVehicleVerticalDynamics(
+      { ...groundedAt(23), verticalVelocity: 12 },
+      environment({
+        previousSurfaceHeight: 23, surfaceHeight: 0,
+        longitudinalSpeed: speed, grade: 0,
+        jumpTakeoff: { height: 24, grade: 0.3 },
+      }),
+      1 / 60,
+    )
+
+    const slow = launch(60)
+    const fast = launch(160)
+    expect(slow.z).toBe(24)
+    expect(slow.grounded).toBe(false)
+    expect(slow.contactLoad).toBe(0)
+    expect(slow.verticalVelocity).toBeGreaterThan(0)
+    expect(fast.verticalVelocity).toBeGreaterThan(slow.verticalVelocity)
+
+    const fly = (initial: VehicleVerticalState) => {
+      let state = initial
+      let ticks = 0
+      let peak = state.z
+      while (!state.grounded && ticks < 600) {
+        state = stepVehicleVerticalDynamics(state, environment({
+          previousSurfaceHeight: 0, surfaceHeight: 0,
+          longitudinalSpeed: 100,
+        }), 1 / 60)
+        peak = Math.max(peak, state.z)
+        ticks += 1
+      }
+      expect(state.grounded).toBe(true)
+      expect(state.z).toBe(0)
+      expect(state.landingIntensity).toBeGreaterThan(0)
+      return { ticks, peak }
+    }
+
+    const slowFlight = fly(slow)
+    const fastFlight = fly(fast)
+    expect(fastFlight.peak).toBeGreaterThan(slowFlight.peak)
+    expect(fastFlight.ticks).toBeGreaterThan(slowFlight.ticks)
+  })
+
+  it('does not launch from an unsupported or descending lip', () => {
+    const common = {
+      previousSurfaceHeight: 24, surfaceHeight: 0,
+      longitudinalSpeed: 120, overRoad: false,
+    }
+    const fall = stepVehicleVerticalDynamics(
+      { ...groundedAt(24), verticalVelocity: 30 },
+      environment({ ...common, jumpTakeoff: { height: 24, grade: -0.3 } }),
+      1 / 60,
+    )
+    expect(fall.grounded).toBe(false)
+    expect(fall.verticalVelocity).toBe(0)
+
+    const unsupported = stepVehicleVerticalDynamics(
+      groundedAt(0),
+      environment({
+        ...common, previousSurfaceHeight: 0, previousOverRoad: false,
+        jumpTakeoff: { height: 24, grade: 0.3 },
+      }),
+      1 / 60,
+    )
+    expect(unsupported.grounded).toBe(true)
+    expect(unsupported.z).toBe(0)
+  })
+
+  it('does not relaunch an already airborne car from a repeated lip event', () => {
+    const result = stepVehicleVerticalDynamics(
+      { ...groundedAt(26), grounded: false, verticalVelocity: 10 },
+      environment({
+        previousSurfaceHeight: 0, surfaceHeight: 0, longitudinalSpeed: 200,
+        jumpTakeoff: { height: 24, grade: 0.3 },
+      }),
+      1 / 60,
+    )
+    expect(result.grounded).toBe(false)
+    expect(result.verticalVelocity).toBeLessThan(10)
+  })
+
   it('absorbs a crest at low speed as suspension movement', () => {
     const result = stepVehicleVerticalDynamics(
       groundedAt(9.8),
