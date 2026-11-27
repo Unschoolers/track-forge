@@ -1,3 +1,6 @@
+import { asTrackId } from '@/domain/model'
+import { createStarterTrack } from '@/domain/track/starterTrack'
+import { decodeTrack } from '@/domain/track/trackCodec'
 import { describe, expect, it } from 'vitest'
 import { createEditorState, reduceEditor } from '@/domain/editor/editorState'
 import { normalizeSceneryTransform, stepSceneryScale } from '@/domain/track/sceneryTransform'
@@ -16,6 +19,18 @@ describe('authored scenery transforms', () => {
   it('stores a prop transform during normalization', () => {
     const prop = { kind: 'city-house', x: 12, y: 15, rotation: 135, scale: 1.15 }
     expect(normalizeSceneryProps([prop])).toEqual([prop])
+  })
+
+  it('round trips authored transformations and rejects invalid imported tree scale', () => {
+    const track = { ...createStarterTrack(asTrackId('scenery-transform'), 1),
+      environmentId: 'cityscape' as const,
+      trees: [{ x: 0, y: 0 }, { x: 80, y: 80, rotation: 33, scale: 1.2 }],
+      scenery: [{ kind: 'city-house' as const, x: 150, y: 150, rotation: 270, scale: 0.85 }],
+    }
+    const decoded = decodeTrack(JSON.parse(JSON.stringify(track)), 1)
+    expect(decoded?.trees).toEqual(track.trees)
+    expect(decoded?.scenery).toEqual(track.scenery)
+    expect(decodeTrack({ ...track, trees: [{ x: 0, y: 0, scale: 500 }] }, 1)).toBeUndefined()
   })
 
   it('preserves tree transforms on move, undo, redo and reset', () => {

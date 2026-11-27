@@ -230,7 +230,10 @@ export function applyEditorCommand(
   state: EditorState,
   command: EditorCommand,
 ): EditorCommandResult {
-  if (command.type === 'transform-scenery' && !normalizeSceneryTransform(command.transform)) {
+  const authoredTransform = command.type === 'transform-scenery' ? command.transform
+    : command.type === 'add-tree' ? command.tree
+    : command.type === 'add-scenery-prop' ? command.prop : undefined
+  if (authoredTransform && !normalizeSceneryTransform(authoredTransform)) {
     return { state, rejection: { code: 'invalid-scenery-position', message: 'Invalid scenery scale or rotation.' } }
   }
   if (command.type === 'add-tree') {

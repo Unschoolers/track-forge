@@ -83,8 +83,8 @@ describe('track presentation geometry', () => {
     expect(day[1]).toMatchObject({
       x: 80,
       y: 80,
-      radiusX: 15,
-      radiusY: 15,
+      radiusX: 28,
+      radiusY: 28,
       baseHeight: WORLD_ELEVATION.levelHeight,
     })
     expect(night[1]?.color).not.toBe(day[1]?.color)
@@ -108,10 +108,9 @@ describe('track presentation geometry', () => {
     expect(primitives).toHaveLength(6)
     expect(primitives.filter(({ layer }) => layer === 'canopy')).toHaveLength(2)
     expect(primitives.filter(({ layer }) => layer === 'shadow')).toHaveLength(2)
-    // Bitmap artwork is 34px across (radius 17) despite the 30-unit vector
-    // canopy, so its outer two pixels must remain inside the culling test.
+    // The 56-unit canopy reaches the viewport even at its outer edge.
     expect(buildTreePresentation(
-      [{ x: 117, y: 50 }],
+      [{ x: 128, y: 50 }],
       false,
       undefined,
       bounds,
