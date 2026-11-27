@@ -27,6 +27,50 @@ test('home uses the bundled LiquidGlass.dev optical component and keeps native a
   await expect(page.locator('.home-screen lg-panel')).toHaveCount(0)
 })
 
+test('Options keeps its full available height and fixed chrome across categories', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?qa')
+  await enterTrackForge(page)
+  await page.getByRole('button', { name: 'Options', exact: true }).click()
+  const options = page.getByRole('dialog', { name: 'Options' })
+  const tabs = options.getByRole('tab')
+  const body = options.locator('.modal-body')
+  const measure = () => options.evaluate(card => {
+    const overlay = card.parentElement
+    const { paddingTop, paddingBottom } = getComputedStyle(overlay)
+    const outer = overlay.getBoundingClientRect()
+    const bounds = card.getBoundingClientRect()
+    return {
+      top: bounds.top,
+      bottom: bounds.bottom,
+      availableTop: outer.top + parseFloat(paddingTop),
+      availableBottom: outer.bottom - parseFloat(paddingBottom),
+      headerTop: card.querySelector('.modal-header').getBoundingClientRect().top,
+      tabsTop: card.querySelector('.options-tab-list').getBoundingClientRect().top,
+      footerBottom: card.querySelector('.modal-footer').getBoundingClientRect().bottom,
+    }
+  })
+  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport)
+    await options.getByRole('tab', { name: 'race', exact: true }).click()
+    const baseline = await measure()
+    expect(baseline.top).toBeCloseTo(baseline.availableTop, 0)
+    expect(baseline.bottom).toBeCloseTo(baseline.availableBottom, 0)
+    for (const tab of await tabs.all()) {
+      await tab.click()
+      expect(await measure()).toEqual(baseline)
+      await expect(options.getByRole('button', { name: 'DONE', exact: true })).toBeInViewport()
+    }
+    await options.getByRole('tab', { name: 'controls', exact: true }).click()
+    if (viewport.height < viewport.width) {
+      expect(await body.evaluate(node => node.scrollHeight - node.clientHeight)).toBeGreaterThan(0)
+      await body.evaluate(node => { node.scrollTop = node.scrollHeight })
+      expect(await body.evaluate(node => node.scrollTop)).toBeGreaterThan(0)
+      expect(await measure()).toEqual(baseline)
+    }
+  }
+})
+
 test('track cards stay in two columns with reachable controls on narrow and landscape phones', async ({ page }) => {
   // Track decoding caps saved names at 32 characters; use that full supported length.
   const longName = 'A Long Track Title at Max Length'

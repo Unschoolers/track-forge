@@ -72,7 +72,7 @@
 .options-modal .modal-card {
   width: min(42rem, 100%);
   min-height: 0;
-  height: auto;
+  height: 100%;
   max-height: 100%;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   border-radius: 1.5rem;

@@ -80,7 +80,7 @@ One production design, no theme switch, experiment flag or parallel UI. Each mer
 | Home | Artwork-led entry, one prominent Race action, compact navigation, Race Again and update access |
 | Race setup | Large vehicle showcase, track flyover, concise readable configuration |
 | Track library | Circuit-led browsing, filtering, favorites and contextual actions; preserve shared/read-only semantics |
-| Options | Calm grouped settings and floating category navigation |
+| Options | Calm grouped settings and floating category navigation; fixed full available height across tabs, with only the settings body scrolling |
 | Nearby and cup | Connection, consent and round state prioritized |
 | Pause and results | Compact interruption and result-led celebration; no live-canvas filter |
 
