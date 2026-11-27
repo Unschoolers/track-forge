@@ -78,7 +78,7 @@ describe('driving onto a raised road', () => {
     expect(reachedDeck).toBe(true)
   })
 
-  it('drops the car off a rising ramp and recovers it before a long fall lands', () => {
+  it('drops the car off a rising ramp, allows landing and recovers it on the deadline', () => {
     const pathIndex = path.points.findIndex((point) => point.x >= 48)
     const point = requireFixture(path.points[pathIndex])
     const position = { x: point.x, y: ROAD_GEOMETRY.onRoadRadius - 1 }
@@ -122,25 +122,34 @@ describe('driving onto a raised road', () => {
     expect(falling.z).toBe(0)
     expect(falling.landingIntensity).toBeGreaterThan(0.1)
 
-    // The first departure tick already counts toward the 250 ms deadline.
+    // The departure tick counts toward the 500 ms deadline. This ramp is
+    // low enough to land naturally before the deadline, unlike a taller deck.
     expect(departed.bridgeFallSeconds).toBeCloseTo(1 / 60)
     let car = departed
-    for (let tick = 2; tick <= 15; tick++) {
+    let landings = 0
+    for (let tick = 2; tick <= 30; tick++) {
       const step = drive(race)
       race = step.state
       const next = requireFixture(race.vehicles[0])
-      expect(step.events.some(({ type }) => type === 'vehicle-recovered')).toBe(tick === 15)
-      expect(step.events.some(({ type }) => type === 'vehicle-landed')).toBe(false)
-      if (tick < 15) {
-        expect(next.grounded).toBe(false)
-        expect(next.z).toBeLessThan(car.z)
+      expect(step.events.some(({ type }) => type === 'vehicle-recovered')).toBe(tick === 30)
+      const landed = step.events.filter(({ type }) => type === 'vehicle-landed')
+      if (tick < 30) {
+        expect(next.bridgeFallSeconds).toBeCloseTo(tick / 60)
+        if (!car.grounded) expect(next.z).toBeLessThan(car.z)
+        else expect(next.grounded).toBe(true)
+        expect(landed).toHaveLength(!car.grounded && next.grounded ? 1 : 0)
+        if (next.grounded) expect(next.z).toBe(0)
+        landings += landed.length
       } else {
+        expect(car.grounded).toBe(true)
+        expect(landed).toHaveLength(0)
         expect(next.grounded).toBe(true)
         expect(next.bridgeFallSeconds).toBeUndefined()
         expect(next.z).toBeCloseTo(path.roadSurface.at(next.pathIndex, next).height)
       }
       car = next
     }
+    expect(landings).toBe(1)
   })
 
   it.each([1, -1])('samples a continuous height and grade on the ramp (direction=%s)', (direction) => {

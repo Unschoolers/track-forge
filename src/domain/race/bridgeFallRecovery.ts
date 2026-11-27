@@ -1,7 +1,7 @@
 import type { RaceVehicle } from '@/domain/race/raceState'
 import { SUPPORT_HEIGHT_EPSILON } from '@/domain/race/vehicleVerticalDynamics'
 
-export const BRIDGE_FALL_RESPAWN_SECONDS = 0.25
+export const BRIDGE_FALL_RESPAWN_SECONDS = 0.5
 
 export function hasBridgeFallExpired(seconds: number | undefined): boolean {
   // Fixed-step accumulation can land just below the exact deadline.
