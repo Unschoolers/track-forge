@@ -653,7 +653,7 @@ export class DomUiHost implements UiHost {
             }),
           start: () =>
             this.controller.dispatch({ type: 'start-race' }),
-        }, availability, flyover)
+        }, availability, flyover, currentTrack ? this.runtime.raceSession.ghostSetups?.(currentTrack) : undefined)
       }
       case 'options':
         return createOptionsModal(state, {
