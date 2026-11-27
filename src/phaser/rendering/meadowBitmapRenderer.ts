@@ -1,7 +1,8 @@
 import type Phaser from 'phaser'
+import type { TerrainMap } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import { BITMAP_TILE_LIMIT, createMeadowBitmapLayers, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
+import { BITMAP_TILE_LIMIT, createEditorRoadBitmapLayers, createEditorWaterBitmapTiles, type BitmapTiles } from '@/presentation/environments/meadowBitmapTiles'
 import { GROUND_TILE_SIZE, groundViewportBounds, type GroundTile, type GroundViewport, type WorldBounds } from '@/presentation/environments/groundTexture'
 import { WORLD_RENDER_DEPTH } from './renderLayers'
 import type { TrackShadowMode } from './lighting'
@@ -235,6 +236,7 @@ export class BitmapTileRenderer {
     private readonly tiles: BitmapTiles,
     private readonly depth: number,
     private readonly layerOrder: number,
+    private readonly tileLimit: number = BITMAP_TILE_LIMIT,
   ) {}
 
   render(view: GroundViewport, bounds?: WorldBounds): void {
@@ -254,7 +256,7 @@ export class BitmapTileRenderer {
     const currentSignature = currentTiles.map(tileKey).join('|')
     const maxPrefetch = Math.max(0, Math.min(
       MAX_PREFETCH_TILES_PER_LAYER,
-      BITMAP_TILE_LIMIT - currentTiles.length,
+      this.tileLimit - currentTiles.length,
     ))
     const prefetched = selectAheadTiles(view, currentTiles, prefetchTiles, maxPrefetch)
     const candidates = [...currentTiles, ...prefetched]
@@ -323,7 +325,7 @@ export class BitmapTileRenderer {
   upload(tile: GroundTile, key: string, canvas: HTMLCanvasElement): void {
     if (!this.wants(key)) return
     this.ensureCapacity()
-    if (this.images.size >= BITMAP_TILE_LIMIT) return
+    if (this.images.size >= this.tileLimit) return
     const texture = `meadow-layer-${this.order}:${key}`
     const registered = this.scene.textures.addCanvas(texture, canvas)
     if (!registered) throw new Error('Could not register Meadow bitmap tile')
@@ -354,7 +356,7 @@ export class BitmapTileRenderer {
   private ensureCapacity(): void {
     // Retain offscreen textures within the existing hard cap. Evict only
     // when an actual upload requires space, not merely because a tile left view.
-    if (this.images.size < BITMAP_TILE_LIMIT) return
+    if (this.images.size < this.tileLimit) return
     // Evict stale tiles before any requested tile. Current tiles are never
     // sacrificed for speculation.
     if (!this.evictOldest(key => !this.wanted.has(key))) {
@@ -391,39 +393,83 @@ export class BitmapTileRenderer {
 }
 
 export interface MeadowBitmapRenderer {
+  update(geometry: TrackGeometry, terrain: TerrainMap, gestureActive: boolean, night: boolean, environment: TrackEnvironmentId): void
+  hasRoadLayers(): boolean
   render(view: GroundViewport, bounds?: WorldBounds): void
   warmVisible(): void
   coverage(): readonly number[]
   destroy(): void
 }
 
-export function createMeadowBitmapRenderer(scene: Phaser.Scene, geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): MeadowBitmapRenderer | undefined {
-  const layers = createMeadowBitmapLayers(geometry, night, environment, shadowMode)
-  if (!layers) return undefined
+/** Scene-lifetime owner. Water is independent of road geometry; hills are not. */
+export function createMeadowBitmapRenderer(scene: Phaser.Scene, shadowMode: TrackShadowMode = 'terrain', observe?: BitmapWorkObserver): MeadowBitmapRenderer {
   const scheduler = new BitmapTileUploadScheduler(scene, undefined, observe)
-  const renderers = [
-    new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
-    new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.2, 1),
-    ...(layers.bridgeApproach ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH, 2)] : []),
-    ...(layers.bridgeDeck ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH, 3)] : []),
-  ]
+  let water: BitmapTileRenderer | undefined
+  let roadLayers: BitmapTileRenderer[] = []
+  let previousTerrain: TerrainMap | undefined
+  let previousEnvironment: TrackEnvironmentId | undefined
+  let previousNight: boolean | undefined
+  let waterLimit = BITMAP_TILE_LIMIT as number
+  let hillLimit = BITMAP_TILE_LIMIT as number
+  let hasWater = false
+  let hasHill = false
   let destroyed = false
+
+  const destroyRoadLayers = () => {
+    for (const renderer of roadLayers) renderer.destroy()
+    roadLayers = []
+  }
   const destroy = () => {
     if (destroyed) return
     destroyed = true
     scene.events.off('shutdown', destroy)
+    water?.destroy()
+    water = undefined
+    destroyRoadLayers()
     scheduler.destroy()
-    for (const renderer of renderers) renderer.destroy()
   }
   scene.events.once('shutdown', destroy)
+  const renderers = (): readonly BitmapTileRenderer[] => water ? [water, ...roadLayers] : roadLayers
   return {
+    update(geometry, terrain, gestureActive, night, environment) {
+      if (destroyed) return
+      const changed = previousTerrain !== terrain || previousNight !== night || previousEnvironment !== environment
+      if (changed) {
+        water?.destroy()
+        water = undefined
+        previousTerrain = terrain
+        previousNight = night
+        previousEnvironment = environment
+        hasWater = terrain.cells.some(cell => cell.kind === 'water')
+        hasHill = terrain.cells.some(cell => cell.kind === 'hill')
+        // Keep the original combined terrain cap even when the map contains
+        // both materials. Each source and GPU cache enforces its allocation.
+        waterLimit = hasHill ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
+        hillLimit = hasWater ? BITMAP_TILE_LIMIT / 2 : BITMAP_TILE_LIMIT
+      }
+      destroyRoadLayers()
+      if (gestureActive) return
+      if (hasWater && !water) {
+        const tiles = createEditorWaterBitmapTiles(geometry, night, environment, waterLimit)
+        if (tiles) water = new BitmapTileRenderer(scene, scheduler, tiles, WORLD_RENDER_DEPTH.terrain + 0.2, 1, waterLimit)
+      }
+      const layers = createEditorRoadBitmapLayers(geometry, night, environment, shadowMode, hillLimit)
+      if (!layers) return
+      roadLayers = [
+        new BitmapTileRenderer(scene, scheduler, layers.road, ROAD_BITMAP_DEPTH, 0),
+        ...(hasHill ? [new BitmapTileRenderer(scene, scheduler, layers.terrain, WORLD_RENDER_DEPTH.terrain + 0.21, 4, hillLimit)] : []),
+        ...(layers.bridgeApproach ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeApproach, BRIDGE_APPROACH_BITMAP_DEPTH, 2)] : []),
+        ...(layers.bridgeDeck ? [new BitmapTileRenderer(scene, scheduler, layers.bridgeDeck, BRIDGE_DECK_BITMAP_DEPTH, 3)] : []),
+      ]
+    },
+    hasRoadLayers: () => roadLayers.length > 0,
     render(view, bounds) {
-      for (const renderer of renderers) renderer.render(view, bounds)
+      for (const renderer of renderers()) renderer.render(view, bounds)
     },
     warmVisible: () => scheduler.warmVisible(),
     coverage: () => {
-      const counts = Array<number>(12).fill(0)
-      for (const renderer of renderers) renderer.writeCoverage(counts)
+      const counts = Array<number>(15).fill(0)
+      for (const renderer of renderers()) renderer.writeCoverage(counts)
       return counts
     },
     destroy,
