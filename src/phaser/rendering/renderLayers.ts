@@ -7,9 +7,10 @@ export const WORLD_RENDER_DEPTH = {
   ground: -40,
   editorGrid: -30,
   terrain: -20,
-  environmentScenery: -15,
-  scenery: -10,
   road: 0,
+  // Above road bitmap and markings (+0.2/+0.4), below raised structures and cars.
+  environmentScenery: 1,
+  scenery: 1.5,
   structureUnderlay: 2,
   vehicleShadow: 4,
   lowerVehicle: 5,

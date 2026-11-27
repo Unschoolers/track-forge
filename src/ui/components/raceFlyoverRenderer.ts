@@ -256,6 +256,47 @@ export function createRaceFlyoverRenderer(
       ctx.globalAlpha = 1
     }
     if (bitmap) drawBitmapTiles(ctx, bitmap.terrain, worldView)
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    for (const edge of [true, false]) {
+      for (const section of sections) {
+        if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
+        const spec = roadColorsForEnvironment(section.a.surface, environmentId)
+        ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y)
+        ctx.lineWidth = edge ? ROAD_GEOMETRY.edgeWidth : ROAD_GEOMETRY.surfaceWidth
+        ctx.strokeStyle = edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
+        ctx.stroke()
+      }
+    }
+    if (bitmap) drawBitmapTiles(ctx, bitmap.road, worldView)
+    // The flyover and Phaser road use identical distance-anchored material
+    // strokes, so textures never switch character between preview and race.
+    if (materialSections.length > 0 && (!bitmap || bitmap.road.visible(worldView).length === 0)) {
+      for (const section of materialSections) {
+        if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
+        for (const stroke of section.strokes) {
+          ctx.lineWidth = stroke.width
+          ctx.strokeStyle = `#${stroke.color.toString(16).padStart(6, '0')}`
+          ctx.globalAlpha = stroke.alpha
+          ctx.beginPath()
+          ctx.moveTo(stroke.start.x, stroke.start.y)
+          ctx.lineTo(stroke.end.x, stroke.end.y)
+          ctx.stroke()
+        }
+      }
+      ctx.globalAlpha = 1
+    }
+    // Road markings and warm pools make the direction and night scene readable at small sizes.
+    ctx.setLineDash([20, 26])
+    ctx.lineWidth = 2
+    for (const section of sections) {
+      if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
+      const spec = roadColorsForEnvironment(section.a.surface, environmentId)
+      ctx.strokeStyle = night ? spec.nightStripe : spec.stripe
+      ctx.lineDashOffset = -section.a.distance
+      ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y); ctx.stroke()
+    }
+    ctx.setLineDash([])
     const left = Math.floor((player.x - radius) / GROUND_TILE_SIZE)
     const right = Math.ceil((player.x + radius) / GROUND_TILE_SIZE)
     const top = Math.floor((player.y - radius) / GROUND_TILE_SIZE)
@@ -311,47 +352,6 @@ export function createRaceFlyoverRenderer(
       }
       ctx.restore()
     }
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    for (const edge of [true, false]) {
-      for (const section of sections) {
-        if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-        const spec = roadColorsForEnvironment(section.a.surface, environmentId)
-        ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y)
-        ctx.lineWidth = edge ? ROAD_GEOMETRY.edgeWidth : ROAD_GEOMETRY.surfaceWidth
-        ctx.strokeStyle = edge ? (night ? spec.nightEdge : spec.edge) : (night ? spec.nightRoad : spec.road)
-        ctx.stroke()
-      }
-    }
-    if (bitmap) drawBitmapTiles(ctx, bitmap.road, worldView)
-    // The flyover and Phaser road use identical distance-anchored material
-    // strokes, so textures never switch character between preview and race.
-    if (materialSections.length > 0 && (!bitmap || bitmap.road.visible(worldView).length === 0)) {
-      for (const section of materialSections) {
-        if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-        for (const stroke of section.strokes) {
-          ctx.lineWidth = stroke.width
-          ctx.strokeStyle = `#${stroke.color.toString(16).padStart(6, '0')}`
-          ctx.globalAlpha = stroke.alpha
-          ctx.beginPath()
-          ctx.moveTo(stroke.start.x, stroke.start.y)
-          ctx.lineTo(stroke.end.x, stroke.end.y)
-          ctx.stroke()
-        }
-      }
-      ctx.globalAlpha = 1
-    }
-    // Road markings and warm pools make the direction and night scene readable at small sizes.
-    ctx.setLineDash([20, 26])
-    ctx.lineWidth = 2
-    for (const section of sections) {
-      if (!visible(section.a.x, section.a.y) && !visible(section.b.x, section.b.y)) continue
-      const spec = roadColorsForEnvironment(section.a.surface, environmentId)
-      ctx.strokeStyle = night ? spec.nightStripe : spec.stripe
-      ctx.lineDashOffset = -section.a.distance
-      ctx.beginPath(); ctx.moveTo(section.a.x, section.a.y); ctx.lineTo(section.b.x, section.b.y); ctx.stroke()
-    }
-    ctx.setLineDash([])
     // Match the canonical bridge geometry and themed material painter, not an
     // approximate centerline shadow. Tiles replace only deck surface pixels.
     for (const item of bridge) {

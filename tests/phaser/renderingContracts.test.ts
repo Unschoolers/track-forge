@@ -24,14 +24,18 @@ import {
   WORLD_LIGHTING,
 } from '@/phaser/rendering/lighting'
 import { WORLD_RENDER_DEPTH } from '@/phaser/rendering/renderLayers'
+import { ROAD_BITMAP_DEPTH, ROAD_MARKINGS_DEPTH } from '@/phaser/rendering/meadowBitmapRenderer'
 import { renderRoadTransitions, renderRecoveryCheckpoints } from '@/phaser/rendering/trackCues'
 
 describe('race rendering contracts', () => {
   it('keeps terrain, structures, vehicles, lamps, effects, and night ordered', () => {
     const orderedDepths = [
       WORLD_RENDER_DEPTH.terrain,
-      WORLD_RENDER_DEPTH.scenery,
       WORLD_RENDER_DEPTH.road,
+      ROAD_BITMAP_DEPTH,
+      ROAD_MARKINGS_DEPTH,
+      WORLD_RENDER_DEPTH.environmentScenery,
+      WORLD_RENDER_DEPTH.scenery,
       WORLD_RENDER_DEPTH.structureUnderlay,
       WORLD_RENDER_DEPTH.structureDeck,
       WORLD_RENDER_DEPTH.structureWall,
@@ -42,9 +46,11 @@ describe('race rendering contracts', () => {
       WORLD_RENDER_DEPTH.nightLight,
     ]
 
-    expect(orderedDepths).toEqual(
-      [...orderedDepths].sort((left, right) => left - right),
-    )
+    for (const [index, depth] of orderedDepths.slice(1).entries()) {
+      expect(depth).toBeGreaterThan(orderedDepths[index])
+    }
+    expect(WORLD_RENDER_DEPTH.scenery + 0.01).toBeLessThan(WORLD_RENDER_DEPTH.structureUnderlay)
+    expect(WORLD_RENDER_DEPTH.scenery + 0.01).toBeLessThan(WORLD_RENDER_DEPTH.vehicleShadow)
     expect(WORLD_RENDER_DEPTH.lowerVehicle)
       .toBeLessThan(WORLD_RENDER_DEPTH.structureDeck)
   })
