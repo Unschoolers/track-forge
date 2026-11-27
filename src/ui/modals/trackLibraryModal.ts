@@ -26,6 +26,7 @@ export interface TrackLibraryActions {
 
 export interface TrackLibraryViewState {
   readonly searchQuery: string
+  readonly searchOpen?: boolean
   readonly filter: 'all' | 'favorites'
 }
 
@@ -78,14 +79,34 @@ export function createTrackLibraryModal(
   const favorites = new Set(state.preferences.favoriteTrackIds ?? [])
   const libraryContent = element('div', 'track-library-content')
   const toolbar = element('div', 'track-library-toolbar')
-  const searchLabel = element('label', 'track-library-search-label', 'Find a circuit')
   const search = document.createElement('input')
   search.type = 'search'
   search.className = 'track-library-search'
   search.placeholder = 'Search circuits or creators'
   search.setAttribute('aria-label', 'Search tracks')
   search.value = initialViewState?.searchQuery ?? ''
-  searchLabel.append(search)
+  search.id = 'track-library-search'
+  search.dataset.action = 'library-search-input'
+  search.hidden = !(initialViewState?.searchOpen || search.value)
+  const searchToggle = iconAction('Search circuits', 'search', 'library-search-toggle', () => setSearchOpen(search.hidden), 'track-library-search-toggle')
+  searchToggle.setAttribute('aria-controls', search.id)
+  const updateSearchToggle = () => {
+    const label = search.hidden ? 'Search circuits' : 'Close search'
+    searchToggle.setAttribute('aria-expanded', String(!search.hidden))
+    searchToggle.setAttribute('aria-label', label)
+    searchToggle.title = label
+  }
+  const setSearchOpen = (open: boolean) => {
+    search.hidden = !open
+    updateSearchToggle()
+    if (open) search.focus()
+    else {
+      search.value = ''
+      renderTracks()
+      searchToggle.focus()
+    }
+  }
+  updateSearchToggle()
   const filter = element('div', 'track-library-filter')
   filter.setAttribute('role', 'group')
   filter.setAttribute('aria-label', 'Filter circuits')
@@ -96,7 +117,7 @@ export function createTrackLibraryModal(
   favoritesFilter.setAttribute('aria-pressed', String(initialFilter === 'favorites'))
   filter.append(allFilter, favoritesFilter)
   const count = element('p', 'track-library-count')
-  toolbar.append(searchLabel, filter, count)
+  toolbar.append(filter, count, searchToggle, search)
   const list = element('div', 'track-list')
   list.setAttribute('aria-live', 'polite')
   libraryContent.append(toolbar, list)
@@ -209,6 +230,13 @@ export function createTrackLibraryModal(
     for (const track of tracks) list.append(cardFor(track, OFFICIAL_TRACK_IDS.has(track.id)))
   }
   search.addEventListener('input', renderTracks)
+  search.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      setSearchOpen(false)
+    }
+  })
   renderTracks()
 
   const fileInput = document.createElement('input')

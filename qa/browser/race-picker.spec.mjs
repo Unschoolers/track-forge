@@ -18,6 +18,11 @@ test('track cards stay in two columns with reachable controls on narrow and land
   const picker = await openPicker(page)
   for (const viewport of [{ width: 320, height: 740 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport)
+    await expect(picker.locator('.track-library-search')).toBeHidden()
+    const searchToggle = picker.getByRole('button', { name: 'Search circuits' })
+    await expect(searchToggle).toHaveAttribute('aria-expanded', 'false')
+    expect((await picker.locator('.track-library-toolbar').boundingBox()).height).toBeLessThanOrEqual(64)
+    expect((await searchToggle.boundingBox()).width).toBeGreaterThanOrEqual(44)
     const cards = picker.locator('.track-card')
     await expect(cards.first()).toBeVisible()
     const bounds = await cards.evaluateAll(nodes => nodes.map(node => {
@@ -65,6 +70,14 @@ test('track cards stay in two columns with reachable controls on narrow and land
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   }
   await expect(picker.getByRole('button', { name: `Race ${longName}` })).toBeVisible()
+  await picker.getByRole('button', { name: 'Search circuits' }).click()
+  const search = picker.getByRole('searchbox', { name: 'Search tracks' })
+  await expect(search).toBeFocused()
+  await search.fill(longName)
+  await expect(picker.locator('.track-card')).toHaveCount(1)
+  await picker.getByRole('button', { name: 'Close search' }).click()
+  await expect(search).toBeHidden()
+  await expect(picker.getByRole('button', { name: 'Search circuits' })).toBeFocused()
 })
 
 test('previews every track and shares a saved track without selecting it', async ({ page }) => {

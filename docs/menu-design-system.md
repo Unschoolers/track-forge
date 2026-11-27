@@ -45,7 +45,7 @@ migration, review the following alongside the existing interaction contracts:
 - **Organization:** use readable title-case section headings, grouped rows
   and consistent padding instead of all-caps boxed panels. Settings use forms
   and native semantics rather than making every row an optical effect.
-- **Search:** if needed in the library, use semantic search and verify keyboard
+- **Search:** library browsing comes first: a compact icon opens search on demand; closing clears the query, and returning from race setup restores the previous view. Use semantic search and verify keyboard
   resizing, safe areas and clear/dismiss behavior. Placement follows available
   space and task; no separate search tab unless search is a true destination.
 - **Platform verification:** test Android WebView, desktop, touch and keyboard.

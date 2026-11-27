@@ -353,7 +353,15 @@ describe('modal application flows', () => {
     expect(root.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()
 
     const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
-    if (!search) throw new Error('Missing track search')
+    const toggle = root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')
+    if (!search || !toggle) throw new Error('Missing track search')
+    expect(search.hidden).toBe(true)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).not.toBe(search)
+    toggle.click()
+    expect(search.hidden).toBe(false)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(search)
     search.value = 'Alex'
     search.dispatchEvent(new Event('input'))
     expect(root.querySelectorAll('.track-card')).toHaveLength(1)
@@ -363,6 +371,30 @@ describe('modal application flows', () => {
     expect(root.querySelector('.track-list .empty-state')?.textContent).toBe('No circuits match this view.')
     root.querySelector<HTMLButtonElement>('[data-action="library-filter-all"]')?.click()
     expect(root.querySelectorAll('.track-card')).toHaveLength(0)
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(search.hidden).toBe(true)
+    expect(search.value).toBe('')
+    expect(root.querySelectorAll('.track-card')).toHaveLength(2)
+    expect(document.activeElement).toBe(toggle)
+  })
+
+  it('restores active search on return from race setup and resets it on a new visit', () => {
+    const initial = state({ type: 'track-library', purpose: 'race' })
+    const { root, update, host } = setup(initial)
+    root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')?.click()
+    const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
+    if (!search) throw new Error('Missing track search')
+    search.value = 'Starter'
+    search.dispatchEvent(new Event('input'))
+    update(state({ type: 'race-setup' }))
+    update(initial)
+    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Starter')
+    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(false)
+    update(state())
+    update(initial)
+    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('')
+    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(true)
+    host.destroy()
   })
 
   it('keeps the search query and favorites filter when a favorite update rerenders the library', () => {
@@ -372,6 +404,7 @@ describe('modal application flows', () => {
     }
     const { root, update, host } = setup(initial)
     root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.click()
+    root.querySelector<HTMLButtonElement>('[data-action="library-search-toggle"]')?.click()
     const search = root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
     if (!search) throw new Error('Missing track search')
     search.value = 'Alex'
@@ -380,6 +413,7 @@ describe('modal application flows', () => {
     update({ ...initial, preferences: { ...preferences, favoriteTrackIds: [ready.id] } })
 
     expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.value).toBe('Alex')
+    expect(root.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')?.hidden).toBe(false)
     expect(root.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed')).toBe('true')
     expect(root.querySelectorAll('.track-card')).toHaveLength(1)
     expect(root.querySelector('[data-action="select-edit-ready"]')).not.toBeNull()

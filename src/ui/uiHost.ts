@@ -398,18 +398,26 @@ export class DomUiHost implements UiHost {
     const libraryScroll = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
       ? this.root.querySelector<HTMLElement>('.track-library-modal .modal-body')?.scrollTop
       : undefined
-    const currentLibrary = state.overlay.type === 'track-library' && this.previousOverlayType === 'track-library'
+    // Preserve the current view while visiting race setup, not on a fresh visit.
+    const returningThroughSetup = state.mode === 'home' && (
+      state.overlay.type === 'race-setup' ||
+      (state.overlay.type === 'options' && state.overlay.returnTo === 'race-setup') ||
+      (state.overlay.type === 'track-library' && state.overlay.purpose === 'race' && this.previousOverlayType === 'race-setup')
+    )
+    const currentLibrary = this.previousOverlayType === 'track-library' &&
+      (state.overlay.type === 'track-library' || returningThroughSetup)
       ? this.root.querySelector<HTMLElement>('.track-library-modal')
       : null
     const librarySearch = currentLibrary?.querySelector<HTMLInputElement>('[aria-label="Search tracks"]')
-    this.trackLibraryViewState = currentLibrary
-      ? {
+    if (currentLibrary) {
+      this.trackLibraryViewState = {
         searchQuery: librarySearch?.value ?? '',
+        searchOpen: librarySearch ? !librarySearch.hidden : false,
         filter: currentLibrary.querySelector<HTMLButtonElement>('[data-action="library-filter-favorites"]')?.getAttribute('aria-pressed') === 'true'
           ? 'favorites'
           : 'all',
       }
-      : undefined
+    } else if (!returningThroughSetup) this.trackLibraryViewState = undefined
     // Keep the local player's scroll and diagnostic export across roster updates.
     const previousLobby = lobbyTrack && this.previousOverlayType === 'nearby'
       ? this.root.querySelector<HTMLElement>('.nearby-lobby-modal') : null
