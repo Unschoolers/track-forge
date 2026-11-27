@@ -7,7 +7,6 @@ import { createEditorState } from '@/domain/editor/editorState'
 import { asTrackId } from '@/domain/model'
 import { createStarterTrack } from '@/domain/track/starterTrack'
 import { TrackGeometryService } from '@/domain/track/trackGeometryService'
-import * as trackExport from '@/infrastructure/export/trackExport'
 import { createTrackLibraryModal } from '@/ui/modals/trackLibraryModal'
 import {
   DomUiHost,
@@ -199,16 +198,10 @@ describe('modal application flows', () => {
     const overflow = share?.closest<HTMLDetailsElement>('details.track-card-overflow')
     expect(overflow).not.toBeNull()
     if (!overflow) throw new Error('Saved track share action must be in its overflow menu')
-    const shareTrack = vi.spyOn(trackExport, 'shareTrack').mockResolvedValueOnce(true)
-    try {
-      overflow.open = true
-      share?.click()
-      expect(overflow.open).toBe(false)
-      await Promise.resolve()
-      expect(shareTrack).toHaveBeenCalledWith(ready, expect.any(String), undefined)
-    } finally {
-      shareTrack.mockRestore()
-    }
+    overflow.open = true
+    share?.click()
+    expect(overflow.open).toBe(false)
+    expect(port.dispatch).toHaveBeenCalledWith({ type: 'open-track-share', track: ready, challenge: undefined })
     expect(root.querySelector('[data-action="export-ready"]')).toBeNull()
     expect(root.querySelector('[data-action^="select-race-"]')).not.toBeNull()
     expect(root.querySelector('.track-library-modal')?.textContent).not.toContain('01:02.345')
@@ -660,24 +653,25 @@ it('hides share on built-in tracks but keeps it for player tracks', () => {
   expect(root.textContent).toContain('Track Forge')
 })
 
-it('does not expose Nearby sharing for system-owned tracks', () => {
+it('exposes only the unified Share action for personal tracks', () => {
   const seeded = {
     ...ready, id: asTrackId('system-starter-circuit'), origin: 'seeded' as const,
     creator: { id: 'trackforge-system', name: 'Track Forge' },
   }
   const personal = { ...ready, id: asTrackId('my-track'), origin: 'local' as const }
-  const sendNearby = vi.fn()
+  const share = vi.fn()
   const modal = createTrackLibraryModal({
     ...state({ type: 'track-library', purpose: 'edit' }), tracks: [seeded, personal],
   }, {
-    share: vi.fn(), sendNearby, importFile: vi.fn(), close: vi.fn(), create: vi.fn(),
+    share, importFile: vi.fn(), close: vi.fn(), create: vi.fn(),
     selectForEdit: vi.fn(), selectForRace: vi.fn(), toggleFavorite: vi.fn(), delete: vi.fn(),
   }, new TrackGeometryService())
-  expect(modal.querySelector('[data-action="send-nearby-system-starter-circuit"]')).toBeNull()
-  const menu = modal.querySelector<HTMLDetailsElement>('.track-card:has([data-action="send-nearby-my-track"]) .track-card-overflow')
+  expect(modal.querySelector('[data-action="share-system-starter-circuit"]')).toBeNull()
+  expect(modal.querySelector('[data-action^="send-nearby-"]')).toBeNull()
+  const menu = modal.querySelector<HTMLDetailsElement>('.track-card:has([data-action="share-my-track"]) .track-card-overflow')
   expect(menu).not.toBeNull()
   if (menu) menu.open = true
-  modal.querySelector<HTMLButtonElement>('[data-action="send-nearby-my-track"]')?.click()
-  expect(sendNearby).toHaveBeenCalledWith(personal)
+  modal.querySelector<HTMLButtonElement>('[data-action="share-my-track"]')?.click()
+  expect(share).toHaveBeenCalledWith(personal)
   expect(menu?.open).toBe(false)
 })
