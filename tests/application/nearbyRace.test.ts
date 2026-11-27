@@ -984,6 +984,13 @@ describe('Nearby track sharing and rematches', () => {
       expect(guestStarts[1]?.track.name).toBe('Changed circuit')
       expect(host.snapshot().phase).toBe('staging')
       expect(guest.snapshot().phase).toBe('staging')
+      // A delayed synchronization reply from the previous race must not seed
+      // the new round's clock estimate or advance its staging state.
+      await network.endpoint('host').send(['guest'], encodeControl({
+        type: 'clock-reply', round: 0, probe: 0, receivedAt: 100, sentAt: 100,
+      }))
+      await Promise.resolve()
+      expect(guest.snapshot().phase).toBe('staging')
       host.sceneReady()
       guest.sceneReady()
       await vi.waitFor(() => expect(guest.snapshot().phase).toBe('racing'), { interval: 5 })

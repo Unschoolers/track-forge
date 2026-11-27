@@ -451,18 +451,18 @@ export class NearbyRace {
 
   private clearRound(): void {
     this.diagnostic.finishRound()
+    this.clearRoundState()
+  }
+
+  /** Clear state shared by round changes and room teardown. */
+  private clearRoundState(): void {
     this.lobby.reset()
     this.rosterDelivery.reset()
     this.armed.clear()
     this.racers.clear()
     this.lineup = null
     this.localSceneReady = false
-    this.resetStagingClock()
-    this.clockAudit.reset()
-    this.clockAuditNextAt = Infinity
-    this.clockAuditDeadline = null
-    this.clockAuditResult = null
-    this.clockAuditFailures = 0
+    this.resetRoundClock()
     this.ranking.reset()
     this.localProgress = null
     this.sharedStartAt = null
@@ -599,6 +599,15 @@ export class NearbyRace {
   private resetStagingClock(): void {
     clearTimeout(this.clockProbeTimer)
     this.clock.reset()
+  }
+
+  private resetRoundClock(): void {
+    this.resetStagingClock()
+    this.clockAudit.reset()
+    this.clockAuditNextAt = Infinity
+    this.clockAuditDeadline = null
+    this.clockAuditResult = null
+    this.clockAuditFailures = 0
   }
 
   /** Low-rate diagnostic probes never move GO or change local physics speed. */
@@ -1183,28 +1192,8 @@ export class NearbyRace {
     this.rooms.clear()
     this.pendingPairs.clear()
     this.guests.clear()
-    this.lobby.reset()
-    this.rosterDelivery.reset()
-    this.armed.clear()
-    this.localSceneReady = false
-    this.lineup = null
-    this.resetStagingClock()
-    this.clockAudit.reset()
-    this.clockAuditNextAt = Infinity
-    this.clockAuditDeadline = null
-    this.clockAuditResult = null
-    this.clockAuditFailures = 0
-    this.ranking.reset()
-    this.localProgress = null
-    this.sharedStartAt = null
-    this.lastSimulationElapsed = null
-    this.finalClockElapsed = null
-    this.racers.clear()
-    this.receiver = null
-    this.prepared = null
+    this.clearRoundState()
     this.slot = 0
-    this.poseSync.reset()
-    this.progressSync.reset()
     this.error = error
     this.setPhase('idle')
   }
