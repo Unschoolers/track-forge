@@ -161,6 +161,59 @@ describe('BitmapTileUploadScheduler', () => {
 })
 
 describe('BitmapTileRenderer', () => {
+  it('reveals the entire editor terrain window only after all required tiles are resident', () => {
+    const { scheduler, scene, frame } = schedulerFixture()
+    const images: { visible: boolean }[] = []
+    Object.assign(scene, {
+      textures: { addCanvas: () => ({}), remove: () => undefined },
+      add: {
+        image: () => {
+          const image = {
+            visible: true,
+            setOrigin: () => image,
+            setDepth: () => image,
+            setVisible: (visible: boolean) => { image.visible = visible; return image },
+            destroy: () => undefined,
+          }
+          images.push(image)
+          return image
+        },
+      },
+    })
+    let tileOffset = 0
+    const renderer = new BitmapTileRenderer(scene, scheduler, {
+      visible: () => Array.from({ length: 2 }, (_, x) => ({
+        x: x + tileOffset, y: 0, variant: 0,
+      })),
+      image: () => ({} as HTMLCanvasElement),
+    }, 0, 1, 48, true)
+    renderer.render(view)
+    frame()
+    frame()
+    expect(images).toHaveLength(1)
+    expect(images.every(image => !image.visible)).toBe(true)
+    frame()
+    frame()
+    expect(images).toHaveLength(2)
+    expect(images.every(image => image.visible)).toBe(true)
+
+    tileOffset = 1
+    renderer.render({ ...view, centerX: view.centerX + 4096 })
+    expect(images.every(image => !image.visible)).toBe(true)
+    frame()
+    frame()
+    expect(images).toHaveLength(3)
+    expect(images.filter(image => image.visible)).toHaveLength(2)
+    tileOffset = 0
+    renderer.render(view)
+    expect(images.filter(image => image.visible)).toHaveLength(2)
+    expect(images).toHaveLength(3)
+    renderer.destroy()
+    scheduler.destroy()
+  })
+
+
+
   it('retains offscreen textures within capacity and reuses them on return', () => {
     const { scheduler, scene, frame } = schedulerFixture()
     const registered = new Set<string>()
