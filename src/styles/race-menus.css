@@ -651,7 +651,6 @@
   background: #ff925c; color: #20110a; font-weight: 800;
 }
 .race-setup-modal :is(.setup-choice, .car-choice, .button):active:not(:disabled) { filter: brightness(.9); }
-.race-setup-modal :is(.setup-choice, .car-choice, .button):disabled { opacity: .5; }
 @media (max-width: 520px) and (orientation: portrait) {
   .modal-overlay.race-setup-modal { padding: 0; background-image: linear-gradient(0deg, #080d1699, #080d1644), url('../assets/title/city-harbor-portrait.webp'); background-position: center; }
   .race-setup-modal .modal-card { width: 100%; height: 100%; border: 0; border-radius: 0; }
