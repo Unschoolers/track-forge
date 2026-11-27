@@ -62,16 +62,20 @@ export function createHomeScreen(
 
   const primaryDock = createMenuDock('Race')
   primaryDock.classList.add('home-primary-dock')
+  primaryDock.append(createMenuAction('Race', 'race', actions.race, 'primary'))
   if (state.raceAgainTrackName) {
     const label = `Race again · ${state.raceAgainTrackName}`
     const raceAgain = createMenuAction(label, 'race-again', actions.raceAgain)
-    raceAgain.replaceChildren(element('span', 'home-race-again-label', label))
+    raceAgain.setAttribute('aria-label', label)
+    raceAgain.replaceChildren(
+      element('span', 'home-race-again-label', 'Race again'),
+      element('span', 'home-race-again-track', state.raceAgainTrackName),
+    )
     primaryDock.append(raceAgain)
   }
-  primaryDock.append(createMenuAction('Race', 'race', actions.race, 'primary'))
 
-  const navigationDock = createMenuDock('Main menu')
-  navigationDock.classList.add('home-navigation-dock')
+  const navigationDock = element('nav', 'home-navigation')
+  navigationDock.setAttribute('aria-label', 'Main menu')
   if (actions.nearby) navigationDock.append(createMenuAction('Nearby race', 'nearby', actions.nearby))
   if (actions.cup) navigationDock.append(createMenuAction('Cup', 'arcade-cup', actions.cup))
   navigationDock.append(createMenuAction('Track editor', 'editor', actions.edit))
