@@ -96,3 +96,6 @@ The shared `attachMenuGlass` adapter mounts upstream `lg-panel` only on explicit
 Cup and Nearby navigation use the same static harbor artwork for their action lenses; the live flyover is never sampled. Pause and results use painted opaque surfaces without backdrop filters over the race canvas. Physical Android visual and frame-pacing verification remains required before merging optical changes.
 
 Options reconciles newly inserted or hidden action controls while open; download polling preserves existing button identity and does not recreate lenses for unchanged progress controls. Release notes and progress retain native semantics.
+
+## Remaining compact dialogs
+Editor menu, unsaved changes, track naming/renaming and player-name onboarding use the shared 18px action geometry and opaque painted material. These dialogs can appear over an editor or other unknown backdrop; they do not opt into SVG refraction. Android's system Back exit confirmation is a native dialog, not a DOM modal: its rounded panel, warm primary and graphite secondary native ripple drawables match the menu palette without adding a WebView bridge or live backdrop capture. Preserve native Back/Stay/Exit behavior and accessible scalable text. The native dialog remains opaque independently of graphics quality.
