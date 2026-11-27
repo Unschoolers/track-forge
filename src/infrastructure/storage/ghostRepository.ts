@@ -1,5 +1,5 @@
 import type { KeyValueStore } from '@/application/ports/storage'
-import type { Track } from '@/domain/model'
+import { CAR_IDS, normalizeRouteKind, type Track } from '@/domain/model'
 import {
   ghostRaceKey,
   MAX_GHOST_FRAMES,
@@ -86,6 +86,16 @@ export class BrowserGhostRepository implements GhostStore {
     const migrationPending = Object.keys(legacy).length > 0 && !this.write(runs)
     if (migrationPending) console.warn('Track Forge: ghost migration not yet persisted.')
     return { runs, migrationPending }
+  }
+
+  availableSetups(track: Track): readonly GhostSetup[] {
+    // Validate/read the bank once, not once for each button in the menu.
+    const { runs } = this.all()
+    const laps = normalizeRouteKind(track.routeKind) === 'point-to-point' ? [1] : [1, 2, 3]
+    return CAR_IDS.flatMap(car => laps.flatMap(laps => {
+      const run = runs[ghostRaceKey(track, { car, laps })]
+      return run?.car === car ? [{ car, laps }] : []
+    }))
   }
 
   availability(track: Track, setup: GhostSetup): GhostAvailability {
