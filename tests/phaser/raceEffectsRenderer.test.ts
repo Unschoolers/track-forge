@@ -41,3 +41,16 @@ describe('race speed-line rendering', () => {
     expect(graphics.lineBetween).not.toHaveBeenCalled()
   })
 })
+
+it('renders only effects belonging to each bridge layer', () => {
+  const graphics = { lineStyle: vi.fn(), lineBetween: vi.fn(), fillStyle: vi.fn(), fillCircle: vi.fn() }
+  const mark = { start: { x: 0, y: 0 }, end: { x: 1, y: 1 }, width: 1, life: 1, maxLife: 1 }
+  const effects = { particles: [speedLine, { ...speedLine, x: 30, raised: true as const }],
+    skids: [mark, { ...mark, start: { x: 20, y: 20 }, raised: true as const }], previousTires: {} }
+  const g = graphics as unknown as Phaser.GameObjects.Graphics
+  renderRaceEffects(g, effects)
+  expect(graphics.lineBetween.mock.calls.map(args => args[0])).toEqual([0, 10])
+  graphics.lineBetween.mockClear()
+  renderRaceEffects(g, effects, false, false, true)
+  expect(graphics.lineBetween.mock.calls.map(args => args[0])).toEqual([20, 30])
+})

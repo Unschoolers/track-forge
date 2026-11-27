@@ -7,13 +7,16 @@ export function renderRaceEffects(
   effects: RaceEffectsState,
   nativeParticles = false,
   desert = false,
+  raised = false,
 ): void {
   for (const skid of effects.skids) {
+    if (Boolean(skid.raised) !== raised) continue
     graphics.lineStyle(skid.width, 0x15191e, 0.52 * (skid.life / skid.maxLife))
     graphics.lineBetween(skid.start.x, skid.start.y, skid.end.x, skid.end.y)
   }
   if (nativeParticles) return
   for (const particle of effects.particles) {
+    if (Boolean(particle.raised) !== raised) continue
     const style = raceParticleStyle(particle, desert)
     const remaining = Math.max(0, particle.life / particle.maxLife)
     if (style.shape === 'wind') {

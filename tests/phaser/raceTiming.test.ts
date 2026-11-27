@@ -11,7 +11,7 @@ it('uses the actual raw Phaser TimeStep delta after reset instead of its smoothe
   const TimeStep = require(`${process.cwd()}/node_modules/phaser/src/core/TimeStep.js`)
   const loop = new TimeStep({}, {})
   const advance = vi.fn()
-  const scene = { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, snapshot: {}, controller: { snapshot: () => ({ preferences: { pedalMode: 'auto' } }) }, raceSession: { advance, snapshot: () => ({ state: null }) }, controls: { consumeBoostRequest: () => false, snapshot: () => ({}) }, game: { loop } }
+  const scene = { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, lowerRaceEffects: {}, upperRaceEffects: {}, snapshot: {}, controller: { snapshot: () => ({ preferences: { pedalMode: 'auto' } }) }, raceSession: { advance, snapshot: () => ({ state: null }) }, controls: { consumeBoostRequest: () => false, snapshot: () => ({}) }, game: { loop } }
   loop.deltaHistory = Array(10).fill(loop._target)
   loop.resetDelta()
   let time = loop.lastTime
@@ -29,7 +29,7 @@ it('waits for the first submitted race frame and preserves visible local countdo
   const controls = { consumeBoostRequest: () => false, snapshot: () => ({}) }
   const loop = { rawDelta: 4000 }
   const scene = new RaceScene(controller as never, { advance, snapshot } as never, controls as never, {} as never)
-  Object.assign(scene, { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, snapshot: {}, game: { loop, events: { once } } })
+  Object.assign(scene, { vehicleGraphics: {}, shadowGraphics: {}, upperVehicleGraphics: {}, effectGraphics: {}, lowerRaceEffects: {}, upperRaceEffects: {}, snapshot: {}, game: { loop, events: { once } } })
   const update = (mode: string, phase: string, rawDelta: number) => {
     loop.rawDelta = rawDelta
     // The scene exits after advancing, so this test needs no renderer.

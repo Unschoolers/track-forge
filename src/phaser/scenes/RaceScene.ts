@@ -91,6 +91,8 @@ export class RaceScene extends Phaser.Scene {
   private vehicleSprites: VehicleSpriteRenderer | undefined
   private isCoveredByBridgeDeck: BridgeDeckOcclusion | undefined
   private effectGraphics?: Phaser.GameObjects.Graphics
+  private lowerRaceEffects?: Phaser.GameObjects.Graphics
+  private upperRaceEffects?: Phaser.GameObjects.Graphics
   private nativeParticles: NativeRaceParticles | undefined
   private desertParticles = false
   private lampGraphics: { graphics: Phaser.GameObjects.Graphics; bounds: WorldBounds }[] = []
@@ -174,8 +176,10 @@ export class RaceScene extends Phaser.Scene {
     this.effectGraphics = this.add
       .graphics()
       .setDepth(WORLD_RENDER_DEPTH.effect)
+    this.lowerRaceEffects = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.lowerRaceEffect)
+    this.upperRaceEffects = this.add.graphics().setDepth(WORLD_RENDER_DEPTH.upperRaceEffect)
     if (this.game.renderer && this.game.renderer.type === Phaser.WEBGL && typeof this.add.particles === 'function') {
-      this.nativeParticles = new NativeRaceParticles(this, WORLD_RENDER_DEPTH.effect + 0.01, this.desertParticles, this.snapshot.preferences.graphicsQuality === 'low')
+      this.nativeParticles = new NativeRaceParticles(this, WORLD_RENDER_DEPTH.lowerRaceEffect + 0.01, this.desertParticles, this.snapshot.preferences.graphicsQuality === 'low', WORLD_RENDER_DEPTH.upperRaceEffect + 0.01)
     }
     if (night) this.nightBeamRenderer = new NightBeamRenderer(this, Phaser.BlendModes.ADD)
     this.nightLightGraphics = this.add
@@ -287,6 +291,8 @@ export class RaceScene extends Phaser.Scene {
       !this.shadowGraphics ||
       !this.upperVehicleGraphics ||
       !this.effectGraphics ||
+      !this.lowerRaceEffects ||
+      !this.upperRaceEffects ||
       !this.snapshot
     ) return
     const benchmark = this.racePerformance?.beginUpdate()
@@ -388,7 +394,10 @@ export class RaceScene extends Phaser.Scene {
     this.vehicleSprites?.beginFrame()
     this.effectGraphics.clear()
     this.nativeParticles?.render(race.effects, race.tick)
-    renderRaceEffects(this.effectGraphics, race.effects, this.nativeParticles !== undefined, this.desertParticles)
+    this.lowerRaceEffects.clear()
+    this.upperRaceEffects.clear()
+    renderRaceEffects(this.lowerRaceEffects, race.effects, this.nativeParticles !== undefined, this.desertParticles)
+    renderRaceEffects(this.upperRaceEffects, race.effects, this.nativeParticles !== undefined, this.desertParticles, true)
     const restart = manualRecoverySignal(race)
     if (player && restart) {
       // Counter-rotate and scale to keep the local signal upright and legible.
@@ -618,6 +627,8 @@ export class RaceScene extends Phaser.Scene {
     this.localCountdownFrame = 'waiting'
     this.nativeParticles?.destroy()
     this.nativeParticles = undefined
+    delete this.lowerRaceEffects
+    delete this.upperRaceEffects
     this.frameDiagnostics?.endRace()
     this.controls.reset()
     this.boostRequestPending = false

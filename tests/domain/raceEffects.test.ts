@@ -90,6 +90,17 @@ describe('race effects', () => {
     expect(recovered.skids).toHaveLength(second.skids.length)
   })
 
+  it('keeps effects on their birth layer when a car changes elevation', () => {
+    const player = vehicles()[0]
+    if (!player) throw new Error('Missing player fixture')
+    const first = advanceRaceEffects(createRaceEffectsState(), [player], [], 1 / 60, { next: () => 0 }, 0, () => true)
+    expect(first.particles.every(p => p.raised)).toBe(true)
+    expect(first.skids.every(mark => mark.raised)).toBe(true)
+    const second = advanceRaceEffects(first, [{ ...player, x: player.x + 1 }], [], 1 / 60, { next: () => 0 }, 1, () => false)
+    expect(second.particles.map(p => Boolean(p.raised))).toEqual([true, false])
+    expect(second.skids.map(mark => Boolean(mark.raised))).toEqual([true, true, false, false])
+  })
+
   it('expires descriptors and bounds retained arrays', () => {
     let effects = createRaceEffectsState()
     for (let index = 0; index < 300; index += 1) {
