@@ -40,6 +40,7 @@ export function createResultsModal(
   const hasStandings = result.ghostTime === undefined && !timeTrial && !boostPractice && result.standings.length > 0
   const frame = createModalFrame(headline, result.trackName, undefined, 'results-modal')
   frame.overlay.dataset.modal = 'results'
+  frame.overlay.dataset.outcome = result.outcome
   if (result.playerTime !== null) {
     const finishTime = createFinishTime(result.playerTime)
     if (hasStandings) {

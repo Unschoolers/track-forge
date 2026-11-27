@@ -35,6 +35,10 @@ describe('Cup menu', () => {
       start: vi.fn(), resume: vi.fn(), hostNearby: vi.fn(),
     }
     const overlay = createCupModal(state([OFFICIAL_CIRCUITS[0]!.track.id, OFFICIAL_CIRCUITS[1]!.track.id]), actions)
+    const lineup = overlay.querySelector('ol.cup-track-list')
+    expect(lineup?.getAttribute('aria-label')).toBe('Cup track order')
+    expect(lineup?.hasAttribute('aria-labelledby')).toBe(false)
+    expect(lineup?.querySelectorAll('li')).toHaveLength(2)
     const first = OFFICIAL_CIRCUITS[0]
     const second = OFFICIAL_CIRCUITS[1]
     expect([...overlay.querySelectorAll('.cup-track-name')].map(node => node.textContent))
