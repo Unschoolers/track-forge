@@ -9,7 +9,7 @@ import { createArtCanvas } from './meadowBitmapArt'
 
 export type TreeSpriteKind = 'tree' | 'tree-spring' | 'tree-autumn' | 'tree-winter'
 export type ScenerySpriteKind = SceneryPropKind | TreeSpriteKind
-export type SceneryBitmapResolver = (kind: ScenerySpriteKind, night: boolean) => HTMLCanvasElement | undefined
+export type SceneryBitmapResolver = (kind: ScenerySpriteKind, night: boolean) => HTMLCanvasElement | HTMLImageElement | undefined
 export const SCENERY_SPRITE_SIZE = 256
 
 interface AtlasDefinition {
@@ -107,7 +107,7 @@ export function getSceneryAtlas(kind: ScenerySpriteKind, night: boolean): Scener
 
 /** The Canvas flyover and pre-boot test adapter use lazily cached cells.
  * Phaser registers named frames directly from the shared sheets. */
-export const getSceneryBitmap: SceneryBitmapResolver = (kind, night) => {
+export function getSceneryBitmap(kind: ScenerySpriteKind, night: boolean): HTMLCanvasElement | undefined {
   if (!artwork) return undefined
   const key = `${kind}:${night}`
   const existing = bitmaps.get(key)

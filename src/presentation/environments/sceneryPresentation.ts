@@ -40,7 +40,7 @@ export function buildSceneryPresentation(environmentId: TrackEnvironmentId, prop
 
 export interface SceneryBitmapSprite {
   readonly kind: SceneryPropKind
-  readonly image: HTMLCanvasElement
+  readonly image: HTMLCanvasElement | HTMLImageElement
   readonly x: number
   readonly y: number
   readonly size: number

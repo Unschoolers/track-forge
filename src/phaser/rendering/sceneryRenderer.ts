@@ -3,7 +3,10 @@ import type { Vector2 } from '@/domain/model'
 import type { SceneryProp, TrackEnvironmentId } from '@/domain/track/trackEnvironment'
 import { groundViewportBounds, GROUND_TILE_SIZE, type GroundViewport } from '@/presentation/environments/groundTexture'
 import { buildSceneryRenderPlan } from '@/presentation/environments/sceneryPresentation'
-import { getSceneryBitmap, type SceneryBitmapResolver } from '@/presentation/environments/sceneryBitmapArt'
+import { getSceneryAtlas, type SceneryBitmapResolver } from '@/presentation/environments/sceneryBitmapArt'
+import { registerSceneryFrame } from './sceneryAtlasTexture'
+
+const resolveAtlas: SceneryBitmapResolver = (kind, night) => getSceneryAtlas(kind, night)?.source
 
 /** Caches an overscanned world-space window until its tile boundary changes. */
 export class SceneryRenderer {
@@ -11,7 +14,7 @@ export class SceneryRenderer {
   private props: readonly SceneryProp[] | undefined
   private readonly sprites: Phaser.GameObjects.Image[] = []
 
-  constructor(private readonly graphics: Phaser.GameObjects.Graphics, private readonly resolveBitmap: SceneryBitmapResolver = getSceneryBitmap) {}
+  constructor(private readonly graphics: Phaser.GameObjects.Graphics, private readonly resolveBitmap: SceneryBitmapResolver = resolveAtlas) {}
 
   render(view: GroundViewport, environmentId: TrackEnvironmentId, props: readonly SceneryProp[], night: boolean, preview?: { index: number; position: Vector2; rotation?: number }): void {
     const bounds = groundViewportBounds(view)
@@ -54,22 +57,25 @@ export class SceneryRenderer {
         this.graphics.fillPath()
       }
     }
-    // Texture count is bounded by prop kinds × two lighting modes, shared
-    // by scenes. Reuse visible objects instead of allocating on each drag.
+    // Share native atlas textures by environment and lighting; reuse visible images during drag.
     for (let index = 0; index < plan.sprites.length; index++) {
       const prop = plan.sprites[index]
       if (!prop) throw new Error('Missing scenery sprite presentation')
       const scene = this.graphics.scene
-      const texture = `trackforge-scenery-${prop.kind}-${night ? 'night' : 'day'}`
-      if (!scene.textures.exists(texture) && !scene.textures.addCanvas(texture, prop.image)) {
-        throw new Error(`Could not register scenery artwork for ${prop.kind}`)
+      const native = this.resolveBitmap === resolveAtlas ? registerSceneryFrame(scene, prop.kind, night) : undefined
+      const texture = native?.key ?? `trackforge-scenery-${prop.kind}-${night ? 'night' : 'day'}`
+      if (!native && !scene.textures.exists(texture)) {
+        const created = prop.image instanceof HTMLImageElement
+          ? scene.textures.addImage(texture, prop.image)
+          : scene.textures.addCanvas(texture, prop.image)
+        if (!created) throw new Error(`Could not register scenery artwork for ${prop.kind}`)
       }
       let sprite = this.sprites[index]
       if (!sprite) {
-        sprite = scene.add.image(prop.x, prop.y, texture).setDepth(this.graphics.depth + 0.01)
+        sprite = scene.add.image(prop.x, prop.y, texture, native?.frame).setDepth(this.graphics.depth + 0.01)
         this.sprites.push(sprite)
       }
-      sprite.setTexture(texture).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size).setRotation(prop.rotation)
+      (native ? sprite.setTexture(texture, native.frame) : sprite.setTexture(texture)).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size).setRotation(prop.rotation)
     }
     for (const sprite of this.sprites.splice(plan.sprites.length)) sprite.destroy()
 

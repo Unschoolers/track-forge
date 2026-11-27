@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/presentation/environments/sceneryBitmapArt', () => ({
-  getSceneryBitmap: () => undefined,
+  getSceneryAtlas: () => undefined,
 }))
 vi.mock('@/presentation/environments/meadowBitmapArt', () => ({
   getMeadowBitmapArt: () => undefined,
