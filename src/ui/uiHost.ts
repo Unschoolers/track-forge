@@ -22,6 +22,7 @@ import { createRaceHud } from '@/ui/screens/raceHud'
 import { RaceFlyoverLifecycle } from '@/ui/components/raceFlyover'
 import { DialogController } from '@/ui/dialogController'
 import { attachEdgeRefraction } from '@/ui/menu/edgeRefraction'
+import { attachLiquidGlassHome } from '@/ui/menu/liquidGlassHome'
 import { createCupModal } from '@/ui/modals/cupModal'
 import { createEditorMenuModal } from '@/ui/modals/editorMenuModal'
 import { createEditorExitModal } from '@/ui/modals/editorExitModal'
@@ -434,12 +435,12 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
-    this.materialCleanup = attachEdgeRefraction(
-      this.root,
-      overlay
-        ? '.track-library-modal .track-library-toolbar, .track-library-modal .modal-footer > .button, .track-library-modal .modal-close, .options-modal .options-tab-list, .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close'
-        : '.home-screen:not(:has(.home-navigation)) .tf-menu-dock, .home-screen:has(.home-navigation) .tf-menu-action',
-    )
+    this.materialCleanup = state.mode === 'home' && !overlay
+      ? attachLiquidGlassHome(this.root)
+      : attachEdgeRefraction(
+        this.root,
+        '.track-library-modal .track-library-toolbar, .track-library-modal .modal-footer > .button, .track-library-modal .modal-close, .options-modal .options-tab-list, .race-setup-modal .modal-footer > .button, .race-setup-modal .modal-close',
+      )
     const scroll = libraryScroll ?? lobbyScroll
     if (scroll !== undefined) {
       const body = overlay?.querySelector<HTMLElement>('.modal-body')
