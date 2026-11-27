@@ -22,6 +22,8 @@ Home's Android Back confirmation uses the ordinary in-game modal and two indepen
 
 Disable the native WebView tap highlight on interactive controls. Press feedback uses the existing glass contact reflection and elastic response without changing the authored tint; keyboard focus outlines and persistent selection colors remain intact.
 
+`button()` assigns `data-menu-action-intent` to every shared DOM button: `primary` for `.tf-menu-action--primary` / `.button-primary`, `danger` for `.button-danger`, and `secondary` otherwise. Danger takes precedence if a button has conflicting legacy classes. Click feedback and static menu glass use this intent for confirm/danger feedback and primary/danger material styling. Legacy class selectors remain as CSS fallbacks for class-only controls, and the host retains class-based feedback fallback for native or externally authored buttons.
+
 menu-glass.css owns optical material and its static-art fallback; menu-controls.css owns painted controls; menu-dialogs.css owns base dialog layout, field geometry and minimum touch sizes. Options, Track Library, Race Setup, Results and the player topper picker have focused stylesheets. An unclassified new
 dialog must already look like Track Forge, not the retired angular theme.
 Use the existing button and setup-choice classes; selectable buttons expose

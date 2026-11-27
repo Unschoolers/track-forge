@@ -83,6 +83,31 @@ function setup(
 }
 
 describe('DomUiHost', () => {
+  it('uses semantic action intent for home and legacy modal click feedback', () => {
+    const runtime = createUiRuntime()
+    const feedback = vi.spyOn(runtime.feedback, 'handle')
+    const { root, update, host } = setup('home', undefined, undefined, undefined, runtime)
+    try {
+      root.querySelector<HTMLButtonElement>('[data-action="race"]')?.click()
+      expect(feedback).toHaveBeenLastCalledWith({ type: 'ui', emphasis: 'confirm' })
+
+      update({ ...snapshot('race'), overlay: { type: 'pause' } })
+      root.querySelector<HTMLButtonElement>('[data-action="resume-race"]')?.click()
+      expect(feedback).toHaveBeenLastCalledWith({ type: 'ui', emphasis: 'confirm' })
+      root.querySelector<HTMLButtonElement>('[data-action="quit-race"]')?.click()
+      expect(feedback).toHaveBeenLastCalledWith({ type: 'ui', emphasis: 'danger' })
+
+      const conflictingLegacyButton = document.createElement('button')
+      conflictingLegacyButton.className = 'button button-primary button-danger'
+      root.append(conflictingLegacyButton)
+      conflictingLegacyButton.click()
+      expect(feedback).toHaveBeenLastCalledWith({ type: 'ui', emphasis: 'danger' })
+    } finally {
+      host.destroy()
+      feedback.mockRestore()
+    }
+  })
+
   it('updates menu material quality when graphics settings change', () => {
     const { root, update, host } = setup()
     expect(root.dataset.graphicsQuality).toBe('medium')
