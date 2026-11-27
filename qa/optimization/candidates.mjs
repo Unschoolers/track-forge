@@ -79,3 +79,11 @@ export function generateCandidates(car, baseline, count) {
 }
 
 export const DEFAULT_CARS = ['red', 'green', 'blue', 'yellow']
+
+/** Isolated P1 experiment: do not change any braking or steering coefficient. */
+export function generateRacingLineCandidates(car, baseline, count) {
+  if (!DEFAULT_CARS.includes(car)) throw new Error('Unknown car: ' + car)
+  if (!Number.isInteger(count) || count < 1 || count > 100) throw new Error('Candidates per car must be 1..100')
+  return [0, 0.25, 0.5, 0.75, 1].filter(value => value !== (baseline.hardRacingLineBlend ?? 0))
+    .slice(0, count).map(value => ({ id: car + '-line-' + value, car, changes: { hardRacingLineBlend: value } }))
+}

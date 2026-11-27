@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { availableParallelism } from 'node:os'
 import { resolve } from 'node:path'
 import { SimulationPool } from './pool.mjs'
-import { generateCandidates, DEFAULT_CARS } from './candidates.mjs'
+import { generateCandidates, generateRacingLineCandidates, DEFAULT_CARS } from './candidates.mjs'
 import { generatePassingCandidates } from './passingCandidates.mjs'
 import { STUDY_SCENARIOS, selectScenarios } from './scenarios.mjs'
 import { trialKey, assessCandidate, evaluatePair, compareScores, assessFleet, PHYSICS_ACCEPTANCE } from './score.mjs'
@@ -21,6 +21,7 @@ function options(args) {
   const seeds = take('seeds', '1,4331').split(',').map(Number)
   const out = resolve(take('out', focus === 'balance' ? 'qa/results/balance' : 'qa/results/optimization'))
   const tune = args.includes('--tune')
+  const racingLine = args.includes('--racing-line')
   const scenarioIds = take('scenarios', STUDY_SCENARIOS.map(x => x.id).join(',')).split(',')
   const baselineOnly = args.includes('--baseline-only')
   const behaviorPreserving = args.includes('--behavior-preserving')
@@ -48,9 +49,11 @@ function options(args) {
     throw new Error('--tune and --holdout-track are for balance tuning only')
   if (focus === 'balance' && (args.includes('--cars') || args.includes('--scenarios') || (tune && baselineOnly)))
     throw new Error('Balance uses all four cars and the fixed six benchmark scenarios')
+  if (racingLine && (focus !== 'driving' || behaviorPreserving || reference))
+    throw new Error('--racing-line is an isolated driving-policy search')
   if (behaviorPreserving && (reference || focus !== 'driving'))
     throw new Error('--behavior-preserving is for driving comparisons without recalibration')
-  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement, behaviorPreserving, tune, holdoutFiles,
+  return { cars, focus, workers, trials, seeds, out, scenarioIds, baselineOnly, reference, gameplayImprovement, behaviorPreserving, tune, racingLine, holdoutFiles,
     sampleTelemetry: !args.includes('--no-telemetry') }
 }
 
@@ -59,7 +62,7 @@ if (args.help) {
   console.log('Usage: npm run qa:optimize -- [--focus driving|passing|balance] [--cars red,green,blue,yellow]' +
     ' [--workers 2] [--trials 14] [--seeds 1,4331]' +
     ' [--scenarios pine-hairpins,desert-reverse] [--baseline-only] [--reference baseline-results.json] [--gameplay-improvement] [--behavior-preserving]' +
-    ' [--out qa/results/optimization] [--no-telemetry]')
+    ' [--out qa/results/optimization] [--no-telemetry] [--racing-line]')
   console.log('Balance: npm run qa:optimize -- --focus balance [--tune [--trials 14] [--holdout-track file.json]] [--out qa/results/balance]')
 } else if (args.focus === 'balance') {
   const { runBalance } = await import('./balance/runner.mjs')
@@ -123,7 +126,8 @@ if (args.help) {
     const baselines = args.cars.map(car => ({ id: `base-${car}`, car, changes: {} }))
     const candidates = args.baselineOnly ? [] : args.cars.flatMap(car => args.focus === 'passing'
       ? generatePassingCandidates(car, profiles[car], args.trials)
-      : generateCandidates(car, profiles[car], args.trials))
+      : args.racingLine ? generateRacingLineCandidates(car, profiles[car], args.trials)
+        : generateCandidates(car, profiles[car], args.trials))
     const duelOpponents = { red: 'green', green: 'red', blue: 'red', yellow: 'green' }
     const screeningTask = (candidate, scenario) => trial(
       candidate.car, scenario, args.seeds[0],

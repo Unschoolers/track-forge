@@ -19,6 +19,7 @@ import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
 import { planAiSpeed } from '@/domain/race/ai/aiSpeedPlan'
 import { planCornerTactics, technicalCornerScale } from '@/domain/race/ai/cornerTactics'
+import { racingLineOffset } from '@/domain/race/ai/racingLine'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
@@ -214,6 +215,16 @@ export function stepAiVehicle(
   // This controls an intended racing line, never the actual friction,
   // road support or checkpoint collision geometry.
   const cutScale = difficulty === 'hard' ? hardProfile.hardApexCutScale ?? 1 : 1
+  // Blend the complete legacy target into a geometry-optimized target; never
+  // stack both offsets. Yield to traffic and leave unstable recovery alone.
+  const lineStrength = difficulty === 'hard' ? clamp(hardProfile.hardRacingLineBlend ?? 0, 0, 1) : 0
+  const lineBlend = lineStrength > 0 && ai.phase === 'follow' && !occupied &&
+    !relevantTraffic.nearby.some(entry => Math.abs(entry.signedDistance) < LANE_CHANGE_LOOKAHEAD) &&
+    context.onRoad && vehicle.grounded && context.surface === 'street'
+    ? lineStrength * (1 - edgeRisk) * (1 - clamp((Math.abs(slipAngle) - 0.06) / 0.12, 0, 1)) : 0
+  const line = lineBlend > 0 ? racingLineOffset(path, targetIndex) : undefined
+  const legacyX = context.normal.x * pursuitLane + cut.x * cutScale
+  const legacyY = context.normal.y * pursuitLane + cut.y * cutScale
   const terminalApproach = !path.closed && rawTargetIndex >= path.points.length - 1
   const terminalBefore = terminalApproach ? path.points[path.points.length - 2] : undefined
   const terminalLength = terminalBefore ? Math.hypot(target.x - terminalBefore.x, target.y - terminalBefore.y) : 0
@@ -221,10 +232,12 @@ export function stepAiVehicle(
   const extension = terminalLength > 0 ? ROAD_GEOMETRY.onRoadRadius : 0
   const targetX = terminalBefore && terminalLength > 0
     ? target.x + (target.x - terminalBefore.x) / terminalLength * extension
-    : target.x + context.normal.x * pursuitLane + cut.x * cutScale
+    : line ? target.x + legacyX * (1 - lineBlend) + line.x * lineBlend
+      : target.x + context.normal.x * pursuitLane + cut.x * cutScale
   const targetY = terminalBefore && terminalLength > 0
     ? target.y + (target.y - terminalBefore.y) / terminalLength * extension
-    : target.y + context.normal.y * pursuitLane + cut.y * cutScale
+    : line ? target.y + legacyY * (1 - lineBlend) + line.y * lineBlend
+      : target.y + context.normal.y * pursuitLane + cut.y * cutScale
   const desiredAngle = (!path.closed && Math.hypot(targetX - vehicle.x, targetY - vehicle.y) < 0.001
     ? Math.atan2(context.tangent.y * direction, context.tangent.x * direction)
     : Math.atan2(targetY - vehicle.y, targetX - vehicle.x)) +

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { generateCandidates } from './candidates.mjs'
+import { generateCandidates, generateRacingLineCandidates } from './candidates.mjs'
 import { assessCandidate, evaluatePair, trialKey, compareScores, assessFleet, PHYSICS_ACCEPTANCE, applyTimingReview, hasIdenticalRecordedOutput } from './score.mjs'
 
 test('candidate enumeration stays bounded and deterministic', () => {
@@ -178,4 +178,13 @@ test('explicit timing review is scoped to exact baseline and trial and cannot wa
     applyTimingReview({ ...row, before: 59 }, task, review, 'old'),
     applyTimingReview({ ...row, recoveriesAfter: 1 }, task, review, 'old'),
   ]) assert.equal(rejected.eligible, false)
+})
+
+test('racing line search isolates one bounded policy for every car', () => {
+  for (const car of ['red', 'green', 'blue', 'yellow']) {
+    const variants = generateRacingLineCandidates(car, {}, 5)
+    assert.deepEqual(variants.map(x => x.changes), [0.25, 0.5, 0.75, 1].map(hardRacingLineBlend => ({ hardRacingLineBlend })))
+    assert.ok(variants.every(x => x.car === car))
+    assert.equal(generateRacingLineCandidates(car, { hardRacingLineBlend: 1 }, 5)[0].changes.hardRacingLineBlend, 0)
+  }
 })

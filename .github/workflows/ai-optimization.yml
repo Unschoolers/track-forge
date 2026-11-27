@@ -128,3 +128,31 @@ jobs:
           path: qa/results/passing/
           if-no-files-found: warn
           retention-days: 14
+
+  racing-line:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Search continuous lines on generic calibration and holdout tracks
+        run: npm run qa:optimize -- --focus driving --racing-line --workers 2 --trials 5 --seeds 1,4331 --out qa/results/racing-line
+      - name: Print per-car cross-track results
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs'
+          const report = JSON.parse(readFileSync('qa/results/racing-line/summary.json', 'utf8'))
+          for (const car of report.cars) {
+            console.log('RACING_LINE_CAR ' + JSON.stringify({ car, candidates: report.candidates.filter(row => row.car === car).map(row => ({ id: row.id, changes: row.changes, calibration: row.calibration, validation: row.validation })) }))
+          }
+          JS
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: racing-line-${{ github.sha }}
+          path: qa/results/racing-line/
+          if-no-files-found: error
