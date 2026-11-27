@@ -17,13 +17,16 @@ test('shows the title during startup and starts a mobile race in the production 
   try {
     await page.goto('/', { waitUntil: 'commit' })
     await expect(page.getByRole('heading', { name: 'Track Forge', exact: true })).toBeVisible()
-    await expect(page.getByRole('status')).toHaveText('Loading Track Forge…')
+    await expect(page.getByRole('status')).toHaveText(/Loading (Track Forge|artwork).*\d+%/)
+    await expect(page.getByRole('progressbar', { name: 'Loading progress' })).toBeVisible()
     await expect(startButton(page)).toHaveCount(0)
     await expect(page.locator('#app')).toHaveAttribute('inert', '')
   } finally {
     releaseBundle()
   }
   await expect(startButton(page)).toBeVisible()
+  await expect(page.locator('#title-progress')).toHaveJSProperty('value', 100)
+  await expect(page.locator('#title-progress')).toBeHidden()
   await expect(page.locator('#game-container canvas')).toBeAttached()
   await startButton(page).tap()
   await expect(page.locator('#title-screen')).toHaveCount(0)

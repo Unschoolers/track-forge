@@ -85,13 +85,18 @@ html { background: #080b10; }
   color: #c0ccd9;
 }
 
-.title-screen[data-state='loading'] .title-screen__status::after {
-  content: '';
-  height: 2px;
-  background: linear-gradient(90deg, var(--title-accent) 29%, rgb(237 242 248 / 23%) 29%);
-  transform-origin: left center;
-  animation: title-loader 1.6s ease-in-out infinite alternate;
+.title-screen__progress {
+  width: min(100%, 17rem);
+  min-width: 12rem;
+  height: 3px;
+  appearance: none;
+  border: 0;
+  background: rgb(237 242 248 / 23%);
+  accent-color: var(--title-accent);
 }
+.title-screen__progress::-webkit-progress-bar { background: rgb(237 242 248 / 23%); }
+.title-screen__progress::-webkit-progress-value { background: var(--title-accent); }
+.title-screen__progress::-moz-progress-bar { background: var(--title-accent); }
 
 .title-screen__start {
   position: relative;
@@ -156,11 +161,6 @@ html { background: #080b10; }
   4% { opacity: .36; translate: -.034em 0; }
 }
 
-@keyframes title-loader {
-  from { transform: scaleX(.45); }
-  to { transform: scaleX(1); }
-}
-
 @media (orientation: portrait) {
   .title-screen { align-items: end; padding-bottom: max(clamp(2rem, 7vh, 5rem), env(safe-area-inset-bottom)); }
   .title-screen__art { bottom: 22%; }
@@ -184,5 +184,5 @@ html { background: #080b10; }
 
 @media (prefers-reduced-motion: reduce) {
   .title-screen, .title-screen__start::before { transition: none; }
-  .title-screen__forge::after, .title-screen[data-state='loading'] .title-screen__status::after { animation: none; }
+  .title-screen__forge::after { animation: none; }
 }

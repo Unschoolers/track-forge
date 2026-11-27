@@ -14,6 +14,7 @@ import type { LightingMode, Track } from '@/domain/model'
 import type { TrackGeometry } from '@/domain/track/trackGeometry'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 import { normalizeTrackEnvironmentId } from '@/domain/track/trackEnvironment'
+import { prepareRaceAtlas } from '@/phaser/rendering/raceBitmapAtlas'
 import { RacePresentationPreparation } from '@/phaser/rendering/racePresentationPreparation'
 import { graphicsPixelRatio, backingSize } from '@/phaser/rendering/graphicsQuality'
 
@@ -137,8 +138,28 @@ export class PhaserSceneHost implements SceneHost {
       geometry,
       normalizeTrackEnvironmentId(track.environmentId),
       lighting === 'night',
-      game?.isRunning ? { textures: game.textures, width: game.scale.width, height: game.scale.height, lowQuality: this.controller.snapshot().preferences?.graphicsQuality === 'low' } : undefined,
+      game?.isRunning ? { textures: game.textures, width: game.scale.width, height: game.scale.height, lowQuality: this.controller.snapshot().preferences?.graphicsQuality === 'low', atlasTextures: game.textures } : undefined,
     )
+  }
+
+  async prepareStartupRace(track: Track, lighting: LightingMode, report: (progress: number) => void): Promise<void> {
+    const game = this.game
+    if (!game?.isRunning) throw new Error('Phaser must be ready before race atlas preparation')
+    const nextPaint = () => new Promise<void>(resolve => {
+      window.requestAnimationFrame(() => { window.setTimeout(resolve, 0) })
+    })
+    report(0)
+    await nextPaint()
+    const work = prepareRaceAtlas(game.textures, this.geometry.get(track), lighting === 'night', normalizeTrackEnvironmentId(track.environmentId))
+    let deadline = performance.now() + 8
+    for (const progress of work) {
+      report(progress)
+      if (performance.now() >= deadline) {
+        await nextPaint()
+        deadline = performance.now() + 8
+      }
+    }
+    report(1)
   }
 
   setRacePreparationForeground(foreground: boolean): void {

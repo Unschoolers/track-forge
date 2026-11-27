@@ -70,6 +70,7 @@ for (const track of trackStore.list()) {
 }
 
 const scoreStore = new BrowserScoreRepository(storage)
+const lastRaceStore = new BrowserLastRaceRepository(storage)
 const geometry = new TrackGeometryService()
 const nearbyConnection = selectNearbyConnection(createAndroidNearby(), createLanNearby())
 const nearbyTransport = nearbyConnection.transport
@@ -109,7 +110,7 @@ const controller = new AppController({
   cupStore: new BrowserCupRepository(storage),
   trackStore,
   scoreStore,
-  lastRaceStore: new BrowserLastRaceRepository(storage),
+  lastRaceStore,
   preferencesStore: initialPreferences,
   raceSession,
   geometry,
@@ -207,6 +208,18 @@ if (!controller.snapshot().preferences.displayName) {
   controller.dispatch({ type: 'open-player-name' })
 }
 export const gameReady = sceneHost.whenReady()
+
+/** Warm the most likely next circuit, not an unbounded library of atlases. */
+export async function prepareStartupRace(report: (progress: number) => void): Promise<void> {
+  await gameReady
+  const lastRace = lastRaceStore.load()
+  const lastTrack = lastRace && (trackStore.find(lastRace.trackId) ??
+    OFFICIAL_COURSES.find(({ track }) => track.id === lastRace.trackId)?.track)
+  const track = lastTrack ?? OFFICIAL_COURSES[0]?.track
+  if (!track) { report(1); return }
+  await sceneHost.prepareStartupRace(track, (lastTrack && lastRace ? lastRace.setup.lighting : track.lighting) ?? track.lighting, report)
+}
+
 // Render the controls before a scene uses their bounds to fit the camera.
 const stopSceneSync = controller.subscribe((snapshot) => {
   sceneHost.start(snapshot.mode)
