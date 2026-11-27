@@ -24,6 +24,7 @@ export interface ToneSink {
   ): void
   playLanding(strength: number): void
   playBoostIgnition?(): void
+  playJumpTakeoff?(strength: number): void
   setEngine(
     car: CarId,
     speedRatio: number,
@@ -231,6 +232,27 @@ export class BrowserToneSink implements ToneSink {
     surge.start(now)
     surge.stop(now + 0.24)
     this.play(340 * pitch, 0.11, 0.04, 'triangle', 0.025)
+  }
+
+  playJumpTakeoff(strength: number): void {
+    const context = this.context
+    const output = this.output
+    const buffer = this.road?.buffer
+    if (!context || !output || !buffer) return
+    const now = context.currentTime
+    const force = Math.max(0, Math.min(1, strength))
+    const release = context.createBufferSource()
+    const filter = context.createBiquadFilter()
+    const gain = context.createGain()
+    release.buffer = buffer
+    filter.type = 'bandpass'
+    filter.Q.value = 0.9
+    filter.frequency.setValueAtTime(240, now)
+    filter.frequency.exponentialRampToValueAtTime(1300, now + 0.10)
+    gain.gain.setValueAtTime(0.025 + force * 0.065, now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16)
+    release.connect(filter).connect(gain).connect(output)
+    release.start(now, 0, 0.16)
   }
 
   playLanding(strength: number): void {
@@ -460,6 +482,9 @@ export class WebAudioAdapter implements FeedbackPort {
       this.sink.setSlip(event.strength, event.speedRatio, event.surface)
     } else if (event.type === 'rival') {
       this.sink.setRival?.(event.proximity, event.pan, event.speedRatio)
+    } else if (event.type === 'jump-takeoff') {
+      if (this.sink.playJumpTakeoff) this.sink.playJumpTakeoff(event.strength)
+      else this.sink.play(180, 0.09, 0.025 + 0.035 * event.strength, 'triangle')
     } else if (event.type === 'landing') {
       this.sink.playLanding(event.strength)
     } else if (event.type === 'position-change') {

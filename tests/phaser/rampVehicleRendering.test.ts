@@ -10,7 +10,7 @@ import { captureRaceSnapshot } from '@/domain/race/raceSnapshot'
 import type { RaceState } from '@/domain/race/raceState'
 import { getVehicleStepContext } from '@/domain/race/trackContext'
 import { RaceScene } from '@/phaser/scenes/RaceScene'
-import { isVehicleAboveStructures, renderVehicles } from '@/phaser/rendering/vehicleRenderer'
+import { isVehicleAboveStructures, renderVehicles, projectVehicleShadow } from '@/phaser/rendering/vehicleRenderer'
 import { VEHICLE_VISUAL_SCALE, vehiclePaintColor } from '@/presentation/vehicleArtwork'
 import { TOPPER_COLORS } from '@/application/multiplayer/playerIdentity'
 
@@ -406,4 +406,20 @@ describe('ramp vehicle rendering', () => {
 		expect(lower.bodies).toHaveLength(1)
 		expect(upper.bodies).toHaveLength(0)
 	})
+})
+
+it('makes an intentional airborne car visibly larger and gives it a night shadow', () => {
+  const path = buildRoadPath(track.points, track.terrain)
+  const base = createRace({ path, playerCar: 'blue', difficulty: 'normal', laps: 1 })
+  const player = requireFixture(base.vehicles[0])
+  const grounded = { ...player, z: path.roadSurface.at(player.pathIndex, player).height, grounded: true, jumpFlight: false }
+  const flying = { ...grounded, z: grounded.z + 32, grounded: false, jumpFlight: true, verticalVelocity: 0 }
+  const draw = vi.fn((_car: string, _x: number, _y: number, _angle: number, _scaleX: number, _scaleY: number, _depth: number) => true)
+  renderVehicles(new Graphics() as never, [grounded, flying], path, { draw })
+  expect(draw.mock.calls).toHaveLength(2)
+  expect(draw).toHaveBeenNthCalledWith(2, flying.car, flying.x, flying.y, flying.angle,
+    expect.any(Number), expect.any(Number), 5)
+  expect(draw.mock.calls[1]?.[4]).toBeGreaterThan(draw.mock.calls[0]?.[4] ?? 0)
+  expect(projectVehicleShadow(grounded, path.terrainSurface, true)).toBeNull()
+  expect(projectVehicleShadow(flying, path.terrainSurface, true)?.alpha).toBeGreaterThan(0)
 })

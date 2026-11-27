@@ -72,6 +72,8 @@ export interface RaceVehicle {
   readonly bridgeFallSeconds?: number | undefined
   /** True only on the tick an authored jump launches the car. */
   readonly jumpLaunched?: boolean
+  /** Presentation-only identity of an intentional flight; clears on contact or reset. */
+  readonly jumpFlight?: boolean
   readonly currentSurface: SurfaceId | 'grass'
   readonly surfaceGrip?: number
   readonly onCurb: boolean

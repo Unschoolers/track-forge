@@ -9,6 +9,7 @@ export type RaceParticleKind =
   | 'tire-smoke'
   | 'speed-line'
   | 'landing-dust'
+  | 'jump-launch'
   | 'water'
 
 export interface RaceParticle extends Vector2 {
@@ -44,6 +45,7 @@ export interface RaceEffectEvent {
   readonly type: string
   readonly vehicleId?: string
   readonly strength?: number
+  readonly jump?: true
   readonly reason?: string
   readonly x?: number
   readonly y?: number
@@ -222,28 +224,48 @@ export function advanceRaceEffects(
         }
       }
     }
+    if (event.type === 'vehicle-jumped') {
+      const vehicle = vehicles.find(({ id }) => id === event.vehicleId)
+      if (!vehicle) continue
+      const cosine = Math.cos(vehicle.angle)
+      const sine = Math.sin(vehicle.angle)
+      // A brief lip release, anchored to the ramp rather than chasing the car.
+      // Deterministic decorative emissions do not advance the race RNG.
+      for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+        const life = 0.16 + i * 0.035
+        particles.push({ kind: 'jump-launch', raised: true,
+          x: (event.x ?? vehicle.x) - cosine * (8 + i * 3) - side * sine * 7,
+          y: (event.y ?? vehicle.y) - sine * (8 + i * 3) + side * cosine * 7,
+          vx: -cosine * (22 + i * 9) - side * sine * 20,
+          vy: -sine * (22 + i * 9) + side * cosine * 20,
+          life, maxLife: life, size: 1.5 + i * 0.4 })
+      }
+    }
     if (event.type === 'vehicle-landed') {
       const vehicle = vehicles.find(({ id }) => id === event.vehicleId)
       if (!vehicle) continue
-      const strength = event.strength ?? 0
+      const strength = event.jump ? Math.max(0.4, event.strength ?? 0) : event.strength ?? 0
       const raised = isRaised(vehicle)
       const cosine = Math.cos(vehicle.angle)
       const sine = Math.sin(vehicle.angle)
       const kind = vehicle.currentSurface === 'street' ? 'landing-dust' : vehicle.currentSurface
       for (const side of [-1, 1]) {
         for (const axle of [-1, 1]) {
-          const life = 0.18 + strength * 0.14
-          particles.push({
-            kind,
-            ...(raised ? { raised: true as const } : {}),
-            x: vehicle.x + axle * cosine * 10 - side * sine * 7,
-            y: vehicle.y + axle * sine * 10 + side * cosine * 7,
-            vx: -vehicle.vx * 0.04 - side * sine * 28 * strength,
-            vy: -vehicle.vy * 0.04 + side * cosine * 28 * strength,
-            life,
-            maxLife: life,
-            size: (1.6 + strength * 2.4) * EFFECT_SIZE[vehicle.car].landing,
-          })
+          const count = event.jump ? 3 : 1
+          for (let i = 0; i < count; i++) {
+            const life = 0.18 + strength * 0.14 + i * 0.08
+            particles.push({
+              kind,
+              ...(raised ? { raised: true as const } : {}),
+              x: vehicle.x + axle * cosine * 10 - side * sine * 7,
+              y: vehicle.y + axle * sine * 10 + side * cosine * 7,
+              vx: -vehicle.vx * 0.04 - side * sine * (28 + i * 16) * strength,
+              vy: -vehicle.vy * 0.04 + side * cosine * (28 + i * 16) * strength,
+              life,
+              maxLife: life,
+              size: (1.6 + strength * 2.4 + i * 0.55) * EFFECT_SIZE[vehicle.car].landing,
+            })
+          }
         }
       }
       continue

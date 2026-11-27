@@ -79,3 +79,30 @@ This is headless verification, not Android visual validation. Fixed height,
 directionality, and ordinary-road physics are unchanged. Review the matrix
 artifact and real-device flight/readability before calling the feature fully
 validated.
+
+## Phase 3 — jump presentation
+
+Intentional takeoff is a one-shot engine event, emitted after recovery
+resolution, and an optional presentation flag follows that flight until
+ground contact or reset. An intentional landing is marked on the existing
+landing event; ordinary bridge drops retain their former effects.
+
+- Six short takeoff puffs originate on the ramp, in its raised effect layer.
+- Twelve contact particles spread from the four tire contact positions on
+  landing. Existing asphalt, dirt, grass and ice materials determine color.
+- Airborne cars gain up to 26% extra body scale based on actual clearance;
+  daytime projected shadows remain and night flight gains a small soft
+  ground shadow. No pose or camera physics change.
+- The local car gets a brief filtered-noise suspension-release cue; the
+  existing suspension/impact sound and haptics play on landing. Tire contact
+  and slip audio are muted during intentional flight, engine audio continues.
+  Audio preferences and unlock gating remain authoritative.
+- Existing 180-particle simulation/native budgets and low-quality reductions
+  remain intact. Additional particle births do not consume simulation RNG.
+
+No saved or network fields, geometry, AI policy, speed, gravity, or contact
+load change. The extra flight marker is runtime-only. Revert the presentation
+slice independently to restore the original feedback. Domain/component
+tests cover one-shot events, landing burst, render scaling, night shadow,
+and local audio routing. CI, optimizer and physical Android review are
+required before release; the final visual mix is provisional.

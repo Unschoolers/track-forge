@@ -68,12 +68,12 @@ export function transformVehicleLights(
 }
 
 export function projectVehicleShadow(
-  vehicle: VehicleShadowPose,
+  vehicle: VehicleShadowPose & { readonly jumpFlight?: boolean },
   terrainSurface: TerrainSurface,
   night: boolean,
   receiverHeight?: number,
 ): VehicleShadow | null {
-  if (night) return null
+  if (night && !vehicle.jumpFlight) return null
   const geometry = getVehicleGeometry(vehicle.car)
   const surfaceHeight = receiverHeight ?? terrainSurface.heightAt(vehicle)
   const height = Math.max(
@@ -82,11 +82,11 @@ export function projectVehicleShadow(
   )
   const separation = Math.min(1, height / WORLD_ELEVATION.levelHeight)
   return {
-    center: projectSunShadow(vehicle, height + 0.8),
+    center: night ? { x: vehicle.x + height * 0.18, y: vehicle.y + height * 0.26 } : projectSunShadow(vehicle, height + 0.8),
     angle: vehicle.angle,
     width: (15 + geometry.wheelbase * 0.24 + separation * 5) * VEHICLE_VISUAL_SCALE,
     length: (geometry.wheelbase * 2 + 13 + separation * 6) * VEHICLE_VISUAL_SCALE,
-    alpha: Math.max(0.1, 0.34 - separation * 0.19),
+    alpha: night ? 0.22 - separation * 0.07 : Math.max(0.1, 0.34 - separation * 0.19),
   }
 }
 
@@ -152,7 +152,7 @@ export function renderVehicles(
     // From above, pitch shortens the silhouette and shifts the roof toward
     // the raised axle. A falling car visibly noses down before touchdown.
     const pitch = vehicle.grounded ? -impact : Math.max(-1, Math.min(1, vehicle.verticalVelocity / 35))
-    const lift = Math.min(0.11, clearance * 0.012)
+    const lift = vehicle.jumpFlight ? Math.min(0.26, clearance * 0.008) : Math.min(0.11, clearance * 0.012)
     const scaleX = (1 + lift - 0.12 * Math.abs(pitch)) * VEHICLE_VISUAL_SCALE
     const scaleY = (1 + lift + 0.1 * Math.max(impact * 0.55, compression)) * VEHICLE_VISUAL_SCALE
     const painted = painter?.draw(vehicle.car, vehicle.x, vehicle.y, vehicle.angle, scaleX, scaleY, graphics.depth)
@@ -183,7 +183,7 @@ export function renderBoostFlames(
   const liftHeight = vehicle.grounded ? 0 : Math.max(0, clearance)
   const pitch = vehicle.grounded ? -vehicle.landingIntensity :
     Math.max(-1, Math.min(1, vehicle.verticalVelocity / 35))
-  const lift = Math.min(0.11, liftHeight * 0.012)
+  const lift = vehicle.jumpFlight ? Math.min(0.26, liftHeight * 0.008) : Math.min(0.11, liftHeight * 0.012)
   // Small exhaust backfires: a brighter ignition burst, then gentle intermittent flicker.
   const ignition = vehicle.driftBoost.remainingTicks >= 54
   const flicker = Math.min(1, Math.max(0, pulse))
@@ -339,7 +339,6 @@ export function renderVehicleShadows(
   path: RoadPath,
   night: boolean,
 ): void {
-  if (night) return
   for (const vehicle of vehicles) {
     const support = vehicle.structureRunId === null
       ? undefined
@@ -348,7 +347,7 @@ export function renderVehicleShadows(
       vehicle.z >= support.height - 2
       ? support.height
       : undefined
-    const shadow = projectVehicleShadow(vehicle, path.terrainSurface, false, bridgeHeight)
+    const shadow = projectVehicleShadow(vehicle, path.terrainSurface, night, bridgeHeight)
     if (!shadow) continue
     const graphics = bridgeHeight === undefined ? groundGraphics : bridgeGraphics
     graphics.save()

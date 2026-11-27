@@ -508,6 +508,7 @@ export function resetVehicleToTrack(
     lastRoadContactIndex: nearest.index,
     bridgeFallSeconds: undefined,
     jumpLaunched: false,
+    jumpFlight: false,
     recoveryAnchorIndex: undefined,
     recoveryReacquiredIndex: undefined,
     pathDistance: nearest.point.distance,

@@ -44,6 +44,22 @@ describe('feedback adapters', () => {
     expect(vibrate).toHaveBeenCalledOnce()
   })
 
+  it('routes the jump release to its own sound only while enabled', () => {
+    const sink: ToneSink = {
+      unlock: vi.fn(), play: vi.fn(), playLanding: vi.fn(), playJumpTakeoff: vi.fn(),
+      setEngine: vi.fn(), setSurface: vi.fn(), setSlip: vi.fn(), silenceContinuous: vi.fn(), destroy: vi.fn(),
+    }
+    const audio = new WebAudioAdapter(() => sink, true)
+    audio.handle({ type: 'jump-takeoff', strength: 0.8 })
+    expect(sink.playJumpTakeoff).not.toHaveBeenCalled()
+    audio.unlock()
+    audio.handle({ type: 'jump-takeoff', strength: 0.8 })
+    expect(sink.playJumpTakeoff).toHaveBeenCalledExactlyOnceWith(0.8)
+    audio.setEnabled(false)
+    audio.handle({ type: 'jump-takeoff', strength: 0.8 })
+    expect(sink.playJumpTakeoff).toHaveBeenCalledTimes(1)
+  })
+
   it('stays locked until a gesture then maps continuous and one-shot audio', () => {
     const sink: ToneSink = {
       unlock: vi.fn(),
