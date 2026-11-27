@@ -235,6 +235,12 @@ describe('single-player topper customization', () => {
     expect(modal.querySelectorAll('[data-action^="options-topper-icon-"]')).toHaveLength(6)
     expect(modal.querySelectorAll('[data-action^="options-topper-color-"]')).toHaveLength(6)
     expect(modal.querySelector('[data-action="options-topper-icon-crown"]')?.getAttribute('aria-pressed')).toBe('true')
+    const choices = [...modal.querySelectorAll<HTMLButtonElement>('[data-action^="options-topper-icon-"], [data-action^="options-topper-color-"]')]
+    expect(choices.every(choice => choice.classList.contains('setup-choice') && !choice.classList.contains('button'))).toBe(true)
+    expect(choices.filter(choice => choice.classList.contains('active')).map(choice => choice.dataset.action)).toEqual([
+      'options-topper-icon-crown', 'options-topper-color-gold',
+    ])
+    expect(choices.every(choice => choice.classList.contains('active') === (choice.getAttribute('aria-pressed') === 'true'))).toBe(true)
     modal.querySelector<HTMLButtonElement>('[data-action="options-topper-icon-star"]')?.click()
     expect(save).toHaveBeenCalledWith(expect.objectContaining({
       car: 'green', playerIdentity: { icon: 'star', color: 'gold' },

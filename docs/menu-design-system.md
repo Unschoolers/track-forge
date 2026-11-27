@@ -16,6 +16,20 @@ The layout is a full-bleed media layer, semantic header, scrollable main content
 Use one optical material per grouped dock, or independent optical buttons on an unfiltered action group; never nest backdrop filters. Content stays opaque or directly on art with a scrim. Regular glass prioritizes readability; clear glass is reserved for intentionally composed static art. Default to opaque with live/unknown backdrops. CSS feature detection, reduced transparency and increased contrast restore readable opaque surfaces. No live canvas sampling, WebGL context, full-screen backdrop filters or JS frame loops. Respect reduced motion; controls retain visible focus and 44px minimum targets (48px primary).
 Menu glass uses LiquidGlass.dev's upstream SVG refraction of aligned copies of static artwork in Home, Track Library, Race Setup and Options. All independent actions use the shared clear tint and rim geometry; primary actions use the orange tint for readable dark labels. Grouped navigation gets one lens, never one per tab. Track cards remain translucent content with unframed favorite/overflow icons and 44px hit areas; no per-card filters. Options' native sliders, toggles and grouped settings retain paint-only selection feedback. Low quality and reduced transparency/high contrast use opaque surfaces. No live canvas sampling, WebGL or idle animation. Android WebView visual fidelity and frame pacing still require device review.
 
+## Shared control defaults
+
+The base modal stylesheet (menu-dialogs.css) owns the paint-only defaults for
+actions, choices, toggles, close buttons and text fields. An unclassified new
+dialog must already look like Track Forge, not the retired angular theme.
+Use the existing button and setup-choice classes; selectable buttons expose
+aria-pressed and the matching active class. Specialized pickers (including
+topper icons/colors) may set layout, glyph size and swatches, not create their
+own borders, selection bars or typography. Keep 44px touch targets and wrap
+choices rather than shrinking them. Static optical surfaces may enhance these
+defaults; live editor tools use the same palette with opaque rounded controls.
+Do not introduce square action styles, clipped corners or a new optical layer
+for a settings choice.
+
 ## Adoption review gates
 
 The Apple adoption guide is the design reference, not a native SDK dependency.

@@ -39,9 +39,11 @@ export function createTopperSelector(
   if (!customizing || !change) return section
 
   const icons = element('div', 'topper-options')
+  icons.setAttribute('role', 'group')
+  icons.setAttribute('aria-label', 'Topper icon')
   for (const icon of Object.keys(TOPPER_ICONS) as TopperIcon[]) {
     const choice = button('', `${actionPrefix}-topper-icon-${icon}`,
-      () => change({ ...identity, icon }), 'button topper-choice')
+      () => change({ ...identity, icon }), `setup-choice topper-choice${icon === identity.icon ? ' active' : ''}`)
     choice.append(createTopperGlyph(icon))
     choice.title = `${icon} topper`
     choice.setAttribute('aria-label', `${icon} topper`)
@@ -50,10 +52,12 @@ export function createTopperSelector(
   }
   section.append(element('p', 'setup-label', 'TOPPER ICON'), icons)
 
-  const colors = element('div', 'topper-options')
+  const colors = element('div', 'topper-options topper-colors')
+  colors.setAttribute('role', 'group')
+  colors.setAttribute('aria-label', 'Topper color')
   for (const color of Object.keys(TOPPER_COLORS) as TopperColor[]) {
-    const choice = button(color, `${actionPrefix}-topper-color-${color}`,
-      () => change({ ...identity, color }), 'button topper-choice topper-color-choice')
+    const choice = button(color[0]!.toUpperCase() + color.slice(1), `${actionPrefix}-topper-color-${color}`,
+      () => change({ ...identity, color }), `setup-choice topper-choice topper-color-choice${color === identity.color ? ' active' : ''}`)
     choice.style.setProperty('--topper-choice-color', '#' + TOPPER_COLORS[color].toString(16).padStart(6, '0'))
     choice.setAttribute('aria-label', `${color} topper color`)
     choice.setAttribute('aria-pressed', String(color === identity.color))
