@@ -291,23 +291,23 @@ describe('editor water cache lifecycle', () => {
     const empty = source(false)
     const createWater = vi.spyOn(bitmapLayers, 'createEditorWaterBitmapTiles').mockReturnValue(water)
     const createRoad = vi.spyOn(bitmapLayers, 'createEditorRoadBitmapLayers').mockReturnValue({
-      road: empty, terrain: empty, bridgeApproach: undefined, bridgeDeck: undefined,
+      road: empty, bridgeApproach: undefined, bridgeDeck: undefined,
     })
     const renderer = createMeadowBitmapRenderer(scene)
     const terrain: TerrainMap = { cellSize: 32, cells: [{ column: 0, row: 0, kind: 'water' }] }
     const geometry = () => ({} as TrackGeometry)
     try {
-      renderer.update(geometry(), terrain, false, false, 'grass')
+      renderer.update(geometry(), terrain, '', false, false, 'grass')
       renderer.render(view)
       renderer.warmVisible()
       expect(uploaded).toHaveBeenCalledTimes(1)
       expect(water.image).toHaveBeenCalledTimes(1)
 
-      renderer.update(geometry(), terrain, true, false, 'grass')
+      renderer.update(geometry(), terrain, '', true, false, 'grass')
       expect(renderer.hasRoadLayers()).toBe(false)
       renderer.render(view)
       renderer.warmVisible()
-      renderer.update(geometry(), terrain, false, false, 'grass')
+      renderer.update(geometry(), terrain, '', false, false, 'grass')
       renderer.render(view)
       renderer.warmVisible()
       expect(createWater).toHaveBeenCalledTimes(1)
@@ -315,9 +315,38 @@ describe('editor water cache lifecycle', () => {
       expect(removed).not.toHaveBeenCalled()
       expect(renderer.hasRoadLayers()).toBe(true)
 
-      renderer.update(geometry(), { ...terrain, cells: [] }, false, false, 'grass')
+      renderer.update(geometry(), { ...terrain, cells: [] }, '', false, false, 'grass')
       expect(removed).toHaveBeenCalledTimes(1)
       expect(renderer.coverage()[5]).toBe(0)
+
+      const createHill = vi.spyOn(bitmapLayers, 'createEditorHillBitmapTiles').mockReturnValue(water)
+      try {
+        const mixed: TerrainMap = { cellSize: 32, cells: [
+          { column: 0, row: 0, kind: 'water' },
+          { column: 1, row: 0, kind: 'hill' },
+        ] }
+        renderer.update(geometry(), mixed, 'near', false, false, 'grass')
+        renderer.render(view)
+        renderer.warmVisible()
+        const before = uploaded.mock.calls.length
+        const removals = removed.mock.calls.length
+        renderer.update(geometry(), mixed, 'near', true, false, 'grass')
+        renderer.update(geometry(), mixed, 'near', false, false, 'grass')
+        renderer.render(view)
+        renderer.warmVisible()
+        expect(createHill).toHaveBeenCalledTimes(1)
+        expect(uploaded).toHaveBeenCalledTimes(before)
+        expect(removed).toHaveBeenCalledTimes(removals)
+
+        renderer.update(geometry(), mixed, 'changed-nearby-road', false, false, 'grass')
+        renderer.render(view)
+        renderer.warmVisible()
+        expect(createHill).toHaveBeenCalledTimes(2)
+        expect(uploaded).toHaveBeenCalledTimes(before + 1)
+        expect(removed).toHaveBeenCalledTimes(removals + 1)
+      } finally {
+        createHill.mockRestore()
+      }
     } finally {
       renderer.destroy()
       createWater.mockRestore()
