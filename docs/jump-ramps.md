@@ -51,6 +51,31 @@ Inspect every car's matched pace, recovery and finish metrics before promoting
 any driving-policy changes. Then verify Easy/Normal/Hard ordering and real
 Android flight/readability. No speed cheats or track-specific production AI.
 
-PR #459 remains draft until CI, the jump study, independent review and
-Android visual checks are confirmed. No claim of passing checks or tuned AI
-is made by this document.
+PR #459 was merged after its CI completed. The Hard optimizer artifact from
+run 45955565749 (artifact 15178542803) contains 252 simulation trials, with
+no recommended policy change. All four cars completed the two solo fixtures
+without recovery. Red's traffic runs included off-road recovery after the
+jump section; this does not establish a jump-specific cause. No production
+profile change is justified by these results.
+
+## Phase 2: verify actual flight and pace
+
+```sh
+node qa/optimization/jump-flight-matrix.mjs qa/results/jump-optimization
+```
+
+The matrix observes the real simulation at every 60 Hz tick (not a sampled
+trace that can miss the launch flag). Both jump fixtures exercise all four
+cars, all three difficulties, two seeds, solo and traffic. It records actual
+launch count, landing count, peak height, flight duration, takeoff speed,
+recovery and finish time. Solo traversal must complete both laps with one
+intentional flight and landing per authored lip per lap. Any recovery or
+bridge-fall timer during intentional flight fails the gate. Traffic recovery
+outside flight and difficulty pace ordering remain visible in the report;
+do not change difficulty or tuning parameters until measured evidence
+supports the change. The original four-car optimizer continues to run.
+
+This is headless verification, not Android visual validation. Fixed height,
+directionality, and ordinary-road physics are unchanged. Review the matrix
+artifact and real-device flight/readability before calling the feature fully
+validated.
