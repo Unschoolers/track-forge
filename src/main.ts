@@ -24,6 +24,7 @@ import { BrowserScoreRepository } from '@/infrastructure/storage/scoreRepository
 import { BrowserGhostRepository } from '@/infrastructure/storage/ghostRepository'
 import { IndexedDbTrackRepository } from '@/infrastructure/storage/indexedDbTrackRepository'
 import { PhaserSceneHost } from '@/phaser/sceneHost'
+import { playVictoryFireworks } from '@/phaser/rendering/victoryFireworks'
 import { DomUiHost } from '@/ui/uiHost'
 import { RaceFrameDiagnostics } from '@/infrastructure/qa/raceFrameDiagnostics'
 import { installRacePerformance } from '@/infrastructure/qa/racePerformance'
@@ -124,6 +125,7 @@ const longTaskObserver = supportsLongTasks ? new PerformanceObserver(list => {
 longTaskObserver?.observe({ entryTypes: ['longtask'] })
 const nativeExit = registerPlugin<{ exit(): Promise<void> }>('TrackForgeApp')
 const uiHost = new DomUiHost(uiRoot, controller, {
+  playVictoryFireworks,
   ...(Capacitor.getPlatform() === 'android' ? { exitApp: () => nativeExit.exit() } : {}),
   nearby,
   ...(nearbyConnection.modes ? { nearbyConnections: nearbyConnection.modes } : {}),

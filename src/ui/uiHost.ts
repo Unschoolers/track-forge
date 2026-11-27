@@ -45,6 +45,7 @@ import type { RaceSessionPort } from '@/application/race/raceSession'
 import type { RaceControlsPort } from '@/application/ports/input'
 import { createResultsModal, createCupFinalModal } from '@/ui/modals/resultsModal'
 import { updateStandings } from '@/ui/components/scoreboard'
+import { VictoryCelebration, type PlayVictoryFireworks } from '@/ui/components/victoryCelebration'
 import type { FeedbackPort } from '@/application/ports/feedback'
 import type { TrackGeometryService } from '@/domain/track/trackGeometryService'
 
@@ -62,6 +63,7 @@ export interface UiRuntime {
   readonly exitApp?: () => Promise<void>
   readonly nearby?: NearbyRace | undefined
   readonly nearbyConnections?: NearbyConnectionModes
+  readonly playVictoryFireworks?: PlayVictoryFireworks
   readonly raceSession: RaceSessionPort
   readonly frameDiagnostics?: () => unknown
   readonly raceControls: RaceControlsPort
@@ -76,6 +78,8 @@ export class DomUiHost implements UiHost {
   private unsubscribe: Unsubscribe | undefined
   private screenCleanup: (() => void) | undefined
   private overlayCleanup: (() => void) | undefined
+  private readonly victoryCelebration = new VictoryCelebration()
+  private victoryCleanup: (() => void) | undefined
   private materialCleanup: (() => void) | undefined
   private touchCleanup: (() => void) | undefined
   private racePreparation: { track: Track; lighting: LightingMode; cancel: () => void } | undefined
@@ -125,6 +129,8 @@ export class DomUiHost implements UiHost {
     this.screenCleanup = undefined
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
+    this.victoryCleanup?.()
+    this.victoryCleanup = undefined
     this.materialCleanup?.()
     this.materialCleanup = undefined
     this.touchCleanup?.()
@@ -314,6 +320,8 @@ export class DomUiHost implements UiHost {
     this.screenCleanup = undefined
     this.overlayCleanup?.()
     this.overlayCleanup = undefined
+    this.victoryCleanup?.()
+    this.victoryCleanup = undefined
     this.materialCleanup?.()
     this.materialCleanup = undefined
     if (
@@ -480,6 +488,12 @@ export class DomUiHost implements UiHost {
       nodes.push(createToast(state.notice))
     }
     this.root.replaceChildren(...nodes)
+    if (overlay && state.overlay.type === 'results' && this.runtime.playVictoryFireworks) {
+      this.victoryCleanup = this.victoryCelebration.attach(
+        overlay, this.runtime.raceSession.snapshot().runId,
+        state.preferences.graphicsQuality ?? 'medium', this.runtime.playVictoryFireworks,
+      )
+    }
     this.materialCleanup = !overlay && state.mode === 'editor'
       ? attachEditorGlass(this.root, screen)
       : attachMenuGlass(this.root, overlay ?? (state.mode === 'home' ? screen : undefined))
