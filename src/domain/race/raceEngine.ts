@@ -12,6 +12,7 @@ import {
 import {
   buildRaceCameraHints,
   findNearestSafeTrackIndex,
+  isVehicleAboveStructures,
   reconcileSupportAfterCollision,
   resetVehicleToTrack,
 } from '@/domain/race/trackContext'
@@ -527,6 +528,7 @@ function advanceRace(
         dt,
         random,
         state.tick,
+        vehicle => isVehicleAboveStructures(vehicle, state.path),
       ),
     },
     events,

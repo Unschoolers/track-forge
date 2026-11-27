@@ -61,20 +61,28 @@ function particleTexture(scene: Phaser.Scene, shape: ParticleShape): string {
   return key
 }
 
-/** Phaser owns pooled motion, fading and expiry. All pools together retain at most 180 particles. */
+/** Phaser owns pooled motion, fading and expiry. Both height layers share at most 180 live particles. */
 export class NativeRaceParticles {
   private readonly emitters = new Map<ParticleShape, Phaser.GameObjects.Particles.ParticleEmitter>()
+  private readonly upperEmitters = new Map<ParticleShape, Phaser.GameObjects.Particles.ParticleEmitter>()
   private readonly cursor = new ParticleEmissionCursor()
   private readonly appearance = new WeakMap<Phaser.GameObjects.Particles.Particle, Appearance>()
   private pending: Appearance = { scale: 1, alpha: 1, age: 0, growth: 0, angle: 0 }
   private tick: number | undefined
 
-  constructor(scene: Phaser.Scene, depth: number, private readonly desert = false, private readonly low = false) {
-    for (const shape of SHAPES) {
-      const emitter = scene.add.particles(0, 0, particleTexture(scene, shape), {
+  constructor(private readonly scene: Phaser.Scene, depth: number, private readonly desert = false, private readonly low = false, private readonly upperDepth = depth) {
+    for (const shape of SHAPES) this.emitters.set(shape, this.createEmitter(shape, depth))
+  }
+
+  private budget(shape: ParticleShape): number {
+    return this.low ? Math.floor(BUDGETS[shape] / 2) : BUDGETS[shape]
+  }
+
+  private createEmitter(shape: ParticleShape, depth: number): Phaser.GameObjects.Particles.ParticleEmitter {
+    return this.scene.add.particles(0, 0, particleTexture(this.scene, shape), {
         // Phaser's hard maxParticles counts dead pooled entries and blocks reuse at the cap.
         // Limit live particles instead; emitParticle reuses dead entries before allocating.
-        emitting: false, maxAliveParticles: low ? Math.floor(BUDGETS[shape] / 2) : BUDGETS[shape], speed: 0,
+        emitting: false, maxAliveParticles: this.budget(shape), speed: 0,
         scale: {
           onEmit: particle => {
             if (particle) this.appearance.set(particle, this.pending)
@@ -94,21 +102,29 @@ export class NativeRaceParticles {
         },
         rotate: { onEmit: () => this.pending.angle },
       }).setDepth(depth).setActive(false)
-      this.emitters.set(shape, emitter)
-    }
   }
 
   render(effects: RaceEffectsState, tick: number): void {
     // Advance from the fixed-step clock rather than wall time.
     if (this.tick !== undefined && tick > this.tick) {
-      for (const emitter of this.emitters.values()) emitter.preUpdate(0, (tick - this.tick) * 1000 / 60)
+      for (const pool of [this.emitters, this.upperEmitters]) {
+        for (const emitter of pool.values()) emitter.preUpdate(0, (tick - this.tick) * 1000 / 60)
+      }
     }
     this.tick = tick
     for (const item of this.cursor.update(effects)) {
       if (this.low && (item.emissionId ?? 0) % 2 !== 0) continue
       const style = raceParticleStyle(item, this.desert)
-      const emitter = this.emitters.get(style.shape)
-      if (!emitter) throw new Error('Missing particle emitter: ' + style.shape)
+      const lower = this.emitters.get(style.shape)
+      if (!lower) throw new Error('Missing particle emitter: ' + style.shape)
+      let upper = this.upperEmitters.get(style.shape)
+      // Both height layers share the original live budget for this shape.
+      if (lower.getAliveParticleCount() + (upper?.getAliveParticleCount() ?? 0) >= this.budget(style.shape)) continue
+      if (item.raised && !upper) {
+        upper = this.createEmitter(style.shape, this.upperDepth)
+        this.upperEmitters.set(style.shape, upper)
+      }
+      const emitter = item.raised && upper ? upper : lower
       this.pending = {
         scale: style.size / 8 * (style.shape === 'wind' ? 1.6 : 1),
         alpha: item.life / item.maxLife * style.opacity,
@@ -126,5 +142,10 @@ export class NativeRaceParticles {
     }
   }
 
-  destroy(): void { for (const emitter of this.emitters.values()) emitter.destroy() }
+  destroy(): void {
+    for (const pool of [this.emitters, this.upperEmitters]) {
+      for (const emitter of pool.values()) emitter.destroy()
+      pool.clear()
+    }
+  }
 }

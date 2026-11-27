@@ -42,7 +42,7 @@ describe('native particle pool lifetime', () => {
         const emit = vi.fn(() => ({ velocityX: 0, velocityY: 0 }))
         emissions.push(emit)
         const emitter = { setDepth: () => emitter, setActive: () => emitter, preUpdate: vi.fn(),
-          setParticleLifespan: vi.fn(), setParticleTint: vi.fn(), emitParticleAt: emit, destroy: vi.fn() }
+          setParticleLifespan: vi.fn(), setParticleTint: vi.fn(), getAliveParticleCount: () => 0, emitParticleAt: emit, destroy: vi.fn() }
         return emitter
       } },
     } as unknown as Phaser.Scene
@@ -56,4 +56,28 @@ describe('native particle pool lifetime', () => {
     expect(emissions[0]).toHaveBeenCalledTimes(160)
     native.destroy()
   })
+})
+
+it('routes raised births above the deck without doubling the live shape budget', () => {
+  const pools: { depth: number; alive: number; emit: ReturnType<typeof vi.fn> }[] = []
+  const scene = {
+    textures: { exists: () => true },
+    add: { particles: () => {
+      const pool = { depth: 0, alive: 0, emit: vi.fn(() => { pool.alive++; return { velocityX: 0, velocityY: 0 } }) }
+      pools.push(pool)
+      const emitter = { setDepth: (depth: number) => { pool.depth = depth; return emitter }, setActive: () => emitter,
+        preUpdate: vi.fn(), setParticleLifespan: vi.fn(), setParticleTint: vi.fn(),
+        getAliveParticleCount: () => pool.alive, emitParticleAt: pool.emit, destroy: vi.fn() }
+      return emitter
+    } },
+  } as unknown as Phaser.Scene
+  const native = new NativeRaceParticles(scene, 6, false, false, 16)
+  const births: RaceParticle[] = Array.from({ length: 150 }, (_, i) => ({
+    ...particle(i), kind: 'tire-smoke', ...(i % 2 === 0 ? { raised: true as const } : {}),
+  }))
+  native.render({ particles: births, skids: [], previousTires: {} }, 0)
+  expect(pools.filter(pool => pool.depth === 16)).toHaveLength(1)
+  expect(pools.filter(pool => pool.depth === 16).reduce((sum, pool) => sum + pool.alive, 0)).toBe(58)
+  expect(pools.reduce((sum, pool) => sum + pool.alive, 0)).toBe(116)
+  native.destroy()
 })
