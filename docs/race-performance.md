@@ -390,3 +390,7 @@ pose arrival gaps, skipped samples and effective receive rate. The target pose
 rate is 30 Hz; arrival gaps are not round-trip latency or proof of radio packet
 loss. Rendering submission does not measure GPU completion. Only actual
 matched device captures establish whether the new artwork affects gameplay.
+
+## Race particles
+
+Native WebGL emitters own wind, soft puffs and occasional tire debris with a combined 180-particle pool (90 on Low); Low also samples half of the visual descriptors. Canvas keeps a lightweight Graphics fallback. Surface styling is presentation-only: desert uses sand-colored dust, ice uses soft powder, and wind is player-only. Existing race RNG draws are preserved; additional drift smoke and water splashes do not consume race randomness. Tire marks and vehicle physics are unchanged. Check Rally and Sandy Beach on Android for visibility and frame pacing before increasing density.
