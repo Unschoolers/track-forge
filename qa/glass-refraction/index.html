@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08111b">
+  <title>Track Forge glass refraction QA</title>
+  <style>
+    * { box-sizing: border-box }
+    body { margin: 0; min-height: 100vh; color: #f1f6fb; background: #08111b; font: 15px/1.45 system-ui, sans-serif }
+    main { min-height: 100vh; padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); position: relative; overflow: hidden; isolation: isolate }
+    .scene { position: absolute; z-index: -2; inset: 0; background: linear-gradient(135deg,#143a56,#102235 42%,#461f25 78%,#e5683c); overflow: hidden }
+    .scene::before { content: ""; position: absolute; inset: -20%; background: repeating-linear-gradient(30deg,transparent 0 56px,#9cdafa22 57px 59px,transparent 60px 115px); transform: rotate(-8deg) }
+    .sun { position: absolute; width: 140px; aspect-ratio: 1; border-radius: 50%; background: #ffb45d; left: 67%; top: 11%; box-shadow: 0 0 90px #ff8b4d88 }
+    .track { position: absolute; left: -8%; right: -8%; bottom: -7%; height: 46%; transform: rotate(-9deg); border: 50px solid #29313b; border-radius: 50%; box-shadow: 0 0 0 4px #f0ca89, inset 0 0 0 4px #f0ca89 }
+    header { max-width: 720px; margin: auto }
+    h1 { margin: 0 0 6px; letter-spacing: -.04em; font-size: clamp(28px, 7vw, 42px) }
+    .intro { color: #c4d0db; margin: 0 0 22px }
+    .samples { display: grid; gap: 14px; max-width: 720px; margin: auto }
+    .sample { position: relative; isolation: isolate; min-height: 148px; padding: 18px; overflow: hidden; border-radius: 18px; border: 1px solid #d8e8f055; background: #101d2bd9; box-shadow: inset 0 1px #fff2, 0 14px 40px #0005 }
+    .sample h2 { margin: 0 0 5px; font-size: 18px }
+    .sample p { max-width: 440px; margin: 0; color: #c1cfdd; font-size: 14px }
+    .blur { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: #10223670 }
+    /* A controlled duplicate of the backdrop is displaced inside the pane.
+       It demonstrates SVG filter support; it is not backdrop sampling. */
+    .lens { background: #10223658 }
+    .lens-copy { position: absolute; z-index: -1; inset: 0; overflow: hidden; filter: url(#copied-capsule-lens); opacity: .56; pointer-events: none }
+    .lens-copy::before { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg,#143a56,#102235 42%,#461f25 78%,#e5683c); background-size: 100vw 100vh; background-position: center }
+    .lens-copy::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(30deg,transparent 0 56px,#9cdafa22 57px 59px,transparent 60px 115px); transform: rotate(-8deg) }
+    .lens-copy .mini-sun { position: absolute; width: 140px; aspect-ratio: 1; left: 67%; top: 11%; border-radius: 50%; background: #ffb45d; box-shadow: 0 0 90px #ff8b4d88 }
+    .lens-copy .mini-track { position: absolute; left: -8%; right: -8%; bottom: -7%; height: 46%; transform: rotate(-9deg); border: 50px solid #29313b; border-radius: 50%; box-shadow: 0 0 0 4px #f0ca89, inset 0 0 0 4px #f0ca89 }
+    .backdrop-lens { border-radius: 999px; backdrop-filter: url(#capsule-lens); -webkit-backdrop-filter: url(#capsule-lens); background: #10223658 }
+    .badge { display: inline-block; margin-top: 13px; padding: 3px 8px; border-radius: 99px; background: #07111a99; color: #d3e5f2; font: 11px ui-monospace, monospace }
+    #capability { max-width: 720px; margin: 18px auto 0; padding: 12px 14px; border-left: 3px solid #ff9b68; background: #111c28dd; font-size: 13px; color: #d2dde8 }
+    @media (prefers-reduced-transparency: reduce) { .blur, .lens { backdrop-filter: none; -webkit-backdrop-filter: none; background: #132536 } }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <filter id="capsule-lens" color-interpolation-filters="sRGB">
+      <feImage id="capsule-map" x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="edge-map" />
+      <feDisplacementMap in="SourceGraphic" in2="edge-map" scale="12" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+    <filter id="copied-capsule-lens" color-interpolation-filters="sRGB">
+      <feImage id="copied-capsule-map" x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="edge-map" />
+      <feDisplacementMap in="SourceGraphic" in2="edge-map" scale="12" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+  <main>
+    <div class="scene" aria-hidden="true"><div class="sun"></div><div class="track"></div></div>
+    <header>
+      <h1>Glass material lab</h1>
+      <p class="intro">Static QA comparison for Android WebView. The colorful track is a deliberate backdrop texture so blur and distortion are easy to see.</p>
+    </header>
+    <section class="samples" aria-label="Glass technique comparison">
+      <article class="sample"><h2>1. Tinted chrome</h2><p>Translucent fill, edge, and inset highlight only. No pixel sampling or refraction.</p><span class="badge">reliable baseline</span></article>
+      <article class="sample blur"><h2>2. CSS backdrop blur</h2><p>Samples and softens pixels behind the pane where supported. Blur is not refraction.</p><span class="badge">backdrop-filter</span></article>
+      <article class="sample lens"><div class="lens-copy" aria-hidden="true"><div class="mini-sun"></div><div class="mini-track"></div></div><h2>3. SVG displacement demo</h2><p>Displaces a manually duplicated scene inside the pane. This is genuine warping of that copy, not live backdrop sampling.</p><span class="badge">SVG feDisplacementMap</span></article>
+      <article class="sample backdrop-lens"><h2>4. Refract the live backdrop</h2><p>The backdrop is the image being displaced; a static capsule-edge map supplies the displacement. Confirm the road edge bends inside this pane. A backdrop used as the map input is a separate, privacy-restricted case.</p><span class="badge">backdrop-filter: url(#capsule-lens)</span></article>
+    </section>
+    <p id="capability" role="status">Checking browser feature exposure…</p>
+  </main>
+  <script>
+    const blur = CSS.supports('(-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))');
+    const liveDisplacement = CSS.supports('(-webkit-backdrop-filter: url(#capsule-lens)) or (backdrop-filter: url(#capsule-lens))');
+    const mapPairs = [
+      [document.querySelector('.lens'), document.querySelector('#copied-capsule-map')],
+      [document.querySelector('.backdrop-lens'), document.querySelector('#capsule-map')],
+    ];
+    for (const [pane, map] of mapPairs) {
+      if (pane) new ResizeObserver(() => drawCapsuleMap(pane, map)).observe(pane);
+      if (pane) drawCapsuleMap(pane, map);
+    }
+    const svgFilter = document.querySelector('#capsule-lens')?.tagName.toLowerCase() === 'filter';
+    document.querySelector('#capability').textContent = `Feature exposure: backdrop-filter blur ${blur ? 'reported' : 'not reported'}; backdrop-filter URL displacement ${liveDisplacement ? 'reported by parser' : 'not accepted by parser'}; inline SVG filter ${svgFilter ? 'present' : 'missing'}. The static vector map uses neutral center pixels and curved edge normals; parser support does not prove rendered pixels. Inspect whether the road edge bends in sample 4.`;
+
+    function drawCapsuleMap(pane, map) {
+      if (!pane || !map) return;
+      const rect = pane.getBoundingClientRect();
+      const ratio = window.devicePixelRatio > 1 ? 1.5 : 1;
+      const width = Math.max(1, Math.round(rect.width * ratio));
+      const height = Math.max(1, Math.round(rect.height * ratio));
+      const radius = height / 2;
+      const capCenterX = width / 2;
+      const endX = Math.max(0, width / 2 - radius);
+      const amplitude = 5.5 * ratio;
+      const edgeWidth = 18 * ratio;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) return;
+      const image = context.createImageData(width, height);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const dx = x - capCenterX;
+          const closestX = Math.max(-endX, Math.min(endX, dx));
+          const nx = dx - closestX;
+          const ny = y - radius;
+          const distance = Math.hypot(nx, ny) - radius;
+          const edge = Math.max(0, 1 - Math.abs(distance) / edgeWidth);
+          const strength = amplitude * edge * edge * (3 - 2 * edge);
+          const length = Math.hypot(nx, ny) || 1;
+          const offset = (y * width + x) * 4;
+          image.data[offset] = Math.max(0, Math.min(255, Math.round(128 + (nx / length) * strength / (12 * ratio / 2) * 127)));
+          image.data[offset + 1] = Math.max(0, Math.min(255, Math.round(128 + (ny / length) * strength / (12 * ratio / 2) * 127)));
+          image.data[offset + 2] = 128;
+          image.data[offset + 3] = 255;
+        }
+      }
+      context.putImageData(image, 0, 0);
+      map.setAttribute('href', canvas.toDataURL('image/png'));
+    }
+  </script>
+</body>
+</html>
