@@ -40,6 +40,7 @@
   border-radius: 1.15rem;
   transition: border-color 150ms ease, background-color 150ms ease;
 }
+.track-library-modal .track-card.edit { flex-direction: row; }
 .track-library-modal .track-card:is(:hover, :focus-within) { border-color: #c1cad4; z-index: 2; }
 .track-library-modal .track-card.selected { border-color: #ff925c; }
 .track-library-modal .track-card:has(.track-card-overflow[open]) { z-index: 5; }
@@ -184,20 +185,21 @@
   .track-library-modal .track-library-count { margin: 0; }
   .track-library-modal .track-list { grid-template-columns: 1fr; gap: .55rem; }
   .track-library-modal .track-card { min-height: 8rem; }
-  .track-library-modal .track-preview { height: 6.8rem; }
+  .track-library-modal .track-card-select { grid-template-columns: minmax(5rem, .8fr) minmax(0, 1.2fr); }
+  .track-library-modal .track-preview { height: 6.8rem; padding: .35rem; }
   .track-library-modal .modal-header { padding: .9rem 1rem .55rem; }
   .track-library-modal .modal-body { padding: .55rem 1rem .8rem; }
   .track-library-modal .modal-footer { padding: .65rem 1rem max(.8rem, env(safe-area-inset-bottom)); }
 }
 @media (max-width: 380px) {
-  .track-library-modal .track-card-select { grid-template-columns: minmax(4rem, .7fr) minmax(0, 1.3fr); padding: .45rem; }
+  .track-library-modal .track-card-select { grid-template-columns: minmax(4.5rem, .8fr) minmax(0, 1.2fr); padding: .45rem; }
   .track-library-modal .track-card-copy { padding: .35rem; }
   .track-library-modal .track-library-filter-button { padding-inline: .6rem; }
   .track-library-modal .modal-footer { display: grid; grid-template-columns: 1fr 1.25fr; }
 }
 @media (prefers-reduced-motion: reduce) { .track-library-modal .track-card { transition: none; } }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .track-library-modal .track-library-toolbar { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
+  .track-library-modal[data-graphics-quality] .track-library-toolbar { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
 }
 
 .results-modal .modal-title { font-size: clamp(1.5rem, 5vw, 2.3rem); letter-spacing: .06em; }

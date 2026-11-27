@@ -24,6 +24,11 @@ export interface TrackLibraryActions {
   readonly delete: (track: Track) => void
 }
 
+export interface TrackLibraryViewState {
+  readonly searchQuery: string
+  readonly filter: 'all' | 'favorites'
+}
+
 // Built-in tracks are immutable; reuse identity collections on each library redraw.
 const OFFICIAL_TRACKS = OFFICIAL_COURSES.map(({ track }) => track)
 const OFFICIAL_TRACK_IDS = new Set(OFFICIAL_TRACKS.map(track => track.id))
@@ -49,6 +54,7 @@ export function createTrackLibraryModal(
   state: AppSnapshot,
   actions: TrackLibraryActions,
   geometry: TrackGeometryService,
+  initialViewState?: TrackLibraryViewState,
 ): HTMLElement {
   if (state.overlay.type !== 'track-library') {
     throw new Error('Track library requires a track-library overlay')
@@ -78,21 +84,23 @@ export function createTrackLibraryModal(
   search.className = 'track-library-search'
   search.placeholder = 'Search circuits or creators'
   search.setAttribute('aria-label', 'Search tracks')
+  search.value = initialViewState?.searchQuery ?? ''
   searchLabel.append(search)
   const filter = element('div', 'track-library-filter')
   filter.setAttribute('role', 'group')
   filter.setAttribute('aria-label', 'Filter circuits')
-  const allFilter = button('All circuits', 'library-filter-all', () => setFilter('all'), 'track-library-filter-button active')
-  const favoritesFilter = button('Favorites', 'library-filter-favorites', () => setFilter('favorites'), 'track-library-filter-button')
-  allFilter.setAttribute('aria-pressed', 'true')
-  favoritesFilter.setAttribute('aria-pressed', 'false')
+  const initialFilter = initialViewState?.filter ?? 'all'
+  const allFilter = button('All circuits', 'library-filter-all', () => setFilter('all'), `track-library-filter-button${initialFilter === 'all' ? ' active' : ''}`)
+  const favoritesFilter = button('Favorites', 'library-filter-favorites', () => setFilter('favorites'), `track-library-filter-button${initialFilter === 'favorites' ? ' active' : ''}`)
+  allFilter.setAttribute('aria-pressed', String(initialFilter === 'all'))
+  favoritesFilter.setAttribute('aria-pressed', String(initialFilter === 'favorites'))
   filter.append(allFilter, favoritesFilter)
   const count = element('p', 'track-library-count')
   toolbar.append(searchLabel, filter, count)
   const list = element('div', 'track-list')
   list.setAttribute('aria-live', 'polite')
   libraryContent.append(toolbar, list)
-  let activeFilter: 'all' | 'favorites' = 'all'
+  let activeFilter: 'all' | 'favorites' = initialFilter
   const setFilter = (next: 'all' | 'favorites') => {
     activeFilter = next
     allFilter.classList.toggle('active', next === 'all')
@@ -113,8 +121,9 @@ export function createTrackLibraryModal(
     select.setAttribute('aria-label', `${action} ${track.name}`)
     select.disabled = race && !validation.ready
 
+    const preview = createTrackPreview(path, track.points[0], track.environmentId)
     const copy = element('span', 'track-card-copy')
-    copy.append(createTrackPreview(path, track.points[0], track.environmentId), element('strong', 'track-card-name', track.name))
+    copy.append(element('strong', 'track-card-name', track.name))
     const creator = element('span', 'track-card-creator')
     const environment = normalizeTrackEnvironmentId(track.environmentId)
     const dot = element('span', 'track-environment-dot')
@@ -134,7 +143,7 @@ export function createTrackLibraryModal(
       const medal = timeMedal(track, state.scoresByTrack[track.id] ?? [])
       if (medal) copy.append(element('span', 'track-card-medal', `${medal.toUpperCase()} MEDAL`))
     }
-    select.append(copy)
+    select.append(preview, copy)
     card.append(select)
 
     const favorite = button(favorites.has(track.id) ? '★' : '☆', `favorite-${track.id}`, () => actions.toggleFavorite(track.id), 'track-card-favorite')
