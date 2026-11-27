@@ -11,7 +11,7 @@ import type {
 } from '@/domain/editor/editorState'
 /** Application navigation state; host adapters consume this instead of owning it. */
 export type AppMode = 'home' | 'editor' | 'race'
-import type { LightingMode, RoadStructure, Track, TrackId } from '@/domain/model'
+import type { CreatorGhostChallenge, LightingMode, RoadStructure, Track, TrackId } from '@/domain/model'
 import type {
   EditorCommandRejection,
 } from '@/domain/editor/editorConstraints'
@@ -34,6 +34,8 @@ export type OverlayReturn =
   | { readonly type: 'editor-menu' }
   | { readonly type: 'editor-exit' }
 
+export type TrackShareReturn = TrackLibraryOverlay | { readonly type: 'editor-menu' } | { readonly type: 'results' }
+
 export type AppOverlay =
   | { readonly type: 'none' }
   | TrackLibraryOverlay
@@ -45,7 +47,8 @@ export type AppOverlay =
   | { readonly type: 'player-name' }
   | { readonly type: 'race-setup' }
   | { readonly type: 'cup'; readonly returnTo?: 'nearby' }
-  | { readonly type: 'nearby'; readonly confirmLeave?: true }
+  | { readonly type: 'nearby'; readonly confirmLeave?: true; readonly shareReturnTo?: TrackShareReturn }
+  | { readonly type: 'track-share'; readonly track: Track; readonly challenge?: CreatorGhostChallenge | undefined; readonly returnTo: TrackShareReturn }
   | { readonly type: 'editor-menu' }
   | { readonly type: 'editor-exit' }
   | {
@@ -111,7 +114,8 @@ export type AppCommand =
   | { readonly type: 'race-current-track' }
   | { readonly type: 'start-race' }
   | { readonly type: 'open-nearby' }
-  | { readonly type: 'send-nearby-track'; readonly track: Track }
+  | { readonly type: 'open-track-share'; readonly track: Track; readonly challenge?: CreatorGhostChallenge | undefined }
+  | { readonly type: 'send-nearby-track'; readonly track: Track; readonly challenge?: CreatorGhostChallenge | undefined }
   | { readonly type: 'scan-nearby-track' }
   | { readonly type: 'save-nearby-track' }
   | { readonly type: 'decline-nearby-track' }
