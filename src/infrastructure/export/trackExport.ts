@@ -1,7 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { CreatorGhostChallenge, Track } from '@/domain/model'
 import { isSeededTrack } from '@/domain/track/trackCreator'
-import { MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, TRACK_EXPORT_FORMAT_VERSION } from '@/domain/track/trackCodec'
+import { MAX_TRACK_EXPORT_CHARS, TRACK_EXPORT_FORMAT, trackExportFormatVersion } from '@/domain/track/trackCodec'
 import { decodeCreatorGhostChallenge } from '@/domain/track/creatorGhostChallenge'
 import {
   serializeSignedTrack,
@@ -24,7 +24,7 @@ export function serializeTrack(track: Track): { filename: string; content: strin
   delete legacyTrack.signedSource
   delete legacyTrack.signedChallengeSource
   delete legacyTrack.creatorChallenge
-  const content = JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: TRACK_EXPORT_FORMAT_VERSION,
+  const content = JSON.stringify({ format: TRACK_EXPORT_FORMAT, formatVersion: trackExportFormatVersion(legacyTrack),
     track: legacyTrack })
   return {
     filename: trackFilename(track),
