@@ -239,6 +239,9 @@ decodes day/night cells once. A load error reaches the existing startup
 retry screen rather than silently hiding artwork.
 
 Editor, race and flyover share the same visible-scenery render plan.
+Authored props and trees paint above the road surface and lane stripes, so
+foliage can overlap the shoulder naturally. Vehicles and raised bridge
+structures retain their foreground ordering; physics and placement are unchanged.
 Existing placement radius, stable identifiers, day/night contact shadows,
 selection/drag/undo semantics and terrain physics are preserved. The
 shared tree retains the existing canopy size and terrain-projected shadow.
