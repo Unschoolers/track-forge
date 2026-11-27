@@ -641,7 +641,7 @@
   .race-setup-modal .modal-header { padding-block: .45rem; }
   .race-setup-modal .modal-body { padding-block: .45rem; }
   .race-setup-modal .race-preparation-body { gap: .4rem; }
-  .race-setup-modal .race-flyover { height: clamp(5rem, 23svh, 7.25rem); }
+  .race-setup-modal .race-flyover { height: clamp(6.25rem, 23svh, 7.25rem); }
   .race-setup-modal .setup-section { gap: .4rem; padding: .55rem; }
   .race-setup-modal .modal-footer { padding-block: .45rem; }
 }
