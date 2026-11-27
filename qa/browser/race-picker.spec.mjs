@@ -124,7 +124,6 @@ test('race setup actions stay visible and reachable at narrow portrait and lands
     expect(layout.bodyBottom).toBeLessThanOrEqual(layout.footerTop)
     expect(layout.footerBottom).toBeLessThanOrEqual(layout.height)
     await actions[0].focus()
-    await page.keyboard.press('Tab')
     await expect(actions[0]).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(actions[1]).toBeFocused()
