@@ -18,8 +18,7 @@ Menu glass uses LiquidGlass.dev's upstream SVG refraction of aligned copies of s
 
 ## Shared control defaults
 
-The base modal stylesheet (menu-dialogs.css) owns the paint-only defaults for
-actions, choices, toggles, close buttons and text fields. An unclassified new
+menu-system.css owns shared painted and optical control material; menu-dialogs.css owns base dialog layout, field geometry and minimum touch sizes. An unclassified new
 dialog must already look like Track Forge, not the retired angular theme.
 Use the existing button and setup-choice classes; selectable buttons expose
 aria-pressed and the matching active class. Specialized pickers (including
@@ -102,7 +101,7 @@ Apple's [Landmarks sample](https://developer.apple.com/documentation/swiftui/lan
 Each page review must show the compact and expanded compositions, actual artwork behind controls, and relevant interaction states. Do not add a native SwiftUI layer or change app icon packaging for this redesign.
 
 ## Delivery
-One production design, no theme switch, experiment flag or parallel UI. Each merged screen replaces its old layout for every player; unmigrated screens retain their current implementation until their turn. Remove legacy rules once their last consumer is migrated.
+One production design, no theme switch, experiment flag or parallel UI. All migrated menus use the shared material for every player. Remove superseded per-screen paint rather than stacking overrides. Preserve screen-specific layout, HUD styling, accessibility fallbacks and old track/save compatibility.
 
 | Slice | Deliverable |
 | --- | --- |
@@ -115,7 +114,7 @@ One production design, no theme switch, experiment flag or parallel UI. Each mer
 | Nearby and cup | Connection, consent and round state prioritized |
 | Pause and results | Compact interruption and result-led celebration; no live-canvas filter |
 
-Editor tools and in-race HUD are out of scope until separately reviewed. Each screen gets its own PR, component contracts, portrait/landscape/desktop review and real browser screenshots before approval. Check 320px narrow, 360x780, 780x360 and 1440x900 CSS pixels, enlarged text, safe areas, keyboard, touch, disabled/selected states, scroll/focus restoration and reduced motion/contrast. For optical changes compare Android warm/cold frame pacing per race-performance.md. Do not loosen existing checks.
+Editor tools use the same painted material; in-race HUD remains a separate gameplay interface. Each screen gets its own PR, component contracts, portrait/landscape/desktop review and real browser screenshots before approval. Check 320px narrow, 360x780, 780x360 and 1440x900 CSS pixels, enlarged text, safe areas, keyboard, touch, disabled/selected states, scroll/focus restoration and reduced motion/contrast. For optical changes compare Android warm/cold frame pacing per race-performance.md. Do not loosen existing checks.
 
 The reference lab is a developer-only route: run npm run dev and open /qa/menu-design/. It uses the real shared primitives and existing car artwork. It is not an approved screen or packaged production route. No production imports until the first screen migration. Rollback is independent per screen.
 
