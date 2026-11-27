@@ -16,10 +16,6 @@
   width: min(44rem, 100%);
   min-height: 0;
   max-height: 100%;
-  border-color: #b4c8d54d;
-  border-radius: 1.5rem;
-  background: linear-gradient(145deg, #e6f3ff1a, transparent 42%), #101821bd;
-  box-shadow: 0 1.5rem 5rem #000b, inset 0 1px #ffffff42;
 }
 
 #app .cup-modal .modal-header,
@@ -117,7 +113,6 @@
   color: var(--cup-ink);
 }
 
-#app .cup-modal .cup-secondary-action { min-height: 48px; }
 
 #app .cup-modal .modal-footer {
   flex-wrap: wrap;
@@ -128,14 +123,12 @@
 
 #app .cup-modal .modal-footer .button { flex: 1 1 42%; }
 
-#app [data-graphics-quality='low'] .cup-modal .modal-card,
 #app [data-graphics-quality='low'] .cup-modal .cup-track-row,
 #app [data-graphics-quality='low'] .cup-modal .cup-checkpoint-note {
   background: #101821;
 }
 
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  #app .cup-modal .modal-card,
   #app .cup-modal .cup-track-row,
   #app .cup-modal .cup-checkpoint-note { background: #101821; }
 }
