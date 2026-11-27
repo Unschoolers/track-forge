@@ -15,6 +15,7 @@ import { roadColorsForEnvironment } from './roadMaterials'
 import { environmentRoadStrokes } from './environmentRoadStrokes'
 import { bridgePaintCommands, paintBridgeCanvas } from './bridgeMaterials'
 import { elevationLevelForHeight, elevationMaterialForLevel, groupElevationFaces } from './elevationMaterials'
+import { HILL_FIELD_PADDING, HILL_FIELD_STEP, hillMaterialWeights, smoothHillField } from './hillMaterialField'
 
 export const BITMAP_TILE_LIMIT = 48
 const TILE = GROUND_TILE_SIZE
@@ -333,7 +334,7 @@ export function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = fal
     }
   }
   return indexBitmapItems(items, item => 'segment' in item
-    ? [item.segment.start, item.segment.end] : item.triangle, WATER_SHALLOW_RADIUS + 2)
+    ? [item.segment.start, item.segment.end] : item.triangle, Math.max(WATER_SHALLOW_RADIUS, HILL_FIELD_PADDING) + 2)
 }
 
 function appendTriangle(context: CanvasRenderingContext2D, [a, b, c]: TerrainTriangle): void {
@@ -358,16 +359,138 @@ function bankStroke(context: CanvasRenderingContext2D, items: readonly TerrainBi
   context.globalAlpha = 1
 }
 
+/** Rasterize only the padded tile's geometry at a bounded, world-aligned
+ * resolution. The result is reused for the material and directional lighting
+ * masks, not sampled during gameplay. */
+function paintHillBitmap(
+  target: CanvasRenderingContext2D,
+  faces: readonly ElevationFace[],
+  art: EnvironmentBitmapArt,
+  tile: GroundTile,
+): void {
+  const resolution = target.canvas.width
+  const left = tile.x * TILE
+  const top = tile.y * TILE
+  const fieldWorldSize = TILE + HILL_FIELD_PADDING * 2
+  const fieldSize = fieldWorldSize / HILL_FIELD_STEP
+  const field = createArtCanvas(fieldSize)
+  const mask = createArtCanvas(fieldSize)
+  const hill = createArtCanvas(resolution)
+  const rock = createArtCanvas(resolution)
+  const worldTransform = (context: CanvasRenderingContext2D): void => {
+    context.setTransform(resolution / TILE, 0, 0, resolution / TILE,
+      -left * resolution / TILE, -top * resolution / TILE)
+  }
+  const drawField = (context: CanvasRenderingContext2D): void => {
+    context.drawImage(mask.canvas, left - HILL_FIELD_PADDING, top - HILL_FIELD_PADDING,
+      fieldWorldSize, fieldWorldSize)
+  }
+  for (const [level, levelFaces] of groupElevationFaces(faces)) {
+    if (!levelFaces.some(face => face.kind === 'hill-mask')) continue
+    const material = elevationMaterialForLevel(art.elevationMaterials, level)
+    const shading = material.shading
+    field.context.setTransform(1, 0, 0, 1, 0, 0)
+    field.context.clearRect(0, 0, fieldSize, fieldSize)
+    field.context.save()
+    field.context.setTransform(1 / HILL_FIELD_STEP, 0, 0, 1 / HILL_FIELD_STEP,
+      (HILL_FIELD_PADDING - left) / HILL_FIELD_STEP,
+      (HILL_FIELD_PADDING - top) / HILL_FIELD_STEP)
+    field.context.beginPath()
+    for (const face of levelFaces) {
+      if (face.kind === 'hill-mask') appendTriangle(field.context, face.triangle)
+    }
+    field.context.fillStyle = '#000000'
+    field.context.fill()
+    field.context.clip()
+    // Red is rock coverage, green/blue are opposing light directions.
+    // The canonical mesh supplies the road-aware grades; only these masks
+    // are filtered. No texture, physics or hazard data is interpolated.
+    for (let bucket = 0; bucket < 9; bucket++) {
+      field.context.beginPath()
+      for (const face of levelFaces) {
+        if (face.kind === 'slope' && Math.max(0, Math.min(8, Math.round((face.shade + 1) * 4))) === bucket) {
+          appendTriangle(field.context, face.triangle)
+        }
+      }
+      const light = Math.max(0, bucket - 4) * 63
+      const shadow = Math.max(0, 4 - bucket) * 63
+      field.context.fillStyle = `rgb(255,${light},${shadow})`
+      field.context.fill()
+    }
+    field.context.restore()
+    const values = smoothHillField(field.context.getImageData(0, 0, fieldSize, fieldSize).data, fieldSize, fieldSize)
+    const maskPixels = mask.context.createImageData(fieldSize, fieldSize)
+    const writeMask = (channel: 'coverage' | 'rock' | 'lighting'): void => {
+      const lightColor = shading.slopeLight.split(',').map(Number)
+      const shadowColor = shading.slopeShadow.split(',').map(Number)
+      for (let offset = 0; offset < values.length; offset += 4) {
+        const weights = hillMaterialWeights(values, offset)
+        if (channel === 'lighting') {
+          const light = weights.light * shading.slopeLightStrength * 4
+          const shadow = weights.shadow * shading.slopeShadowStrength * 4
+          const strength = light + shadow
+          for (let c = 0; c < 3; c++) {
+            maskPixels.data[offset + c] = strength > 0
+              ? ((lightColor[c] ?? 0) * light + (shadowColor[c] ?? 0) * shadow) / strength
+              : 0
+          }
+          maskPixels.data[offset + 3] = Math.min(1, strength) * 255
+        } else {
+          maskPixels.data[offset] = 255
+          maskPixels.data[offset + 1] = 255
+          maskPixels.data[offset + 2] = 255
+          maskPixels.data[offset + 3] = weights[channel] * 255
+        }
+      }
+      mask.context.putImageData(maskPixels, 0, 0)
+    }
+    worldTransform(hill.context)
+    hill.context.clearRect(left, top, TILE, TILE)
+    hill.context.fillStyle = repeatPattern(hill.context, material.plateau)
+    hill.context.fillRect(left, top, TILE, TILE)
+    hill.context.fillStyle = shading.plateauGlaze
+    hill.context.fillRect(left, top, TILE, TILE)
+
+    worldTransform(rock.context)
+    rock.context.clearRect(left, top, TILE, TILE)
+    rock.context.fillStyle = repeatPattern(rock.context, material.slope)
+    rock.context.fillRect(left, top, TILE, TILE)
+    writeMask('rock')
+    rock.context.globalCompositeOperation = 'destination-in'
+    drawField(rock.context)
+    rock.context.globalCompositeOperation = 'source-over'
+    hill.context.drawImage(rock.canvas, left, top, TILE, TILE)
+
+    writeMask('lighting')
+    drawField(hill.context)
+    writeMask('coverage')
+    hill.context.globalCompositeOperation = 'destination-in'
+    drawField(hill.context)
+    hill.context.globalCompositeOperation = 'source-over'
+
+    // The continuous opacity fades inward from the rounded outline. Clip the
+    // outer footprint so a neighboring water hazard never acquires hill art.
+    target.save()
+    target.beginPath()
+    for (const face of levelFaces) {
+      if (face.kind === 'hill-mask') appendTriangle(target, face.triangle)
+    }
+    target.clip()
+    target.drawImage(hill.canvas, left, top, TILE, TILE)
+    target.restore()
+  }
+}
+
 /** Painter order: sand outside, deep water, translucent shallow shelves
  * clipped to water, narrow contact foam, then the textured mountain faces.
  * All patterns are world anchored across tile boundaries. */
-export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile?: GroundTile, night = false): void {
+export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: readonly TerrainBitmapItem[], art: EnvironmentBitmapArt, tile: GroundTile, night = false): void {
   // Projected shadows were beneath the existing textured terrain overlay.
   // One combined path avoids double darkening on internal triangle edges.
   if (items.some(item => item.kind === 'hill-shadow')) {
     context.beginPath()
     for (const item of items) if (item.kind === 'hill-shadow') appendTriangle(context, item.triangle)
-    context.fillStyle = night ? 'rgba(8,18,13,0.16)' : 'rgba(8,18,13,0.24)'
+    context.fillStyle = night ? 'rgba(8,18,13,0.08)' : 'rgba(8,18,13,0.12)'
     context.fill()
   }
   const palette = art.terrainPalette
@@ -401,72 +524,14 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   bankStroke(context, items, 23 * shallowScale, palette.shallow[2], 0.18)
   bankStroke(context, items, 12 * shallowScale, palette.shallow[2], 0.20)
   bankStroke(context, items, 3 * shallowScale, palette.contact, 0.55)
-  if (palette.waterDetail === 'oil-slicks' && tile) paintHarborOilSlicks(context, tile)
+  if (palette.waterDetail === 'oil-slicks') paintHarborOilSlicks(context, tile)
   context.restore()
 
-  // The rounded outline owns the continuous material fill. Mesh facets are
-  // no longer opaque texture patches; this avoids the visible square mosaic.
   const faces = items.filter((item): item is ElevationFace => item.kind === 'slope' || item.kind === 'hill-mask')
-  // Contact shadow follows the same decorative outline as the material.
+  // A subtle contact shadow uses the same rounded bank as water; the
+  // continuous field owns all interior rock and lighting transitions.
   bankStroke(context, items, 12, '#15202a', 0.055, 'hill-bank')
-  bankStroke(context, items, 8, '#15202a', 0.075, 'hill-bank')
-  bankStroke(context, items, 4, '#15202a', 0.11, 'hill-bank')
-  for (const [level, levelFaces] of groupElevationFaces(faces)) {
-    const material = elevationMaterialForLevel(art.elevationMaterials, level)
-    const shading = material.shading
-    const slope = repeatPattern(context, material.slope)
-    context.save()
-    context.beginPath()
-    for (const item of levelFaces) {
-      if (item.kind === 'hill-mask') appendTriangle(context, item.triangle)
-    }
-    // Fill once, then clip every interior pass to the same hole-aware mask.
-    context.fillStyle = repeatPattern(context, material.plateau)
-    context.fill()
-    context.fillStyle = shading.plateauGlaze
-    context.fill()
-    context.clip()
-
-    // Road-adjacent grades can extend farther than natural slopes. Retain
-    // their visual cue, but do not let the sampling grid own opaque materials.
-    context.beginPath()
-    for (const item of levelFaces) {
-      if (item.kind === 'slope') appendTriangle(context, item.triangle)
-    }
-    context.fillStyle = slope
-    context.globalAlpha = 0.25
-    context.fill()
-    context.globalAlpha = 1
-
-    // Same overlapping, rounded bands as the shoreline painter, with the
-    // rock material growing progressively stronger toward the mountain foot.
-    const run = WORLD_ELEVATION.naturalSlopeRun
-    bankStroke(context, items, run * 2.5, slope, 0.15, 'hill-bank')
-    bankStroke(context, items, run * 2, slope, 0.26, 'hill-bank')
-    bankStroke(context, items, run * 1.5, slope, 0.40, 'hill-bank')
-    bankStroke(context, items, run, slope, 0.62, 'hill-bank')
-    bankStroke(context, items, run * 0.5, slope, 0.80, 'hill-bank')
-
-    // Preserve the road-aware directional shading, but soften its contrast
-    // so discretized gradient samples cannot form opaque square patches.
-    for (let bucket = 0; bucket < 9; bucket++) {
-      if (bucket === 4) continue
-      context.beginPath()
-      for (const item of levelFaces) {
-        if (item.kind === 'slope' && Math.max(0, Math.min(8, Math.round((item.shade + 1) * 4))) === bucket) {
-          appendTriangle(context, item.triangle)
-        }
-      }
-      context.fillStyle = bucket < 4
-        ? `rgba(${shading.slopeShadow},${(4 - bucket) * shading.slopeShadowStrength * 0.5})`
-        : `rgba(${shading.slopeLight},${(bucket - 4) * shading.slopeLightStrength * 0.5})`
-      context.fill()
-    }
-    bankStroke(context, items, 18, `rgb(${shading.slopeShadow})`, 0.07, 'hill-bank')
-    bankStroke(context, items, 12, `rgb(${shading.slopeShadow})`, 0.10, 'hill-bank')
-    bankStroke(context, items, 6, `rgb(${shading.slopeShadow})`, 0.15, 'hill-bank')
-    context.restore()
-  }
+  if (faces.length > 0) paintHillBitmap(context, faces, art, tile)
 }
 
 function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme, part: 'all' | 'water' | 'hill' = 'all', limit: number = BITMAP_TILE_LIMIT, regionalCache?: RegionalTerrainMeshCache): BakeableBitmapTiles {
