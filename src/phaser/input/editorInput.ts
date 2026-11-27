@@ -152,6 +152,7 @@ export interface EditorInputDependencies {
   readonly path?: () => RoadPath
   readonly dispatch: (command: EditorCommand) => void
   readonly worldPoint?: (pointer: PointerSample) => Vector2
+  readonly polygonContains?: (point: Vector2, polygon: readonly Vector2[]) => boolean
   readonly onCameraChanged?: () => void
   readonly viewport?: () => { readonly width: number; readonly height: number }
   readonly onCrossingSelected?: (key: string | null) => void
@@ -806,18 +807,16 @@ export class EditorInputController {
             world,
             this.dependencies.camera.zoom,
           )
-          const crossing = (this.dependencies.path?.().crossings ?? [])
-            .map((candidate) => ({
-              candidate,
-              distance: Math.hypot(
-                candidate.position.x - world.x,
-                candidate.position.y - world.y,
-              ),
-            }))
-            .filter(
-              ({ candidate }) => pointInPolygon(world, candidate.polygon),
-            )
-            .sort((left, right) => left.distance - right.distance)[0]
+          // Phaser supplies the live hit shape; the pure geometry fallback
+          // keeps headless editor command tests independent of a canvas.
+          const contains = this.dependencies.polygonContains ?? pointInPolygon
+          const crossings = this.dependencies.path?.().crossings ?? []
+          let crossing: { candidate: (typeof crossings)[number]; distance: number } | undefined
+          for (const candidate of crossings) {
+            if (!contains(world, candidate.polygon)) continue
+            const distance = Math.hypot(candidate.position.x - world.x, candidate.position.y - world.y)
+            if (!crossing || distance < crossing.distance) crossing = { candidate, distance }
+          }
           const control = point >= 0 ? editor.points[point] : undefined
           const controlDistance = control
             ? Math.hypot(control.x - world.x, control.y - world.y)
