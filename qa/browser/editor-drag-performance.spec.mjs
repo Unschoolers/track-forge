@@ -34,6 +34,7 @@ test('profiles live road dragging on a large track', async ({ page, context }, t
   await enterTrackForge(page)
   await page.evaluate(async () => {
     const { EditorScene } = await import('/src/phaser/scenes/EditorScene.ts')
+    const { EditorTerrainPresentation } = await import('/src/phaser/rendering/editorTerrainPresentation.ts')
     const { TrackGeometryService } = await import('/src/domain/track/trackGeometryService.ts')
     const { DomUiHost } = await import('/src/ui/uiHost.ts')
     const samples = { terrain: [], world: [], geometry: [], chrome: [], frame: [] }
@@ -46,7 +47,7 @@ test('profiles live road dragging on a large track', async ({ page, context }, t
         finally { samples[key].push(performance.now() - start) }
       }
     }
-    wrap(EditorScene.prototype, 'renderTerrainPresentation', 'terrain')
+    wrap(EditorTerrainPresentation.prototype, 'renderTerrain', 'terrain')
     wrap(EditorScene.prototype, 'renderWorldPresentation', 'world')
     wrap(TrackGeometryService.prototype, 'get', 'geometry')
     wrap(DomUiHost.prototype, 'render', 'chrome')
