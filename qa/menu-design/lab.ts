@@ -1,3 +1,4 @@
+import '@/styles/tokens.css'
 import '@/styles/menu-system.css'
 import './lab.css'
 import { createMenuLayout, createMenuDock } from '@/ui/menu/menuLayout'
