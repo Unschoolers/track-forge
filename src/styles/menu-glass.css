@@ -49,7 +49,7 @@
   isolation: isolate;
   background: transparent;
   backdrop-filter: none;
-  border-color: #c6e3fa40;
+  border-color: transparent;
   box-shadow: none;
   border-radius: var(--menu-control-rounding);
   --lg-tint: rgb(15 28 41 / 20%);
@@ -126,4 +126,33 @@
   border: 1px solid #dbeafe12;
   border-radius: 18px;
   background: var(--menu-static-section-fill);
+}
+
+/* Shared surface reflection and elastic press. The native control and label
+   never move; only decorative pixels scale. No per-frame optical map rebuild. */
+#app [data-liquid-glass] > lg-panel::after,
+#app [data-lighting-art] > .lighting-reflection {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse at var(--glass-light-x, 24%) var(--glass-light-y, 0%),
+    var(--glass-light-color, rgb(255 255 255 / 15%)), transparent 65%);
+}
+#app [data-liquid-glass] > lg-panel,
+#app [data-lighting-art] > :is(.lighting-sky, .lighting-reflection) {
+  transition: transform 280ms cubic-bezier(.2, 1.55, .45, 1);
+}
+#app [data-liquid-glass-kind='action']:active:not(:disabled) > lg-panel,
+#app [data-lighting-art]:active:not(:disabled) > :is(.lighting-sky, .lighting-reflection) {
+  transform: scale(.98, .94);
+  transition: transform 90ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  #app [data-liquid-glass] > lg-panel,
+  #app [data-lighting-art] > :is(.lighting-sky, .lighting-reflection) {
+    transform: none !important;
+    transition: none !important;
+  }
 }

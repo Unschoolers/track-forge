@@ -1,4 +1,5 @@
 import { attachLightingArtwork } from '@/ui/components/lightingToggle'
+import { glassOptics } from '@/ui/menu/glassMaterial'
 
 /** Static artwork is a screen capability, not a per-button allowlist.
  * All standard actions share one policy; content cards and live canvases are
@@ -75,13 +76,10 @@ export function attachMenuGlass(
       panel.setAttribute('aria-hidden', 'true')
       panel.setAttribute('backdrop', config.backdrop)
       panel.setAttribute('radius', surface.matches('.modal-close, .options-release-notes-button') ? 'capsule' : '18')
-      panel.setAttribute('refraction', group ? '14' : '18')
-      panel.setAttribute('bezel', group ? '0.45' : '0.75')
-      panel.setAttribute('curvature', '3')
-      panel.setAttribute('chroma', root.dataset.graphicsQuality === 'high' ? '0.1' : '0')
-      panel.setAttribute('blur', '0')
-      panel.setAttribute('specular', '0.8')
-      panel.setAttribute('specular-width', '1.5')
+      const optics = glassOptics(group ? 'group' : 'action', root.dataset.graphicsQuality === 'high')
+      for (const [name, value] of Object.entries(optics)) {
+        panel.setAttribute(name === 'specularWidth' ? 'specular-width' : name, String(value))
+      }
       surface.dataset.liquidGlass = ''
       surface.dataset.liquidGlassKind = group ? 'group' : 'action'
       panels.set(surface, panel)
