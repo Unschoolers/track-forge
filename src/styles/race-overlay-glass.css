@@ -7,7 +7,6 @@
 	--overlay-highlight: #ffffff24;
 	--overlay-line: #a9bdcc55;
 	--overlay-surface: #101821f5;
-	--overlay-raised: #1a2632;
 	--overlay-accent: #ff925c;
 	background: #05090dd9;
 }
@@ -62,39 +61,10 @@
 	gap: 0.55rem;
 }
 
-.pause-modal .menu-buttons > .button {
-	min-height: 50px;
-	padding-inline: 1rem;
-	border: 1px solid #9caebe32;
-	border-radius: 0.85rem;
-	background:
-		linear-gradient(135deg, #ffffff0b, transparent 60%), var(--overlay-raised);
-	box-shadow: inset 0 1px #ffffff0d;
-	color: #edf2f8;
-	font:
-		700 0.9rem / 1.2 system-ui,
-		sans-serif;
-	letter-spacing: 0.015em;
-	text-align: center;
-	text-transform: none;
-}
+.pause-modal .menu-buttons > .button { min-height: 50px; padding-inline: 1rem; text-align: center; }
 
-.pause-modal .menu-buttons > .button-primary {
-	border-color: #ffc6a2;
-	background: linear-gradient(135deg, #ffb17e, var(--overlay-accent));
-	box-shadow:
-		inset 0 1px #fff8,
-		0 0.3rem 1rem #ff784633;
-	color: #20120d;
-	font-weight: 800;
-}
 
-.pause-modal .menu-buttons > .button-danger {
-	margin-top: 0.25rem;
-	border-color: #a05b6470;
-	background: #321e25;
-	color: #ffc4c5;
-}
+.pause-modal .menu-buttons > .button-danger { margin-top: .25rem; }
 
 /* Results lead with the finish, then keep optional detail and history secondary. */
 .results-modal .modal-card {
@@ -218,42 +188,15 @@
 	background: #0b121ad9;
 }
 
-.results-modal .results-primary-actions .button {
-	min-height: 48px;
-	border-radius: 0.75rem;
-	font:
-		750 0.72rem / 1.15 system-ui,
-		sans-serif;
-	letter-spacing: 0.015em;
-	text-transform: none;
-}
+.results-modal .results-primary-actions .button { min-height: 48px; font-size: .72rem; }
 
-.results-modal .results-primary-actions .button-primary {
-	border-color: #ffc6a2;
-	background: linear-gradient(135deg, #ffb17e, var(--overlay-accent));
-	box-shadow:
-		inset 0 1px #fff8,
-		0 0.25rem 0.8rem #ff78462b;
-	color: #20120d;
-}
 
 .results-modal .results-secondary {
 	gap: clamp(0.35rem, 3vw, 1.2rem);
 }
 
-.results-modal .results-secondary .button {
-	min-height: 44px;
-	border-radius: 0.65rem;
-	font:
-		650 0.74rem / 1.2 system-ui,
-		sans-serif;
-	letter-spacing: 0.01em;
-	text-transform: none;
-}
+.results-modal .results-secondary .button { min-height: 44px; font-size: .74rem; }
 
-.results-modal .results-secondary .button:hover {
-	background: #ffffff0c;
-}
 
 @media (max-width: 420px) {
 	.pause-modal .modal-card,
