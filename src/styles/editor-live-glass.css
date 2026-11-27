@@ -1,0 +1,52 @@
+/* The vendored engine sets backdrop-filter directly on the semantic surface.
+   Its SVG map supplies real edge refraction and specular light; CSS supplies
+   only contrast/tint and native interaction styling. No nested filters. */
+#app .editor-screen [data-editor-glass][data-editor-glass] {
+  background: var(--menu-live-glass-fill);
+  border: 1px solid var(--menu-live-glass-border);
+  box-shadow: 0 3px 12px #0004;
+  color: var(--menu-control-ink);
+  text-shadow: 0 1px 3px #000d;
+  transition-property: background-color, border-color;
+}
+#app .editor-screen [data-editor-glass='group'][data-editor-glass] {
+  background: var(--menu-live-glass-group-fill);
+}
+#app .editor-screen [data-editor-glass='action'][data-editor-glass]:is(.active, .accent, [aria-pressed='true']) {
+  background: var(--menu-live-glass-selection);
+  border-color: #ffd2b680;
+  color: #20130f;
+  text-shadow: none;
+}
+#app .editor-screen [data-editor-glass='action'][data-editor-glass].danger { color: #ffadb3; }
+
+/* Controls inside a refractive group are not separate glass objects. The
+   canvas is visible through the whole group, including unselected choices. */
+#app .editor-screen [data-editor-glass='group'] :is(button, .editor-segmented-button) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  text-shadow: 0 1px 3px #000d;
+  transition-property: background-color, border-color;
+}
+#app .editor-screen [data-editor-glass='group'] :is(button, .editor-segmented-button):is(.active, .accent, [aria-pressed='true']) {
+  background: var(--menu-live-glass-selection);
+  border-color: #ffd2b680;
+  color: #20130f;
+  text-shadow: none;
+}
+#app .editor-screen :is([data-editor-glass], [data-editor-glass='group'] button):hover {
+  filter: none;
+  translate: none;
+}
+#app .editor-screen :is([data-editor-glass='action'], [data-editor-glass='group'] button):active:not(:disabled) {
+  border-color: #ffffff80;
+}
+#app .editor-screen [data-editor-glass='group'] :is(.point-insert, .diagnostic-repair):not(:disabled) {
+  border-color: var(--menu-live-glass-border);
+}
+#app .editor-screen [data-editor-glass='group'] :is(.point-control-title, .crossing-control-title, .point-tension-label, .label, .start-control-help, .diagnostic-message),
+#app .editor-screen [data-editor-glass] .editor-toolbox-summary-copy {
+  color: #f2f6fa;
+}
