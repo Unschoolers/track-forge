@@ -61,7 +61,8 @@ class CachedBitmapTiles<T> implements BakeableBitmapTiles {
   private readonly cache = new Map<string, HTMLCanvasElement>()
 
   constructor(private readonly index: ReadonlyMap<string, readonly T[]>,
-    private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[], tile: GroundTile) => void) {}
+    private readonly paint: (context: CanvasRenderingContext2D, items: readonly T[], tile: GroundTile) => void,
+    private readonly limit = BITMAP_TILE_LIMIT) {}
 
   all(): readonly GroundTile[] {
     return Array.from(this.index.keys(), key => {
@@ -78,7 +79,7 @@ class CachedBitmapTiles<T> implements BakeableBitmapTiles {
     // budget is independent of world size and never grows with track length.
     if (Math.min(view.zoom, view.minimumZoom ?? view.zoom) < 0.18) return []
     const tiles = visibleGroundTiles(bounds, 768).filter(tile => this.index.has(keyFor(tile)))
-    return tiles.length <= BITMAP_TILE_LIMIT ? tiles : []
+    return tiles.length <= this.limit ? tiles : []
   }
 
   image(tile: GroundTile): HTMLCanvasElement {
@@ -91,7 +92,7 @@ class CachedBitmapTiles<T> implements BakeableBitmapTiles {
     }
     const canvas = this.bake(tile, TILE)
     this.cache.set(key, canvas)
-    if (this.cache.size > BITMAP_TILE_LIMIT) {
+    if (this.cache.size > this.limit) {
       const oldest = this.cache.keys().next().value
       if (oldest !== undefined) this.cache.delete(oldest)
     }
@@ -287,11 +288,12 @@ export function splitBankSegment(start: Vector2, end: Vector2): readonly BankSeg
   return Array.from({ length: count }, (_, i) => ({ start: at(i / count), end: at((i + 1) / count) }))
 }
 
-function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false): Map<string, TerrainBitmapItem[]> {
+function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false, part: 'all' | 'water' | 'hill' = 'all'): Map<string, TerrainBitmapItem[]> {
   const surface = geometry.path.terrainSurface
   const items: TerrainBitmapItem[] = []
   for (const contour of surface.contours) {
     if ((contour.kind !== 'water' && contour.kind !== 'hill') || contour.points.length < 3) continue
+    if (part !== 'all' && contour.kind !== part) continue
     for (let i = 0; i < contour.points.length; i++) {
       const a = contour.points[i], b = contour.points[(i + 1) % contour.points.length]
       if (!a || !b) continue
@@ -300,12 +302,12 @@ function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false): Ma
   }
   // Tiling the water components avoids indexing a huge triangulated interior
   // as one primitive. Component holes remain empty, including land islands.
-  for (const component of buildTerrainComponents(surface.contours, 'water')) {
+  for (const component of part === 'hill' ? [] : buildTerrainComponents(surface.contours, 'water')) {
     for (const triangle of tileTerrainComponent(component, TILE)) items.push({ kind: 'water', triangle })
   }
   // Tile the projected component rather than indexing a potentially huge
   // shadow triangle. The same projection and holes as the vector pass remain.
-  if (includeShadows) {
+  if (includeShadows && part !== 'water') {
     for (const component of buildTerrainComponents(surface.contours, 'hill')) {
       const projected = mapTerrainComponent(component, point => projectSunShadow(point, WORLD_ELEVATION.levelHeight))
       for (const triangle of tileTerrainComponent(projected, TILE)) items.push({ kind: 'hill-shadow', triangle })
@@ -313,7 +315,7 @@ function terrainBitmapIndex(geometry: TrackGeometry, includeShadows = false): Ma
   }
   // Reuse the canonical full-detail facets and their directional lighting.
   // Full-detail plateau triangles are small and bounded, unlike overview runs.
-  for (const primitive of buildTerrainPresentation(surface, 'full')) {
+  for (const primitive of part === 'water' ? [] : buildTerrainPresentation(surface, 'full')) {
     if (primitive.kind === 'hill-slope') {
       const level = elevationLevelForHeight(primitive.height)
       for (const facet of primitive.facets) items.push({ kind: 'slope', ...facet, level })
@@ -443,8 +445,27 @@ export function paintTerrainBitmap(context: CanvasRenderingContext2D, items: rea
   }
 }
 
-function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme): BakeableBitmapTiles {
-  return new CachedBitmapTiles(terrainBitmapIndex(geometry, Boolean(theme)), (context, items, tile) => paintTerrainBitmap(context, items, art, tile, theme?.night))
+function terrainTiles(geometry: TrackGeometry, art: EnvironmentBitmapArt, theme?: RacePaintTheme, part: 'all' | 'water' | 'hill' = 'all', limit = BITMAP_TILE_LIMIT): BakeableBitmapTiles {
+  return new CachedBitmapTiles(terrainBitmapIndex(geometry, Boolean(theme), part), (context, items, tile) => paintTerrainBitmap(context, items, art, tile, theme?.night), limit)
+}
+
+// Water does not depend on road grade. Editor road changes only rebuild the
+// road/bridge passes and the hill pass (whose slope does depend on roads).
+export function createEditorWaterBitmapTiles(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, limit: number): BakeableBitmapTiles | undefined {
+  const art = getEnvironmentBitmapArt(environment, night)
+  return art ? terrainTiles(geometry, art, undefined, 'water', limit) : undefined
+}
+
+export function createEditorRoadBitmapLayers(geometry: TrackGeometry, night: boolean, environment: TrackEnvironmentId, shadowMode: TrackShadowMode, hillLimit: number): EnvironmentBitmapLayers | undefined {
+  const art = getEnvironmentBitmapArt(environment, night)
+  if (!art) return undefined
+  const bridge = buildBridgePresentation(geometry, shadowMode)
+  return {
+    road: roadTiles(geometry, art),
+    terrain: terrainTiles(geometry, art, undefined, 'hill', hillLimit),
+    bridgeApproach: bridgeTiles(bridge, geometry, art, environment, night, true),
+    bridgeDeck: bridgeTiles(bridge, geometry, art, environment, night, false),
+  }
 }
 
 export interface EnvironmentBitmapLayers {
