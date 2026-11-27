@@ -47,7 +47,9 @@ describe('race rendering contracts', () => {
     ]
 
     for (const [index, depth] of orderedDepths.slice(1).entries()) {
-      expect(depth).toBeGreaterThan(orderedDepths[index])
+      const previousDepth = orderedDepths[index]
+      if (previousDepth === undefined) throw new Error('Missing preceding render depth')
+      expect(depth).toBeGreaterThan(previousDepth)
     }
     expect(WORLD_RENDER_DEPTH.scenery + 0.01).toBeLessThan(WORLD_RENDER_DEPTH.structureUnderlay)
     expect(WORLD_RENDER_DEPTH.scenery + 0.01).toBeLessThan(WORLD_RENDER_DEPTH.vehicleShadow)
