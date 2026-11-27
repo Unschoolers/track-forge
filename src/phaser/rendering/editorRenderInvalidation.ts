@@ -1,9 +1,9 @@
 import type { ScenerySelection } from '@/domain/track/sceneryTransform'
-import type { TerrainBrushRadius } from '@/domain/config'
+import { ROAD_GEOMETRY, WORLD_ELEVATION, type TerrainBrushRadius } from '@/domain/config'
 import type { EditorTool } from '@/domain/editor/editorGeometry'
 import type { TerrainBrushMode } from '@/domain/editor/terrainBrush'
 import type { TrackEnvironmentId } from '@/domain/track/trackEnvironment'
-import type { RouteKind, Vector2 } from '@/domain/model'
+import type { RouteKind, TerrainMap, Vector2 } from '@/domain/model'
 
 export interface EditorRenderState {
   readonly routeKind: RouteKind
@@ -138,4 +138,52 @@ export function terrainPreviewCompileRequired(
     preview.dirtyCells.length > 0 &&
     preview.revision !== compiledRevision
   )
+}
+
+/** Only road segments within the hill slope blending corridor can change
+ * hill shading. Preserve exact segment coordinates and order for ties in
+ * nearest-road lookup; surface/structure metadata cannot affect this field.
+ * Bounding-box intersection is deliberately conservative. */
+export function hillRoadInfluenceKey(
+  terrain: TerrainMap,
+  path: { readonly points: readonly Vector2[]; readonly closed: boolean },
+): string {
+  const hills = terrain.cells.filter(cell => cell.kind === 'hill')
+  if (!hills.length || !path.points.length) return ''
+  const size = terrain.cellSize
+  const margin = ROAD_GEOMETRY.edgeWidth + WORLD_ELEVATION.cellSize
+  const occupied = new Set(hills.map(cell => `${cell.column}:${cell.row}`))
+  let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
+  for (const cell of hills) {
+    left = Math.min(left, cell.column)
+    right = Math.max(right, cell.column)
+    top = Math.min(top, cell.row)
+    bottom = Math.max(bottom, cell.row)
+  }
+  const keys: string[] = []
+  const count = path.points.length
+  const segments = count === 1 ? 1 : path.closed ? count : count - 1
+  for (let i = 0; i < segments; i++) {
+    const a = path.points[i]
+    const b = path.points[(i + 1) % count]
+    if (!a || !b) continue
+    const minX = Math.max(left, Math.floor((Math.min(a.x, b.x) - margin) / size))
+    const maxX = Math.min(right, Math.floor((Math.max(a.x, b.x) + margin) / size))
+    const minY = Math.max(top, Math.floor((Math.min(a.y, b.y) - margin) / size))
+    const maxY = Math.min(bottom, Math.floor((Math.max(a.y, b.y) + margin) / size))
+    if (minX > maxX || minY > maxY) continue
+    let intersects = false
+    if ((maxX - minX + 1) * (maxY - minY + 1) > hills.length) {
+      intersects = hills.some(cell => cell.column >= minX && cell.column <= maxX &&
+        cell.row >= minY && cell.row <= maxY)
+    } else {
+      for (let y = minY; y <= maxY && !intersects; y++) {
+        for (let x = minX; x <= maxX && !intersects; x++) {
+          intersects = occupied.has(`${x}:${y}`)
+        }
+      }
+    }
+    if (intersects) keys.push(`${a.x},${a.y}:${b.x},${b.y}`)
+  }
+  return keys.join('|')
 }
