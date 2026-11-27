@@ -190,6 +190,9 @@ export class EditorScene extends Phaser.Scene {
       editor: () =>
         this.currentSnapshot?.editor ?? this.controller.snapshot().editor,
       path: () => this.trackGeometry().path,
+      polygonContains: (point, polygon) => Phaser.Geom.Polygon.Contains(
+        new Phaser.Geom.Polygon([...polygon]), point.x, point.y,
+      ),
       worldPoint: (pointer) => {
         const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
         return { x: point.x, y: point.y }
