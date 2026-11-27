@@ -1,7 +1,7 @@
 /** Static artwork is a screen capability, not a per-button allowlist.
  * All standard actions share one policy; content cards and live canvases are
  * deliberately excluded. Choices in settings remain paint-only. */
-const standardActions = 'button:is(.tf-menu-action, .button, .modal-close):not(:where(.track-card *, .cup-track-row *))'
+const standardActions = 'button.tf-menu-action, button.button, button.modal-close'
 const menuSurfaces = [
   { screen: '.home-screen', backdrop: '.home-artwork', groups: '' },
   { screen: '.track-library-modal', backdrop: '.track-library-modal', groups: '.track-library-toolbar' },
@@ -49,7 +49,8 @@ export function attachMenuGlass(
     const visible = (surface: HTMLElement) => !surface.closest('[hidden], details:not([open])')
     const groups = config.groups ? [...screen.querySelectorAll<HTMLElement>(config.groups)].filter(visible) : []
     const actions = [...screen.querySelectorAll<HTMLElement>(actionsSelector)]
-      .filter(action => visible(action) && !groups.some(group => group.contains(action)))
+      .filter(action => visible(action) && !action.closest('.track-card, .cup-track-row') &&
+        !groups.some(group => group.contains(action)))
     const surfaces = new Set([...groups, ...actions])
     for (const [surface, panel] of panels) {
       if (surfaces.has(surface)) continue
@@ -92,7 +93,7 @@ export function attachMenuGlass(
     }).finally(() => { loading = false })
   }
 
-  // Update controls and the release reader are replaced asynchronously. Observe
+  // Updates, release notes and disclosed diagnostics can change in place. Observe
   // only structural/visibility changes involving actual controls, not lens internals.
   const selector = [actionsSelector, config.groups].filter(Boolean).join(', ')
   const containsControl = (node: Node) => node instanceof Element &&
