@@ -1,0 +1,111 @@
+/* Shared menu layout and material. Never apply optical effects to the live canvas. */
+.tf-menu {
+  --tf-ink: #f4f6f8;
+  --tf-muted: #c1cad4;
+  --tf-base: #0c1118;
+  --tf-surface: #202a36;
+  --tf-accent: #ff925c;
+  --tf-gap: clamp(.75rem, 2vw, 1.25rem);
+  --tf-inset: clamp(1rem, 3vw, 3rem);
+  --tf-pill: 999px;
+  --tf-dock-inset: 6px;
+  --tf-dock-radius: 2rem;
+  --tf-motion: 160ms cubic-bezier(.2,.75,.3,1);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: max(var(--tf-inset), env(safe-area-inset-top)) max(var(--tf-inset), env(safe-area-inset-right))
+    max(var(--tf-inset), env(safe-area-inset-bottom)) max(var(--tf-inset), env(safe-area-inset-left));
+  gap: var(--tf-gap);
+  color: var(--tf-ink);
+  background: var(--tf-base);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color-scheme: dark;
+}
+.tf-menu, .tf-menu * { box-sizing: border-box; }
+.tf-menu-media { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.tf-menu-media > img { width: 100%; height: 100%; object-fit: cover; }
+.tf-menu-header, .tf-menu-content, .tf-menu-actions { min-width: 0; }
+.tf-menu-content { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.tf-menu-actions { display: grid; justify-items: center; gap: .65rem; }
+.tf-menu-dock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tf-dock-inset);
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--tf-dock-inset);
+  border: 1px solid #8393a580;
+  border-radius: var(--tf-dock-radius);
+  background: var(--tf-surface);
+  box-shadow: inset 0 1px 1px #ffffff32, inset 0 -1px 1px #0008, 0 8px 28px #0005;
+}
+@supports (backdrop-filter: blur(8px)) {
+  .tf-menu[data-backdrop='static'] .tf-menu-dock {
+    background: linear-gradient(145deg, #e4f2ff26, transparent 48%, #080c1660), #182431d9;
+    backdrop-filter: blur(12px);
+  }
+  .tf-menu[data-backdrop='static'] .tf-menu-dock[data-material='clear'] {
+    background: linear-gradient(145deg, #ecf7ff30, transparent 48%, #070d1960), #152231a6;
+    backdrop-filter: blur(8px);
+  }
+}
+.tf-menu-dock { isolation: isolate; }
+[data-graphics-quality='low'] .tf-menu[data-backdrop] .tf-menu-dock[data-material] {
+  background: #202a36;
+  backdrop-filter: none;
+}
+.tf-menu-action, .tf-menu-choice-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  min-width: 44px;
+  padding: .65rem 1.05rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--tf-dock-radius) - var(--tf-dock-inset));
+  background: transparent;
+  color: var(--tf-ink);
+  font: 650 .9rem/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform var(--tf-motion), background-color var(--tf-motion);
+}
+.tf-menu-action--primary {
+  background: var(--tf-accent);
+  color: #20110a;
+  box-shadow: inset 0 1px 1px #fff7;
+}
+.tf-menu-action:active:not(:disabled), .tf-menu-choice:active .tf-menu-choice-label { transform: scale(.97); }
+.tf-menu-action:disabled, .tf-menu-choice input:disabled + span { opacity: .46; cursor: not-allowed; }
+.tf-menu-action:focus-visible, .tf-menu-choice input:focus-visible + span { outline: 2px solid white; outline-offset: 2px; }
+.tf-menu-choices { margin: 0; padding: 0; min-width: 0; border: 0; }
+.tf-menu-legend { padding: 0 .25rem .4rem; font-size: .85rem; color: var(--tf-muted); }
+.tf-menu-choice-row { display: flex; flex-wrap: wrap; gap: .25rem; }
+.tf-menu-choice { position: relative; flex: 1; min-width: 0; }
+.tf-menu-choice input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.tf-menu-choice-label { min-height: 44px; }
+.tf-menu-choice input:checked + span {
+  background: #e8eff2;
+  color: #141b25;
+  border-color: #fff;
+  box-shadow: 0 2px 8px #0004, inset 0 1px 1px #fff;
+  font-weight: 800;
+}
+@media (hover: hover) {
+  .tf-menu-action--secondary:hover:not(:disabled), .tf-menu-choice input:not(:checked):not(:disabled) + span:hover { background: #ffffff1a; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .tf-menu[data-backdrop] .tf-menu-dock[data-material] { background: #202a36; backdrop-filter: none; border-color: #c1cad4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tf-menu-action, .tf-menu-choice-label { transition: none; }
+  .tf-menu-action:active:not(:disabled), .tf-menu-choice:active .tf-menu-choice-label { transform: none; }
+}
