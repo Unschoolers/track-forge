@@ -200,6 +200,7 @@ export class RaceSession implements RaceSessionPort {
   private previousPresentationTick: RaceState | null = null
   private presentationDiscontinuities = new Set<string>()
   private startsAt: number | undefined
+  private localCountdownCuePending = false
   private nearbyTimingOffset = 0
   private rivalFinishRemaining = 0
   private destroyed = false
@@ -240,6 +241,7 @@ export class RaceSession implements RaceSessionPort {
     this.startsAt = setup.mode === 'nearby' ? startsAt : undefined
     this.nearbyTimingOffset = 0
     const nearby = setup.mode === 'nearby'
+    this.localCountdownCuePending = !nearby
     const boostPractice = setup.mode === 'boost-practice'
     const challenge = setup.mode === 'ghost' ? track.creatorChallenge : undefined
     this.bestGhost = nearby || boostPractice ? null
@@ -274,7 +276,7 @@ export class RaceSession implements RaceSessionPort {
     this.diagnostics = nearby ? null : new RaceDiagnosticsRecording(state)
     this.runId += 1
     this.publish(this.buildSnapshot(track, resolved, state, null))
-    if (!nearby || this.startsAt !== undefined) {
+    if (nearby && this.startsAt !== undefined) {
       this.dependencies.feedback.handle({ type: 'countdown', cue: countdownCue(state.countdown) })
     }
   }
@@ -357,6 +359,7 @@ export class RaceSession implements RaceSessionPort {
     this.recording = null
     this.diagnostics = null
     this.timing = new LapTiming()
+    this.localCountdownCuePending = false
     this.publish(EMPTY_RACE)
   }
 
@@ -421,6 +424,13 @@ export class RaceSession implements RaceSessionPort {
     let countdownChanged = false
     if (state.phase === 'countdown') {
       const previousCue = countdownCue(state.countdown)
+      // Local scenes pass zero time until their first frame has been
+      // submitted. Start audio on the first real countdown advance, not
+      // during the potentially expensive scene initialization.
+      if (this.localCountdownCuePending) {
+        this.localCountdownCuePending = false
+        this.dependencies.feedback.handle({ type: 'countdown', cue: previousCue })
+      }
       const remaining = nearbyElapsed === undefined ? state.countdown - deltaSeconds : -nearbyElapsed
       const countdown = Math.max(0, remaining)
       const cue = countdownCue(countdown)
