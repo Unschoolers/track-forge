@@ -35,7 +35,15 @@ export class SceneryRenderer {
     for (const primitive of plan.primitives) {
       this.graphics.fillStyle(primitive.color, primitive.alpha ?? 1)
       if (primitive.kind === 'ellipse') {
-        this.graphics.fillEllipse(primitive.x, primitive.y, primitive.radiusX * 2, primitive.radiusY * 2)
+        if (primitive.rotation) {
+          this.graphics.save()
+          this.graphics.translateCanvas(primitive.x, primitive.y)
+          this.graphics.rotateCanvas(primitive.rotation)
+          this.graphics.fillEllipse(0, 0, primitive.radiusX * 2, primitive.radiusY * 2)
+          this.graphics.restore()
+        } else {
+          this.graphics.fillEllipse(primitive.x, primitive.y, primitive.radiusX * 2, primitive.radiusY * 2)
+        }
       } else {
         const first = primitive.points[0]
         if (!first) continue
@@ -61,7 +69,7 @@ export class SceneryRenderer {
         sprite = scene.add.image(prop.x, prop.y, texture).setDepth(this.graphics.depth + 0.01)
         this.sprites.push(sprite)
       }
-      sprite.setTexture(texture).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size)
+      sprite.setTexture(texture).setPosition(prop.x, prop.y).setDisplaySize(prop.size, prop.size).setRotation(prop.rotation)
     }
     for (const sprite of this.sprites.splice(plan.sprites.length)) sprite.destroy()
 
