@@ -25,20 +25,26 @@ export function routeRaceFeedback(
         throttle: player.braking ? 0 : input.throttle,
         cornering: Math.min(1, Math.abs(input.steering)),
       })
+      const airborneJump = player.jumpFlight === true && !player.grounded
       feedback.handle({
         type: 'surface',
         surface: player.currentSurface,
-        speedRatio,
+        speedRatio: airborneJump ? 0 : speedRatio,
       })
       feedback.handle({
         type: 'tire-slip',
-        strength: player.slip > 8 ? Math.min(1, player.slip / 80) : 0,
-        speedRatio,
+        strength: !airborneJump && player.slip > 8 ? Math.min(1, player.slip / 80) : 0,
+        speedRatio: airborneJump ? 0 : speedRatio,
         surface: player.currentSurface,
       })
-      if (peakLanding > 0.1) {
-        feedback.handle({ type: 'landing', strength: peakLanding })
+      for (const event of events) {
+        if (event.type === 'vehicle-jumped' && event.vehicleId === player.id) {
+          feedback.handle({ type: 'jump-takeoff', strength: Math.min(1, event.speed / CAR_SPECS[player.car].max) })
+        }
       }
+      const jumpLanding = events.find(event => event.type === 'vehicle-landed' && event.vehicleId === player.id && event.jump)
+      const landing = jumpLanding?.type === 'vehicle-landed' ? Math.max(0.4, peakLanding, jumpLanding.strength) : peakLanding
+      if (landing > 0.1) feedback.handle({ type: 'landing', strength: landing })
       const rival = state.vehicles
         .filter((vehicle) => !vehicle.player && vehicle.finishedAt === null)
         .map((vehicle) => ({ vehicle, distance: Math.hypot(vehicle.x - player.x, vehicle.y - player.y) }))
