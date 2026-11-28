@@ -28,6 +28,14 @@
                 <data android:mimeType="application/vnd.trackforge.track+json" />
             </intent-filter>
 
+            <!-- File managers often identify an unknown extension as binary and
+                 expose an opaque content URI without the original filename. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/octet-stream" />
+            </intent-filter>
+
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
