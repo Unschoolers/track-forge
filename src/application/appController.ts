@@ -593,6 +593,9 @@ export class AppController {
       case 'import-track':
         this.importTrack(command.content)
         break
+      case 'report-track-import-error':
+        this.update({ ...this.state, notice: 'Could not open the track file. Try opening it again from Files.' })
+        break
       case 'select-track-for-edit':
         this.selectTrackForEdit(command.id)
         break

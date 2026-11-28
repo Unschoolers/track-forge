@@ -18,7 +18,7 @@ it('shares a portable track file with the challenge text', async () => {
   expect(await shareTrack(track, 'Beat my time')).toBe(true)
   expect(payload?.text).toBe('Beat my time')
   const file = payload?.files?.[0]
-  expect(file?.name).toMatch(/\.trackforge\.json$/)
+  expect(file?.name).toMatch(/\.trackforge$/)
   const content = await file?.text()
   expect(await parseSharedTrackImport(content ?? '')).toMatchObject({ ok: true, signedSource: content })
 })

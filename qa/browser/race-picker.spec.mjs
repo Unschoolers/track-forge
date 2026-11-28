@@ -275,7 +275,7 @@ test('previews every track and shares a saved track without selecting it', async
   await share.tap()
   await page.locator('[data-action="share-export"]').tap()
   await expect.poll(() => page.evaluate(() => window.sharedTrack)).toMatchObject({
-    file: 'QA-Shared-Circuit.trackforge.json',
+    file: 'QA-Shared-Circuit.trackforge',
     track: OWNED_TRACK_NAME,
   })
   await expect(picker).toBeVisible()

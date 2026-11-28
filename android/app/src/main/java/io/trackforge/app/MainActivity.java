@@ -1,6 +1,7 @@
 package io.trackforge.app;
 
 import android.app.Dialog;
+import android.content.Intent;
 import android.os.Bundle;
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.splashscreen.SplashScreen;
@@ -20,6 +21,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(LanRacePlugin.class);
         registerPlugin(TrackForgeUpdatesPlugin.class);
         registerPlugin(TrackForgeAppPlugin.class);
+        TrackExportPlugin.captureIncomingTrackIntent(getIntent());
         super.onCreate(savedInstanceState);
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -28,6 +30,15 @@ public class MainActivity extends BridgeActivity {
             }
         });
         enterImmersiveMode();
+    }
+
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (TrackExportPlugin.captureIncomingTrackIntent(intent) && getBridge() != null) {
+            getBridge().triggerWindowJSEvent("trackforge:incoming-track");
+        }
     }
 
     @Override
