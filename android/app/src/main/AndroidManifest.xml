@@ -31,13 +31,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="content" android:mimeType="*/*" android:pathPattern=".*\.trackforge" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.trackforge" />
             </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="content" android:mimeType="*/*" android:pathPattern=".*\.trackforge\.json" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.trackforge\\.json" />
             </intent-filter>
 
         </activity>
