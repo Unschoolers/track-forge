@@ -1,5 +1,5 @@
 import type { RandomSource } from '@/domain/race/randomSource'
-import { stepAiVehicle } from '@/domain/race/ai/aiDriver'
+import { stepAiVehicle, type AiDecisionObserver } from '@/domain/race/ai/aiDriver'
 import { getTrafficState } from '@/domain/race/ai/traffic'
 import { manualRecoveryTicksRemaining, type DriverInput, type RaceState, type RaceVehicle } from '@/domain/race/raceState'
 import { gradeForTravel, getVehicleStepContext, type VehicleStepContext } from '@/domain/race/trackContext'
@@ -25,6 +25,7 @@ export function advanceVehicle(
   deltaSeconds: number,
   random: RandomSource,
   catchUp: SpeedAssist | undefined,
+  observeAiDecision?: AiDecisionObserver,
 ): RaceVehicle {
   const previousContext = raceVehicleContext(race, vehicle)
   let moved: RaceVehicle
@@ -78,6 +79,7 @@ export function advanceVehicle(
       race.aiPassingPolicyOverrides?.[vehicle.car],
       race.aiAiTrafficMode,
       previousContext,
+      observeAiDecision,
     )
   }
   const nextContext = raceVehicleContext(race, moved, previousContext)

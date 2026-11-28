@@ -87,6 +87,7 @@ try {
         // stand-ins for a human obstacle. Production AI↔AI traffic remains
         // compact; this legacy mode is confined to these offline studies.
         ...(passingStudy ? { aiAiTrafficMode: 'legacy' } : {}),
+        captureAiDecisions: task.aiDecisionTelemetry === true,
         mode: task.mode, startRatio: scenario.startRatio,
         ...(trialGrid ? { gridPositions: trialGrid } : {}),
         ...(task.mode === 'duel' ? { duelOpponentCar: task.opponentCar,

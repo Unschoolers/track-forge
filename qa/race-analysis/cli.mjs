@@ -7,9 +7,10 @@ function usage() {
     '  npm run qa:race -- track <track.json> [--json]\n' +
     '  npm run qa:race -- stats <race.json> [--full] [--json]\n' +
     '  npm run qa:race -- compare <old-race.json> <new-race.json> [--json]\n' +
+    '  npm run qa:race -- difficulty <scenario> [--car red] [--mode solo|traffic] [--seed 1] [--normal-bonus 0.1] [--normal-reserve 0.2] [--json] [--trace]\n' +
     '  npm run qa:race -- simulate <track.json> [--car red|green|blue|yellow|all]' +
     ' [--mode solo|traffic] [--difficulty hard|normal|easy]' +
-    ' [--seed 1] [--laps 2] [--start 0.5] [--grid 2,1,0,3] [--seconds 110]\n' +
+    ' [--level 1|2|3] [--seed 1] [--laps 2] [--start 0.5] [--grid 2,1,0,3] [--seconds 110]\n' +
     'stats defaults to the player finish time; AI rivals may not finish within the export.')
   process.exitCode = 2
 }
@@ -21,7 +22,34 @@ function flagValue(name) {
   return index < 0 ? undefined : args[index + 1]
 }
 
-if (command === 'simulate') {
+if (command === 'difficulty') {
+  try {
+    const { runDifficultyComparison } = await import('./difficulty-runner.mjs')
+    const result = await runDifficultyComparison(args)
+    if (flags.has('--json')) console.log(JSON.stringify(result, null, 2))
+    else {
+      console.log('DIFFICULTY_COMPARISON ' + JSON.stringify({ ...result, sections: undefined }))
+      console.table(result.sections.slice(0, 12).map(section => ({
+        from: section.pathIndexFrom, to: section.pathIndexTo, delta: section.secondsDelta,
+        normalSpeed: section.normal.meanSpeed, hardSpeed: section.hard.meanSpeed,
+        normalBrake: section.normal.brakingSeconds, hardBrake: section.hard.brakingSeconds,
+        normalOffRoad: section.normal.offRoadSeconds, hardOffRoad: section.hard.offRoadSeconds,
+        normalSteer: section.normal.steeringSaturatedSeconds, hardSteer: section.hard.steeringSaturatedSeconds,
+        normalHeading: section.normal.ai?.meanAbsoluteHeadingErrorDegrees,
+        hardHeading: section.hard.ai?.meanAbsoluteHeadingErrorDegrees,
+        normalDemand: section.normal.ai?.steeringDemandSaturatedSeconds,
+        hardDemand: section.hard.ai?.steeringDemandSaturatedSeconds,
+        normalTarget: section.normal.ai?.meanTargetSpeed,
+        hardTarget: section.hard.ai?.meanTargetSpeed,
+        normalCornerBrake: section.normal.ai?.cornerBrakingSeconds,
+        hardCornerBrake: section.hard.ai?.cornerBrakingSeconds,
+      })))
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  }
+} else if (command === 'simulate') {
   const file = args[0]
   if (!file || file.startsWith('--')) {
     usage()
@@ -49,6 +77,7 @@ if (command === 'simulate') {
     const { fileURLToPath } = await import('node:url')
     const root = fileURLToPath(new URL('../../', import.meta.url))
     const config = {
+      level: Number(flagValue('level') ?? 1),
       cars: flagValue('car'),
       mode: flagValue('mode'),
       difficulty: flagValue('difficulty'),
@@ -76,14 +105,14 @@ if (command === 'simulate') {
     }
   }
 } else {
-  const files = args.filter((value) => !value.startsWith('--'))
+  const files = args.filter((value, index) => !value.startsWith('--') && args[index - 1] !== '--level')
   if (!['track', 'stats', 'compare'].includes(command) ||
       (command === 'compare' ? files.length !== 2 : files.length !== 1)) {
     usage()
   } else {
     try {
       const data = command === 'track' ? summarizeTrack(readJson(files[0])) :
-        command === 'stats' ? summarizeRace(readJson(files[0]), { full: flags.has('--full') }) :
+        command === 'stats' ? summarizeRace(readJson(files[0]), { full: flags.has('--full'), level: Number(flagValue('level') ?? 1) }) :
           compareRaces(readJson(files[0]), readJson(files[1]))
       if (flags.has('--json') || command === 'track') {
         console.log(JSON.stringify(data, null, 2))
@@ -100,6 +129,9 @@ if (command === 'simulate') {
           lap: v.completedLaps,
           finish: v.finishTime === null ? 'not finished in export' : v.finishTime.toFixed(3) + 's',
         })))
+        for (const v of data.vehicles) {
+          console.log('DIAGNOSTICS ' + JSON.stringify({ id: v.id, car: v.car, ...v.diagnostics }))
+        }
         console.table(data.hotspots.slice(0, 12).map((h) => ({
           car: h.car, id: h.id, from: h.pathIndexFrom, to: h.pathIndexTo,
           recoveries: h.counts['vehicle-recovered'] ?? 0,

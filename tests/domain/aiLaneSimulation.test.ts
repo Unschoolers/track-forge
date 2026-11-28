@@ -91,6 +91,33 @@ describe('AI lane simulations', () => {
 		).toHaveLength(4)
 		expect(first.samples.length).toBeLessThan(120 * 4)
 	})
+	it('captures AI intent at the telemetry rate without changing the race', () => {
+		const track = requireFixture(createLaneScenarios()[0])
+		const base = {
+			path: buildRoadPath(track.points, track.terrain),
+			trackName: track.name,
+			seed: 42,
+			difficulty: 'hard' as const,
+			reversed: false,
+			seconds: 2,
+			laps: 3,
+			mode: 'solo' as const,
+			car: 'blue' as const,
+		}
+		const withoutTrace = runLaneCheck(base)
+		const withTrace = runLaneCheck({ ...base, captureAiDecisions: true })
+		expect(withTrace.vehicles).toEqual(withoutTrace.vehicles)
+		expect(withTrace.samples).toEqual(withoutTrace.samples)
+		expect(withTrace.issues).toEqual(withoutTrace.issues)
+		expect(withTrace.steps).toBe(withoutTrace.steps)
+		expect(withTrace.aiDecisions?.length).toBeGreaterThan(0)
+		expect(withTrace.aiDecisions?.[0]?.time).toBe(0)
+		expect(withTrace.aiDecisions?.every((decision) =>
+			Number.isFinite(decision.unclampedSteering) &&
+			Number.isFinite(decision.targetSpeed) &&
+			withTrace.samples.some((sample) => sample.time === decision.time),
+		)).toBe(true)
+	})
 	it('runs one driver without traffic and stops as soon as it finishes', () => {
 		const track = requireFixture(createLaneScenarios()[0])
 		const path = buildRoadPath(track.points, track.terrain)

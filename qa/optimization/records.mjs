@@ -88,20 +88,67 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
       ...passingMetrics(run.samples, vehicle.vehicleId),
     }
   })
-  const events = run.issues.map(issue => ({
-    ...base,
-    vehicle_id: issue.vehicleId, event_time: issue.time, code: issue.code,
-    severity: issue.severity, path_index: issue.pathIndex,
-    section_id: issue.sectionId, detail: issue.detail,
-  }))
-  const samples = telemetry ? run.samples.map(sample => ({
-    ...base, vehicle_id: sample.vehicleId, car_type: sample.car,
-    time: sample.time, path_index: sample.pathIndex,
-    section_id: sample.sectionId, speed: sample.speed,
-    lane: sample.lane, target_lane: sample.targetLane,
-    on_road: sample.onRoad, grounded: sample.grounded,
-    ai_phase: sample.phase,
-  })) : []
+  const events = run.issues.map(issue => {
+    const trace = issue.code === 'recovery'
+      ? run.samples.filter(sample => sample.vehicleId === issue.vehicleId && sample.time < issue.time)
+      : []
+    const before = trace.at(-1)
+    const previous = trace.at(-2)
+    const elapsed = before && previous ? before.time - previous.time : 0
+    const crossedRecovery = before && previous && run.issues.some(other =>
+      other.code === 'recovery' && other.vehicleId === issue.vehicleId &&
+      other.time > previous.time && other.time <= before.time)
+    return {
+      ...base,
+      vehicle_id: issue.vehicleId, event_time: issue.time, code: issue.code,
+      severity: issue.severity, path_index: issue.pathIndex,
+      section_id: issue.sectionId, detail: issue.detail,
+      ...(issue.code === 'recovery' ? {
+        recovery_reason: issue.detail.match(/^Automatic (.+) recovery$/)?.[1] ?? 'unknown',
+        before_time: before?.time ?? null, before_speed: before?.speed ?? null,
+        before_acceleration: elapsed > 0 && !crossedRecovery ? (before.speed - previous.speed) / elapsed : null,
+        before_angle: before?.angle ?? null, before_yaw_rate: before?.yawRate ?? null,
+        before_steering: before?.steering ?? null, before_braking: before?.braking ?? null,
+        before_road_distance: before?.roadDistance ?? null,
+        before_offroad_seconds: before?.offRoadSeconds ?? null,
+      } : {}),
+    }
+  })
+  const decisionKey = (vehicleId, time) => `${vehicleId}\u0000${time}`
+  const aiDecisionBySample = new Map((telemetry ? run.aiDecisions ?? [] : []).map(decision =>
+    [decisionKey(decision.vehicleId, decision.time), decision]))
+  const samples = telemetry ? run.samples.map(sample => {
+    const decision = aiDecisionBySample.get(decisionKey(sample.vehicleId, sample.time))
+    return {
+      ...base, vehicle_id: sample.vehicleId, car_type: sample.car,
+      time: sample.time, path_index: sample.pathIndex,
+      section_id: sample.sectionId, speed: sample.speed,
+      angle: sample.angle ?? null, yaw_rate: sample.yawRate ?? null,
+      steering: sample.steering ?? null, slip: sample.slip ?? null,
+      surface: sample.surface ?? null, lap: sample.lap ?? null,
+      braking: sample.braking ?? null, road_distance: sample.roadDistance ?? null,
+      offroad_seconds: sample.offRoadSeconds ?? null,
+      lane: sample.lane, target_lane: sample.targetLane,
+      on_road: sample.onRoad, grounded: sample.grounded,
+      ai_phase: sample.phase,
+      ...(decision ? { ai_decision: {
+        path_index: decision.pathIndex, target_index: decision.targetIndex,
+        look_ahead_samples: decision.lookAheadSamples,
+        pursuit_samples: decision.pursuitSamples, target_distance: decision.targetDistance,
+        heading_error_radians: decision.headingErrorRadians,
+        unclamped_steering: decision.unclampedSteering,
+        desired_steering: decision.desiredSteering,
+        applied_steering: decision.appliedSteering, pursuit_lane: decision.pursuitLane,
+        bend: decision.bend, corner_bend: decision.cornerBend,
+        corner_phase: decision.cornerPhase, corner_pursuit_scale: decision.cornerPursuitScale,
+        edge_risk: decision.edgeRisk, target_speed: decision.targetSpeed,
+        target_speed_error: decision.targetSpeedError, control_mode: decision.controlMode,
+        throttle: decision.throttle, brake_pressure: decision.brakePressure,
+        braking: decision.braking, ahead_distance: decision.aheadDistance,
+        ahead_ttc: decision.aheadTtc,
+      } } : {}),
+    }
+  }) : []
   return { rows, events, samples }
 }
 

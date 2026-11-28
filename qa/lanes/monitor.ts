@@ -36,9 +36,18 @@ export interface LaneSample extends LaneLocation {
 	readonly car: CarId
 	readonly z: number
 	readonly speed: number
+	readonly angle?: number
+	readonly yawRate?: number
+	readonly slip?: number
+	readonly steering?: number
+	readonly braking?: boolean
+	readonly surface?: string
+	readonly lap?: number
 	readonly lane: number
 	readonly targetLane: number
 	readonly onRoad: boolean
+	readonly roadDistance?: number
+	readonly offRoadSeconds?: number
 	readonly grounded: boolean
 	readonly phase: string
 }
@@ -96,9 +105,18 @@ export function sampleLaneVehicle(
 		pathIndex: vehicle.pathIndex,
 		sectionId: context.nearest.point.sectionId,
 		speed: vehicle.speed,
+		angle: vehicle.angle,
+		yawRate: vehicle.yawRate,
+		slip: vehicle.slip,
+		steering: vehicle.ai?.steer ?? 0,
+		braking: vehicle.braking,
+		surface: vehicle.currentSurface,
+		lap: vehicle.lap,
 		lane,
 		targetLane: vehicle.ai?.targetLane ?? lane,
 		onRoad: context.onRoad,
+		roadDistance: context.nearest.distance,
+		offRoadSeconds: vehicle.aiOffRoadSeconds ?? 0,
 		grounded: vehicle.grounded,
 		phase: vehicle.ai?.phase ?? 'unknown',
 	}
@@ -245,9 +263,18 @@ export class LaneMonitor {
 				car: vehicle.car,
 				z: vehicle.z,
 				speed: vehicle.speed,
+				angle: vehicle.angle,
+				yawRate: vehicle.yawRate,
+				slip: vehicle.slip,
+				steering: vehicle.ai?.steer ?? 0,
+				braking: vehicle.braking,
+				surface: vehicle.currentSurface,
+				lap: vehicle.lap,
 				lane,
 				targetLane,
 				onRoad: context.onRoad,
+				roadDistance: context.nearest.distance,
+				offRoadSeconds: vehicle.aiOffRoadSeconds ?? 0,
 				grounded: vehicle.grounded,
 				phase: vehicle.ai?.phase ?? 'unknown',
 			}
@@ -310,6 +337,8 @@ export class LaneMonitor {
 				const geometry = roadGateGeometry(race.path, gateIndex)
 				this.issues.push({ ...sample, code: 'missed-gate', severity: 'warning', detail: JSON.stringify({
 					gate: missed.gate, gateIndex, crossing, geometry, onRoad: context.onRoad,
+		roadDistance: context.nearest.distance,
+		offRoadSeconds: vehicle.aiOffRoadSeconds ?? 0,
 					before: { x: before.x, y: before.y, z: before.z, pathIndex: before.pathIndex, speed: before.speed },
 					after: { x: vehicle.x, y: vehicle.y, z: vehicle.z, pathIndex: vehicle.pathIndex, speed: vehicle.speed },
 				}) })

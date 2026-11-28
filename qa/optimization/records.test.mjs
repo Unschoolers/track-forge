@@ -34,7 +34,26 @@ test('one row per car with stable comparison dimensions', () => {
   assert.equal(JSON.parse(jsonLines(result.rows)).vehicle_id, 'green-1')
 })
 test('optional telemetry remains separate from summary and events', () => {
-  assert.equal(projectTrial(run, meta, { telemetry: true }).samples[0].speed, 80)
+  const decision = {
+    vehicleId: 'green-1', time: 12, pathIndex: 123, targetIndex: 140,
+    lookAheadSamples: 13, pursuitSamples: 17, targetDistance: 110, headingErrorRadians: 0.3,
+    unclampedSteering: 1.2, desiredSteering: 1, appliedSteering: 0.8,
+    pursuitLane: 4, bend: 0.1, cornerBend: 0.14, cornerPhase: 'turn',
+    cornerPursuitScale: 0.9, edgeRisk: 0.2, targetSpeed: 105,
+    targetSpeedError: 12, controlMode: 'corner-braking', throttle: 0,
+    brakePressure: 0.7, braking: true, aheadDistance: null, aheadTtc: null,
+  }
+  const output = projectTrial({ ...run, aiDecisions: [decision] }, meta, { telemetry: true })
+  assert.equal(output.samples[0].speed, 80)
+  assert.deepEqual(output.samples[0].ai_decision, {
+    path_index: 123, target_index: 140, look_ahead_samples: 13, pursuit_samples: 17,
+    target_distance: 110, heading_error_radians: 0.3,
+    unclamped_steering: 1.2, desired_steering: 1, applied_steering: 0.8,
+    pursuit_lane: 4, bend: 0.1, corner_bend: 0.14, corner_phase: 'turn',
+    corner_pursuit_scale: 0.9, edge_risk: 0.2, target_speed: 105,
+    target_speed_error: 12, control_mode: 'corner-braking', throttle: 0,
+    brake_pressure: 0.7, braking: true, ahead_distance: null, ahead_ttc: null,
+  })
 })
 test('invalid measurements fail loudly', () => {
   assert.throws(() => projectTrial({
@@ -57,4 +76,16 @@ test('passing diagnostics quantify actual two-car activity separately from lap t
   assert.equal(row.duel_opponent_car, 'yellow')
   assert.equal(row.pass_attempts, 2)
   assert.equal(row.passing_seconds, 0.3)
+})
+
+test('recovery events retain their cause and preceding driving context without full telemetry', () => {
+  const sample = { ...run.samples[0], angle: 0.4, yawRate: 0.6, steering: 0.8, roadDistance: 94, offRoadSeconds: 0.4 }
+  const result = projectTrial({ ...run, samples: [sample], issues: [{
+    ...run.issues[0], code: 'recovery', detail: 'Automatic off-road recovery',
+  }] }, meta)
+  assert.equal(result.events[0].recovery_reason, 'off-road')
+  assert.equal(result.events[0].before_speed, 80)
+  assert.equal(result.events[0].before_steering, 0.8)
+  assert.equal(result.events[0].before_road_distance, 94)
+  assert.deepEqual(result.samples, [])
 })
