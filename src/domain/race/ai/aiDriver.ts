@@ -17,13 +17,33 @@ import {
 } from '@/domain/race/trackContext'
 import { stepVehicle, type SpeedAssist } from '@/domain/race/vehiclePhysics'
 import { racingPavementAllowance, sweepingPavementAllowance } from '@/domain/race/ai/cornerSpeed'
-import { planAiSpeed } from '@/domain/race/ai/aiSpeedPlan'
+import { planAiSpeed, type AiSpeedPlanDiagnostics } from '@/domain/race/ai/aiSpeedPlan'
 import { planCornerTactics, technicalCornerScale } from '@/domain/race/ai/cornerTactics'
 import { plannedApexCut } from '@/domain/race/ai/apexCut'
 import { AI_DRIVING_TUNING } from '@/domain/race/ai/aiDrivingTuning'
 import { CAR_DRIVING_PROFILES, type CarDrivingProfile } from '@/domain/race/ai/aiCarDrivingProfiles'
 import { CAR_PASSING_POLICIES, type CarPassingPolicy } from '@/domain/race/ai/aiCarPassingPolicies'
 import type { RoadPath } from '@/domain/track/pathBuilder'
+
+export interface AiDecisionTelemetry extends AiSpeedPlanDiagnostics {
+  readonly pathIndex: number
+  readonly targetIndex: number
+  readonly lookAheadSamples: number
+  readonly pursuitSamples: number
+  readonly targetDistance: number
+  readonly headingErrorRadians: number
+  readonly unclampedSteering: number
+  readonly desiredSteering: number
+  readonly appliedSteering: number
+  readonly pursuitLane: number
+  readonly bend: number
+  readonly cornerBend: number
+  readonly cornerPhase: string
+  readonly cornerPursuitScale: number
+  readonly edgeRisk: number
+}
+
+export type AiDecisionObserver = (vehicleId: string, telemetry: AiDecisionTelemetry) => void
 
 const {
   HARD_LOOKAHEAD_SAMPLES,
@@ -81,6 +101,7 @@ export function stepAiVehicle(
   /** Test-only comparison switch; all production AI rivals use compact clearance. */
   aiAiTrafficMode: 'legacy' | 'compact' = 'compact',
   resolvedContext?: VehicleStepContext,
+  observeDecision?: AiDecisionObserver,
 ): RaceVehicle {
   if (path.points.length === 0) return vehicle
   // Arcade shares steering technique across difficulties. Traffic decisions
@@ -234,24 +255,42 @@ export function stepAiVehicle(
   const sideslip = vehicle.speed > SIDESLIP_MIN_SPEED
     ? slipAngle * corner.sideslipGain
     : 0
-  const desiredSteer = clamp(
-    wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
-      vehicle.yawRate * 0.38,
-    -1,
-    1,
-  )
+  const unclampedSteering = wrapAngleRadians(desiredAngle - vehicle.angle - sideslip) * tuning.steerGain -
+    vehicle.yawRate * 0.38
+  const desiredSteer = clamp(unclampedSteering, -1, 1)
   const steer =
     ai.steer +
     (desiredSteer - ai.steer) *
       clamp(tuning.reaction * deltaSeconds, 0, 1)
   ai = { ...ai, steer }
 
-  const { input, speedAssist } = planAiSpeed({
+  const speedPlan = planAiSpeed({
     vehicle, path, relevantTraffic, difficulty, reversed, direction, tuning,
     hardProfile, ai, context, corner, arcadePavement, bend, sweep, basePace,
     racingPace, slipAngle, roadOffset,
     lateralVelocity, edgeRisk, catchUp,
-  })
+  }, observeDecision !== undefined)
+  const { input, speedAssist } = speedPlan
+  if (observeDecision && speedPlan.diagnostics) {
+    observeDecision(vehicle.id, {
+      pathIndex: context.nearest.index,
+      targetIndex,
+      lookAheadSamples,
+      pursuitSamples,
+      targetDistance: Math.hypot(targetX - vehicle.x, targetY - vehicle.y),
+      headingErrorRadians: wrapAngleRadians(desiredAngle - vehicle.angle),
+      unclampedSteering,
+      desiredSteering: desiredSteer,
+      appliedSteering: steer,
+      pursuitLane,
+      bend,
+      cornerBend: corner.bend,
+      cornerPhase: corner.phase,
+      cornerPursuitScale: corner.pursuitScale,
+      edgeRisk,
+      ...speedPlan.diagnostics,
+    })
+  }
   const stepped = stepVehicle(
     vehicle,
     { steering: steer, ...input },

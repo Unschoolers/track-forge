@@ -45,8 +45,11 @@ branches in production AI. Driver profiles change *decisions*, never tire forces
   reversed direction, start ratio, finish, recoveries and off-road duration.
 - `events.jsonl`: exact-time recovery / path-jump / collision / other issues,
   with the same join keys.
-- `telemetry.jsonl`: optional 10 Hz recorded pose/line samples from simulations.
-  Detailed braking/slip data requires **new instrumentation**; do not infer it.
+- `telemetry.jsonl`: optional 10 Hz pose/line samples and, for difficulty
+  comparisons, the AI's actual decision at each sample: pursuit point and
+  distance, heading error, requested/applied steering, corner phase, planned
+  speed, throttle/brake request and longitudinal control mode. These are
+  observations of the controller, not estimates of intent from car motion.
 - `summary.json`: ranked policies, rejected candidates and comparison matrix.
 
 Parquet is for *offline analysis*, not gameplay. Convert batch results with
@@ -212,6 +215,27 @@ rounding them to these tolerances.
 ## AI speed-planning responsibility
 
 `aiDriver.ts` owns perception, pursuit, passing/mistakes, steering and integration; `aiSpeedPlan.ts` owns longitudinal speed requests (corner target, braking, throttle and catch-up eligibility). Both continue to use the same per-car driving profiles and existing physical tire model. A behavior-preserving extraction must retain deterministic pace, recovery and difficulty outcomes; the optimization lab and lane checker are validation tools, not permission to retune physical handling in a refactoring PR.
+
+## Matched difficulty decision traces
+
+`qa:race difficulty` captures the real controller at 10 Hz while comparing the
+same car, course, grid, seed and route in Normal and Hard. Section summaries
+include heading error, steering demand saturation, desired-to-applied steering
+lag, curve-speed target and time spent in each longitudinal mode and corner
+phase. Use `--trace --json` to include the sample-by-sample values. For example:
+
+```sh
+npm run qa:race -- difficulty desert-reverse --car red \
+  --normal-bonus 0.1 --normal-reserve 0.2 --json
+npm run qa:race -- difficulty desert-reverse --car red \
+  --normal-bonus 0.1 --normal-reserve 0.2 --trace --json
+```
+
+Each decision is aligned to the state sample at the beginning of its 0.1 second
+interval. The trace is opt-in QA data only; it does not alter race state,
+control decisions or saved replay format. Metrics remain sampled estimates: a
+large steering request or target-speed difference identifies where to
+investigate, but does not alone prove which policy term caused the time loss.
 
 ### Low-speed steering response experiment
 

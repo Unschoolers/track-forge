@@ -1,4 +1,5 @@
 import type { RandomSource } from '@/domain/race/randomSource'
+import type { AiDecisionObserver } from '@/domain/race/ai/aiDriver'
 import { rivalCatchUp } from '@/domain/race/ai/catchUp'
 import { lastRoadRecoveryTarget, reachedRecoveryCheckpoint, safeFallbackRecoveryTarget } from '@/domain/race/recoveryCheckpoints'
 import { lastSampleBeforeCheckpoint } from '@/domain/race/progress'
@@ -87,6 +88,7 @@ export type RaceStep = (
   input: DriverInput,
   deltaSeconds: number,
   random: RandomSource,
+  observeAiDecision?: AiDecisionObserver,
 ) => RaceStepResult
 
 function controlsForVehicle(
@@ -96,7 +98,8 @@ function controlsForVehicle(
   return Object.hasOwn(controls, id) ? controls[id] : undefined
 }
 
-export const stepRace: RaceStep = advanceRace
+export const stepRace: RaceStep = (state, input, deltaSeconds, random, observeAiDecision) =>
+  advanceRace(state, input, deltaSeconds, random, undefined, observeAiDecision)
 
 export function isRivalRacing(vehicle: RaceVehicle): boolean {
   return !vehicle.player && vehicle.finishedAt === null
@@ -411,6 +414,7 @@ function advanceRace(
   deltaSeconds: number,
   random: RandomSource,
   controls?: RaceTickInput['controls'],
+  observeAiDecision?: AiDecisionObserver,
 ): RaceStepResult {
   if (state.phase !== 'running' || state.paused || deltaSeconds <= 0) {
     return { state, events: [] }
@@ -424,7 +428,7 @@ function advanceRace(
     const directInput = controls && controlsForVehicle(controls, vehicle.id)
     const input = directInput ?? (vehicle.player ? playerInput : undefined)
     return advanceVehicle(vehicle, state, input, dt, random,
-      input ? undefined : rivalCatchUp(state, vehicle))
+      input ? undefined : rivalCatchUp(state, vehicle), observeAiDecision)
   })
   let playerGateFractions: number[] | undefined
   const tickProgress = advanceRaceTickProgressAndRecovery(

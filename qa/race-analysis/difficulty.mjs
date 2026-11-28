@@ -1,4 +1,5 @@
 const round = n => Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null
+const roundDurations = values => Object.fromEntries(Object.entries(values).map(([key, value]) => [key, round(value)]))
 
 /** Compare time-weighted samples in fixed road-index bins, not clock time. */
 export function compareDifficultyTraces(normal, hard, { binSize = 50, maxSampleGap = 0.5 } = {}) {
@@ -28,7 +29,11 @@ export function compareDifficultyTraces(normal, hard, { binSize = 50, maxSampleG
         continue
       }
       const key = Math.floor(a.path_index / binSize) * binSize
-      const bin = bins.get(key) ?? { seconds: 0, speed: 0, brakingSeconds: 0, brakingCoverage: 0, offRoadSeconds: 0, offRoadCoverage: 0, steeringSaturatedSeconds: 0, steeringCoverage: 0, lane: 0, laneSeconds: 0, slip: 0, slipSeconds: 0, entries: 0 }
+      const bin = bins.get(key) ?? { seconds: 0, speed: 0, brakingSeconds: 0, brakingCoverage: 0, offRoadSeconds: 0, offRoadCoverage: 0, steeringSaturatedSeconds: 0, steeringCoverage: 0, lane: 0, laneSeconds: 0, slip: 0, slipSeconds: 0, entries: 0,
+        ai: { coverage: 0, headingError: 0, headingErrorCoverage: 0, steeringDemandSaturatedSeconds: 0,
+          steeringLagSeconds: 0, targetSpeed: 0, targetSpeedError: 0, speedCoverage: 0,
+          cornerBrakingSeconds: 0, bend: 0, bendCoverage: 0, pursuitSamples: 0,
+          pursuitCoverage: 0, controlModes: {}, cornerPhases: {} } }
       if (key !== priorBin) bin.entries++
       priorBin = key
       bin.seconds += dt
@@ -38,6 +43,35 @@ export function compareDifficultyTraces(normal, hard, { binSize = 50, maxSampleG
       if (Number.isFinite(a.steering)) { bin.steeringCoverage += dt; if (Math.abs(a.steering) >= 0.9) bin.steeringSaturatedSeconds += dt }
       if (Number.isFinite(a.slip)) { bin.slip += Math.abs(a.slip) * dt; bin.slipSeconds += dt }
       if (Number.isFinite(a.lane)) { bin.lane += Math.abs(a.lane) * dt; bin.laneSeconds += dt }
+      const decision = a.ai_decision
+      if (decision) {
+        const ai = bin.ai
+        ai.coverage += dt
+        if (Number.isFinite(decision.heading_error_radians)) {
+          ai.headingError += Math.abs(decision.heading_error_radians) * dt
+          ai.headingErrorCoverage += dt
+        }
+        if (Number.isFinite(decision.unclamped_steering) && Math.abs(decision.unclamped_steering) >= 1)
+          ai.steeringDemandSaturatedSeconds += dt
+        if (Number.isFinite(decision.desired_steering) && Number.isFinite(decision.applied_steering) &&
+            Math.abs(decision.desired_steering - decision.applied_steering) >= 0.2)
+          ai.steeringLagSeconds += dt
+        if (Number.isFinite(decision.target_speed) && Number.isFinite(decision.target_speed_error)) {
+          ai.targetSpeed += decision.target_speed * dt
+          ai.targetSpeedError += decision.target_speed_error * dt
+          ai.speedCoverage += dt
+        }
+        if (Number.isFinite(decision.bend)) { ai.bend += decision.bend * dt; ai.bendCoverage += dt }
+        if (Number.isFinite(decision.pursuit_samples)) {
+          ai.pursuitSamples += decision.pursuit_samples * dt
+          ai.pursuitCoverage += dt
+        }
+        if (decision.control_mode === 'corner-braking') ai.cornerBrakingSeconds += dt
+        if (typeof decision.control_mode === 'string')
+          ai.controlModes[decision.control_mode] = (ai.controlModes[decision.control_mode] ?? 0) + dt
+        if (typeof decision.corner_phase === 'string')
+          ai.cornerPhases[decision.corner_phase] = (ai.cornerPhases[decision.corner_phase] ?? 0) + dt
+      }
       bins.set(key, bin)
     }
     for (const [key, bin] of bins) bins.set(key, {
@@ -47,6 +81,20 @@ export function compareDifficultyTraces(normal, hard, { binSize = 50, maxSampleG
       steeringSaturatedSeconds: bin.steeringCoverage ? round(bin.steeringSaturatedSeconds) : null,
       meanAbsoluteSlip: bin.slipSeconds ? round(bin.slip / bin.slipSeconds) : null, entries: bin.entries,
       meanAbsoluteLane: bin.laneSeconds ? round(bin.lane / bin.laneSeconds) : null,
+      ai: bin.ai.coverage ? {
+        coverageSeconds: round(bin.ai.coverage),
+        meanAbsoluteHeadingErrorDegrees: bin.ai.headingErrorCoverage
+          ? round(bin.ai.headingError / bin.ai.headingErrorCoverage * 180 / Math.PI) : null,
+        steeringDemandSaturatedSeconds: round(bin.ai.steeringDemandSaturatedSeconds),
+        steeringLagSeconds: round(bin.ai.steeringLagSeconds),
+        meanTargetSpeed: bin.ai.speedCoverage ? round(bin.ai.targetSpeed / bin.ai.speedCoverage) : null,
+        meanTargetSpeedError: bin.ai.speedCoverage ? round(bin.ai.targetSpeedError / bin.ai.speedCoverage) : null,
+        cornerBrakingSeconds: round(bin.ai.cornerBrakingSeconds),
+        meanBend: bin.ai.bendCoverage ? round(bin.ai.bend / bin.ai.bendCoverage) : null,
+        meanPursuitSamples: bin.ai.pursuitCoverage ? round(bin.ai.pursuitSamples / bin.ai.pursuitCoverage) : null,
+        controlModeSeconds: roundDurations(bin.ai.controlModes),
+        cornerPhaseSeconds: roundDurations(bin.ai.cornerPhases),
+      } : null,
     })
     excluded.seconds = round(excluded.seconds)
     return { row, bins, excluded }

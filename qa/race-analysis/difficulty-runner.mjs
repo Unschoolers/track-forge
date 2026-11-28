@@ -12,7 +12,7 @@ export async function runDifficultyComparison(args) {
   }
   const optionsWithValues = new Set(['--car', '--mode', '--seed', '--bin-size', '--normal-bonus', '--normal-reserve'])
   for (let i = 1; i < args.length; i++) {
-    if (args[i] === '--json') continue
+    if (args[i] === '--json' || args[i] === '--trace') continue
     if (!optionsWithValues.has(args[i])) throw new Error(`Unknown option ${args[i]}`)
     if (!args[i + 1] || args[i + 1].startsWith('--')) throw new Error(`Missing ${args[i]} value`)
     i++
@@ -39,18 +39,29 @@ export async function runDifficultyComparison(args) {
   await pool.start()
   try {
     const task = difficulty => ({ candidateId: difficulty, car, playerCar: car, focusRole: 'player',
-      scenarioId: scenario.id, seed, mode, difficulty, changes: difficulty === 'normal' ? overrides : {}, telemetry: true })
+      scenarioId: scenario.id, seed, mode, difficulty, changes: difficulty === 'normal' ? overrides : {},
+      telemetry: true, aiDecisionTelemetry: true })
     const [normal, hard] = await Promise.all(['normal', 'hard'].map(difficulty => pool.submit(task(difficulty))))
     const find = run => run.rows.find(row => row.vehicle_id === run.focusVehicleId)
     const recoveryEvents = run => run.events.filter(event => event.vehicle_id === run.focusVehicleId && event.code === 'recovery').map(event => ({
       time: event.event_time, reason: event.recovery_reason, pathIndex: event.path_index,
       speed: event.before_speed, steering: event.before_steering, roadDistance: event.before_road_distance,
     }))
-    return { scenario: scenario.id, trackFingerprint: find(normal).track_fingerprint,
+    const comparison = { scenario: scenario.id, trackFingerprint: find(normal).track_fingerprint,
       car, mode, seed, laps: scenario.laps, startRatio: scenario.startRatio, reversed: scenario.reverse,
       gridPositions: scenario.gridPositions ?? [0, 1, 2, 3], normalOverrides: overrides,
       normal: { seconds: find(normal).finished_seconds, recoveries: find(normal).recoveries, recoveryEvents: recoveryEvents(normal) },
       hard: { seconds: find(hard).finished_seconds, recoveries: find(hard).recoveries, recoveryEvents: recoveryEvents(hard) },
       ...compareDifficultyTraces(normal, hard, { binSize }) }
+    if (!args.includes('--trace')) return comparison
+    const decisionTrace = run => run.samples
+      .filter(sample => sample.vehicle_id === run.focusVehicleId && sample.ai_decision)
+      .map(sample => ({
+        time: sample.time, pathIndex: sample.path_index, lap: sample.lap,
+        speed: sample.speed, lane: sample.lane, roadDistance: sample.road_distance,
+        onRoad: sample.on_road, steering: sample.steering, braking: sample.braking,
+        ai: sample.ai_decision,
+      }))
+    return { ...comparison, decisionTrace: { normal: decisionTrace(normal), hard: decisionTrace(hard) } }
   } finally { await pool.close() }
 }

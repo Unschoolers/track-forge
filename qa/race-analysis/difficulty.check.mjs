@@ -2,7 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { compareDifficultyTraces } from './difficulty.mjs'
 
-const sample = (time, path_index, speed, braking = false) => ({ vehicle_id: 'player', time, path_index, speed, braking, steering: 0.5, lane: 0, on_road: true })
+const sample = (time, path_index, speed, braking = false, ai_decision = undefined) => ({
+  vehicle_id: 'player', time, path_index, speed, braking, steering: 0.5,
+  lane: 0, on_road: true, ...(ai_decision ? { ai_decision } : {}),
+})
 const run = (samples, events = []) => ({ rows: [{ vehicle_id: 'player', finished_seconds: samples.at(-1).time, recoveries: events.length }], focusVehicleId: 'player', samples, events })
 test('compares time, pace and braking over matched road sections', () => {
   const normal = run([sample(0, 0, 100), sample(1, 0, 100), sample(2, 50, 100), sample(3, 50, 100)])
@@ -25,9 +28,46 @@ test('excludes recovery discontinuities and flags missing coverage', () => {
   assert.throws(() => compareDifficultyTraces(normal, hard, { binSize: 0 }), /binSize/)
 })
 
+test('compares AI steering demand, speed target and corner braking by road section', () => {
+  const decision = (overrides = {}) => ({
+    heading_error_radians: 0.1, unclamped_steering: 0.5,
+    desired_steering: 0.5, applied_steering: 0.45,
+    target_speed: 100, target_speed_error: 0, bend: 0.12, pursuit_samples: 10,
+    control_mode: 'curve-control', corner_phase: 'turn',
+    ...overrides,
+  })
+  const normal = run([
+    sample(0, 0, 100, false, decision()),
+    sample(1, 0, 100, false, decision()),
+    sample(2, 50, 100),
+  ])
+  const hard = run([
+    sample(0, 0, 100, false, decision({
+      heading_error_radians: 0.4, unclamped_steering: 1.2,
+      desired_steering: 1, applied_steering: 0.7,
+      target_speed: 90, target_speed_error: 10,
+      control_mode: 'corner-braking',
+    })),
+    sample(1, 0, 100, false, decision({
+      heading_error_radians: 0.4, unclamped_steering: 1.2,
+      desired_steering: 1, applied_steering: 0.7,
+      target_speed: 90, target_speed_error: 10,
+      control_mode: 'corner-braking',
+    })),
+    sample(2, 50, 100),
+  ])
+  const section = compareDifficultyTraces(normal, hard, { maxSampleGap: 2 }).sections.find(value => value.pathIndexFrom === 0)
+  assert.equal(section.hard.ai.steeringDemandSaturatedSeconds, 2)
+  assert.equal(section.hard.ai.steeringLagSeconds, 2)
+  assert.equal(section.hard.ai.cornerBrakingSeconds, 2)
+  assert.equal(section.hard.ai.meanTargetSpeed, 90)
+  assert.equal(section.hard.ai.meanAbsoluteHeadingErrorDegrees, 22.918)
+  assert.equal(section.normal.ai.steeringDemandSaturatedSeconds, 0)
+})
+
 test('runs the matched Desert Reverse study with explicit experimental Normal settings', { timeout: 30000 }, async () => {
   const { runDifficultyComparison } = await import('./difficulty-runner.mjs')
-  const result = await runDifficultyComparison(['desert-reverse', '--car', 'red', '--normal-bonus', '0.1', '--normal-reserve', '0.2'])
+  const result = await runDifficultyComparison(['desert-reverse', '--car', 'red', '--normal-bonus', '0.1', '--normal-reserve', '0.2', '--trace'])
   assert.equal(result.car, 'red')
   assert.equal(result.normalOverrides.normalCornerTargetBonus, 0.1)
   assert.ok(Number.isFinite(result.finishDelta))
@@ -37,4 +77,8 @@ test('runs the matched Desert Reverse study with explicit experimental Normal se
   assert.ok(section)
   assert.equal(typeof section.comparableEntries, 'boolean')
   assert.ok(Number.isFinite(section.hard.meanSpeed))
+  assert.ok(Number.isFinite(section.hard.ai.meanTargetSpeed))
+  assert.ok(Number.isFinite(section.hard.ai.steeringDemandSaturatedSeconds))
+  assert.ok(result.decisionTrace.normal.length > 0)
+  assert.ok(Number.isFinite(result.decisionTrace.hard[0].ai.unclamped_steering))
 })

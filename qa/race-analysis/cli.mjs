@@ -7,7 +7,7 @@ function usage() {
     '  npm run qa:race -- track <track.json> [--json]\n' +
     '  npm run qa:race -- stats <race.json> [--full] [--json]\n' +
     '  npm run qa:race -- compare <old-race.json> <new-race.json> [--json]\n' +
-    '  npm run qa:race -- difficulty <scenario> [--car red] [--mode solo|traffic] [--seed 1] [--normal-bonus 0.1] [--normal-reserve 0.2] [--json]\n' +
+    '  npm run qa:race -- difficulty <scenario> [--car red] [--mode solo|traffic] [--seed 1] [--normal-bonus 0.1] [--normal-reserve 0.2] [--json] [--trace]\n' +
     '  npm run qa:race -- simulate <track.json> [--car red|green|blue|yellow|all]' +
     ' [--mode solo|traffic] [--difficulty hard|normal|easy]' +
     ' [--level 1|2|3] [--seed 1] [--laps 2] [--start 0.5] [--grid 2,1,0,3] [--seconds 110]\n' +
@@ -35,6 +35,14 @@ if (command === 'difficulty') {
         normalBrake: section.normal.brakingSeconds, hardBrake: section.hard.brakingSeconds,
         normalOffRoad: section.normal.offRoadSeconds, hardOffRoad: section.hard.offRoadSeconds,
         normalSteer: section.normal.steeringSaturatedSeconds, hardSteer: section.hard.steeringSaturatedSeconds,
+        normalHeading: section.normal.ai?.meanAbsoluteHeadingErrorDegrees,
+        hardHeading: section.hard.ai?.meanAbsoluteHeadingErrorDegrees,
+        normalDemand: section.normal.ai?.steeringDemandSaturatedSeconds,
+        hardDemand: section.hard.ai?.steeringDemandSaturatedSeconds,
+        normalTarget: section.normal.ai?.meanTargetSpeed,
+        hardTarget: section.hard.ai?.meanTargetSpeed,
+        normalCornerBrake: section.normal.ai?.cornerBrakingSeconds,
+        hardCornerBrake: section.hard.ai?.cornerBrakingSeconds,
       })))
     }
   } catch (error) {

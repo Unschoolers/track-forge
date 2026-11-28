@@ -114,19 +114,41 @@ export function projectTrial(run, meta, { telemetry = false } = {}) {
       } : {}),
     }
   })
-  const samples = telemetry ? run.samples.map(sample => ({
-    ...base, vehicle_id: sample.vehicleId, car_type: sample.car,
-    time: sample.time, path_index: sample.pathIndex,
-    section_id: sample.sectionId, speed: sample.speed,
-    angle: sample.angle ?? null, yaw_rate: sample.yawRate ?? null,
-    steering: sample.steering ?? null, slip: sample.slip ?? null,
-    surface: sample.surface ?? null, lap: sample.lap ?? null,
-    braking: sample.braking ?? null, road_distance: sample.roadDistance ?? null,
-    offroad_seconds: sample.offRoadSeconds ?? null,
-    lane: sample.lane, target_lane: sample.targetLane,
-    on_road: sample.onRoad, grounded: sample.grounded,
-    ai_phase: sample.phase,
-  })) : []
+  const decisionKey = (vehicleId, time) => `${vehicleId}\u0000${time}`
+  const aiDecisionBySample = new Map((telemetry ? run.aiDecisions ?? [] : []).map(decision =>
+    [decisionKey(decision.vehicleId, decision.time), decision]))
+  const samples = telemetry ? run.samples.map(sample => {
+    const decision = aiDecisionBySample.get(decisionKey(sample.vehicleId, sample.time))
+    return {
+      ...base, vehicle_id: sample.vehicleId, car_type: sample.car,
+      time: sample.time, path_index: sample.pathIndex,
+      section_id: sample.sectionId, speed: sample.speed,
+      angle: sample.angle ?? null, yaw_rate: sample.yawRate ?? null,
+      steering: sample.steering ?? null, slip: sample.slip ?? null,
+      surface: sample.surface ?? null, lap: sample.lap ?? null,
+      braking: sample.braking ?? null, road_distance: sample.roadDistance ?? null,
+      offroad_seconds: sample.offRoadSeconds ?? null,
+      lane: sample.lane, target_lane: sample.targetLane,
+      on_road: sample.onRoad, grounded: sample.grounded,
+      ai_phase: sample.phase,
+      ...(decision ? { ai_decision: {
+        path_index: decision.pathIndex, target_index: decision.targetIndex,
+        look_ahead_samples: decision.lookAheadSamples,
+        pursuit_samples: decision.pursuitSamples, target_distance: decision.targetDistance,
+        heading_error_radians: decision.headingErrorRadians,
+        unclamped_steering: decision.unclampedSteering,
+        desired_steering: decision.desiredSteering,
+        applied_steering: decision.appliedSteering, pursuit_lane: decision.pursuitLane,
+        bend: decision.bend, corner_bend: decision.cornerBend,
+        corner_phase: decision.cornerPhase, corner_pursuit_scale: decision.cornerPursuitScale,
+        edge_risk: decision.edgeRisk, target_speed: decision.targetSpeed,
+        target_speed_error: decision.targetSpeedError, control_mode: decision.controlMode,
+        throttle: decision.throttle, brake_pressure: decision.brakePressure,
+        braking: decision.braking, ahead_distance: decision.aheadDistance,
+        ahead_ttc: decision.aheadTtc,
+      } } : {}),
+    }
+  }) : []
   return { rows, events, samples }
 }
 

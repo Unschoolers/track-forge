@@ -6,6 +6,7 @@ import {
 	type DifficultyId,
 } from '@/domain/model'
 import { createAiDriverState } from '@/domain/race/ai/aiState'
+import type { AiDecisionTelemetry } from '@/domain/race/ai/aiDriver'
 import { createRace } from '@/domain/race/raceFactory'
 import { validNearbyGridPositions } from '@/domain/race/startGrid'
 import { stepRace, type RaceStepResult } from '@/domain/race/raceEngine'
@@ -25,6 +26,8 @@ import {
 export interface LaneRunOptions {
 	/** Optional offline observer of authoritative 60 Hz ticks; never modifies race state. */
 	readonly observeStep?: (previous: RaceState, result: RaceStepResult) => void
+	/** Optional 10 Hz trace of decisions made by the real AI controller. */
+	readonly captureAiDecisions?: boolean
 	readonly path: RoadPath
 	readonly trackName: string
 	readonly seed: number
@@ -69,6 +72,7 @@ export interface LaneRun {
 	}[]
 	readonly vehicles: readonly VehicleMetrics[]
 	readonly samples: readonly LaneSample[]
+	readonly aiDecisions?: readonly (AiDecisionTelemetry & { readonly vehicleId: string; readonly time: number })[]
 	readonly issues: readonly LaneIssue[]
 }
 
@@ -173,15 +177,24 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 	const samples: LaneSample[] = race.vehicles.map((v) =>
 		sampleLaneVehicle(race, v),
 	)
+	const aiDecisions: (AiDecisionTelemetry & { vehicleId: string; time: number })[] = []
 	const maxSteps = Math.ceil(options.seconds * 60)
 	let steps = 0
 	let invalid = false
+	const observeAiDecision = options.captureAiDecisions
+		? (vehicleId: string, decision: AiDecisionTelemetry) => {
+			if (steps % 6 === 0) {
+				aiDecisions.push({ vehicleId, time: race.elapsed, ...decision })
+			}
+		}
+		: undefined
 	while (steps < maxSteps && race.vehicles.some((v) => v.finishedAt === null)) {
 		const result = stepRace(
 			race,
 			{ steering: 0, throttle: 0, braking: false },
 			1 / 60,
 			random,
+			observeAiDecision,
 		)
 		options.observeStep?.(race, result)
 		monitor.observe(race, result, 1 / 60)
@@ -225,6 +238,7 @@ export function runLaneCheck(options: LaneRunOptions): LaneRun {
 		})),
 		vehicles: monitor.metrics(),
 		samples,
+		...(options.captureAiDecisions ? { aiDecisions } : {}),
 		issues: monitor.issues,
 	}
 }

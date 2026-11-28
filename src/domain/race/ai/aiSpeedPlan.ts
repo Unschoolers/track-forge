@@ -47,12 +47,27 @@ interface SpeedPlanContext {
   readonly catchUp: SpeedAssist | undefined
 }
 
+export interface AiSpeedPlanDiagnostics {
+  readonly targetSpeed: number
+  readonly targetSpeedError: number
+  readonly controlMode: 'traffic-emergency' | 'corner-braking' | 'off-road-recovery' | 'traffic-following' | 'curve-control'
+  readonly throttle: number
+  readonly brakePressure: number
+  readonly braking: boolean
+  readonly aheadDistance: number | null
+  readonly aheadTtc: number | null
+}
+
 /** Longitudinal control requests only. Tire forces remain in vehiclePhysics. */
 export function planAiSpeed({
   vehicle, path, relevantTraffic, difficulty, reversed, direction, tuning,
   hardProfile, ai, context, corner, arcadePavement, bend, sweep, basePace,
   racingPace, slipAngle, roadOffset, lateralVelocity, edgeRisk, catchUp,
-}: SpeedPlanContext): { input: Pick<DriverInput, 'throttle' | 'braking' | 'brakePressure'>; speedAssist: SpeedAssist | undefined } {
+}: SpeedPlanContext, captureDiagnostics = false): {
+  input: Pick<DriverInput, 'throttle' | 'braking' | 'brakePressure'>
+  speedAssist: SpeedAssist | undefined
+  diagnostics?: AiSpeedPlanDiagnostics
+} {
   const car = CAR_SPECS[vehicle.car]
   const ahead = relevantTraffic.ahead
   const emergency =
@@ -195,28 +210,38 @@ export function planAiSpeed({
     vehicle.grounded && Math.abs(context.grade) < 0.025 && bend < 0.015
       ? catchUp
       : undefined
+  const offRoadBrake = recovering && context.nearest.distance > 72 && vehicle.speed > 90
+  const input = {
+    throttle:
+      emergency || curveBraking
+        ? 0
+        : recovering
+          // Coasting preserves lateral tire force; braking while turning
+          // would starve steering through the friction circle.
+          ? vehicle.speed > 90 ? 0 : tuning.pace * 0.45
+        : following
+          ? tuning.pace * 0.72
+          : plannedThrottle,
+    braking: emergency || curveBraking || offRoadBrake,
+    brakePressure: emergency || offRoadBrake ? 1 : plannedBrakePressure,
+  }
+  if (!captureDiagnostics) return { input, speedAssist }
+  const controlMode = emergency ? 'traffic-emergency'
+    : curveBraking ? 'corner-braking'
+      : recovering ? 'off-road-recovery'
+        : following ? 'traffic-following' : 'curve-control'
   return {
-    input: {
-      throttle:
-        emergency || curveBraking
-          ? 0
-          : recovering
-            // Coasting preserves lateral tire force; braking while turning
-            // would starve steering through the friction circle.
-            ? vehicle.speed > 90 ? 0 : tuning.pace * 0.45
-          : following
-            ? tuning.pace * 0.72
-            : plannedThrottle,
-      braking:
-        emergency ||
-        curveBraking ||
-        (recovering &&
-          context.nearest.distance > 72 &&
-          vehicle.speed > 90),
-      brakePressure: emergency || (recovering &&
-        context.nearest.distance > 72 && vehicle.speed > 90)
-        ? 1 : plannedBrakePressure,
-    },
+    input,
     speedAssist,
+    diagnostics: {
+      targetSpeed: curveSpeed,
+      targetSpeedError: vehicle.speed - curveSpeed,
+      controlMode,
+      throttle: input.throttle,
+      brakePressure: input.brakePressure,
+      braking: input.braking,
+      aheadDistance: ahead?.distance ?? null,
+      aheadTtc: ahead?.timeToCollision ?? null,
+    },
   }
 }
