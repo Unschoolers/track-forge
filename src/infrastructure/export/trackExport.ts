@@ -10,13 +10,21 @@ import {
 } from '@/application/library/trackSignature'
 import { getTrackSigningKeys } from '@/infrastructure/storage/trackSigningKeyStore'
 
+export const TRACK_FILE_MIME_TYPE = 'application/vnd.trackforge.track+json'
+
+export type IncomingTrackFile =
+  | { readonly pending: false }
+  | { readonly pending: true; readonly content: string }
+  | { readonly pending: true; readonly error: string }
+
 const nativeExporter = registerPlugin<{
   save(options: { filename: string; content: string }): Promise<{ saved: boolean }>
   share(options: { filename: string; content: string; text?: string }): Promise<{ shared: boolean }>
+  consumeIncomingTrack(): Promise<IncomingTrackFile>
 }>('TrackExport')
 function trackFilename(track: Track): string {
   const name = track.name.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'track'
-  return `${name}.trackforge.json`
+  return `${name}.trackforge`
 }
 
 export function serializeTrack(track: Track): { filename: string; content: string } {
@@ -70,9 +78,14 @@ export async function exportTrack(track: Track, creatorChallenge?: CreatorGhostC
   return saveJsonFile({ filename: trackFilename(track), content: await serializeSharedTrack(track, creatorChallenge) })
 }
 
+export async function consumeIncomingTrack(): Promise<IncomingTrackFile> {
+  if (!Capacitor.isNativePlatform()) return { pending: false }
+  return nativeExporter.consumeIncomingTrack()
+}
+
 export async function saveJsonFile(file: { filename: string; content: string }): Promise<boolean> {
   if (Capacitor.isNativePlatform()) return (await nativeExporter.save(file)).saved
-  const url = URL.createObjectURL(new Blob([file.content], { type: 'application/json' }))
+  const url = URL.createObjectURL(new Blob([file.content], { type: TRACK_FILE_MIME_TYPE }))
   const link = document.createElement('a')
   link.href = url
   link.download = file.filename
@@ -88,7 +101,7 @@ export async function shareTrack(track: Track, text?: string, creatorChallenge?:
   if (isSeededTrack(track)) throw new Error('Built-in tracks cannot be shared.')
   const file = { filename: trackFilename(track), content: await serializeSharedTrack(track, creatorChallenge) }
   if (Capacitor.isNativePlatform()) return (await nativeExporter.share({ ...file, ...(text === undefined ? {} : { text }) })).shared
-  const attachment = new File([file.content], file.filename, { type: 'application/json' })
+  const attachment = new File([file.content], file.filename, { type: TRACK_FILE_MIME_TYPE })
   try {
     if (!navigator.share || !navigator.canShare?.({ files: [attachment] })) return false
     await navigator.share({ title: 'Track Forge challenge', ...(text === undefined ? {} : { text }), files: [attachment] })

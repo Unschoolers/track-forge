@@ -255,7 +255,7 @@ export function createTrackLibraryModal(
 
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
-  fileInput.accept = '.json,.trackforge.json,application/json'
+  fileInput.accept = '.trackforge,.trackforge.json,.json,application/json,application/vnd.trackforge.track+json'
   fileInput.hidden = true
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.item(0)

@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import androidx.activity.result.ActivityResult;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
@@ -20,9 +21,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,12 +37,32 @@ public class TrackExportPlugin extends Plugin {
     private static final String EXPORT_DIRECTORY = "trackforge-exports";
     private static final String SHARE_DIRECTORY = "trackforge-shares";
     private static final long STALE_AFTER_MS = 24L * 60 * 60 * 1000;
+    public static final String TRACK_MIME_TYPE = "application/vnd.trackforge.track+json";
+    private static final int MAX_TRACK_IMPORT_CHARS = 2_000_000;
+    private static final int MAX_PENDING_TRACK_IMPORTS = 8;
+    private static final Object PENDING_TRACK_IMPORT_LOCK = new Object();
+    private static final ArrayDeque<Uri> PENDING_TRACK_IMPORTS = new ArrayDeque<>();
+    private static boolean pendingTrackImportOverflow;
     private static final ExecutorService IO = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "trackforge-export-io");
         thread.setDaemon(true);
         return thread;
     });
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    static boolean captureIncomingTrackIntent(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) return false;
+        Uri uri = intent.getData();
+        if (uri == null) return false;
+        synchronized (PENDING_TRACK_IMPORT_LOCK) {
+            if (PENDING_TRACK_IMPORTS.size() >= MAX_PENDING_TRACK_IMPORTS) {
+                pendingTrackImportOverflow = true;
+            } else {
+                PENDING_TRACK_IMPORTS.addLast(uri);
+            }
+        }
+        return true;
+    }
 
     @PluginMethod
     public void save(PluginCall call) {
@@ -71,7 +96,7 @@ public class TrackExportPlugin extends Plugin {
                 call.getData().put("exportId", id);
                 Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("application/json");
+                intent.setType(TRACK_MIME_TYPE);
                 intent.putExtra(Intent.EXTRA_TITLE, filename);
                 mainHandler.post(() -> {
                     try {
@@ -134,9 +159,62 @@ public class TrackExportPlugin extends Plugin {
         });
     }
 
+    @PluginMethod
+    public void consumeIncomingTrack(PluginCall call) {
+        final Uri uri;
+        final boolean overflow;
+        synchronized (PENDING_TRACK_IMPORT_LOCK) {
+            uri = PENDING_TRACK_IMPORTS.pollFirst();
+            overflow = uri == null && pendingTrackImportOverflow;
+            if (overflow) pendingTrackImportOverflow = false;
+        }
+        if (uri == null) {
+            JSObject response = new JSObject();
+            response.put("pending", overflow);
+            if (overflow) response.put("error", "too_many_files");
+            call.resolve(response);
+            return;
+        }
+
+        IO.execute(() -> {
+            try {
+                String content = readTrackImport(getContext(), uri);
+                JSObject response = new JSObject();
+                response.put("pending", true);
+                response.put("content", content);
+                call.resolve(response);
+            } catch (Exception error) {
+                Log.e("TrackExport", "Could not read the opened track file.", error);
+                JSObject response = new JSObject();
+                response.put("pending", true);
+                response.put("error", "read_failed");
+                call.resolve(response);
+            }
+        });
+    }
+
+    private static String readTrackImport(Context context, Uri uri) throws IOException {
+        InputStream input = context.getContentResolver().openInputStream(uri);
+        if (input == null) throw new IOException("No readable content for the selected track file.");
+        try (InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT))) {
+            StringBuilder content = new StringBuilder();
+            char[] buffer = new char[8192];
+            int length;
+            while ((length = reader.read(buffer)) != -1) {
+                if (content.length() > MAX_TRACK_IMPORT_CHARS - length) {
+                    throw new IOException("Track file exceeds the import size limit.");
+                }
+                content.append(buffer, 0, length);
+            }
+            return content.toString();
+        }
+    }
+
     static Intent shareIntent(Uri uri, String text) {
         Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("application/json");
+        intent.setType(TRACK_MIME_TYPE);
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         if (text != null && !text.isEmpty()) intent.putExtra(Intent.EXTRA_TEXT, text);
         intent.setClipData(ClipData.newRawUri("Track Forge track", uri));
@@ -148,8 +226,8 @@ public class TrackExportPlugin extends Plugin {
         if (!validId(id)) throw new IllegalArgumentException("Invalid share identifier.");
         String name = filename.replace('\\', '/');
         name = name.substring(name.lastIndexOf('/') + 1).replaceAll("[^\\p{L}\\p{N}_.-]", "-");
-        if (name.isEmpty() || name.equals(".") || name.equals("..")) name = "track.trackforge.json";
-        if (name.length() > 50) name = name.substring(0, 50) + ".trackforge.json";
+        if (name.isEmpty() || name.equals(".") || name.equals("..")) name = "track.trackforge";
+        if (name.length() > 50) name = name.substring(0, 50) + ".trackforge";
         return new File(new File(new File(context.getCacheDir(), SHARE_DIRECTORY), id), name);
     }
 

@@ -5,7 +5,7 @@ import { asTrackId } from '@/domain/model'
 it('exports all authored track data in a portable versioned JSON file', () => {
  const track=createStarterTrack(asTrackId('export'),1)
  const result=serializeTrack({...track,name:'Ramp / debug'})
- expect(result.filename).toBe('Ramp-debug.trackforge.json')
+ expect(result.filename).toBe('Ramp-debug.trackforge')
  const parsed=JSON.parse(result.content)
  expect(parsed.format).toBe('trackforge-track')
  expect(parsed.formatVersion).toBe(1)

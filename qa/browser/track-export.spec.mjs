@@ -16,7 +16,7 @@ test('downloads the shared track when file sharing is unavailable', async ({ pag
   await page.getByRole('button', { name: `Share ${OWNED_TRACK_NAME}`, exact: true }).click()
   await page.getByRole('button', { name: 'EXPORT', exact: true }).click()
   const download = await downloadPromise
-  expect(download.suggestedFilename()).toMatch(/\.trackforge\.json$/)
+  expect(download.suggestedFilename()).toMatch(/\.trackforge$/)
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'))
   expect(exported.format).toBe('trackforge-track')
   expect(exported.formatVersion).toBe(2)

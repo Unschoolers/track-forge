@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 import { GitHubUpdateProvider } from '@/application/updates/updateProvider'
 import { isPortableWindows } from '@/infrastructure/updates/windowsPortableUpdate'
 import { NearbyRace } from '@/application/multiplayer/nearbyRace'
-import { serializeSharedTrack } from '@/infrastructure/export/trackExport'
+import { consumeIncomingTrack, serializeSharedTrack } from '@/infrastructure/export/trackExport'
 import { createAndroidNearby } from '@/infrastructure/multiplayer/androidNearby'
 import { createLanNearby } from '@/infrastructure/multiplayer/lanNearby'
 import { selectNearbyConnection } from '@/infrastructure/multiplayer/selectNearbyConnection'
@@ -211,6 +211,49 @@ if (Capacitor.isNativePlatform()) {
 if (!controller.snapshot().preferences.displayName) {
   controller.dispatch({ type: 'open-player-name' })
 }
+
+if (Capacitor.getPlatform() === 'android') {
+  let incomingTrackImports: Promise<void> = Promise.resolve()
+  let waitingForPlayerName = false
+  let unsubscribePlayerName: (() => void) | undefined
+
+  const processIncomingTrack = async (): Promise<void> => {
+    if (!controller.snapshot().preferences.displayName) {
+      if (!waitingForPlayerName) {
+        waitingForPlayerName = true
+        unsubscribePlayerName = controller.subscribe(snapshot => {
+          if (!snapshot.preferences.displayName) return
+          unsubscribePlayerName?.()
+          unsubscribePlayerName = undefined
+          waitingForPlayerName = false
+          enqueueIncomingTrackImport()
+        })
+      }
+      return
+    }
+
+    try {
+      const incoming = await consumeIncomingTrack()
+      if (!incoming.pending) return
+      if ('content' in incoming) {
+        controller.dispatch({ type: 'import-track', content: incoming.content })
+      } else {
+        controller.dispatch({ type: 'report-track-import-error' })
+      }
+    } catch (error) {
+      console.error('Could not read the opened Track Forge file.', error)
+      controller.dispatch({ type: 'report-track-import-error' })
+    }
+  }
+
+  function enqueueIncomingTrackImport(): void {
+    incomingTrackImports = incomingTrackImports.then(processIncomingTrack, processIncomingTrack)
+  }
+
+  window.addEventListener('trackforge:incoming-track', enqueueIncomingTrackImport)
+  enqueueIncomingTrackImport()
+}
+
 export const gameReady = sceneHost.whenReady()
 
 /** Warm the most likely next circuit, not an unbounded library of atlases. */

@@ -46,7 +46,7 @@ public class TrackExportPluginTest {
     @Test public void largeTrackDoesNotEnterActivitySavedState() throws Exception {
         String content = "{\"track\":\"" + "é漢".repeat(600_000) + "\"}";
         JSObject data = new JSObject();
-        data.put("filename", "large.trackforge.json");
+        data.put("filename", "large.trackforge");
         data.put("content", content);
         PluginCall call = new PluginCall(null, "TrackExport", "1", "save", data);
         Exporter plugin = new Exporter();
@@ -85,10 +85,10 @@ public class TrackExportPluginTest {
         }
     }
     @Test public void shareIntentCarriesReadableContentUriAndOptionalText() {
-        android.net.Uri uri = android.net.Uri.parse("content://io.trackforge.app.fileprovider/shares/id/track.trackforge.json");
+        android.net.Uri uri = android.net.Uri.parse("content://io.trackforge.app.fileprovider/shares/id/track.trackforge");
         Intent intent = TrackExportPlugin.shareIntent(uri, "Beat my time!");
         assertEquals(Intent.ACTION_SEND, intent.getAction());
-        assertEquals("application/json", intent.getType());
+        assertEquals(TrackExportPlugin.TRACK_MIME_TYPE, intent.getType());
         assertEquals(uri, intent.getParcelableExtra(Intent.EXTRA_STREAM));
         assertEquals("Beat my time!", intent.getStringExtra(Intent.EXTRA_TEXT));
         assertTrue((intent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0);
@@ -98,8 +98,8 @@ public class TrackExportPluginTest {
     @Test public void sharedFileNameCannotEscapeItsUniqueDirectory() {
         Context context = RuntimeEnvironment.getApplication();
         String id = java.util.UUID.randomUUID().toString();
-        File file = TrackExportPlugin.shareFile(context, id, "../../unsafe.trackforge.json");
-        assertEquals("unsafe.trackforge.json", file.getName());
+        File file = TrackExportPlugin.shareFile(context, id, "../../unsafe.trackforge");
+        assertEquals("unsafe.trackforge", file.getName());
         assertEquals(id, file.getParentFile().getName());
     }
 
